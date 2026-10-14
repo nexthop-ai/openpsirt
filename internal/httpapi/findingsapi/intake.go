@@ -241,9 +241,16 @@ func registerIntake(api huma.API, in core.Deps) {
 			"attachment download whatever it is.\n\n" +
 			"Refused when the file is larger than this deployment accepts, when it has no " +
 			"room left, or when it would take you past your own share of the store; all " +
-			"three limits are settings.",
-		Tags:        []string{"Findings"},
-		Middlewares: huma.Middlewares{core.BoundedForm(api, maxAttachmentRequest)},
+			"three limits are settings. Answers 503 with `Retry-After` when the deployment " +
+			"is already reading as many uploads as it takes at once.",
+		Tags: []string{"Findings"},
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
+			Admit: func(hc huma.Context) error {
+				_, _, err := reportAttaching(hc.Context(), in, hc.Param("product"), hc.Param("reference"))
+				return err
+			},
+			Limit: attachmentRequest(in),
+		})},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
@@ -252,25 +259,17 @@ func registerIntake(api huma.API, in core.Deps) {
 		Status int
 		Body   AttachmentBody
 	}, error) {
-		subject, product, err := productForReports(ctx, in, input.Product)
+		subject, at, err := reportAttaching(ctx, in, input.Product, input.Reference)
 		if err != nil {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil || !files.Configured() {
-			return nil, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
-		}
-		row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "that report could not be read")
-		}
 		maxSize, quota, share, err := attachmentLimits(ctx, in)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "cannot tell what this deployment accepts", err)
 		}
 		part := input.RawBody.Data().File
-		stored, err := files.Upload(ctx, subject,
-			attach.Against{ProductID: product.ID, FlawReportID: row.ID},
+		stored, err := files.Upload(ctx, subject, at,
 			part.Filename, part, part.Size, maxSize, quota, share,
 			// Held the moment it arrives, never waiting. A report carries no
 			// text a reference could be written into, so the only thing that
@@ -363,6 +362,31 @@ func productForReports(ctx context.Context, in core.Deps, name string) (
 		return access.Subject{}, nil, err
 	}
 	return subject, product, nil
+}
+
+// reportAttaching is the person attaching and the report a file would hang
+// off, where they may attach to it, and the refusal otherwise. Asked before
+// the form is read as well as by the handler, as issueAttaching is.
+func reportAttaching(ctx context.Context, in core.Deps, product, reference string) (
+	access.Subject, attach.Against, error) {
+
+	subject, named, err := productForReports(ctx, in, product)
+	if err != nil {
+		return access.Subject{}, attach.Against{}, err
+	}
+	files := in.Attachments()
+	if files == nil || !files.Configured() {
+		return access.Subject{}, attach.Against{}, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
+	}
+	row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, named.ID, reference)
+	if err != nil {
+		return access.Subject{}, attach.Against{}, refusedReport(in, err, "that report could not be read")
+	}
+	at := attach.Against{ProductID: named.ID, FlawReportID: row.ID}
+	if err := files.MayAttach(ctx, subject, at); err != nil {
+		return access.Subject{}, attach.Against{}, core.Refused(in.Logger, err, "cannot store that file")
+	}
+	return subject, at, nil
 }
 
 // refusedReport turns what the store answers into what the caller sees.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -27,15 +28,6 @@ import (
 // back in. It is not a session: the authorization happened before the redirect
 // was issued.
 const signedFor = 5 * time.Minute
-
-// maxAttachmentRequest is the largest upload request this will read at all.
-//
-// Not the limit an operator sets — that is a setting, read per request, and it
-// refuses inside this one. This is the ceiling on what is worth spooling to
-// disk before anything can look at it, and it is deliberately far above any
-// sensible setting so that raising the setting does not also mean changing
-// code.
-const maxAttachmentRequest = 512 << 20
 
 // AttachmentBody is one file hanging off an issue.
 type AttachmentBody struct {
@@ -108,21 +100,26 @@ func registerAttachments(api huma.API, in core.Deps) {
 			"Refused when the file is larger than this deployment accepts, when it has no " +
 			"room left, or when it would take you past your own share of the store; all " +
 			"three limits are settings. A deployment that has configured no store " +
-			"holds no attachments and says so.\n\n" +
+			"holds no attachments and says so. Answers 503 with `Retry-After` when the " +
+			"deployment is already reading as many uploads as it takes at once.\n\n" +
 			"An upload nothing refers to is removed after a day, so a file attached and then " +
 			"abandoned does not accumulate. Send `evidence=true` where the file hangs off the " +
 			"issue itself — a test case that proves the flaw — rather than off text you are " +
 			"about to write: it is then listed at once and never swept, because the issue is " +
 			"what points at it.",
 		Tags: []string{"Findings"},
-		// The request itself is capped before the form is read. A part larger
-		// than the limit is otherwise spooled to the temporary directory in
-		// full before anything looks at its size, which is a disk somebody
-		// fills from outside. The ceiling here is the largest a deployment
-		// could accept rather than what it does accept: the setting is read
-		// per request and this is fixed when the route is built, so the
-		// setting refuses inside it and this refuses the absurd.
-		Middlewares: huma.Middlewares{core.BoundedForm(api, maxAttachmentRequest)},
+		// The caller is authorized for the issue and the request capped at
+		// the size this deployment accepts before the form is read. A part
+		// is otherwise spooled to the temporary directory in full before
+		// anything looks at its size, which is a disk somebody fills from
+		// outside.
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
+			Admit: func(hc huma.Context) error {
+				_, _, err := issueAttaching(hc.Context(), in, hc.Param("product"), hc.Param("vulnerability"))
+				return err
+			},
+			Limit: attachmentRequest(in),
+		})},
 	}, core.PerProduct, "A collaborator brought onto this issue may attach to it too.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -132,19 +129,11 @@ func registerAttachments(api huma.API, in core.Deps) {
 		Status int
 		Body   AttachmentBody
 	}, error) {
-		subject, err := core.Reading(ctx)
+		subject, at, err := issueAttaching(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil || !files.Configured() {
-			return nil, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
-		}
-		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that issue could not be looked up",
-				func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
-		}
 
 		maxSize, quota, share, err := attachmentLimits(ctx, in)
 		if err != nil {
@@ -156,8 +145,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		// waiting for the text that will refer to it, and is swept if that
 		// text never arrives.
 		evidence := input.RawBody.Data().Evidence
-		stored, err := files.Upload(ctx, subject,
-			attach.Against{ProductID: productID, VulnerabilityID: vulnerabilityID},
+		stored, err := files.Upload(ctx, subject, at,
 			part.Filename, part, part.Size, maxSize, quota, share, evidence)
 		switch {
 		case errors.Is(err, attach.ErrTooLarge):
@@ -326,4 +314,45 @@ func attachmentLimits(ctx context.Context, in core.Deps) (maxSize, quota, share 
 		return 0, 0, 0, err
 	}
 	return int64(size), int64(held), int64(each), nil
+}
+
+// issueAttaching is the person attaching and the issue a file would hang off,
+// where they may attach to it, and the refusal otherwise.
+//
+// Asked before the form is read as well as by the handler, in the words the
+// handler answers in, so somebody who may not attach spools nothing and
+// learns nothing from which of the two refused.
+func issueAttaching(ctx context.Context, in core.Deps, product, vulnerability string) (
+	access.Subject, attach.Against, error) {
+
+	subject, err := core.Reading(ctx)
+	if err != nil {
+		return access.Subject{}, attach.Against{}, err
+	}
+	files := in.Attachments()
+	if files == nil || !files.Configured() {
+		return access.Subject{}, attach.Against{}, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
+	}
+	productID, vulnerabilityID, err := files.Issue(ctx, subject, product, vulnerability)
+	if err != nil {
+		return access.Subject{}, attach.Against{}, core.Absent(in.Logger, err, "that issue could not be looked up",
+			func() error { return huma.Error404NotFound(attach.ErrNoSuchIssue.Error()) })
+	}
+	at := attach.Against{ProductID: productID, VulnerabilityID: vulnerabilityID}
+	if err := files.MayAttach(ctx, subject, at); err != nil {
+		return access.Subject{}, attach.Against{}, core.Refused(in.Logger, err, "cannot store that file")
+	}
+	return subject, at, nil
+}
+
+// attachmentRequest is the largest attachment upload read at all: one file of
+// the size this deployment accepts, and the form around it.
+func attachmentRequest(in core.Deps) func(context.Context) (int64, error) {
+	return func(ctx context.Context) (int64, error) {
+		maxSize, _, _, err := attachmentLimits(ctx, in)
+		if err != nil {
+			return 0, err
+		}
+		return maxSize + core.Envelope, nil
+	}
 }

@@ -2939,7 +2939,7 @@ export interface paths {
          *
          *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
          *
-         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings. A deployment that has configured no store holds no attachments and says so.
+         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings. A deployment that has configured no store holds no attachments and says so. Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once.
          *
          *     An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
          *
@@ -3657,7 +3657,7 @@ export interface paths {
          *
          *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
          *
-         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings.
+         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings. Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once.
          *
          *     Requires: private-triage on the product
          */
@@ -4660,6 +4660,8 @@ export interface paths {
          *     The product, branch and variant must already exist; an upload naming something undeclared is rejected and the error says which part is missing.
          *
          *     Returns 202 before the documents are parsed. A success here means they were accepted for processing, not that they were valid. Poll `GET .../scans` to find out whether they parsed and what the scan found.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
          *
          *     Requires: public-triage or private-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
          */

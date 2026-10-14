@@ -92,12 +92,20 @@ func registerScans(api huma.API, in core.Deps) {
 			"undeclared is rejected and the error says which part is missing.\n\n" +
 			"Returns 202 before the documents are parsed. A success here means they were " +
 			"accepted for processing, not that they were valid. Poll `GET .../scans` to find out " +
-			"whether they parsed and what the scan found.",
+			"whether they parsed and what the scan found.\n\n" +
+			"Answers 503 with `Retry-After` when the deployment is already reading as many " +
+			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"},
 		// A scan file is somebody else's output arriving over a link we do not
 		// control, and this is the first place it can be stopped.
-		MaxBodyBytes:  core.MaxUpload(in.Limits),
-		Middlewares:   huma.Middlewares{core.BoundedForm(api, core.MaxUpload(in.Limits))},
+		MaxBodyBytes: core.MaxUpload(in.Limits),
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
+			Admit: func(hc huma.Context) error {
+				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
+				return err
+			},
+			Limit: core.Fixed(core.MaxUpload(in.Limits)),
+		})},
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without any "+
 		"of these, and is how a build sends.", core.TriageRights()...), func(ctx context.Context, input *UploadInput) (*UploadOutput, error) {
@@ -128,49 +136,11 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 			sent, limits.MaxDocuments))
 	}
 
-	// The sender, before anything is read or written.
-	subject, err := core.Requester(ctx)
+	// Asked again, though the form was only read once it was asked: what a
+	// handler refuses is the second statement of what admission refused.
+	subject, named, err := admitted(ctx, in, input.Product, input.Stream, input.Variant)
 	if err != nil {
 		return nil, err
-	}
-
-	// The names are resolved to things before the pair is recorded, so that
-	// whether this sender may file against them is decided first. Recording
-	// and then refusing would leave a row created by a request that failed.
-	catalog := catalog.NewStore(in.DB.DB)
-	named, err := catalog.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
-	if err != nil {
-		// The message names which part is missing, which is what whoever sees
-		// the failed upload needs in order to declare it — and a target this
-		// sender may not file against is reported as not declared, so that a
-		// stolen key cannot be used to read the shipping catalog one guess at
-		// a time.
-		return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-	}
-
-	// A key authorizes an upload; it does not describe one. Every
-	// constraint it carries must match what this upload says it is for,
-	// and a mismatch is refused rather than redirected — a key covering
-	// one release must never quietly accept a scan of another.
-	//
-	// Refused here rather than answered as not-declared, deliberately.
-	// Told apart, the two let a key learn which releases and variants
-	// exist inside the product it already sends to, which is a bounded
-	// thing to give somebody holding a working credential for that product
-	// — and the alternative costs a pipeline the message that says what
-	// actually went wrong. Another product stays invisible to it either
-	// way.
-	//
-	// A person may send too, where they hold triage on the product:
-	// somebody re-uploading a build by hand is doing triage work, not
-	// administration.
-	switch {
-	case subject.Kind == access.Pipeline:
-		if !subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
-			return nil, huma.Error403Forbidden("not authorized")
-		}
-	case !subject.TriagesIn(named.ProductID):
-		return nil, huma.Error403Forbidden("not authorized")
 	}
 
 	// A retired product, release or variant takes no scan. It is the other
@@ -222,7 +192,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 			fmt.Sprintf("%d scans are already waiting to be read; try again shortly", depth))
 	}
 
-	target, err := catalog.TargetFor(ctx, named.StreamID, named.VariantID)
+	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
 	if err != nil {
 		return nil, core.WentWrong(in.Logger, "the target could not be recorded", err)
 	}
@@ -465,4 +435,59 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 	}
 	_, err := documents.Write(ctx, scanID, kind, ordinal, file)
 	return err
+}
+
+// admitted is the sender and the build an upload names, where the sender may
+// file against it, and the refusal otherwise.
+//
+// Asked before the form is read as well as by the handler, so a sender with no
+// right to the build spools nothing.
+func admitted(ctx context.Context, in core.Deps, product, stream, variant string) (
+	access.Subject, *catalog.Named, error) {
+
+	// The sender, before anything is read or written.
+	subject, err := core.Requester(ctx)
+	if err != nil {
+		return access.Subject{}, nil, err
+	}
+
+	// The names are resolved to things before the pair is recorded, so that
+	// whether this sender may file against them is decided first. Recording
+	// and then refusing would leave a row created by a request that failed.
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	if err != nil {
+		// The message names which part is missing, which is what whoever sees
+		// the failed upload needs in order to declare it — and a target this
+		// sender may not file against is reported as not declared, so that a
+		// stolen key cannot be used to read the shipping catalog one guess at
+		// a time.
+		return access.Subject{}, nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
+	}
+
+	// A key authorizes an upload; it does not describe one. Every
+	// constraint it carries must match what this upload says it is for,
+	// and a mismatch is refused rather than redirected — a key covering
+	// one release must never quietly accept a scan of another.
+	//
+	// Refused here rather than answered as not-declared, deliberately.
+	// Told apart, the two let a key learn which releases and variants
+	// exist inside the product it already sends to, which is a bounded
+	// thing to give somebody holding a working credential for that product
+	// — and the alternative costs a pipeline the message that says what
+	// actually went wrong. Another product stays invisible to it either
+	// way.
+	//
+	// A person may send too, where they hold triage on the product:
+	// somebody re-uploading a build by hand is doing triage work, not
+	// administration.
+	switch {
+	case subject.Kind == access.Pipeline:
+		if !subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
+			return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
+		}
+	case !subject.TriagesIn(named.ProductID):
+		return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
+	}
+
+	return subject, named, nil
 }

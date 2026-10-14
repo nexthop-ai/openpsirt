@@ -65,7 +65,8 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		// it is not consulted for multipart at all — so the whole body is
 		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: core.MaxUpload(in.Limits),
-		Middlewares:  huma.Middlewares{core.BoundedForm(api, core.MaxUpload(in.Limits))},
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in,
+			core.Admission{Limit: core.Fixed(core.MaxUpload(in.Limits))})},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		RawBody huma.MultipartFormFiles[advisoryParts]

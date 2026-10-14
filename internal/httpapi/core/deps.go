@@ -93,6 +93,9 @@ type Deps struct {
 	// none, which is ordinary: attachments are off and everything else
 	// works.
 	Files attach.Storage
+	// Uploads counts the forms this server is reading at once, across every
+	// upload route. One per server, made where the routes are.
+	Uploads *Uploads
 }
 
 // Attachments returns a store over the files this deployment holds, or nothing

@@ -182,6 +182,16 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 	return nil
 }
 
+// MayAttach refuses what Upload refuses about who is asking: a deployment that
+// configured no store, and a subject who may not attach to what the file would
+// hang off. Asked by a route before anything is carried.
+func (s *Store) MayAttach(ctx context.Context, subject access.Subject, at Against) error {
+	if !s.Configured() {
+		return ErrNotConfigured
+	}
+	return mayAttachTo(ctx, s.db, subject, at)
+}
+
 // mayAttachTo is mayAttach asked of whichever of the two a file hangs off.
 func mayAttachTo(ctx context.Context, db bun.IDB, subject access.Subject,
 	at Against) error {
@@ -271,10 +281,7 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	at Against, filename string, body io.Reader, size int64,
 	maxSize, quota, share int64, held bool) (*Attachment, error) {
 
-	if !s.Configured() {
-		return nil, ErrNotConfigured
-	}
-	if err := mayAttachTo(ctx, s.db, subject, at); err != nil {
+	if err := s.MayAttach(ctx, subject, at); err != nil {
 		return nil, err
 	}
 	if size <= 0 {

@@ -112,6 +112,7 @@ refuse it.
 
 | Order | Step | Placement reason |
 |---|---|---|
+| 0 | Admission, before the form is read | The form streams to a temporary file as it is read, so the sender is authorized for the target, a declared length past the request bound is refused, and a place is held among the uploads this server reads at once, all before the first byte of it. Step 1 is asked again by the handler, which is the second statement of the rule rather than the only one |
 | 1 | Is the target declared, and may this sender file against it? | One query, naming which of product, stream or variant is missing. First, because how far behind the deployment is is not something an unauthorized sender may measure |
 | 2 | Is the backlog too deep? | The cheapest refusal once the sender is known. Deciding afterwards means storing tens of megabytes and discarding them, on a deployment already behind |
 | 3 | What does the inventory say about itself, and what does the submission hash to? | One pass over the inventory answers what it says about itself and hashes it; the claim documents are hashed beside it. Every hash covers the bytes that arrived, not a value the sender supplied |
@@ -124,7 +125,8 @@ refuse it.
 | Bad request | The build time is ahead of this deployment's clock |
 | Conflict | Something newer, or something with the same build time, is already held |
 | Unprocessable | The inventory could not be read at all |
-| Service unavailable | Too much is already waiting to be read |
+| Payload too large | The request is larger than twice the document bound, refused unread where it declares its length |
+| Service unavailable | Too much is already waiting to be read, or this server is already reading as many uploads as `upload.max-concurrent` allows. The second carries a time to retry after |
 
 Already held is a success, because the ordinary case is a retry after a timeout
 that had in fact succeeded.
@@ -133,6 +135,8 @@ that had in fact succeeded.
 |---|---|
 | The label on a part is not trusted | What a part is gets decided by reading it. A build pushing a file with an ordinary command-line client labels it as opaque bytes |
 | A large part is not held in memory | Parts above a few kilobytes are spilled to a temporary file for the length of the request. The deployment therefore needs a writable temporary path despite a read-only root filesystem, which the packaging provides |
+| The temporary path holds at most `upload.max-concurrent` of the largest requests | The setting bounds how many uploads one server reads at once, across the scan, attachment and import routes, and a place is held until the request is answered, because the spilled files are removed only then. Four at the shipped values, each up to 512 MiB for a scan |
+| An upload a sender may not make spills nothing | A pipeline key for one product, or a person holding no role on it, is refused before the form is read, in the words the handler refuses in. A product the sender may not see answers as one nobody declared |
 
 ## The arrival decision
 

@@ -152,6 +152,7 @@ func changesSomething(method string) bool {
 // without starting a server.
 func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API) {
 	in.Logger = logger
+	in.Uploads = &core.Uploads{}
 	router := chi.NewMux()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)

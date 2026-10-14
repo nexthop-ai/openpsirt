@@ -27,8 +27,14 @@ strategy:
 
 # Scratch space for the process, since the root filesystem is read-only. An
 # emptyDir without a limit is node disk that a stray file can fill.
+#
+# An upload is written here as it arrives. It has to hold the setting
+# upload.max-concurrent times the largest request a route takes, which is
+# twice ingest.max_bytes for a scan, or attachment.max-size for an attachment:
+# four times 512 MiB at the shipped values. Past the limit the kubelet evicts
+# the pod, so raise this with either setting.
 tmp:
-  sizeLimit: 1Gi
+  sizeLimit: 3Gi
 
 image:
   # Published by the release workflow, one image per tag. While the repository
