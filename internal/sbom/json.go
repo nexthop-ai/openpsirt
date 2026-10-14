@@ -24,8 +24,19 @@ type capped struct {
 	left int64
 }
 
+// Read stops at the cap. A reader with nothing left still asks the source
+// for one byte, so a document of exactly the cap ends at its end of file
+// rather than at the refusal meant for one larger.
 func (c *capped) Read(p []byte) (int, error) {
 	if c.left <= 0 {
+		var probe [1]byte
+		n, err := io.ReadFull(c.r, probe[:])
+		if n == 0 && (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)) {
+			return 0, io.EOF
+		}
+		if n == 0 && err != nil {
+			return 0, err
+		}
 		return 0, errTooLarge
 	}
 	if int64(len(p)) > c.left {
@@ -71,6 +82,26 @@ func (b *bounded) token() (json.Token, error) {
 		return nil, refusal.New("the document ends partway through a value")
 	}
 	return tok, err
+}
+
+// end refuses a document that continues after its top-level value.
+//
+// Whitespace may follow it and nothing else may. Two documents written one
+// after the other are read as the first otherwise, and an inventory missing
+// everything the second held reads as a product that shrank.
+func (b *bounded) end() error {
+	tok, err := b.dec.Token()
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		return refusal.New("the document continues after its top-level value")
+	}
+	if err != nil {
+		return err
+	}
+	return refusal.Errorf("the document continues after its top-level value with %v", tok)
 }
 
 func (b *bounded) enter() error {

@@ -102,6 +102,9 @@ func (c *reader) read() error {
 		}
 		return c.b.skip()
 	})
+	if err == nil {
+		err = c.b.end()
+	}
 	if err != nil {
 		return refusal.Errorf("reading scan file: %w", err)
 	}
