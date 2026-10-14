@@ -19,6 +19,9 @@ func mappers(err error) map[string]error {
 		"oneVersion": oneVersion(err, func(err error) error {
 			return core.RefusedFinding(in, err)
 		}),
+		"recipient": recipient(err, func(err error) error {
+			return core.RefusedFinding(in, err)
+		}),
 	}
 }
 

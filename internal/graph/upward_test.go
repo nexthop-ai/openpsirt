@@ -69,7 +69,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 				t.Fatal(err)
 			}
 			if _, _, err := findings.Assign(t.Context(), boss, f.targetID,
-				issue, component, &to); err != nil {
+				issue, component, &to, nil); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -165,7 +165,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		}
 		to := int64(party)
 		if _, _, err := findings.Assign(t.Context(), boss, f.targetID,
-			issue, component, &to); err != nil {
+			issue, component, &to, nil); err != nil {
 			t.Fatal(err)
 		}
 		// Withheld after the fact, which is what a role being revoked looks

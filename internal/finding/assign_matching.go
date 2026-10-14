@@ -81,10 +81,10 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 				"decide who deals with findings in product %d", productID))
 		}
 		dispatches := subject.Holds(access.Assigner, productID)
-		if !dispatches && to != nil && *to != subject.Party() {
-			return access.Denied(fmt.Sprintf(
-				"give work to somebody else in product %d — you may take what nobody owns, "+
-					"and hand back your own", productID))
+		// Refused before anything is read, by the rule moveWhere holds, so a
+		// hand-off nobody may make is refused whether or not anything matches.
+		if err := mayMove(subject, productID, to, dispatches); err != nil {
+			return err
 		}
 		if len(targets) == 0 {
 			return nil

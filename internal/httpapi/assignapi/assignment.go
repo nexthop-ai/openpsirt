@@ -178,6 +178,10 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// nobody: a queue filling up is digest content rather than an
 		// interruption.
 		var whoToTell int64
+		// admits is asked about the strictest visibility open here inside the
+		// write that hands the work over, so a place recorded undisclosed
+		// between the two is part of what the recipient is asked about.
+		var admits finding.Admits
 		rights := access.NewStore(in.DB.DB)
 		switch {
 		case input.Body.Person != "":
@@ -190,55 +194,26 @@ func registerAssigning(api huma.API, in core.Deps) {
 			// sight of the row — which, before the assignment, they do not
 			// have. Handing an embargoed finding to somebody cleared for
 			// nothing embargoed would make the assignment the disclosure.
-			strictest, err := finding.NewStore(in.DB.DB).StrictestOf(ctx, subject,
-				target, issue, component)
-			if err != nil {
-				return nil, core.RefusedFinding(in, err)
-			}
-			if strictest == access.Private {
-				reads, err := rights.PersonReads(ctx, person.ID, product, strictest)
-				if err != nil {
-					return nil, core.WentWrong(in.Logger,
-						"cannot tell whether they may see this", err)
-				}
-				if !reads {
-					return nil, huma.Error422UnprocessableEntity(
-						"this has not been disclosed and they may not read undisclosed " +
-							"work here, so handing it to them would be the disclosure")
-				}
-			}
 			party := person.PartyID
 			to, whoToTell = &party, person.ID
+			admits = personAdmits(person, product)
 		case input.Body.Team != "":
 			team, err := rights.TeamByName(ctx, input.Body.Team)
 			if err != nil {
 				return nil, core.Absent(in.Logger, err, "that team could not be looked up",
 					func() error { return noSuchTeamNamed(input.Body.Team) })
 			}
-			// At least one member has to be able to read what is
-			// being routed there, asked at the strictest
-			// visibility present.
-			strictest, err := finding.NewStore(in.DB.DB).StrictestOf(ctx, subject,
-				target, issue, component)
-			if err != nil {
-				return nil, core.RefusedFinding(in, err)
-			}
-			reads, err := teamMayHold(ctx, rights, team.ID, product, strictest)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "cannot tell whether that team may see this", err)
-			}
-			if !reads {
-				return nil, huma.Error422UnprocessableEntity(
-					"nobody on " + team.Called() + " may read this, so it would sit in a " +
-						"queue none of them can see")
-			}
+			// At least one member has to be able to read what is being
+			// routed there, asked at the strictest visibility present.
 			party := team.PartyID
 			to = &party
+			admits = teamAdmits(team, product)
 		}
 
-		_, undisclosed, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue, component, to)
+		_, undisclosed, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
+			component, to, admits)
 		if err != nil {
-			return nil, core.RefusedFinding(in, err)
+			return nil, recipient(err, func(err error) error { return core.RefusedFinding(in, err) })
 		}
 
 		// Tell them. Work arriving is the thing a triager most wants

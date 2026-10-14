@@ -58,6 +58,13 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	productID int64, to *int64, dispatches bool,
 	naming func(*bun.UpdateQuery) *bun.UpdateQuery) (int64, error) {
 
+	// Refused here, where the rows are chosen: with neither way in, the group
+	// below would be empty, and an empty group narrows nothing.
+	if err := mayMove(subject, productID, to, dispatches); err != nil {
+		return 0, err
+	}
+	selfward := to == nil || *to == subject.Party()
+
 	now := s.now().UTC().Truncate(time.Microsecond)
 	update := naming(db.NewUpdate().Model((*Finding)(nil)).
 		// Across the product's builds, not one of them. The same code
@@ -92,7 +99,6 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	mine := bun.List(subject.Mine())
 	triaged := bun.List(triagedIn(subject, productID))
 	read := bun.List(access.Visible(subject, productID))
-	selfward := to == nil || *to == subject.Party()
 	update = update.WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
 		if dispatches {
 			q = q.WhereOr("visibility IN (?)", triaged)
@@ -120,6 +126,17 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 		return 0, fmt.Errorf("record who is dealing with this: %w", err)
 	}
 	return moved, nil
+}
+
+// mayMove refuses giving work to somebody else, or taking what they hold, to a
+// subject without the right that names it.
+func mayMove(subject access.Subject, productID int64, to *int64, dispatches bool) error {
+	if !dispatches && to != nil && *to != subject.Party() {
+		return access.Denied(fmt.Sprintf(
+			"give work to somebody else in product %d — you may take what nobody owns, "+
+				"and hand back your own", productID))
+	}
+	return nil
 }
 
 // triagedIn is the visibilities this subject triages in one product.
@@ -152,11 +169,6 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 			"decide who deals with findings in product %d", productID))
 	}
 	dispatches := subject.Holds(access.Assigner, productID)
-	if !dispatches && to != nil && *to != subject.Party() {
-		return 0, access.Denied(fmt.Sprintf(
-			"give work to somebody else in product %d — you may take what nobody owns, "+
-				"and hand back your own", productID))
-	}
 	var moved int64
 	for _, each := range work {
 		n, err := s.moveWork(ctx, tx, subject, productID, each[0], each[1], to,
@@ -190,8 +202,30 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 // The party work lands on is a person or a team, in the column that already
 // holds one. Nothing here asks which it is: the whole point of one
 // column is that every filter, count and handover asks "who holds this" once.
+//
+// Admits is asked whether the party may hold work of the strictest visibility
+// open there, in the transaction that moves it. Nil admits any party.
 func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
-	componentID int64, to *int64) (moved int64, undisclosed bool, err error) {
+	componentID int64, to *int64, admits Admits) (moved int64, undisclosed bool, err error) {
+
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		moved, undisclosed = 0, false
+		inner := &Store{db: tx, now: s.now, reach: s.reach}
+		var err error
+		moved, undisclosed, err = inner.assign(ctx, subject, targetID, vulnerabilityID,
+			componentID, to, admits)
+		return err
+	})
+	return moved, undisclosed, err
+}
+
+// assign is Assign inside the transaction it opened.
+//
+// One transaction, because whether the recipient may hold the work depends on
+// what is open there, and a scan recording an undisclosed place between a read
+// of that and the write would hand the new row over unasked.
+func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
+	componentID int64, to *int64, admits Admits) (int64, bool, error) {
 
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
@@ -209,8 +243,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// otherwise need somebody's attention before anybody could start.
 	// Putting work on somebody else, or taking what they are holding, is a
 	// different act and asks for the right that names it.
-	triages := subject.TriagesIn(productID)
-	if !triages {
+	if !subject.TriagesIn(productID) {
 		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
 	}
 	// This caller's right to put work on somebody else, or to take what
@@ -219,17 +252,29 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// two statements are two moments, and a colleague's assignment landing
 	// between them is all it takes to reassign what the rule just refused.
 	dispatches := subject.Holds(access.Assigner, productID)
-	if !dispatches && to != nil && *to != subject.Party() {
-		return 0, false, access.Denied(fmt.Sprintf(
-			"give work to somebody else in product %d — you may take what nobody owns, "+
-				"and hand back your own", productID))
+	if err := mayMove(subject, productID, to, dispatches); err != nil {
+		return 0, false, err
 	}
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return 0, false, err
 	}
 
-	moved, err = s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
+	// An assignment carries visibility of what was assigned, so the
+	// recipient is asked about the strictest visibility open here rather
+	// than about their present sight of the row — which, before the
+	// assignment, they do not have.
+	if to != nil && admits != nil {
+		strictest, err := s.strictestOf(ctx, productID, visible, vulnerabilityID, componentID)
+		if err != nil {
+			return 0, false, err
+		}
+		if err := admits(ctx, s.db, strictest); err != nil {
+			return 0, false, err
+		}
+	}
+
+	moved, err := s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
 		to, dispatches)
 	if err != nil {
 		return 0, false, err
@@ -285,7 +330,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	return moved, private, nil
 }
 
-// StrictestOf is the tightest visibility any open place of this finding
+// strictestOf is the tightest visibility any open place of this finding
 // carries, across the product's builds.
 //
 // The question routing asks: work goes to a party that can read all of what is
@@ -296,13 +341,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 //
 // Narrowed by what the caller may see, like every other read here. A place
 // they cannot see is not one they can route.
-func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetID,
+func (s *Store) strictestOf(ctx context.Context, productID int64, visible []access.Visibility,
 	vulnerabilityID, componentID int64) (access.Visibility, error) {
 
-	productID, visible, err := readableIn(ctx, s.db, subject, targetID)
-	if err != nil {
-		return access.Public, err
-	}
 	private, err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
 		Where(inThisProduct, productID).

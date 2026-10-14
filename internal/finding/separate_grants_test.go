@@ -172,7 +172,7 @@ func TestAPrivateOnlyTriagerHandsBackDisclosedWorkTheyHold(t *testing.T) {
 		f.handTo(t, f.target, "CVE-2026-1", libnl.Name, who.Party())
 
 		moved, _, err := f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-1"),
-			f.componentID(t, libnl.Name), nil)
+			f.componentID(t, libnl.Name), nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +196,7 @@ func TestDispatchReachesOnlyTheVisibilitiesTheCallerTriages(t *testing.T) {
 		other := int64(2)
 
 		moved, _, err := f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-1"),
-			f.componentID(t, libnl.Name), &other)
+			f.componentID(t, libnl.Name), &other, nil)
 		if err != nil && !errors.Is(err, access.ErrDenied) {
 			t.Fatal(err)
 		}
@@ -208,7 +208,7 @@ func TestDispatchReachesOnlyTheVisibilitiesTheCallerTriages(t *testing.T) {
 		}
 
 		moved, _, err = f.store.Assign(ctx, who, f.target, f.issueID(t, "CVE-2026-2"),
-			f.componentID(t, swss.Name), &other)
+			f.componentID(t, swss.Name), &other, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

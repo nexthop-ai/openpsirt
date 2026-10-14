@@ -40,6 +40,54 @@ type errRecipient struct{ answer error }
 
 func (e errRecipient) Error() string { return e.answer.Error() }
 
+// recipient answers err in the words a refused recipient carries, and anything
+// else as otherwise does.
+func recipient(err error, otherwise func(error) error) error {
+	var refused errRecipient
+	if errors.As(err, &refused) {
+		return refused.answer
+	}
+	return otherwise(err)
+}
+
+// personAdmits refuses handing a person work some of which is undisclosed in a
+// product where they may not read undisclosed work: the hand-over would be the
+// disclosure. Asked through the transaction that hands the work over.
+func personAdmits(person *access.Account, productID int64) finding.Admits {
+	return func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
+		if strictest != access.Private {
+			return nil
+		}
+		reads, err := access.NewStore(db).PersonReads(ctx, person.ID, productID, strictest)
+		if err != nil {
+			return err
+		}
+		if !reads {
+			return errRecipient{huma.Error422UnprocessableEntity(
+				"some of this has not been disclosed and they may not read " +
+					"undisclosed work here, so handing it to them would be the disclosure")}
+		}
+		return nil
+	}
+}
+
+// teamAdmits refuses routing work to a team none of whose members may read it,
+// where it would sit in a queue nobody on it can see.
+func teamAdmits(team *access.Team, productID int64) finding.Admits {
+	return func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
+		reads, err := teamMayHold(ctx, access.NewStore(db), team.ID, productID, strictest)
+		if err != nil {
+			return err
+		}
+		if !reads {
+			return errRecipient{huma.Error422UnprocessableEntity(
+				"nobody on " + team.Called() + " may read this, so it would sit in a " +
+					"queue none of them can see")}
+		}
+		return nil
+	}
+}
+
 func registerAssignMatching(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-matching-findings", Method: http.MethodPost,
@@ -107,21 +155,7 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			}
 			party := person.PartyID
 			to, whoToTell = &party, person.ID
-			admits = func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
-				if strictest != access.Private {
-					return nil
-				}
-				reads, err := access.NewStore(db).PersonReads(ctx, person.ID, product, strictest)
-				if err != nil {
-					return err
-				}
-				if !reads {
-					return errRecipient{huma.Error422UnprocessableEntity(
-						"some of this has not been disclosed and they may not read " +
-							"undisclosed work here, so handing it to them would be the disclosure")}
-				}
-				return nil
-			}
+			admits = personAdmits(person, product)
 		case input.Body.Team != "":
 			team, err := rights.TeamByName(ctx, input.Body.Team)
 			if err != nil {
@@ -130,27 +164,14 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 			}
 			party := team.PartyID
 			to = &party
-			admits = func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
-				reads, err := teamMayHold(ctx, access.NewStore(db), team.ID, product, strictest)
-				if err != nil {
-					return err
-				}
-				if !reads {
-					return errRecipient{huma.Error422UnprocessableEntity(
-						"nobody on " + team.Called() + " may read this, so it would sit in a " +
-							"queue none of them can see")}
-				}
-				return nil
-			}
+			admits = teamAdmits(team, product)
 		}
 
 		handed, err := at.Store.AssignMatching(ctx, subject, at.Scope, at.Filter, only, to, admits)
 		if err != nil {
-			var recipient errRecipient
-			if errors.As(err, &recipient) {
-				return nil, recipient.answer
-			}
-			return nil, core.Refused(in.Logger, err, "cannot record who is dealing with this")
+			return nil, recipient(err, func(err error) error {
+				return core.Refused(in.Logger, err, "cannot record who is dealing with this")
+			})
 		}
 
 		// One notification for the act rather than one per row: a selection

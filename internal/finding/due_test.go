@@ -222,7 +222,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 		open := f.open(t)
 		triager := f.holding(t, access.PublicTriage, access.Assigner)
 		if _, _, err := f.store.Assign(t.Context(), triager, f.target,
-			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7))); err != nil {
+			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -287,7 +287,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		open := f.open(t)
 		triager := f.holding(t, access.PublicTriage, access.Assigner)
 		if _, _, err := f.store.Assign(ctx, triager, f.target,
-			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7))); err != nil {
+			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
 		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)

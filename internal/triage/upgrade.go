@@ -46,6 +46,10 @@ type Upgrade struct {
 	// Recorded in the same transaction as the promise, so a promise nobody
 	// is carrying and a holder with no promise are both impossible.
 	HoldBy *int64
+	// Admits is asked whether HoldBy may hold work of the strictest
+	// visibility the promise covers, in the same transaction, before
+	// anything is handed over. Nil admits any holder.
+	Admits finding.Admits
 }
 
 // PlanUpgrade records moving a component as the answer to what is open on it.
@@ -241,6 +245,19 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// no owner, and the screen that records it is the screen that knows
 		// who the owner is.
 		if up.HoldBy != nil {
+			// Read in this transaction, so a place recorded undisclosed since
+			// the promise was asked for is part of what the holder is asked
+			// about.
+			if up.Admits != nil {
+				strictest, err := finding.NewStore(tx).StrictestOnComponent(ctx, subject,
+					up.ProductID, wanted, up.Component, up.Version)
+				if err != nil {
+					return err
+				}
+				if err := up.Admits(ctx, tx, strictest); err != nil {
+					return err
+				}
+			}
 			held, err := findings.HandOverWithin(ctx, tx, subject, up.ProductID, work, up.HoldBy)
 			if err != nil {
 				return err

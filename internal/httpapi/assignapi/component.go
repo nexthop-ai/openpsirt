@@ -303,8 +303,8 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			builds = append(builds, target.ID)
 		}
 
-		holder, err := carrying(ctx, in, subject, product.ID, builds, input.Component, input.Body.Version,
-			input.Body.Person, input.Body.Team)
+		holder, admits, err := carrying(ctx, in, subject, product.ID, input.Body.Person,
+			input.Body.Team)
 		if err != nil {
 			return nil, err
 		}
@@ -315,10 +315,12 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		done, err := store.PlanUpgrade(ctx, subject, triage.Upgrade{
 			ProductID: product.ID, Component: input.Component, Version: input.Body.Version,
 			To: input.Body.To, By: by, Builds: builds, Reasoning: input.Body.Reasoning,
-			HoldBy: holder,
+			HoldBy: holder, Admits: admits,
 		})
 		if err != nil {
-			return nil, oneVersion(err, func(err error) error { return core.RefusedDecision(in.Logger, err) })
+			return nil, recipient(err, func(err error) error {
+				return oneVersion(err, func(err error) error { return core.RefusedDecision(in.Logger, err) })
+			})
 		}
 		return &struct{ Body PlannedUpgradeBody }{Body: PlannedUpgradeBody{
 			ClaimID: done.ClaimID, Decisions: done.Decisions,
@@ -339,64 +341,40 @@ func oneVersion(err error, otherwise func(error) error) error {
 }
 
 // carrying is the party an upgrade is handed to, or none where nobody was
-// named.
+// named, with what the party is asked before the work is handed over.
 //
-// The same checks the per-finding assignment makes, asked once about the whole
-// set: a handover carries visibility of what was handed over, so the check is
-// against the strictest thing the promise covers rather than whichever row
-// somebody was looking at — one embargoed finding among fifty is enough to
-// make the handover the disclosure. And somebody has to be able to read a
-// team's queue, or it sits where none of them can see it.
+// The same checks the per-finding assignment makes, asked about the whole set
+// inside the transaction that records the promise: a handover carries
+// visibility of what was handed over, so the check is against the strictest
+// thing the promise covers rather than whichever row somebody was looking at —
+// one embargoed finding among fifty is enough to make the handover the
+// disclosure. And somebody has to be able to read a team's queue, or it sits
+// where none of them can see it.
 func carrying(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
-	targets []int64, component, version, person, team string) (*int64, error) {
+	person, team string) (*int64, finding.Admits, error) {
 
 	if person == "" && team == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err := mayHandOver(subject, productID, person, team); err != nil {
-		return nil, err
-	}
-	strictest, err := finding.NewStore(in.DB.DB).StrictestOnComponent(ctx, subject,
-		productID, targets, component, version)
-	if err != nil {
-		return nil, oneVersion(err, func(err error) error { return core.RefusedFinding(in, err) })
+		return nil, nil, err
 	}
 	rights := access.NewStore(in.DB.DB)
 	if person != "" {
 		who, err := rights.ByIdentity(ctx, person)
 		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
-		}
-		if strictest == access.Private {
-			reads, err := rights.PersonReads(ctx, who.ID, productID, strictest)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "cannot tell whether they may see this", err)
-			}
-			if !reads {
-				return nil, huma.Error422UnprocessableEntity(
-					"some of what this covers has not been disclosed and they may not read " +
-						"undisclosed work here, so handing it to them would be the disclosure")
-			}
+			return nil, nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
 		}
 		party := who.PartyID
-		return &party, nil
+		return &party, personAdmits(who, productID), nil
 	}
 	found, err := rights.TeamByName(ctx, team)
 	if err != nil {
-		return nil, core.Absent(in.Logger, err, "that team could not be looked up",
+		return nil, nil, core.Absent(in.Logger, err, "that team could not be looked up",
 			func() error { return noSuchTeamNamed(team) })
 	}
-	reads, err := teamMayHold(ctx, rights, found.ID, productID, strictest)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "cannot tell whether that team may see this", err)
-	}
-	if !reads {
-		return nil, huma.Error422UnprocessableEntity(
-			"nobody on " + found.Called() + " may read this, so it would sit in a queue " +
-				"none of them can see")
-	}
 	party := found.PartyID
-	return &party, nil
+	return &party, teamAdmits(found, productID), nil
 }
 
 // mayHandOver refuses a party nobody may be given work as, and a hand-off the

@@ -211,6 +211,8 @@ yourself is still doing it.
 |---|---|
 | Assigner is held alongside triage, not instead of it | The role widens what a triager may do with work; on its own it assigns nothing, because handing around findings in a product you may not argue about is not a narrower version of triaging it. Enforced at the endpoint and again at the store, with the session answer carrying the same conjunction so an interface does not draw a control that always fails |
 | Who may *be* assigned is visibility, not a grant of its own | |
+| The write that moves the rows refuses a hand-off the caller may not make | Every path that hands work over reaches that write, so a path that forgot to check first still moves nothing |
+| Whether the recipient may read the work is asked inside the write's transaction | Asked at the strictest visibility open there. A scan recording an undisclosed place between a separate read and the write would hand the new row over unasked. The single assignment, assignment by narrowing and an upgrade's holder all ask it there |
 | A finding is assigned for a whole group at once | One issue in one component, however many places. Assigning one place and not another is not something anybody means to do |
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
