@@ -455,6 +455,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
 | Somebody who can see the product and lacks the right is refused with 403 | The same answer an issue act gives them. A product they cannot see answers as not declared, as every product route does |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
+| The rule listing names a rule's team by identifier and marks a retired one | The list read is the list the sweep applies, so a rule that places nothing says so. A team past the first page of teams, or retired, still has a name |
 | A pattern naming most of a build is refused | A rule says where in the tree something sits, and a bare glob is not that. Refused when it is written and again at the preview, the way a rule matching nothing is refused: a rule that quietly applied to part of what it names is worse than one nobody could save. The subtree is one recursive walk per build rather than one per named component — it was tens of thousands of round trips inside one request, from a route anybody who may triage the product can reach |
 
 A rule matches without regard to capitals. Its keys are folded by the rule the

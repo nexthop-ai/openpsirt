@@ -267,7 +267,15 @@ export function AutoAssignment() {
                           </>
                         )}
                       </td>
-                      <td>{rule.team}</td>
+                      <td>
+                        {rule.team}
+                        {rule.team_retired && (
+                          <span className="hint" title="This rule places nothing.">
+                            {" "}
+                            · retired
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {/* A rule with no identifier is a row the server did
                             not fully answer for, and asking to retire rule

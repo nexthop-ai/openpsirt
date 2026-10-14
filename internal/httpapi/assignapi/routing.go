@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -31,6 +30,9 @@ type RuleBody struct {
 	// "Platform Security" lists as the label, and sending that back finds no
 	// team at all.
 	TeamDisplayName string `json:"team_name,omitempty" doc:"The team's display name, where it differs from its name"`
+	// TeamRetired marks a rule that places nothing, because its team is out
+	// of use.
+	TeamRetired bool `json:"team_retired,omitempty" doc:"Whether the team is retired. A rule whose team is retired places nothing"`
 	// Order is the whole of the precedence: first match wins.
 	Order int `json:"order" doc:"Its position among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package
@@ -83,7 +85,11 @@ func registerRouting(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the rules could not be read", err)
 		}
-		teams, err := teamsByID(ctx, in)
+		owners := make([]int64, 0, len(rules))
+		for _, rule := range rules {
+			owners = append(owners, rule.TeamID)
+		}
+		teams, err := teamsByID(ctx, in, owners)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the teams could not be read", err)
 		}
@@ -93,6 +99,7 @@ func registerRouting(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, RuleBody{
 				ID: rule.ID, Name: rule.Name, Team: teams[rule.TeamID].Address,
 				TeamDisplayName: teams[rule.TeamID].Display,
+				TeamRetired:     teams[rule.TeamID].Retired,
 				Order:           rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
 			})
 		}
@@ -301,20 +308,27 @@ func queueSweep(ctx context.Context, in core.Deps, tx bun.Tx, productID int64) e
 	return nil
 }
 
-// teamsByID is every team's two names, by identifier: the one a write resolves
-// and the one a screen shows.
-func teamsByID(ctx context.Context, in core.Deps) (map[int64]core.Named, error) {
-	teams, err := access.NewStore(in.DB.DB).Teams(ctx, "", database.InBulk.Most)
+// ruleTeam is a rule's team as the listing names it: the name a write
+// resolves, the one a screen shows, and whether it is still in use.
+type ruleTeam struct {
+	core.Named
+	Retired bool
+}
+
+// teamsByID is the named teams' names, by identifier, retired ones included,
+// so a rule whose team was retired still names it.
+func teamsByID(ctx context.Context, in core.Deps, ids []int64) (map[int64]ruleTeam, error) {
+	teams, err := access.NewStore(in.DB.DB).TeamsByID(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	by := make(map[int64]core.Named, len(teams))
-	for _, team := range teams {
-		one := core.Named{Address: team.Name}
+	by := make(map[int64]ruleTeam, len(teams))
+	for id, team := range teams {
+		one := ruleTeam{Named: core.Named{Address: team.Name}, Retired: team.RetiredAt != nil}
 		if team.DisplayName != "" && team.DisplayName != team.Name {
 			one.Display = team.DisplayName
 		}
-		by[team.ID] = one
+		by[id] = one
 	}
 	return by, nil
 }

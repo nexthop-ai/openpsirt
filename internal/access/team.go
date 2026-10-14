@@ -192,6 +192,30 @@ func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, erro
 	return teams, nil
 }
 
+// TeamsByID is the teams the identifiers name, retired ones included.
+//
+// Something that already points at a team names it by identifier, and has to
+// keep naming it after the team is retired and however many teams sort ahead
+// of it, so this reads exactly the identifiers asked about and nothing else.
+func (s *Store) TeamsByID(ctx context.Context, ids []int64) (map[int64]Team, error) {
+	by := make(map[int64]Team, len(ids))
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, some []int64) error {
+		var teams []Team
+		if err := s.db.NewSelect().Model(&teams).
+			Where("id IN (?)", bun.List(some)).Scan(ctx); err != nil {
+			return fmt.Errorf("read the teams named: %w", err)
+		}
+		for _, team := range teams {
+			by[team.ID] = team
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return by, nil
+}
+
 // CountTeams is how many teams a term matches, in all.
 //
 // The same narrowing as the listing above, so a picker showing a few of them

@@ -183,6 +183,47 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 	})
 }
 
+// A rule whose team is retired still names the team, and says it is retired,
+// so the list read is the list the sweep applies.
+func TestARuleWhoseTeamIsRetiredStillNamesItAndSaysSo(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"curlers","display_name":"The Curlers"}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/routing-rules",
+			`{"name":"curl","team":"curlers","upstream":"curl"}`); made.Code != http.StatusCreated {
+			t.Fatalf("adding answered %d: %s", made.Code, made.Body.String())
+		}
+		type listed struct {
+			Items []struct {
+				Team        string `json:"team"`
+				TeamName    string `json:"team_name"`
+				TeamRetired bool   `json:"team_retired"`
+			} `json:"items"`
+		}
+		var live listed
+		httpapitest.Read(t, r, "assigner", "/v1/products/mine/routing-rules", &live)
+		if len(live.Items) != 1 || live.Items[0].Team != "curlers" || live.Items[0].TeamRetired {
+			t.Fatalf("before the team is retired the rules read %+v", live.Items)
+		}
+
+		if gone := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/teams/curlers",
+			""); gone.Code >= 300 {
+			t.Fatalf("retiring the team answered %d: %s", gone.Code, gone.Body.String())
+		}
+		var retired listed
+		httpapitest.Read(t, r, "assigner", "/v1/products/mine/routing-rules", &retired)
+		if len(retired.Items) != 1 {
+			t.Fatalf("after the team is retired the rules read %+v", retired.Items)
+		}
+		if got := retired.Items[0]; got.Team != "curlers" || got.TeamName != "The Curlers" || !got.TeamRetired {
+			t.Errorf("a rule whose team is retired reads %+v, want it named and marked retired", got)
+		}
+	})
+}
+
 func TestARuleSaysWhatItWouldCatchBeforeItIsSaved(t *testing.T) {
 	// A rule whose reach nobody can see before saving is a rule that sweeps
 	// the estate on a guess, and one naming something nothing is called places

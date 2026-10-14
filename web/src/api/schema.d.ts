@@ -11589,6 +11589,8 @@ export interface components {
             team: string;
             /** @description The team's display name, where it differs from its name */
             team_name?: string;
+            /** @description Whether the team is retired. A rule whose team is retired places nothing */
+            team_retired?: boolean;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
         };
