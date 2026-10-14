@@ -3,6 +3,8 @@
 
 package access
 
+import "regexp"
+
 // visibilityColumns are the qualified columns a statement may count
 // undisclosed rows of. A column is placed in the statement as written, so it
 // comes from this set rather than from a caller.
@@ -33,14 +35,26 @@ func AnyPrivate(column string) (string, any) {
 	return "(" + count + " > 0)", arg
 }
 
+// alias is the shape of a name a column list selects a count under. The name
+// is placed in the statement inside quotes, so a quote in it would close them.
+var alias = regexp.MustCompile(`^[a-z_]+$`)
+
+// as quotes name as a column alias, refusing one that is not a plain word.
+func as(caller, name string) string {
+	if !alias.MatchString(name) {
+		panic("access." + caller + ": " + name + " is not an alias")
+	}
+	return ` AS "` + name + `"`
+}
+
 // PrivateCountAs is PrivateCount selected under a name, for a column list.
 func PrivateCountAs(column, name string) (string, any) {
 	count, arg := PrivateCount(column)
-	return count + ` AS "` + name + `"`, arg
+	return count + as("PrivateCountAs", name), arg
 }
 
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.
 func AnyPrivateAs(column, name string) (string, any) {
 	cond, arg := AnyPrivate(column)
-	return cond + ` AS "` + name + `"`, arg
+	return cond + as("AnyPrivateAs", name), arg
 }

@@ -111,8 +111,8 @@ func TestACorrectionNeedsASecondPerson(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if standing != nil && standing.State == triage.Approved {
-			t.Error("a correction waiting for a second person is already in force")
+		if standing != nil {
+			t.Errorf("a correction waiting for a second person is already in force, as %q", standing.State)
 		}
 	})
 }
