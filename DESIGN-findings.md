@@ -421,7 +421,7 @@ about the commit in its repository.
 | Recorded per commit | |
 |---|---|
 | When it was last looked up | Null is never, which is what a visit takes first |
-| Whether the copy held it | A commit in an unmerged pull request, or one a history rewrite dropped, is linked and on no branch |
+| Whether the copy resolved it to one commit | A commit in an unmerged pull request, or one a history rewrite dropped, is linked and on no branch. An abbreviation more than one object in the copy shares resolves to none, and is recorded as not held: the two are shown alike, as not found |
 | How many branches held it, and the names of up to a hundred | A mainline commit is on every branch cut since it landed. The count stays whole; a name wider than the column is counted and not kept, because a cut name is another branch |
 
 | Recorded per repository | |

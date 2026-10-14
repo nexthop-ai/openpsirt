@@ -10325,7 +10325,7 @@ export interface components {
             commits: number;
             /**
              * Format: int64
-             * @description How many of those the repository holds
+             * @description How many of those the repository's copy resolves to one commit
              */
             found: number;
             /**
@@ -10368,7 +10368,7 @@ export interface components {
             fetched_at?: string;
             /**
              * Format: int64
-             * @description How many of those the repository holds
+             * @description How many of those the repository's copy resolves to one commit
              */
             found: number;
             /**
@@ -11163,7 +11163,7 @@ export interface components {
              */
             kind: "patch" | "advisory" | "report" | "other";
             /**
-             * @description 'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit
+             * @description 'found' is a commit the copy of its repository holds. 'absent' is a hash the copy does not resolve to one commit: no commit has it, or it is an abbreviation more than one object shares. Omitted where no copy has been asked, or where the link names no commit
              * @enum {string}
              */
             lookup?: "found" | "absent";
