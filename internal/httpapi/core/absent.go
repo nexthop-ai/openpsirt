@@ -298,6 +298,7 @@ func Absent(logger *slog.Logger, err error, reading string, missing func() error
 		errors.Is(err, access.ErrNoSuchToken),
 		errors.Is(err, finding.ErrNoSuchRun),
 		errors.Is(err, finding.ErrNoOpenFinding),
+		errors.Is(err, finding.ErrNoSuchRule),
 		errors.Is(err, attach.ErrNoSuchIssue),
 		errors.Is(err, access.ErrNoSuchPerson),
 		errors.Is(err, graph.ErrNoComponent):

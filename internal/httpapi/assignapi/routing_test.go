@@ -168,6 +168,17 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 		if len(after.Items) != 1 || after.Items[0].Open != placed {
 			t.Errorf("retiring a rule took back what it placed: %+v", after.Items)
 		}
+
+		// A second click, and an identifier nothing here declared, are both a
+		// rule not in use: the caller's to know, not a fault.
+		for _, id := range []int64{rules.Items[0].ID, rules.Items[0].ID + 1000} {
+			if again := httpapitest.AsPerson(t, r, "assigner", http.MethodDelete,
+				"/v1/products/mine/routing-rules/"+httpapitest.Itoa(id),
+				""); again.Code != http.StatusNotFound {
+				t.Errorf("retiring rule %d, not in use, answered %d: %s", id, again.Code,
+					again.Body.String())
+			}
+		}
 	})
 }
 

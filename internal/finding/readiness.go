@@ -65,6 +65,10 @@ type Readiness struct {
 	Floor Floor
 }
 
+// NothingScannedYet is what readiness says of a build declared and never
+// built.
+const NothingScannedYet = "nothing has been scanned here yet"
+
 // ReadyFor compares a branch's current state against the last release cut from
 // it, built the same way.
 //
@@ -91,6 +95,12 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	out := &Readiness{Now: *here, Floor: floor}
+	if here.TargetID == 0 {
+		// Declared and not built. An answer rather than a refusal, and not
+		// zeroes alone, which read as a build that was scanned and is clean.
+		out.Why = NothingScannedYet
+		return out, nil
+	}
 	if here.Kind != string(catalog.Branch) {
 		// A tag is one frozen point and was not cut into anything, so there is
 		// no "since we shipped" for it. Said rather than answered with an
@@ -185,21 +195,27 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		standing.Total += row.Open
 	}
 
+	// Named from the release and the variant rather than from the build, and
+	// the build joined to them: a tag declared and not yet built has a name and
+	// no build, which is the ordinary state of a tag between being cut and its
+	// pipeline running.
 	if err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`tg.id AS "target_id"`).
+		TableExpr(`"stream" AS "st"`).
+		Join(`JOIN "variant" AS "va" ON va.id = ?`, variantID).
+		Join(`LEFT JOIN "target" AS "tg" ON tg.stream_id = st.id AND tg.variant_id = va.id`).
+		ColumnExpr(`COALESCE(tg.id, 0) AS "target_id"`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`va.name AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		Where("tg.stream_id = ?", streamID).
-		Where("tg.variant_id = ?", variantID).
+		Where("st.id = ?", streamID).
 		Limit(1).
 		Scan(ctx, standing); err != nil {
-		return nil, fmt.Errorf("read what this build is called: %w", err)
+		return nil, database.FromRead(err, catalog.ErrNotFound, "read what this build is called")
+	}
+	if standing.TargetID == 0 {
+		return standing, nil
 	}
 
 	// The newest finished run, read as a row rather than as MAX(): an

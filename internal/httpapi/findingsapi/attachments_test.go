@@ -106,6 +106,13 @@ func TestWhoMayFetchAndRedactAnAttachment(t *testing.T) {
 			`{"reason":"Not mine to remove."}`); got.Code != http.StatusForbidden {
 			t.Errorf("a triager removed a file: %d %s", got.Code, got.Body.String())
 		}
+		// A reason of nothing but spaces passes the length bound and is the
+		// caller's to correct, not a fault.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, at,
+			`{"reason":"   "}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("removing a file with a blank reason answered %d: %s",
+				got.Code, got.Body.String())
+		}
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, at,
 			`{"reason":"It carried a credential."}`); got.Code != http.StatusNoContent {
 			t.Fatalf("an administrator could not remove a file: %d %s",

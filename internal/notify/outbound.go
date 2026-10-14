@@ -861,6 +861,11 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		return row, nil
 	}
 	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			// In use under that name and kind, since a retired one was taken
+			// up again above.
+			return nil, fmt.Errorf("%w: %q", ErrDestinationTaken, row.Name)
+		}
 		return nil, fmt.Errorf("record that destination: %w", err)
 	}
 	return row, nil
@@ -869,6 +874,11 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 // ShortestSecret is the shortest secret a webhook is signed with, in
 // characters.
 const ShortestSecret = 16
+
+// ErrDestinationTaken is a destination added under a name and kind one in use
+// already has.
+var ErrDestinationTaken = refusal.New(
+	"a destination is already configured under that name and kind")
 
 // webhookOnly refuses what a signed request does not take.
 //

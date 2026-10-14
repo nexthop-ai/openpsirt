@@ -197,7 +197,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		return access.Denied("redact an attachment")
 	}
 	if strings.TrimSpace(reason) == "" {
-		return fmt.Errorf("say why the file is being removed")
+		return ErrNoReason
 	}
 	row := new(Attachment)
 	err := s.db.NewSelect().Model(row).Where("token = ?", strings.TrimSpace(token)).Scan(ctx)
@@ -421,3 +421,7 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 // ErrNoSuchIssue is the one answer for an issue that is not here, one nobody
 // may see, and a product that is neither.
 var ErrNoSuchIssue = fmt.Errorf("no issue here goes by that name")
+
+// ErrNoReason is a redaction that says nothing about why: a reason of nothing
+// but spaces passes a length bound and is no reason.
+var ErrNoReason = fmt.Errorf("say why the file is being removed")

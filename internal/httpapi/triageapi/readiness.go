@@ -42,7 +42,7 @@ type ReadinessBody struct {
 	// shipped with" are answers a person acts on differently, so the second is
 	// never dressed up as the first.
 	Shipped *BuildCountsBody `json:"shipped,omitempty"`
-	Why     string           `json:"why,omitempty" doc:"The missing half, where there is nothing to compare against"`
+	Why     string           `json:"why,omitempty" doc:"The missing half, where there is nothing to compare against, or that nothing has been scanned here yet"`
 	// Floor is the line both counts are at or above, named so a shared number
 	// says whose it is.
 	Floor string `json:"floor,omitempty" doc:"The least severity counted, or empty where everything is"`
@@ -102,7 +102,9 @@ func registerReadiness(api huma.API, in core.Deps) {
 			"Both sides come from scans already collected, so this asks nothing new of a " +
 			"build pipeline. Where there is nothing to compare against, `shipped` is absent " +
 			"and `why` says what is missing rather than reporting zeroes, because a release " +
-			"that shipped clean and a release nobody scanned are not the same answer.\n\n" +
+			"that shipped clean and a release nobody scanned are not the same answer. A build " +
+			"declared and not yet built answers with zeroes, no `last_scanned_at`, and `why` " +
+			"saying nothing has been scanned there yet.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.\n\n" +
 			"`blocking` is the worst few of what the count is made of: the work nobody has agreed to ship " +

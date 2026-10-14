@@ -177,6 +177,9 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			}
 			var err error
 			row, err = notify.NewStore(tx).AddDestination(ctx, by, want, in.Chats)
+			if errors.Is(err, notify.ErrDestinationTaken) {
+				return huma.Error409Conflict(notify.ErrDestinationTaken.Error())
+			}
 			if err != nil {
 				return core.Asked(in.Logger, err)
 			}

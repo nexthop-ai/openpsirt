@@ -4,8 +4,12 @@
 package triageapi_test
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -100,6 +104,49 @@ func TestBlockingRowsOfOneComponentAreToldApart(t *testing.T) {
 		if first.Version == second.Version {
 			t.Errorf("two rows of %q are identical at version %q",
 				first.Component, first.Version)
+		}
+	})
+}
+
+// A tag declared and not yet built is the ordinary state of a tag between
+// being cut and its pipeline running. It answers, saying nothing has been
+// scanned there, rather than failing or reporting a clean build.
+func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedTwoIssues(t)
+		names := catalog.NewStore(r.DB.DB)
+		product, err := names.ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareStream(ctx, product.ID, "v2.5.0", catalog.Tag,
+			nil); err != nil {
+			t.Fatal(err)
+		}
+
+		const at = "/v1/products/mine/streams/v2.5.0/variants/broadcom/readiness"
+		answered := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, "")
+		if answered.Code != http.StatusOK {
+			t.Fatalf("readiness for a tag not yet built answered %d: %s", answered.Code,
+				answered.Body.String())
+		}
+		var out struct {
+			Now struct {
+				Stream        string `json:"stream"`
+				Total         int    `json:"total"`
+				LastScannedAt string `json:"last_scanned_at"`
+			} `json:"now"`
+			Why string `json:"why"`
+		}
+		if err := json.Unmarshal(answered.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Why != finding.NothingScannedYet {
+			t.Errorf("why reads %q, want %q", out.Why, finding.NothingScannedYet)
+		}
+		if out.Now.Stream != "v2.5.0" || out.Now.Total != 0 || out.Now.LastScannedAt != "" {
+			t.Errorf("the build reads %+v", out.Now)
 		}
 	})
 }

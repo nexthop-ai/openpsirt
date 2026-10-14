@@ -291,6 +291,8 @@ func registerAttachments(api huma.API, in core.Deps) {
 		switch {
 		case errors.Is(err, attach.ErrGone):
 			return nil, huma.Error410Gone("that file was already removed")
+		case errors.Is(err, attach.ErrNoReason):
+			return nil, huma.Error422UnprocessableEntity(attach.ErrNoReason.Error())
 		case err != nil:
 			return nil, core.Refused(in.Logger, err, "cannot remove that file")
 		}

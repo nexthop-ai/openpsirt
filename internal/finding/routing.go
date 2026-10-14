@@ -165,10 +165,14 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 		return fmt.Errorf("retire that rule: %w", err)
 	}
 	if n == 0 {
-		return refusal.Errorf("no rule of this product is in use under that identifier")
+		return ErrNoSuchRule
 	}
 	return nil
 }
+
+// ErrNoSuchRule is a routing rule not in use in this product: retired already,
+// never declared, or another product's.
+var ErrNoSuchRule = refusal.New("no rule of this product is in use under that identifier")
 
 // ApplyRules places work nobody holds, one bounded batch at a time.
 //
