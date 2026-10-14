@@ -454,6 +454,7 @@ behind the cap.
 | An issue this product was attacked through is never behind the cap | Agreeing is refused while one is in the claim, so it is the row an approver has to be able to set aside |
 | A row names every place of its issue, and setting it aside sets all of them aside | Agreeing to any one place of an issue is agreeing to the issue |
 | Every act over many issues carries the table | Rows set aside from one, and one re-made after it lapsed, are refused over an attacked issue the same way, and without the table the only answer to them is refusing them whole |
+| The signals are read with one identifier per issue and per product | A claim over one kernel issue holds a decision at each of its places, 133,549 in one measured estate, and a list carrying one per decision is a statement past the size one engine accepts |
 
 Without this an approver of a bulk claim chooses between refusing everything and
 agreeing to everything.

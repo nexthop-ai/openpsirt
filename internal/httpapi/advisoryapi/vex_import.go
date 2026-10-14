@@ -182,7 +182,7 @@ func registerVexImport(api huma.API, in core.Deps) {
 				"who published it is longer than the %d characters this records; "+
 					"name it with ?publisher=", finding.MostPublisher))
 		}
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.ID, finding.Supplied{
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, finding.Supplied{
 			Source:    finding.FromVex,
 			Publisher: publisher,
 			Document:  documentName(file.Filename),
@@ -215,15 +215,22 @@ func statementsOf(said []sbom.Suppression) []finding.Statement {
 // place of what the same document said before, and notes the upload in the
 // trail under about. It answers how many statements it recorded and how many
 // earlier ones it set aside.
-func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, productID int64,
+//
+// The product is resolved by name inside the write. The caller's lookup before
+// parsing is an early refusal, and the one here decides, so a product renamed
+// or retired while the document was read is what a retry reads.
+func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, productName string,
 	from finding.Supplied, said []sbom.Suppression, about string) (int, int, error) {
 
 	statements := statementsOf(said)
 	var recorded, superseded int
 	if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
-		var err error
+		product, err := catalog.NewStore(tx).ProductByName(ctx, productName)
+		if err != nil {
+			return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+		}
 		recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
-			productID, from, statements)
+			product.ID, from, statements)
 		if err != nil {
 			return core.Asked(in.Logger, err)
 		}

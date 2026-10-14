@@ -330,21 +330,27 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	}
 	publisher := strings.ToLower(strings.TrimSpace(from.Publisher))
 	identifier := strings.TrimSpace(from.Identifier)
-	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
+		now := s.now().UTC().Truncate(time.Microsecond)
 
-		for i := range said {
-			said[i].Vulnerability = folded(said[i].Vulnerability)
-			said[i].Component = folded(said[i].Component)
-			said[i].Within = folded(said[i].Within)
+		// A copy of its own on every attempt. The closure is re-run whole
+		// when a transaction is retried, and an attempt that folded, paired
+		// and narrowed the caller's slice would hand the next one the claims
+		// it had left to insert instead of what the document said: the claims
+		// it repeated would then read as withdrawn.
+		claims := slices.Clone(said)
+		for i := range claims {
+			claims[i].Vulnerability = folded(claims[i].Vulnerability)
+			claims[i].Component = folded(claims[i].Component)
+			claims[i].Within = folded(claims[i].Within)
 			// Bounded to the columns that hold them, and the reasoning to
 			// the one copy kept of it. Cut before anything is compared, so
 			// the same over-long document read again reads as the same.
-			said[i].About = bound.HeadRunes(said[i].About, database.NameWidth)
-			said[i].WithinAbout = bound.HeadRunes(said[i].WithinAbout, database.NameWidth)
-			said[i].Justification = bound.HeadRunes(said[i].Justification, database.NameWidth)
-			said[i].Statement = WordsOf(said[i].Statement)
+			claims[i].About = bound.HeadRunes(claims[i].About, database.NameWidth)
+			claims[i].WithinAbout = bound.HeadRunes(claims[i].WithinAbout, database.NameWidth)
+			claims[i].Justification = bound.HeadRunes(claims[i].Justification, database.NameWidth)
+			claims[i].Statement = WordsOf(claims[i].Statement)
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
@@ -366,7 +372,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
 		}
-		if len(standing) > 0 && sameReading(standing, said) {
+		if len(standing) > 0 && sameReading(standing, claims) {
 			// What the document says is what the record already holds.
 			recorded = len(standing)
 			return nil
@@ -396,7 +402,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
-		repeated, gone, fresh := pairRepeated(held, said)
+		repeated, gone, fresh := pairRepeated(held, claims)
 
 		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Statement)(nil)).
@@ -428,31 +434,28 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			recorded += len(ids)
 		}
 
-		said = fresh
-		words := make([]string, 0, len(said))
-		for _, one := range said {
+		toInsert := fresh
+		words := make([]string, 0, len(toInsert))
+		for _, one := range toInsert {
 			words = append(words, one.Statement)
 		}
 		stored, err := internWords(ctx, tx, words)
 		if err != nil {
 			return err
 		}
-		for i := range said {
-			said[i].StatementID = wordsID(stored, said[i].Statement)
+		for i := range toInsert {
+			toInsert[i].StatementID = wordsID(stored, toInsert[i].Statement)
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
-			// into the value it inserted, and this closure is re-run whole
-			// when a transaction is retried — so a second attempt over the
-			// same claims would state keys the first attempt was given, and
-			// the write that a retry exists to repeat is the one that cannot
-			// happen twice.
-			said[i].ID = 0
-			said[i].ProductID = productID
-			said[i].Publisher = publisher
-			said[i].Source, said[i].Identifier = from.Source, identifier
-			said[i].Document, said[i].Digest = from.Document, from.Digest
-			said[i].UploadedBy, said[i].UploadedAt = by.ID, now
-			said[i].Superseded = nil
+			// into the value it inserted, so a key stated here would be one an
+			// earlier attempt was given.
+			toInsert[i].ID = 0
+			toInsert[i].ProductID = productID
+			toInsert[i].Publisher = publisher
+			toInsert[i].Source, toInsert[i].Identifier = from.Source, identifier
+			toInsert[i].Document, toInsert[i].Digest = from.Document, from.Digest
+			toInsert[i].UploadedBy, toInsert[i].UploadedAt = by.ID, now
+			toInsert[i].Superseded = nil
 		}
 		// Written in batches rather than one statement each. A publisher's
 		// statement set is a few thousand claims and one real security
@@ -465,9 +468,9 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		// The batch is sized for the narrowest engine rather than for the
 		// fastest: PostgreSQL binds at most 65,535 parameters in one
 		// statement.
-		for from := 0; from < len(said); from += statementsPerInsert {
-			to := min(from+statementsPerInsert, len(said))
-			batch := said[from:to]
+		for from := 0; from < len(toInsert); from += statementsPerInsert {
+			to := min(from+statementsPerInsert, len(toInsert))
+			batch := toInsert[from:to]
 			if _, err := tx.NewInsert().Model(&batch).Exec(ctx); err != nil {
 				return fmt.Errorf("record what they said: %w", err)
 			}

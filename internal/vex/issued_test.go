@@ -23,9 +23,14 @@ import (
 func TestADocumentRecordedAfterSomebodyElsesStatesTheLaterVersion(t *testing.T) {
 	// A second issuance committing between the document being generated and
 	// the write recording it moves the count. The document handed back has to
-	// carry the number it is recorded under.
+	// carry the number it is recorded under. The document is generated inside
+	// the transaction recording it, and the harness holds SQLite to one
+	// connection, so nothing lands in between there.
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
+		if db.Stats().MaxOpenConnections == 1 {
+			t.Skip("one connection: nothing lands between a read and a write")
+		}
 		ctx := t.Context()
 		product := w.Product
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
@@ -131,12 +136,15 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 }
 
 // A document is not recorded under a name the build lost while it was being
-// written. The document is generated before the write that records it, and a
-// rename committing in between would record one naming what the build had
-// been called.
+// written. The build's names are resolved before the write that records it,
+// and a rename committing in between would record one naming what the build
+// had been called.
 func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
+		if db.Stats().MaxOpenConnections == 1 {
+			t.Skip("one connection: nothing lands between a read and a write")
+		}
 		ctx := t.Context()
 		product := w.Product
 		variant := w.Customer

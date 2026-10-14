@@ -952,6 +952,9 @@ defect.
 | Whether the writer may write a note about an issue | Whether the note is written |
 | Where each added build holds a recorded flaw's component | Which rows the flaw opens. A build that stopped shipping it is refused |
 | What each part of a build is called, on recording that its VEX document went out | Whether the document names the build as it is now called; a rename in between is refused and asked again |
+| The VEX document being recorded as gone out | What the record says went out. Generated from the transaction recording it, on every attempt, so a retry describes the database it commits to |
+| The product a supplier, an uploaded VEX document or an uploaded advisory names | Which product the source or the statements are recorded against |
+| The claims a document makes, folded and paired | Which standing claims it repeats and which it sets aside. Copied from the caller's on every attempt, so a retry starts from what the document said |
 
 A read made before the transaction as an early refusal is repeated inside it;
 the one inside decides.

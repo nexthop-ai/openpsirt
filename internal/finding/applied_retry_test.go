@@ -4,9 +4,12 @@
 package finding_test
 
 import (
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -47,5 +50,53 @@ func TestAScanAppliedAgainAfterALostCommitCountsOnce(t *testing.T) {
 	}
 	if applied.Closed != 2 || applied.Unexplained != 2 {
 		t.Errorf("closed %d, %d of them unexplained; want the 2 places, counted once", applied.Closed, applied.Unexplained)
+	}
+}
+
+// A document recorded again after a lost commit records what it says, and
+// sets aside nothing it repeats. An attempt that narrowed the caller's claims
+// to the ones it had left to insert handed the next attempt those alone, and
+// every claim the document repeated read as withdrawn.
+func TestAStatementSetRecordedAgainAfterALostCommitKeepsWhatItRepeats(t *testing.T) {
+	db, race := dbtest.Racing(t, nil)
+	ctx := t.Context()
+	w := world.New(t, db)
+	store := finding.NewStore(db.DB)
+	who := access.Everything("a test recording statements")
+	who.ID = w.Person.ID
+	claim := func(i int) finding.Statement {
+		return finding.Statement{
+			Vulnerability: fmt.Sprintf("CVE-2026-%d", 100+i), Component: "libnl-3-200",
+			Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
+			Statement: "Never reached in our build.",
+		}
+	}
+	var standing []finding.Statement
+	for i := range 10 {
+		standing = append(standing, claim(i))
+	}
+	from := finding.Supplied{Source: finding.FromVex, Publisher: "debian", Document: "set.json"}
+	from.Digest = "sha256:one"
+	if _, _, err := store.RecordStatements(ctx, who, w.Product.ID, from, slices.Clone(standing)); err != nil {
+		t.Fatal(err)
+	}
+
+	said := append(slices.Clone(standing), claim(10), claim(11))
+	from.Digest = "sha256:two"
+	race.Arm(1)
+	recorded, superseded, err := store.RecordStatements(ctx, who, w.Product.ID, from, said)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if race.Unspent() != 0 {
+		t.Fatal("the recording committed nothing, so no attempt was retried and this checks nothing")
+	}
+	if recorded != 12 || superseded != 0 {
+		t.Errorf("recorded %d and set aside %d; want the twelve the document says and nothing it repeats",
+			recorded, superseded)
+	}
+	if said[0].Vulnerability != "CVE-2026-100" || len(said) != 12 {
+		t.Errorf("the caller's claims were changed in place: %d of them, the first about %q",
+			len(said), said[0].Vulnerability)
 	}
 }

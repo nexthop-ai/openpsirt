@@ -107,21 +107,27 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	if !subject.Triages(access.Public, named.ProductID) {
 		return nil, ErrMayNotPublish
 	}
-	doc, err := s.document(ctx, who, named, target,
-		[]access.Visibility{access.Public}, kind)
-	if err != nil {
-		return nil, err
-	}
-	digest, err := settledDigest(doc)
-	if err != nil {
-		return nil, err
-	}
-	if s.generated != nil {
-		s.generated()
-	}
-
 	var recorded *Issuance
+	attempt := 0
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		attempt++
+		// Generated inside, from the transaction that records it, on every
+		// attempt. Generated before, a withdrawn approval, a finding a scan
+		// closed or a patch dropped while it was recorded leaves a statement
+		// nobody stands behind in what went out, and a retry records a
+		// document describing a database that has moved.
+		doc, err := s.within(tx).document(ctx, who, named, target,
+			[]access.Visibility{access.Public}, kind)
+		if err != nil {
+			return err
+		}
+		digest, err := settledDigest(doc)
+		if err != nil {
+			return err
+		}
+		if s.generated != nil && attempt == 1 {
+			s.generated()
+		}
 		// Read here, like the ordinal below and for the same reason. Taken
 		// before the transaction, a retry carries the moment the first
 		// attempt started: two people recording an issuance for one build at
@@ -149,9 +155,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		recorded.Ordinal = highest + 1
-		// The bytes that go out, numbered and dated inside the write. What
-		// the digest covers was settled above; the version and the moment
-		// are what this transaction decides.
+		// The bytes that go out, numbered and dated. What the digest covers
+		// was settled above; the version and the moment are what this
+		// transaction decides.
 		went := *doc
 		went.Version, went.Timestamp = recorded.Ordinal, issuedAt
 		body, err := json.Marshal(went)
@@ -172,7 +178,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		// The names the document states, confirmed unchanged in the write
-		// that records it. The document is generated before the transaction,
+		// that records it. The names were resolved before the transaction,
 		// so a rename committing in between would otherwise record a document
 		// naming the build by a name it no longer has. Each check is a write
 		// matching the name read, which also holds the row against a rename
@@ -218,7 +224,7 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	var rows []Went
-	err = s.db.NewSelect().
+	err = s.idb().NewSelect().
 		TableExpr(`"vex_issuance" AS "vi"`).
 		Join(`JOIN "person" AS "pe" ON pe.id = vi.issued_by`).
 		ColumnExpr(`vi.ordinal AS "ordinal"`).
@@ -253,7 +259,7 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 		return nil, err
 	}
 	var last string
-	err = s.db.NewSelect().Model((*Issuance)(nil)).
+	err = s.idb().NewSelect().Model((*Issuance)(nil)).
 		Column("digest").
 		Where("target_id = ?", target.ID).
 		Where("kind = ?", kind).
@@ -291,7 +297,7 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject,
 		return "", err
 	}
 	var body string
-	err = s.db.NewSelect().Model((*Issuance)(nil)).
+	err = s.idb().NewSelect().Model((*Issuance)(nil)).
 		Column("document").
 		Where("target_id = ?", target.ID).
 		Where("kind = ?", kind).
@@ -319,7 +325,7 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 // they will be known by.
 func (s *Store) revision(ctx context.Context, targetID int64, kind Kind) (int, error) {
 	var highest int
-	err := s.db.NewSelect().Model((*Issuance)(nil)).
+	err := s.idb().NewSelect().Model((*Issuance)(nil)).
 		ColumnExpr("COALESCE(MAX(ordinal), 0)").
 		Where("target_id = ?", targetID).
 		Where("kind = ?", kind).

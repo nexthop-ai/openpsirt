@@ -514,18 +514,33 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	if len(heads) == 0 {
 		return out, nil
 	}
-	issueIDs := make([]int64, 0, len(heads))
-	productIDs := make([]int64, 0, len(heads))
+	// One identifier per issue and per product, never one per row. A bulk
+	// claim covering one kernel issue holds a decision at each of its
+	// places, which is a hundred thousand rows, and a list carrying each of
+	// them is a statement past the size one engine accepts.
+	var issueIDs, productIDs []int64
+	seenIssue, seenProduct := map[int64]bool{}, map[int64]bool{}
+	inProduct := map[int64]map[int64]bool{}
 	// Every row per issue, earliest first: the first stands for the issue
 	// and all of them are what setting it aside sets aside.
 	covers := map[int64]map[int64][]int64{}
 	within := map[int64]int64{}
 	byProduct := map[int64][]int64{}
 	for _, head := range heads {
-		issueIDs = append(issueIDs, head.VulnerabilityID)
-		productIDs = append(productIDs, head.ProductID)
+		if !seenIssue[head.VulnerabilityID] {
+			seenIssue[head.VulnerabilityID] = true
+			issueIDs = append(issueIDs, head.VulnerabilityID)
+		}
+		if !seenProduct[head.ProductID] {
+			seenProduct[head.ProductID] = true
+			productIDs = append(productIDs, head.ProductID)
+			inProduct[head.ProductID] = map[int64]bool{}
+		}
 		within[head.ClaimID] = head.ProductID
-		byProduct[head.ProductID] = append(byProduct[head.ProductID], head.VulnerabilityID)
+		if !inProduct[head.ProductID][head.VulnerabilityID] {
+			inProduct[head.ProductID][head.VulnerabilityID] = true
+			byProduct[head.ProductID] = append(byProduct[head.ProductID], head.VulnerabilityID)
+		}
 		if covers[head.ClaimID] == nil {
 			covers[head.ClaimID] = map[int64][]int64{}
 		}

@@ -125,7 +125,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 				finding.MostDocumentName))
 		}
 
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.ID, finding.Supplied{
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, finding.Supplied{
 			Source:     finding.FromAdvisory,
 			Identifier: advisory.Identifier,
 			Publisher:  advisory.Publisher,

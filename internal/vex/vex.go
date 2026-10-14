@@ -182,6 +182,26 @@ type Store struct {
 	// records it. Set by a test that has to commit a second issuance inside
 	// that window; nil everywhere else.
 	generated func()
+	// reads is the transaction a document is generated in, where it is
+	// generated for the write that records it, and nil otherwise.
+	reads bun.IDB
+}
+
+// idb is what a document is read from: the transaction recording it, or the
+// database.
+func (s *Store) idb() bun.IDB {
+	if s.reads != nil {
+		return s.reads
+	}
+	return s.db
+}
+
+// within is the store reading from tx, so a document generated for the write
+// recording it describes the database that write commits to.
+func (s *Store) within(tx bun.IDB) *Store {
+	inside := *s
+	inside.reads = tx
+	return &inside
 }
 
 // NewStore returns a store over db.
@@ -325,7 +345,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// a decision is a claim about a product's code and reaches every build
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
-	q := s.db.NewSelect().
+	q := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
@@ -365,7 +385,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	}
 	// Where a component's places disagree, each place a decision covers is
 	// stated on its own, naming what pulls the component in as the product.
-	placed, err := finding.CoveredAtPlaces(ctx, s.db, named.ProductID, target.ID, visible, s.carrying())
+	placed, err := finding.CoveredAtPlaces(ctx, s.idb(), named.ProductID, target.ID, visible, s.carrying())
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +423,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	for _, row := range placed {
 		decided = append(decided, row.DecidedBy)
 	}
-	said, err := finding.StatedBy(ctx, s.db, decided)
+	said, err := finding.StatedBy(ctx, s.idb(), decided)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +616,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.db.NewSelect().
+	err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(nodeJoin).
@@ -644,7 +664,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		ClosedAt time.Time `bun:"closed_at"`
 	}
 	where, args := database.InAnyOf("f.id", ids)
-	if err := s.db.NewSelect().
+	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.id AS "id"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
@@ -735,7 +755,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.db.NewSelect().
+	err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(nodeJoin).
@@ -793,7 +813,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Document      string    `bun:"document"`
 	}
 	where, args := database.InAnyOf("f.id", ids)
-	if err := s.db.NewSelect().
+	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
 		Join(finding.WordsJoin("ss")).
@@ -890,7 +910,7 @@ func build(named *catalog.Named) string {
 // root by a package identifier that states a version.
 func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64) (string, error) {
 	var root string
-	err := s.db.NewSelect().
+	err := s.idb().NewSelect().
 		TableExpr(`"target" AS "t"`).
 		Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
 		ColumnExpr(`COALESCE(sc.root_identifier, '')`).
@@ -925,7 +945,7 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 	// dismissals is a thousand identifiers here and a large one is far more,
 	// and a statement binding them all is refused by two of the four engines.
 	where, args := database.InAnyOf("va.vulnerability_id", issues)
-	err := s.db.NewSelect().Model((*finding.Alias)(nil)).
+	err := s.idb().NewSelect().Model((*finding.Alias)(nil)).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = va.vulnerability_id`).
 		ColumnExpr(`va.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`va.identifier AS "identifier"`).

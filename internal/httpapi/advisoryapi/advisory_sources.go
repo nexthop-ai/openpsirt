@@ -133,10 +133,6 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if in.DB == nil {
 			return nil, core.NoDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
-		}
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
@@ -147,7 +143,12 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		}
 		var row *supplier.Source
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
-			var err error
+			// Resolved inside the act it names, so a rename or a retirement
+			// committing between the two is what a retry reads.
+			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			if err != nil {
+				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+			}
 			row, err = supplier.NewStore(tx).Add(ctx, by, product.ID, input.Body.Name, address)
 			switch {
 			case errors.Is(err, supplier.ErrNameTaken):
@@ -200,11 +201,13 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if in.DB == nil {
 			return nil, core.NoDatabase(in.Logger)
 		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
-		}
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+			// Resolved inside the act it names, so a rename committing
+			// between the two is what a retry reads.
+			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			if err != nil {
+				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+			}
 			// Mapped before the trail row, which would otherwise record a
 			// withdrawal that did not happen — and the pass goes on reaching
 			// out to a publisher somebody believes it has stopped reading.
