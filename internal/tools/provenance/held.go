@@ -7,6 +7,18 @@
 // identifier.
 package provenance
 
+// Owner is who holds the copyright in what this project wrote.
+const Owner = "Nexthop Systems Inc."
+
+// OwnLicense is the license this tree is under.
+const OwnLicense = "Apache-2.0"
+
+// GoHeader is the two lines a Go file this project writes opens with: its
+// copyright and the license expression it is under.
+func GoHeader(license string) string {
+	return "// Copyright " + Owner + "\n// SPDX-License-Identifier: " + license + "\n"
+}
+
 // Entry is one file held in the tree, and what it may be kept under.
 type Entry struct {
 	Path    string

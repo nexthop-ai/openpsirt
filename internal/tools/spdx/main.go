@@ -28,10 +28,10 @@ import (
 )
 
 // owner is who holds the copyright in what this project wrote.
-const owner = "Nexthop Systems Inc."
+const owner = provenance.Owner
 
 // own is the license this tree is under.
-const own = "Apache-2.0"
+const own = provenance.OwnLicense
 
 // style is how one kind of file writes a comment.
 type style int

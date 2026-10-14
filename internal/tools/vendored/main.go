@@ -67,14 +67,15 @@ var marks = []*regexp.Regexp{
 
 // ownLicense is the identifier naming this tree's own license and nothing
 // else.
-var ownLicense = regexp.MustCompile(`SPDX-License-Identifier:\s*Apache-2\.0\s*(?:\*/)?\s*$`)
+var ownLicense = regexp.MustCompile(`SPDX-License-Identifier:\s*` +
+	regexp.QuoteMeta(provenance.OwnLicense) + `\s*(?:\*/)?\s*$`)
 
 // itself is where this program and the list it reads live, both of which
 // spell every mark it looks for.
 var itself = map[string]bool{"internal/tools/vendored": true, "internal/tools/provenance": true}
 
 // Our own name, which a copyright line naming is not somebody else's.
-const owner = "Nexthop Systems Inc."
+const owner = provenance.Owner
 
 // A path NOTICE names: a file under one of the tree's top-level directories.
 // Taken from where the path begins, so a directory named partway along one is
