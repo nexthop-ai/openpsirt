@@ -37,6 +37,7 @@ import (
 	"fmt"
 	"go/format"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"sort"
@@ -51,6 +52,16 @@ const catalogURL = "https://cwe.mitre.org/data/xml/cwec_latest.xml.zip"
 
 // written is where the names go, relative to the repository root.
 const written = "internal/weakness/names.go"
+
+// The bounds on what is read. The published archive is a few megabytes and
+// the document inside it a few tens; each bound sits well above that and
+// fails in words when outgrown, where an unbounded read of a hostile answer
+// is the process running out of memory.
+const (
+	mostArchive  = 64 << 20
+	mostDocument = 512 << 20
+	mostHops     = 5
+)
 
 // catalog is the shape of the published file, read down to the two fields a
 // document needs. Everything else it carries — the descriptions, the
@@ -75,27 +86,16 @@ func main() {
 }
 
 func run() error {
-	body, err := fetch(catalogURL)
+	client := &http.Client{Timeout: 2 * time.Minute, CheckRedirect: redirect}
+	body, err := fetch(client, catalogURL, mostArchive)
 	if err != nil {
 		return err
 	}
-	read, err := catalogIn(body)
+	read, err := catalogIn(body, mostDocument)
 	if err != nil {
 		return err
 	}
-	names := map[string]string{}
-	for _, one := range read.Weaknesses.Weakness {
-		id, name := strings.TrimSpace(one.ID), strings.TrimSpace(one.Name)
-		// An entry missing either half is not usable and is not a reason to
-		// refuse the rest of a published catalog.
-		if id == "" || name == "" {
-			continue
-		}
-		if _, err := strconv.Atoi(id); err != nil {
-			continue
-		}
-		names["CWE-"+id] = name
-	}
+	names := namesIn(read)
 	// The whole point is that this is not a list somebody typed, so an empty
 	// or near-empty answer is a fetch that went wrong rather than a catalog
 	// that shrank. Refused rather than committed.
@@ -115,9 +115,39 @@ func run() error {
 	return nil
 }
 
-// fetch reads the published archive.
-func fetch(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 2 * time.Minute}
+// namesIn is the catalog's weakness names by identifier.
+func namesIn(read *catalog) map[string]string {
+	names := map[string]string{}
+	for _, one := range read.Weaknesses.Weakness {
+		id, name := strings.TrimSpace(one.ID), strings.TrimSpace(one.Name)
+		// An entry missing either half is not usable and is not a reason to
+		// refuse the rest of a published catalog.
+		if id == "" || name == "" {
+			continue
+		}
+		if _, err := strconv.Atoi(id); err != nil {
+			continue
+		}
+		names["CWE-"+id] = name
+	}
+	return names
+}
+
+// redirect follows a redirect only to https, and only a few hops: the names
+// read land in published advisories, so a hop to plain http is a hop to
+// whoever is on the path.
+func redirect(req *http.Request, via []*http.Request) error {
+	if req.URL.Scheme != "https" {
+		return fmt.Errorf("refused a redirect to %s, which is not https", req.URL)
+	}
+	if len(via) >= mostHops {
+		return fmt.Errorf("refused a redirect to %s after %d hops", req.URL, len(via))
+	}
+	return nil
+}
+
+// fetch reads the published archive, refusing one larger than most bytes.
+func fetch(client *http.Client, url string, most int64) ([]byte, error) {
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("ask %s for the catalog: %w", url, err)
@@ -126,15 +156,19 @@ func fetch(url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%s answered %s", url, resp.Status)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, most+1))
 	if err != nil {
 		return nil, fmt.Errorf("read the catalog from %s: %w", url, err)
+	}
+	if int64(len(body)) > most {
+		return nil, fmt.Errorf("%s answered more than %d bytes, which is too large to be the catalog", url, most)
 	}
 	return body, nil
 }
 
-// catalogIn reads the one document inside the archive.
-func catalogIn(body []byte) (*catalog, error) {
+// catalogIn reads the one document inside the archive, refusing one that
+// decompresses to more than most bytes.
+func catalogIn(body []byte, most int64) (*catalog, error) {
 	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
 	if err != nil {
 		return nil, fmt.Errorf("open the archive: %w", err)
@@ -142,6 +176,12 @@ func catalogIn(body []byte) (*catalog, error) {
 	for _, file := range archive.File {
 		if !strings.HasSuffix(strings.ToLower(file.Name), ".xml") {
 			continue
+		}
+		// The archive reader refuses a document that runs past the size it
+		// declares, so bounding the declared size bounds what is decoded.
+		if file.UncompressedSize64 > math.MaxInt64 || int64(file.UncompressedSize64) > most {
+			return nil, fmt.Errorf("%s declares %d bytes, which is too large to be the catalog",
+				file.Name, file.UncompressedSize64)
 		}
 		opened, err := file.Open()
 		if err != nil {
