@@ -356,7 +356,7 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 | Source | What it yields |
 |---|---|
 | The namespace this deployment publishes under | The organization in the three spellings the ecosystems use: the host, the host reversed, which is what a Maven group and a Java package are, and each label short of the top-level domain. Already required for CSAF and VEX and already meaning "who we are", so a deployment that publishes anything has said this once |
-| What each build declared itself to be | The account, scope or group that identifier is published under. A root is the product this deployment builds, so who publishes it is this deployment by construction. Taken from the scan record rather than from the stored component, because the component standing for the product is stored by its name alone — a version on it would give the product a new identity every night |
+| What each build declared itself to be | The account, scope or group that identifier is published under: the segment beside the name, and for a Go module path the account after its host, whatever major-version suffix, module subdirectory or forge group follows it. A root is the product this deployment builds, so who publishes it is this deployment by construction. Taken from the scan record rather than from the stored component, because the component standing for the product is stored by its name alone — a version on it would give the product a new identity every night |
 | What the deployment stated | Whatever else an operator named, for what the other two cannot reach |
 
 | Rule | Reason |
