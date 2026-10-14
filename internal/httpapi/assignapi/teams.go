@@ -6,6 +6,7 @@ package assignapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -140,6 +141,10 @@ func registerTeams(api huma.API, a core.Administering) {
 					nil, trail.Said("declared", true)); err != nil {
 					return core.NotRecorded(a.Logger, err)
 				}
+			}
+			if len(in.Body.Members) > access.MostTeamMembers {
+				return huma.Error422UnprocessableEntity(fmt.Sprintf(
+					"a team is declared with at most %d members at once", access.MostTeamMembers))
 			}
 			for _, identity := range in.Body.Members {
 				person, err := store.ByIdentity(ctx, identity)

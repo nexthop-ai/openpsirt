@@ -655,3 +655,25 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 		}
 	})
 }
+
+// The message names the case as the record holds it. A path segment carries
+// no bound and is matched without regard to capitals, so what the caller typed
+// is neither the name nor of any bounded length.
+func TestBeingBroughtInNamesTheCaseAsRecorded(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		embargoed := r.Embargoed(t)
+		typed := strings.ToLower(embargoed)
+		if typed == embargoed {
+			t.Fatalf("the identifier %q has no capitals to tell the two apart by", embargoed)
+		}
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/MINE/issues/"+typed+"/collaborators/triager", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing somebody in answered %d: %s", got.Code, got.Body.String())
+		}
+		told := r.Told(t, "triager", "brought-in")
+		if len(told) != 1 || !strings.Contains(told[0], embargoed+" in mine.") {
+			t.Errorf("being brought in was said as %q, want the case as recorded", told)
+		}
+	})
+}

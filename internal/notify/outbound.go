@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -804,6 +805,10 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	return row, nil
 }
 
+// ShortestSecret is the shortest secret a webhook is signed with, in
+// characters.
+const ShortestSecret = 16
+
 // webhookOnly refuses what a signed request does not take.
 //
 // It belongs to the deployment. Whatever receives it is automation, which
@@ -815,8 +820,8 @@ func webhookOnly(d Destination, row *Outbound) error {
 	if err := reachable(row.URL); err != nil {
 		return err
 	}
-	if row.Secret == "" {
-		return refusal.Errorf("a webhook needs a secret to sign with")
+	if utf8.RuneCountInString(row.Secret) < ShortestSecret {
+		return refusal.Errorf("a webhook's secret is at least %d characters", ShortestSecret)
 	}
 	if strings.TrimSpace(d.Channel) != "" || strings.TrimSpace(d.Topic) != "" {
 		return refusal.Errorf("a webhook has an address rather than a channel")

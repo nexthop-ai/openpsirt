@@ -58,7 +58,7 @@ func registerBulk(api huma.API, in core.Deps) {
 		Variant   string `path:"variant"`
 		Component string `path:"component"`
 		core.ComponentQuery
-		Contains string `query:"contains" doc:"Match the text of the report"`
+		Contains string `query:"contains" maxLength:"200" doc:"Match the text of the report"`
 		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"500"`
 		Offset   int    `query:"offset" minimum:"0"`
 	}) (*struct {

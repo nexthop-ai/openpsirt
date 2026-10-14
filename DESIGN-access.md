@@ -377,6 +377,11 @@ Who is on a team is listed for an administrator; anybody else sees the names.
 Routing work needs the name and not the membership, and the membership of a team
 is a fact about people.
 
+| Bound | |
+|---|---|
+| A team's name and its display spelling are at most 191 characters, refused past that by the store | The name carries an index of that width. Cut, the name stored and the name typed would differ, and declaring the typed one again would make a second team |
+| One declaration puts at most 500 people on a team | Each is resolved and written on its own |
+
 A provider group is the wrong unit twice over: role assignment is one mode for
 the whole deployment, so a deployment in direct mode has no groups at all; and
 what makes people leave the other mode is discovering that their groups do not

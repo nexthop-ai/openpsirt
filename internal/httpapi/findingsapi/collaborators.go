@@ -146,10 +146,10 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			// is unactionable.
 			core.Tell(ctx, in, "could not say that somebody was brought into a case", notify.Telling{
 				PersonID: person.ID, Kind: notify.BroughtIn,
-				Body: "You have been brought into " + input.Vulnerability + " in " +
-					input.Product + ". You can read and argue about that issue there, " +
+				Body: "You have been brought into " + issued + " in " +
+					named + ". You can read and argue about that issue there, " +
 					"and nothing else of that product.",
-				Link:    weblink.ProductFindings(input.Product, input.Vulnerability),
+				Link:    weblink.ProductFindings(named, issued),
 				Private: true,
 				// The pair the case grant itself is, so the
 				// person being brought in can read the line

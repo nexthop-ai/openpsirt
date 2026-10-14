@@ -551,6 +551,7 @@ request-forgery primitive unless governed:
 | Rule | Reason |
 |---|---|
 | Every request is signed over the timestamp and the body | A receiver can distinguish one of ours from one anybody could make, and cannot be handed yesterday's again. The timestamp is inside the signature |
+| A webhook's signing secret is at least 16 characters, refused by the store | Every caller that records a destination is held to it, the request route included |
 | The signing secret is stored recoverably | Every other credential is hashed because it authenticates somebody to this deployment; this one authenticates this deployment to somebody else. No endpoint returns it |
 | No endpoint returns a destination's address, only its host | For Slack and Teams the path is the credential. A destination is told apart by its name and kind, which is also what retires it |
 | The subject and the text are escaped as markdown, line by line, by the rule the release note uses, and then carry `&`, `<` and `>` as `&amp;`, `&lt;` and `&gt;` | Teams renders markdown in the text, so `[label](address)` is a link labelled anything, and Slack and Teams read `<!channel>` as a ping for the whole channel and `<address\|label>` as a link. A body carries publisher names, supplier failure text and component names nobody here chose, and the text this application writes carries no markdown of its own. The line holding the address this deployment composed stays an address, and the link field is sent as it is. A mail is plain text and carries the text unescaped |
