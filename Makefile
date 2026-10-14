@@ -866,6 +866,7 @@ tag-as-given = $(if $(filter command line,$(origin VERSION)),$(value VERSION),$(
 # be shell text.
 release-freeze: export RELEASE_TAG = $(tag-as-given)
 release-freeze:
+	$(GO) run ./internal/tools/release guard "$$RELEASE_TAG"
 	OPENPSIRT_TEST_ENGINES=sqlite,postgres,mysql,mariadb OPENPSIRT_RELEASE_FREEZE="$$RELEASE_TAG" \
 	  $(GO) test -count=1 -run '^TestWriteTheSchemaAReleaseTags$$' ./internal/database/migrate/migrations/
 	$(GO) run ./internal/tools/release freeze "$$RELEASE_TAG"
