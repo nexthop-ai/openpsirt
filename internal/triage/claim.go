@@ -114,7 +114,7 @@ func (s *Store) PointAt(ctx context.Context, subject access.Subject, claimID int
 	// argue about. The two are asked separately because the second
 	// question names the issue: somebody brought into one case may argue
 	// about it , and a check that only knew the product would refuse them.
-	_, rows, err := s.claimRows(ctx, subject, claimID, readable)
+	_, rows, err := s.claimRows(ctx, subject, claimID, readableOn)
 	if err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func (s *Store) ApproveClaim(ctx context.Context, subject access.Subject, claimI
 func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimID int64,
 	batch string, except []int64, because string) (*ClaimApproved, error) {
 
-	claim, rows, err := s.claimRows(ctx, subject, claimID, mayApprove)
+	claim, rows, err := s.claimRows(ctx, subject, claimID, mayApproveOn)
 	if err != nil {
 		return nil, err
 	}
@@ -695,7 +695,7 @@ func (s *Store) Split(ctx context.Context, subject access.Subject, claimID int64
 func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64,
 	rows []int64, because string) (*Claim, error) {
 
-	claim, all, err := s.claimRows(ctx, subject, claimID, mayDecide)
+	claim, all, err := s.claimRows(ctx, subject, claimID, mayDecideOn)
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +816,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 	var result *SentBack
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		result = &SentBack{}
-		claim, rows, err := within.claimRows(ctx, subject, claimID, mayApprove)
+		claim, rows, err := within.claimRows(ctx, subject, claimID, mayApproveOn)
 		if err != nil {
 			return err
 		}
@@ -889,8 +889,12 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 // refused the whole rather than handed the part — acting on a claim is acting
 // on the argument, which does not come in halves. A claim they may reach none
 // of answers as one that is not there, like everything else here.
+//
+// The rule is asked of each row's product, issue and visibility, so a rule
+// that honors a case grant can: somebody brought into one issue reads and
+// argues the claims about it.
 func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID int64,
-	allowed func(access.Subject, int64, access.Visibility) bool) (*Claim, []Decision, error) {
+	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Claim, []Decision, error) {
 
 	claim := new(Claim)
 	if err := s.db.NewSelect().Model(claim).Where("id = ?", claimID).Scan(ctx); err != nil {
@@ -905,7 +909,7 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 		return nil, nil, ErrNotTheirs
 	}
 	for _, row := range rows {
-		if !allowed(subject, row.ProductID, row.Visibility) {
+		if !allowed(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
 			return nil, nil, ErrNotTheirs
 		}
 	}

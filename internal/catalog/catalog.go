@@ -817,7 +817,7 @@ func (s *Store) LocateVisible(ctx context.Context, subject access.Subject, produ
 	// to resolve it would refuse them the one thing they were granted
 	// while telling them nothing they did not already know. Every read
 	// past this still asks about the issue.
-	if !subject.Sees(p.ID) && len(subject.Cases(p.ID)) == 0 {
+	if !subject.Reaches(p.ID) {
 		return nil, fmt.Errorf("product %q: %w", product, ErrNotFound)
 	}
 	return s.Locate(ctx, product, stream, variant)

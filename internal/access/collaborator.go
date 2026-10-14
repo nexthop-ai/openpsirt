@@ -15,7 +15,7 @@ import (
 
 // sameCase is the condition that a grant's issue column names the issue bound
 // in its one placeholder: the same issue, or one merged into it.
-func sameCase(column string) string { return filed.Under(column) }
+func sameCase(column filed.Column) string { return filed.Under(column) }
 
 // Collaborator is one person brought into one undisclosed case.
 //
@@ -82,7 +82,7 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 		Set("removed_by = ?", by).
 		Set("live_person_id = ?", nil).
 		Where("product_id = ?", productID).
-		Where(sameCase("vulnerability_id"), vulnerabilityID).
+		Where(sameCase(filed.Issue), vulnerabilityID).
 		Where("person_id = ?", personID).
 		Where("live_person_id IS NOT NULL").
 		Exec(ctx)
@@ -98,7 +98,7 @@ func (s *Store) OnCase(ctx context.Context, productID, vulnerabilityID int64) ([
 	err := s.db.NewSelect().Model((*Collaborator)(nil)).
 		ColumnExpr("cc.person_id").
 		Where("cc.product_id = ?", productID).
-		Where(sameCase("cc.vulnerability_id"), vulnerabilityID).
+		Where(sameCase(filed.CaseIssue), vulnerabilityID).
 		Where("cc.live_person_id IS NOT NULL").
 		OrderExpr("cc.added_at, cc.id").
 		Scan(ctx, &people)
@@ -154,7 +154,7 @@ func (s *Store) onCase(ctx context.Context, productID, vulnerabilityID,
 	on, err := s.db.NewSelect().Model((*Collaborator)(nil)).
 		Column("cc.id").
 		Where("cc.product_id = ?", productID).
-		Where(sameCase("cc.vulnerability_id"), vulnerabilityID).
+		Where(sameCase(filed.CaseIssue), vulnerabilityID).
 		Where("cc.person_id = ?", personID).
 		Where("cc.live_person_id IS NOT NULL").
 		Exists(ctx)
@@ -172,7 +172,7 @@ func (s *Store) CaseRows(ctx context.Context, productID,
 	var rows []Collaborator
 	err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where(sameCase("vulnerability_id"), vulnerabilityID).
+		Where(sameCase(filed.Issue), vulnerabilityID).
 		Where("live_person_id IS NOT NULL").
 		Order("added_at", "id").
 		Scan(ctx)

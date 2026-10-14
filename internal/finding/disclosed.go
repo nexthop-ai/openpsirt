@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -97,7 +98,7 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			// was waiting leaves the queue with nothing left to disclose.
 			waiting, err := tx.NewSelect().Model((*Movement)(nil)).
 				Where("product_id = ?", productID).
-				Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+				Where(FiledUnder(filed.Issue), vulnerabilityID).
 				Where("act = ?", Disclosure).
 				Where("needs_approval = ?", true).
 				Where("approved_at IS NULL").
@@ -190,7 +191,7 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 		Where(`"product_id" = ?`, productID).
 		// Every decision about the issue, including those filed under an
 		// issue that merged into it.
-		Where(FiledUnder(`"vulnerability_id"`), vulnerabilityID).
+		Where(FiledUnder(filed.Issue), vulnerabilityID).
 		Where(`"visibility" = ?`, access.Private).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the decisions: %w", err)

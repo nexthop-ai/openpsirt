@@ -47,11 +47,11 @@ type Merge struct {
 // FiledUnder is the condition that a row whose issue is held in column is
 // about the issue bound in its one placeholder. The filed package holds the
 // spelling.
-func FiledUnder(column string) string { return filed.Under(column) }
+func FiledUnder(column filed.Column) string { return filed.Under(column) }
 
 // FiledUnderAny is FiledUnder for a list of issues bound in its one
 // placeholder.
-func FiledUnderAny(column string) string { return filed.UnderAny(column) }
+func FiledUnderAny(column filed.Column) string { return filed.UnderAny(column) }
 
 // Decisions is every decision `de` beside `dv`, the issue it was filed under.
 //
@@ -166,7 +166,7 @@ func issueOf(ctx context.Context, db bun.IDB, vulnerabilityID int64) (int64, err
 func MergesInto(ctx context.Context, db bun.IDB, issueID int64) ([]Merge, error) {
 	var merges []Merge
 	if err := db.NewSelect().Model(&merges).
-		Where(FiledUnder("vm.absorbed_id"), issueID).
+		Where(FiledUnder(filed.AbsorbedIssue), issueID).
 		OrderExpr("vm.merged_at, vm.id").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what merged into this issue: %w", err)

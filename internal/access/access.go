@@ -662,6 +662,17 @@ func (s Subject) Sees(productID int64) bool {
 	return s.ReadsIn(productID)
 }
 
+// Reaches reports whether this subject may resolve this product's names: they
+// may know it exists, or they were brought into a case in it.
+//
+// The one spelling of the rule. It is a lookup's question and never a read's:
+// every read past it asks SeesOn, VisibleOn or the product-wide question about
+// what it returns, because a case grant reaches one issue and nothing else of
+// the product.
+func (s Subject) Reaches(productID int64) bool {
+	return s.Sees(productID) || len(s.cases[productID]) > 0
+}
+
 // HoldsAnywhere reports whether this subject holds one of these roles on any
 // product at all.
 //

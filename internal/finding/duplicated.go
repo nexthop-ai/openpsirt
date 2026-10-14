@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -236,7 +237,7 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	var record []Movement
 	if err := tx.NewSelect().Model(&record).
 		Where("product_id = ?", ruling.ProductID).
-		Where(FiledUnder("vulnerability_id"), issue).
+		Where(FiledUnder(filed.Issue), issue).
 		Order("asked_at", "id").
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read how this embargo has been moved: %w", err)

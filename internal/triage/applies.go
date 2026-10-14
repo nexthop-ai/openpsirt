@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -49,7 +50,7 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	// deferral stops standing on a date that is held there too.
 	query := s.db.NewSelect().Model(decision).Relation("Claim").
 		Where("de.product_id = ?", at.ProductID).
-		Where(finding.FiledUnder("de.vulnerability_id"), at.VulnerabilityID).
+		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
 		// Approved, or proposed and never needing agreement, and not one
 		// that was sent back — asked of the one spelling rather than written
@@ -119,7 +120,7 @@ func (s *Store) PreviouslyAt(ctx context.Context, subject access.Subject, at Pla
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&previous).Relation("Claim"), subject, "de").
 		Where("de.product_id = ?", at.ProductID).
-		Where(finding.FiledUnder("de.vulnerability_id"), at.VulnerabilityID).
+		Where(finding.FiledUnder(filed.DecisionIssue), at.VulnerabilityID).
 		Where("de.place_identity = ?", at.PlaceIdentity).
 		Order("de.id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)
@@ -148,7 +149,7 @@ func matchVersion(query *bun.SelectQuery, column, stated string) *bun.SelectQuer
 // All of it. An approval names one revision, so reading only the current one
 // leaves somebody unable to see what was actually agreed to.
 func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID int64) ([]Revision, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readable); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
 		return nil, err
 	}
 	var revisions []Revision
@@ -163,7 +164,7 @@ func (s *Store) Revisions(ctx context.Context, subject access.Subject, claimID i
 // Approvals returns who agreed to a claim and to which words, including
 // agreements later taken back.
 func (s *Store) Approvals(ctx context.Context, subject access.Subject, claimID int64) ([]Approval, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readable); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
 		return nil, err
 	}
 	var approvals []Approval
@@ -212,7 +213,7 @@ func (s *Store) Read(ctx context.Context, subject access.Subject, decisionID int
 func (s *Store) ReadClaim(ctx context.Context, subject access.Subject,
 	claimID int64) (*Claim, []Decision, error) {
 
-	return s.claimRows(ctx, subject, claimID, readable)
+	return s.claimRows(ctx, subject, claimID, readableOn)
 }
 
 // Filter narrows a list of decisions to what somebody is looking for.

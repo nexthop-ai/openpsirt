@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -211,7 +212,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		q = q.Where("de.product_id = ?", where.ProductID)
 	}
 	if len(where.Vulnerabilities) > 0 {
-		q = q.Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(where.Vulnerabilities))
+		q = q.Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(where.Vulnerabilities))
 	}
 	if where.OpenIn > 0 {
 		q = q.Where(`dv.issue_id IN (SELECT "fo".vulnerability_id FROM "finding" AS "fo"`+

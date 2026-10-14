@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -368,7 +369,7 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 		if err := tx.NewSelect().Model((*Assessment)(nil)).
 			Column("severity").
 			Where("product_id = ?", productID).
-			Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+			Where(FiledUnder(filed.Issue), vulnerabilityID).
 			Where("state = ?", AssessmentLive).
 			OrderExpr("decided_at DESC, id DESC").Limit(1).
 			Scan(ctx, &left); err != nil {

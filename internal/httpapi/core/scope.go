@@ -5,6 +5,7 @@ package core
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -64,12 +65,32 @@ func Scoped(ctx context.Context, in Deps, subject access.Subject, q ScopeQuery) 
 // caller's job to turn an empty result for a product they cannot see back into
 // "no such product", which keeps the property the ordinary check exists for.
 //
-// It reports whether they see the product, because that is what the caller
-// needs in order to do it.
+// It reports whether they see the product, and HiddenIfEmpty is the one
+// spelling of what to do with that.
 func ScopedByHolding(ctx context.Context, in Deps, subject access.Subject,
 	q ScopeQuery) (finding.Scope, bool, error) {
 
 	return resolveScope(ctx, in, subject, q)
+}
+
+// HiddenIfEmpty is the answer to a read narrowed by holding: nothing held, in a
+// product named and not seen, is the answer a product never declared gives, so
+// the read cannot be used to find out which products exist. Nil otherwise.
+func HiddenIfEmpty(rows int, product string, sees bool) error {
+	if rows == 0 && product != "" && !sees {
+		return NoSuchProduct()
+	}
+	return nil
+}
+
+// levelAbsent answers a branch or a variant that did not resolve: as the
+// product does, where the subject cannot see it, so a refusal here says
+// nothing a refusal on the product did not, and in its own words otherwise.
+func levelAbsent(logger *slog.Logger, err error, sees bool, reading, sentence string) error {
+	if !sees {
+		return Absent(logger, err, reading, NoSuchProduct)
+	}
+	return Absent(logger, err, reading, func() error { return huma.Error404NotFound(sentence) })
 }
 
 // resolveScope turns names into identifiers and says whether the subject reads
@@ -101,33 +122,16 @@ func resolveScope(ctx context.Context, in Deps, subject access.Subject,
 	if q.Stream != "" {
 		stream, err := names.StreamByName(ctx, product.ID, q.Stream)
 		if err != nil {
-			// A product they cannot see answers about its branches the way it
-			// answers about itself, so a refusal here says nothing a refusal
-			// on the product did not.
-			if !sees {
-				return finding.Scope{}, false, Absent(in.Logger, err,
-					"that branch could not be looked up", NoSuchProduct)
-			}
-			return finding.Scope{}, false, Absent(in.Logger, err,
-				"that branch could not be looked up", func() error {
-					return huma.Error404NotFound(
-						"that product has no branch or tag by that name")
-				})
+			return finding.Scope{}, false, levelAbsent(in.Logger, err, sees,
+				"that branch could not be looked up", "that product has no branch or tag by that name")
 		}
 		scope.StreamID = &stream.ID
 	}
 	if q.Variant != "" {
 		variant, err := names.VariantByName(ctx, product.ID, q.Variant)
 		if err != nil {
-			if !sees {
-				return finding.Scope{}, false, Absent(in.Logger, err,
-					"that variant could not be looked up", NoSuchProduct)
-			}
-			return finding.Scope{}, false, Absent(in.Logger, err,
-				"that variant could not be looked up", func() error {
-					return huma.Error404NotFound(
-						"that product has no variant by that name")
-				})
+			return finding.Scope{}, false, levelAbsent(in.Logger, err, sees,
+				"that variant could not be looked up", "that product has no variant by that name")
 		}
 		scope.VariantID = &variant.ID
 	}

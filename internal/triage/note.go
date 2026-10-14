@@ -16,6 +16,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -236,7 +237,7 @@ func (s *Store) Notes(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().Model(&notes).
 		// Every note on the issue, including those written under an issue that
 		// merged into it.
-		Where(finding.FiledUnder("vulnerability_id"), vulnerabilityID).
+		Where(finding.FiledUnder(filed.Issue), vulnerabilityID).
 		Where("product_id = ?", productID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the notes on this issue: %w", err)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 )
 
 // FlawReport is what somebody told us, and what became of it.
@@ -149,7 +150,7 @@ func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 	err := s.db.NewSelect().Model(row).
 		// The issue's report, filed under it or under an issue that merged into
 		// it. The one received first where each name had one.
-		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+		Where(FiledUnder(filed.Issue), vulnerabilityID).
 		OrderExpr("id").Limit(1).Scan(ctx)
 	switch {
 	case database.IsNoRows(err):

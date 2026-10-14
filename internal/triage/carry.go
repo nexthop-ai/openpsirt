@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -499,7 +500,7 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
 		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
 		Where("de.product_id = ?", productID).
-		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(issues)).
+		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
 		Where("de.place_identity IN (?)", bun.List(identities)).
 		Where("claim.outcome = ?", Deferred).
 		// Withdrawn ones for the span they were in force, as the threshold

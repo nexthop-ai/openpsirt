@@ -115,7 +115,7 @@ func MintingCredentials(ctx context.Context) error {
 	}
 	if subject.Delegated() {
 		return huma.Error403Forbidden(
-			"a credential cannot hand out another way in — sign in to record a person, "+
+			"a credential cannot hand out another way in — sign in to record a person, " +
 				"create a key or unbind an identifier")
 	}
 	return nil

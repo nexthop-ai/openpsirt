@@ -455,8 +455,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		// Nothing here, in a product they cannot read, is the answer a product
 		// that was never declared gives — so it gives that answer, and asking
 		// this cannot be used to find out which products exist.
-		if len(rows) == 0 && input.Product != "" && !sees {
-			return nil, core.NoSuchProduct()
+		if err := core.HiddenIfEmpty(len(rows), input.Product, sees); err != nil {
+			return nil, err
 		}
 		return unassignedPage(rows, total), nil
 	})
@@ -516,8 +516,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what the team is dealing with could not be read", err)
 		}
-		if len(rows) == 0 && input.Product != "" && !sees {
-			return nil, core.NoSuchProduct()
+		if err := core.HiddenIfEmpty(len(rows), input.Product, sees); err != nil {
+			return nil, err
 		}
 		return unassignedPage(rows, total), nil
 	})

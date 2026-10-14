@@ -64,7 +64,7 @@ type WasSaid struct {
 // is about the argument: a note on one place of forty-four is one nobody else
 // reading the claim would see.
 func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, body string) (*Comment, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, mayTakePart); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, claimID, mayTakePartOn); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(body) == "" {
@@ -121,7 +121,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 		// identical. A read that failed is a fault, and carries its cause.
 		return 0, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
-	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, mayTakePart); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, mayTakePartOn); err != nil {
 		return 0, err
 	}
 	if comment.WrittenBy != subject.ID {
@@ -190,7 +190,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 
 // Discussion returns what has been said about a claim, oldest first.
 func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID int64) ([]Comment, error) {
-	if _, _, err := s.claimRows(ctx, subject, claimID, readable); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, claimID, readableOn); err != nil {
 		return nil, err
 	}
 	var comments []Comment
@@ -229,7 +229,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 		Where("id = ?", commentID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
-	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, readable); err != nil {
+	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, readableOn); err != nil {
 		return nil, err
 	}
 	var rows []WasSaid

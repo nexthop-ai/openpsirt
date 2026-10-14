@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -107,7 +108,7 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 		ColumnExpr("de.id, de.product_id, de.vulnerability_id, de.place_identity").
 		ColumnExpr("de.component_upstream_version, de.consumer_upstream_version").
 		ColumnExpr("de.state, de.proposed_at, cl.outcome").
-		Where(FiledUnder("de.vulnerability_id"), kept).
+		Where(FiledUnder(filed.DecisionIssue), kept).
 		Where("de.live_key IS NOT NULL").
 		OrderExpr("de.id").
 		Scan(ctx, &live); err != nil {

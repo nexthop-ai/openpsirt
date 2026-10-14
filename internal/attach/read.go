@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -121,7 +122,7 @@ func (s *Store) ForIssue(ctx context.Context, subject access.Subject,
 	var rows []Attachment
 	if err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where(finding.FiledUnder("vulnerability_id"), vulnerabilityID).
+		Where(finding.FiledUnder(filed.Issue), vulnerabilityID).
 		Where("attached_at IS NOT NULL").
 		Order("uploaded_at DESC", "id DESC").
 		Scan(ctx); err != nil {
@@ -379,7 +380,7 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 		// Folded in with the two conditions below, an outage told every caller
 		// their attachments were gone.
 		return 0, 0, err
-	case subject.Kind != access.Person || !subject.Sees(named.ID):
+	case subject.Kind != access.Person || !subject.Reaches(named.ID):
 		return 0, 0, ErrNoSuchIssue
 	}
 	var issue int64

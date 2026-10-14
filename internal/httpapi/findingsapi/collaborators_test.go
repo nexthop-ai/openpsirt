@@ -4,9 +4,12 @@
 package findingsapi_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -537,6 +540,107 @@ func TestACollaboratorIsToldNothingOfWhatWasFiledAgainstABuild(t *testing.T) {
 			if got.Code != stranger.Code || got.Body.String() != stranger.Body.String() {
 				t.Errorf("%s answers a collaborator %d %s, where a stranger is answered %d %s",
 					path, got.Code, got.Body.String(), stranger.Code, stranger.Body.String())
+			}
+		}
+	})
+}
+
+func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
+	// The grant reaches one issue: its files and the claims about it, read and
+	// written, and nothing of a second undisclosed issue in the same product.
+	// Two collaborators: one holding nothing on the product, for the files,
+	// and one triaging its disclosed work, because arguing is a route only
+	// somebody triaging the product reaches.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		theirs := r.Embargoed(t)
+		other := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+				`"summary":"The recovery console takes a password nobody set.",`+
+				`"severity":"high","component":"libnl-3-200"}`)
+		if other.Code != http.StatusCreated {
+			t.Fatalf("recording a second flaw answered %d: %s", other.Code, other.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(other.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		notTheirs := recorded.Identifier
+		for _, who := range []string{"outsider", "triager"} {
+			if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+				"/v1/products/mine/issues/"+theirs+"/collaborators/"+who,
+				""); got.Code != http.StatusNoContent {
+				t.Fatalf("bringing %s in answered %d: %s", who, got.Code, got.Body.String())
+			}
+		}
+
+		attach := func(issue string) *httptest.ResponseRecorder {
+			body := &bytes.Buffer{}
+			form := multipart.NewWriter(body)
+			part, err := form.CreateFormFile("file", "evidence.txt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := part.Write([]byte("the socket answered before sign-in")); err != nil {
+				t.Fatal(err)
+			}
+			if err := form.WriteField("evidence", "true"); err != nil {
+				t.Fatal(err)
+			}
+			if err := form.Close(); err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest(http.MethodPost,
+				"/v1/products/mine/issues/"+issue+"/attachments", body)
+			req.Header.Set("Content-Type", form.FormDataContentType())
+			req.Header.Set(httpapitest.TestHeader, "outsider")
+			httpapitest.FromOurOwnPage(req)
+			rec := httptest.NewRecorder()
+			r.Handler.ServeHTTP(rec, req)
+			return rec
+		}
+
+		// Their own case: files, and a claim they argue, revise and comment on.
+		if got := attach(theirs); got.Code != http.StatusCreated {
+			t.Errorf("attaching to their own case answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
+			"/v1/products/mine/issues/"+theirs+"/attachments", ""); got.Code != http.StatusOK {
+			t.Errorf("listing their own case's files answered %d: %s", got.Code, got.Body.String())
+		}
+		mine, _ := r.Claimed(t, "triager", theirs, "libnl-3-200", httpapitest.Dismissal)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", mine),
+			`{"reasoning":"The socket is not built into this image."}`); got.Code != http.StatusOK {
+			t.Errorf("revising their own claim on their case answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/comments", mine),
+			`{"body":"Checked the build configuration."}`); got.Code != http.StatusCreated {
+			t.Errorf("commenting on a claim about their case answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+			fmt.Sprintf("/v1/claims/%d", mine), ""); got.Code != http.StatusOK {
+			t.Errorf("reading a claim about their case answered %d: %s", got.Code, got.Body.String())
+		}
+
+		// The other undisclosed issue: every route answers as one that is not
+		// there.
+		elsewhere, _ := r.Claimed(t, "private-triage", notTheirs, "libnl-3-200", httpapitest.Dismissal)
+		httpapitest.RefusedWith(t, attach(notTheirs), http.StatusNotFound)
+		for _, c := range []struct{ method, path, body string }{
+			{http.MethodGet, "/v1/products/mine/issues/" + notTheirs + "/attachments", ""},
+			{http.MethodGet, fmt.Sprintf("/v1/claims/%d", elsewhere), ""},
+			{http.MethodPost, fmt.Sprintf("/v1/claims/%d/comments", elsewhere),
+				`{"body":"Checked the build configuration."}`},
+			{http.MethodPut, fmt.Sprintf("/v1/claims/%d/reasoning", elsewhere),
+				`{"reasoning":"The socket is not built into this image."}`},
+		} {
+			for _, who := range []string{"outsider", "triager"} {
+				httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, who, c.method, c.path, c.body),
+					http.StatusNotFound)
 			}
 		}
 	})

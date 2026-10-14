@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -701,7 +702,7 @@ func (s *Store) Movements(ctx context.Context, subject access.Subject,
 	var rows []Movement
 	if err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+		Where(FiledUnder(filed.Issue), vulnerabilityID).
 		Order("asked_at", "id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how this embargo has been moved: %w", err)
 	}
@@ -764,7 +765,7 @@ func movedBy(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) 
 	var rows []Movement
 	err := db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
-		Where(FiledUnder("vulnerability_id"), vulnerabilityID).
+		Where(FiledUnder(filed.Issue), vulnerabilityID).
 		Scan(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("read how far this has already been moved: %w", err)

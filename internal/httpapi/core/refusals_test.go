@@ -29,6 +29,7 @@ func mappers(err error) map[string]error {
 		"NotRecorded":        NotRecorded(quiet, err),
 		"AmbiguousOrMissing": AmbiguousOrMissing(quiet, err),
 		"Undeclared":         Undeclared(quiet, err, "that could not be looked up"),
+		"levelAbsent":        levelAbsent(quiet, err, true, "that could not be looked up", "nothing goes by that"),
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -116,7 +117,7 @@ func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 	var deferrals []Decision
 	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Claim")).
 		Where("de.product_id IN (?)", bun.List(productIDs)).
-		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(asked)).
+		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(asked)).
 		Where("claim.outcome = ?", Deferred).
 		// Withdrawn ones included, for the span they were actually in force.
 		// Excluded outright, the threshold was defeated by taking a deferral

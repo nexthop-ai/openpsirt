@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -369,7 +370,7 @@ func mintReference(ctx context.Context, tx bun.IDB, product string, year int) (s
 // asks again.
 func refuseIfReported(ctx context.Context, tx bun.IDB, vulnerabilityID, reportID int64) error {
 	held, err := tx.NewSelect().Model((*FlawReport)(nil)).
-		Where(FiledUnder("fr.vulnerability_id"), vulnerabilityID).
+		Where(FiledUnder(filed.ReportIssue), vulnerabilityID).
 		Where("fr.id <> ?", reportID).
 		Exists(ctx)
 	if err != nil {

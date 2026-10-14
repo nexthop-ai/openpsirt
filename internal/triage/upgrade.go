@@ -304,7 +304,7 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 	var moved bool
 	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
-		claim, rows, err := within.claimRows(ctx, subject, claimID, mayDecide)
+		claim, rows, err := within.claimRows(ctx, subject, claimID, mayDecideOn)
 		if err != nil {
 			return err
 		}

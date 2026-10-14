@@ -24,6 +24,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -796,17 +797,24 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 		if len(private) > 0 {
 			q = q.WhereOr("product_id IN (?)", bun.List(private))
 		}
-		// A case grant is one issue in one product, so it is a pair rather
-		// than a product: widening it to the product would hand a
-		// collaborator the rest of that product's embargo list, which is the
-		// whole of what the grant is not.
-		for _, product := range subject.CaseProducts() {
-			for _, issue := range subject.Cases(product) {
-				q = q.WhereOr("(product_id = ? AND "+finding.FiledUnder("vulnerability_id")+")", product, issue)
-			}
-		}
-		return q
+		return onCases(q, subject)
 	})
+}
+
+// onCases widens a group by the issues a case grant names.
+//
+// A case grant is one issue in one product, so it is a pair rather than a
+// product: widening it to the product would hand a collaborator the rest of
+// that product's embargo list, which is the whole of what the grant is not.
+// Followed through a merge, so a row about the issue their case merged into is
+// still about their case.
+func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	for _, product := range subject.CaseProducts() {
+		for _, issue := range subject.Cases(product) {
+			q = q.WhereOr("(product_id = ? AND "+finding.FiledUnder(filed.Issue)+")", product, issue)
+		}
+	}
+	return q
 }
 
 // inHeldProducts narrows to rows about a product this subject holds a role on:
@@ -837,12 +845,7 @@ func inHeldProducts(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery
 		if len(private) > 0 {
 			q = q.WhereOr("(private = ? AND product_id IN (?))", true, bun.List(private))
 		}
-		for _, product := range subject.CaseProducts() {
-			for _, issue := range subject.Cases(product) {
-				q = q.WhereOr("(product_id = ? AND vulnerability_id = ?)", product, issue)
-			}
-		}
-		return q
+		return onCases(q, subject)
 	})
 }
 

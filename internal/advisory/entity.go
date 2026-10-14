@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
@@ -339,7 +340,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		err := tx.NewSelect().Model(&held).
 			Where("advisory_id = ?", row.ID).
 			Where("product_id = ?", named.ID).
-			Where(finding.FiledUnder("vulnerability_id"), issue.ID).
+			Where(finding.FiledUnder(filed.Issue), issue.ID).
 			Limit(1).Scan(ctx)
 		switch {
 		case err != nil && !database.IsNoRows(err):
@@ -432,7 +433,7 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 			Set("removed_by = ?", subject.ID).
 			Where("advisory_id = ?", row.ID).
 			Where("product_id = ?", named.ID).
-			Where(finding.FiledUnder("vulnerability_id"), issue.ID).
+			Where(finding.FiledUnder(filed.Issue), issue.ID).
 			Where("removed_at IS NULL").
 			Exec(ctx)
 		if err != nil {

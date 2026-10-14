@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
@@ -213,7 +214,7 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 	var credits []string
 	err := s.db.NewSelect().Model((*finding.FlawReport)(nil)).
 		ColumnExpr("fr.credit").
-		Where(finding.FiledUnder("fr.vulnerability_id"), issueID).
+		Where(finding.FiledUnder(filed.ReportIssue), issueID).
 		Where("fr.product_id = ?", productID).
 		Scan(ctx, &credits)
 	if err != nil {

@@ -997,7 +997,7 @@ func (s *Store) knowsBuild(ctx context.Context, subject access.Subject, targetID
 	if err != nil {
 		return err
 	}
-	if !subject.Sees(productID) && len(subject.Cases(productID)) == 0 {
+	if !subject.Reaches(productID) {
 		return access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -92,7 +93,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
-		Where(finding.FiledUnderAny("de.vulnerability_id"), bun.List(issues)).
+		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
 		Where("de.state = ?", Approved).
 		Where("de.live_key IS NOT NULL").
 		GroupExpr("dv.issue_id, cl.outcome")

@@ -60,14 +60,25 @@ func mayApprove(subject access.Subject, productID int64, visibility access.Visib
 		subject.Reads(visibility, productID), mayDecide(subject, productID, visibility))
 }
 
-// mayTakePart reports whether a subject may add to a decision rather than only
-// read it — writing a comment, or changing their own.
+// mayTakePartOn reports whether a subject may add to a decision about one named
+// issue rather than only read it — writing a comment, or changing their own.
 //
 // Taking part asks for triage or the approver capability; reading asks only for
-// the finding's visibility. Named separately from readable so that widening
-// who may read never widens who may comment.
-func mayTakePart(subject access.Subject, productID int64, visibility access.Visibility) bool {
-	return mayApprove(subject, productID, visibility) || mayDecide(subject, productID, visibility)
+// the finding's visibility. Named separately from readableOn so that widening
+// who may read never widens who may comment. Arguing widens by a case grant
+// and agreeing does not.
+func mayTakePartOn(subject access.Subject, productID, vulnerabilityID int64,
+	visibility access.Visibility) bool {
+
+	return mayApprove(subject, productID, visibility) ||
+		mayDecideOn(subject, productID, vulnerabilityID, visibility)
+}
+
+// mayApproveOn is mayApprove in the shape of a rule about one named issue. The
+// issue is not asked: approval stays with the pool that reads the product, so
+// two collaborators cannot be the two people a dismissal asks for.
+func mayApproveOn(subject access.Subject, productID, _ int64, visibility access.Visibility) bool {
+	return mayApprove(subject, productID, visibility)
 }
 
 // readable reports whether a subject may see what was decided.

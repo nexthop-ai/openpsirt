@@ -367,7 +367,7 @@ func ProductForIssue(ctx context.Context, in Deps, subject access.Subject,
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that product could not be looked up", NoSuchProduct)
 	}
-	if !subject.Sees(product.ID) && len(subject.Cases(product.ID)) == 0 {
+	if !subject.Reaches(product.ID) {
 		return nil, NoSuchProduct()
 	}
 	return product, nil
