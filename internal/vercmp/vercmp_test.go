@@ -496,6 +496,14 @@ func TestAVersionLeadingToAReleaseIsToldApartFromOne(t *testing.T) {
 		{vercmp.Maven, "2.25.1", false},
 		// A word Maven has never heard of sorts above the release.
 		{vercmp.Maven, "33.0.0-jre", false},
+		// Except the words publishers mark an unfinished version with.
+		{vercmp.Maven, "12.9.0.jre11-preview", true},
+		{vercmp.Maven, "5.0.0-preview1", true},
+		{vercmp.Maven, "21-ea", true},
+		{vercmp.Maven, "1.4-M1-eap-93", true},
+		{vercmp.Maven, "2023.2-eap", true},
+		{vercmp.Maven, "2.0.0-dev", true},
+		{vercmp.Maven, "2.0.0-PRE", true},
 		{vercmp.Maven, "1.0-sp1", false},
 		{vercmp.Maven, "1.0.Final", false},
 		{vercmp.NuGet, "14.0.1-beta2", true},
