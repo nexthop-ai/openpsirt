@@ -342,7 +342,7 @@ that did not come back both answer the version alone.
 |---|---|
 | A package is asked about once a pass, however many of its versions are stored | A component is one version and the question is about the package, so every version in the pass's window takes the one answer |
 | A PyPI name is asked for as PyPI spells it | Lower case, each run of hyphens, underscores and dots one hyphen. Asked any other way the index redirects, and the client follows no redirect |
-| A name the Maven or NuGet asker refuses before sending is reported as unreadable | It was never sent, so "no index knows it" would put a name nobody asked about on the list somebody holds back from |
+| A name the Maven or NuGet asker refuses before sending is reported as unreadable | It was never sent, so "not known, or refused" would put a name nobody asked about on the list somebody holds back from |
 
 ### Names held back
 
@@ -378,15 +378,15 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 ### Unanswered components
 
 Two questions that are one report, because they are asked together: what was
-held back says what the default is costing, and what no public index has heard
-of is the list an operator reads to decide what else should be held back. A
+held back says what the default is costing, and what no public index knew or
+answered is the list an operator reads to decide what else should be held back. A
 name promoted from the second appears in the first afterwards, which is how
 somebody knows the promotion worked.
 
 | Why there is no answer | |
 |---|---|
 | It is ours | Never sent. The names it was matched against travel with the report, so a row can be checked rather than taken on trust |
-| No index knows it | Sent, and nothing had heard of it. A private module and a vendored fork both look like this, and neither is a fault |
+| Not known, or refused | Sent, and no version came back: the index had not heard of it, or refused it in a way it will repeat. A private module and a vendored fork both look like this, and neither is a fault. A refusal is recorded exactly as an unknown name is, so the two are one row |
 | The identifier cannot be read | Nothing can turn it into a request. Kept apart from the one above because it is a fault in a document this deployment accepted rather than a fact about the world, and reading it as "no index knows this" would put it on the list of names somebody is about to hold back, where it means nothing |
 
 The classification is derived rather than stored. A held-back name and one no

@@ -19,7 +19,7 @@ import (
 type UnansweredBody struct {
 	Purl      string          `json:"purl" doc:"The package identifier, which is the name that would be sent"`
 	Ecosystem string          `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
-	Why       core.Unanswered `json:"why" doc:"'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"`
+	Why       core.Unanswered `json:"why" doc:"'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and came back with no version: not known, or refused. 'unreadable' is an identifier nothing can turn into a request"`
 	Checked   string          `json:"checked" doc:"The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked"`
 }
 
@@ -63,8 +63,9 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"Asking sends a component's name to that ecosystem's index, so names this " +
 			"deployment calls its own are never sent. `ours` is what they were matched " +
 			"against, narrowed to the products you may read.\n\n" +
-			"`unknown` is a component no public index has heard of — a private module or a " +
-			"vendored fork — and is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. " +
+			"`unknown` is a component sent to its public index that came back with no version: " +
+			"not known, or refused in a way the index will repeat. Most are private modules or " +
+			"vendored forks, and the list is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. " +
 			"`unreadable` is an identifier nothing can turn into a request.\n\n" +
 			"A component the pass has not reached is not here. It is waiting rather than " +
 			"unanswered.\n\n" +

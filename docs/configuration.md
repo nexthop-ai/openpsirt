@@ -818,10 +818,10 @@ is removed the next time the pass reaches it, along with the summary and the
 project address. All of it came from sending the name. Nothing else is
 affected and no upgrade step is needed.
 
-Read what it held back, and what no index knew. The report is at
+Read what it held back, and what no index knew or answered. The report is at
 `/v1/upstream/unanswered` and on the System screen. Held-back names say what
-the default is costing; names no public index has heard of are private modules
-and vendored forks, and they are the candidates to promote into
+the default is costing; names no public index knew or answered are mostly
+private modules and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
 ## Outbound exclusions

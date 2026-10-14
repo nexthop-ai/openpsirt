@@ -18,7 +18,7 @@ import (
 // answer.
 //
 // One report rather than two, because the two questions are asked together.
-// The held-back list says what the default costs, and the list no index knows
+// The held-back list says what the default costs, and the list no index knew or answered
 // is the list an operator reads to decide what else should be held back — so a
 // name promoted from the second appears in the first afterwards, which is the
 // confirmation that the promotion worked.
@@ -27,12 +27,14 @@ type Why string
 const (
 	// WhyOurs is a name this deployment calls its own, so it was never sent.
 	WhyOurs Why = "ours"
-	// WhyUnknown is a name that was sent and no index had heard of.
+	// WhyUnknown is a name that was sent and came back with no version: the
+	// index had not heard of it, or refused it in a way it will repeat. Both
+	// are recorded alike, so nothing tells them apart.
 	WhyUnknown Why = "unknown"
 	// WhyUnreadable is an identifier nothing can turn into a request. It is
 	// separated from the one above because it is a fault in a document this
 	// deployment accepted rather than a fact about the world, and reading it
-	// as "no index knows this" would put it on the list of names an operator
+	// as "not known, or refused" would put it on the list of names an operator
 	// is about to hold back, where it means nothing.
 	WhyUnreadable Why = "unreadable"
 )
