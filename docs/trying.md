@@ -6,7 +6,7 @@ this thing do"; the checkout answers "what does my change do".
 ## The published image
 
 ```
-docker run -p 8080:8080 \
+docker run -p 127.0.0.1:8080:8080 \
   -v "$PWD/openpsirt-data:/data" \
   -e OPENPSIRT_DATABASE_URL="sqlite:///data/openpsirt.db" \
   -e OPENPSIRT_ADDR="0.0.0.0:8080" \
@@ -23,7 +23,9 @@ one port. The Helm chart is published beside the image, as
 
 !!! warning "Not a small production deployment"
     Plain HTTP, and administration handed to whoever a header says they are.
-    It is for looking at.
+    It is for looking at. The port is published on this machine alone,
+    because anybody who reaches it from an address in the trusted ranges and
+    sends the header is that person.
 
 ### Sign-in
 
@@ -55,9 +57,8 @@ the demo below stands up, and what a real deployment does with its ingress.
 ## From a checkout
 
 ```
-make demo                    # build, start, seed two products, print the address
-make demo DEMO_HOST=yourbox  # if you browse by something other than localhost
-make demo DEMO_BIND=0.0.0.0  # to reach it from another machine
+make demo                                      # build, start, seed two products, print the address
+make demo DEMO_BIND=0.0.0.0 DEMO_HOST=yourbox  # to browse from another machine, by this one's name
 ```
 
 The demo and `make dev` listen on this machine alone unless `DEMO_BIND` says

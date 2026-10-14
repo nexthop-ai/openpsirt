@@ -196,8 +196,9 @@ The image's own health check, which Kubernetes ignores and Docker acts on,
 runs `openpsirt health`: it reads the configuration the server reads from the
 environment and asks `/healthz` where `OPENPSIRT_ADDR` says the server listens,
 on loopback where that names every interface, never through a proxy. It
-takes `--config` as every other command does, so a container configured by
-file runs the check with the same file.
+takes `--config` as every other command does. The image's check passes none,
+so a container configured by file replaces that check with one naming the same
+file; left alone, it reads the environment and asks port 8080.
 
 The startup probe allows ten minutes by default. Migrations run before the
 service answers, and a probe that gives up part way kills the pod and restarts

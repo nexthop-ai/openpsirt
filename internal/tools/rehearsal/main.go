@@ -7,8 +7,7 @@
 //	rehearsal -from v0.5.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
-// the test suite reads, so the password is never on the command line. -url
-// names one instead.
+// the test suite reads, so the password is never on the command line.
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let

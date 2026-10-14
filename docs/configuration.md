@@ -115,7 +115,7 @@ starts read them, so they stay in the environment beside a file.
 
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
-| `OPENPSIRT_ADDR` | `server.address` | The `host:port` the HTTP server listens on. The image's health check, `openpsirt health`, asks the server there. A container configured by file runs the check as `openpsirt health --config <file>` | `:8080` |
+| `OPENPSIRT_ADDR` | `server.address` | The `host:port` the HTTP server listens on. The image's health check, `openpsirt health`, asks the server there. A container configured by file replaces the image's check with `openpsirt health --config <file>`, because the image's check names no file | `:8080` |
 | `OPENPSIRT_BASE_URL` | `server.base_url` | The address people arrive on, **written in full, with no path below it and no query, fragment or credentials**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
 | `OPENPSIRT_PLAIN_HTTP` | `server.plain_http` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
 | `OPENPSIRT_SHUTDOWN_GRACE` | `server.shutdown_grace` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |

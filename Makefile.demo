@@ -31,7 +31,9 @@
 #   DEMO_HOST   where this waits for the container to answer, and what the
 #               status line prints. Not what you have to type: the demo is not
 #               told a base address, so it answers on whatever name you reach
-#               it by
+#               it by. With DEMO_BIND left at 127.0.0.1 it names this machine's
+#               loopback address, so a name for another machine goes with
+#               DEMO_BIND=0.0.0.0
 #   DEMO_USER   who you arrive as, and the administrator the demo names. An
 #               identity is the username the proxy asserts, unprefixed
 #   DEMO_BIND   the address the demo's doors and the dev server listen on.
