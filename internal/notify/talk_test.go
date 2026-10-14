@@ -566,3 +566,54 @@ func TestAChannelTakingTwoKindsIsOneMessage(t *testing.T) {
 		}
 	})
 }
+
+// A channel that refuses a post is tried again on the next sweep, up to the
+// limit, and then left alone; what arrives after is carried as its own.
+func TestAChannelThatRefusesIsTriedAgainAndThenLeftAlone(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		w.channel(t, "psirt", notify.Destination{})
+		w.chat.fail = errors.New("not_in_channel")
+		w.hold(t, notify.BuildQuiet, notify.Holds{
+			About: "quiet-1", Body: "kernel main has not been scanned", ProductID: &w.kernel,
+		})
+		sent, failed, err := w.talk.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != 0 || failed != 1 {
+			t.Errorf("the first sweep reported %d sent and %d failed, want 0 and 1", sent, failed)
+		}
+		for i := 0; i < 7; i++ {
+			w.sweep(t)
+		}
+		if got := len(w.chat.posts["psirt"]); got != 5 {
+			t.Errorf("the channel was tried %d times, want it to stop at 5", got)
+		}
+
+		w.chat.fail = nil
+		w.hold(t, notify.BuildQuiet,
+			notify.Holds{About: "quiet-1", Body: "kernel main has not been scanned", ProductID: &w.kernel},
+			notify.Holds{About: "quiet-2", Body: "firmware main has not been scanned", ProductID: &w.firmware})
+		w.sweep(t)
+		posts := w.chat.posts["psirt"]
+		if len(posts) != 6 {
+			t.Fatalf("the channel was posted to %d times, want one more after it answered", len(posts))
+		}
+		last := said(posts[5:])
+		if !strings.Contains(last, "firmware main") || strings.Contains(last, "kernel main") {
+			t.Errorf("after it answered the channel was told %q, want the new condition alone", last)
+		}
+	})
+}
+
+// One turn of the chat sweep, as Run takes it on its interval, carries what is
+// owed.
+func TestTheChatSweepCarriesWhatIsOwed(t *testing.T) {
+	eachChat(t, func(t *testing.T, w *chatWorld) {
+		w.tell(t, notify.Telling{Kind: notify.Assigned, Body: "CVE-2026-1 in libfoo", Link: "/f/1"})
+		notify.TalkCycleForTest(w.talk, t.Context())
+		if got := said(w.chat.directs["U-ANA"]); !strings.Contains(got, "CVE-2026-1 in libfoo") {
+			t.Errorf("one turn of the sweep did not carry it: %q", got)
+		}
+	})
+}

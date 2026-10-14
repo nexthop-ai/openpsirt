@@ -55,22 +55,26 @@ func NewWatch(db *bun.DB, logger *slog.Logger) *Watch {
 
 // Run sweeps until the context ends.
 func (w *Watch) Run(ctx context.Context, interval time.Duration) {
-	background.Every(ctx, interval, betweenSweeps, func(ctx context.Context) {
-		if opened, cleared, err := w.Once(ctx); err != nil {
-			// Logged and carried on, like every other background pass here: a
-			// sweep that cannot run is not a reason to stop the process, and
-			// the next one is fifteen minutes away.
-			w.logger.Error("working out what is worth saying", "error", err)
-		} else if opened > 0 || cleared > 0 {
-			w.logger.Info("operational alerts changed",
-				"opened", opened, "cleared", cleared)
-		}
-		if gone, err := w.Tidy(ctx); err != nil {
-			w.logger.Error("clearing expired sessions", "error", err)
-		} else if gone > 0 {
-			w.logger.Info("cleared expired sessions", "sessions", gone)
-		}
-	})
+	background.Every(ctx, interval, betweenSweeps, w.cycle)
+}
+
+// cycle is one turn of the sweep: every condition, and then the sessions that
+// have run out.
+func (w *Watch) cycle(ctx context.Context) {
+	if opened, cleared, err := w.Once(ctx); err != nil {
+		// Logged and carried on, like every other background pass here: a
+		// sweep that cannot run is not a reason to stop the process, and
+		// the next one is fifteen minutes away.
+		w.logger.Error("working out what is worth saying", "error", err)
+	} else if opened > 0 || cleared > 0 {
+		w.logger.Info("operational alerts changed",
+			"opened", opened, "cleared", cleared)
+	}
+	if gone, err := w.tidy(ctx); err != nil {
+		w.logger.Error("clearing expired sessions", "error", err)
+	} else if gone > 0 {
+		w.logger.Info("cleared expired sessions", "sessions", gone)
+	}
 }
 
 // tellAdministrators derives the conditions that go to administrators and to
@@ -335,7 +339,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	return out, nil
 }
 
-// Tidy clears what has run out: sessions past their lifetime.
+// tidy clears what has run out: sessions past their lifetime.
 //
 // Sessions are the one table that grows with use rather than with what is
 // tracked, and an expired one is refused on sight, so nothing but the table's
@@ -344,7 +348,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 // the sweep that already runs every quarter of an hour on every replica. Two
 // replicas clearing at once delete the same rows or disjoint ones, and either
 // way nothing is lost.
-func (w *Watch) Tidy(ctx context.Context) (int64, error) {
+func (w *Watch) tidy(ctx context.Context) (int64, error) {
 	return access.NewStore(w.db).PurgeExpiredSessions(ctx)
 }
 

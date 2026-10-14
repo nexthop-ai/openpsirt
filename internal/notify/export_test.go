@@ -12,6 +12,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
+// CycleForTest runs one turn of the watch's sweep, as Run does on its
+// interval, so a test pins what the sweep reaches rather than a method the
+// sweep might stop calling.
+func CycleForTest(w *Watch, ctx context.Context) { w.cycle(ctx) }
+
+// TalkCycleForTest runs one turn of the chat sweep, as Run does.
+func TalkCycleForTest(t *Talk, ctx context.Context) { t.cycle(ctx) }
+
 // SweepBatch is how many notifications one sweep carries.
 //
 // Exported for the test alone, which has to build a backlog of exactly that
