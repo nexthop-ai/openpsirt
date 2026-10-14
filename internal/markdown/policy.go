@@ -537,7 +537,15 @@ func mintedToken(token string) bool {
 // from reading the brackets as a tag or an address, so the whole of it is a
 // mention rather than whatever prefix the plain form reads. `@<identity>` is
 // read too, where markdown leaves it as text.
-var mention = regexp.MustCompile(`(^|[^\w@.:-])@(?:\\?<([^<>\n]{1,191})>|([A-Za-z0-9][A-Za-z0-9._:@-]{0,190}))`)
+//
+// Inside the brackets a backslash escapes the character after it, as markdown
+// reads one: `@\<a\>b>` names `a>b`, and `@\<\_svc\_>` names `_svc_` where
+// the bare underscores would be read as emphasis and split the run.
+var mention = regexp.MustCompile(`(^|[^\w@.:-])@(?:\\?<((?:[^<>\n\\]|\\[^\n]){1,191})>|([A-Za-z0-9][A-Za-z0-9._:@-]{0,190}))`)
+
+// escapedPunct is a backslash before ASCII punctuation, which markdown reads as the
+// punctuation alone. A backslash before anything else is itself.
+var escapedPunct = regexp.MustCompile(`\\([[:punct:]])`)
 
 // trailingAt is a run of text ending in an @ that begins a mention: one
 // standing at the start, or after a character that cannot end a word or an
@@ -612,7 +620,7 @@ func Mentions(source string) []string {
 		said := run.String()
 		for _, match := range mention.FindAllStringSubmatch(said, -1) {
 			if match[2] != "" {
-				add(strings.TrimSpace(match[2]))
+				add(strings.TrimSpace(escapedPunct.ReplaceAllString(match[2], "$1")))
 				continue
 			}
 			// Punctuation at the end is the sentence rather than the name:

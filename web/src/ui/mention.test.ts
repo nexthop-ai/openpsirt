@@ -18,4 +18,10 @@ describe("mentionOf", () => {
     expect(mentionOf("josé")).toBe("@\\<josé>");
     expect(mentionOf("ana.")).toBe("@\\<ana.>");
   });
+
+  it("escapes what markdown would read inside the brackets", () => {
+    expect(mentionOf("a>b")).toBe("@\\<a\\>b>");
+    expect(mentionOf("_svc_")).toBe("@\\<\\_svc\\_>");
+    expect(mentionOf("DOMAIN\\ana")).toBe("@\\<DOMAIN\\\\ana>");
+  });
 });
