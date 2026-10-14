@@ -195,17 +195,25 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Pinned, so the unbind would succeed for a session.
+		if _, err := r.Rights.MatchProvider(t.Context(), "okta", "okta-reader", "reader"); err != nil {
+			t.Fatal(err)
+		}
+
 		for _, act := range []struct {
-			what string
-			path string
-			body string
+			what   string
+			method string
+			path   string
+			body   string
 		}{
-			{"record a person", "/v1/people",
+			{"record a person", http.MethodPost, "/v1/people",
 				`{"identity":"made-by-token","display_name":"Made","admin":true}`},
-			{"create a key", "/v1/keys",
+			{"create a key", http.MethodPost, "/v1/keys",
 				`{"name":"made-by-token","product":"mine"}`},
+			// Whoever next arrives under the username is taken to be them.
+			{"unbind an identifier", http.MethodDelete, "/v1/people/reader/identifier", ""},
 		} {
-			req := httptest.NewRequest(http.MethodPost, act.path, strings.NewReader(act.body))
+			req := httptest.NewRequest(act.method, act.path, strings.NewReader(act.body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+secret)
 			got := httptest.NewRecorder()
@@ -221,6 +229,38 @@ func TestATokenCannotMintACredentialThatOutlivesIt(t *testing.T) {
 			`{"identity":"made-by-session","display_name":"Made"}`); got.Code != http.StatusCreated {
 			t.Errorf("an administrator signing in could not record a person: %d %s",
 				got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/reader/identifier", ""); got.Code != http.StatusNoContent {
+			t.Errorf("an administrator signing in could not unbind an identifier: %d %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestUnbindingReopensTheWindowTheDeploymentConfigured(t *testing.T) {
+	// The window an unbind re-opens is the one in which a username alone
+	// decides who gets somebody's roles, so a deployment that shortened it is
+	// held to the shorter one here too.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+			"/v1/settings/signin.claim-window", `{"value":"1h"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("setting the window answered %d: %s", got.Code, got.Body.String())
+		}
+		if _, err := r.Rights.MatchProvider(t.Context(), "okta", "okta-reader", "reader"); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/reader/identifier", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("unbinding answered %d: %s", got.Code, got.Body.String())
+		}
+		var until time.Time
+		if err := r.DB.DB.NewSelect().Table("person_identity").Column("claimable_until").
+			Where("username = ?", "reader").Scan(t.Context(), &until); err != nil {
+			t.Fatal(err)
+		}
+		if latest := time.Now().Add(time.Hour + time.Minute); until.After(latest) {
+			t.Errorf("the re-opened window runs to %s, past the hour configured", until)
 		}
 	})
 }

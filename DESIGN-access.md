@@ -86,7 +86,7 @@ seeding.
 
 | Rule | Reason |
 |---|---|
-| Creating a credential asks for a session (REQ-44) | A credential may not mint another. That held for a personal token issuing a token, and was got around by what an administrator's token could make instead: a person, an administrator even, and a pipeline key, both outliving the token and neither bounded by it. Recording a person and creating a key are the two acts refused to a delegated subject |
+| Creating a credential asks for a session (REQ-44) | A credential may not mint another. That held for a personal token issuing a token, and was got around by what an administrator's token could make instead: a person, an administrator even, and a pipeline key, both outliving the token and neither bounded by it. Recording a person, creating a key and unbinding a provider identifier are the three acts refused to a delegated subject. Unbinding is among them because whoever next arrives under the username is taken to be its holder |
 | Admin is a property of the person rather than a grant against a product | Modeling it as a grant means a row whose product is absent, and a uniqueness rule over a nullable column behaves differently on each of the four engines |
 | The `reporting` role is retired rather than defined | What such a role would gate is breadth of view, and statistics are what breadth looks like once aggregated. It gated nothing: one use outside tests, and a field in the session answer no screen read. A test asserts the refusal rather than its absence from a list |
 
@@ -784,7 +784,7 @@ it. That window ends.
 |---|---|
 | An unredeemed authorization stops being redeemable, on every path | It is the one place where a name rather than an identifier decides who gets a set of roles. Left open, it waits for whoever turns up holding that name |
 | Authorizing somebody again restarts it, and so does unbinding them | Otherwise the window is written once and never again: an authorization nobody redeemed could be reopened by no act at all, and the administrators named in configuration — whose authorization is written again at every start — would lose their way in on the day it lapsed, with nothing logged |
-| The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing |
+| The window is written when the authorization is | It carries the window in force at the moment it was granted, the way a token carries the expiry it was minted with, so changing the setting does not silently extend what is already standing. Unbinding writes the configured window too, read inside the act |
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
 | A group mapping does not reopen it | A group-bound sign-in adopts an account an administrator recorded only while its authorization is redeemable. Adopting a lapsed one would renew the window for whoever arrived holding the name |
 | A group mapping adopts only an authorization waiting under the name | An account whose holder's name moved away at the provider has none, and whoever holds the name next is somebody new. Direct mode refuses the same arrival |

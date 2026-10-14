@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -389,15 +390,9 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if err != nil {
 				return core.WentWrong(a.Logger, "cannot read where roles come from", err)
 			}
-			window := access.DefaultClaimWindow
-			if a.Settings != nil {
-				if settings := a.Settings(db); settings != nil {
-					window, err = settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
-					if err != nil {
-						return core.WentWrong(a.Logger,
-							"cannot read how long an authorization stays redeemable", err)
-					}
-				}
+			window, err := claimWindowIn(ctx, a, db)
+			if err != nil {
+				return err
 			}
 
 			// What was stored before is the value the write was made against,
@@ -649,13 +644,18 @@ func registerAdministration(api huma.API, a core.Administering) {
 			"configured: the name matches and the identifier does not.\n\n" +
 			"It re-opens the window a pinned identifier closes, in which whoever arrives under " +
 			"that username is taken to be its holder. Do it when you expect them to sign in.\n\n" +
+			"The window lasts as long as the claim-window setting says.\n\n" +
+			"Needs a signed-in administrator: a personal token is refused with 403, because " +
+			"whoever arrives next under the username is taken to be its holder.\n\n" +
 			"Somebody with no identifier pinned answers 404 and records nothing.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, _, err := core.Administerable(ctx, a, tx)
+			// A credential-shaped act: whoever next arrives under the username
+			// is taken to be its holder, so a token may not do it.
+			store, _, err := mintable(ctx, a, tx)
 			if err != nil {
 				return err
 			}
@@ -663,7 +663,13 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if err != nil {
 				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
 			}
-			switch err := store.UnbindIdentifier(ctx, person.ID); {
+			// The window re-opened is the one the deployment configured, read
+			// inside the act like every other value it decides from.
+			window, err := claimWindowIn(ctx, a, tx)
+			if err != nil {
+				return err
+			}
+			switch err := store.ClaimingWithin(window).UnbindIdentifier(ctx, person.ID); {
 			case errors.Is(err, access.ErrNothingMatched):
 				return huma.Error404NotFound("they have no identifier bound")
 			case err != nil:
@@ -788,13 +794,30 @@ func registerAdministration(api huma.API, a core.Administering) {
 // timeFormat is how a moment is reported.
 const timeFormat = "2006-01-02T15:04:05Z"
 
-// mintable is administerable for the two acts that create a credential: a
-// credential cannot create another.
+// mintable is administerable for the acts that hand out a way in: a credential
+// cannot hand out another.
 func mintable(ctx context.Context, a core.Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
 	if err := core.MintingCredentials(ctx); err != nil {
 		return nil, nil, err
 	}
 	return core.Administerable(ctx, a, db)
+}
+
+// claimWindowIn is how long an authorization stays redeemable, read through
+// the handle of the act that writes one.
+func claimWindowIn(ctx context.Context, a core.Administering, db bun.IDB) (time.Duration, error) {
+	if a.Settings == nil {
+		return access.DefaultClaimWindow, nil
+	}
+	settings := a.Settings(db)
+	if settings == nil {
+		return access.DefaultClaimWindow, nil
+	}
+	window, err := settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+	if err != nil {
+		return 0, core.WentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
+	}
+	return window, nil
 }
 
 // readable is administerable for the routes that only read the deployment's

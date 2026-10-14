@@ -17350,6 +17350,10 @@ paths:
 
         It re-opens the window a pinned identifier closes, in which whoever arrives under that username is taken to be its holder. Do it when you expect them to sign in.
 
+        The window lasts as long as the claim-window setting says.
+
+        Needs a signed-in administrator: a personal token is refused with 403, because whoever arrives next under the username is taken to be its holder.
+
         Somebody with no identifier pinned answers 404 and records nothing.
 
         Requires: administrator

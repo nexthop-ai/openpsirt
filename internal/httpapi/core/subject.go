@@ -91,18 +91,20 @@ func ReadingTheDeployment(ctx context.Context) error {
 	return nil
 }
 
-// MintingCredentials is administrating, for the two acts that create a
-// credential outliving whoever asked.
+// MintingCredentials is administrating, for the acts that hand out a way in
+// outliving whoever asked.
 //
 // A credential may not mint another. A personal token issuing a token is
 // refused, and the way round it is what an administrator's token can make
 // instead: recording a person — an administrator, even — and creating a
 // pipeline key. Both outlive the token and neither is bounded by it, so the
-// narrow credential can always ask for a wide one.
+// narrow credential can always ask for a wide one. Unbinding somebody's
+// provider identifier is the third: whoever next arrives under their username
+// is taken to be them, with every role they hold.
 //
-// Only these two. The rest of administration is reversible by another
-// administrator and leaves the record every change here leaves; creating a
-// credential is the one that hands out a new way in.
+// Only these three. The rest of administration is reversible by another
+// administrator and leaves the record every change here leaves; these are the
+// ones that hand out a new way in.
 func MintingCredentials(ctx context.Context) error {
 	if err := Administrating(ctx); err != nil {
 		return err
@@ -113,7 +115,8 @@ func MintingCredentials(ctx context.Context) error {
 	}
 	if subject.Delegated() {
 		return huma.Error403Forbidden(
-			"a credential cannot create another — sign in to record a person or create a key")
+			"a credential cannot hand out another way in — sign in to record a person, "+
+				"create a key or unbind an identifier")
 	}
 	return nil
 }
