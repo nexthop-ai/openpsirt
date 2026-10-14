@@ -571,6 +571,40 @@ func TestTheStreamsListSaysWhatEachTagWasCutFrom(t *testing.T) {
 	})
 }
 
+// A tag cut from a branch since retired still names it, whether or not retired
+// streams are asked for: the tag is listed, and what it was cut from is a fact
+// about the tag.
+func TestATagCutFromARetiredBranchStillNamesIt(t *testing.T) {
+	eachCatalog(t, func(t *testing.T, d *declaring) {
+		d.post(t, "/v1/products", `{"name":"sonic"}`)
+		d.post(t, "/v1/products/sonic/streams", `{"name":"release-1","kind":"branch"}`)
+		d.post(t, "/v1/products/sonic/streams", `{"name":"v1.0","kind":"tag","parent":"release-1"}`)
+		req := httptest.NewRequest(http.MethodDelete, "/v1/products/sonic/streams/release-1", nil)
+		httpapitest.FromOurOwnPage(req)
+		req.Header.Set(httpapitest.TestHeader, d.admin)
+		if code, body := d.do(t, req); code >= 300 {
+			t.Fatalf("retiring the branch answered %d: %v", code, body)
+		}
+
+		_, body := d.get(t, "/v1/products/sonic/streams")
+		items, _ := body["items"].([]any)
+		found := false
+		for _, each := range items {
+			row, _ := each.(map[string]any)
+			if row["name"] != "v1.0" {
+				continue
+			}
+			found = true
+			if row["parent"] != "release-1" {
+				t.Errorf("a tag cut from a retired branch reads as cut from %v, want release-1", row["parent"])
+			}
+		}
+		if !found {
+			t.Fatalf("the tag is not listed: %v", items)
+		}
+	})
+}
+
 func TestWhenAReleaseWentOutIsSaidAfterTheFact(t *testing.T) {
 	// A tag is declared here so scans can be filed against it, which happens
 	// whenever somebody gets to it — before the release, months after, or

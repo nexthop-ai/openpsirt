@@ -163,6 +163,25 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		for _, row := range rows {
 			named[row.ID] = row.Name
 		}
+		// A tag cut from a branch since retired names the branch whether or
+		// not retired streams were asked for: the parent is a fact about the
+		// tag, and leaving it out reads as cut from nothing.
+		for _, row := range rows {
+			if row.ParentID == nil {
+				continue
+			}
+			if _, ok := named[*row.ParentID]; ok {
+				continue
+			}
+			every, err := store.Streams(ctx, subject, product.ID, true)
+			if err != nil {
+				return nil, core.Refused(d.Logger, err, "cannot list streams")
+			}
+			for _, one := range every {
+				named[one.ID] = one.Name
+			}
+			break
+		}
 
 		out := &core.ListOutput[core.StreamBody]{}
 		out.Body.Items = make([]core.StreamBody, 0, len(rows))
