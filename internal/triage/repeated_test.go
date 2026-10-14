@@ -70,7 +70,7 @@ func (f *fixture) putOffAt(t *testing.T, product int64, place string, from, unti
 		PlaceIdentity: place, Visibility: access.Public,
 		State: state, ProposedBy: f.proposer, ProposedAt: from, EndedAt: endedAt,
 	}
-	if state != triage.Withdrawn {
+	if state.Live() {
 		row.LiveKey = &live
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
@@ -234,6 +234,103 @@ func TestTwoProductsDisplayedAlikeAreNotOnePattern(t *testing.T) {
 		}
 		if len(rows) != 0 {
 			t.Errorf("one deferral in each of two products read as a pattern: %+v", rows)
+		}
+	})
+}
+
+// putOffAtTwoVersions records one deferral claim with two rows at one place,
+// which is what one claim keyed at two upstream versions writes.
+func (f *fixture) putOffAtTwoVersions(t *testing.T, place string, from, until time.Time) {
+	t.Helper()
+	claim := &triage.Claim{
+		Kind: triage.FindingClaim, ProposedBy: f.proposer, ProposedAt: from,
+		Outcome: triage.Deferred, DeferredUntil: &until,
+	}
+	if _, err := f.db.DB.NewInsert().Model(claim).Exec(t.Context()); err != nil {
+		t.Fatalf("record a claim: %v", err)
+	}
+	for _, version := range []string{"1.2.3", "1.2.4"} {
+		live := fmt.Sprintf("%d\x00%s\x00%s", f.product, place, version)
+		row := &triage.Decision{
+			ClaimID: claim.ID, ProductID: f.product, VulnerabilityID: f.issue,
+			PlaceIdentity: place, Visibility: access.Public, LiveKey: &live,
+			State: triage.Approved, ProposedBy: f.proposer, ProposedAt: from,
+		}
+		if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
+			t.Fatalf("record a deferral: %v", err)
+		}
+	}
+}
+
+func TestALapsedDeferralCountsForAsLongAsItHeldAndOverlapsCountOnce(t *testing.T) {
+	// A lapse ends a deferral's effect the way a withdrawal does, so it counts
+	// for as long as it held. Re-affirmed, the new claim carries the old
+	// date: the place was hidden from the first day to the date once, less
+	// the day between, and never twice.
+	each(t, func(t *testing.T, f *fixture) {
+		// Midnight, because a deferral returns on a day and the servers keep
+		// the date alone.
+		now := time.Now().UTC().Truncate(24 * time.Hour)
+		day := func(n int) time.Time { return now.Add(time.Duration(n-30) * 24 * time.Hour) }
+		lapsed := day(5)
+		f.putOffEnding(t, "place-a", day(0), day(25), triage.LapsedState, &lapsed)
+		f.putOff(t, "place-a", day(6), day(25), triage.Approved)
+
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, 2, 100, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("listed %d places, want the one: %+v", len(rows), rows)
+		}
+		if rows[0].Times != 2 {
+			t.Errorf("it says %d deferrals, want the two claims", rows[0].Times)
+		}
+		if rows[0].TotalDays < 23.9 || rows[0].TotalDays > 24.1 {
+			t.Errorf("it says %.1f days, want 24: five before the lapse and nineteen after",
+				rows[0].TotalDays)
+		}
+
+		held, err := f.store.DeferredAt(t.Context(), f.triager, f.product, f.issue,
+			[]string{"place-a"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := held["place-a"]; got != 24*24*time.Hour {
+			t.Errorf("the threshold measures %v put off, want 24 days", got)
+		}
+	})
+}
+
+func TestOneClaimAtTwoVersionsIsOneDeferral(t *testing.T) {
+	// One claim keyed at two versions writes two rows over one stretch. It
+	// put the place off once.
+	each(t, func(t *testing.T, f *fixture) {
+		now := time.Now().UTC().Truncate(24 * time.Hour)
+		f.putOff(t, "place-b", now.Add(-40*24*time.Hour), now.Add(-30*24*time.Hour), triage.Approved)
+		f.putOffAtTwoVersions(t, "place-b", now.Add(-10*24*time.Hour), now.Add(10*24*time.Hour))
+
+		rows, _, err := f.store.RepeatsPage(t.Context(), f.triager, 0, 2, 100, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("listed %d places, want the one: %+v", len(rows), rows)
+		}
+		if rows[0].Times != 2 {
+			t.Errorf("it says %d deferrals, want the two claims", rows[0].Times)
+		}
+		if rows[0].TotalDays < 29.9 || rows[0].TotalDays > 30.1 {
+			t.Errorf("it says %.1f days, want 30", rows[0].TotalDays)
+		}
+
+		held, err := f.store.DeferredAt(t.Context(), f.triager, f.product, f.issue,
+			[]string{"place-b"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := held["place-b"]; got != 30*24*time.Hour {
+			t.Errorf("the threshold measures %v put off, want 30 days", got)
 		}
 	})
 }
