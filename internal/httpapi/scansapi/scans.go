@@ -104,7 +104,8 @@ func registerScans(api huma.API, in core.Deps) {
 				_, _, err := admitted(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
 				return err
 			},
-			Limit: core.Fixed(core.MaxUpload(in.Limits)),
+			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
+			Refused: refusedBeforeReading(in),
 		})},
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without any "+
@@ -119,8 +120,36 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	}
 	parts := input.RawBody.Data()
 
-	// The number of documents one scan may carry, refused before any row is
-	// written. Each one is read within the bounds a document is read within,
+	// Asked again, though the form was only read once it was asked: what a
+	// handler refuses is the second statement of what admission refused.
+	subject, named, err := admitted(ctx, in, input.Product, input.Stream, input.Variant)
+	if err != nil {
+		return nil, err
+	}
+
+	// The build every refusal from here on is recorded against. Every door
+	// that turns an upload away records it, not only the last one: a build
+	// whose uploads are refused at a door that records nothing draws as
+	// quiet-and-never-refused, which the coverage report reads as a pipeline
+	// nobody wired up, and tells the wrong person about the failure this
+	// record exists for. Recorded only past authorization, so a sender who
+	// may not file here writes nothing.
+	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+	if err != nil {
+		return nil, core.WentWrong(in.Logger, "the target could not be recorded", err)
+	}
+	note := func(reason string, builtAt *time.Time, hash *string) {
+		refusedAt(ctx, in, subject, ingest.Refusal{
+			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
+		}, input.Product)
+	}
+	refuse := func(refused huma.StatusError) error {
+		note(refused.Error(), nil, nil)
+		return refused
+	}
+
+	// The number of documents one scan may carry, refused before any scan is
+	// recorded. Each one is read within the bounds a document is read within,
 	// and without a ceiling on the count those bounds are multiplied by a
 	// number nothing decides.
 	limits := in.Limits.OrDefault()
@@ -131,16 +160,9 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		}
 	}
 	if sent > limits.MaxDocuments {
-		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+		return nil, refuse(huma.Error422UnprocessableEntity(fmt.Sprintf(
 			"that scan carries %d suppression documents, and this deployment reads %d",
-			sent, limits.MaxDocuments))
-	}
-
-	// Asked again, though the form was only read once it was asked: what a
-	// handler refuses is the second statement of what admission refused.
-	subject, named, err := admitted(ctx, in, input.Product, input.Stream, input.Variant)
-	if err != nil {
-		return nil, err
+			sent, limits.MaxDocuments)))
 	}
 
 	// A retired product, release or variant takes no scan. It is the other
@@ -166,8 +188,8 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
 	}
 	if retired != "" {
-		return nil, huma.NewError(http.StatusConflict, fmt.Sprintf(
-			"%s is retired and takes no scan; declare it again to bring it back", retired))
+		return nil, refuse(huma.NewError(http.StatusConflict, fmt.Sprintf(
+			"%s is retired and takes no scan; declare it again to bring it back", retired)))
 	}
 
 	// Refusing before storing. Deciding costs a query; deciding afterwards
@@ -188,39 +210,18 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		return nil, core.WentWrong(in.Logger, "cannot tell how much work may wait", err)
 	}
 	if depth >= limit {
-		return nil, huma.NewError(http.StatusServiceUnavailable,
-			fmt.Sprintf("%d scans are already waiting to be read; try again shortly", depth))
-	}
-
-	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "the target could not be recorded", err)
-	}
-
-	// The submission and its digest: what it says about itself comes from the
-	// inventory, and whether we already hold it is asked of everything that
-	// arrived. Every door that turns an upload away records it, not only the
-	// last one. A producer posting a document nothing can read never reaches
-	// the arm below, so the build draws as quiet-and-never-refused — which the
-	// coverage report reads as a pipeline nobody wired up, telling the wrong
-	// person about the commoner of the two failures this record exists for.
-	note := func(reason string, builtAt *time.Time, hash *string) {
-		if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, ingest.Refusal{
-			TargetID: target.ID, Reason: reason, BuiltAt: builtAt, ContentHash: hash,
-		}); noted != nil {
-			// Best-effort, and the one place that is right: a note about
-			// something that already failed, where failing the failure would
-			// turn a refusal the producer needs to read into a fault they
-			// cannot.
-			in.Log().ErrorContext(ctx, "could not record that an upload was refused",
-				"error", noted, "product", input.Product)
-		}
+		return nil, refuse(huma.NewError(http.StatusServiceUnavailable,
+			fmt.Sprintf("%d scans are already waiting to be read; try again shortly", depth)))
 	}
 
 	header, contentHash, inventoryHash, err := describe(parts, in.Limits)
 	if err != nil {
+		// The reason recorded is what was wrong with the upload, which the
+		// producer is handed among the errors: the answer's own detail is
+		// the same sentence for every unreadable upload, and a report reading
+		// it cannot tell a version nothing reads from a truncated file.
 		refused := huma.Error422UnprocessableEntity("the upload could not be read", err)
-		note(refused.Error(), nil, nil)
+		note("the upload could not be read: "+err.Error(), nil, nil)
 		return nil, refused
 	}
 
@@ -301,7 +302,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):
-		return nil, huma.NewError(http.StatusServiceUnavailable, err.Error())
+		return nil, refuse(huma.NewError(http.StatusServiceUnavailable, err.Error()))
 	case errors.Is(err, ingest.ErrRejected):
 		// Recorded here, because nothing else records it. Without this a
 		// refused upload leaves no server-side trace: the producer is told and
@@ -335,6 +336,42 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 	}
 	out.Body.Outcome = "queued"
 	return out, nil
+}
+
+// refusedAt records that an upload to a build was turned away.
+//
+// Best-effort, and the one place that is right: a note about something that
+// already failed, where failing the failure would turn a refusal the producer
+// needs to read into a fault they cannot.
+func refusedAt(ctx context.Context, in core.Deps, subject access.Subject, refusal ingest.Refusal,
+	product string) {
+
+	if noted := ingest.NewStore(in.DB.DB).Refused(ctx, subject, refusal); noted != nil {
+		in.Log().ErrorContext(ctx, "could not record that an upload was refused",
+			"error", noted, "product", product)
+	}
+}
+
+// refusedBeforeReading records an upload the form bound turned away before the
+// operation ran, against the build it names. The bound asks it only once the
+// sender has been admitted to that build.
+func refusedBeforeReading(in core.Deps) func(huma.Context, string) {
+	return func(hctx huma.Context, reason string) {
+		ctx := hctx.Context()
+		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("stream"),
+			hctx.Param("variant"))
+		if err != nil {
+			return
+		}
+		target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+		if err != nil {
+			in.Log().ErrorContext(ctx, "could not record that an upload was refused",
+				"error", err, "product", hctx.Param("product"))
+			return
+		}
+		refusedAt(ctx, in, subject, ingest.Refusal{TargetID: target.ID, Reason: reason},
+			hctx.Param("product"))
+	}
 }
 
 // rejection turns a refusal into the status that describes it.

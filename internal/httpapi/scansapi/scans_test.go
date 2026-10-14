@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // spdxInventory is the same inventory in the other format, so the upload path
@@ -502,17 +505,72 @@ func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
 // Through the door rather than against the store, because that is where the
 // arms are and the store was never the part that was missing.
 func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
+	inventory := httpapitest.Inventory(time.Now().Add(-time.Hour), "libc6")
 	for _, c := range []struct {
-		what string
-		body string
-		want int
+		what    string
+		request func(t *testing.T, f *httpapitest.IngestFixture) *http.Request
+		before  func(t *testing.T, f *httpapitest.IngestFixture)
+		want    int
+		// said is what the recorded reason has to carry.
+		said string
 	}{
-		{"a document nothing can read", "{ not an inventory", http.StatusUnprocessableEntity},
-		{"one built in the future", httpapitest.Inventory(time.Now().Add(48*time.Hour), "libc6"), http.StatusBadRequest},
+		{what: "a document nothing can read",
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				return httpapitest.Upload(t, f.Path, "{ not an inventory")
+			},
+			want: http.StatusUnprocessableEntity, said: "the upload could not be read: "},
+		{what: "one built in the future",
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				return httpapitest.Upload(t, f.Path,
+					httpapitest.Inventory(time.Now().Add(48*time.Hour), "libc6"))
+			},
+			want: http.StatusBadRequest, said: "future"},
+		{what: "more suppression documents than are read",
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				many := make([]string, sbom.Limits{}.OrDefault().MaxDocuments+1)
+				for i := range many {
+					many[i] = "{}"
+				}
+				return httpapitest.Upload(t, f.Path, inventory, many...)
+			},
+			want: http.StatusUnprocessableEntity, said: "suppression documents"},
+		{what: "a form larger than an upload may be",
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				return httpapitest.Upload(t, f.Path, inventory, strings.Repeat(" ", 16<<10))
+			},
+			want: http.StatusRequestEntityTooLarge, said: "larger than"},
+		{what: "a variant that is retired",
+			before: func(t *testing.T, f *httpapitest.IngestFixture) {
+				if _, err := f.DB.DB.NewUpdate().Table("variant").Set("retired_at = ?",
+					time.Now().UTC()).Where("1 = 1").Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			},
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				return httpapitest.Upload(t, f.Path, inventory)
+			},
+			want: http.StatusConflict, said: "retired"},
+		{what: "a full backlog",
+			before: func(t *testing.T, f *httpapitest.IngestFixture) {
+				if err := setting.NewStore(f.DB.DB).Set(t.Context(), setting.QueueBacklog,
+					"1"); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.Queue.Add(t.Context(), queue.Parse, "somebody else's scan"); err != nil {
+					t.Fatal(err)
+				}
+			},
+			request: func(t *testing.T, f *httpapitest.IngestFixture) *http.Request {
+				return httpapitest.Upload(t, f.Path, inventory)
+			},
+			want: http.StatusServiceUnavailable, said: "waiting"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			httpapitest.EachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
-				if code, _ := f.Send(t, httpapitest.Upload(t, f.Path, c.body)); code != c.want {
+				if c.before != nil {
+					c.before(t, f)
+				}
+				if code, _ := f.Send(t, c.request(t, f)); code != c.want {
 					t.Fatalf("%s answered %d, want %d", c.what, code, c.want)
 				}
 				var recorded []struct {
@@ -525,10 +583,12 @@ func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
 				if len(recorded) != 1 {
 					t.Fatalf("%s left %d refusals behind, want one", c.what, len(recorded))
 				}
-				// The words the producer was given, so both ends of the
-				// conversation say the same thing when somebody compares them.
-				if recorded[0].Reason == "" {
-					t.Errorf("%s recorded a refusal with no reason", c.what)
+				// What was wrong, so the person reading the coverage report
+				// can tell one refusal from another.
+				if !strings.Contains(recorded[0].Reason, c.said) ||
+					len(recorded[0].Reason) <= len(c.said) {
+					t.Errorf("%s recorded %q, want it to say %q and why", c.what,
+						recorded[0].Reason, c.said)
 				}
 			})
 		})

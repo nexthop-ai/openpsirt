@@ -123,10 +123,17 @@ refuse it.
 |---|---|
 | Not found | The product, stream or variant is not declared. The message names which |
 | Bad request | The build time is ahead of this deployment's clock |
-| Conflict | Something newer, or something with the same build time, is already held |
-| Unprocessable | The inventory could not be read at all |
+| Conflict | Something newer, or something with the same build time, is already held; or the product, stream or variant is retired |
+| Unprocessable | The inventory could not be read at all, or more suppression documents arrived than one scan may carry |
 | Payload too large | The request is larger than twice the document bound, refused unread where it declares its length |
 | Service unavailable | Too much is already waiting to be read, or this server is already reading as many uploads as `upload.max-concurrent` allows. The second carries a time to retry after |
+
+Every refusal past authorization is recorded against the build, the ones above
+included. A refusal before it — a name not declared, a sender who may not file
+there — records nothing, so a sender who may not file against a build cannot
+write rows about it. The reason recorded for an upload that could not be read is
+what was wrong with it, which the producer is also handed among the answer's
+errors.
 
 Already held is a success, because the ordinary case is a retry after a timeout
 that had in fact succeeded.
