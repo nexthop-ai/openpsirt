@@ -21,7 +21,7 @@ func init() {
 // The v0.8.0 release's schema changed into v0.9.0's.
 //
 // Run in one transaction of its own, the way migrations 40 to 42 are. On
-// MySQL and MariaDB the table is made in one and the rows moved in a second:
+// MySQL and MariaDB each table is made in one and its rows moved in another:
 // both commit a data-definition statement as it runs, so made in the one
 // transaction, the hold on every build and the merge after it would run a
 // statement at a time, and a merge stopped part way would be committed part
@@ -32,13 +32,15 @@ func init() {
 func upV090(ctx context.Context, sqldb *sql.DB) error {
 	switch migrate.EngineFrom(ctx) {
 	case database.MySQL, database.MariaDB:
-		if err := inV020(ctx, sqldb, createImageVersionV090); err != nil {
-			return err
+		for _, step := range []func(context.Context, bun.Tx) error{
+			createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+			shapeWordsV090, moveWordsV090, dropWordsV090,
+		} {
+			if err := inV020(ctx, sqldb, step); err != nil {
+				return err
+			}
 		}
-		if err := inV020(ctx, sqldb, foldDestinationsV090); err != nil {
-			return err
-		}
-		return inV020(ctx, sqldb, mergeImagesV090)
+		return nil
 	}
 	return inV020(ctx, sqldb, upgradeV090)
 }
@@ -65,12 +67,17 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //     them is pointed at it.
 //   - A destination's name is held folded, as the key it is matched on, beside
 //     the spelling it was typed in.
+//   - A claim's reasoning is stored once and pointed at, a build's claim is
+//     keyed on its reasoning, and a reference to an issue is keyed on its
+//     address as given.
 func upgradeV090(ctx context.Context, tx bun.Tx) error {
-	if err := createImageVersionV090(ctx, tx); err != nil {
-		return err
+	for _, step := range []func(context.Context, bun.Tx) error{
+		createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+		shapeWordsV090, moveWordsV090, dropWordsV090,
+	} {
+		if err := step(ctx, tx); err != nil {
+			return err
+		}
 	}
-	if err := foldDestinationsV090(ctx, tx); err != nil {
-		return err
-	}
-	return mergeImagesV090(ctx, tx)
+	return nil
 }

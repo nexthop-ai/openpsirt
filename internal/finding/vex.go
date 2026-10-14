@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -64,9 +65,15 @@ type Statement struct {
 	// Status is what they said in the format's own vocabulary, Justification
 	// the term they gave for it, and Statement the reasoning — which is the
 	// part worth having, because the status is in the fix state already.
+	//
+	// The reasoning is stored once, however many components the statement
+	// names, and StatementID points at it; nil where they gave none. A read
+	// fills Statement through withWords, and a read that does not leaves it
+	// empty.
 	Status        string `bun:"status,notnull"`
 	Justification string `bun:"justification"`
-	Statement     string `bun:"statement"`
+	StatementID   *int64 `bun:"statement_id"`
+	Statement     string `bun:"statement,scanonly"`
 	// Source is which kind of document carried it and Identifier the name the
 	// publisher gave that document, where it carries one. Together they are
 	// what a later upload supersedes on, and Identifier is what a reader
@@ -81,6 +88,12 @@ type Statement struct {
 	UploadedBy int64      `bun:"uploaded_by,notnull"`
 	UploadedAt time.Time  `bun:"uploaded_at,notnull"`
 	Superseded *time.Time `bun:"superseded_at"`
+}
+
+// withWords reads every column of the statements a query selects, and the
+// reasoning each points at.
+func withWords(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.ColumnExpr("?TableColumns").Join(wordsJoin("ss")).ColumnExpr(wordsColumn + ` AS "statement"`)
 }
 
 // StatementOf is one claim a document makes, about one of the components it
@@ -325,6 +338,13 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			said[i].Vulnerability = folded(said[i].Vulnerability)
 			said[i].Component = folded(said[i].Component)
 			said[i].Within = folded(said[i].Within)
+			// Bounded to the columns that hold them, and the reasoning to
+			// the one copy kept of it. Cut before anything is compared, so
+			// the same over-long document read again reads as the same.
+			said[i].About = bound.HeadRunes(said[i].About, database.NameWidth)
+			said[i].WithinAbout = bound.HeadRunes(said[i].WithinAbout, database.NameWidth)
+			said[i].Justification = bound.HeadRunes(said[i].Justification, database.NameWidth)
+			said[i].Statement = WordsOf(said[i].Statement)
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
@@ -334,7 +354,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification", "statement").
+				"within_about", "placement", "status", "justification").
+			Join(wordsJoin("ss")).ColumnExpr(wordsColumn+` AS "statement"`).
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
@@ -363,7 +384,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var held []Statement
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification", "statement").
+				"within_about", "placement", "status", "justification").
+			Join(wordsJoin("ss")).ColumnExpr(wordsColumn+` AS "statement"`).
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
@@ -407,7 +429,16 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 
 		said = fresh
+		words := make([]string, 0, len(said))
+		for _, one := range said {
+			words = append(words, one.Statement)
+		}
+		stored, err := internWords(ctx, tx, words)
+		if err != nil {
+			return err
+		}
 		for i := range said {
+			said[i].StatementID = wordsID(stored, said[i].Statement)
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
 			// into the value it inserted, and this closure is re-run whole
@@ -480,8 +511,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		lowered = append(lowered, folded(name))
 	}
 	var said []Statement
-	err := s.db.NewSelect().Model(&said).
-		Where("product_id = ?", productID).
+	err := withWords(s.db.NewSelect().Model(&said)).
+		Where("ss.product_id = ?", productID).
 		Where("superseded_at IS NULL").
 		Where("vulnerability IN (?)", bun.List(lowered)).
 		Where("component = ?", folded(component)).
@@ -514,8 +545,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 			aboveNames = append(aboveNames, folded(c.Name))
 		}
 		var beneath []Statement
-		err := s.db.NewSelect().Model(&beneath).
-			Where("product_id = ?", productID).
+		err := withWords(s.db.NewSelect().Model(&beneath)).
+			Where("ss.product_id = ?", productID).
 			Where("superseded_at IS NULL").
 			Where("placement = ?", PlacedProduct).
 			Where("vulnerability IN (?)", bun.List(lowered)).

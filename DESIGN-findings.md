@@ -323,6 +323,10 @@ else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
 showed one tracker link and no patches. References from every identifier an
 issue answers to are kept, deduplicated against the matched record's own.
 
+| Rule | |
+|---|---|
+| Two references are one where their addresses are the same as given, apart from surrounding space | An address is case-sensitive past its host, and two patch links commonly agree for longer than an index key is wide. The key is a digest of the whole address |
+
 ## Index responses
 
 A bare name is not enough for a dependency of a dependency. Where an ecosystem
@@ -1114,6 +1118,15 @@ A statement naming several packages becomes several claims, one per subject.
 Claims are held over intervals, so re-sending them writes nothing; withdrawing
 one closes it rather than deleting it, because what a release argued is a
 question asked years later.
+
+| Stored claim | |
+|---|---|
+| A statement's reasoning is stored once, and each of its claims points at it | One statement naming five thousand components gives one explanation five thousand times. Two documents giving the same words share the copy. Every reader of a claim's words joins them: a finding's claim, the carried patches, the disposition register and the VEX document |
+| The reasoning is cut to the bound a markdown field typed here is held to, and kept | One over-long explanation is no reason to refuse the scan or the document carrying it. The cut lands on a character; a NUL is dropped and invalid UTF-8 replaced, because PostgreSQL refuses both in text |
+| The issue's identifier and the justification are cut to an indexed name's width | Every claim of a statement repeats them |
+
+A supplier's statement is stored the same way (`DESIGN-triage.md` § Evidence
+from publishers).
 
 A covered finding is kept, never dropped. This is why claims are applied here
 rather than upstream: a finding that never arrived is indistinguishable from a

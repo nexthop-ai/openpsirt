@@ -120,7 +120,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 			Source:     finding.FromAdvisory,
 			Identifier: advisory.Identifier,
 			Publisher:  advisory.Publisher,
-			Document:   file.Filename,
+			Document:   documentName(file.Filename),
 			Digest:     digest,
 		}, advisory.Claims, "Advisory "+advisory.Identifier+" from "+advisory.Publisher)
 		if err != nil {

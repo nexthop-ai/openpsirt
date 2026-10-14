@@ -977,6 +977,9 @@ var tables = []string{
 	"party",
 	"finding",
 	"suppression",
+	// After suppression and vex_statement, whose rows point at it with no
+	// foreign key.
+	"statement_text",
 	// Before scan_run and vulnerability, both of which it points at, and
 	// after decision_superseded, which points at it.
 	"vulnerability_merge",

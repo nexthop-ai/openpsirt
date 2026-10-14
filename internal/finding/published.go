@@ -71,7 +71,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	}
 	if rootBase != "" && rootVersion != "" && holding == 1 {
 		var said []Statement
-		if err := tx.NewSelect().Model(&said).
+		if err := withWords(tx.NewSelect().Model(&said)).
 			Where("ss.product_id = ?", productID).
 			Where("ss.superseded_at IS NULL").
 			Where("ss.placement = ?", PlacedInside).
@@ -92,7 +92,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 			row := Claim{
 				TargetID: targetID, Vulnerability: one.Vulnerability,
 				Status: one.Status, Justification: one.Justification,
-				Statement: one.Statement, Origin: Published,
+				StatementID: one.StatementID, Statement: one.Statement, Origin: Published,
 				SubjectPurl: one.Purl, SubjectName: spelled(one),
 				SubjectFolded:  one.Component,
 				SubjectVersion: statedBeside(sbom.Target{Purl: one.Purl, Version: one.About}),

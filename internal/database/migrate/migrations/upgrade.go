@@ -116,6 +116,9 @@ type change struct {
 	add []added
 	// relax is the columns that stop refusing a null.
 	relax []string
+	// drop is the columns the release no longer declares. Whatever a column
+	// held is moved before the change, which removes it.
+	drop []string
 	// then runs once every column is in place and before any constraint is.
 	then func() error
 	// constraints and indexes are named as the release names them. An
@@ -132,7 +135,8 @@ func (c change) addsOnly() bool {
 			return false
 		}
 	}
-	return len(c.relax) == 0 && len(c.constraints) == 0 && len(c.indexes) == 0 && c.then == nil
+	return len(c.relax) == 0 && len(c.drop) == 0 && len(c.constraints) == 0 && len(c.indexes) == 0 &&
+		c.then == nil
 }
 
 // added is one column, and the value existing rows take in it. No fill is a
@@ -197,6 +201,9 @@ func (u *upgrader) change(statements []string, c change) error {
 		default:
 			stmts = append(stmts, `ALTER TABLE "`+c.table+`" MODIFY COLUMN `+def)
 		}
+	}
+	for _, column := range c.drop {
+		stmts = append(stmts, `ALTER TABLE "`+c.table+`" DROP COLUMN "`+column+`"`)
 	}
 	if err := u.run(stmts); err != nil {
 		return err

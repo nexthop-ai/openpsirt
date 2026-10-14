@@ -1323,6 +1323,11 @@ the decisions made here. The screen says what the build claims, what the
 distribution says, and what we decided — three statements, not one collapsed
 answer.
 
+A statement's reasoning is stored once however many components it names, cut
+to the same bound, the way a build's claim's is (`DESIGN-findings.md` §
+Build-declared claims). Its file name is made safe and bounded the way an
+attachment's is, because every statement the document makes carries it.
+
 A supplier's statement about its own product closes the finding at the places
 that product occupies (REQ-31), applied by the run beside the build's own
 patches and the issue's CVE record. Every other statement is shown and offered

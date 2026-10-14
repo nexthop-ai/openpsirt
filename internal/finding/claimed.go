@@ -66,10 +66,11 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 	if err := db.NewSelect().
 		TableExpr(`"suppression" AS "sup"`).
 		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
+		Join(wordsJoin("sup")).
 		ColumnExpr(`sup.id AS "id"`).
 		ColumnExpr(`sup.status AS "status"`).
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
+		ColumnExpr(wordsColumn+` AS "statement"`).
 		ColumnExpr(`sup.origin AS "origin"`).
 		ColumnExpr(`COALESCE(sup.subject_purl, '') AS "subject_purl"`).
 		ColumnExpr(`COALESCE(sup.subject_name, '') AS "subject_name"`).

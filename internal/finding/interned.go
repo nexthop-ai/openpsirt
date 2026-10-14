@@ -381,7 +381,7 @@ func aDay(t time.Time) bool {
 // unreferenced is whether a report points somewhere the issue does not.
 func unreferenced(held map[string]bool, references []Reference) bool {
 	for _, reference := range references {
-		if reference.URL != "" && !held[identity(reference.URL)] {
+		if reference.URL != "" && !held[urlIdentity(reference.URL)] {
 			return true
 		}
 	}

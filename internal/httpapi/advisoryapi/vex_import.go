@@ -17,6 +17,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -191,7 +192,7 @@ func registerVexImport(api huma.API, in core.Deps) {
 		recorded, superseded, err := recordSupplied(ctx, in, by, product.ID, finding.Supplied{
 			Source:    finding.FromVex,
 			Publisher: publisher,
-			Document:  file.Filename,
+			Document:  documentName(file.Filename),
 			Digest:    digest,
 		}, said, "VEX statements from "+publisher)
 		if err != nil {
@@ -242,4 +243,14 @@ func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, produc
 		return 0, 0, err
 	}
 	return recorded, superseded, nil
+}
+
+// documentName is the file name a document is recorded under: the client's,
+// made safe and bounded the way an attachment's is, and empty where the client
+// gave none. It is stored on every statement the document makes.
+func documentName(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return ""
+	}
+	return attach.SafeName(name)
 }
