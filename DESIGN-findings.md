@@ -830,6 +830,20 @@ which products hold claims.
 Somebody brought onto a single case reaches no reports. A case grant is about
 one issue, and a product's claims are not.
 
+### Recorded words on a shared issue
+
+A flaw recorded here writes its summary as the issue's description, its minted
+identifier among the issue's names, and its addresses on the issue. The issue
+row is the one every product holding the issue reads, so those three follow the
+record rather than the row (REQ-42).
+
+| Rule | Reason |
+|---|---|
+| The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The summary of an undisclosed flaw in another product is the embargo |
+| Every reader asks the one rule: the issue page and document, a finding's evidence, the component's issue list, the approaching-disclosure list, a decision's issue and an approver's outliers | One rule in one place keeps a new reader from being the one that forgets it |
+| A text match over descriptions matches nothing in a withheld description | A filter that matched it would say what the summary holds, one guess at a time |
+| An advisory's covered issues read the description unwithheld | The advisory is held to a reader of every place of its issues in its own product, and a recorded flaw in another product holding the same issue is not asked about |
+
 ### Dispositions
 
 A judged report carries one of five dispositions. Accepted is written by

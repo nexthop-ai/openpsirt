@@ -539,8 +539,17 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		Where("id IN (?)", bun.List(issueIDs)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the issues a bulk claim covers: %w", err)
 	}
+	// A flaw recorded where this reader may not read it wrote its summary
+	// onto the issue row every product shares.
+	withheld, err := finding.RecordedOutOfReach(ctx, s.db, subject, issueIDs)
+	if err != nil {
+		return nil, err
+	}
 	byIssue := make(map[int64]finding.Vulnerability, len(issues))
 	for _, issue := range issues {
+		if withheld[issue.ID] {
+			issue.Description = ""
+		}
 		byIssue[issue.ID] = issue
 	}
 	rated, err := finding.RatingsIn(ctx, s.db, productIDs, issueIDs)

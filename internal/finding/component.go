@@ -76,10 +76,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// then recorded against, so one justification landed on issues
 			// nobody saw. A backslash matched differently on each engine
 			// besides.
-			q = q.Where("f.vulnerability_id IN (?)",
-				q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-					Where(`LOWER(v.description) LIKE ?`+database.LikeClause,
-						"%"+containsTerm(contains)+"%"))
+			q = q.Where("f.vulnerability_id IN (?)", describedAs(q, subject, contains))
 		}
 		return q
 	}
@@ -181,7 +178,14 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("read about what is open against this component: %w", err)
 		}
+		withheld, err := RecordedOutOfReach(ctx, s.db, subject, issues)
+		if err != nil {
+			return nil, 0, 0, err
+		}
 		for _, row := range rows {
+			if withheld[row.VulnerabilityID] {
+				row.Description = ""
+			}
 			about[row.VulnerabilityID] = row
 		}
 	}
@@ -396,14 +400,23 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 		// The same escaped match the candidate list makes. Spliced raw, a term
 		// holding a percent selects far more than the box said — and this is
 		// the number an approver checks the claim against.
-		q = q.Where("f.vulnerability_id IN (?)",
-			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-				Where(`LOWER(v.description) LIKE ?`+database.LikeClause,
-					"%"+containsTerm(contains)+"%"))
+		q = q.Where("f.vulnerability_id IN (?)", describedAs(q, subject, contains))
 	}
 	matched, err := tx.NewSelect().TableExpr(`(?) AS "grouped"`, q).Count(ctx)
 	if err != nil {
 		return Narrowing{}, fmt.Errorf("count what that narrowing reaches: %w", err)
 	}
 	return Narrowing{Contains: contains, Matched: matched, Named: named}, nil
+}
+
+// describedAs is the issues whose description this subject may read and holds
+// this term.
+//
+// A description withheld from the reader matches nothing, so the filter is no
+// way to ask what an undisclosed summary says.
+func describedAs(q *bun.SelectQuery, subject access.Subject, contains string) *bun.SelectQuery {
+	withheld, args := recordedOutOfReachOf(subject, `"v"."id"`)
+	return q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
+		Where(`LOWER(v.description) LIKE ?`+database.LikeClause, "%"+containsTerm(contains)+"%").
+		Where("NOT ("+withheld+")", args...)
 }

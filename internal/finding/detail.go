@@ -684,6 +684,16 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}
 
+	// The summary, other names and addresses a flaw recorded here wrote onto
+	// the shared issue row, where that record sits out of this reader's reach.
+	withheld, err := recordedOutOfReach(ctx, s.db, subject, vulnerabilityID)
+	if err != nil {
+		return nil, err
+	}
+	if withheld {
+		issue.Description, aliases, references = "", nil, nil
+	}
+
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 	claimed := map[int64]bool{}
 	var claims []int64

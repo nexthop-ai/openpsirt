@@ -182,6 +182,19 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 	if err := s.whereEmbargoed(ctx, approaching, rows); err != nil {
 		return nil, 0, err
 	}
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.VulnerabilityID)
+	}
+	withheld, err := RecordedOutOfReach(ctx, s.db, subject, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range rows {
+		if withheld[rows[i].VulnerabilityID] {
+			rows[i].Summary = ""
+		}
+	}
 	return rows, total, nil
 }
 
