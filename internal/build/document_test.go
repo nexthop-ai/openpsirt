@@ -18,8 +18,14 @@ import (
 // prints.
 var (
 	documented = regexp.MustCompile("`make ([a-z][a-z0-9-]*)(?:\\s[^`\n]*)?`")
-	printed    = regexp.MustCompile(`"([a-z][a-z-]*)"`)
-	named      = regexp.MustCompile("`internal/([a-z][a-z0-9/]*)/`")
+	// A make command on a line of its own inside a code block, after a shell
+	// prompt, and after variables set for the one run on either side of make.
+	codeCommand = regexp.MustCompile(`^[ \t]*(?:\$[ \t]+)?(?:[A-Z_][A-Z0-9_]*=\S*[ \t]+)*make[ \t]+` +
+		`(?:[A-Z_][A-Z0-9_]*=\S*[ \t]+)*([a-z][a-z0-9-]*)`)
+	// The fence that opens or closes a code block.
+	fence   = regexp.MustCompile("^[ \t]*(```|~~~)")
+	printed = regexp.MustCompile(`"([a-z][a-z-]*)"`)
+	named   = regexp.MustCompile("`internal/([a-z][a-z0-9/]*)/`")
 )
 
 // buildDocument returns DESIGN-build.md, which is the one document that
@@ -249,12 +255,38 @@ func TestEveryMakeCommandADocumentNamesIsATarget(t *testing.T) {
 
 // unknownCommands is each target a document's make commands name that is not
 // defined, counting every command it read into described.
+//
+// A command is read inline, in backticks, or on a line of its own inside a
+// fenced code block, which is the form a reader copies. Prose outside a block
+// is not read line by line, because "make the claim" opens a line as readily
+// as a command does.
 func unknownCommands(document string, defined map[string]bool, described *int) []string {
 	var out []string
-	for _, found := range documented.FindAllStringSubmatch(document, -1) {
+	read := func(target string) {
 		*described++
-		if !defined[found[1]] {
-			out = append(out, found[1])
+		if !defined[target] {
+			out = append(out, target)
+		}
+	}
+	for _, found := range documented.FindAllStringSubmatch(document, -1) {
+		read(found[1])
+	}
+	open := ""
+	for _, line := range strings.Split(document, "\n") {
+		if m := fence.FindStringSubmatch(line); m != nil {
+			switch open {
+			case "":
+				open = m[1]
+			case m[1]:
+				open = ""
+			}
+			continue
+		}
+		if open == "" {
+			continue
+		}
+		if m := codeCommand.FindStringSubmatch(line); m != nil {
+			read(m[1])
 		}
 	}
 	return out
@@ -269,6 +301,19 @@ func TestAMakeCommandWithArgumentsIsReadAsItsTarget(t *testing.T) {
 		defined, &described)
 	if strings.Join(got, ",") != "typo" || described != 3 {
 		t.Errorf("unknown: %v of %d, want [typo] of 3", got, described)
+	}
+}
+
+// A command on its own line in a code block is read, after a prompt or
+// variables, and a line of prose outside one is not.
+func TestAMakeCommandInACodeBlockIsReadAsItsTarget(t *testing.T) {
+	defined := map[string]bool{"gate": true, "upgrade-rehearsal": true}
+	described := 0
+	document := "Run make the claim first.\n\n```sh\nmake gate\n$ make upgrade-rehearsal FROM=v0.7.0\n" +
+		"OPENPSIRT_X=1 make scanner-dbx\nmake ARG=1 gone\n```\n\nmake prose here\n"
+	got := unknownCommands(document, defined, &described)
+	if strings.Join(got, ",") != "scanner-dbx,gone" || described != 4 {
+		t.Errorf("unknown: %v of %d, want [scanner-dbx gone] of 4", got, described)
 	}
 }
 

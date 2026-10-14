@@ -28,8 +28,9 @@ var (
 	notInSiteAnchor = regexp.MustCompile(`[^A-Za-z0-9_\s-]`)
 	siteSeparators  = regexp.MustCompile(`[-\s]+`)
 	// A link to anything else in the repository: a directory, the license, a
-	// file of another kind. A scheme's colon, a fragment and a query end it.
-	otherLink = regexp.MustCompile(`\]\((?:\./)?([^):#?\s]+)\)`)
+	// file of another kind. A scheme's colon rules it out; a fragment, a query
+	// and a title follow the path it names.
+	otherLink = regexp.MustCompile(`\]\((?:\./)?([^):#?\s]+)(?:[#?][^)\s]*)?(?:\s+"[^"]*")?\)`)
 	// An inline code span, which renders no link.
 	inlineCode = regexp.MustCompile("`[^`\n]*`")
 	// A link to another document, with the fragment it names where it has
@@ -114,13 +115,16 @@ func linkProblems(docs map[string]string, exists func(string) bool) ([]string, l
 		if published(path) {
 			anchorsIn = siteAnchors
 		}
-		for _, m := range internalLink.FindAllStringSubmatch(body, -1) {
+		// Headings are read from body; links from the text an inline code
+		// span leaves, because a link inside one renders as text.
+		links := inlineCode.ReplaceAllString(body, "")
+		for _, m := range internalLink.FindAllStringSubmatch(links, -1) {
 			count.inside++
 			if !anchorsIn[path][m[1]] {
 				problems = append(problems, fmt.Sprintf("%s: the link #%s reaches no heading in that document", path, m[1]))
 			}
 		}
-		for _, m := range crossLink.FindAllStringSubmatch(body, -1) {
+		for _, m := range crossLink.FindAllStringSubmatch(links, -1) {
 			count.across++
 			to := filepath.Clean(filepath.Join(filepath.Dir(path), m[1]))
 			anchors, read := anchorsIn[to]
@@ -135,7 +139,7 @@ func linkProblems(docs map[string]string, exists func(string) bool) ([]string, l
 					"%s: the link to %s#%s reaches that document and no heading in it", path, to, m[2]))
 			}
 		}
-		for _, m := range otherLink.FindAllStringSubmatch(inlineCode.ReplaceAllString(body, ""), -1) {
+		for _, m := range otherLink.FindAllStringSubmatch(links, -1) {
 			if strings.HasSuffix(m[1], ".md") {
 				continue
 			}
@@ -215,6 +219,9 @@ func TestALinkThatReachesNothingIsReported(t *testing.T) {
 		"a fragment naming no heading there":    "# A\n\n[there](b.md#nothing)\n",
 		"a file of another kind not there":      "# A\n\n[there](gone.txt)\n",
 		"a directory not there":                 "# A\n\n[there](gone/)\n",
+		"a file not there, with a fragment":     "# A\n\n[there](gone.go#L3)\n",
+		"a file not there, with a query":        "# A\n\n[there](gone.txt?raw=1)\n",
+		"a file not there, with a title":        "# A\n\n[there](gone.txt \"t\")\n",
 		"a forge anchor dropping an underscore": "# A\n\n## OPENPSIRT_ADDR\n\n[in](#openpsirtaddr)\n",
 	} {
 		problems, _ := linkProblems(map[string]string{"a.md": text, "b.md": docs["b.md"]}, none)
@@ -254,7 +261,7 @@ func TestEachDocumentIsHeldToTheAnchorsWhereItIsRead(t *testing.T) {
 // inline code span, is not reported.
 func TestALinkToAnotherFileThatIsThereIsNotReported(t *testing.T) {
 	there := func(path string) bool { return path == "LICENSE" || path == "docs" }
-	text := "# A\n\n[license](LICENSE) [site](docs/) `[x](gone.txt)`\n"
+	text := "# A\n\n[license](LICENSE) [site](docs/) `[x](gone.txt)` `[y](#nowhere)` `[z](gone.md)`\n"
 	if problems, count := linkProblems(map[string]string{"a.md": text}, there); len(problems) != 0 || count.other != 2 {
 		t.Errorf("links that reach their files: %v, counted %d, want none and 2", problems, count.other)
 	}

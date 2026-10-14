@@ -127,15 +127,23 @@ build:
 }
 
 // A test reading a document of this repository, by a relative path that climbs
-// out of its package: "../../docs/x.md", or the same path in pieces.
-var readsADocument = regexp.MustCompile(`(?:"\.\."\s*,\s*)+"[^"\n]+\.md"|"(?:\.\./)+[^"\n]+\.md"`)
+// out of its package: "../../docs/x.md", or the same path in pieces with any
+// directories between.
+var readsADocument = regexp.MustCompile(`(?:"\.\."\s*,\s*)+(?:"[^"\n]+"\s*,\s*)*"[^"\n]+\.md"|"(?:\.\./)+[^"\n]+\.md"`)
+
+// A test that walks out of its package and keeps the files named ".md", which
+// reads every document without naming one.
+var (
+	climbs     = regexp.MustCompile(`"\.\."\s*,|"\.\./`)
+	walksForMd = regexp.MustCompile(`"\.md"`)
+)
 
 // documentReaders is each package directory, as make names it, holding a test
-// file the pattern above matches.
+// file the patterns above match.
 func documentReaders(files map[string]string) []string {
 	seen := map[string]bool{}
 	for file, text := range files {
-		if readsADocument.MatchString(text) {
+		if readsADocument.MatchString(text) || (climbs.MatchString(text) && walksForMd.MatchString(text)) {
 			seen["./"+filepath.ToSlash(filepath.Dir(file))+"/"] = true
 		}
 	}
@@ -201,14 +209,17 @@ func TestDocsCheckTestsEveryPackageThatReadsADocument(t *testing.T) {
 }
 
 // One test that reads a document by each spelling is found, and one that names
-// a document as data is not.
+// a document as data, or keeps ".md" files without climbing out, is not.
 func TestATestReadingADocumentIsFound(t *testing.T) {
 	got := documentReaders(map[string]string{
 		"internal/a/a_test.go": `os.ReadFile("../../docs/x.md")`,
 		"internal/b/b_test.go": `os.ReadFile(filepath.Join("..", "..", "DESIGN-x.md"))`,
 		"internal/c/c_test.go": `archive(map[string][]byte{"README.md": nil})`,
+		"internal/d/d_test.go": `os.ReadFile(filepath.Join("..", "..", "docs", "x.md"))`,
+		"internal/e/e_test.go": "root := filepath.Join(\"..\", \"..\")\nif filepath.Ext(path) != \".md\" {",
+		"internal/f/f_test.go": `if filepath.Ext(path) != ".md" {`,
 	})
-	if strings.Join(got, ",") != "./internal/a/,./internal/b/" {
-		t.Errorf("readers: %v, want internal/a and internal/b", got)
+	if strings.Join(got, ",") != "./internal/a/,./internal/b/,./internal/d/,./internal/e/" {
+		t.Errorf("readers: %v, want internal/a, b, d and e", got)
 	}
 }
