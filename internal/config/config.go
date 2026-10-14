@@ -327,14 +327,6 @@ type Store struct {
 // the opposite of what it says — worse than refusing to start, because the
 // operator has no reason to look.
 func Load() (Config, error) {
-	// The name this list had when it covered repositories alone. Refused
-	// rather than ignored: ignored, a deployment that set it fetches from
-	// everything it meant to keep out. A file has no key under the old name,
-	// and a file with the variable set beside it is refused for that.
-	if os.Getenv("OPENPSIRT_PATCH_EXCLUDED") != "" {
-		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED is now OPENPSIRT_OUTBOUND_EXCLUDED: " +
-			"rename it, since the old name is not read")
-	}
 	given := map[string]string{}
 	for _, one := range settings {
 		if v, ok := os.LookupEnv(envPrefix + one.env); ok {

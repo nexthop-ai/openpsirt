@@ -195,9 +195,9 @@ outage into a restart loop on top of a database outage.
 The image's own health check, which Kubernetes ignores and Docker acts on,
 runs `openpsirt health`: it reads the configuration the server reads from the
 environment and asks `/healthz` where `OPENPSIRT_ADDR` says the server listens,
-on loopback where that names every interface, never through a proxy. A
-container configured by file names its address in the environment too, or
-overrides the check.
+on loopback where that names every interface, never through a proxy. It
+takes `--config` as every other command does, so a container configured by
+file runs the check with the same file.
 
 The startup probe allows ten minutes by default. Migrations run before the
 service answers, and a probe that gives up part way kills the pod and restarts
@@ -235,6 +235,8 @@ file, never both (REQ-83).
 | A list entry holding a comma is refused | The loader reads a list as the environment carries it, where one entry would become two |
 | A malformed file is refused naming the line | What the parser reports |
 | A file anybody but its owner may read or write is refused, saying to set 0600 | It holds the database password and the sign-in and store secrets. Write is refused with read, because a file somebody else can change is a configuration somebody else chose |
+| A file owned by a user other than the process's own or root is refused | Its owner can rewrite it whatever its mode. Root's is accepted, because a mounted secret is root's |
+| The file is opened once, and every check is made on what was opened | Checked by path and read by path, a file swapped between the two is read unchecked. A directory or a pipe is refused as not a regular file before anything is read |
 | A refusal that stops the process names the key rather than the variable, including one made after startup began | The process rewrites each variable's name in a refusal to its key on the way out, so a check written once for both sources speaks to whichever source is in use |
 | A refusal answered to a request names the setting both ways | Answered while running, it cannot be rewritten on the way out, and the operator reading it relayed may have configured either source. The advisory prefix and the publisher are the two |
 | A pod configured by file sets `enableServiceLinks: false` | Kubernetes gives a pod a variable for every Service in its namespace, named `<SERVICE>_SERVICE_HOST`, `<SERVICE>_PORT` and more. For a Service named `openpsirt` they start `OPENPSIRT_`, and are refused beside a file. The chart configures by environment and is unaffected |

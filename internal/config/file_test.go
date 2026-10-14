@@ -406,10 +406,10 @@ func TestAValueRefusedFromTheEnvironmentIsRefusedFromAFile(t *testing.T) {
 
 func TestARefusalNamesTheKeyAndKeepsWhatItWraps(t *testing.T) {
 	cause := errors.New("OPENPSIRT_DIRECTORY_URL: set it alongside OPENPSIRT_DIRECTORY_BUCKET or " +
-		"OPENPSIRT_DIRECTORY_DIR; see OPENPSIRT_PATCH_EXCLUDED")
+		"OPENPSIRT_DIRECTORY_DIR; see OPENPSIRT_NOT_A_SETTING")
 	got := InFile(cause)
 	want := "directory.url: set it alongside directory.bucket or directory.dir; " +
-		"see OPENPSIRT_PATCH_EXCLUDED"
+		"see OPENPSIRT_NOT_A_SETTING"
 	if got.Error() != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -494,6 +494,7 @@ func TestAGroupRolesTableThatCannotBeReadIsRefusedNamingIt(t *testing.T) {
 	github := "[signin.github]\nclient_id = \"gid\"\nclient_secret = \"gs\"\norg = \"example\"\n"
 	for body, says := range map[string]string{
 		"[signin]\nroles = \"leads=admin\"\n":                                                                    "want tables written [[signin.roles]]",
+		"[signin]\nroles = [\"leads=admin\"]\n":                                                                  "want tables written [[signin.roles]]",
 		"[[signin.roles]]\ngroup = 1\nrole = \"admin\"\n":                                                        "group: want a string",
 		"[[signin.roles]]\ngroup = \"g\"\nrole = [\"admin\"]\n":                                                  "role: want a string",
 		"[[signin.roles]]\ngroup = \"g\"\nroles = \"admin\"\n":                                                   "roles: want a list of strings",
@@ -546,5 +547,40 @@ func TestGroupRolesWithNoSourceOfGroupsAreRefused(t *testing.T) {
 				t.Errorf("a source of groups was not counted: %v", err)
 			}
 		})
+	}
+}
+
+// A configuration file is a regular file. A directory cannot be read as one,
+// and a pipe would hold the start until something wrote to it.
+func TestAConfigurationFileThatIsNotAFileIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFile(dir, nil); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+		t.Errorf("a directory answered %v, want it refused as not a regular file", err)
+	}
+}
+
+// A file owned by another user is one they can rewrite, whatever its mode, so
+// only the process's own user and root may own it.
+func TestAConfigurationFileOwnedByAnotherUserIsRefused(t *testing.T) {
+	for _, c := range []struct {
+		owner, me int
+		accepted  bool
+	}{
+		{1000, 1000, true},
+		{0, 1000, true},
+		{0, 0, true},
+		{1001, 1000, false},
+		{1000, 0, false},
+	} {
+		if got := ownedAcceptably(c.owner, c.me); got != c.accepted {
+			t.Errorf("owned by %d, read as %d: accepted = %v, want %v", c.owner, c.me, got, c.accepted)
+		}
+	}
+	// And the file a test writes, which is its own user's, is read.
+	if _, err := LoadFile(writeFile(t, ""), nil); err != nil {
+		t.Errorf("a file of this user's own was refused: %v", err)
 	}
 }

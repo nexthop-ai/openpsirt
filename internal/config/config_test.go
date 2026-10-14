@@ -91,6 +91,9 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// every internal host becomes somewhere a report can send a fetch.
 		{"OUTBOUND_EXCLUDED", "10.0.0.0/33"},
 		{"OUTBOUND_EXCLUDED", "not a host"},
+		// Dropped, a mapping that cannot be read leaves the deployment
+		// starting with no group mappings and nobody holding what one grants.
+		{"GROUP_ROLES", "leads=owner"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
@@ -164,19 +167,6 @@ func TestPatchBranchesAreOffUnlessTheDeploymentTurnsThemOn(t *testing.T) {
 	}
 	if c.PatchBranches {
 		t.Error("patch branch lookups are on in a deployment that never turned them on")
-	}
-}
-
-func TestTheExcludedListUnderItsOldNameIsRefusedRatherThanIgnored(t *testing.T) {
-	// Ignored, a deployment that set the old name fetches from everything it
-	// meant to keep out.
-	t.Setenv(envPrefix+"PATCH_EXCLUDED", "corp.example.com")
-	_, err := Load()
-	if err == nil {
-		t.Fatal("the old name was accepted and nothing it lists is excluded")
-	}
-	if !strings.Contains(err.Error(), envPrefix+"OUTBOUND_EXCLUDED") {
-		t.Errorf("the refusal does not name the new variable: %v", err)
 	}
 }
 
