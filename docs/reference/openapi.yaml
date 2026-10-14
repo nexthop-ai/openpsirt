@@ -2630,7 +2630,7 @@ components:
           description: Their display name, where it differs from their identity
           type: string
         reasoning:
-          description: The justification as it currently stands, in markdown
+          description: The justification as it currently stands, in markdown. Empty where you may read only some of the places the claim covers
           type: string
       required:
         - decision
@@ -3033,7 +3033,7 @@ components:
           description: Their display name, where it differs from their identity
           type: string
         reasoning:
-          description: The reasoning as it last stood, in markdown, offered back rather than thrown away
+          description: The reasoning as it last stood, in markdown, offered back rather than thrown away. Empty where you may read only some of the places the claim covers
           type: string
       required:
         - decision_id
@@ -3117,6 +3117,7 @@ components:
           description: The product it was decided in
           type: string
         reasoning:
+          description: The reasoning, in markdown. Empty where you may read only some of the places the claim covers
           type: string
       required:
         - product
@@ -4866,7 +4867,7 @@ components:
         proposed_by:
           type: string
         reasoning:
-          description: The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart
+          description: The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers
           type: string
         standing:
           description: Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it
@@ -10282,6 +10283,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         reasoning:
+          description: The reasoning, in markdown. Empty where you may read only some of the places the claim covers
           type: string
       required:
         - claim_id

@@ -7675,7 +7675,7 @@ export interface components {
             proposed_by: string;
             /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
-            /** @description The justification as it currently stands, in markdown */
+            /** @description The justification as it currently stands, in markdown. Empty where you may read only some of the places the claim covers */
             reasoning: string;
         };
         DecisionsOutputBody: {
@@ -7881,7 +7881,7 @@ export interface components {
             proposed_by: string;
             /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
-            /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
+            /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away. Empty where you may read only some of the places the claim covers */
             reasoning: string;
         };
         "Edit-commentRequest": {
@@ -7919,6 +7919,7 @@ export interface components {
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The product it was decided in */
             product: string;
+            /** @description The reasoning, in markdown. Empty where you may read only some of the places the claim covers */
             reasoning: string;
         };
         EmbargoedBody: {
@@ -8909,7 +8910,7 @@ export interface components {
             product_name?: string;
             proposed_at: string;
             proposed_by: string;
-            /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart */
+            /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers */
             reasoning: string;
             /** @description Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it */
             standing: boolean;
@@ -11998,6 +11999,7 @@ export interface components {
             issues: number;
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
+            /** @description The reasoning, in markdown. Empty where you may read only some of the places the claim covers */
             reasoning: string;
         };
         SittingBody: {

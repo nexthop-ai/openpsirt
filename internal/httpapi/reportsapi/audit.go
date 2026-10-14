@@ -50,7 +50,7 @@ type JudgedBody struct {
 	Mitigation    string             `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
 	DeferredUntil string             `json:"deferred_until,omitempty"`
 	FixedVersion  string             `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
-	Reasoning     string             `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart"`
+	Reasoning     string             `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers"`
 
 	State    core.ClaimState `json:"state"`
 	Standing bool            `json:"standing" doc:"Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it"`

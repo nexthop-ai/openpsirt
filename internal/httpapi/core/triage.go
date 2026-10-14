@@ -282,7 +282,7 @@ type DecisionDetail struct {
 	// Finding is the decision's subject, where an open finding still sits at
 	// its place. Absent where none does.
 	Finding        *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
-	Reasoning      string          `json:"reasoning" doc:"The justification as it currently stands, in markdown"`
+	Reasoning      string          `json:"reasoning" doc:"The justification as it currently stands, in markdown. Empty where you may read only some of the places the claim covers"`
 	ProposedBy     string          `json:"proposed_by" doc:"The person who made the claim, by sign-in identity"`
 	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string          `json:"proposed_at" doc:"The moment the claim was made"`

@@ -67,7 +67,7 @@ type EarlierBody struct {
 	Ended          ClaimStateEnded `json:"ended" doc:"The reason it stopped applying"`
 	EndedAt        string          `json:"ended_at,omitempty"`
 	About          string          `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
-	Reasoning      string          `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
+	Reasoning      string          `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away. Empty where you may read only some of the places the claim covers"`
 	ApprovedBy     string          `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did, by sign-in identity"`
 	ApprovedByName string          `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 }
@@ -78,7 +78,7 @@ type SimilarBody struct {
 	ClaimID        int64         `json:"claim_id" doc:"Pass as extends when deciding to carry it to this issue"`
 	DecisionID     int64         `json:"decision_id"`
 	Justification  Justification `json:"justification,omitempty"`
-	Reasoning      string        `json:"reasoning"`
+	Reasoning      string        `json:"reasoning" doc:"The reasoning, in markdown. Empty where you may read only some of the places the claim covers"`
 	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
 	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string        `json:"approved_at,omitempty"`
@@ -100,7 +100,7 @@ type ElsewhereBody struct {
 	DecisionID     int64         `json:"decision_id"`
 	Outcome        Outcome       `json:"outcome"`
 	Justification  Justification `json:"justification,omitempty"`
-	Reasoning      string        `json:"reasoning"`
+	Reasoning      string        `json:"reasoning" doc:"The reasoning, in markdown. Empty where you may read only some of the places the claim covers"`
 	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
 	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string        `json:"approved_at,omitempty"`
