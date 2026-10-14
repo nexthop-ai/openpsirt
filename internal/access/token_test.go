@@ -146,6 +146,38 @@ func TestATokenNarrowedToAProductCarriesNoAdministration(t *testing.T) {
 	})
 }
 
+func TestATokenNarrowedToRolesCarriesNoAdministration(t *testing.T) {
+	// Administration and auditing are not roles a token can name, so one
+	// asked to carry some roles carries neither — on every product, the
+	// narrowing by product above aside.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", access.Stated(true), access.Stated(true))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := f.store.NewToken(ctx, person.ID, "reading", nil,
+			[]access.Role{access.PublicRead}, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.Admin || subject.ReadsTheDeployment() {
+			t.Errorf("a token narrowed to reading kept administration %v or the audit grant %v",
+				subject.Admin, subject.ReadsTheDeployment())
+		}
+		if !subject.Reads(access.Public, f.products["sonic"]) {
+			t.Error("a token narrowed to reading does not read")
+		}
+	})
+}
+
 func TestATokenHasToExpireAndCannotOutlastTheCeiling(t *testing.T) {
 	// A credential that never runs out is one nobody ever revokes.
 	each(t, func(t *testing.T, f *fixture) {

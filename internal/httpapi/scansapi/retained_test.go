@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -156,6 +157,24 @@ func TestADocumentABuildSentReadsBackAsItArrived(t *testing.T) {
 			t.Errorf("another key on the build could not read back an upload filed there: %d",
 				other.Code)
 		}
+
+		// A key pinned to another variant of the product reaches the product
+		// and not this build, and is refused for the act.
+		variant, err := catalog.NewStore(f.DB.DB).DeclareVariant(context.Background(),
+			httpapitest.ProductHere(t, f), "elsewhere", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, pinned, err := access.NewStore(f.DB.DB).NewKey(context.Background(), "pinned-elsewhere",
+			access.Scope{ProductID: httpapitest.ProductHere(t, f), VariantID: &variant.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		fenced := httptest.NewRequest(http.MethodGet, at(result.ScanID, inventoryID), nil)
+		fenced.Header.Set("Authorization", "Bearer "+pinned)
+		refused := httptest.NewRecorder()
+		f.Handler.ServeHTTP(refused, fenced)
+		httpapitest.RefusedWith(t, refused, http.StatusForbidden)
 
 		// A branch build's contents are let go once they have been read, and
 		// that answers as gone rather than as never having existed: the

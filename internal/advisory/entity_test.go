@@ -594,3 +594,24 @@ func TestAnAdvisoryCoveringNothingIsItsMintersAlone(t *testing.T) {
 		}
 	})
 }
+
+func TestMarkingAReleaseNeedsTriageOnEveryProductTheAdvisoryCovers(t *testing.T) {
+	// What an advisory says about one product is part of the same document as
+	// what it says about the other, so changing it asks for triage on both.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t, [2]string{"sonic", here}, [2]string{"switchd", there})
+
+		reads := []access.Role{access.PublicRead, access.PrivateRead}
+		partly := access.NewPerson(f.second.ID, f.second.Identity, false, map[int64][]access.Role{
+			f.product:      append(reads, access.PublicTriage, access.PrivateTriage),
+			f.otherProduct: reads,
+		}, 0)
+		if err := f.store.MarkAffected(ctx, partly, named, "sonic", here, "master", "broadcom",
+			true); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody triaging one of its two products marked a release: %v", err)
+		}
+	})
+}

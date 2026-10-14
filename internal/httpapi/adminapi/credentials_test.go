@@ -311,3 +311,32 @@ func TestAnAdministratorListsEveryTokenWithItsOwner(t *testing.T) {
 			"/v1/people/tokens", ""), http.StatusForbidden)
 	})
 }
+
+// A token's roles narrow what its owner holds. An empty list and a list of
+// roles nobody holds each mint a token reaching nothing, so both are refused,
+// and nothing is minted.
+func TestATokenCarryingNoRoleItsOwnerHoldsIsRefused(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, c := range []struct{ what, body, says string }{
+			{"an empty list of roles", `{"name":"nothing","lifetime":"24h","holds":[]}`,
+				"carrying no role"},
+			{"roles the owner does not hold", `{"name":"elsewhere","lifetime":"24h","holds":["public-read"]}`,
+				"hold none of those roles"},
+		} {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/tokens", c.body)
+			httpapitest.RefusedWith(t, got, http.StatusUnprocessableEntity)
+			if !strings.Contains(got.Body.String(), c.says) {
+				t.Errorf("%s was refused as %s", c.what, got.Body.String())
+			}
+		}
+		var listed struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/tokens", &listed)
+		if len(listed.Items) != 0 {
+			t.Errorf("a refused token was minted: %+v", listed.Items)
+		}
+	})
+}
