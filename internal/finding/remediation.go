@@ -132,18 +132,18 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// closed when the last of its places is, and the places are what fans
 	// out.
 	var spans []struct {
-		Band    string  `bun:"band"`
+		Rank    int     `bun:"rank"`
 		Seconds float64 `bun:"seconds"`
 		Issues  int     `bun:"issues"`
 	}
+	// One row per issue and product first, because a rating belongs to a
+	// product and every narrowing is a condition on a place.
 	closed := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(rating.For(rating.OnStream)).
-		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`MAX(f.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		Where("f.closed_at IS NOT NULL").
@@ -154,24 +154,36 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 			}
 			return q.Where("f.closed_at < ?", until)
 		}).
-		GroupExpr("band, f.vulnerability_id")
+		GroupExpr("f.vulnerability_id, st.product_id")
 	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
+
+	// Then one row per issue, in the strictest band any product it closed in
+	// gives it, so an issue rated two ways in
+	// two products is one fix, in the same unit as what opened.
+	perIssue := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, closed).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(rating.For(rating.OnGrouped)).
+		ColumnExpr(`MAX(` + rankCase(rating.BandExpr, 0) + `) AS "rank"`).
+		ColumnExpr(`MAX(grouped.closed_at) AS "closed_at"`).
+		ColumnExpr(`MIN(grouped.opened_at) AS "opened_at"`).
+		GroupExpr("grouped.vulnerability_id")
 
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.
 	if err := s.db.NewSelect().
-		TableExpr(`(?) AS "per_issue"`, closed).
-		ColumnExpr(`per_issue.band AS "band"`).
+		TableExpr(`(?) AS "per_issue"`, perIssue).
+		ColumnExpr(`per_issue.rank AS "rank"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
 		ColumnExpr(secondsBetween(s.db)+` AS "seconds"`).
-		GroupExpr("per_issue.band").
+		GroupExpr("per_issue.rank").
 		Scan(ctx, &spans); err != nil {
 		return nil, fmt.Errorf("read how long fixes took: %w", err)
 	}
 	for _, row := range spans {
 		out.Fixed += row.Issues
 		if row.Issues > 0 {
-			out.TimeToFix[row.Band] = time.Duration(row.Seconds) * time.Second
+			out.TimeToFix[wordAt(row.Rank)] = time.Duration(row.Seconds) * time.Second
 		}
 	}
 

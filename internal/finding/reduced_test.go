@@ -253,3 +253,27 @@ func TestAgingCountsAnIssueOpenInTwoProductsInTheStrictestBandEitherGivesIt(t *t
 		}
 	})
 }
+
+func TestAFixCountsAnIssueClosedInTwoProductsOnceInTheStrictestBandEitherGivesIt(t *testing.T) {
+	// Fixed is counted in issues so it reads against what opened, and an issue
+	// two products rate differently is still one issue.
+	each(t, func(t *testing.T, f *fixture) {
+		who := f.ratedTwoWays(t)
+		now := time.Now().UTC()
+		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2"} {
+			f.aged(t, issue, now.Add(-10*24*time.Hour))
+			f.closeIt(t, issue, finding.Upgraded, now)
+		}
+		got, err := f.store.Remediation(t.Context(), who, finding.Scope{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Fixed != 2 {
+			t.Errorf("two issues each closed in two products counted as %d fixes, want 2", got.Fixed)
+		}
+		if len(got.TimeToFix) != 1 || got.TimeToFix["medium"] == 0 {
+			t.Errorf("two issues each rated low in one product and medium in the other "+
+				"are timed in %v, want medium alone", got.TimeToFix)
+		}
+	})
+}
