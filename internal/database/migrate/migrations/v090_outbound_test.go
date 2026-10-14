@@ -15,8 +15,10 @@ import (
 
 // A v0.8.0 database's destinations are upgraded to names held folded beside
 // the spelling typed. Two names one kind held that fold to one key stay two
-// destinations: the one already spelled as the key keeps it, or else the
-// earliest, and the other takes the key with its own number.
+// destinations: one still in use keeps the key before a retired one, then the
+// one already spelled as the key, then the earliest. The other takes the key
+// with its own number and is listed under it, so retiring it by the name shown
+// reaches it.
 func TestAV080DatabaseFoldsItsDestinationNames(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -27,15 +29,24 @@ func TestAV080DatabaseFoldsItsDestinationNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		ids := map[string]int64{}
-		for _, each := range []struct{ name, kind string }{
-			{"Ops", "*"}, {"ops", "*"}, {" Pager ", "assigned"}, {"PAGER", "assigned"},
-			{"Chat", "*"}, {"Chat", "assigned"},
+		for _, each := range []struct {
+			name, kind string
+			retired    bool
+		}{
+			{"Ops", "*", false}, {"ops", "*", false}, {" Pager ", "assigned", false},
+			{"PAGER", "assigned", false}, {"Chat", "*", false}, {"Chat", "assigned", false},
+			{"Feed", "*", false}, {"feed", "*", true},
 		} {
+			var retired *time.Time
+			if each.retired {
+				at := time.Now().UTC().Truncate(time.Second)
+				retired = &at
+			}
 			var id int64
 			if _, err := db.DB.NewRaw(`INSERT INTO "outbound" ("name", "kind", "url", "secret", `+
-				`"created_by", "created_at", "platform") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				`"created_by", "created_at", "platform", "retired_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 				each.name, each.kind, "https://hooks.example/x", "a-secret", who.ID,
-				time.Now().UTC().Truncate(time.Second), "webhook").Exec(ctx); err != nil {
+				time.Now().UTC().Truncate(time.Second), "webhook", retired).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if err := db.DB.NewRaw(`SELECT MAX("id") FROM "outbound"`).Scan(ctx, &id); err != nil {
@@ -60,11 +71,13 @@ func TestAV080DatabaseFoldsItsDestinationNames(t *testing.T) {
 		}
 		for at, want := range map[string][2]string{
 			"ops|*":            {"ops", "ops"},
-			"Ops|*":            {"ops-" + strconv.FormatInt(ids["Ops|*"], 10), "Ops"},
+			"Ops|*":            {"ops-" + strconv.FormatInt(ids["Ops|*"], 10), "ops-" + strconv.FormatInt(ids["Ops|*"], 10)},
 			" Pager |assigned": {"pager", "Pager"},
-			"PAGER|assigned":   {"pager-" + strconv.FormatInt(ids["PAGER|assigned"], 10), "PAGER"},
+			"PAGER|assigned":   {"pager-" + strconv.FormatInt(ids["PAGER|assigned"], 10), "pager-" + strconv.FormatInt(ids["PAGER|assigned"], 10)},
 			"Chat|*":           {"chat", "Chat"},
 			"Chat|assigned":    {"chat", "Chat"},
+			"Feed|*":           {"feed", "Feed"},
+			"feed|*":           {"feed-" + strconv.FormatInt(ids["feed|*"], 10), "feed-" + strconv.FormatInt(ids["feed|*"], 10)},
 		} {
 			if got[ids[at]] != want {
 				t.Errorf("%s was upgraded to %q, want %q", at, got[ids[at]], want)

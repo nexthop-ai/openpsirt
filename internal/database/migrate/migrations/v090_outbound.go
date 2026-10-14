@@ -64,15 +64,18 @@ type outboundRowV090 struct {
 	Name        string `bun:"name"`
 	Kind        string `bun:"kind"`
 	DisplayName string `bun:"display_name"`
+	Live        bool   `bun:"live"`
 }
 
 // foldOutboundV090 writes each destination's name as its folded key, and its
 // display name as typed where none is held yet.
 //
-// Two names one kind holds that fold to one key keep one destination each: the
-// row already spelled as the key, or else the earliest, takes the key, and
-// every other takes the key and its own number. Both stay configured, and the
-// listing shows each as it was typed.
+// Two names one kind holds that fold to one key keep one destination each. The
+// key goes to a destination still in use before a retired one, then to the one
+// already spelled as the key, then to the earliest; every other takes the key
+// and its own number. Both stay configured. A destination given a numbered key
+// is listed under that key, because what the listing shows is what retiring
+// matches.
 //
 // The fold is copied rather than called, so a later change to the
 // application's rule does not change what this upgrade wrote.
@@ -80,6 +83,7 @@ func foldOutboundV090(ctx context.Context, tx bun.Tx) error {
 	var rows []outboundRowV090
 	if err := tx.NewSelect().TableExpr(`"outbound"`).
 		ColumnExpr(`"id", "name", "kind", "display_name"`).
+		ColumnExpr(`CASE WHEN "retired_at" IS NULL THEN 1 ELSE 0 END AS "live"`).
 		OrderExpr(`"id"`).Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read the destinations: %w", err)
 	}
@@ -103,10 +107,19 @@ func foldOutboundV090(ctx context.Context, tx bun.Tx) error {
 		members := byKey[group]
 		key, _, _ := strings.Cut(group, "\x00")
 		keeper := members[0]
-		for _, i := range members {
+		rank := func(i int) int {
+			r := 0
+			if rows[i].Live {
+				r += 2
+			}
 			if rows[i].Name == key {
+				r++
+			}
+			return r
+		}
+		for _, i := range members {
+			if rank(i) > rank(keeper) {
 				keeper = i
-				break
 			}
 		}
 		named[keeper] = key
@@ -126,6 +139,9 @@ func foldOutboundV090(ctx context.Context, tx bun.Tx) error {
 		display := strings.TrimSpace(row.DisplayName)
 		if display == "" {
 			display = strings.TrimSpace(row.Name)
+		}
+		if named[i] != strings.ToLower(strings.TrimSpace(row.Name)) {
+			display = named[i]
 		}
 		if named[i] == row.Name && display == row.DisplayName {
 			return nil
