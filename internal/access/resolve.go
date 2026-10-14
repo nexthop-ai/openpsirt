@@ -320,6 +320,13 @@ func ParseSources(raw string) ([]net.IPNet, error) {
 			continue
 		}
 		if _, network, err := net.ParseCIDR(entry); err == nil {
+			// An IPv4-mapped range is held as the IPv4 range it is. Matching
+			// reads it that way already, mask included, so ::ffff:0:0/96
+			// covers every IPv4 address, and holding it in the same form is
+			// what lets the check for a range covering everybody see that.
+			if v4 := network.IP.To4(); v4 != nil && len(network.Mask) == net.IPv6len {
+				network = &net.IPNet{IP: v4, Mask: network.Mask[12:]}
+			}
 			out = append(out, *network)
 			continue
 		}

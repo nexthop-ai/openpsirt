@@ -1438,6 +1438,8 @@ notice the absence and say so.
   text and, for a connection failure, the address and user it tried.
 - Naming every address as a trusted source is refused. It reaches the same
   place as naming none, through the setting that is supposed to be the guard.
+  An IPv4-mapped range is held as the IPv4 range it is, so `::ffff:0:0/96`,
+  which matches every IPv4 client, is refused with `0.0.0.0/0`.
 - Granting a role somebody already holds succeeds. An administrator scripting
   grants should not have to check first. The refused insert stands on a
   savepoint of its own, because on PostgreSQL a refused statement aborts the

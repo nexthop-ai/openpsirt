@@ -6,6 +6,7 @@ package access_test
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -523,7 +524,8 @@ func TestAKeyIsAcceptedWhereverItComesFrom(t *testing.T) {
 func TestTrustingEveryAddressIsRefused(t *testing.T) {
 	// The guard that halts on a header with no sources would be decorative if
 	// the setting meant to satisfy it could name every address instead.
-	for _, sources := range []string{"0.0.0.0/0", "::/0", "10.0.0.0/8, 0.0.0.0/0"} {
+	// ::ffff:0:0/96 is every IPv4 address, written as IPv6.
+	for _, sources := range []string{"0.0.0.0/0", "::/0", "10.0.0.0/8, 0.0.0.0/0", "::ffff:0:0/96"} {
 		parsed, err := access.ParseSources(sources)
 		if err != nil {
 			t.Fatalf("%q: %v", sources, err)
@@ -540,6 +542,17 @@ func TestTrustingEveryAddressIsRefused(t *testing.T) {
 	}
 	if err := (access.Trust{Header: "X-User", From: parsed}).Configured(); err != nil {
 		t.Errorf("an ordinary range was refused: %v", err)
+	}
+	// And one written as IPv4-mapped is the IPv4 range it names, no wider.
+	mapped, err := access.ParseSources("::ffff:10.0.0.0/104")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (access.Trust{Header: "X-User", From: mapped}).Configured(); err != nil {
+		t.Errorf("an IPv4-mapped range was refused: %v", err)
+	}
+	if !mapped[0].Contains(net.ParseIP("10.1.2.3")) || mapped[0].Contains(net.ParseIP("11.1.2.3")) {
+		t.Errorf("::ffff:10.0.0.0/104 reads as %v", mapped[0])
 	}
 }
 
