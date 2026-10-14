@@ -650,7 +650,10 @@ func databaseURL(base string, engine database.Engine, name string) (string, erro
 	if engine == database.Postgres {
 		query := parsed.Query()
 		query.Set("options", "-c synchronous_commit=off")
-		parsed.RawQuery = query.Encode()
+		// A space written as %20: the driver reads a query value the way
+		// libpq does, where "+" is a plus sign, and Encode writes a space as
+		// "+". Encode writes a plus sign as %2B, so nothing else changes.
+		parsed.RawQuery = strings.ReplaceAll(query.Encode(), "+", "%20")
 	}
 	return parsed.String(), nil
 }
