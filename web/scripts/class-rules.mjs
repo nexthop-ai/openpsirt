@@ -68,14 +68,27 @@ export function rulesIn(text, into = { declared: new Map(), modifiers: new Map()
   return into;
 }
 
+// A bare rule that draws a box: a display, spacing, border or background. A
+// class reached as a modifier carries its bare rule too, at the same
+// specificity, so a later bare rule of this kind replaces the box of the thing
+// it modifies.
+export const DRAWS_A_BOX =
+  /(^|[\s;])(display|margin(-[a-z]+)*|padding(-[a-z]+)*|border(-[a-z]+)*|background(-[a-z]+)*)\s*:/;
+
+// modifiersWhoseRule is every class reached as a modifier whose own bare rule
+// matches a pattern, sorted.
+export function modifiersWhoseRule({ declared, modifiers }, pattern) {
+  return [...modifiers.keys()].filter((name) => pattern.test(declared.get(name) ?? "")).sort();
+}
+
 // positionedModifiers is every class reached as a modifier whose own bare rule
 // takes an element out of normal flow.
 //
 // Narrow on purpose: a modifier sharing a name with a text style is ordinary
 // and correct. What cannot be right is a chip becoming positioned because of
 // the word beside it — so the test is the property rather than the name.
-export function positionedModifiers({ declared, modifiers }) {
-  return [...modifiers.keys()].filter((name) => escapes.test(declared.get(name) ?? "")).sort();
+export function positionedModifiers(read) {
+  return modifiersWhoseRule(read, escapes);
 }
 
 // emits is whether a stylesheet holds a rule for a class, as a whole name.

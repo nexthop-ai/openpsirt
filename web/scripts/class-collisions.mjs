@@ -16,7 +16,7 @@
 // Utilities used deliberately in markup are not the subject. What is checked
 // is the names we *define a rule for*, which is where the two can disagree.
 import { compile } from "tailwindcss";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   cssRules,
@@ -26,25 +26,15 @@ import {
   styleless as unstyled,
 } from "./class-rules.mjs";
 import { createRequire } from "node:module";
+import { sourceFiles, SRC as src } from "./parsed.mjs";
 
 const require = createRequire(import.meta.url);
-const here = import.meta.dirname;
-const src = path.join(here, "..", "src");
-
-async function stylesheets(dir) {
-  const found = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) found.push(...(await stylesheets(full)));
-    else if (entry.name.endsWith(".css")) found.push(full);
-  }
-  return found;
-}
+const stylesheets = sourceFiles({ ext: [".css"] });
 
 // Class selectors we write. Deliberately narrow: a bare `.name`, which is the
 // only shape a single-class utility can collide with.
 const defined = new Map();
-for (const file of await stylesheets(src)) {
+for (const file of stylesheets) {
   for (const { selector } of cssRules(await readFile(file, "utf8"))) {
     for (const [, name] of selector.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) {
       if (!defined.has(name)) defined.set(name, path.relative(src, file));
@@ -67,7 +57,7 @@ for (const file of await stylesheets(src)) {
 const declared = new Map();
 const modifiers = new Map();
 const read = { declared, modifiers };
-for (const file of await stylesheets(src)) {
+for (const file of stylesheets) {
   rulesIn(await readFile(file, "utf8"), read);
 }
 
@@ -158,33 +148,18 @@ const clashing = names.filter((name) => emits(emitted, name));
 // first, then only the quoted runs are kept, nested ones included: a class
 // inside an interpolation is itself a quoted string.
 //
-// The generated client is left out for the same reason its two sibling gates
-// leave it out: it is the API document as TypeScript, and a word in an
-// operation's description is not markup.
+// The generated client is left out by the walker every gate shares: it is the
+// API document as TypeScript, and a word in an operation's description is not
+// markup.
 const sources = [];
-async function scripts(dir) {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await scripts(full);
-      continue;
-    }
-    if (!/\.(tsx?|html)$/.test(entry.name) || entry.name === "schema.d.ts") continue;
-    const text = (await readFile(full, "utf8"))
-      .replace(/\/\*[\s\S]*?\*\//g, " ")
-      .replace(/(?<![:\w])\/\/[^\n]*/g, " ");
-    if (entry.name.endsWith(".html")) {
-      sources.push(text);
-      continue;
-    }
-    for (const [, single, double, template] of text.matchAll(
-      /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g,
-    )) {
-      sources.push(` ${single ?? double ?? template ?? ""} `);
-    }
+for (const full of sourceFiles({ ext: [".ts", ".tsx"], tests: true })) {
+  const text = (await readFile(full, "utf8"))
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(?<![:\w])\/\/[^\n]*/g, " ");
+  for (const [, single, double, template] of text.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
+    sources.push(` ${single ?? double ?? template ?? ""} `);
   }
 }
-await scripts(src);
 const markup = sources.join("\n");
 
 // Names that come from somewhere other than our own markup, so their absence
@@ -241,30 +216,21 @@ const written = new Map();
 // can.
 let markupSeen = 0;
 let classesSeen = 0;
-async function markupClasses(dir) {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      await markupClasses(full);
-      continue;
-    }
-    if (!/\.tsx?$/.test(entry.name) || entry.name === "schema.d.ts") continue;
-    markupSeen++;
-    const lines = (await readFile(full, "utf8")).split("\n");
-    lines.forEach((line, i) => {
-      for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
-        for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
-          if (!/^[A-Za-z][\w-]*$/.test(word)) continue;
-          classesSeen++;
-          if (!defined.has(word) && !written.has(word)) {
-            written.set(word, `${path.relative(src, full)}:${i + 1}`);
-          }
+for (const full of sourceFiles({ ext: [".ts", ".tsx"], tests: true })) {
+  markupSeen++;
+  const lines = (await readFile(full, "utf8")).split("\n");
+  lines.forEach((line, i) => {
+    for (const m of line.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+      for (const word of (m[1] ?? m[2] ?? "").replace(/\$\{[^}]*\}/g, " ").split(/\s+/)) {
+        if (!/^[A-Za-z][\w-]*$/.test(word)) continue;
+        classesSeen++;
+        if (!defined.has(word) && !written.has(word)) {
+          written.set(word, `${path.relative(src, full)}:${i + 1}`);
         }
       }
-    });
-  }
+    }
+  });
 }
-await markupClasses(src);
 const alone = await compile('@import "tailwindcss";', {
   base: process.cwd(),
   loadStylesheet: loadTailwind,

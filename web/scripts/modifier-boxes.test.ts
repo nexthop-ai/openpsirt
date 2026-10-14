@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { rulesIn } from "./class-rules.mjs";
+import { DRAWS_A_BOX, modifiersWhoseRule, rulesIn } from "./class-rules.mjs";
 // @ts-expect-error - plain ESM with no types of its own
 import { stylesheets } from "./source.mjs";
 
@@ -12,11 +12,8 @@ import { stylesheets } from "./source.mjs";
 // carries the bare rule too, at the same specificity, so a later bare rule
 // replaces the display, spacing, border and background of the thing it
 // modifies: a chip in a table cell draws as a block-level callout.
-const box =
-  /(^|[\s;])(display|margin(-[a-z]+)*|padding(-[a-z]+)*|border(-[a-z]+)*|background(-[a-z]+)*)\s*:/;
-
 function boxedModifiers(declared: Map<string, string>, modifiers: Map<string, string>): string[] {
-  return [...modifiers.keys()].filter((name) => box.test(declared.get(name) ?? "")).sort();
+  return modifiersWhoseRule({ declared, modifiers }, DRAWS_A_BOX) as string[];
 }
 
 describe("a modifier class", () => {

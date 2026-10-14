@@ -15,25 +15,12 @@
 // taken for an importer. It does not resolve paths: a name imported from any
 // module counts for every module exporting it.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
-
-const web = path.join(import.meta.dirname, "..");
+import { sourceFiles, WEB } from "./parsed.mjs";
 
 const declared =
   /^export\s+(?:default\s+)?(?:async\s+)?(?:const|let|function|type|interface|class|enum)\s+([A-Za-z_$][\w$]*)/gm;
-
-// Every source file under a directory, the generated API types left out: they
-// are the server's document rather than code anybody here wrote.
-function files(dir) {
-  const out = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...files(full));
-    else if (/\.(ts|tsx|mjs)$/.test(entry.name) && !entry.name.endsWith(".d.ts")) out.push(full);
-  }
-  return out;
-}
 
 // The names one file imports from others.
 const clause = /\b(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s/g;
@@ -79,12 +66,17 @@ export function unnamed(sources) {
   return { found: found.sort(), examined };
 }
 
-// The web source as the check reads it.
+// The web source as the check reads it: the interface and its gate scripts,
+// tests included, because a test is an importer.
 export function webSources() {
   const out = {};
   for (const dir of ["src", "scripts"]) {
-    for (const full of files(path.join(web, dir))) {
-      out[path.relative(web, full)] = readFileSync(full, "utf8");
+    for (const full of sourceFiles({
+      ext: [".ts", ".tsx", ".mjs"],
+      tests: true,
+      under: path.join(WEB, dir),
+    })) {
+      out[path.relative(WEB, full)] = readFileSync(full, "utf8");
     }
   }
   return out;

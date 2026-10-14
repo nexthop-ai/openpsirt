@@ -6,9 +6,10 @@
 // you are on — is drawn in ink or on the raised tone. A state drawn in the
 // accent reads as something to click.
 
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { cssRules } from "./class-rules.mjs";
+import { sourceFiles, SRC } from "./parsed.mjs";
 
 // A selector that describes a state rather than an interaction.
 const STATE =
@@ -37,13 +38,12 @@ export function stateInAccent(file, css) {
   return { examined, found: out };
 }
 
-// Every stylesheet under src/styles.
+// Every stylesheet of the interface.
 export function sweep() {
-  const dir = join(import.meta.dirname, "..", "src", "styles");
   let examined = 0;
   const found = [];
-  for (const name of readdirSync(dir).filter((each) => each.endsWith(".css"))) {
-    const one = stateInAccent(name, readFileSync(join(dir, name), "utf8"));
+  for (const file of sourceFiles({ ext: [".css"] })) {
+    const one = stateInAccent(path.relative(SRC, file), readFileSync(file, "utf8"));
     examined += one.examined;
     found.push(...one.found);
   }

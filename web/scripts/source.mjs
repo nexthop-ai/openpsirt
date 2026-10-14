@@ -4,21 +4,17 @@
 // Files of the web source a test reads as text. The tests are typed without
 // Node's own declarations, so the reading is done here, in plain ESM.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
+import { sourceFiles, WEB } from "./parsed.mjs";
 
-const web = path.join(import.meta.dirname, "..");
-
-// Every stylesheet under src/styles, as its text, in name order.
+// Every stylesheet of the interface, as its text, in path order: the set every
+// stylesheet check reads.
 export function stylesheets() {
-  const styles = path.join(web, "src", "styles");
-  return readdirSync(styles)
-    .filter((name) => name.endsWith(".css"))
-    .sort()
-    .map((name) => readFileSync(path.join(styles, name), "utf8"));
+  return sourceFiles({ ext: [".css"] }).map((file) => readFileSync(file, "utf8"));
 }
 
 // The page every screen is mounted in, as its text.
 export function indexHtml() {
-  return readFileSync(path.join(web, "index.html"), "utf8");
+  return readFileSync(path.join(WEB, "index.html"), "utf8");
 }
