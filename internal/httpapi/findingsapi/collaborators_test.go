@@ -537,6 +537,14 @@ func TestACollaboratorIsToldNothingOfWhatWasFiledAgainstABuild(t *testing.T) {
 			"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1",
 			"/v1/products/mine/streams/master/variants/broadcom/scans/1/changes",
 			"/v1/products/mine/streams/master/variants/never-scanned/scans/1/changes",
+			"/v1/products/mine/streams/master/variants/broadcom/runs/1",
+			"/v1/products/mine/streams/master/variants/never-scanned/runs/1",
+			"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades",
+			"/v1/products/mine/streams/master/variants/never-scanned/pending-upgrades",
+			"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades.csv",
+			"/v1/products/mine/streams/master/variants/never-scanned/pending-upgrades.csv",
+			"/v1/products/mine/streams/master/variants/broadcom/carried-patches",
+			"/v1/products/mine/streams/master/variants/never-scanned/carried-patches",
 		} {
 			got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
 			if got.Code != stranger.Code || got.Body.String() != stranger.Body.String() {

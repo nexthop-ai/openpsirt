@@ -412,12 +412,19 @@ func VisibleBuild(ctx context.Context, in Deps, product, stream, variant string)
 // "the names do not resolve" and "nothing has been filed here" stay two
 // answers: the first is a typo and the second is a build waiting for its first
 // scan, and a reader can act on only one of them.
+//
+// Both answers are for somebody who sees the product. Somebody brought into a
+// case resolves its names and reads nothing these routes answer with, so told
+// apart, the two would tell them which builds were ever scanned.
 func TargetIDOf(ctx context.Context, in Deps, subject access.Subject,
 	product, stream, variant string) (int64, error) {
 
 	named, err := LocatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
 		return 0, err
+	}
+	if !subject.Sees(named.ProductID) {
+		return 0, NoSuchProduct()
 	}
 	target, err := TargetRow(ctx, in, named.StreamID, named.VariantID)
 	if err != nil {
