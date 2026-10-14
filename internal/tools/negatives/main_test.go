@@ -118,13 +118,30 @@ func TestTheOnePlaceA404MayPublishAnErrorsTextSaysWhy(t *testing.T) {
 	if len(allowed) == 0 {
 		t.Fatal("nothing is exempt, so the exemption list checks nothing")
 	}
-	for path, why := range allowed {
+	for key, why := range allowed {
 		if why == "" {
-			t.Errorf("%s is exempt and says nothing about why", path)
+			t.Errorf("%s is exempt and says nothing about why", key)
 		}
-		if !strings.HasSuffix(path, ".go") {
-			t.Errorf("%q is exempt and is not a Go file, so it matches by accident", path)
+		path, fn, ok := strings.Cut(key, ":")
+		if !ok || !strings.HasSuffix(path, ".go") || fn == "" {
+			t.Errorf("%q is exempt and does not name a function of a Go file, so it matches by accident", key)
 		}
+	}
+}
+
+// The exemption covers one function. A 404 built from an error elsewhere in
+// the same file is reported.
+func TestTheExemptionCoversItsFunctionAndNothingElseInTheFile(t *testing.T) {
+	const path = "internal/httpapi/core/absent.go"
+	src := "package core\n\n" +
+		"func Undeclared(err error) error {\n\treturn huma.Error404NotFound(err.Error())\n}\n\n" +
+		"func other(err error) error {\n\treturn huma.Error404NotFound(err.Error())\n}\n"
+	lines, err := builtIn(path, []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != 1 || lines[0] != 8 {
+		t.Errorf("reported lines %v, want only line 8, in the function nothing exempts", lines)
 	}
 }
 
@@ -145,6 +162,7 @@ func TestWhatCountsAsAnArmThatAnswers404WhateverTheErrorWas(t *testing.T) {
 		{"as the fifth of five, one a struct", "\tif err != nil {\n\t\treturn Subject{}, nil, 0, \"\", noSuchPerson()\n\t}", true},
 		{"exported and called from another package", "\tif err != nil {\n\t\treturn nil, core.NoSuchPerson()\n\t}", true},
 		{"exported and called in its own package", "\tif err != nil {\n\t\treturn nil, NoSuchPerson()\n\t}", true},
+		{"the scanned-nothing helper", "\tif err != nil {\n\t\treturn nil, core.NothingScannedThere()\n\t}", true},
 		{"the helper, exported", "\tif err != nil {\n\t\treturn nil, core.Absent(l, err, \"x\", core.NoSuchPerson)\n\t}", false},
 
 		{"the helper that splits the two", "\tif err != nil {\n\t\treturn nil, absent(l, err, \"x\", noSuchPerson)\n\t}", false},

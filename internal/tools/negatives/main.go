@@ -162,7 +162,8 @@ func sentinel(x ast.Expr) bool {
 	return strings.HasPrefix(name, "Err") && len(name) > 3 && unicode.IsUpper(rune(name[3]))
 }
 
-// builtIn is the line of every such 404 in a file's source.
+// builtIn is the line of every such 404 in a file's source, outside the
+// functions `allowed` names.
 //
 // Parsed rather than matched line by line: a call spread over lines, an error
 // under any name, and an error passed as a second argument are all one shape
@@ -176,6 +177,11 @@ func builtIn(path string, src []byte) ([]int, error) {
 	}
 	var lines []int
 	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok {
+			if _, exempt := allowed[path+":"+fn.Name.Name]; exempt {
+				continue
+			}
+		}
 		bound := boundIn(decl)
 		ast.Inspect(decl, func(n ast.Node) bool {
 			if call, ok := n.(*ast.CallExpr); ok && builtFromError(call, bound) {
@@ -191,9 +197,10 @@ func builtIn(path string, src []byte) ([]int, error) {
 var collapsing = regexp.MustCompile(`\berr != nil(\s*\|\|[^{]*)?\s*\{\s*$`)
 
 // absence matches a return answering a fixed 404, behind any number of other
-// return values.
+// return values: a helper named for what is missing, the one named for a build
+// nothing has been scanned into, or the framework's own constructor.
 var absence = regexp.MustCompile(
-	`^\s*return\s+(?:[^,()]+,\s*)*(?:(?:\w+\.)?[nN]oSuch\w*\(|huma\.Error404NotFound\()`)
+	`^\s*return\s+(?:[^,()]+,\s*)*(?:(?:\w+\.)?(?:[nN]oSuch\w*|NothingScannedThere)\(|huma\.Error404NotFound\()`)
 
 // collapses reports the lines of body that open an error arm answering a fixed
 // 404 whatever the error was, as one-based line numbers.
@@ -225,17 +232,16 @@ func collapses(body string) []int {
 // branch and the variant was not declared. The arm is reached only once the
 // sentinel has been tested — a property of one audited function rather than
 // anything this gate can see, so the exemption is named rather than inferred.
+// It is keyed by file and function, and covers only the 404 built from an
+// error: the rest of that file is read like any other.
 var allowed = map[string]string{
-	"internal/httpapi/core/absent.go": "undeclared, reached only for catalog.ErrNotFound",
+	"internal/httpapi/core/absent.go:Undeclared": "reached only for catalog.ErrNotFound",
 }
 
 func main() {
 	var bad []string
 	read, err := walk.Sources(".go", func(path string, body []byte) error {
 		if strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		if _, ok := allowed[path]; ok {
 			return nil
 		}
 		for _, at := range collapses(string(body)) {
