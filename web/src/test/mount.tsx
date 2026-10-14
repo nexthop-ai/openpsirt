@@ -61,11 +61,16 @@ export function serve(answer: Served) {
 // One request a screen sent: the path and what it was sent with.
 export type Sent = [path: string, init: unknown];
 
-// The generated client's POST, answered the same way. What it returns reads
-// back every request sent so far, in order.
-export function accept(answer: Served): () => Sent[] {
-  const spy = vi.spyOn(api, "POST").mockImplementation(answering(answer));
+// One of the generated client's writes, answered the same way. What it
+// returns reads back every request sent so far, in order.
+export function answer(method: "POST" | "PUT" | "PATCH" | "DELETE", served: Served): () => Sent[] {
+  const spy = vi.spyOn(api, method).mockImplementation(answering(served));
   return () => spy.mock.calls as unknown as Sent[];
+}
+
+// The generated client's POST.
+export function accept(served: Served): () => Sent[] {
+  return answer("POST", served);
 }
 
 function answering(answer: Served) {

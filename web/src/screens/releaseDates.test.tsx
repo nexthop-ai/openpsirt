@@ -3,10 +3,9 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Branches } from "./Branches";
-import { mounted, screen, serve, settle } from "../test/mount";
+import { answer, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
 
@@ -34,21 +33,18 @@ describe("a tag's release date", () => {
       }
       return { data: { items: [] } };
     });
-    const put = vi.spyOn(api, "PUT").mockImplementation((async () => ({
-      data: {},
-      response: new Response(null, { status: 204 }),
-    })) as never);
+    const put = answer("PUT", () => ({ status: 204 }));
     mount.render(screen(<Branches />, "/products/sonic/streams", "/products/:product/streams"));
     await settle();
     const box = mount.host().querySelector<HTMLInputElement>('input[aria-label="Released"]');
     type(box, "0002-01-01");
     type(box, "0202-01-01");
     type(box, "2026-01-01");
-    expect(put).not.toHaveBeenCalled();
+    expect(put()).toHaveLength(0);
     act(() => save()?.click());
     await settle();
-    expect(put).toHaveBeenCalledTimes(1);
-    const sent = put.mock.calls[0] as unknown as [string, { body: { released_on: string } }];
+    expect(put()).toHaveLength(1);
+    const sent = put()[0] as [string, { body: { released_on: string } }];
     expect(sent[1].body.released_on).toBe("2026-01-01");
   });
 });

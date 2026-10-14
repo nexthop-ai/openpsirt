@@ -3,9 +3,8 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
 import { Me } from "./Me";
-import { screen, serve, settle, mounted, type Answer } from "../test/mount";
+import { answer, screen, serve, settle, mounted, type Answer } from "../test/mount";
 
 const mount = mounted();
 
@@ -51,10 +50,10 @@ describe("a person's own page", () => {
   it("shows the digest as set once the server has taken it", async () => {
     const digest = { on: false };
     deployment({ data: { items: [], total: 0 } }, digest);
-    vi.spyOn(api, "PUT").mockImplementation((async () => {
+    answer("PUT", () => {
       digest.on = true;
-      return { data: undefined, error: undefined, response: new Response(null, { status: 204 }) };
-    }) as never);
+      return { status: 204 };
+    });
     mount.render(screen(<Me />));
     await settle();
     const box = () =>

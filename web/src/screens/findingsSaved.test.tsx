@@ -3,9 +3,8 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
 import { Findings } from "./Findings";
-import { location, mounted, screen, serve, settle } from "../test/mount";
+import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
 
@@ -27,17 +26,11 @@ async function draw(address: string) {
     if (path === "/v1/session/me/saved-filters") return { data: { items: kept, total: 2 } };
     return { data: { items: [], total: 0 } };
   });
-  const forgot = vi.spyOn(api, "DELETE").mockImplementation((async () => ({
-    data: undefined,
-    error: undefined,
-    response: new Response(null, { status: 204 }),
-  })) as never);
+  const forgot = answer("DELETE", () => ({ status: 204 }));
   mount.render(screen(<Findings />, address, "/findings"));
   await settle();
   return () =>
-    (forgot.mock.calls as unknown as [string, { params: { path: { name: string } } }][]).map(
-      ([, init]) => init.params.path.name,
-    );
+    forgot().map(([, init]) => (init as { params: { path: { name: string } } }).params.path.name);
 }
 
 const control = () =>

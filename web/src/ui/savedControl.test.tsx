@@ -4,8 +4,7 @@
 import { act } from "react";
 import { useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
-import { location, mounted, screen, serve, settle } from "../test/mount";
+import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 import { Saved } from "./Saved";
 
 const mount = mounted();
@@ -41,12 +40,8 @@ function keeping(items: { name: string; query: string }[]) {
   serve((path) =>
     path === "/v1/session/me/saved-filters" ? { data: { items, total: items.length } } : undefined,
   );
-  const put = vi.spyOn(api, "PUT").mockImplementation((async () => ({
-    data: undefined,
-    error: undefined,
-    response: new Response(null, { status: 204 }),
-  })) as never);
-  return () => put.mock.calls as unknown as [string, { body: { query: string } }][];
+  const put = answer("PUT", () => ({ status: 204 }));
+  return () => put() as [string, { body: { query: string } }][];
 }
 
 // Saves the list on screen under a name.
