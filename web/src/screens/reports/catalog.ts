@@ -41,8 +41,10 @@ export type Report = {
   answers: string;
   // The address it is read at. A report the catalog owns is at its slug; one
   // that points elsewhere builds its address from the selection, so the scope
-  // picker is not asked for twice.
-  to?: (at: Scoped) => string;
+  // picker is not asked for twice. The outcomes the server calls dismissals
+  // are passed in for an entry that asks about them; an entry that cannot
+  // be asked yet answers nothing.
+  to?: (at: Scoped, dismissing: readonly string[]) => string | null;
   // What it needs picked, for a report that cannot span.
   needs?: Needs;
 };
@@ -114,12 +116,20 @@ export const GROUPS: Group[] = [
         // The product the catalog is being read for, carried into the record.
         // The record reads its narrowing from the address alone, and without
         // the product it answers for every product the reader can see.
-        to: (at) =>
-          withProduct(
-            "alone=true&outcome=not-applicable&outcome=mismatched&outcome=wont-fix" +
-              "&outcome=already-fixed",
-            at,
-          ),
+        // Every outcome the server calls a dismissal, as it publishes them:
+        // asked of a list typed here, an outcome the server adds would go
+        // uncounted while the record said none stood alone. Before the
+        // server has said, there is nothing to ask.
+        to: (at, dismissing) =>
+          dismissing.length === 0
+            ? null
+            : withProduct(
+                new URLSearchParams([
+                  ["alone", "true"],
+                  ...dismissing.map((outcome) => ["outcome", outcome]),
+                ]).toString(),
+                at,
+              ),
       },
       {
         // The record again, asked the other question it was built to answer.
@@ -248,11 +258,15 @@ function lacks(needs: Needs | undefined, at: Scoped): Needs | null {
 // Returned together because a row that cannot answer is still worth drawing:
 // a report missing from a list reads as a report that does not exist, and
 // what somebody needs is to be told what to pick.
-export function leadsTo(report: Report, at: Scoped): { to: string | null; needs: Needs | null } {
+export function leadsTo(
+  report: Report,
+  at: Scoped,
+  dismissing: readonly string[],
+): { to: string | null; needs: Needs | null } {
   const needs = lacks(report.needs, at);
   if (needs) return { to: null, needs };
   if (report.slug) return { to: reportAt(report.slug), needs: null };
-  return { to: report.to?.(at) ?? null, needs: null };
+  return { to: report.to?.(at, dismissing) ?? null, needs: null };
 }
 
 // What a sheet counted by product alone covers. Its reads take a product and no

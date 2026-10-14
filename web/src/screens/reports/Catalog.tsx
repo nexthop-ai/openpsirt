@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Link } from "react-router-dom";
+import { useOutcomes } from "../../ui/outcomes";
 import { askForScope, useScope } from "../../app/scope";
 import { GROUPS, ON_SCREENS, leadsTo, scopeWords, type Needs, type Report } from "./catalog";
 
@@ -131,7 +132,8 @@ export function Catalog() {
 // beneath, where it would read as part of the description.
 function Entry({ report }: { report: Report }) {
   const at = useScope();
-  const { to, needs } = leadsTo(report, at);
+  const { dismissing } = useOutcomes();
+  const { to, needs } = leadsTo(report, at, dismissing);
   return (
     <li>
       <div className="catalog-name">
