@@ -324,9 +324,12 @@ func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
 		if len(offered.Moved) != 0 {
 			t.Errorf("a place undisclosed on the new line was offered: %+v", offered.Moved)
 		}
+		// Refused as not offered: the offer is narrowed inside the same
+		// transaction, so the visibility check on the written proposal is a
+		// backstop this cannot reach.
 		if _, err := f.store.Carry(ctx, f.triager, was, next,
-			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
-			t.Error("a judgment was carried onto a place undisclosed to its carrier")
+			[]int64{agreed.ID}, triage.DefaultBounds()); !errors.Is(err, triage.ErrNotOffered) {
+			t.Errorf("a judgment carried onto a place undisclosed to its carrier answered %v", err)
 		}
 		written, err := f.db.DB.NewSelect().Model((*triage.Decision)(nil)).
 			Where("visibility = ?", access.Private).Count(ctx)

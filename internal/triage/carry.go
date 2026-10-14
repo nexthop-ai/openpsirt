@@ -156,7 +156,9 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			// place it lands at: the visibility there is the new line's,
 			// which may be undisclosed where the old line's was not, and a
 			// dated judgment is refused on a line built once, as it is when
-			// proposed there.
+			// proposed there. The offer read above already leaves out a
+			// place the carrier may not argue about, so the visibility arm
+			// is a backstop no request reaches.
 			if err := permitted(subject, []Proposal{proposal}, s.now()); err != nil {
 				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
 			}
