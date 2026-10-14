@@ -239,13 +239,11 @@ it, which `signin.claim-window` also bounds.
 scopes requested are `openid profile email` and are not configurable, so a
 claim carried by any of the three is available.
 
-A claim the provider does not send, or sends as something other than a string,
-reads as absent. The sign-in then falls back to the address the provider says
-it verified, and failing that to the subject — which matches no authorization
-anybody typed, so the person is refused rather than admitted. A claim name
-with a typo in it therefore reads as "this person was never granted access",
-not as a configuration error, so check the name against the provider's own
-token before deciding somebody's grant is missing.
+A claim the provider does not send, or sends empty or as something other than
+a string, refuses the sign-in. Nothing stands in for it: not the address the
+provider verified, and not the subject. The person sees only that they were
+not let in, and the log line `a sign-in could not be completed` names the claim
+that was missing, so a claim name with a typo in it shows up there.
 
 ### GitHub
 

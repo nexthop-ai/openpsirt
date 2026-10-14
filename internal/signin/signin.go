@@ -33,10 +33,10 @@ type Identity struct {
 	// control it.
 	//
 	// The two are separate because an unverified address is whatever the
-	// account holder typed. Nothing here is authorized by it — the
-	// username fallback already refuses one for that reason — and mail
-	// sent to it is mail sent wherever they said, which for an alert about
-	// an undisclosed finding is the disclosure the alert exists to avoid.
+	// account holder typed. Nothing here is authorized by an address, and
+	// mail sent to an unverified one is mail sent wherever they said, which
+	// for an alert about an undisclosed finding is the disclosure the alert
+	// exists to avoid.
 	Email         string
 	EmailVerified bool
 	// Groups is what the provider says they belong to, read at sign-in and
@@ -113,11 +113,9 @@ func (p Pending) challenge() string {
 // than an anonymous user, so this fails instead of inventing a name: an
 // invented one would not match anything an administrator granted access to,
 // and the sign-in would be refused for a reason nobody could work out.
-func usernameFrom(candidates ...string) (string, error) {
-	for _, candidate := range candidates {
-		if trimmed := strings.TrimSpace(candidate); trimmed != "" {
-			return trimmed, nil
-		}
+func usernameFrom(supplied string) (string, error) {
+	if trimmed := strings.TrimSpace(supplied); trimmed != "" {
+		return trimmed, nil
 	}
 	return "", fmt.Errorf("the provider supplied no username, so there is nothing to match against what was granted")
 }

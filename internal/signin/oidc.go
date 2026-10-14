@@ -81,7 +81,10 @@ type OIDCConfig struct {
 // process rather than producing a deployment whose sign-in fails later for
 // reasons nobody can see.
 func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
-	issuer, err := url.Parse(cfg.Issuer)
+	// Surrounding spaces ignored, as a file or a template leaves them, before
+	// anything reads it.
+	written := strings.TrimSpace(cfg.Issuer)
+	issuer, err := url.Parse(written)
 	if err != nil || issuer.Hostname() == "" {
 		return nil, fmt.Errorf("the issuer %q is not a URL naming a host", cfg.Issuer)
 	}
@@ -139,7 +142,7 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	// some providers publish their issuer with the slash and most without, and
 	// an operator writes whichever they copied. The well-known path is built
 	// without it either way.
-	provider, err := oidc.NewProvider(ctx, strings.TrimSpace(cfg.Issuer))
+	provider, err := oidc.NewProvider(ctx, written)
 	var mismatch *oidc.IssuerMismatchError
 	if errors.As(err, &mismatch) &&
 		strings.TrimRight(mismatch.Provided, "/") == strings.TrimRight(mismatch.Discovered, "/") {
@@ -198,7 +201,7 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 
 	return &OIDC{
 		name:   name,
-		issuer: strings.TrimRight(strings.TrimSpace(cfg.Issuer), "/"),
+		issuer: strings.TrimRight(written, "/"),
 		config: oauth2.Config{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
 			Endpoint: endpoint, Scopes: scopes,
@@ -260,17 +263,15 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 		return nil, fmt.Errorf("read the claims from %q: %w", o.name, err)
 	}
 
-	// The email is a fallback only where the provider says it verified it. An
-	// unverified one is whatever the account holder typed, and an
-	// authorization waiting under somebody's work address would be redeemable
-	// by anybody willing to claim that address at the provider.
-	fallback := ""
-	if verifiedEmail(claims) {
-		fallback = text(claims["email"])
-	}
-	username, err := usernameFrom(text(claims[o.usernameClaim]), fallback, verified.Subject)
-	if err != nil {
-		return nil, err
+	// The claim the operator named, and nothing in its place. Another claim
+	// is a value the operator did not choose and may be one an end user can,
+	// and the subject cannot be typed into an authorization before anybody
+	// arrives. The refusal names the claim, and the caller logs it.
+	username := strings.TrimSpace(text(claims[o.usernameClaim]))
+	if username == "" {
+		return nil, fmt.Errorf("the identity token from %q carries no %q claim, which "+
+			"OPENPSIRT_OIDC_USERNAME_CLAIM names as the username, so the sign-in is refused "+
+			"rather than named by another claim", o.name, o.usernameClaim)
 	}
 	return &Identity{
 		Subject:       verified.Subject,

@@ -63,10 +63,12 @@ func TestGroupMembershipThatCannotBeReadYieldsNoRolesRatherThanEveryRole(t *test
 func TestAProviderThatNamesNobodyIsAMisconfigurationRatherThanAnAnonymousUser(t *testing.T) {
 	// An invented username would match nothing an administrator granted, and
 	// the sign-in would be refused for a reason nobody could work out.
-	if _, err := usernameFrom("", "  ", ""); err == nil {
-		t.Error("a provider that supplied no username produced one anyway")
+	for _, blank := range []string{"", "  "} {
+		if _, err := usernameFrom(blank); err == nil {
+			t.Errorf("a provider that supplied %q produced a username anyway", blank)
+		}
 	}
-	got, err := usernameFrom("", " someone ", "fallback")
+	got, err := usernameFrom(" someone ")
 	if err != nil {
 		t.Fatal(err)
 	}

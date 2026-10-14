@@ -799,6 +799,8 @@ is no default.
 | The subject cannot serve as the claim | An authorization is written before anybody has arrived, so the name it is written for has to be one a person can type. The subject is not knowable then |
 | There is no safe default rather than a different default | OpenID Connect permits a provider to let people choose their own `preferred_username`; whether a given one does is a question only its operator can answer. On a provider where the login is assigned by an administrator it is the right answer, and on one with self-registration it is the attack |
 | A missing claim is refused before discovery | Like every other refusal of what configuration supplies, it names the setting to fix and needs no provider to be reachable |
+| A token without the claim is refused, and the log names the claim | A verified address or the subject in its place is a value the operator never chose, and the subject cannot be written into an authorization before anybody arrives. A provider that omits the claim for some people is a configuration to fix, and the log line is where an operator finds which claim |
+| The issuer is read with surrounding spaces ignored | A file or a template leaves them, and a host with a space in it does not parse |
 | The groups claim is named with surrounding spaces ignored, once | Whether a provider reports groups decides whether group mappings are accepted at startup, so the claim checked is the claim read. A name read with its spaces passes that check and yields no groups, and every arrival is then refused |
 
 ## Sessions and request forgery

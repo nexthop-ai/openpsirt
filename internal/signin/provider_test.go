@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-jose/go-jose/v4"
 )
 
@@ -36,6 +38,8 @@ type provider struct {
 	// document overrides what discovery publishes, for the tests about a
 	// provider naming its endpoints somewhere else.
 	document map[string]any
+	// mux is what the stand-in serves, for a test that serves more.
+	mux *http.ServeMux
 	// asked records what was fetched, because what these adapters get wrong is
 	// the request they build and only the server sees that.
 	asked []string
@@ -47,8 +51,8 @@ func standing(t *testing.T) *provider {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &provider{key: key, claims: map[string]any{}}
 	mux := http.NewServeMux()
+	p := &provider{key: key, claims: map[string]any{}, mux: mux}
 	p.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p.asked = append(p.asked, r.URL.Path)
 		mux.ServeHTTP(w, r)
@@ -402,15 +406,76 @@ func TestAnIssuerIsTheSameProviderWithOrWithoutATrailingSlash(t *testing.T) {
 
 func TestAnIssuerDifferingByMoreThanASlashIsRefused(t *testing.T) {
 	// The comparison is the provider's, and a spelling that names another
-	// path is refused at startup rather than at every sign-in.
+	// path is refused at startup rather than at every sign-in. The other
+	// tenant answers discovery as itself, so asking it again would succeed
+	// and the refusal is the comparison's.
 	p := standing(t)
 	p.document = map[string]any{"issuer": p.URL + "/tenant-a"}
+	p.mux.HandleFunc("/tenant-a/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]any{
+			"issuer":                 p.URL + "/tenant-a",
+			"authorization_endpoint": p.URL + "/authorize",
+			"token_endpoint":         p.URL + "/token",
+			"jwks_uri":               p.URL + "/keys",
+		})
+	})
 	_, err := NewOIDC(t.Context(), OIDCConfig{
 		Name: "acme", Issuer: p.URL, ClientID: "a-client", ClientSecret: "a-secret",
 		UsernameClaim: "preferred_username", client: p.Client(),
 	})
-	if err == nil {
-		t.Error("an issuer spelled differently from what the provider publishes was accepted")
+	var mismatch *oidc.IssuerMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Errorf("an issuer spelled differently from what the provider publishes answered %v, "+
+			"want the mismatch refused", err)
+	}
+}
+
+// An issuer written with surrounding spaces, as a file or a template leaves
+// them, is the issuer without them.
+func TestAnIssuerWithSurroundingSpacesIsTheIssuer(t *testing.T) {
+	p := standing(t)
+	adapter, err := NewOIDC(t.Context(), OIDCConfig{
+		Name: "acme", Issuer: " " + p.URL + "\n", ClientID: "a-client", ClientSecret: "a-secret",
+		UsernameClaim: "preferred_username", client: p.Client(),
+	})
+	if err != nil {
+		t.Fatalf("an issuer with surrounding spaces was refused: %v", err)
+	}
+	if adapter.Issuer() != p.URL {
+		t.Errorf("identities are recorded against %q, want %q", adapter.Issuer(), p.URL)
+	}
+}
+
+// A token without the claim the operator named is refused, naming the claim.
+// A verified address and the subject are values the operator did not choose,
+// and neither stands in for it.
+func TestATokenWithoutTheUsernameClaimIsRefused(t *testing.T) {
+	p := standing(t)
+	adapter, err := p.adapter(t, OIDCConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, claims := range map[string]map[string]any{
+		"a verified address": {"email": "ana@example.com", "email_verified": true},
+		"the subject alone":  {},
+		"a blank claim":      {"preferred_username": "  ", "email": "ana@example.com", "email_verified": true},
+	} {
+		_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.claims = map[string]any{"nonce": pending.Nonce}
+		for key, value := range claims {
+			p.claims[key] = value
+		}
+		who, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back")
+		if err == nil {
+			t.Errorf("%s: signed in as %q", name, who.Username)
+			continue
+		}
+		if !strings.Contains(err.Error(), `"preferred_username"`) {
+			t.Errorf("%s: the refusal does not name the claim: %v", name, err)
+		}
 	}
 }
 
