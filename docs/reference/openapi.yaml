@@ -6914,7 +6914,7 @@ components:
           description: That window's name
           type: string
         window_id:
-          description: The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+          description: The window this notice answers, where whoever recorded it named one and the caller may read it. A retired window's name may be declared again, so this is what tells the two apart
           format: int64
           type: integer
       required:

@@ -9978,7 +9978,7 @@ export interface components {
             window?: string;
             /**
              * Format: int64
-             * @description The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+             * @description The window this notice answers, where whoever recorded it named one and the caller may read it. A retired window's name may be declared again, so this is what tells the two apart
              */
             window_id?: number;
         };

@@ -347,7 +347,7 @@ func (s *Store) Restate(ctx context.Context, identity, displayName string,
 	// Folded, so that what is recorded here and what a sign-in matches are the
 	// same string. An identity is a username, and a username is a name people
 	// type.
-	identity = folded(identity)
+	identity = Folded(identity)
 	if identity == "" {
 		return nil, nil, ErrNoIdentity
 	}
@@ -520,7 +520,7 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	// Folded to match how it was stored. An identity typed with different
 	// capitals is the same person, and looking it up exactly would answer
 	// "nobody" for somebody who is plainly there.
-	err := s.db.NewSelect().Model(person).Where("identity = ?", folded(identity)).Scan(ctx)
+	err := s.db.NewSelect().Model(person).Where("identity = ?", Folded(identity)).Scan(ctx)
 	if err != nil {
 		return nil, database.FromRead(err,
 			fmt.Errorf("nobody is recorded as %q: %w", identity, ErrNoSuchPerson),
@@ -798,7 +798,7 @@ func KeyName(typed string) string { return credentialNamed(typed) }
 // credentialNamed is a key's or a token's name as stored: folded, and cut to
 // the width of the column that holds it, on a character.
 func credentialNamed(typed string) string {
-	return bound.HeadRunes(folded(typed), database.NameWidth)
+	return bound.HeadRunes(Folded(typed), database.NameWidth)
 }
 
 // ErrNoKeyName refuses a key whose name is only spaces.

@@ -87,6 +87,38 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 	})
 }
 
+func TestANoticeNamesNoWindowItsReaderMayNotRead(t *testing.T) {
+	// A window limited since to a product the reader may not know exists is
+	// left out of what they read, and its identifier with it: an identifier
+	// with no name beside it says such a window exists.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		early := r.Declared(t, "Early warning", 24)
+		record := r.AttackedAt(t, time.Now().UTC().Add(-2*time.Hour))
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			fmt.Sprintf("/v1/exploited-here/%d/told", record),
+			fmt.Sprintf(`{"recipient":"ENISA","told_at":%q,"said":"An attack.","window":%d}`,
+				time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), early),
+		); got.Code != http.StatusCreated {
+			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+			fmt.Sprintf("/v1/obligation-windows/%d", early),
+			`{"name":"Early warning","hours":24,"products":["theirs"]}`); got.Code != http.StatusOK {
+			t.Fatalf("limiting the window answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var seen shelf
+		httpapitest.Read(t, r, "private-triage", "/v1/obligations", &seen)
+		if len(seen.Items) != 1 || len(seen.Items[0].Told) != 1 {
+			t.Fatalf("the shelf holds %+v, want one incident with one notice", seen)
+		}
+		if told := seen.Items[0].Told[0]; told.WindowID != 0 || told.Window != "" {
+			t.Errorf("the notice names a window its reader may not read: %+v", told)
+		}
+	})
+}
+
 func TestAWindowThatEndedWithNobodyToldIsSaidAsPassed(t *testing.T) {
 	// The two conditions clear differently, so the running one closes when
 	// the end arrives and the passed one opens.

@@ -132,6 +132,20 @@ func TestAnAdvisoryIsReadWholeOrNotAtAll(t *testing.T) {
 	})
 }
 
+func TestAnAdvisoryIsReadWholeBySomebodyHoldingEveryProduct(t *testing.T) {
+	// Holding every product is answered by no list of products at all, and
+	// the count of covers outside what is held has to read that as none.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		everything := access.Everything("a test reading the whole deployment")
+		if _, held, err := f.store.Covers(t.Context(), everything, named); err != nil || len(held) != 1 {
+			t.Errorf("a subject holding every product read %d covers: %v", len(held), err)
+		}
+	})
+}
+
 func TestAnIdentifierIsMintedInSequenceAndMatchedWithoutRegardToCapitals(t *testing.T) {
 	// The name is minted rather than chosen: it is what a reader cites the
 	// document by and what a revision of it keeps, so two under one name is a

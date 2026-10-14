@@ -411,7 +411,8 @@ func carrying(ctx context.Context, in core.Deps, subject access.Subject, product
 // and that asymmetry is the whole of a team queue rather than a holding.
 // Matched without regard to capitals, because an identity is stored folded:
 // somebody typing their own name with the capitals they use is told they need
-// the right to give work away, to themselves.
+// the right to give work away, to themselves. Folded the way the lookup folds
+// it, so a name this reads as the caller is the name the lookup finds.
 //
 // A 422 rather than a 404, which is the API's rule: a 404 answers a
 // *name*, and this answers an act on a finding already shown to them.
@@ -423,7 +424,7 @@ func mayHandOver(subject access.Subject, productID int64, person, team string) e
 	// Assigning to yourself, or to nobody, is not giving work away and needs
 	// no more than the triage right the route has already asked for.
 	givingAway := team != "" ||
-		(person != "" && !strings.EqualFold(strings.TrimSpace(person), subject.Identity))
+		(person != "" && access.Folded(person) != subject.Identity)
 	if givingAway && !subject.Holds(access.Assigner, productID) {
 		return huma.Error422UnprocessableEntity(
 			"you may take what nobody owns and hand back your own; giving this to " +

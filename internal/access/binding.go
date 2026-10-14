@@ -748,7 +748,7 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (N
 		// Folded, because that is how an identity is stored and how a sign-in
 		// matches one. A name written "Alice" in configuration names the row
 		// "alice", both in the NOT IN below and in the update that names them.
-		trimmed := folded(identity)
+		trimmed := Folded(identity)
 		if trimmed == "" {
 			continue
 		}

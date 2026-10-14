@@ -46,7 +46,7 @@ type Identity struct {
 	BoundAt        *time.Time `bun:"bound_at"`
 }
 
-// folded is how a username is stored and how it is matched.
+// Folded is how a username is stored and how it is matched.
 //
 // An identity is a username now, and a username is both halves of the rule at
 // once: an administrator types it to authorize somebody in advance, and a
@@ -58,7 +58,7 @@ type Identity struct {
 // Normalized on the way in rather than compared loosely. The stored value
 // compares the same under any engine, which is what keeps this from depending
 // on a collation (REQ-08).
-func folded(username string) string {
+func Folded(username string) string {
 	return strings.ToLower(strings.TrimSpace(username))
 }
 
@@ -96,7 +96,7 @@ var ErrNameTaken = refusal.New("already somebody else here")
 // advance has to be expressed in the moving name and then pinned to the fixed
 // one at first use.
 func (s *Store) Claim(ctx context.Context, personID int64, username string) error {
-	username = folded(username)
+	username = Folded(username)
 	if username == "" {
 		return refusal.Errorf("a way to sign in needs a username")
 	}
@@ -155,7 +155,7 @@ func (s *Store) MatchProvider(ctx context.Context, provider, subject, username s
 	// The identifier is the provider's own and is compared exactly. Only the
 	// name is folded.
 	provider = strings.TrimSpace(provider)
-	subject, username = strings.TrimSpace(subject), folded(username)
+	subject, username = strings.TrimSpace(subject), Folded(username)
 	if provider == "" {
 		// An identifier with no issuer names nobody. Binding one would record
 		// a subject that a later sign-in cannot tell apart from a different
@@ -282,7 +282,7 @@ func (s *Store) BoundProviders(ctx context.Context) ([]string, error) {
 // saying who is there, and a deployment trusting the header has already
 // granted whatever sets it the power to claim to be anybody.
 func (s *Store) MatchProxy(ctx context.Context, username string) (*Account, error) {
-	username = folded(username)
+	username = Folded(username)
 	if username == "" {
 		return nil, ErrDenied
 	}
@@ -329,7 +329,7 @@ func (s *Store) claimedBy(ctx context.Context, username string) (*Identity, erro
 // happen while both are real. Keeping the old name is the safe answer: it is
 // only a label, and the identifier still resolves them.
 func (s *Store) rename(ctx context.Context, identity *Identity, username string) error {
-	username = folded(username)
+	username = Folded(username)
 	taken, err := s.db.NewSelect().Model((*Identity)(nil)).
 		Where("username = ?", username).Where("id <> ?", identity.ID).Count(ctx)
 	if err != nil {
@@ -443,5 +443,5 @@ func (s *Store) match(ctx context.Context, who Arrival) (*Account, error) {
 // provider, so there is nothing to qualify it with — and qualifying it made
 // one human two accounts, which is the defect that settled this (REQ-41).
 func (a Arrival) handle() string {
-	return folded(a.Username)
+	return Folded(a.Username)
 }
