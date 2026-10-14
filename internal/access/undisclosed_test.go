@@ -109,8 +109,8 @@ func TestAPrivateCountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
 
 func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {
 	for name, ask := range map[string]func(){
-		"PrivateCountAs": func() { access.PrivateCountAs("f.visibility", `x" FROM finding --`) },
-		"AnyPrivateAs":   func() { access.AnyPrivateAs("f.visibility", `x" FROM finding --`) },
+		"PrivateCountAs": func() { access.PrivateCountAs("f.visibility", `x", "y`) },
+		"AnyPrivateAs":   func() { access.AnyPrivateAs("f.visibility", `x", "y`) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {
