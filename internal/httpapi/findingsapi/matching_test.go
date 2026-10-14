@@ -79,6 +79,14 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 			t.Errorf("narrowed, the build reads as %d unmatched", one.Unmatched)
 		}
 
+		// An offset past every page is an empty page, the largest one there
+		// is included.
+		var past findingsapi.MatchCoverageBody
+		httpapitest.Read(t, r, "reader", build+"?offset=9223372036854775807", &past)
+		if past.Total != 3 || len(past.Items) != 0 {
+			t.Errorf("past the end, %d items of %d, want none of 3", len(past.Items), past.Total)
+		}
+
 		file := httpapitest.AsPerson(t, r, "reader", http.MethodGet, build+".csv?reason=no-distribution", "")
 		if file.Code != http.StatusOK {
 			t.Fatalf("exporting answered %d: %s", file.Code, file.Body.String())
