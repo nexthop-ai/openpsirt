@@ -621,6 +621,7 @@ document, so the account has to be asked about.
 | Configuring both stops the process, naming the two settings | An identity here is a username (REQ-41). Two providers issuing usernames independently make the same name either one person or two, and nothing in the record says which — so the ambiguity is refused rather than resolved by whichever arrived first |
 | Configuring none is not a fault | It is the arrangement where a reverse proxy authenticates instead |
 | Refused at startup, not at a sign-in | A deployment whose sign-in is broken should be visible to whoever started it, rather than to the first person who tries to use it |
+| The forge's team listing is read to the end, up to twenty full pages, and one more asked for to tell a whole listing from a longer one | The listing covers every organization somebody belongs to, so a page is not a page of this deployment's teams. A listing still full past the bound refuses the sign-in rather than withdrawing roles from whoever is in many teams without saying so |
 
 The exchange happens here and the browser gets a session of this deployment's. A
 provider's token is never handed to a page: one of them is opaque and this API
@@ -639,7 +640,7 @@ sign-ins, which has to be swept and which anybody can fill.
 | The proof key is sent as a digest and kept as the secret it hashes | An authorization code taken in flight being exchanged by whoever took it |
 | The identity token must carry the value tying it to this sign-in | It belonging to a different one |
 | An identity token naming no subject is refused | Quietly reducing that deployment to matching by name |
-| A provider's stated address is used only where the provider says it verified it | An authorization waiting under somebody's work address being redeemable by anybody willing to claim it |
+| A provider's stated address is recorded only where the provider says it verified it | Mail about an undisclosed finding going to whatever address an account holder typed. No address redeems an authorization: the username claim alone does |
 | The sealed value carries when it was minted, and a stale one is refused | The window being a request to the browser and nothing else. The browser holding the value may be the one that planted it, and the key sealing it is never rotated — so without a time in the payload a sign-in sealed months ago stays acceptable |
 
 ## Outbound provider fetches

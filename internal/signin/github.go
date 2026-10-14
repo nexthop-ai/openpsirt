@@ -162,7 +162,9 @@ func (g *GitHub) teams(ctx context.Context, token *oauth2.Token) ([]string, erro
 	// whoever happens to be in a lot of teams, which is a refusal nobody could
 	// diagnose from either side.
 	names := []string{}
-	for page := 1; page <= maxTeamPages; page++ {
+	// One page past the bound is asked for, so a listing of exactly the bound
+	// in full pages ends on an empty page and is whole.
+	for page := 1; page <= maxTeamPages+1; page++ {
 		var memberships []struct {
 			Slug         string `json:"slug"`
 			Organization struct {
@@ -172,6 +174,9 @@ func (g *GitHub) teams(ctx context.Context, token *oauth2.Token) ([]string, erro
 		url := fmt.Sprintf("%s/user/teams?per_page=%d&page=%d", g.api, teamPageSize, page)
 		if err := g.get(ctx, token, url, &memberships); err != nil {
 			return nil, err
+		}
+		if page > maxTeamPages && len(memberships) > 0 {
+			break
 		}
 		for _, membership := range memberships {
 			// Folded, because GitHub hands back the organization's canonical

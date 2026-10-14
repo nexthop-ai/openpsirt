@@ -14,7 +14,8 @@ import (
 // A team listing that is still full at the last page read is refused rather
 // than cut short: a short list withdraws roles from whoever is in many teams,
 // and nothing on either side could say why. The listing is read no further
-// than the bound.
+// than one page past the bound, which is what tells a listing of exactly the
+// bound from a longer one.
 //
 // Verified by replacing the refusal after the page loop with `return names,
 // nil`: the sign-in then completes with every team read so far.
@@ -50,7 +51,44 @@ func TestATeamListingPastTheLastPageReadIsRefused(t *testing.T) {
 	if !strings.Contains(err.Error(), "pages of teams") {
 		t.Errorf("the refusal does not say what it would not read: %v", err)
 	}
-	if n := asked.Load(); n != maxTeamPages {
-		t.Errorf("%d pages were asked for, want %d", n, maxTeamPages)
+	if n := asked.Load(); n != maxTeamPages+1 {
+		t.Errorf("%d pages were asked for, want %d", n, maxTeamPages+1)
+	}
+}
+
+// A listing of exactly the bound in full pages is whole: the page after it is
+// empty, and every team on the pages read is kept.
+func TestATeamListingOfExactlyTheBoundIsWhole(t *testing.T) {
+	adapter := forge(t, "ours", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/token"):
+			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
+		case r.URL.Path == "/user":
+			writeJSON(w, map[string]any{"login": "ana", "id": 42})
+		case r.URL.Path == "/user/emails":
+			writeJSON(w, []any{})
+		case r.URL.Path == "/user/teams":
+			page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+			full := make([]any, 0, teamPageSize)
+			for i := range teamPageSize {
+				if page > maxTeamPages {
+					break
+				}
+				full = append(full, map[string]any{
+					"slug":         "team" + strconv.Itoa(page) + "-" + strconv.Itoa(i),
+					"organization": map[string]any{"login": "ours"}})
+			}
+			writeJSON(w, full)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
+		"https://here.example/back")
+	if err != nil {
+		t.Fatalf("a listing of exactly %d full pages was refused: %v", maxTeamPages, err)
+	}
+	if len(who.Groups) != maxTeamPages*teamPageSize {
+		t.Errorf("%d teams were kept, want %d", len(who.Groups), maxTeamPages*teamPageSize)
 	}
 }
