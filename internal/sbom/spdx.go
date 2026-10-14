@@ -257,6 +257,16 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			return c.into(&concluded)
 		case "externalRefs":
 			return c.spdxExternalRefs(&described)
+		case "primaryPackagePurpose":
+			// What the package is for, in the format's own vocabulary. Only
+			// one is read: a container image is identified by its name
+			// (IsImage).
+			var purpose string
+			if err := c.into(&purpose); err != nil {
+				return err
+			}
+			described.Container = purpose == "CONTAINER"
+			return nil
 		default:
 			return c.b.skip()
 		}

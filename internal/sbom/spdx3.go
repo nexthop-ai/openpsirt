@@ -127,6 +127,9 @@ type spdx3Element struct {
 
 	// expression is what a license element says, where it is one.
 	expression string
+
+	// purpose is what a package is for, in the format's own vocabulary.
+	purpose string
 }
 
 // spdx3Context refuses a version this reader was not written against, from the
@@ -180,6 +183,8 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			return c.into(&e.version)
 		case "software_packageUrl":
 			return c.into(&e.purl)
+		case "software_primaryPurpose":
+			return c.into(&e.purpose)
 		case "simplelicensing_licenseExpression":
 			return c.into(&e.expression)
 		case "externalIdentifier":
@@ -396,6 +401,9 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 		Version: sentinel(e.version),
 		Purl:    sentinel(e.purl),
 		CPE:     sentinel(e.cpe),
+		// Only one purpose is read: a container image is identified by its
+		// name (IsImage).
+		Container: e.purpose == "container",
 	}
 	if err := described.Valid(); err != nil {
 		return refusal.Errorf("%w, so it cannot be tracked", err)

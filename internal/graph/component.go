@@ -124,6 +124,12 @@ type Described struct {
 	// listed, joined as a conjunction, where it lists several. Not part of
 	// identity, for the reason Supplier is not.
 	License string
+	// Container is whether the format describes the component as a container
+	// image: a CycloneDX component of type container, or an SPDX package
+	// whose primary purpose is a container. Read only where the component
+	// carries no package identifier, because an identifier says what a
+	// package is (IsImage).
+	Container bool
 }
 
 // Identity returns the content-derived key for a described component.
@@ -471,6 +477,7 @@ func (d *Described) FillFrom(other Described) {
 	if d.License == "" {
 		d.License = other.License
 	}
+	d.Container = d.Container || other.Container
 	if d.UpstreamName == "" {
 		d.UpstreamName, d.UpstreamVersion = other.UpstreamName, other.UpstreamVersion
 	} else if d.UpstreamVersion == "" && d.UpstreamName == other.UpstreamName {

@@ -82,6 +82,9 @@ type placer struct {
 	root int64
 	// names caches whether a product names any component of the build.
 	names map[string]bool
+	// images is what the build states for each image it holds by name,
+	// which is the version a product naming one is placed at.
+	images map[int64]graph.ImageVersion
 }
 
 // placing reads the build's root and turns its places into a placer.
@@ -110,7 +113,24 @@ func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
 	if len(roots) > 0 {
 		p.root = roots[0]
 	}
+	images, err := graph.StatedImages(ctx, db, targetID)
+	if err != nil {
+		return nil, err
+	}
+	p.images = images
 	return p, nil
+}
+
+// asStated is a component as this build states it: an image held by name
+// carries the version and the identifier the build stated for it.
+func (p *placer) asStated(c graph.Component) graph.Component {
+	if stated, ok := p.images[c.ID]; ok {
+		c.Version = stated.Version
+		if stated.Purl != "" {
+			c.Purl = stated.Purl
+		}
+	}
+	return c
 }
 
 // reaches reports whether a build's claim naming the product given reaches a
@@ -378,7 +398,7 @@ func (d *placer) place(product sbom.Target) *placement {
 		if id == d.root {
 			continue
 		}
-		if isProduct(product, c, true) {
+		if isProduct(product, d.asStated(c), true) {
 			p.product[id] = true
 		}
 	}

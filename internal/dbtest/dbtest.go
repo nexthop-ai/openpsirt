@@ -988,6 +988,8 @@ var tables = []string{
 	"scan_document_chunk",
 	"scan_document",
 	"graph_edge",
+	// Before graph_node, which it points at.
+	"image_version",
 	"graph_node",
 	"component",
 	"job",
@@ -1083,6 +1085,7 @@ var addedAt = map[string]int64{
 	"chat_preference": 39,
 	"told_place":      40,
 	"exploited_fix":   40,
+	"image_version":   43,
 }
 
 // clearOf empties the named tables, which are in the order tables holds them.

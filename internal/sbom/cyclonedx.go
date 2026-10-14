@@ -206,6 +206,15 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			return c.into(&described.Purl)
 		case "cpe":
 			return c.into(&described.CPE)
+		case "type":
+			// The format's word for what kind of thing this is. Only one is
+			// read: a container image is identified by its name (IsImage).
+			var kind string
+			if err := c.into(&kind); err != nil {
+				return err
+			}
+			described.Container = kind == "container"
+			return nil
 		case "supplier":
 			// An object naming who supplied it.
 			return c.b.object(func(field string) error {

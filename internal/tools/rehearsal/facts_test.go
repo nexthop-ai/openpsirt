@@ -11,7 +11,7 @@ import (
 func TestAnUpgradeThatKeepsEveryRowIsNotReported(t *testing.T) {
 	before := Counts{"finding": 10, "advisory_issuance": 3}
 	after := Counts{"finding": 10, "advisory_issuance": 3, "told_place": 0}
-	if faults := Compare(before, after); len(faults) != 0 {
+	if faults := Compare(before, after, nil); len(faults) != 0 {
 		t.Errorf("a faithful upgrade was reported: %v", faults)
 	}
 }
@@ -24,7 +24,7 @@ func TestEveryRowAnUpgradeLosesOrInventsIsReported(t *testing.T) {
 		"told_place":        1, // a new table something filled
 		// scan is gone with no rule saying where its rows went
 	}
-	faults := Compare(before, after)
+	faults := Compare(before, after, nil)
 	for _, table := range []string{"finding", "told_place", "scan"} {
 		found := false
 		for _, fault := range faults {
@@ -51,5 +51,20 @@ func TestATotalThatMovesOrVanishesIsReported(t *testing.T) {
 	faults := CompareTotals("open", before, Totals{"sonic/master/broadcom": 4, "sonic/master/mellanox": 6, "x/y/z": 1})
 	if len(faults) != 3 {
 		t.Errorf("want a moved total, a missing build and a new one, got %v", faults)
+	}
+}
+
+func TestAnUpgradeMergingImagesMayHoldFewerOfThemAndFillTheirVersions(t *testing.T) {
+	before := Counts{"component": 40, "graph_node": 50, "graph_edge": 60, "finding": 10}
+	after := Counts{"component": 30, "graph_node": 45, "graph_edge": 55, "finding": 10, "image_version": 20}
+	if faults := Compare(before, after, Moved(42)); len(faults) != 0 {
+		t.Errorf("merging images from a release before it was reported: %v", faults)
+	}
+	if faults := Compare(before, after, Moved(43)); len(faults) != 4 {
+		t.Errorf("from a release that already merged them, want every moved count reported: %v", faults)
+	}
+	grown := Counts{"component": 41, "graph_node": 0, "graph_edge": 60, "finding": 10, "image_version": 20}
+	if faults := Compare(before, grown, Moved(42)); len(faults) != 2 {
+		t.Errorf("a merge that grew a table or emptied one is reported: want two, got %v", faults)
 	}
 }

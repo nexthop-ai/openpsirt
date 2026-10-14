@@ -68,8 +68,8 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		bare := graph.Described{Purl: "pkg:docker/nginx@1.25", Name: "nginx", Version: "1.25"}
-		named := graph.Described{Purl: "pkg:docker/library/nginx@1.25", Name: "nginx", Version: "1.25"}
+		bare := graph.Described{Purl: "pkg:generic/nginx@1.25", Name: "nginx", Version: "1.25"}
+		named := graph.Described{Purl: "pkg:generic/library/nginx@1.25", Name: "nginx", Version: "1.25"}
 		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{bare, named},

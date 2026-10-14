@@ -3,7 +3,7 @@
 What a scan is filed against, and the structures it produces.
 
 Satisfies REQ-07, REQ-08, REQ-14, REQ-15, REQ-16, REQ-17, REQ-18, REQ-20,
-REQ-25, REQ-32, REQ-52, REQ-54.
+REQ-25, REQ-32, REQ-52, REQ-54, REQ-84.
 
 ## Contents
 
@@ -269,7 +269,7 @@ here".
 
 | | Definition |
 |---|---|
-| Component | A package at a version. One row, however many products ship it |
+| Component | A package at a version, or a container image by its name (§ Container images). One row, however many products ship it |
 | Node | That component's presence in one variant |
 | Edge | One node depending on another |
 
@@ -335,6 +335,54 @@ The reduction is the one the identifier specification describes, applied the sam
 way to every ecosystem. Nothing here knows which producer wrote a document,
 because the inventories this will be given come from build systems nobody has
 seen.
+
+### Container images
+
+A container image is identified by its name (REQ-84). The version a build
+states for one is a tag, a build stamp or a digest, and a product rebuilding
+its images in CI states a new one every build whether or not anything inside
+moved. SONiC stamps each image `master.<build>-<commit>`; other producers state
+a commit or a content digest.
+
+| Producer shape | Read as an image |
+|---|---|
+| A package identifier of type `oci` | Yes. SONiC, Trivy, Syft, apko |
+| A package identifier of type `docker` | Yes. The type names an image the way `oci` does |
+| A package identifier of any other type | No, whatever the format calls the component. The identifier is what identity is derived from |
+| No identifier, and a CycloneDX component of type `container` | Yes |
+| No identifier, and an SPDX 2 package whose primary purpose is `CONTAINER` | Yes |
+| No identifier, and an SPDX 3 package whose primary purpose is `container` | Yes |
+| The document's own root | Stored by its name already (§ The dependency graph) |
+
+| Rule | |
+|---|---|
+| An image is stored without its version | The version is cut from the component's identifier and from its version alike, so the component's version is empty and its identity is the identifier with no version. Qualifiers stay, and identity drops them as it does for every component |
+| The node's identifier is the build's, with the version cut | It holds the qualifiers the build stated, and a build restating them writes the node where it stands (§ Duplicate descriptions) |
+| A build states one image name at one version, or it is no image by name | One component is one node in a build, so two images of one name side by side cannot both be the name. Each keeps its version in its identity, as a package does, and records no image version. apko describes every layer of an image as an image named `image`, and a build can ship a base image beside an image built on it |
+| A build stating the name once again moves it to the name | Once, the way a version moving would: the version-identified node closes and the image's node opens |
+| Every other component keeps its version in its identity | An upgrade inside an image still closes the old node and supersedes its findings |
+| The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`DESIGN-reporting.md` § Match coverage) |
+| A claim or a statement naming an image at a version is placed against the version the build states | The component row carries no version to compare it with, so the version the build states now is read from its image versions |
+
+#### Image versions
+
+What a build stated for an image it holds by name is kept beside the image's
+node: the format's version as stated, empty where it stated none, and the
+package identifier whole, version and qualifiers included. One row per version
+a build stated, open across the scans that stated it, the interval a node and
+an edge carry (§ History as intervals).
+
+| Rule | |
+|---|---|
+| A rebuilt image writes one version row and nothing else | Its node, its edges and every finding beneath it stay as they are |
+| A build restating the same version writes nothing | An unchanged build writes nothing, image versions included |
+| A version row closes when the build states something else, when the image leaves, or when the build states its name twice | Its interval is the scans that stated it |
+| What a build stated is recorded as given | Nothing is derived from it and nothing else holds a copy |
+
+Measured on a ten-build SONiC bench with every image identified by its
+version and restamped nightly: about 176,000 finding rows closed, 95,000 graph
+edges opened and 120 to 140 MB of database a night, with the open findings
+flat.
 
 ### Component references
 
@@ -491,6 +539,7 @@ documents a build sent, true as they are read.
 | Counted by name | An upgrade is one dependency that moved. Counted by component it is one arrival and one departure, so a build that upgraded three things reports six |
 | A name at two versions at once is one entry | A vendored tree ships one routinely, and one copy going is that name at fewer versions |
 | The root is excluded from both sides | It is not one of the build's components, its version is not stored, and its name differs per variant |
+| An image held by name is at no version on either side | Its version is not part of what it is, so a rebuilt image is no change. What each build stated is listed on the component screen (`DESIGN-interface.md` § The component screen) |
 | The earliest scan applied to a build has none | It is the first picture rather than a change to one |
 | Worked out when asked, never stored | The rows that answer it are the rows applying the scan already wrote (REQ-20) |
 
@@ -630,6 +679,8 @@ root, against 0.018 s.
 
 | Limit | Detail |
 |---|---|
+| An image with no package identifier in a database v0.8.0 built is not recognized by the upgrade | v0.8.0 kept nothing saying the format called it a container. Its next upload stores it by name, once, as a version moving would (`DESIGN-database.md` § The v0.9.0 upgrade) |
+| An image's version is shown on the component screen alone | The tree, the findings list, a place's chain and the comparisons show an image with no version, which is what it is stored as |
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |

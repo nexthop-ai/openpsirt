@@ -326,7 +326,7 @@ func TestAComponentWithoutANameIsRefused(t *testing.T) {
 func rowCounts(t *testing.T, f *fixture) map[string]int {
 	t.Helper()
 	counts := map[string]int{}
-	for _, table := range []string{"component", "graph_node", "graph_edge"} {
+	for _, table := range []string{"component", "graph_node", "graph_edge", "image_version"} {
 		n, err := f.db.DB.NewSelect().Table(table).Count(t.Context())
 		if err != nil {
 			t.Fatalf("count %s: %v", table, err)

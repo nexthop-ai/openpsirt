@@ -189,6 +189,8 @@ func (r *Reader) Run(ctx context.Context, interval time.Duration) {
 			"scan", result.ScanID, "components", result.Components,
 			"nodes_opened", result.Applied.NodesOpened, "nodes_closed", result.Applied.NodesClosed,
 			"edges_opened", result.Applied.EdgesOpened, "edges_closed", result.Applied.EdgesClosed,
+			"image_versions_opened", result.Applied.VersionsOpened,
+			"image_versions_closed", result.Applied.VersionsClosed,
 			"suppressions", result.Suppressions,
 			"claims_opened", result.ClaimsOpened, "claims_closed", result.ClaimsClosed,
 			"claims_unstated", result.ClaimsUnstated,

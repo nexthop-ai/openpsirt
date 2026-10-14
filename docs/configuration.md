@@ -1154,3 +1154,13 @@ v0.5.0's schema in one step and carries none of the upgrades before it.
 | A claim the build sent with its SBOM about a component inside a product of the build applies beneath that product, rather than at every place of the component | Nothing for a branch: its next upload restates each claim with its product. A tag is not uploaded again, so its claims keep applying across the build until it is |
 | A VEX document uploaded on its own whose statements name the build's root is the build's own claim | Upload such a document again. A statement recorded by v0.6.0 kept no product, so it stays evidence until it is read again |
 
+### From v0.8.0
+
+| Change | What to do |
+|---|---|
+| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | Nothing. The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version |
+| A live judgment beneath an image is keyed on the image with no version | Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
+| Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
+| A build holding one image name at two versions at once keeps them apart by version, as before | Nothing |
+| An image the inventory states with no package identifier is not found by the upgrade | Nothing. The next upload of each build stores it by name, which closes the old node and opens the new one once, as a version moving would |
+

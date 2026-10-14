@@ -86,11 +86,16 @@ type Applied struct {
 	NodesClosed int
 	EdgesOpened int
 	EdgesClosed int
+	// VersionsOpened and VersionsClosed count the versions stated for images
+	// identified by name: a rebuilt image moves these and nothing else.
+	VersionsOpened int
+	VersionsClosed int
 }
 
 // Unchanged reports whether the snapshot changed nothing.
 func (a Applied) Unchanged() bool {
-	return a.NodesOpened == 0 && a.NodesClosed == 0 && a.EdgesOpened == 0 && a.EdgesClosed == 0
+	return a.NodesOpened == 0 && a.NodesClosed == 0 && a.EdgesOpened == 0 && a.EdgesClosed == 0 &&
+		a.VersionsOpened == 0 && a.VersionsClosed == 0
 }
 
 // Store writes graphs.
@@ -154,16 +159,25 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		// build. Everything the document said about it — including every edge
 		// hanging off it — has to resolve to that one row, or the version
 		// arrives again through the edges and the churn it causes with it.
+		// An image the document states once is stored the same way, by its
+		// name, for the same reason.
 		root := snap.Root.AsRoot()
 		described := snap.Root.Identity()
+		images := imagesByName(snap.Components)
 		asStored := func(d Described) Described {
 			if d.Identity() == described {
 				return root
 			}
+			if image, ok := images[d.Identity()]; ok {
+				return image
+			}
 			return d
 		}
 
-		all := append([]Described{root}, snap.Components...)
+		all := []Described{root}
+		for _, d := range snap.Components {
+			all = append(all, asStored(d))
+		}
 		for _, dep := range snap.Dependencies {
 			all = append(all, asStored(dep.Parent), asStored(dep.Child))
 		}
@@ -175,9 +189,10 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		wanted := map[int64]stated{}
 		wanted[ids[root.Identity()]] = stated{isRoot: true}
 		for _, d := range snap.Components {
-			id := ids[d.Identity()]
+			stored := asStored(d)
+			id := ids[stored.Identity()]
 			if _, already := wanted[id]; !already {
-				wanted[id] = stated{purl: strings.TrimSpace(d.Purl), cpe: strings.TrimSpace(d.CPE)}
+				wanted[id] = stated{purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE)}
 			}
 		}
 
@@ -186,6 +201,23 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			return err
 		}
 		applied.NodesOpened, applied.NodesClosed = opened, closed
+
+		// What the build stated for each image it holds by name, whole.
+		statedImages := map[int64]statedImage{}
+		for _, d := range snap.Components {
+			image, ok := images[d.Identity()]
+			if !ok || d.Identity() == described {
+				continue
+			}
+			statedImages[nodeIDs[ids[image.Identity()]]] = statedImage{
+				version: strings.TrimSpace(d.Version), purl: strings.TrimSpace(d.Purl),
+			}
+		}
+		applied.VersionsOpened, applied.VersionsClosed, err = reconcileImageVersions(ctx, tx,
+			targetID, scanID, statedImages)
+		if err != nil {
+			return err
+		}
 
 		wantedEdges := map[edgeAt]bool{}
 		for _, dep := range snap.Dependencies {

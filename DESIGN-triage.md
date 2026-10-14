@@ -87,6 +87,7 @@ sweeps and nothing runs on a timer.
 |---|---|
 | Only the upstream version counts | `10.5.4` to `10.6` lapses a decision; a packaging revision does not. A shipped package is rebuilt constantly, and a rebuild is not somebody's reasoning becoming wrong |
 | A version change mid-chain needs no rule of its own | It either changes the direct consumer of something, which lapses that decision, or it does not |
+| A rebuilt container image lapses nothing beneath it | An image is identified by its name and stores no version (`DESIGN-data-model.md` § Container images), so a decision about a package inside one is keyed on no version for what pulls it in. A package inside that moves lapses its own decision as any upgrade does |
 | A carried patch does not lapse a decision | A producer that fixes by patching moves no version this can see. For one that patches heavily, a decision may never be automatically re-examined however much the code moves |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above. An eight-year-old judgment should look like one |
 | A deferral runs out on a date, not on a version | A bump does not change a judgment about priority, and a calendar does not change one about applicability. The finding returns to the queue marked as deferred rather than as new |

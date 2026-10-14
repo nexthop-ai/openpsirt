@@ -4,7 +4,7 @@ What happens to a scan between arrival and application.
 
 Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
 REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69.
+REQ-69, REQ-84.
 
 ## Contents
 
@@ -324,6 +324,12 @@ each fact.
 | A dependency's scope | a component's `scope` | the relationship type: build, development, runtime, optional, test | a `scope` on the relationship |
 | What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
 | What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** | **cannot be stated** |
+| That a component is a container image | `type` of `container` | `primaryPackagePurpose` of `CONTAINER` | `software_primaryPurpose` of `container` |
+
+Whether a component is a container image is read from the format only where
+it carries no package identifier, because the identifier's type decides where
+there is one. An image is identified by its name (REQ-84), as
+`DESIGN-data-model.md` § Container images holds.
 
 The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,
 `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are

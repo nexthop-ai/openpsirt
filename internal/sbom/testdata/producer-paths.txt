@@ -51,7 +51,7 @@ skipped @graph[].software_downloadLocation:string
 skipped @graph[].software_homePage:string
 read @graph[].software_packageUrl:string
 read @graph[].software_packageVersion:string
-skipped @graph[].software_primaryPurpose:string
+read @graph[].software_primaryPurpose:string
 skipped @graph[].software_sourceInfo:string
 read @graph[].spdxId:string
 read @graph[].specVersion:string
@@ -72,7 +72,7 @@ skipped components[].author:string
 read components[].bom-ref:string
 read components[].components[].name:string
 read components[].components[].purl:string
-skipped components[].components[].type:string
+read components[].components[].type:string
 read components[].components[].version:string
 read components[].cpe:string
 skipped components[].description:string
@@ -115,7 +115,7 @@ read components[].supplier.name:string
 skipped components[].swid.name:string
 skipped components[].swid.tagId:string
 skipped components[].swid.version:string
-skipped components[].type:string
+read components[].type:string
 read components[].version:string
 skipped creationInfo.comment:string
 read creationInfo.created:string
@@ -193,7 +193,7 @@ skipped hasExtractedLicensingInfos[].licenseId:string
 read metadata.component.bom-ref:string
 read metadata.component.components[].name:string
 read metadata.component.components[].purl:string
-skipped metadata.component.components[].type:string
+read metadata.component.components[].type:string
 read metadata.component.components[].version:string
 skipped metadata.component.externalReferences[].type:string
 skipped metadata.component.externalReferences[].url:string
@@ -237,7 +237,7 @@ read packages[].name:string
 read packages[].originator:string
 skipped packages[].packageFileName:string
 skipped packages[].packageVerificationCode.packageVerificationCodeValue:string
-skipped packages[].primaryPackagePurpose:string
+read packages[].primaryPackagePurpose:string
 skipped packages[].sourceInfo:string
 skipped packages[].summary:string
 read packages[].supplier:string
