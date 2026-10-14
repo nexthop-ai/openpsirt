@@ -11850,6 +11850,9 @@ components:
         digest_unassigned:
           description: Their digest lists findings nobody owns as well as their own outstanding work
           type: boolean
+        disclose_after:
+          description: The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s
+          type: string
         identity:
           description: The identity this deployment holds for them
           type: string
@@ -16458,6 +16461,39 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/my-claims.{format}:
+    get:
+      description: |-
+        What `GET /v1/my-claims` lists, as a file: every claim you proposed, newest first, with what became of each and who did it, rather than one page.
+
+        Narrowed to what you may still read.
+
+        Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+      operationId: export-my-claims
+      parameters:
+        - in: path
+          name: format
+          required: true
+          schema:
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Export the outcomes of your own claims
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        note: Exports only what you may see.
   /v1/notes/{id}:
     put:
       description: |-
