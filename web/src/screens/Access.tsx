@@ -179,6 +179,15 @@ export function Access({ who: me }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
+  // Clears the identifier a provider pinned to somebody, so the next sign-in
+  // under the name binds again. Needed when the provider changes, and refused
+  // to a personal token, so a screen is where it is done.
+  const unbind = useMutation({
+    mutationFn: async (who: { identity: string }) =>
+      unwrap(await api.DELETE("/v1/people/{identity}/identifier", { params: { path: who } })),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+  });
+
   if (people.isPending) return <Loading />;
   if (people.isError) {
     return <Failed error={people.error} what="The users could not be read." />;
@@ -258,6 +267,9 @@ export function Access({ who: me }: { who: Who }) {
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That role could not be withdrawn." />
       )}
+      {unbind.error != null && (
+        <Failed error={unbind.error} what="Their sign-in could not be unbound." />
+      )}
       {endSessions.error != null && (
         <Failed error={endSessions.error} what="Their sessions could not be ended." />
       )}
@@ -332,6 +344,25 @@ export function Access({ who: me }: { who: Who }) {
                         (person.signs_in_by ?? []).map((door) => (
                           <div key={door.username}>
                             <span className="id">{door.username}</span>
+                            {door.pinned && (
+                              <>
+                                {" "}
+                                <button
+                                  type="button"
+                                  className="linkish"
+                                  style={{ color: "var(--muted)" }}
+                                  disabled={!me.admin || unbind.isPending}
+                                  title={
+                                    me.admin
+                                      ? "Let the next sign-in under this name bind it again"
+                                      : "Only an administrator unbinds a sign-in"
+                                  }
+                                  onClick={() => unbind.mutate({ identity: person.identity ?? "" })}
+                                >
+                                  Unbind
+                                </button>
+                              </>
+                            )}
                           </div>
                         ))
                       )}

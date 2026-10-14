@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { api } from "../api/client";
 import { Access } from "./Access";
 import type { Who } from "../app/session";
 import { screen, serve, settle, mounted, type Answer } from "../test/mount";
@@ -85,5 +87,46 @@ describe("the access screen", () => {
     await settle();
     expect(mount.host().textContent).toContain("alice");
     expect(mount.host().querySelector('[title="Withdraw this role"]')).toBeNull();
+  });
+
+  it("unbinds a pinned sign-in from the list", async () => {
+    deployment({
+      "/v1/people": {
+        data: {
+          items: [{ ...alice, signs_in_by: [{ username: "alice", pinned: true }] }],
+          total: 1,
+        },
+      },
+    });
+    const sent = vi.spyOn(api, "DELETE").mockResolvedValue({
+      data: undefined,
+      error: undefined,
+      response: new Response(null, { status: 204 }),
+    } as never);
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const button = [...mount.host().querySelectorAll("button")].find(
+      (one) => one.textContent === "Unbind",
+    );
+    expect(button).toBeDefined();
+    await act(async () => button?.click());
+    expect(sent).toHaveBeenCalledWith("/v1/people/{identity}/identifier", {
+      params: { path: { identity: "alice" } },
+    });
+  });
+
+  it("offers no unbinding for a name nothing is pinned to", async () => {
+    deployment({
+      "/v1/people": {
+        data: {
+          items: [{ ...alice, signs_in_by: [{ username: "alice", pinned: false }] }],
+          total: 1,
+        },
+      },
+    });
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const labels = [...mount.host().querySelectorAll("button")].map((one) => one.textContent);
+    expect(labels).not.toContain("Unbind");
   });
 });

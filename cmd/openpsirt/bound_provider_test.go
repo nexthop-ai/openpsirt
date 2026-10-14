@@ -61,7 +61,7 @@ func TestAStartupWithADifferentIssuerIsRefused(t *testing.T) {
 		if err == nil {
 			t.Fatal("a deployment bound under one issuer started configured for another")
 		}
-		for _, want := range []string{was, "https://new.example", "DELETE /v1/people/{identity}/identifier"} {
+		for _, want := range []string{was, "https://new.example", "the Access screen"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("the refusal does not name %s: %v", want, err)
 			}

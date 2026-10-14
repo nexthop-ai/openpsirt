@@ -1078,8 +1078,8 @@ func onlyTheBoundProvider(ctx context.Context, rights *access.Store, providers m
 		return fmt.Errorf(
 			"identities here are bound to %q and this deployment is configured for %s: "+
 				"an identifier one provider issued names somebody else at another. Point "+
-				"OPENPSIRT_OIDC_ISSUER back at %[1]q, unbind each person under Administration "+
-				"(DELETE /v1/people/{identity}/identifier), and change the issuer after that "+
+				"OPENPSIRT_OIDC_ISSUER back at %[1]q, unbind each person from the Access screen, "+
+				"signed in as an administrator, and change the issuer after that "+
 				"— a binding is withdrawn while the provider that made it is still "+
 				"configured. Where %[1]q cannot be reached either, configure the trusted "+
 				"header with no provider at all and do the same from there",

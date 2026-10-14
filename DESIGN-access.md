@@ -774,7 +774,7 @@ is what a provider change goes through.
 | Situation | What to do |
 |---|---|
 | The provider is down and people must sign in | Configure the trusted header and leave no provider configured. A pinned identifier does not refuse a proxy arrival, so everybody reaches what they already hold |
-| The provider is changing | Unbind each person, then configure the new provider. The authorization stays and is redeemed again by whoever arrives under that name |
+| The provider is changing | Unbind each person, then configure the new provider. The authorization stays and is redeemed again by whoever arrives under that name. Unbinding needs a signed-in administrator, so it is a control beside each pinned name on the Access screen |
 | The provider is changing and the old one cannot be reached | The same, reached through the trusted header, because a provider that cannot be discovered stops the process before anybody could unbind anything |
 
 | Rule | Reason |

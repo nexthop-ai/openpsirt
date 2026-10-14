@@ -341,8 +341,10 @@ to start.
    trusted header with no provider at all where the old one cannot be reached
    either. A binding is withdrawn while the provider that made it is still
    configured.
-2. `DELETE /v1/people/{identity}/identifier` for each person. The
-   authorization and the roles stay; only the pin goes.
+2. Unbind each person, signed in as an administrator: **Unbind** beside their
+   name on the Access screen, or `DELETE /v1/people/{identity}/identifier`
+   from that session. A personal token is refused. The authorization and the
+   roles stay; only the pin goes.
 3. Configure the new provider and restart. Each name is redeemed again by
    whoever next arrives holding it.
 
