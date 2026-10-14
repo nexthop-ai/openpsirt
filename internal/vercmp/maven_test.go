@@ -4,9 +4,11 @@
 package vercmp_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
@@ -340,20 +342,47 @@ func TestAVersionTooLongToBeOneIsRefused(t *testing.T) {
 	// A version is a tree with a level per hyphen, so what arrives decides
 	// what is allocated. Two megabytes of this allocates 393 MB, and both
 	// operands are read before either is compared.
-	long := "1" + strings.Repeat("-1", 64<<10)
-	for _, scheme := range []vercmp.Scheme{
-		vercmp.Maven, vercmp.PyPI, vercmp.NuGet, vercmp.Debian, vercmp.RPM, vercmp.APK, vercmp.Semantic,
-	} {
-		if _, ok := vercmp.Order(scheme, long, "1.0"); ok {
-			t.Errorf("%v ordered a version of %d bytes", scheme, len(long))
+	//
+	// Each scheme is fed a version its grammar accepts at every length, so
+	// the bound is the only thing that refuses the longer one.
+	dotted := func(n int) string {
+		// "1.1.1…", with the first segment widened by a digit where the
+		// length is even.
+		head := "1"
+		if n%2 == 0 {
+			head = "11"
 		}
-		if _, ok := vercmp.Order(scheme, "1.0", long); ok {
-			t.Errorf("%v ordered a version of %d bytes on the other side", scheme, len(long))
-		}
+		return head + strings.Repeat(".1", (n-len(head))/2)
 	}
-	// And a version of an ordinary length still orders, so the bound is not
-	// simply refusing everything.
-	if _, ok := vercmp.Order(vercmp.Maven, "1.0.0-alpha-1", "1.0.0"); !ok {
-		t.Error("an ordinary version was refused")
+	labeled := func(n int) string { return "1.0.0-" + strings.Repeat("a", n-len("1.0.0-")) }
+	for _, each := range []struct {
+		name   string
+		scheme vercmp.Scheme
+		shape  func(int) string
+	}{
+		{"Maven", vercmp.Maven, labeled}, {"NuGet", vercmp.NuGet, labeled},
+		{"semantic", vercmp.Semantic, labeled}, {"PyPI", vercmp.PyPI, dotted},
+		{"Debian", vercmp.Debian, dotted}, {"RPM", vercmp.RPM, dotted}, {"APK", vercmp.APK, dotted},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			for _, side := range []string{"left", "right"} {
+				boundtest.Edges(t, vercmp.Longest, func(n int) error {
+					long := each.shape(n)
+					if len(long) != n {
+						t.Fatalf("the shape made %d bytes, want %d", len(long), n)
+					}
+					a, b := long, "1.0"
+					if side == "right" {
+						a, b = b, a
+					}
+					if _, ok := vercmp.Order(each.scheme, a, b); !ok {
+						return errUnordered
+					}
+					return nil
+				}, func(err error) bool { return err == errUnordered })
+			}
+		})
 	}
 }
+
+var errUnordered = errors.New("unordered")
