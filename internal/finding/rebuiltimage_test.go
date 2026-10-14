@@ -9,6 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // swssImage is the image libnl ships in, as SONiC stamps it at one build.
@@ -170,6 +171,75 @@ func TestTheComponentPageListsTheVersionsEachBuildStampedAnImageWith(t *testing.
 		}
 		if len(inside) != 1 || len(inside[0].Packages) != 1 || inside[0].Packages[0].Stated != nil {
 			t.Errorf("a package inside the image answers %+v, want no stated versions", inside)
+		}
+	})
+}
+
+// acmeImage is a supplier's container image as one build stamps it.
+func acmeImage(stamp string) graph.Described {
+	return graph.Described{
+		Purl: "pkg:oci/docker-acme@" + stamp + "?arch=amd64", Name: "docker-acme",
+		Version: stamp, Container: true,
+	}
+}
+
+// underTheImage is the latest row for zlib inside the image.
+func (f *fixture) underTheImage(t *testing.T) finding.Finding {
+	t.Helper()
+	var latest finding.Finding
+	for _, row := range f.every(t) {
+		if placedAt(t, f, []finding.Finding{row})["zlib under docker-acme"].ID == row.ID {
+			latest = row
+		}
+	}
+	if latest.ID == 0 {
+		t.Fatal("nothing sits beneath the image")
+	}
+	return latest
+}
+
+func TestAClaimNamingAnImageAtAStampAnswersOnlyTheBuildStatingThatStamp(t *testing.T) {
+	// The image is stored with no version, and the claim names the one the
+	// build stamped. It is placed against the stamp the build states now.
+	each(t, func(t *testing.T, f *fixture) {
+		claim := insideOf(sbom.NotAffected, acmeImage("master.2-bbb"), "never called")
+		f.shipped(t, beside(acmeImage("master.2-bbb")))
+		f.argues(t, claim)
+		f.reported(t, found(inside, zlib))
+		if row := f.underTheImage(t); row.SuppressedBy == nil {
+			t.Error("a claim about zlib inside the image at the stamp the build states answers nothing")
+		}
+
+		f.shipped(t, beside(acmeImage("master.3-ccc")))
+		f.argues(t, claim)
+		f.reported(t, found(inside, zlib))
+		if row := f.underTheImage(t); row.SuppressedBy != nil {
+			t.Error("a claim about the image at master.2 answers the build stamping it master.3")
+		}
+	})
+}
+
+func TestASuppliersStatementNamingAnImageAtAStampClosesOnlyUnderThatStamp(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		image := acmeImage("master.2-bbb")
+		claim := sbom.Suppression{
+			Vulnerability: inside, Status: sbom.NotAffected,
+			Justification: "vulnerable_code_not_in_execute_path",
+			Statement:     "zlib's inflate is never reached",
+		}
+		f.publishes(t, []finding.Statement{finding.StatementOf(claim, sbom.Target{
+			Purl: zlib.Purl, Name: zlib.Name, Within: &sbom.Target{Purl: image.Purl, Name: image.Name},
+		})}, "sha256:acme-image")
+		f.shipped(t, beside(image))
+		f.reported(t, found(inside, zlib))
+		if row := f.underTheImage(t); row.ClosedBecause != finding.Disclaimed {
+			t.Errorf("zlib inside the image the statement names closed as %q, want disclaimed", row.ClosedBecause)
+		}
+
+		f.shipped(t, beside(acmeImage("master.3-ccc")))
+		f.reported(t, found(inside, zlib))
+		if row := f.underTheImage(t); row.ClosedAt != nil {
+			t.Errorf("zlib inside the image at the next stamp closed as %q, want it open", row.ClosedBecause)
 		}
 	})
 }
