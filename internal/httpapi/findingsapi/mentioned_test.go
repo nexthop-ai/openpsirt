@@ -85,32 +85,52 @@ func TestAMentionTellsOnlySomebodyWhoCouldAlreadyReadIt(t *testing.T) {
 
 func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 	// The disclosure this rule exists to prevent: being told you were named on
-	// a finding is being told the finding exists.
+	// a finding is being told the finding exists. Two people are named on a
+	// claim about undisclosed work: one who reads it is told, and one who
+	// reads only what is disclosed is told nothing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/findings",
-			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
-				`"summary":"The management socket answers before anyone authenticated.",`+
-				`"severity":"critical"}`)
-		if made.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		flaw := r.Embargoed(t)
+		claim, _ := r.Claimed(t, "private-triage", flaw, "libnl-3-200", httpapitest.Dismissal)
+		said := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/claims/"+httpapitest.Itoa(claim)+"/comments",
+			`{"body":"@reader and @private, could you look at the management socket?"}`)
+		if said.Code >= 400 {
+			t.Fatalf("commenting answered %d: %s", said.Code, said.Body.String())
 		}
 
-		// A comment on the undisclosed finding's decision would be the place
-		// to name somebody; what matters here is that the public reader is
-		// never told anything about it however it is written.
-		var theirs struct {
-			Items []struct {
-				Kind string `json:"kind"`
-				Body string `json:"body"`
-			} `json:"items"`
-		}
-		httpapitest.Read(t, r, "reader", "/v1/notifications", &theirs)
-		for _, item := range theirs.Items {
-			if strings.Contains(item.Body, "management socket") {
-				t.Errorf("somebody who may not read undisclosed work was told: %q", item.Body)
+		mentioned := func(who string) int {
+			var told struct {
+				Items []struct {
+					Kind string `json:"kind"`
+				} `json:"items"`
 			}
+			httpapitest.Read(t, r, who, "/v1/notifications", &told)
+			n := 0
+			for _, item := range told.Items {
+				if item.Kind == "mentioned" {
+					n++
+				}
+			}
+			return n
+		}
+		if n := mentioned("private"); n != 1 {
+			t.Errorf("somebody who reads undisclosed work was told %d times, want once", n)
+		}
+		if n := mentioned("reader"); n != 0 {
+			t.Errorf("somebody who may not read undisclosed work was told %d times", n)
+		}
+		// Not written for them at all, rather than written and then left out
+		// of what they read: a row about undisclosed work held for somebody
+		// who may not read it is one step from being shown.
+		held, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
+			Join(`JOIN "person" AS "p" ON p.id = n.person_id`).
+			Where("p.identity = ?", "reader").Where("n.kind = ?", "mentioned").Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d mentions were written for somebody who may not read the work", held)
 		}
 	})
 }

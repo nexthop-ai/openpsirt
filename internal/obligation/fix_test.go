@@ -260,12 +260,18 @@ func TestAFixIsNamedAndReadOnlyByWhoMayTriageTheProduct(t *testing.T) {
 		if _, err := f.store.NameFix(ctx, f.outsider, record.ID, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Errorf("somebody with nothing on the product naming a fix answered %v", err)
 		}
+		if _, err := f.store.NameFix(ctx, f.reader, record.ID, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
+			t.Errorf("a reader of the product naming a fix answered %v", err)
+		}
 		if _, err := f.store.NameFix(ctx, f.triager, record.ID+1000, world.TagName); !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Errorf("a record nobody kept answered %v", err)
 		}
 		named, err := f.store.NameFix(ctx, f.triager, record.ID, world.TagName)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if err := f.store.WithdrawFix(ctx, f.reader, record.ID, named.ID); !errors.Is(err, obligation.ErrNoSuchRecord) {
+			t.Errorf("a reader of the product withdrawing a fix answered %v", err)
 		}
 		if err := f.store.WithdrawFix(ctx, f.outsider, record.ID, named.ID); !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Errorf("somebody with nothing on the product withdrawing a fix answered %v", err)

@@ -30,7 +30,8 @@ var knownAt = time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
 
 // cast is a product with an issue open in it, somebody who triages its public
 // findings, somebody who triages its undisclosed ones too, somebody who reads
-// another product only, and an administrator.
+// it and triages nothing, somebody who reads another product only, and an
+// administrator.
 type cast struct {
 	product, issue int64
 }
@@ -93,6 +94,15 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	if err := rights.GrantRole(ctx, insider.ID, product.ID, access.PrivateTriage); err != nil {
 		return cast{}, err
 	}
+	// Told of the issue and triaging nothing, so a refusal asking for
+	// triage is the one that turns them away.
+	reader, err := rights.Ensure(ctx, "reader", "Reader", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantRole(ctx, reader.ID, product.ID, access.PublicRead); err != nil {
+		return cast{}, err
+	}
 	outsider, err := rights.Ensure(ctx, "outsider", "Outsider", nil, nil)
 	if err != nil {
 		return cast{}, err
@@ -108,6 +118,7 @@ type fixture struct {
 	store                             *obligation.Store
 	product, issue                    int64
 	admin, triager, insider, outsider access.Subject
+	reader                            access.Subject
 }
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
@@ -124,7 +135,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		fn(t, &fixture{
 			db: db, store: obligation.NewStore(db.DB), product: c.product, issue: c.issue,
 			admin: subject("admin"), triager: subject("triager"), insider: subject("insider"),
-			outsider: subject("outsider"),
+			outsider: subject("outsider"), reader: subject("reader"),
 		})
 	})
 }
@@ -381,6 +392,12 @@ func TestANoticeIsRecordedOnlyByWhoeverMayTriageTheProduct(t *testing.T) {
 			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
 		if !errors.Is(err, obligation.ErrNoSuchRecord) {
 			t.Fatalf("somebody with nothing on the product recording a notice answered %v", err)
+		}
+		// Somebody told of the issue who triages nothing on the product.
+		_, err = f.store.RecordTold(t.Context(), f.reader, record.ID, nil, "ENISA",
+			knownAt.Add(time.Hour), "An attack.", obligation.Details{})
+		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			t.Fatalf("a reader of the product recording a notice answered %v", err)
 		}
 		_, err = f.store.RecordTold(t.Context(), f.outsider, record.ID+1000, nil, "ENISA",
 			knownAt.Add(time.Hour), "An attack.", obligation.Details{})

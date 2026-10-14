@@ -354,3 +354,27 @@ func TestAnEarlierNoteThatCouldNotBeReadIsNotAbsent(t *testing.T) {
 		t.Errorf("a database nobody can reach said the note is not there: %v", err)
 	}
 }
+
+func TestWhatANoteSaidBeforeIsReadOnlyByWhoMayReadTheNote(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.sits(t, access.Public)
+		note, err := f.store.NoteOn(ctx, f.triager, f.product, f.issue, "Upstream patch next week.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.RewordNote(ctx, f.triager, note.ID, "Upstream patch landed."); err != nil {
+			t.Fatal(err)
+		}
+		if earlier, err := f.store.EarlierNote(ctx, f.onlooker, note.ID); err != nil || len(earlier) == 0 {
+			t.Errorf("a reader of the product read %d earlier versions: %v", len(earlier), err)
+		}
+		elsewhere := f.alongside(t, "other")
+		stranger := access.NewPerson(f.proposer, "stranger", false,
+			map[int64][]access.Role{elsewhere: {access.PublicRead}}, 0)
+		if earlier, err := f.store.EarlierNote(ctx, stranger, note.ID); err == nil || len(earlier) != 0 {
+			t.Errorf("a reader of another product read %d earlier versions of a note here: %v",
+				len(earlier), err)
+		}
+	})
+}

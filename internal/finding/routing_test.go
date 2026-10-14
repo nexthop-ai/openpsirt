@@ -478,3 +478,25 @@ func TestARuleForARetiredTeamPlacesNothing(t *testing.T) {
 		}
 	})
 }
+
+func TestARoutingRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
+	// A rule hands work to a team over and over with nobody present, which is
+	// the act the assigner right names. Triaging the product is not it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		triager := f.planner(t, access.PublicTriage)
+		where := f.team(t, "platform")
+		if _, err := f.store.AddRule(ctx, triager, f.productID, where, "the library",
+			"", "libnl-3-*"); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a triager without the assigner right wrote a rule: %v", err)
+		}
+		assigner := f.planner(t, access.PublicTriage, access.Assigner)
+		rule, err := f.store.AddRule(ctx, assigner, f.productID, where, "the library", "", "libnl-3-*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.RetireRule(ctx, triager, f.productID, rule.ID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a triager without the assigner right retired a rule: %v", err)
+		}
+	})
+}
