@@ -1021,6 +1021,19 @@ Built with mkdocs-material and published to GitHub Pages, with sets versioned by
 | The site's default is `latest` once a release carries it, and `main` until then | The root of the site is what a visitor reads first, and unreleased documentation there describes a version nobody can install |
 | A push to `main` sets the default to `latest` where a set carries it, and to `main` where none does | Set on every merge, so a default another run moved is put back rather than left until the next release |
 
+### Link check
+
+A test in `internal/docs` follows every link in every document and fails on one
+that reaches nothing.
+
+| Rule | Why |
+|---|---|
+| A fragment is checked against the anchors the renderer of its own page derives | A link is followed where its page is read |
+| A page under `docs/` is held to the site's rule: decomposed to ASCII, punctuation removed, each run of spaces and hyphens one hyphen | The site renders those pages with the table-of-contents extension's default |
+| Every other document is held to the forge's rule: punctuation other than the underscore removed, each space a hyphen | The forge renders them. A heading separated by a dash takes two hyphens there and one on the site |
+| A link to a directory or a file of another kind is checked for existence | A renamed `LICENSE` or `docs/` dangles a link as surely as a renamed document |
+| A link inside a code fence or an inline code span is not read | It renders no link |
+
 ### Release version
 
 A page names the release a reader deploys as `{{ release }}`, and the build
