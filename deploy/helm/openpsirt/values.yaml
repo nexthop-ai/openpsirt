@@ -72,6 +72,9 @@ database:
   # root filesystem is read-only, so the chart mounts /var/lib/openpsirt and
   # refuses a SQLite URL whose file is anywhere else. Scratch space by default,
   # which is lost when the pod is replaced; name a claim to keep the trial.
+  # The file sits directly in that directory. A URL in database.existingSecret
+  # is not read by the chart, so nothing is mounted for it and a claim here is
+  # refused beside it.
   sqlite:
     existingClaim: ""
     sizeLimit: 1Gi

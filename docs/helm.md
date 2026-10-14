@@ -24,7 +24,7 @@ install needs and which setting each value sets.
 
 | Value | Holds |
 |---|---|
-| `database.url` or `database.existingSecret` | The database. SQLite is for a single-pod trial, and the chart refuses it beside a second replica. Its file lives under `/var/lib/openpsirt`, as `sqlite:///var/lib/openpsirt/openpsirt.db`, on scratch space unless `database.sqlite.existingClaim` names a claim |
+| `database.url` or `database.existingSecret` | The database. SQLite is for a single-pod trial, and the chart refuses it beside a second replica. Its file lives under `/var/lib/openpsirt`, as `sqlite:///var/lib/openpsirt/openpsirt.db`, on scratch space unless `database.sqlite.existingClaim` names a claim. The chart cannot read a URL held in `database.existingSecret`, so it mounts nothing for SQLite there and refuses `database.sqlite.existingClaim` beside it: use `database.url` for a trial |
 | `auth.baseURL` | The address people reach the deployment on, in full: `https://psirt.example.com`. Required once a provider is configured |
 | `auth.oidc.issuer`, `auth.github.clientID` or `auth.trustedHeader.name` | One way to sign in |
 | `auth.bootstrapAdmins`, or a group mapped to `admin` in `auth.groupRoles` | Who administers the deployment. A name here is granted at every start whatever the groups say, so it is also the way back in |

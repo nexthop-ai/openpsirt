@@ -17,8 +17,11 @@
 {{- fail (printf "database.url is SQLite and replicaCount is %d: SQLite is one file on one pod, so a second replica would start with an empty database of its own rather than share this one. Use PostgreSQL, MySQL or MariaDB, or set replicaCount to 1 for a single-pod trial" (int .Values.replicaCount)) }}
 {{- end }}
 {{- $sqlite := and .Values.database.url (regexMatch "^(sqlite|sqlite3|file):" (lower .Values.database.url)) }}
-{{- if and $sqlite (not (regexMatch "^(?i:sqlite3?|file):(//)?/var/lib/openpsirt/[^/?]+" .Values.database.url)) }}
-{{- fail "database.url is SQLite outside /var/lib/openpsirt: the root filesystem is read-only, and /var/lib/openpsirt is the one writable directory the chart mounts for a database file. Use, for example, sqlite:///var/lib/openpsirt/openpsirt.db" }}
+{{- if and $sqlite (not (regexMatch "^(?i:sqlite3?|file):(//)?/var/lib/openpsirt/[^/?#.][^/?#]*([?#]|$)" .Values.database.url)) }}
+{{- fail "database.url is SQLite outside /var/lib/openpsirt: the root filesystem is read-only, and /var/lib/openpsirt is the one writable directory the chart mounts for a database file, with nothing beneath it. Use, for example, sqlite:///var/lib/openpsirt/openpsirt.db" }}
+{{- end }}
+{{- if and .Values.database.sqlite.existingClaim (not $sqlite) }}
+{{- fail "database.sqlite.existingClaim is set and database.url is not SQLite: the claim is mounted only for a SQLite URL in database.url, and the chart cannot read a URL in database.existingSecret, so it would be silently ignored. Use database.url for a SQLite trial" }}
 {{- end }}
 {{- if and .Values.scanner.persistence.enabled (not .Values.scanner.persistence.existingClaim) (gt (int .Values.replicaCount) 1) (not (has "ReadWriteMany" .Values.scanner.persistence.accessModes)) }}
 {{- fail (printf "scanner.persistence is enabled with replicaCount %d and no ReadWriteMany access mode: every replica mounts the one claim this chart makes, so on storage that binds to a single node the replicas that land elsewhere stay Pending. Add ReadWriteMany, name scanner.persistence.existingClaim per replica set, or set replicaCount to 1" (int .Values.replicaCount)) }}

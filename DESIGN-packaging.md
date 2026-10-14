@@ -262,7 +262,7 @@ SQLite is not a production engine.
 
 | Rule | |
 |---|---|
-| A single-pod SQLite trial keeps its file under `/var/lib/openpsirt` | The root filesystem is read-only, so the chart mounts that one directory for a SQLite URL, on a bounded scratch volume or a claim the operator names. A SQLite URL in values naming any other path is refused at render, because the process would crash-loop failing to create the file |
+| A single-pod SQLite trial keeps its file under `/var/lib/openpsirt` | The root filesystem is read-only, so the chart mounts that one directory for a SQLite URL, on a bounded scratch volume or a claim the operator names. A SQLite URL in values naming any other path, a directory beneath it included, is refused at render, because the process would crash-loop failing to create the file. A claim named for SQLite beside a URL held in a Secret is refused too, because the chart cannot read that URL and would mount nothing |
 | No other install gets the volume | A server database has nothing to keep on the pod |
 
 ## Network policy
