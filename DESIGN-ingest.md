@@ -4,7 +4,7 @@ What happens to a scan between arrival and application.
 
 Satisfies REQ-03, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11,
 REQ-12, REQ-13, REQ-14, REQ-16, REQ-17, REQ-18, REQ-31, REQ-44, REQ-66,
-REQ-69, REQ-84.
+REQ-69.
 
 ## Contents
 
@@ -328,7 +328,7 @@ each fact.
 
 Whether a component is a container image is read from the format only where
 it carries no package identifier, because the identifier's type decides where
-there is one. An image is identified by its name (REQ-84), as
+there is one. An image is identified by its name (REQ-08), as
 `DESIGN-data-model.md` § Container images holds.
 
 The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,

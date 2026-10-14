@@ -3,7 +3,7 @@
 What a scan is filed against, and the structures it produces.
 
 Satisfies REQ-07, REQ-08, REQ-14, REQ-15, REQ-16, REQ-17, REQ-18, REQ-20,
-REQ-25, REQ-32, REQ-52, REQ-54, REQ-84.
+REQ-25, REQ-32, REQ-52, REQ-54.
 
 ## Contents
 
@@ -338,7 +338,7 @@ seen.
 
 ### Container images
 
-A container image is identified by its name (REQ-84). The version a build
+A container image is identified by its name (REQ-08). The version a build
 states for one is a tag, a build stamp or a digest, and a product rebuilding
 its images in CI states a new one every build whether or not anything inside
 moved. SONiC stamps each image `master.<build>-<commit>`; other producers state
