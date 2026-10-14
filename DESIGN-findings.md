@@ -1254,6 +1254,8 @@ changes on top of 6.18.55, and those changes are what a record cannot speak for.
 | A version and an inclusive upper bound | From the version up to and including the bound. A bound ending in `.*` covers every release beginning with what precedes it; `*` alone covers every release |
 | Of no stated type, or `semver` | Ordered as release numbers (`DESIGN-remediation.md` § Version ordering) |
 | A commit range | Nothing. The kernel's records carry one beside every release range, saying the same thing |
+| Typed as the commit a fix originated in, with a release number for its version | Release numbers. The kernel writes the mainline release a fix first reached that way: `7.1` up to `*`, unaffected. 15,026 of the 17,117 lines of that type in the CVE List of 2026-10-14 carry one |
+| Typed as the commit a fix originated in, with a commit for its version | A commit range |
 | Of any other type, or with status changes inside it | Not ordered. Where it states affected, nothing narrows |
 
 ### Narrowing

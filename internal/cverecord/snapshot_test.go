@@ -77,6 +77,8 @@ var kernelEntry = map[string]any{
 		{"version": "6.14", "status": "affected"},
 		{"version": "6.18.27", "lessThanOrEqual": "6.18.*", "status": "unaffected", "versionType": "semver"},
 		{"version": "fb7d3bc4", "lessThan": "efc52947", "status": "affected", "versionType": "git"},
+		{"version": "fb7d3bc4", "lessThan": "*", "status": "affected", "versionType": "original_commit_for_fix"},
+		{"version": "7.1", "lessThanOrEqual": "*", "status": "unaffected", "versionType": "original_commit_for_fix"},
 	},
 }
 
@@ -110,6 +112,9 @@ func TestAnArchiveKeepsOnlyRecordsThatCanNarrow(t *testing.T) {
 	}
 	if !snapshot.Decide([]string{"CVE-2026-31589"}, kernel("6.18.55")).Narrows() {
 		t.Error("the kept record does not narrow what it states")
+	}
+	if !snapshot.Decide([]string{"CVE-2026-31589"}, kernel("7.2.4")).Narrows() {
+		t.Error("the kept record does not narrow a release past the mainline fix")
 	}
 	// Nothing of the inner archive is left beside the snapshot.
 	entries, err := os.ReadDir(dir)

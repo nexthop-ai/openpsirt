@@ -274,8 +274,7 @@ func kept(record *Record, stated Entry, versions []struct {
 			string(version.Changes) != "[]"
 		// Commit ranges say what the release lines beside them say, in
 		// terms this does not order, so they are not kept.
-		if strings.EqualFold(line.VersionType, "git") ||
-			strings.EqualFold(line.VersionType, "original_commit_for_fix") {
+		if commitRange(line) {
 			continue
 		}
 		entry.Versions = append(entry.Versions, line)
@@ -290,7 +289,7 @@ func kept(record *Record, stated Entry, versions []struct {
 // canNarrow reports whether a line is one that could ever narrow a match: an
 // unaffected line in an ordered scheme whose first version can be read.
 func canNarrow(line Line) bool {
-	if !strings.EqualFold(line.Status, "unaffected") || !orderedType(line.VersionType) || line.Changes {
+	if !strings.EqualFold(line.Status, "unaffected") || !ordered(line) || line.Changes {
 		return false
 	}
 	_, ok := vercmp.Order(vercmp.Semantic, line.Version, line.Version)
