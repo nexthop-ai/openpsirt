@@ -27,13 +27,14 @@ func init() {
 // statement at a time, and a merge stopped part way would be committed part
 // way. In a transaction of their own they are held and undone together, and
 // the next start steps over the table and merges again. The destinations are
-// folded in a transaction between the two, which asks whether its column is
-// there before adding it.
+// folded, and the deliveries gain their column, each in a transaction of its
+// own between the two, which asks whether its column is there before adding
+// it.
 func upV090(ctx context.Context, sqldb *sql.DB) error {
 	switch migrate.EngineFrom(ctx) {
 	case database.MySQL, database.MariaDB:
 		for _, step := range []func(context.Context, bun.Tx) error{
-			createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+			createImageVersionV090, foldDestinationsV090, attemptDeliveriesV090, mergeImagesV090,
 			shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 		} {
 			if err := inV020(ctx, sqldb, step); err != nil {
@@ -67,6 +68,7 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //     them is pointed at it.
 //   - A destination's name is held folded, as the key it is matched on, beside
 //     the spelling it was typed in.
+//   - A delivery to a destination records when its latest attempt began.
 //   - A claim's reasoning is stored once and pointed at, a build's claim is
 //     keyed on its reasoning, and a reference to an issue is keyed on its
 //     address as given.
@@ -74,7 +76,7 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //     recorded has an end.
 func upgradeV090(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
-		createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+		createImageVersionV090, foldDestinationsV090, attemptDeliveriesV090, mergeImagesV090,
 		shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 	} {
 		if err := step(ctx, tx); err != nil {

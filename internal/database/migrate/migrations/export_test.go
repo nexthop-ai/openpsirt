@@ -57,11 +57,12 @@ func StatementsV080(engine database.Engine) map[string][]string {
 func StatementsV090(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
-		"image_version":  imageVersionV090(t),
-		"outbound":       outboundV090(t),
-		"statement_text": statementTextV090(t),
-		"suppression":    suppressionV090(t),
-		"vex_statement":  vexStatementsV090(t),
+		"image_version":     imageVersionV090(t),
+		"outbound":          outboundV090(t),
+		"outbound_delivery": outboundDeliveryV090(t),
+		"statement_text":    statementTextV090(t),
+		"suppression":       suppressionV090(t),
+		"vex_statement":     vexStatementsV090(t),
 	}
 }
 
@@ -86,7 +87,7 @@ func StopV090AfterDropping(ctx context.Context, db *database.DB, tables ...strin
 		return nil
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
-		createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+		createImageVersionV090, foldDestinationsV090, attemptDeliveriesV090, mergeImagesV090,
 		shapeWordsV090, moveWordsV090, drop,
 	} {
 		if err := inV020(ctx, db.DB.DB, step); err != nil {

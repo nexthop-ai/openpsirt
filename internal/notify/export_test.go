@@ -38,7 +38,7 @@ func StillToTell(s *Signal, ctx context.Context, name string) (int, error) {
 	if err := s.db.NewSelect().Model(&to).Where("name = ?", name).Scan(ctx); err != nil {
 		return 0, err
 	}
-	rows, err := s.window(ctx, to)
+	rows, err := s.window(ctx, to, sweepBatch)
 	return len(rows), err
 }
 

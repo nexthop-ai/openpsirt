@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -477,19 +478,82 @@ func registerSettings(api huma.API, in core.Deps) {
 // deployment's windows, the deployment's line and a product's line all
 // invalidate the same stored answer, and three spellings of "and then rewrite
 // them" is three places for one of them to be forgotten.
+//
+// The requests one process makes are coalesced, per database. A rewrite reads
+// the policy once its turn comes, so one run after the last change applies
+// every change before it: a burst of changes is the run in progress and one
+// more, rather than a full rewrite each, queued behind one another until the
+// latest time out waiting. One run at a time in a process is also what keeps
+// two of its rewrites from sharing the lease, which knows the process and not
+// the goroutine.
 func deadlinesRewritten(in core.Deps) func(context.Context, string, string) {
 	return func(ctx context.Context, what, value string) {
 		logger, db, replica := in.Logger, in.DB, in.Replica
 		if db == nil {
 			return
 		}
-		go func() {
-			at := context.WithoutCancel(ctx)
-			at, stop := context.WithTimeout(at, recomputeLimit)
-			defer stop()
-			rewriteDeadlines(at, db, replica, logger, what, value)
-		}()
+		rewriterFor(db).ask(ctx, what, value, func(ctx context.Context, what, value string) {
+			rewriteDeadlines(ctx, db, replica, logger, what, value)
+		})
 	}
+}
+
+// ask has run applied once more after whatever run is in progress, or starts
+// it now where none is. Each run has a context of its own, off the request,
+// bounded by recomputeLimit.
+func (r *rewriter) ask(ctx context.Context, what, value string,
+	run func(ctx context.Context, what, value string)) {
+
+	r.mu.Lock()
+	r.pending, r.what, r.value = true, what, value
+	if r.running {
+		r.mu.Unlock()
+		return
+	}
+	r.running = true
+	r.mu.Unlock()
+	go func() {
+		for {
+			r.mu.Lock()
+			if !r.pending {
+				r.running = false
+				r.mu.Unlock()
+				return
+			}
+			r.pending = false
+			what, value := r.what, r.value
+			r.mu.Unlock()
+			at, stop := context.WithTimeout(context.WithoutCancel(ctx), recomputeLimit)
+			run(at, what, value)
+			stop()
+		}
+	}()
+}
+
+// rewriter is one database's coalesced deadline rewrites: whether one is
+// running, and whether a change has arrived since it read the policy.
+type rewriter struct {
+	mu          sync.Mutex
+	running     bool
+	pending     bool
+	what, value string
+}
+
+// rewriters holds each database's rewriter for the life of the process.
+var rewriters = struct {
+	sync.Mutex
+	of map[*database.DB]*rewriter
+}{of: map[*database.DB]*rewriter{}}
+
+func rewriterFor(db *database.DB) *rewriter {
+	rewriters.Lock()
+	defer rewriters.Unlock()
+	r, ok := rewriters.of[db]
+	if !ok {
+		r = new(rewriter)
+		rewriters.of[db] = r
+	}
+	return r
 }
 
 // rewriteDeadlines applies a changed policy to every open finding, one replica

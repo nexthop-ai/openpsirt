@@ -458,7 +458,10 @@ Migration 43. It adds the image version table, moves what v0.8.0 stored for
 a container image to an image identified by its name
 (`DESIGN-data-model.md` § Container images), and folds each destination's
 name into the key it is matched under. It stores a claim's reasoning once,
-keys a build's claim on it, and keys a reference on its address as given.
+keys a build's claim on it, and keys a reference on its address as given. A
+delivery to a destination gains when its latest attempt began
+(`DESIGN-notifications.md` § Delivery); a delivery v0.8.0 recorded holds none,
+which reads as no attempt in flight.
 
 | Step | What it does |
 |---|---|
@@ -478,6 +481,7 @@ keys a build's claim on it, and keys a reference on its address as given.
 | The findings are read and moved once for every image | Read for the places decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
 | Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`DESIGN-notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two. One still in use keeps the key before a retired one, then the one already spelled as the key, then the earliest. The other takes the key followed by its own number, and that numbered key is also the name it is listed under, so retiring it by the name shown reaches it. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
+| A delivery gains when its latest attempt began | A column that takes a null, added where the table stands on every engine, after the destinations are folded. On MySQL and MariaDB in a transaction of its own between the fold and the merge, which asks whether the column is there first, so a start after one stopped part way steps over it |
 | A patch repository records when its last visit ended | No visit v0.8.0 recorded has an end, so each counts as having held the pass for no time until it is visited again (`DESIGN-findings.md` § Host share) |
 
 The rules an identity, a fold key and a live key are worked out by are copied

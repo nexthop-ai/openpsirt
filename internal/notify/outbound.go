@@ -106,11 +106,14 @@ type Delivery struct {
 	// NotificationID is the row that produced the claim. Not part of the key:
 	// a condition opened for six people is six rows and one delivery. It is
 	// what lets the sweep ask whether a row has been settled here.
-	NotificationID int64      `bun:"notification_id,notnull"`
-	Attempts       int        `bun:"attempts,notnull"`
-	SentAt         *time.Time `bun:"sent_at"`
-	Failed         string     `bun:"failed"`
-	FirstSeen      time.Time  `bun:"first_seen,notnull"`
+	NotificationID int64 `bun:"notification_id,notnull"`
+	Attempts       int   `bun:"attempts,notnull"`
+	// AttemptedAt is when the latest attempt began. One that began within
+	// inFlight and has neither gone nor failed is still being made.
+	AttemptedAt *time.Time `bun:"attempted_at"`
+	SentAt      *time.Time `bun:"sent_at"`
+	Failed      string     `bun:"failed"`
+	FirstSeen   time.Time  `bun:"first_seen,notnull"`
 }
 
 // SignalLease names the work of carrying messages to configured destinations.
@@ -184,26 +187,40 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		return 0, 0, nil
 	}
 
+	// One budget of requests for the whole cycle, shared by every
+	// destination, so the lease sized for one batch of requests covers the
+	// cycle. A deployment with many destinations drains more slowly, which is
+	// the price of never having a second replica take the lease while this
+	// one is still sending.
+	budget := sweepBatch
 	for _, destination := range destinations {
+		if budget <= 0 {
+			break
+		}
 		// Read per destination and only what this one has not settled.
 		//
 		// An event row is never cleared, because only a condition is, so a
 		// window asking only for uncleared rows fills with the oldest events
 		// and stops advancing without an error. The per-row delivery
 		// predicate is what makes it advance, as it does for the mail sweep.
-		rows, err := s.window(ctx, destination)
+		rows, err := s.window(ctx, destination, budget)
 		if err != nil {
 			return sent, failed, err
 		}
 		for _, row := range rows {
+			if budget <= 0 {
+				break
+			}
 			done, err := s.deliver(ctx, destination, row)
 			switch {
 			case err != nil:
 				return sent, failed, err
 			case done == delivered:
 				sent++
+				budget--
 			case done == refused:
 				failed++
+				budget--
 			}
 		}
 	}
@@ -215,11 +232,11 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 // Both halves of "still to be told" are asked of the database rather than of
 // the loop, because a row the loop skips never gets a delivery row — so it
 // stays in the window for ever and the window stops advancing.
-func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error) {
+func (s *Signal) window(ctx context.Context, to Outbound, limit int) ([]Notification, error) {
 	var rows []Notification
 	q := unsettled(s.db.NewSelect().Model(&rows), to).
 		OrderExpr("nt.created_at ASC, nt.id ASC").
-		Limit(sweepBatch)
+		Limit(limit)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what there is to say: %w", err)
 	}
@@ -334,6 +351,7 @@ func (s *Signal) retake(ctx context.Context, held Delivery, rowID int64,
 	res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
 		Set("sent_at = NULL").
 		Set("attempts = 0").
+		Set("attempted_at = NULL").
 		Set("failed = ?", "").
 		Set("notification_id = ?", rowID).
 		Set("first_seen = ?", now).
@@ -401,16 +419,19 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 // the delivery it staked, or zero where there is nothing to carry: it has
 // gone, it has been given up on, or somebody else holds it.
 //
-// The claim is staked before the request is made: a row inserted with no
-// sent_at is what stops a second replica — or a second pass a minute later —
-// sending the same thing twice while the first is still in flight.
+// The claim is staked before the request is made, with when the attempt
+// began. An attempt that began within inFlight and has neither gone nor failed
+// is still being made, and a second pass — on this replica a minute later, or
+// on another that took the lease — leaves it alone rather than sending the
+// same thing beside it. One that failed, or whose sender stopped, is taken
+// again.
 func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int64, error) {
 	key := about(row)
 	now := s.now().UTC().Truncate(time.Microsecond)
 
 	claim := &Delivery{
 		OutboundID: to.ID, About: key, NotificationID: row.ID,
-		Attempts: 1, FirstSeen: now,
+		Attempts: 1, AttemptedAt: &now, FirstSeen: now,
 	}
 	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
 		// Only the unique index means somebody has this one. A lost
@@ -442,22 +463,43 @@ func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int6
 				return 0, err
 			}
 			if taken {
-				held.SentAt, held.Attempts = nil, 0
+				held.SentAt, held.Attempts, held.AttemptedAt, held.Failed = nil, 0, nil, ""
 			}
 		}
 		if held.SentAt != nil || held.Attempts >= tries {
 			return 0, nil
 		}
-		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
+		if held.Failed == "" && held.AttemptedAt != nil && now.Sub(*held.AttemptedAt) < inFlight {
+			return 0, nil
+		}
+		// Repeats the count it read, so of two passes taking another attempt
+		// at once one does and the other finds it taken.
+		res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
 			Set("attempts = attempts + 1").
+			Set("attempted_at = ?", now).
+			Set("failed = ?", "").
 			Where("id = ?", held.ID).Where("sent_at IS NULL").
-			Exec(ctx); err != nil {
+			Where("attempts = ?", held.Attempts).
+			Exec(ctx)
+		if err != nil {
 			return 0, fmt.Errorf("take another attempt at a delivery: %w", err)
+		}
+		taken, err := database.Affected(res)
+		if err != nil {
+			return 0, fmt.Errorf("take another attempt at a delivery: %w", err)
+		}
+		if taken == 0 {
+			return 0, nil
 		}
 		claim.ID = held.ID
 	}
 	return claim.ID, nil
 }
+
+// inFlight is how long an attempt that has neither gone nor failed is taken to
+// be still in progress. Twice the bound on one request, so an attempt is either
+// settled by then or its sender has stopped.
+const inFlight = 2 * signalTimeout
 
 // settle records how the claimed deliveries went: sent, or why not.
 func (s *Signal) settle(ctx context.Context, to Outbound, claimed []int64, sendErr error) error {

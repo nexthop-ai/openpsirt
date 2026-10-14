@@ -150,7 +150,7 @@ update.
 | Work shape | On losing the race | Passes |
 |---|---|---|
 | May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; setting aside work whose worker never came back |
-| Must happen | Waits for its turn, then applies. A take that fails is a turn missed and is asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change |
+| Must happen | Waits for its turn, then applies. A take that fails is a turn missed and is asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change. One process runs one rewrite at a time per database, and the changes arriving during it are one more run after it, which reads the newest policy |
 
 Work that waits reads what it decides from **after** its turn comes. Anything
 the work decides from is fetched inside the thing that serializes it.

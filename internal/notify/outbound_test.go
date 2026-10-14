@@ -806,3 +806,117 @@ func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
 		}
 	})
 }
+
+// One cycle sends at most one batch of requests across every destination. The
+// lease is sized for one batch, so a cycle walking a batch per destination
+// outlived it and a second replica took the lease and sent beside the first.
+func TestACycleSendsOneBatchAcrossEveryDestination(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+		store := notify.NewStore(db.DB)
+		for _, name := range []string{"one", "two"} {
+			if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+				Name: name, Kind: string(notify.Everything), URL: server.URL, Secret: "a-shared-secret-long-enough",
+			}, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := range notify.SweepBatch {
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.Assigned, Body: fmt.Sprintf("backlog %d", i), Link: "/x",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		sent, _, err := signal.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != notify.SweepBatch {
+			t.Errorf("one cycle over two destinations sent %d, want one batch of %d", sent, notify.SweepBatch)
+		}
+		// And the next cycle carries on where it stopped.
+		if more, _, err := signal.Once(ctx); err != nil || more != notify.SweepBatch {
+			t.Errorf("the next cycle sent %d (%v), want the other batch", more, err)
+		}
+	})
+}
+
+// An attempt still being made is not made again beside it. One that failed,
+// or whose sender stopped part way, is taken again.
+func TestADeliveryInFlightIsNotSentTwice(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var mu sync.Mutex
+		refusing, requests := true, 0
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			defer mu.Unlock()
+			requests++
+			if refusing {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		defer server.Close()
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "chat", Kind: string(notify.Everything), URL: server.URL, Secret: "a-shared-secret-long-enough",
+		}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Tell(ctx, notify.Telling{
+			PersonID: who.ID, Kind: notify.Assigned, Body: "one thing", Link: "/x",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if _, failed, err := signal.Once(ctx); err != nil || failed != 1 {
+			t.Fatalf("the first attempt failed %d (%v), want 1", failed, err)
+		}
+		mu.Lock()
+		refusing = false
+		mu.Unlock()
+
+		attempt := func(at time.Time) {
+			t.Helper()
+			if _, err := db.DB.NewUpdate().TableExpr(`"outbound_delivery"`).
+				Set("failed = ?", "").Set("attempted_at = ?", at).Where("1 = 1").Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// An attempt begun a moment ago, neither gone nor failed: another
+		// sender is making it.
+		attempt(time.Now().UTC())
+		if sent, _, err := signal.Once(ctx); err != nil || sent != 0 {
+			t.Errorf("a delivery being made was made again beside it: sent %d (%v)", sent, err)
+		}
+		// Begun an hour ago and never settled: its sender stopped.
+		attempt(time.Now().UTC().Add(-time.Hour))
+		if sent, _, err := signal.Once(ctx); err != nil || sent != 1 {
+			t.Errorf("a delivery whose sender stopped was not taken again: sent %d (%v)", sent, err)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if requests != 2 {
+			t.Errorf("the destination was asked %d times, want the failed attempt and the one after the stop", requests)
+		}
+	})
+}

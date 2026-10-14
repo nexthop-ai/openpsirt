@@ -514,6 +514,8 @@ of this table's rules are.
 | A batch refused for a duplicate is opened again a row at a time | The other process opened one row of it, and the rest are still true. Each statement stands on a savepoint, because PostgreSQL refuses everything after a failed statement in the same transaction |
 | **A duplicate is recognized as one, and every other failure is reported** | Read as "somebody has this one" whatever went wrong, a lost connection during a sweep answers "already claimed" for every destination and the cycle reports nothing sent and nothing failed — which is what a quiet queue looks like, so an operator cannot tell them apart |
 | **A sweep's lease covers a cycle of the work, not the gap between cycles** | The lease is not renewed while the work runs, which is what its own contract says. Taken for the interval instead, a batch of two hundred messages to a server answering slowly outlives it, a second replica takes it, reads the same rows and sends every one again — because what marks a message sent is written after each individual send. Sized from the batch and what one message may take |
+| A webhook cycle sends one batch across every destination | The batch is one budget of requests shared by the destinations, so the lease sized from one batch covers the cycle however many destinations there are. A deployment with many drains more slowly |
+| A delivery records when its latest attempt began | An attempt begun less than twice the bound on one request ago that has neither gone nor failed is in flight, and another pass leaves it alone. One that failed, or whose sender stopped, is taken again, by an update repeating the attempt count it read, so two passes taking it at once make one attempt |
 
 ## Mail
 
