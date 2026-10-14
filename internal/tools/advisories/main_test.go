@@ -91,11 +91,17 @@ func TestAnAffectedRangeIncludesItsStartAndExcludesItsFix(t *testing.T) {
 	if !affects([]span{{introduced: "v0", fixed: "v1.0.0"}}, "v0.0.1") {
 		t.Error("a span introduced at zero did not cover the first version")
 	}
+	// A pseudo-version sorts before v0.0.0, so only the guard for a span
+	// opened at zero covers it.
+	if !affects([]span{{introduced: "v0", fixed: "v1.0.0"}}, "v0.0.0-20240101000000-abcdefabcdef") {
+		t.Error("a span introduced at zero did not cover a v0.0.0 pseudo-version")
+	}
 }
 
 // A module at v1.0 carries F, fixed in v1.1, and U, fixed nowhere. The bump
 // to v1.1 is the change a security update makes.
 const partialFix = `{"config":{"scanner_name":"govulncheck"}}
+{"SBOM":{"modules":[{"path":"example.com/m","version":"v1.1.0"},{"path":"example.com/added","version":"v1.0.0"}]}}
 {"osv":{"id":"GO-U","summary":"unfixed","affected":[{"package":{"name":"example.com/m"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}}
 {"osv":{"id":"GO-N","summary":"new in v1.1","affected":[{"package":{"name":"example.com/m"},"ranges":[{"type":"SEMVER","events":[{"introduced":"1.1.0"},{"fixed":"1.2.0"}]}]}]}}
 {"osv":{"id":"GO-S","summary":"a module the base did not have","affected":[{"package":{"name":"example.com/added"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}}
@@ -120,6 +126,7 @@ func TestABumpThatFixesOneAdvisoryIntroducesNoneItLeft(t *testing.T) {
 }
 
 const govulncheckOut = `{"config":{"scanner_name":"govulncheck"}}
+{"SBOM":{"modules":[{"path":"golang.org/x/net","version":"v0.1.0"}]}}
 {"osv":{"id":"GO-2026-1","summary":"reached"}}
 {"osv":{"id":"GO-2026-2","summary":"imported, never called"}}
 {"finding":{"osv":"GO-2026-1","trace":[{"module":"golang.org/x/net","version":"v0.1.0"}]}}
@@ -143,6 +150,17 @@ func TestAGoFindingCountsWhereSomethingCallsIt(t *testing.T) {
 func TestGovulncheckOutputWithoutAConfigurationIsRefused(t *testing.T) {
 	if _, err := goFindings(strings.NewReader(`{"osv":{"id":"GO-2026-1"}}`)); err == nil {
 		t.Error("a stream with no configuration message read as a clean scan")
+	}
+}
+
+func TestGovulncheckOutputNamingNoModulesIsRefused(t *testing.T) {
+	for what, stream := range map[string]string{
+		"no inventory":    `{"config":{"scanner_name":"govulncheck"}}`,
+		"empty inventory": `{"config":{"scanner_name":"govulncheck"}}` + "\n" + `{"SBOM":{"go_version":"go1.27.1"}}`,
+	} {
+		if _, err := goFindings(strings.NewReader(stream)); err == nil {
+			t.Errorf("%s: a scan of no modules read as a clean scan", what)
+		}
 	}
 }
 

@@ -861,6 +861,9 @@ it (REQ-75).
 | A package listed only because something beneath it is affected carries no advisory | npm lists every package on the path to an affected one, and counting those counts one advisory many times |
 | No common commit with the base refuses, in words | Without a base every advisory reads as introduced, or every one as not |
 | A govulncheck run that exits non-zero refuses, with what it printed to standard error | Its JSON mode exits zero whatever it finds, and it prints its configuration before it loads anything, so a failed scan can read as a clean one |
+| A govulncheck run whose inventory names no module refuses | An empty package list scans nothing and exits zero |
+| Both npm audits read the lockfile alone | npm otherwise audits the installed tree, which a checkout that has not reinstalled since a bump holds stale |
+| A file the base lacks is decided by a listing of the base's tree | git's message for a missing path changes with whether the file is on disk and with the locale |
 | An npm run refuses when its output is not a report, with npm's own message where it gave one | npm exits non-zero whenever it finds anything, and without the registry it prints a message in place of a report |
 | On the base branch itself nothing is introduced | The common commit is the commit checked, so a push to `main` reports and does not fail |
 

@@ -157,6 +157,11 @@ func goFindings(r io.Reader) (goScan, error) {
 		Config *struct {
 			ScannerName string `json:"scanner_name"`
 		} `json:"config"`
+		SBOM *struct {
+			Modules []struct {
+				Path string `json:"path"`
+			} `json:"modules"`
+		} `json:"SBOM"`
 		OSV *struct {
 			ID       string `json:"id"`
 			Summary  string `json:"summary"`
@@ -177,6 +182,7 @@ func goFindings(r io.Reader) (goScan, error) {
 	}
 	scan := goScan{affected: map[string]map[string][]span{}}
 	ran := false
+	modules := -1
 	titles := map[string]string{}
 	seen := map[string]bool{}
 	decoder := json.NewDecoder(r)
@@ -192,6 +198,8 @@ func goFindings(r io.Reader) (goScan, error) {
 		switch {
 		case m.Config != nil:
 			ran = true
+		case m.SBOM != nil:
+			modules = max(modules, 0) + len(m.SBOM.Modules)
 		case m.OSV != nil:
 			titles[m.OSV.ID] = m.OSV.Summary
 			modules := map[string][]span{}
@@ -233,6 +241,9 @@ func goFindings(r io.Reader) (goScan, error) {
 	}
 	if !ran {
 		return goScan{}, errors.New("govulncheck said nothing about its configuration, so it did not scan anything")
+	}
+	if modules <= 0 {
+		return goScan{}, errors.New("govulncheck scanned no modules, so this checked nothing")
 	}
 	for i := range scan.found {
 		scan.found[i].Title = titles[scan.found[i].ID]
@@ -328,34 +339,38 @@ func npmAffectedBefore(base []advisory) func(advisory) bool {
 	return func(a advisory) bool { return held[a.ID+" "+a.Name] }
 }
 
-// at reads one file as the base commit holds it. A file the base does not
-// have reads as empty, so everything in it is introduced.
-func at(commit, file string) ([]byte, error) {
+// at reads one file as the base commit holds it, in the repository at root.
+// A file the base does not have reads as empty, so everything in it is
+// introduced. Absence is a listing of the commit's tree that names nothing:
+// git's message for a missing path differs with whether the file is on disk
+// and with the locale, and its exit status is the same for a missing path as
+// for a failure.
+func at(root, commit, file string) ([]byte, error) {
 	//nolint:gosec // G204: a commit git merge-base named, and a path this tool fixes
-	out, err := exec.Command("git", "show", commit+":"+file).Output()
+	listed, err := exec.Command("git", "-C", root, "ls-tree", "--name-only", commit, "--", file).Output()
 	if err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) && bytes.Contains(exit.Stderr, []byte("does not exist")) {
-			return nil, nil
-		}
+		return nil, fmt.Errorf("reading %s at %s: %w", file, commit, err)
+	}
+	if len(bytes.TrimSpace(listed)) == 0 {
+		return nil, nil
+	}
+	//nolint:gosec // G204: as above
+	out, err := exec.Command("git", "-C", root, "show", commit+":"+file).Output()
+	if err != nil {
 		return nil, fmt.Errorf("reading %s at %s: %w", file, commit, err)
 	}
 	return out, nil
 }
 
-// base finds the commit this branch left the reference at.
-func base() (string, string, error) {
-	ref := os.Getenv("AUDIT_BASE")
-	if ref == "" {
-		ref = "origin/main"
-	}
+// base finds the commit the repository at root left the reference at.
+func base(root, ref string) (string, error) {
 	//nolint:gosec // G204: a reference the person running the gate names
-	out, err := exec.Command("git", "merge-base", "HEAD", ref).Output()
+	out, err := exec.Command("git", "-C", root, "merge-base", "HEAD", ref).Output()
 	if err != nil {
-		return "", ref, fmt.Errorf("no common commit with %s, so nothing says what this change introduced; "+
+		return "", fmt.Errorf("no common commit with %s, so nothing says what this change introduced; "+
 			"fetch it, or name the branch this targets in AUDIT_BASE", ref)
 	}
-	return strings.TrimSpace(string(out)), ref, nil
+	return strings.TrimSpace(string(out)), nil
 }
 
 // scan runs the scanner in a directory and returns what it printed. npm exits
@@ -420,8 +435,8 @@ var errFailed = errors.New("introduced advisories")
 
 // checkGo scans the working tree and asks the base's go.mod about each
 // finding.
-func checkGo(command []string, commit string) ([]advisory, func(advisory) bool, error) {
-	out, err := scan("go", ".", command)
+func checkGo(root string, command []string, commit string) ([]advisory, func(advisory) bool, error) {
+	out, err := scan("go", root, command)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -429,7 +444,7 @@ func checkGo(command []string, commit string) ([]advisory, func(advisory) bool, 
 	if err != nil {
 		return nil, nil, err
 	}
-	was, err := at(commit, "go.mod")
+	was, err := at(root, commit, "go.mod")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -442,10 +457,25 @@ func checkGo(command []string, commit string) ([]advisory, func(advisory) bool, 
 	return found.found, goAffectedBefore(found, held), nil
 }
 
+// lockOnly is the audit command reading a lockfile alone. Presence is decided
+// by the lockfile on both sides, and npm otherwise audits whatever is
+// installed, which a checkout that has not reinstalled since a bump holds
+// stale.
+func lockOnly(command []string) []string {
+	const flag = "--package-lock-only"
+	for _, arg := range command {
+		if arg == flag {
+			return command
+		}
+	}
+	return append(command[:len(command):len(command)], flag)
+}
+
 // checkNpm audits the working tree's lockfile and, where that finds anything,
 // the base's.
-func checkNpm(command []string, commit string) ([]advisory, func(advisory) bool, error) {
-	lock, err := os.ReadFile("web/package-lock.json")
+func checkNpm(root string, command []string, commit string) ([]advisory, func(advisory) bool, error) {
+	command = lockOnly(command)
+	lock, err := os.ReadFile(filepath.Join(root, "web", "package-lock.json")) //nolint:gosec // G304: a name this tool fixes, under the checkout it was given
 	if err != nil {
 		return nil, nil, err
 	}
@@ -456,7 +486,7 @@ func checkNpm(command []string, commit string) ([]advisory, func(advisory) bool,
 	if len(locked) == 0 {
 		return nil, nil, errors.New("the lockfile holds no packages, so this checked nothing")
 	}
-	out, err := scan("npm", "web", command)
+	out, err := scan("npm", filepath.Join(root, "web"), command)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -467,11 +497,11 @@ func checkNpm(command []string, commit string) ([]advisory, func(advisory) bool,
 
 	// The base's manifest and lockfile, audited as they stand. npm reads a
 	// lockfile without installing it.
-	manifest, err := at(commit, "web/package.json")
+	manifest, err := at(root, commit, "web/package.json")
 	if err != nil {
 		return nil, nil, err
 	}
-	wasLock, err := at(commit, "web/package-lock.json")
+	wasLock, err := at(root, commit, "web/package-lock.json")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -493,7 +523,7 @@ func checkNpm(command []string, commit string) ([]advisory, func(advisory) bool,
 	if err != nil {
 		return nil, nil, err
 	}
-	wasOut, err := scan("npm", dir, append(command, "--package-lock-only"))
+	wasOut, err := scan("npm", dir, command)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -504,12 +534,14 @@ func checkNpm(command []string, commit string) ([]advisory, func(advisory) bool,
 	return found, npmAffectedBefore(before), nil
 }
 
-func run(args []string) error {
+// run checks the repository at root against the base it left ref at, and
+// writes the report to out.
+func run(root, ref string, args []string, out io.Writer) error {
 	if len(args) < 3 || args[1] != "--" {
 		return errors.New("usage: advisories go|npm -- <scanner command>")
 	}
 	kind, command := args[0], args[2:]
-	commit, ref, err := base()
+	commit, err := base(root, ref)
 	if err != nil {
 		return err
 	}
@@ -517,9 +549,9 @@ func run(args []string) error {
 	var affectedBefore func(advisory) bool
 	switch kind {
 	case "go":
-		found, affectedBefore, err = checkGo(command, commit)
+		found, affectedBefore, err = checkGo(root, command, commit)
 	case "npm":
-		found, affectedBefore, err = checkNpm(command, commit)
+		found, affectedBefore, err = checkNpm(root, command, commit)
 	default:
 		err = fmt.Errorf("no scanner called %q; go or npm", kind)
 	}
@@ -528,7 +560,7 @@ func run(args []string) error {
 	}
 	introduced, present := split(found, affectedBefore)
 	text, passed := report(kind, ref, introduced, present)
-	fmt.Print(text)
+	_, _ = io.WriteString(out, text)
 	if !passed {
 		return errFailed
 	}
@@ -536,7 +568,11 @@ func run(args []string) error {
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	ref := os.Getenv("AUDIT_BASE")
+	if ref == "" {
+		ref = "origin/main"
+	}
+	if err := run(".", ref, os.Args[1:], os.Stdout); err != nil {
 		if !errors.Is(err, errFailed) {
 			fmt.Fprintln(os.Stderr, err)
 		}
