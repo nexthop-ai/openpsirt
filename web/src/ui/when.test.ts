@@ -13,6 +13,13 @@ describe("how a moment is written", () => {
     expect(on("2026-09-04T08:13:44.123456Z")).toBe("2026-09-04");
   });
 
+  it("writes the UTC day of a moment stored with another offset", () => {
+    // A server whose clock is set west of UTC answers a deadline of
+    // 02:00 UTC on the fourteenth as the evening of the thirteenth.
+    expect(on("2026-10-13T21:00:00-05:00")).toBe("2026-10-14");
+    expect(on("2026-10-14T01:00:00+02:00")).toBe("2026-10-13");
+  });
+
   it("writes a moment to the minute in UTC, whatever offset it was stored with", () => {
     // A window of hours ends on a different day depending on the hour it
     // opened, so the day alone does not answer when one runs out.

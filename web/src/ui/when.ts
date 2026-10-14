@@ -36,15 +36,24 @@ function read(moment: string | null | undefined): Date | null {
   return then;
 }
 
-// on is the absolute form: the calendar day, as stored.
+// on is the absolute form: the calendar day, in UTC.
+//
+// A moment written with an offset is the UTC day it falls on, so the same
+// instant is one day wherever the server's clock is set. A day, or a moment
+// written without an offset, is the day it names.
 //
 // Empty in, empty out. A moment that is not there is a different thing from one
 // at the start of the epoch, and every caller of this has somewhere to say so
 // in its own words — and so is a value that is not a moment, which is the same
 // answer for the same reason.
 export function on(moment: string | null | undefined): string {
-  return read(moment) && moment ? moment.slice(0, 10) : "";
+  const then = read(moment);
+  if (!then || !moment) return "";
+  return OFFSET.test(moment) ? then.toISOString().slice(0, 10) : moment.slice(0, 10);
 }
+
+// The end of a moment written with its offset from UTC, Z included.
+const OFFSET = /(?:[zZ]|[+-]\d{2}:?\d{2})$/;
 
 // at is the absolute form to the minute, in UTC and saying so.
 //

@@ -1897,7 +1897,7 @@ tool showing its storage rather than answering the question.
 
 | Form | |
 |---|---|
-| **Absolute** | The calendar day as stored, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both |
+| **Absolute** | The calendar day in UTC, deliberately not localized. These are dates people quote to each other across time zones, and one that reads differently for two people looking at the same row is worse than one that reads unfamiliarly for both. A moment the server writes with another offset is shown as the UTC day it falls on, so one instant is one day whatever zone the server's clock is in. Every stored instant on a screen goes through the one formatter, a key's or token's last use included |
 | **To the minute** | The day and the minute in UTC, and saying so, for a moment somebody correlates with another: a comment, a grant, a scan arriving. Written without the zone it reads as the reader's local time |
 | **Typed to the minute** | In UTC, with the label saying so, and defaulting to now in UTC. The minute typed is the minute the record shows afterwards, and the control alone reads as the reader's local time |
 | **Relative** | For the reader asking whether something is stale. It reads the same scale in both directions, because a deadline and a last scan are the same question about opposite sides of now, and it carries the absolute form on the title |
