@@ -95,9 +95,12 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 		out := &ListedInventoryChanges{}
 		out.Body.Items = []InventoryChangeBody{}
 		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
-		if err != nil {
+		switch {
+		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been filed against it.
 			return out, nil
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "what the upload changed could not be read", err)
 		}
 
 		changes, total, err := graph.NewStore(in.DB.DB).Changes(ctx, subject, target.ID,

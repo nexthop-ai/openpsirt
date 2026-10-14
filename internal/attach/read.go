@@ -406,8 +406,14 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 	// That the issue exists says nothing until it is known to be *here*: an
 	// identifier filed against another product would otherwise confirm itself
 	// against this one.
+	// Only a refusal folds into the issue not being here. A read that could
+	// not be made is a fault, and folded in, an outage tells the caller the
+	// issue is gone.
 	if err := mayReach(ctx, s.db, subject, named.ID, issue); err != nil {
-		return 0, 0, ErrNoSuchIssue
+		if errors.Is(err, access.ErrDenied) {
+			return 0, 0, ErrNoSuchIssue
+		}
+		return 0, 0, err
 	}
 	return named.ID, issue, nil
 }

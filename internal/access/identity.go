@@ -114,6 +114,9 @@ func (s *Store) claim(ctx context.Context, personID int64, username string) erro
 
 	existing := new(Identity)
 	err := s.db.NewSelect().Model(existing).Where("username = ?", username).Scan(ctx)
+	if err != nil && !database.IsNoRows(err) {
+		return fmt.Errorf("look up who may sign in as %q: %w", username, err)
+	}
 	if err == nil {
 		if existing.PersonID != personID {
 			return fmt.Errorf("%q is %w", username, ErrNameTaken)
@@ -184,8 +187,13 @@ func (s *Store) MatchProvider(ctx context.Context, provider, subject, username s
 	}
 
 	bound := new(Identity)
-	if err := s.db.NewSelect().Model(bound).
-		Where("subject = ?", subject).Scan(ctx); err == nil {
+	switch err := s.db.NewSelect().Model(bound).
+		Where("subject = ?", subject).Scan(ctx); {
+	case err != nil && !database.IsNoRows(err):
+		// A lookup that failed falls through to matching by name otherwise,
+		// which is the reinterpretation binding the identifier prevents.
+		return nil, fmt.Errorf("look up who that provider identifier is: %w", err)
+	case err == nil:
 		if !issuedBy(bound, provider) {
 			// The identifier matches and the provider that issued it does
 			// not, so this is a different person who happens to hold the same

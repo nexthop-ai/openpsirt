@@ -120,6 +120,10 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			found.RetiredAt, found.DisplayName = nil, shown
 			*team = *found
 			return nil
+		case !database.IsNoRows(err):
+			// A read that could not be made says nothing about whether the
+			// team is there, and inserting on it is a write made blind.
+			return err
 		}
 
 		party := &Party{Kind: ATeam}

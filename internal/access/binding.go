@@ -302,8 +302,12 @@ func (s *Store) AdmitByGroups(ctx context.Context, who Arrival, groups []string)
 		// groups they arrived with, so rewriting their derived grants on the
 		// way to turning them away is a write with no reader — and it
 		// rewrites the record of what somebody who has left held.
-		if known, err := within.match(ctx, who); err == nil && known.DeactivatedAt != nil {
+		// A match that could not be made is not somebody unknown.
+		switch known, err := within.match(ctx, who); {
+		case err == nil && known.DeactivatedAt != nil:
 			return ErrDenied
+		case err != nil && !errors.Is(err, ErrDenied):
+			return err
 		}
 		var err error
 		person, err = within.admit(ctx, who, groups)
@@ -342,6 +346,10 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// renamed themselves is still themselves and somebody who took the name
 	// they left behind is not.
 	person, err := s.match(ctx, who)
+	if err != nil && !errors.Is(err, ErrDenied) {
+		// A read that failed is not somebody who is not there.
+		return nil, err
+	}
 	known := err == nil
 	if !known && len(roles) == 0 && len(admin.everywhere) == 0 && !admin.administers && !admin.audits {
 		return nil, ErrDenied
@@ -366,13 +374,21 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		// too. Its holder's name moved away at the provider, which moved the
 		// name their identity carries, and whoever holds the name now is
 		// somebody else.
-		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
+		switch waiting, err := s.ByIdentity(ctx, who.handle()); {
+		case err == nil:
 			claimed, err := s.claimedBy(ctx, who.handle())
+			if err != nil && !errors.Is(err, ErrDenied) {
+				return nil, err
+			}
 			if err != nil || claimed.Subject != nil || lapsed(claimed, s.now()) {
 				return nil, ErrDenied
 			}
 			person = waiting
-		} else {
+		case !errors.Is(err, ErrNoSuchPerson):
+			// Recording somebody new on a lookup that failed would make a
+			// second account for somebody already here.
+			return nil, err
+		default:
 			person = &Account{
 				Identity: who.handle(), DisplayName: who.DisplayName,
 				CreatedAt: s.now().Truncate(time.Microsecond),

@@ -425,7 +425,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		if input.Identity != "me" {
 			rights := access.NewStore(in.DB.DB)
 			person, err := rights.ByIdentity(ctx, input.Identity)
-			if err != nil {
+			switch {
+			case errors.Is(err, access.ErrNoSuchPerson):
 				// A name nobody holds answers exactly as a name somebody holds
 				// whose work this caller cannot see: an empty list. Refusing
 				// instead would answer "does this person have an account here"
@@ -435,7 +436,10 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				// anyway, so nothing is lost by answering it for a name that
 				// reaches nobody.
 				holders = []int64{core.Nobody}
-			} else {
+			case err != nil:
+				// A read that could not be made is not that answer.
+				return nil, core.WentWrong(in.Logger, "that person could not be looked up", err)
+			default:
 				teams, err := rights.TeamsOf(ctx, person.ID)
 				if err != nil {
 					return nil, core.WentWrong(in.Logger,

@@ -589,8 +589,10 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 		if err := tx.NewSelect().Model(asked).Where("id = ?", id).Scan(ctx); err != nil {
 			// A movement somebody may not reach and one that is
 			// not there answer alike, so guessing identifiers says
-			// nothing.
-			return ErrNotEmbargoed
+			// nothing. A read that could not be made is neither, and
+			// carries its cause so a lost race is taken again.
+			return database.FromRead(err, ErrNotEmbargoed,
+				fmt.Sprintf("read disclosure movement %d", id))
 		}
 		if !subject.Triages(access.Private, asked.ProductID) {
 			return ErrNotEmbargoed
