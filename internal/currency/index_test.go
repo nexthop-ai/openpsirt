@@ -265,6 +265,12 @@ func TestANuGetPageIsReadOnlyFromTheRegistrationItCameFrom(t *testing.T) {
 		"http://169.254.169.254/latest",
 		"{{base}}/v3/registration5-gz-semver2/thingelse/page/1.json",
 		"{{base}}/v3/registration5-gz-semver2/other/page/1.json",
+		// A dot segment after the registration's own prefix, written plainly
+		// and percent-encoded, which a server resolving it serves as another
+		// package's page.
+		"{{base}}/v3/registration5-gz-semver2/thing/../other/page/1.json",
+		"{{base}}/v3/registration5-gz-semver2/thing/%2e%2e/other/page/1.json",
+		"{{base}}/v3/registration5-gz-semver2/thing/./page/1.json",
 	} {
 		r := routing(t, map[string]string{
 			"/v3/registration5-gz-semver2/thing/index.json":      `{"items":[{"@id":"` + elsewhere + `"}]}`,
