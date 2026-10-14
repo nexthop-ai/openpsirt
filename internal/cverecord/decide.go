@@ -123,11 +123,10 @@ func evaluate(line Line, version string) outcome {
 	if !affected && !unaffected {
 		return silent
 	}
-	readable := orderedType(line.VersionType) && !line.Changes
-	if strings.EqualFold(line.VersionType, "git") ||
-		strings.EqualFold(line.VersionType, "original_commit_for_fix") {
+	if commitRange(line) {
 		return silent
 	}
+	readable := ordered(line) && !line.Changes
 	in, placed := false, false
 	if readable {
 		in, placed = contains(line, version)
@@ -142,6 +141,36 @@ func evaluate(line Line, version string) outcome {
 	default:
 		return containsUnaffected
 	}
+}
+
+// commitRange reports whether a line is about commits rather than releases.
+//
+// A line typed as a git range is. A line typed as the commit a fix originated
+// in is too, except where its version is a release number: the kernel writes
+// the mainline release a fix first reached on that line, "7.1" up to "*"
+// unaffected, and that is a release line like any other.
+func commitRange(line Line) bool {
+	switch strings.ToLower(strings.TrimSpace(line.VersionType)) {
+	case "git":
+		return true
+	case originalCommit:
+		return !releaseNumber.MatchString(strings.TrimSpace(line.Version))
+	default:
+		return false
+	}
+}
+
+// originalCommit is the version type the kernel gives the line naming where a
+// fix first landed.
+const originalCommit = "original_commit_for_fix"
+
+// ordered reports whether a line is one this orders: of a type it orders, or
+// the kernel's line naming the mainline release a fix first reached.
+func ordered(line Line) bool {
+	if strings.EqualFold(strings.TrimSpace(line.VersionType), originalCommit) {
+		return !commitRange(line)
+	}
+	return orderedType(line.VersionType)
 }
 
 // orderedType reports whether a line's version type is one this orders.
@@ -234,7 +263,7 @@ func leading(version string, n int) (string, bool) {
 // 6.18 branch from 6.18.27 on. That is the release to move to without leaving
 // the branch, which a scanner's range cut from another branch does not say.
 func branchFix(line Line, version string) (string, bool) {
-	if !strings.EqualFold(line.Status, "unaffected") || !orderedType(line.VersionType) || line.Changes {
+	if !strings.EqualFold(line.Status, "unaffected") || !ordered(line) || line.Changes {
 		return "", false
 	}
 	bound := strings.TrimSpace(line.LessThanOrEqual)
