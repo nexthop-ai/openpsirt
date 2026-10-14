@@ -377,8 +377,8 @@ func signingKey(ctx context.Context, in core.Deps) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if found && held != "" {
-		return base64.RawURLEncoding.DecodeString(held)
+	if found {
+		return signingKeyFrom(held)
 	}
 	fresh := make([]byte, 32)
 	if _, err := rand.Read(fresh); err != nil {
@@ -395,7 +395,19 @@ func signingKey(ctx context.Context, in core.Deps) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return base64.RawURLEncoding.DecodeString(stored)
+	return signingKeyFrom(stored)
+}
+
+// signingKeyFrom is a stored key, refused unless it is one this minted. An
+// empty or short value would sign with a key anybody can compute, so sign-in
+// fails closed until the row is removed, and the next sign-in mints afresh.
+func signingKeyFrom(stored string) ([]byte, error) {
+	key, err := base64.RawURLEncoding.DecodeString(stored)
+	if err != nil || len(key) < 32 {
+		return nil, errors.New("the stored sign-in key, setting " + setting.SignInKey +
+			", is malformed: remove it and a new one is minted")
+	}
+	return key, nil
 }
 
 // inProgress is a sign-in that has been started: what the provider needs to

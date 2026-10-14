@@ -768,3 +768,37 @@ func TestAVerifiedAddressIsRecordedInEitherMode(t *testing.T) {
 		}
 	}
 }
+
+// A stored sign-in key that is empty, short or not one this minted is refused
+// rather than signed with. An empty key is one anybody can compute, so a
+// pending sign-in sealed with it would be accepted from anybody.
+func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
+	twoSignIn(t, func(t *testing.T, r *signInReach) {
+		for _, stored := range []string{"", "not base64!", "c2hvcnQ"} {
+			if err := setting.NewStore(r.db.DB).Set(t.Context(), setting.SignInKey, stored); err != nil {
+				t.Fatal(err)
+			}
+			rec := httptest.NewRecorder()
+			r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+			if rec.Code == http.StatusFound {
+				t.Errorf("with the key stored as %q a sign-in was started", stored)
+			}
+
+			body := []byte(`{"pending":{"State":"the-state","Nonce":"the-nonce","Verifier":"the-verifier"},"minted":"` +
+				time.Now().UTC().Format(time.RFC3339Nano) + `"}`)
+			mac := hmac.New(sha256.New, []byte(nil))
+			mac.Write(body)
+			forged := base64.RawURLEncoding.EncodeToString(body) + "." +
+				base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+			req := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+			req.Header.Set("Cookie", "openpsirt_pending="+forged)
+			rec = httptest.NewRecorder()
+			r.handler.ServeHTTP(rec, req)
+			for _, cookie := range rec.Result().Cookies() {
+				if cookie.Name == "openpsirt_session" && cookie.Value != "" {
+					t.Errorf("with the key stored as %q a sign-in sealed with an empty key was completed", stored)
+				}
+			}
+		}
+	})
+}

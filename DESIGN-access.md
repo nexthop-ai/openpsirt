@@ -1346,6 +1346,7 @@ between the two mints.
 |---|---|
 | Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every sign-in already in flight, sealed with the losing key, is refused when the callback lands |
 | The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
+| A stored key that is empty, short or not one this minted fails sign-in closed | An empty key is one anybody can compute, so a pending sign-in sealed with it would be accepted from anybody. Removing the row lets the next sign-in mint afresh |
 
 What a setting held is answered by the write that replaced it. Read in a
 statement of its own beforehand it is the value at some earlier moment: two
