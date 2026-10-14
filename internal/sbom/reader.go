@@ -6,8 +6,8 @@ package sbom
 import (
 	"io"
 	"strings"
-	"unicode/utf8"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -590,10 +590,13 @@ func (c *reader) into(dst *string) error {
 // Everything in a scan file was written by somebody else, and an error is one
 // of the few places it reaches a person. A name the length of the file would
 // make a log unreadable and a response unbounded.
+//
+// The cut walks the first characters of the string and no further: a field the
+// size of the upload is quoted from without being copied.
 func trim(s string) string {
 	const most = 120
-	if utf8.RuneCountInString(s) <= most {
-		return s
+	if cut := bound.HeadRunes(s, most); len(cut) < len(s) {
+		return cut + "…"
 	}
-	return string([]rune(s)[:most]) + "…"
+	return s
 }
