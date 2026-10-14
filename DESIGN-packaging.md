@@ -192,6 +192,13 @@ Liveness does not depend on the database. Restarting a process cannot fix an
 unreachable database, and a liveness probe that fails on one turns a database
 outage into a restart loop on top of a database outage.
 
+The image's own health check, which Kubernetes ignores and Docker acts on,
+runs `openpsirt health`: it reads the configuration the server reads from the
+environment and asks `/healthz` where `OPENPSIRT_ADDR` says the server listens,
+on loopback where that names every interface, never through a proxy. A
+container configured by file names its address in the environment too, or
+overrides the check.
+
 The startup probe allows ten minutes by default. Migrations run before the
 service answers, and a probe that gives up part way kills the pod and restarts
 the migration from the beginning.

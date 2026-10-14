@@ -368,14 +368,10 @@ EXPOSE 8080
 #
 # This asks the running server, not a new process. Running "openpsirt -version"
 # proves only that the binary is on disk and executable — a deadlocked or
-# non-listening server passes it forever.
-# Never through a proxy. A deployment that sets HTTP_PROXY so the scanner can
-# fetch its vulnerability database sets it for everything in the image, and
-# busybox wget honors the proxy variables while ignoring no_proxy — so the
-# container asks a proxy about itself, is told 403, and reports unhealthy while
-# serving every request correctly. An orchestrator acting on that restarts a
-# working container in a loop.
+# non-listening server passes it forever. "openpsirt health" reads the same
+# configuration the server does, so it asks where OPENPSIRT_ADDR says the
+# server listens, and never through a proxy.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget -q --proxy=off -O- http://127.0.0.1:8080/healthz || exit 1
+  CMD ["/usr/local/bin/openpsirt", "health"]
 
 ENTRYPOINT ["/usr/local/bin/openpsirt"]

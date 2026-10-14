@@ -99,8 +99,9 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	command, action, operand := "serve", "", ""
 	if fs.NArg() > 0 {
 		command = fs.Arg(0)
-		if command != "serve" && command != "migrate" && command != "records" {
-			return fmt.Errorf("unknown command %q: the commands are \"serve\", \"migrate\" and \"records\"", command)
+		if command != "serve" && command != "migrate" && command != "records" && command != "health" {
+			return fmt.Errorf("unknown command %q: the commands are \"serve\", \"migrate\", "+
+				"\"records\" and \"health\"", command)
 		}
 		rest := fs.Args()[1:]
 		for {
@@ -117,7 +118,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 				break
 			}
 			switch {
-			case command == "serve":
+			case command == "serve" || command == "health":
 				return fmt.Errorf("openpsirt %s: unexpected argument %q", command, sub.Arg(0))
 			case action == "":
 				action = sub.Arg(0)
@@ -162,6 +163,9 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	}
 
 	ctx := context.Background()
+	if command == "health" {
+		return runHealth(ctx, cfg.Addr)
+	}
 	if command == "migrate" {
 		return runMigrate(ctx, cfg, logger, stdout, action)
 	}
