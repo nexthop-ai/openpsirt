@@ -15,11 +15,16 @@
 // with url.PathEscape, a query value with url.QueryEscape. A name holding a
 // slash or a question mark otherwise becomes a second segment or a query, and
 // the link opens a screen about something else.
+//
+// A name of nothing but dots has no escaped form: a browser resolves "." and
+// ".." before the request is sent, percent-encoded or not, so the link would
+// climb to a different screen. An address naming one is the front page.
 package weblink
 
 import (
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Home is the front page, which a message about something undisclosed ends on
@@ -67,21 +72,35 @@ func Claim(id int64) string { return "/claims/" + strconv.FormatInt(id, 10) }
 func Decision(id int64) string { return "/decisions/" + strconv.FormatInt(id, 10) }
 
 // Issue is one issue, everywhere it sits.
-func Issue(identifier string) string { return "/issues/" + url.PathEscape(identifier) }
+func Issue(identifier string) string {
+	if climbs(identifier) {
+		return Home()
+	}
+	return "/issues/" + url.PathEscape(identifier)
+}
 
 // ProductFindings is a product's findings list, searched for one term.
 func ProductFindings(product, search string) string {
+	if climbs(product) {
+		return Home()
+	}
 	return "/products/" + url.PathEscape(product) + "/findings?q=" + url.QueryEscape(search)
 }
 
 // InboxWaiting is a product's inbox opened on the rulings waiting for a second
 // person.
 func InboxWaiting(product string) string {
+	if climbs(product) {
+		return Home()
+	}
 	return "/products/" + url.PathEscape(product) + "/inbox?waiting=1"
 }
 
 // InboxReport is one report in a product's inbox.
 func InboxReport(product, reference string) string {
+	if climbs(product, reference) {
+		return Home()
+	}
 	return "/products/" + url.PathEscape(product) + "/inbox/" + url.PathEscape(reference)
 }
 
@@ -89,6 +108,9 @@ func InboxReport(product, reference string) string {
 // where one is given, picks the component among several of that name in the
 // build; empty, the address carries none.
 func Finding(product, stream, variant, vulnerability, component, version string) string {
+	if climbs(product, stream, variant, vulnerability, component) {
+		return Home()
+	}
 	address := build(product, stream, variant) +
 		"/findings/" + url.PathEscape(vulnerability) +
 		"/components/" + url.PathEscape(component)
@@ -100,16 +122,25 @@ func Finding(product, stream, variant, vulnerability, component, version string)
 
 // Inventories is the list of what one build sent.
 func Inventories(product, stream, variant string) string {
+	if climbs(product, stream, variant) {
+		return Home()
+	}
 	return build(product, stream, variant) + "/inventories"
 }
 
 // InventoryChanges is what one upload moved in a build's inventory.
 func InventoryChanges(product, stream, variant string, scan int64) string {
+	if climbs(product, stream, variant) {
+		return Home()
+	}
 	return build(product, stream, variant) + "/inventories/" + strconv.FormatInt(scan, 10) + "/changes"
 }
 
 // Report is one report sheet, opened on a window of days.
 func Report(slug, days string) string {
+	if climbs(slug) {
+		return Home()
+	}
 	return "/reports/" + url.PathEscape(slug) + "?days=" + url.QueryEscape(days)
 }
 
@@ -119,4 +150,15 @@ func build(product, stream, variant string) string {
 	return "/products/" + url.PathEscape(product) +
 		"/streams/" + url.PathEscape(stream) +
 		"/variants/" + url.PathEscape(variant)
+}
+
+// climbs reports whether any name would be a path segment of nothing but
+// dots, which a browser resolves rather than sends.
+func climbs(names ...string) bool {
+	for _, name := range names {
+		if name != "" && strings.Trim(name, ".") == "" {
+			return true
+		}
+	}
+	return false
 }

@@ -111,6 +111,7 @@ one in a single package, one function per destination.
 | Built in one place | An address spelled by hand elsewhere in the server is a test failure. A link built by hand is the link nothing holds to the interface's routes |
 | Held to the interface's route table | Every builder is called with names holding every separator an address has, and each result is matched against the table the interface's router is built from, query parameters included (`DESIGN-interface.md` § The route table). A builder added without a sample fails the same test |
 | Each part escaped for where it lands | A path segment escaped as one, a query value as one. A product or issue name holding a slash otherwise opens a screen about something else |
+| An address naming a part of dots alone is the front page | A browser resolves "." and ".." before the request is sent, percent-encoded or not, so no escaping keeps the link on its screen. Every builder is also called with "." and "..", and the route check refuses a segment of dots |
 | A private notification's message carries the front page | The rule in § Outbound content. The front page's address comes from the same package |
 
 ## Mentions

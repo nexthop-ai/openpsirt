@@ -84,6 +84,11 @@ func matches(pattern, path string) bool {
 		return false
 	}
 	for i := range want {
+		// A browser resolves a segment of dots alone, percent-encoded or
+		// not, before the request leaves it.
+		if dots := strings.Trim(strings.ReplaceAll(strings.ToLower(got[i]), "%2e", "."), "."); dots == "" && got[i] != "" {
+			return false
+		}
 		if strings.HasPrefix(want[i], ":") {
 			if got[i] == "" {
 				return false
@@ -115,6 +120,9 @@ func TestAnAddressIsHeldToTheRouteTable(t *testing.T) {
 		{"/products/p/streams/s/variants/v/tree?at=c", true},
 		{"/products/p/streams/s/variants/v/dependencies?at=c", false},
 		{"/issues/CVE-1#thread", false},
+		{"/issues/..", true},
+		{"/issues/%2E%2E", true},
+		{"/issues/.", true},
 	} {
 		why := unrouted(known, tc.address)
 		if tc.reported && why == "" {
@@ -139,27 +147,27 @@ const odd = "a/b c?d&f=g%#e"
 // somebody told about a thing is shown something else, silently.
 func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 	known := routes(t)
-	built := map[string]func() string{
-		"Home":                weblink.Home,
-		"ReviewQueue":         weblink.ReviewQueue,
-		"ReviewQueueMine":     weblink.ReviewQueueMine,
-		"ReviewQueueReaffirm": weblink.ReviewQueueReaffirm,
-		"Assignments":         weblink.Assignments,
-		"AssignmentsTeam":     func() string { return weblink.AssignmentsTeam(odd) },
-		"AssignmentsPerson":   func() string { return weblink.AssignmentsPerson(odd) },
-		"Settings":            weblink.Settings,
-		"System":              weblink.System,
-		"ExploitedHere":       weblink.ExploitedHere,
-		"Claim":               func() string { return weblink.Claim(7) },
-		"Decision":            func() string { return weblink.Decision(7) },
-		"Issue":               func() string { return weblink.Issue(odd) },
-		"ProductFindings":     func() string { return weblink.ProductFindings(odd, odd) },
-		"InboxWaiting":        func() string { return weblink.InboxWaiting(odd) },
-		"InboxReport":         func() string { return weblink.InboxReport(odd, odd) },
-		"Finding":             func() string { return weblink.Finding(odd, odd, odd, odd, odd, odd) },
-		"Inventories":         func() string { return weblink.Inventories(odd, odd, odd) },
-		"InventoryChanges":    func() string { return weblink.InventoryChanges(odd, odd, odd, 7) },
-		"Report":              func() string { return weblink.Report(odd, odd) },
+	built := map[string]func(n string) string{
+		"Home":                func(string) string { return weblink.Home() },
+		"ReviewQueue":         func(string) string { return weblink.ReviewQueue() },
+		"ReviewQueueMine":     func(string) string { return weblink.ReviewQueueMine() },
+		"ReviewQueueReaffirm": func(string) string { return weblink.ReviewQueueReaffirm() },
+		"Assignments":         func(string) string { return weblink.Assignments() },
+		"AssignmentsTeam":     weblink.AssignmentsTeam,
+		"AssignmentsPerson":   weblink.AssignmentsPerson,
+		"Settings":            func(string) string { return weblink.Settings() },
+		"System":              func(string) string { return weblink.System() },
+		"ExploitedHere":       func(string) string { return weblink.ExploitedHere() },
+		"Claim":               func(string) string { return weblink.Claim(7) },
+		"Decision":            func(string) string { return weblink.Decision(7) },
+		"Issue":               weblink.Issue,
+		"ProductFindings":     func(n string) string { return weblink.ProductFindings(n, n) },
+		"InboxWaiting":        weblink.InboxWaiting,
+		"InboxReport":         func(n string) string { return weblink.InboxReport(n, n) },
+		"Finding":             func(n string) string { return weblink.Finding(n, n, n, n, n, n) },
+		"Inventories":         func(n string) string { return weblink.Inventories(n, n, n) },
+		"InventoryChanges":    func(n string) string { return weblink.InventoryChanges(n, n, n, 7) },
+		"Report":              func(n string) string { return weblink.Report(n, n) },
 	}
 
 	// Every builder the package exports has a sample above, and every sample
@@ -182,9 +190,12 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		if !sampled {
 			continue
 		}
-		address := build()
-		if why := unrouted(known, address); why != "" {
-			t.Errorf("weblink.%s built %s: %s", name, address, why)
+		// A name of dots alone, which a browser resolves rather than sends.
+		for _, sample := range []string{odd, "..", "."} {
+			address := build(sample)
+			if why := unrouted(known, address); why != "" {
+				t.Errorf("weblink.%s(%q) built %s: %s", name, sample, address, why)
+			}
 		}
 	}
 }
