@@ -575,7 +575,7 @@ func BundleSortKeys() []BundleSortKey {
 // byBump is the order a bundle list has unless somebody asks for another, and
 // the tie-break under every other order: two rows equal on the sorted column
 // must not swap between pages.
-const byBump = "urgency DESC, issues DESC, upstream, fixed_in"
+const byBump = "urgency DESC, issues DESC, upstream, fixed_in, fold"
 
 // bundleSorted is how the fix-bundle list is ordered.
 //
