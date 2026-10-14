@@ -31,6 +31,9 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 		{"", cpe, "1.1.1a", graph.NoIdentifier},
 		{"https://example.com/openssl", "", "1.1.1a", graph.NoIdentifier},
 		{"pkg:oci/docker-database@latest", "", "latest", graph.UnpublishedKind},
+		// An image as it is stored, and as the docker type names one.
+		{"pkg:oci/docker-database?arch=amd64", "", "", graph.UnpublishedKind},
+		{"pkg:docker/library/nginx", "", "", graph.UnpublishedKind},
 		{"pkg:github/sonic-net/sonic-swss@abcdef123456", "", "abcdef123456", graph.UnpublishedKind},
 		{"pkg:generic/openssl@UNKNOWN", cpe, "UNKNOWN", graph.NoVersion},
 		{"pkg:generic/openssl", cpe, "", graph.NoVersion},

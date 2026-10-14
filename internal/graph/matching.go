@@ -66,7 +66,9 @@ func (d Described) Unmatchable() Unmatchable {
 	switch {
 	case parts.Type == "":
 		return NoIdentifier
-	case unpublished[parts.Type]:
+	// An image is stored with no version (IsImage), so a type naming one
+	// reads as what it is rather than as a component that stated none.
+	case unpublished[parts.Type] || imageTypes[parts.Type]:
 		return UnpublishedKind
 	case unversioned(d.Version):
 		return NoVersion
