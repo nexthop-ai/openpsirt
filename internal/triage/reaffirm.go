@@ -379,7 +379,10 @@ func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Cla
 	if claim.RevisionID == nil {
 		return refusal.Errorf("a re-affirmed claim has no reasoning to stand on")
 	}
-	if err := s.secondPerson(ctx, claim.ID, earlier.ApprovedBy); err != nil {
+	// Asked of the earlier claim, whose words the carried agreement was given
+	// to. The new claim is the re-affirmer's alone, and its approver is
+	// already somebody else.
+	if err := s.secondPerson(ctx, previous.ClaimID, earlier.ApprovedBy); err != nil {
 		return err
 	}
 

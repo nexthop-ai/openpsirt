@@ -491,6 +491,18 @@ func TestSomebodyWhoWroteAnyOfAClaimsReasoningMayNotAgreeToIt(t *testing.T) {
 			"The parser is never reached: we only call the encoder."); err != nil {
 			t.Fatal(err)
 		}
+		// The list of what waits for them does not offer it either, nor count it.
+		waiting, total, err := f.store.Queue(ctx, f.reviewer, triage.QueueFilter{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 0 || len(waiting) != 0 {
+			t.Errorf("somebody who wrote part of the reasoning is offered %d claims to agree to", total)
+		}
+		third := f.holding(t, "third", map[int64][]access.Role{f.product: {access.PublicTriage}})
+		if _, total, err := f.store.Queue(ctx, third, triage.QueueFilter{}, 50, 0); err != nil || total != 1 {
+			t.Errorf("somebody who wrote none of it is offered %d claims to agree to: %v", total, err)
+		}
 		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); !errors.Is(err, triage.ErrSamePerson) {
 			t.Errorf("somebody who wrote part of the reasoning agreed to it: %v", err)
 		}
@@ -544,6 +556,41 @@ func TestOnlyAPersonIsAnsweredAboutWhatTheyMustRevisit(t *testing.T) {
 		}
 		if _, _, err := f.store.RepeatsPage(ctx, key, f.product, 0, 50, 0); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a key read which deferrals repeat: %v", err)
+		}
+	})
+}
+
+func TestAnAgreementIsNotCarriedFromSomebodyWhoWroteAnyOfTheEarlierClaim(t *testing.T) {
+	// A carried agreement was given to the earlier claim's words, so the
+	// second-person rule is asked of the earlier claim. Its approver wrote part
+	// of those words here, which an agreement given today is refused for and
+	// one on record from before may still hold.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewInsert().Model(&triage.Revision{
+			ClaimID: agreed.ClaimID, Body: "Nothing an attacker sends is parsed.",
+			WrittenBy: f.approver, WrittenAt: time.Now().UTC().Add(-time.Hour),
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		moved := f.at()
+		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, agreed.ID)
+		_, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+			PreviousID: agreed.ID, Place: moved,
+			Reasoning: "Checked again at the new version; still not reached.",
+			By:        f.proposer,
+		})
+		if !errors.Is(err, triage.ErrSamePerson) {
+			t.Errorf("an agreement from somebody who wrote part of the earlier claim was carried: %v", err)
+		}
+		if standing, _ := f.store.Applying(ctx, moved); standing != nil {
+			t.Error("the re-affirmed claim stands on that agreement")
 		}
 	})
 }

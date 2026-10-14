@@ -168,8 +168,9 @@ type Place struct {
 	ConsumerUpstream  string
 }
 
-// ErrSamePerson is returned when somebody tries to approve their own claim.
-var ErrSamePerson = refusal.New("the person who proposed a decision may not approve it")
+// ErrSamePerson is returned when somebody tries to agree to a claim they proposed
+// any row of or wrote any of the reasoning of.
+var ErrSamePerson = refusal.New("somebody who proposed any of a claim or wrote any of its reasoning may not agree to it")
 
 // ErrNothingToApprove is returned when there is no current reasoning to
 // approve, which means the decision is not in a state anybody can agree to.

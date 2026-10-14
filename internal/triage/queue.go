@@ -156,10 +156,18 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 	// Mine asks for the reader's own claims waiting on somebody else, in the
 	// same statement, so the count and the page cannot disagree about which
 	// question was asked.
+	//
+	// Otherwise the claims the second-person rule lets the reader agree to:
+	// none of whose rows they proposed and none of whose reasoning they wrote.
+	// Offered one they may not agree to, Approve refuses it for a reason the
+	// list never showed.
 	if filter.Mine {
 		q = q.Where("de.proposed_by = ?", subject.ID)
 	} else {
-		q = q.Where("de.proposed_by <> ?", subject.ID)
+		q = q.Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "own"
+			WHERE "own"."claim_id" = de.claim_id AND "own"."proposed_by" = ?)`, subject.ID).
+			Where(`NOT EXISTS (SELECT 1 FROM "claim_revision" AS "wrote"
+			WHERE "wrote"."claim_id" = de.claim_id AND "wrote"."written_by" = ?)`, subject.ID)
 	}
 	outOfReach, args := notApprovableWhere(subject, `"other"`)
 	return s.reachableClaims(q, outOfReach, args)

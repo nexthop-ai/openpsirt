@@ -62,7 +62,7 @@ func registerClaims(api huma.API, in core.Deps) {
 		switch {
 		case errors.Is(err, triage.ErrSamePerson):
 			return nil, huma.Error409Conflict(
-				"the person who proposed a claim may not be the one who agrees to it")
+				"somebody who proposed any of a claim or wrote any of its reasoning may not agree to it")
 		case errors.Is(err, triage.ErrNotTheirs):
 			return nil, noSuchClaim()
 		case err != nil:

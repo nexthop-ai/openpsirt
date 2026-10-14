@@ -185,7 +185,7 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 	case errors.Is(err, triage.ErrNotTheirs):
 		return noSuchDecision()
 	case errors.Is(err, triage.ErrSamePerson):
-		return huma.Error409Conflict("the person who proposed a decision may not agree to it")
+		return huma.Error409Conflict("somebody who proposed any of a claim or wrote any of its reasoning may not agree to it")
 	}
 	// An authorization refusal is not somebody having asked for the
 	// impossible. Without this arm it falls through to the default below and

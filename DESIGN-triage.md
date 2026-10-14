@@ -581,7 +581,7 @@ by its reason, and a claim waiting for two reasons is in both.
 
 | Reason | Holds | Shown to | Answered by |
 |---|---|---|---|
-| **Approval** | A claim awaiting a second person, and nothing sent back | Whoever may approve every row of it, never its proposer | Approving, sending back, or setting rows aside |
+| **Approval** | A claim awaiting a second person, and nothing sent back | Whoever may approve every row of it, never somebody who proposed any row of it or wrote any of its reasoning | Approving, sending back, or setting rows aside |
 | **Expired deferral** | A deferral, proposed or agreed, whose date has passed | Whoever may decide on every row of it, the proposer included | A new decision |
 | **Missed fix date** | A promised upgrade or patch, proposed or agreed, whose date has passed | Whoever may decide on every row of it, the proposer included | Moving the promise to a new version or date, or a new decision |
 
