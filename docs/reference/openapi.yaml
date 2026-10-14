@@ -11850,6 +11850,9 @@ components:
         digest_unassigned:
           description: Their digest lists findings nobody owns as well as their own outstanding work
           type: boolean
+        disclose_after:
+          description: The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s
+          type: string
         identity:
           description: The identity this deployment holds for them
           type: string

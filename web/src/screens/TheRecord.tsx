@@ -11,6 +11,7 @@ import { usePaging } from "./list";
 import { notYours, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { Markdown } from "../ui/Markdown";
 import { Because, labeled } from "../ui/Outcome";
 import { useOutcomes, type Outcome } from "../ui/outcomes";
@@ -229,6 +230,7 @@ export function TheRecord() {
           chosen={products}
           onChange={(chosen) => setMany("product", chosen)}
         />
+        <Unread of={declared} what="The products could not be read." />
         <Choices
           label="Judgment"
           anything="Every judgment"

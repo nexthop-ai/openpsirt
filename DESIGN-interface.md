@@ -1309,6 +1309,7 @@ are about to file against — which the screen also says as a count.
 |---|---|
 | The control appears only for somebody who may record one | A button leading to a refusal is worse than no button. Undisclosed needs private triage, already-public needs the ordinary right, and somebody holding only the ordinary one is offered the second with the first saying why it is not theirs |
 | It is undisclosed unless somebody says otherwise | A choice of two stated options rather than a checkbox: the dangerous mistake should not be the quiet one |
+| The disclosure date an undisclosed report from outside gets is stated as this deployment's embargo | The length is the `disclosure.after` setting, which the server dates the flaw by and which `session/me` publishes to anybody who may ask about themselves. Where that answer has not arrived, the option names no length |
 | The severity has no default, and may be left unset | A judgment sitting in the field as though somebody had made it is this screen making it for them. An unrated flaw has no deadline until somebody rates it (REQ-33), and the hint says so |
 | The component is searched against what that build actually holds | A name typed from memory is a name the server refuses, and a name the build holds at two versions is a question the refusal asks properly rather than something to guess at |
 | The score is composed as a vector and worked out on the server | The metrics are offered in words rather than letters, because somebody rating a flaw is choosing between "over the network" and "physical access". The formula lives in one place, so a second copy in the browser cannot disagree with the number in the database. A vector settles the severity, so it is not asked twice |
@@ -1459,6 +1460,8 @@ One card per standing record that a product was exploited through an issue.
 | A fix release is named by typing a tag, offered from the product's tags in use | A tag declared before any scan of it is among them, which is the usual case. The server refuses a branch or a retired tag in its own sentence |
 | Withdraw sits beside each named tag, and a withdrawn one stays listed, struck through, with who withdrew it | A tag named in error is corrected here, and what was said stays readable |
 | A notice's places are typed one per line | A place's own name may hold a comma. Only a trailing empty line is dropped; a blank between two places goes to the server, which refuses it |
+| A notice is offered for the windows that apply to the record's product | They are the card's own windows. A window limited to another product is one the server refuses to record a notice against |
+| Each card's notice form has fields of its own | Several cards may have the form open at once, and a label pairs with the field on its own card |
 | The finding shows the standing record's named tags, with neither form | Naming and withdrawing happen on this screen, beside the notices |
 
 ## The editor
@@ -1565,6 +1568,9 @@ right answer's confidence.
 | A printed sheet stamps the moment it was taken, so it prints only once every figure has arrived | A dated record of numbers nobody computed is worse than no record |
 | A failed identity read is not "signed out" | Where one provider is configured the sign-in screen forwards straight to it, so drawing a transient failure as signed out sends somebody through their identity provider over a hiccup |
 | What the server said is what is shown, and where it said nothing the status is | HTTP/2 carries no reason phrase, so the fallback was the empty string and a refusal reached the reader as no message at all |
+| One component draws a read's three arms | Waiting, the loading line; failed, what the server said; answered, what the screen draws from the data, its empty state included. A screen drawn through it has no way to show "none" for a read that never answered |
+| A picker whose options failed to arrive says so beside it | The options it has stay usable. An empty select reads as a product with nothing declared, and a select of one default reads as a deliberate choice |
+| A suggestion list may be quiet about a failure, and says why in the source | A name not suggested can still be typed. The web lint fails on any read defaulted to an empty list whose file never consults its failure, unless a comment beside it gives that reason |
 
 ## A render that threw
 

@@ -4,6 +4,9 @@
 import { notACredential } from "./noautofill";
 import { useEffect, useRef, useState } from "react";
 import type { Body } from "../api/client";
+import type { Readable } from "./Count";
+import { Failed } from "./Failed";
+import { Loading } from "./Loading";
 
 // The places a decision covers.
 //
@@ -49,6 +52,7 @@ export function Covering({
   onChange,
   matching,
   differing,
+  reach,
 }: {
   places: Sitting[];
   excluded: Set<string>;
@@ -56,6 +60,8 @@ export function Covering({
   // Other builds, merged from the reach of the covered places.
   matching: number;
   differing: number;
+  // The read the two counts come from. Until it answers they are not zero.
+  reach: Readable;
 }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
@@ -240,16 +246,26 @@ export function Covering({
         </div>
       )}
 
-      <p
-        className="said"
-        style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}
-      >
-        <b>
-          {matching} other {matching === 1 ? "build matches" : "builds match"}
-        </b>{" "}
-        automatically · <b>{differing}</b> at other{" "}
-        {differing === 1 ? "version is" : "versions are"} reviewed one at a time on submit.
-      </p>
+      {reach.isError ? (
+        <Failed error={reach.error} what="Other builds with this component could not be read." />
+      ) : (
+        <p
+          className="said"
+          style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}
+        >
+          {reach.isPending ? (
+            <Loading inline />
+          ) : (
+            <>
+              <b>
+                {matching} other {matching === 1 ? "build matches" : "builds match"}
+              </b>{" "}
+              automatically · <b>{differing}</b> at other{" "}
+              {differing === 1 ? "version is" : "versions are"} reviewed one at a time on submit.
+            </>
+          )}
+        </p>
+      )}
     </div>
   );
 }

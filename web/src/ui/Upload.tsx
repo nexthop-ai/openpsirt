@@ -11,6 +11,7 @@ import { useScope } from "../app/scope";
 import { Drawer } from "./Drawer";
 import { Dropzone } from "./Dropzone";
 import { Failed } from "./Failed";
+import { Unread } from "./Reading";
 import { useReseed } from "./reseed";
 import { Required } from "./Required";
 import { inventoriesAt } from "../app/routes";
@@ -192,6 +193,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             ))}
           </select>
         </div>
+        <Unread of={products} what="The products could not be read." />
+        <Unread of={streams} what="The branches and tags could not be read." />
+        <Unread of={variants} what="The variants could not be read." />
         <span className="hint">Must already be declared. Undeclared targets are refused.</span>
       </div>
 

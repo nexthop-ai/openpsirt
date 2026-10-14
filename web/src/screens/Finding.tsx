@@ -200,8 +200,12 @@ export function Finding() {
     );
     return () => cancelAnimationFrame(frame);
   }, [recorded, landed]);
-  // The place each earlier decision was at, for reaffirming it.
-  const openPlaces = places.filter((p) => p.decision == null).slice(0, SAMPLE);
+  // The place each earlier decision was at, for reaffirming it. Asked of
+  // distinct places: `places` holds chain rows, and eight chains to one place
+  // would otherwise fill the sample and leave a second place never asked.
+  const openPlaces = [
+    ...new Map(places.filter((p) => p.decision == null).map((p) => [p.place, p])).values(),
+  ].slice(0, SAMPLE);
   const history = useQueries({
     queries: ((it?.previous ?? []).some((p) => p.ended === "lapsed") ? openPlaces : []).map(
       (place) => ({
@@ -250,6 +254,9 @@ export function Finding() {
     return claim ? [{ claim, summary: it.standing?.[i] }] : [];
   });
   const claims = pairs.map((pair) => pair.claim);
+  // A decision read that failed is said, because a claim missing from the
+  // cards reads as a place nobody decided.
+  const unread = [...standing, ...history].find((q) => q.isError);
   const placeOf = new Map<number, string>();
   history.forEach((q, i) => {
     for (const d of q.data?.previously ?? []) {
@@ -414,6 +421,10 @@ export function Finding() {
           onChanged={() => void finding.refetch()}
         />
       </div>
+
+      {unread && (
+        <Failed error={unread.error} what="Some decisions standing here could not be read." />
+      )}
 
       {/* The standing notice disclosure opening the record requires: unmissable, above everything,
           and on the screen where somebody is about to write something down.

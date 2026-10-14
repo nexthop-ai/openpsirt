@@ -11,6 +11,7 @@ import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { UNITS, write, type Unit } from "./duration";
 import { Wide } from "../ui/Wide";
 
@@ -477,6 +478,7 @@ function Tokens() {
             ))}
           </select>
         </label>
+        <Unread of={products} what="The products could not be read." />
         <label className="field" style={{ margin: 0 }}>
           <span>Carries</span>
           <select

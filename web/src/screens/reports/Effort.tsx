@@ -8,6 +8,7 @@ import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
+import { Unread } from "../../ui/Reading";
 import { Loading } from "../../ui/Loading";
 import { Sheet } from "./Sheet";
 import {
@@ -88,6 +89,7 @@ export function Effort() {
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
 
+      <Unread of={teams} what="The teams could not be read." />
       {(teams.data?.items ?? []).length > 0 && (
         <div className="controls">
           <label>

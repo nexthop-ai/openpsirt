@@ -6,6 +6,7 @@ import { useClickAway } from "../ui/away";
 import { useReseed } from "../ui/reseed";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCatalog, useReleaseVariants } from "../api/catalog";
+import { Refused } from "../api/queries";
 import {
   findingsPath,
   needsBuild,
@@ -192,6 +193,7 @@ export function Scope() {
               {each.display_name || each.name}
             </button>
           ))}
+          {products.isError && <Unreadable error={products.error} what="the products" />}
           {products.data && (products.data.items ?? []).length === 0 && (
             <p className="hint">You can reach no product yet.</p>
           )}
@@ -231,6 +233,9 @@ export function Scope() {
               {each.name} <span className="hint">{each.kind}</span>
             </button>
           ))}
+          {product && streams.isError && (
+            <Unreadable error={streams.error} what="the branches and tags" />
+          )}
           {product && streams.data && (streams.data.items ?? []).length === 0 && (
             <p className="hint">Nothing is declared under this product yet.</p>
           )}
@@ -257,11 +262,16 @@ export function Scope() {
               type="button"
               className="opt"
               aria-current={each.name === at.variant ? "true" : undefined}
+              disabled={whole && !stream}
+              title={whole && !stream ? "Pick a branch or tag first" : undefined}
               onClick={() => apply({ product, stream, variant: each.name }, true)}
             >
               {each.name}
             </button>
           ))}
+          {product && (stream ? variants : declared).isError && (
+            <Unreadable error={(stream ? variants : declared).error} what="the variants" />
+          )}
           {stream && variants.data && (variants.data.items ?? []).length === 0 && (
             <p className="hint">Nothing has been scanned on this line yet.</p>
           )}
@@ -272,5 +282,15 @@ export function Scope() {
         </p>
       </div>
     </div>
+  );
+}
+
+// A list in the panel that could not be read, said in the column it would fill.
+// An empty column reads as a product with nothing declared.
+function Unreadable({ error, what }: { error: unknown; what: string }) {
+  return (
+    <p className="hint" role="alert" title={error instanceof Refused ? error.message : undefined}>
+      Couldn&rsquo;t read {what}.
+    </p>
   );
 }

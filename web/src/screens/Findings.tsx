@@ -295,6 +295,7 @@ export function Findings() {
   const kept = useKept();
   const prepared = useMemo(() => {
     if (declined === here(params)) return null;
+    // silent-read: the saved-filter picker says when this list could not be read.
     const one = ruleIn(kept.data?.items ?? [], params);
     return one?.prepares ? { name: one.name, prepares: one.prepares } : null;
   }, [kept.data, params, declined]);
@@ -695,7 +696,9 @@ export function Findings() {
           params={asked}
           set={set}
           setMany={setMany}
+          // silent-read: choices offered in the panel; an unread list offers fewer.
           tags={inUse.data?.items ?? []}
+          // silent-read: choices offered in the panel; an unread list offers fewer.
           kinds={kindsHere.data?.items ?? []}
           oneBuild={oneBuild}
           spanning={spanning}

@@ -18,7 +18,8 @@ export function Weaknesses({
 }) {
   const [typed, setTyped] = useState("");
   const [problem, setProblem] = useState("");
-  const offered = useWeaknessSearch(typed).data ?? [];
+  const search = useWeaknessSearch(typed);
+  const offered = search.data ?? [];
   const names = useWeaknessNames(chosen);
 
   function add(id: string) {
@@ -99,7 +100,13 @@ export function Weaknesses({
           {problem}
         </span>
       )}
-      <span className="hint">By number or by name. The most common come first.</span>
+      {search.isError ? (
+        <span className="hint" role="alert">
+          Couldn&rsquo;t search the names. Type CWE- and a number.
+        </span>
+      ) : (
+        <span className="hint">By number or by name. The most common come first.</span>
+      )}
     </div>
   );
 }

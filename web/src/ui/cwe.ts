@@ -99,6 +99,7 @@ export function useWeaknessNames(ids: string[]): Map<string, Named> {
     retry: false,
   });
   const out = new Map<string, Named>();
+  // silent-read: a name that could not be read leaves its identifier shown alone.
   for (const one of got.data ?? []) {
     for (const each of asked) {
       if (each.toUpperCase() === one.id) out.set(each, one);

@@ -11,6 +11,7 @@ import type { Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { Outcome } from "../ui/Outcome";
 import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
@@ -112,6 +113,7 @@ export function Compare() {
         </p>
       </div>
 
+      <Unread of={releases} what="The releases could not be read." />
       {(releases.data?.items ?? []).length > 1 && (
         <div className="card">
           <header>

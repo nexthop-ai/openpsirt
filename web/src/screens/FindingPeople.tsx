@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { notYours, unwrap, whichOf } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
@@ -168,6 +169,7 @@ export function Collaborators({
           Add collaborator
         </button>
       </div>
+      <Unread of={people} what="The people who could be brought in could not be read." />
       <p className="hint" style={{ marginTop: 8 }}>
         They are notified. Logged as an access change.
       </p>
@@ -517,6 +519,7 @@ export function Marks({
   // A tag already on this is not offered again — the request would succeed
   // and change nothing, which reads as the control not working.
   const already = new Set(tags.map((each) => each.trim().toLowerCase()));
+  // silent-read: a suggestion list; a tag not offered can still be typed.
   const offered = (inUse.data?.items ?? []).filter((each) => !already.has(each.toLowerCase()));
 
   if (tags.length === 0 && !mayMark) return null;

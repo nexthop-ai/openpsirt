@@ -12,6 +12,8 @@ import type { Scoped } from "../app/scope";
 import { unwrap } from "../api/queries";
 import { Severity } from "../ui/Severity";
 import { Failed } from "../ui/Failed";
+import { Loading } from "../ui/Loading";
+import { Reading } from "../ui/Reading";
 import { Pace, Mix, Ring, Releases } from "../ui/Charts";
 import { paceReading, mixReading } from "../ui/trend";
 import { claimOf, useQueueCount } from "../api/claims";
@@ -124,6 +126,10 @@ export function Home({ who }: { who: Who }) {
           </header>
           {trend.isError ? (
             <Failed error={trend.error} what="The trend could not be read." />
+          ) : releases.isError ? (
+            <Failed error={releases.error} what="The release trend could not be read." />
+          ) : trend.isPending || (!!at.product && releases.isPending) ? (
+            <Loading />
           ) : byRelease ? (
             <>
               <Releases points={releases.data?.items ?? []} />
@@ -155,8 +161,14 @@ export function Home({ who }: { who: Who }) {
               Open, by severity
             </span>
           </header>
-          <Mix points={points} />
-          <p className="reading">{mixReading(points)}</p>
+          <Reading query={trend} what="The trend could not be read.">
+            {() => (
+              <>
+                <Mix points={points} />
+                <p className="reading">{mixReading(points)}</p>
+              </>
+            )}
+          </Reading>
         </div>
 
         <div className="panel">
@@ -166,8 +178,14 @@ export function Home({ who }: { who: Who }) {
               Open now
             </span>
           </header>
-          <Ring point={points[points.length - 1]} />
-          <p className="reading">Known exploited is counted with what it is rated.</p>
+          <Reading query={trend} what="The trend could not be read.">
+            {() => (
+              <>
+                <Ring point={points[points.length - 1]} />
+                <p className="reading">Known exploited is counted with what it is rated.</p>
+              </>
+            )}
+          </Reading>
         </div>
 
         <Readiness at={at} />
@@ -559,7 +577,7 @@ function Figures({
           product, so the two are never one number. Drawn only where there is
           a record, and counted in records: one is against an issue and a
           product. It opens the shelf narrowed to the product it counted. */}
-      {attacked > 0 && (
+      {(shelf.isError || attacked > 0) && (
         <button
           type="button"
           className="kpi urgent"
@@ -568,7 +586,9 @@ function Figures({
           <span className="l">
             <i style={{ background: "var(--sev-exploited)" }} /> Exploited here
           </span>
-          <span className="n">{attacked.toLocaleString()}</span>
+          <span className="n">
+            <Count of={shelf}>{() => attacked.toLocaleString()}</Count>
+          </span>
           <span className="d">
             {at.stream || at.variant ? `all of ${at.product}` : "recorded attacks"}
           </span>
@@ -1064,7 +1084,9 @@ function Status() {
         </li>
         <li>
           <span className="what">Quiet after</span>
-          <span className="when">{scanning.data?.quiet_after_days ?? 7} days</span>
+          <span className="when">
+            <Count of={scanning}>{() => `${scanning.data?.quiet_after_days ?? "—"} days`}</Count>
+          </span>
         </li>
       </ul>
       {whole && (

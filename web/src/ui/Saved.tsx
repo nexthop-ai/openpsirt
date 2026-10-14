@@ -240,6 +240,11 @@ export function Saved({
               {unshown.toLocaleString()} more over the limit, not shown
             </option>
           )}
+          {kept.isError && (
+            <option value="" disabled>
+              Couldn&rsquo;t read your saved filters
+            </option>
+          )}
         </select>
         {open ? (
           <button

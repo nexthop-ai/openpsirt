@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "./Failed";
+import { Unread } from "./Reading";
 import { Outcome } from "./Outcome";
 import { Wide } from "./Wide";
 
@@ -90,6 +91,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
           ))}
         </select>
       </div>
+      <Unread of={streams} what="The other release lines could not be read." />
 
       {preview.isError && (
         <Failed

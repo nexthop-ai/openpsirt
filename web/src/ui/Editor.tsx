@@ -115,6 +115,7 @@ export function Editor({
       ),
   });
 
+  // silent-read: suggestions after an @; a name not offered can still be typed.
   const candidates = offerable.data?.items ?? [];
 
   // The text typed after an @, if any. Read from the text before the

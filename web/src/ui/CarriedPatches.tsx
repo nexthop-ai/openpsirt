@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { notACredential } from "../ui/noautofill";
 import { Paged } from "../ui/Paged";
@@ -34,8 +35,11 @@ export function CarriedPatches({
   const [offset, setOffset] = useState(0);
   const [open, setOpen] = useState(false);
 
+  // The previous page stays while the next is read, so a keystroke in the
+  // package filter does not flash "none" over rows that are still there.
   const carried = useQuery({
     enabled: open,
+    placeholderData: (previous) => previous,
     queryKey: ["carried-patches", at, component, offset],
     queryFn: async () =>
       unwrap(
@@ -89,7 +93,9 @@ export function CarriedPatches({
               }}
             />
           </div>
-          {rows.length === 0 ? (
+          {carried.isPending ? (
+            <Loading />
+          ) : rows.length === 0 ? (
             <p className="hint">{component ? "None for that package" : "None declared"}</p>
           ) : (
             <>

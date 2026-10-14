@@ -810,6 +810,7 @@ export function Decide({
         onChange={setExcluded}
         matching={matching.length}
         differing={offered.length}
+        reach={reach}
       />
       <div className="tier auto" style={{ margin: 0 }}>
         <p className="said">{forecast(outcome, classes, days, until, soFar)}</p>

@@ -185,7 +185,9 @@ export function AdvisorySources() {
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That supplier could not be withdrawn." />
       )}
-      {product === "" ? (
+      {product === "" && products.isError ? (
+        <Failed error={products.error} what="The products could not be read." />
+      ) : product === "" ? (
         <Empty title="Pick a product" detail="Suppliers are set up per product." />
       ) : sources.isPending ? (
         <Loading />

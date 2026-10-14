@@ -537,6 +537,7 @@ export function Filters({
   // The weaknesses offered while one is typed, searched by number or by name,
   // and the names of the ones chosen.
   const [weaknessTyped, setWeaknessTyped] = useState("");
+  // silent-read: a suggestion list; a weakness not offered can still be typed.
   const weaknessOffers = useWeaknessSearch(weaknessTyped).data ?? [];
   const weaknessNames = useWeaknessNames(all("weakness"));
   const weaknessNamed = (word: string) => {

@@ -59,6 +59,9 @@ export type Who = {
   // round trips as a filter matched — a page nobody can use and nothing can
   // cancel.
   bulk_cap?: number;
+  // The embargo a flaw reported from outside is given, as a duration such as
+  // 2160h0m0s. A screen recording one states the date it will get.
+  disclose_after?: string;
   // Every triage outcome with what it claims, which is how a screen tells a
   // dismissal from a deferral and knows which outcomes state a reason.
   outcomes: Body<"WhoBody">["outcomes"];

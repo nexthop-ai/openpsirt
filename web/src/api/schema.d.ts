@@ -12856,6 +12856,8 @@ export interface components {
             digest?: boolean;
             /** @description Their digest lists findings nobody owns as well as their own outstanding work */
             digest_unassigned?: boolean;
+            /** @description The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s */
+            disclose_after?: string;
             /** @description The identity this deployment holds for them */
             identity: string;
             /**

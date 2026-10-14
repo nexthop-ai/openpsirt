@@ -16,10 +16,12 @@ import { Dropzone } from "../ui/Dropzone";
 import { Editor, mentioning } from "../ui/Editor";
 import { Suggest } from "../ui/Suggest";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { useReseed } from "../ui/reseed";
 import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
 import { Required } from "../ui/Required";
+import { humane } from "./duration";
 import { inboxReportAt, issueAt, productFindingsAt } from "../app/routes";
 
 // Reporting a flaw in what we ship: one somebody outside sent, or one somebody
@@ -47,6 +49,9 @@ const SEVERITIES = RECORDABLE;
 export function ReportFlaw() {
   const scope = useScope();
   const who = useWho();
+  // The deployment's embargo as somebody would say it, or nothing where it
+  // is not known; a fixed number contradicts a deployment that set another.
+  const embargo = humane(who.data?.disclose_after ?? "");
   const navigate = useNavigate();
   const queries = useQueryClient();
 
@@ -359,6 +364,7 @@ export function ReportFlaw() {
               </option>
             ))}
           </select>
+          <Unread of={products} what="The products could not be read." />
         </div>
 
         <div className="field">
@@ -511,6 +517,7 @@ export function ReportFlaw() {
             <div className="field">
               <span className="l">Branches and tags</span>
               <Picked
+                // silent-read: unpicked() says a failed read in the list's place.
                 options={(lines.data?.items ?? []).map((each) => ({
                   value: each.name ?? "",
                   label: each.kind === "tag" ? `${each.name} (tag)` : (each.name ?? ""),
@@ -527,6 +534,7 @@ export function ReportFlaw() {
             <div className="field">
               <span className="l">Built as</span>
               <Picked
+                // silent-read: unpicked() says a failed read in the list's place.
                 options={(builtAs.data?.items ?? []).map((each) => ({
                   value: each.name ?? "",
                   label: each.name ?? "",
@@ -555,6 +563,7 @@ export function ReportFlaw() {
               placeholder={whole ? "the build itself" : "pick a build first"}
               loading={holding.isFetching}
               options={[
+                // silent-read: suggestions; a component not offered can still be typed.
                 ...new Set((holding.data?.items ?? []).map((each) => each.component ?? "")),
               ]}
               onChange={(next) => {
@@ -659,7 +668,9 @@ export function ReportFlaw() {
                         note:
                           origin === "here" || report.data?.found_here
                             ? "No disclosure date: nobody outside is counting down"
-                            : "Disclosure date 90 days from arrival",
+                            : embargo
+                              ? `Disclosure date ${embargo} from arrival`
+                              : "Disclosure date set from arrival",
                       },
                     ]
                   : []),

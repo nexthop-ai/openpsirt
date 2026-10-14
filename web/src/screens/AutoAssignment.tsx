@@ -9,6 +9,8 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
+import { Loading } from "../ui/Loading";
 import { Suggest } from "../ui/Suggest";
 import { Wide } from "../ui/Wide";
 
@@ -86,9 +88,11 @@ export function AutoAssignment() {
   // source-package rule matches on.
   const sources = [
     ...new Set(
+      // silent-read: a suggestion list; a name that is not offered can still be typed.
       (bySource.data?.items ?? []).map((each) => each.source_package || each.component || ""),
     ),
   ].filter(Boolean);
+  // silent-read: a suggestion list; a name that is not offered can still be typed.
   const names = [...new Set((byName.data?.items ?? []).map((each) => each.component ?? ""))].filter(
     Boolean,
   );
@@ -123,6 +127,7 @@ export function AutoAssignment() {
   // running for the field's own list, so this costs no extra request.
   const cutFrom = [
     ...new Set(
+      // silent-read: a suggestion; a failed lookup suggests nothing.
       (bySource.data?.items ?? [])
         .filter((each) => (each.source_package ?? "") !== "")
         .map((each) => each.source_package as string),
@@ -205,6 +210,7 @@ export function AutoAssignment() {
           </select>
         </label>
       </div>
+      <Unread of={products} what="The products could not be read." />
 
       {said && (
         <div className="alert info" style={{ marginBottom: 12 }}>
@@ -217,7 +223,7 @@ export function AutoAssignment() {
           row stays, and the rule goes on placing work. */}
       {retire.isError && <Failed error={retire.error} what="That rule could not be retired." />}
 
-      {product === "" ? (
+      {product === "" && products.isError ? null : product === "" ? (
         <Empty
           title="Pick a product."
           detail="Rules belong to a product, because the components they name do."
@@ -226,6 +232,8 @@ export function AutoAssignment() {
         <>
           {rules.isError ? (
             <Failed error={rules.error} what="The rules could not be read." />
+          ) : rules.isPending ? (
+            <Loading />
           ) : items.length === 0 ? (
             <Empty
               title="Nothing is routed automatically."
@@ -309,6 +317,7 @@ export function AutoAssignment() {
                     </option>
                   ))}
                 </select>
+                <Unread of={teams} what="The teams could not be read." />
               </label>
               <Key
                 id="rule-upstream"

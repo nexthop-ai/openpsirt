@@ -9,6 +9,7 @@ import { Icon } from "./Icons";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "./Failed";
+import { Loading } from "./Loading";
 import { label, waiting } from "./notices";
 
 // The notices waiting on you, with the count on the way in.
@@ -35,6 +36,14 @@ export function Notices() {
   });
   const total = mine.data?.total ?? 0;
   const items = mine.data?.items ?? [];
+  // Nothing waiting is said only once the read has answered.
+  const said = mine.isError
+    ? "Notices could not be read"
+    : mine.isPending
+      ? "Notices"
+      : total > 0
+        ? `${total} waiting on you`
+        : "Nothing waiting on you";
 
   // Unwrapped, so a refusal is a failure rather than a click that did nothing:
   // the request resolves either way, and only the status says which.
@@ -54,8 +63,8 @@ export function Notices() {
         type="button"
         className="bell"
         aria-expanded={open}
-        aria-label={total > 0 ? `${total} waiting on you` : "Nothing waiting on you"}
-        title={total > 0 ? `${total} waiting on you` : "Nothing waiting on you"}
+        aria-label={said}
+        title={said}
         onClick={() => setOpen(!open)}
       >
         <Icon name="bell" />
@@ -82,7 +91,11 @@ export function Notices() {
             <Failed error={forget.error ?? forgetAll.error} what="That could not be cleared." />
           )}
 
-          {items.length === 0 ? (
+          {mine.isError ? (
+            <Failed error={mine.error} what="Notices could not be read." />
+          ) : mine.isPending ? (
+            <Loading />
+          ) : items.length === 0 ? (
             <p className="hint" style={{ margin: 0 }}>
               Nothing is waiting on you.
             </p>

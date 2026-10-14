@@ -12,6 +12,7 @@ import { Suggest } from "../ui/Suggest";
 import { useCatalog } from "../api/catalog";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import { called, ROLES, type Role } from "../ui/roles";
 import { GrantGrid } from "./GrantGrid";
 import { Wide } from "../ui/Wide";
@@ -240,7 +241,20 @@ export function Access({ who: me }: { who: Who }) {
         )}
       </div>
 
+      <Unread of={products} what="The products could not be read." />
       {grant.error != null && <Failed error={grant.error} what="That role could not be granted." />}
+      {grantEverywhere.error != null && (
+        <Failed
+          error={grantEverywhere.error}
+          what="That role could not be granted across every product."
+        />
+      )}
+      {withdrawEverywhere.error != null && (
+        <Failed
+          error={withdrawEverywhere.error}
+          what="That role could not be withdrawn across every product."
+        />
+      )}
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That role could not be withdrawn." />
       )}
@@ -327,7 +341,7 @@ export function Access({ who: me }: { who: Who }) {
                         person={person}
                         busy={reach.isPending}
                         onSet={(address) =>
-                          reach.mutate({ identity: person.identity ?? "", email: address })
+                          reach.mutateAsync({ identity: person.identity ?? "", email: address })
                         }
                       />
                     </td>
@@ -442,7 +456,7 @@ export function Access({ who: me }: { who: Who }) {
                             person={person}
                             busy={rename.isPending}
                             onSet={(name) =>
-                              rename.mutate({ identity: person.identity ?? "", name })
+                              rename.mutateAsync({ identity: person.identity ?? "", name })
                             }
                           />
                         </p>
@@ -791,7 +805,7 @@ function Credentials({ me }: { me: Who }) {
                   <td className="hint" title="A pipeline key does not expire">
                     never
                   </td>
-                  <td className="hint">{key.last_used_at || "never"}</td>
+                  <td className="hint">{on(key.last_used_at) || "never"}</td>
                   <td>
                     {key.withdrawn ? (
                       <span style={{ color: "var(--faint)" }}>withdrawn</span>
@@ -832,7 +846,7 @@ function Credentials({ me }: { me: Who }) {
                   </td>
                   <td className="hint">{on(token.created_at) || "—"}</td>
                   <td className="hint">{on(token.expires_at) || "—"}</td>
-                  <td className="hint">{token.last_used_at || "never"}</td>
+                  <td className="hint">{on(token.last_used_at) || "never"}</td>
                   <td>
                     {token.withdrawn ? (
                       <span style={{ color: "var(--faint)" }}>withdrawn</span>
@@ -938,6 +952,7 @@ function Credentials({ me }: { me: Who }) {
           </select>
           <span className="hint">Required. A key covers one product.</span>
         </label>
+        <Unread of={products} what="The products could not be read." />
         {/* Offered rather than typed from memory. Both are refused unless the
             product already holds them — a key names a branch that exists, not
             one a build will declare later — so the list is what the server
@@ -959,6 +974,7 @@ function Credentials({ me }: { me: Who }) {
             from={0}
           />
           <span className="hint">Optional. Empty means any branch or tag.</span>
+          <Unread of={streams} what="The branches and tags could not be read." />
         </div>
         <div className="field">
           <label htmlFor="key-variant">Variant</label>
@@ -974,6 +990,7 @@ function Credentials({ me }: { me: Who }) {
             from={0}
           />
           <span className="hint">Optional. Empty means any variant.</span>
+          <Unread of={variants} what="The variants could not be read." />
         </div>
       </Declare>
     </div>
@@ -995,7 +1012,9 @@ function InlineEdit({
   type: "text" | "email";
   placeholder: string;
   busy: boolean;
-  onSet: (value: string) => void;
+  // Settles once the write has; the box stays open on a refusal so what was
+  // typed is still there to correct.
+  onSet: (value: string) => Promise<unknown>;
   children: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1031,8 +1050,10 @@ function InlineEdit({
         className="btn"
         disabled={busy}
         onClick={() => {
-          onSet(draft.trim());
-          setEditing(false);
+          onSet(draft.trim()).then(
+            () => setEditing(false),
+            () => undefined,
+          );
         }}
       >
         Save
@@ -1053,7 +1074,7 @@ function Named({
 }: {
   person: { display_name?: string };
   busy: boolean;
-  onSet: (name: string) => void;
+  onSet: (name: string) => Promise<unknown>;
 }) {
   return (
     <InlineEdit
@@ -1089,7 +1110,7 @@ function Reachable({
 }: {
   person: { email?: string; email_source?: string };
   busy: boolean;
-  onSet: (email: string) => void;
+  onSet: (email: string) => Promise<unknown>;
 }) {
   return (
     <InlineEdit

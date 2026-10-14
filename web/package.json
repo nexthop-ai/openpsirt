@@ -14,7 +14,7 @@
     "ladder": "node scripts/one-ladder.mjs",
     "copy": "node scripts/screen-copy.mjs",
     "licenses": "node scripts/licenses.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/silent-reads.mjs",
     "stylelint": "stylelint \"src/**/*.css\"",
     "format": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.{mjs,ts}\""
   },

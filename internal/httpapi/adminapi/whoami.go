@@ -100,6 +100,10 @@ type WhoBody struct {
 	// trips as the filter matched, which is a page nobody can use and
 	// nothing can cancel.
 	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows a screen acts on one request at a time here, and the number of reports one ruling may cover. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
+	// DiscloseAfter is the embargo a flaw reported from outside is given. A
+	// screen recording one states the date it will get, and a fixed number
+	// there contradicts the setting the server dates it by.
+	DiscloseAfter string `json:"disclose_after,omitempty" doc:"The time an undisclosed flaw reported from outside has before its disclosure date, as a duration such as 2160h0m0s"`
 	// Outcomes is the same for everybody and is answered here because every
 	// screen that records or reads a decision needs it before it draws.
 	Outcomes []OutcomeBody `json:"outcomes" doc:"Every triage outcome, in the order the vocabulary lists them, with what each claims"`
@@ -142,6 +146,12 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 				return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
 			}
 			body.BulkCap = cap
+			embargo, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
+				setting.DefaultDiscloseAfter)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
+			}
+			body.DiscloseAfter = embargo.String()
 		}
 		// The digest they asked for, where they are a person and this process
 		// has somewhere to read it from. A credential asks for nothing and is

@@ -224,6 +224,8 @@ function Files({
       <h3>Files</h3>
       {listed.isError ? (
         <Failed error={listed.error} what="The files could not be read." />
+      ) : listed.isPending ? (
+        <Loading />
       ) : files.length === 0 ? (
         <p className="hint">None.</p>
       ) : (

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { useClickAway } from "./away";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { Refused, unwrap } from "../api/queries";
 import { notACredential } from "./noautofill";
 import { useWho } from "../app/session";
 
@@ -188,7 +188,15 @@ export function Holder({
             </li>
           ))}
           {found.isFetching && offered.length === 0 && <li className="hint">Looking…</li>}
-          {!found.isFetching && offered.length === 0 && (
+          {found.isError && (
+            <li
+              className="hint"
+              title={found.error instanceof Refused ? found.error.message : undefined}
+            >
+              Couldn&rsquo;t search the people here.
+            </li>
+          )}
+          {!found.isFetching && !found.isError && offered.length === 0 && (
             <li className="hint">Nobody here is called that.</li>
           )}
         </ul>
