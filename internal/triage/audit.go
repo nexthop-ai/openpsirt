@@ -211,6 +211,17 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 	}
 }
 
+// AuditCount counts the judgments Audit would list, narrowed the same way.
+func (s *Store) AuditCount(ctx context.Context, subject access.Subject, f Filter,
+	from, to time.Time) (int, error) {
+
+	total, err := auditedBy(subject, f, from, to)(s.db.NewSelect().Model((*Decision)(nil))).Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count the judgments made: %w", err)
+	}
+	return total, nil
+}
+
 // Audit returns the judgments made in a period, newest first, with everything
 // needed to read one without opening it.
 //

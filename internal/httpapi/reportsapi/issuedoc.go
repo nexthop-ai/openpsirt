@@ -25,7 +25,7 @@ import (
 //
 // A page rather than everything: an issue at a widely vendored component can
 // carry hundreds, and what this document is for is being read.
-const howManyJudgments = 200
+var howManyJudgments = 200
 
 // registerIssueDocument renders everything known about one issue.
 //
@@ -202,8 +202,19 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 	// judgments, and stopping at two hundred silently reads as the whole of
 	// it.
 	if len(judged) < decided {
-		fmt.Fprintf(&out, "%d judgments stand. The %d most recent are below.\n\n",
-			decided, len(judged))
+		// What stands is the judgments in force. The record below carries the
+		// withdrawn and lapsed ones as well.
+		standing, err := triage.NewStore(in.DB.DB).AuditCount(ctx, subject,
+			triage.Filter{Issue: known.Identifier, InForce: true}, time.Time{}, time.Time{})
+		if err != nil {
+			return "", core.WentWrong(in.Logger, "what was decided could not be counted", err)
+		}
+		below := fmt.Sprintf("The %d most recent are below.", len(judged))
+		if len(judged) == 1 {
+			below = "The most recent is below."
+		}
+		fmt.Fprintf(&out, "%s, of %s recorded. %s\n\n",
+			judgmentsStand(standing), judgments(decided), below)
 	}
 	// Newest first, which is how the record reads: what stands now is what
 	// somebody is looking for, and the history is under it.
@@ -304,4 +315,23 @@ func urlsOf(references []finding.Reference) []string {
 		out = append(out, one.URL)
 	}
 	return out
+}
+
+// judgments says a count of judgments in its singular and plural forms.
+func judgments(n int) string {
+	if n == 1 {
+		return "1 judgment"
+	}
+	return fmt.Sprintf("%d judgments", n)
+}
+
+// judgmentsStand says how many judgments are in force.
+func judgmentsStand(n int) string {
+	switch n {
+	case 0:
+		return "No judgment stands"
+	case 1:
+		return "1 judgment stands"
+	}
+	return fmt.Sprintf("%d judgments stand", n)
 }
