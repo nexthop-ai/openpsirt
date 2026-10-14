@@ -4,9 +4,13 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 )
 
 // repository makes a git repository with one commit, tagged with each of tags.
@@ -28,7 +32,28 @@ func repository(t *testing.T, tags ...string) string {
 	for _, tag := range tags {
 		run("tag", tag)
 	}
+	for _, sub := range []string{root, migrations} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return dir
+}
+
+// record writes a frozen release's record into the checkout at dir, owning the
+// checkout's one migration.
+func record(t *testing.T, dir, version string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, migrations, "00001_first.go"), []byte("package migrations\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	at := filepath.Join(dir, root, version)
+	if err := os.MkdirAll(at, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(at, released.Files), []byte("last 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestATaggedReleaseIsNotFrozenAgain(t *testing.T) {
@@ -40,6 +65,24 @@ func TestATaggedReleaseIsNotFrozenAgain(t *testing.T) {
 	}
 	if err := guard(dir, "v0.8.0"); err != nil {
 		t.Errorf("freezing an untagged release was refused: %v", err)
+	}
+}
+
+// A checkout without tags still refuses a release freezing would refuse, so the
+// schema records it holds are not rewritten before the refusal.
+func TestAReleaseFreezingWouldRefuseIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+	dir := repository(t)
+	record(t, dir, "v0.8.0")
+	for _, c := range []struct{ tag, says string }{
+		{"v0.7.0", "older than v0.8.0"},
+		{"v0.10.0", "part past nine"},
+	} {
+		if err := guard(dir, c.tag); err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("guarding %s answered %v, want %q", c.tag, err, c.says)
+		}
+	}
+	if err := guard(dir, "v0.9.0"); err != nil {
+		t.Errorf("guarding the next release was refused: %v", err)
 	}
 }
 

@@ -72,20 +72,24 @@ func Check(root, migrations, tag string) ([]string, error) {
 	return faults, nil
 }
 
-// declaration is the name of a file holding a release's table declarations,
-// and the code of the release it is for.
-var declaration = regexp.MustCompile(`^(v\d+)_[a-z_]+\.go$`)
+// Ready refuses a release Freeze would refuse, and writes nothing. It is asked
+// before the schema records are written, because the test writing them
+// rewrites a release's records whatever Freeze answers afterwards.
+func Ready(root, migrations, tag string) error {
+	_, err := prepare(root, migrations, tag)
+	return err
+}
 
-// Freeze writes the record of a release's files: every migration past the
-// previous release's last, and every declaration carrying its code. The
-// schema each engine builds is written beside it first, by a test, because
-// only a test has the engines.
-//
-// A release that changes no schema has a record listing no files, with the
-// previous release's last migration as its own. It is still a record: the
-// check refuses a tag with none, and a release that ships nothing new still
-// ships the schema before it.
-func Freeze(root, migrations, tag string) (*Record, error) {
+// freezing is what Freeze reads before it writes anything.
+type freezing struct {
+	version, code string
+	names         []string
+	before, last  int64
+}
+
+// prepare reads what freezing a release needs, and refuses one that cannot be
+// frozen from this tree.
+func prepare(root, migrations, tag string) (*freezing, error) {
 	version, err := Base(tag)
 	if err != nil {
 		return nil, err
@@ -125,6 +129,28 @@ func Freeze(root, migrations, tag string) (*Record, error) {
 		return nil, fmt.Errorf("the last migration here is %d, behind %d, the last of the release before %s",
 			last, before, version)
 	}
+	return &freezing{version: version, code: code, names: names, before: before, last: last}, nil
+}
+
+// declaration is the name of a file holding a release's table declarations,
+// and the code of the release it is for.
+var declaration = regexp.MustCompile(`^(v\d+)_[a-z_]+\.go$`)
+
+// Freeze writes the record of a release's files: every migration past the
+// previous release's last, and every declaration carrying its code. The
+// schema each engine builds is written beside it first, by a test, because
+// only a test has the engines.
+//
+// A release that changes no schema has a record listing no files, with the
+// previous release's last migration as its own. It is still a record: the
+// check refuses a tag with none, and a release that ships nothing new still
+// ships the schema before it.
+func Freeze(root, migrations, tag string) (*Record, error) {
+	p, err := prepare(root, migrations, tag)
+	if err != nil {
+		return nil, err
+	}
+	version, code, names, before, last := p.version, p.code, p.names, p.before, p.last
 	r := &Record{Version: version, Last: last, Digests: map[string]string{}}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# The migrations %s tagged, and the digest of each file below its license header.\n", version)

@@ -521,6 +521,7 @@ last migration as its own.
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
 | A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists in the checkout, before anything is written, and refuses where git cannot say whether it does. A schema change is a migration numbered after its last, for the next release |
+| A release the tree cannot freeze | Refused before anything is written, the schema records included: a version older than one recorded, a version with a part past nine, and a tree whose last migration is behind the release before. A checkout without tags is refused there too |
 | A patch to an older line, after a newer release is recorded | Not cut. A tag is refused unless it is on `main`, and `main` holds the newer release's record and migrations, so every release is newer than the last one recorded |
 
 ### Upgrade rehearsal

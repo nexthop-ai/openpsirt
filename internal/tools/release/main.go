@@ -11,7 +11,9 @@
 // Freezing writes the list of files and their digests. The schema each engine
 // builds is written first, by a test, because only a test has the engines;
 // make release-freeze runs the guard, then both, then the check. The guard
-// runs before the test, because the test rewrites the schema records too.
+// runs before the test, because the test rewrites the schema records too, so
+// it refuses everything freezing would refuse: a tagged release, and every
+// release the tree cannot freeze.
 package main
 
 import (
@@ -19,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 )
@@ -72,7 +75,9 @@ func main() {
 // guard refuses to freeze a release whose tag exists in the checkout at dir,
 // and refuses where git cannot say. A tagged release's record is what it
 // shipped, and freezing it again would rewrite that record to whatever the
-// tree holds now.
+// tree holds now. It then refuses whatever freezing itself would, before the
+// schema records are written: a checkout without tags otherwise rewrites a
+// shipped release's schema and is refused only afterwards.
 func guard(dir, tag string) error {
 	version, err := released.Base(tag)
 	if err != nil {
@@ -86,7 +91,7 @@ func guard(dir, tag string) error {
 		return fmt.Errorf("%s is tagged, and its record is what it shipped; "+
 			"a later migration belongs to the next release", version)
 	}
-	return nil
+	return released.Ready(filepath.Join(dir, root), filepath.Join(dir, migrations), tag)
 }
 
 // tagged reports whether a release's own tag exists in the checkout at dir.
