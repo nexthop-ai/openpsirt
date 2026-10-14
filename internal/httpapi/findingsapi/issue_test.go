@@ -293,7 +293,7 @@ func TestAnIssueIsNotDescribedInTheWordsOfAFlawItsReaderMayNotRead(t *testing.T)
 		}
 		recorded := scanned
 		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
-		recorded.PlaceIdentity = "recorded-" + scanned.PlaceIdentity
+		recorded.PlaceIdentity = finding.PlaceIdentity("libnl-3-200", "recorded-by-hand")
 		if _, err := r.DB.DB.NewInsert().Model(&recorded).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
