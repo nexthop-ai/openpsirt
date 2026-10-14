@@ -224,6 +224,7 @@ take the word.
 |---|---|
 | A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
 | A claim is drawn in the color of what it does | Warm where it hides risk, which is every outcome but affected, and green where it does not. An outcome with no color of its own draws as the neutral base, the color of a claim that hides nothing; a web test fails on an outcome the client names that the stylesheet does not color |
+| A claim's card carries a stripe for where it stands, the same on the claim page and the finding screen | Pending while a second person is needed or the claim is still argued; in force once agreed, or while proposed where nothing waits on a second person; lapsed once it stopped applying. A withdrawn claim carries none: its proposer ended it, which is neither standing nor lapsing. One mapping serves both screens |
 
 ## The shell
 

@@ -10,6 +10,7 @@
 // did it come to say that.
 
 import { useAfterClaim, useClaimApprovals, useClaimRevisions } from "../api/claims";
+import { happenedOf, stripeOf } from "../ui/stripe";
 import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
 import { at, on } from "../ui/when";
@@ -129,13 +130,7 @@ export function Standing({
   const approvals = useClaimApprovals(id);
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
-  const stripe = waiting
-    ? "pending"
-    : state === "approved" || state === "proposed"
-      ? "approved"
-      : state === "lapsed"
-        ? "lapsed"
-        : "";
+  const stripe = stripeOf(happenedOf(state, !!sentBackAt), !!claim.decision?.needs_approval);
 
   return (
     <div className={`card standing ${stripe}`}>
