@@ -48,11 +48,17 @@ func carrying(body []byte) (byte, int, bool) {
 func text(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".go", ".ts", ".tsx", ".js", ".mjs", ".css", ".md", ".yaml", ".yml",
-		".json", ".sql", ".sh", ".html", ".txt", ".mod", ".sum", ".toml":
+		".json", ".sql", ".sh", ".html", ".txt", ".mod", ".sum", ".toml",
+		".svg", ".tpl", ".py", ".in":
 		return true
 	}
-	name := filepath.Base(path)
-	return name == "Makefile" || name == "Dockerfile"
+	switch name := filepath.Base(path); name {
+	case "Dockerfile", ".gitignore", ".dockerignore", ".prettierignore":
+		return true
+	default:
+		// Makefile.demo is a makefile whose extension is not a language.
+		return name == "Makefile" || strings.HasPrefix(name, "Makefile.")
+	}
 }
 
 func main() {
