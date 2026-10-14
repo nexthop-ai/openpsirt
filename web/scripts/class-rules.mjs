@@ -105,3 +105,26 @@ export function emits(css, name) {
 export function styleless(names, css) {
   return names.filter((name) => !emits(css, name)).sort();
 }
+
+// Names that come from somewhere other than our own markup, so their absence
+// says nothing: a charting library writes its own, and print rules are matched
+// by the browser rather than by us.
+const foreign = /^(recharts-|markdown-body$)/;
+
+// unusedClasses is every name, in order, that the markup never applies. The
+// markup is the quoted runs of the source, each with a space either side.
+//
+// A name counts as applied after whitespace, a quote, a backtick or a dot, and
+// before any of those, a colon, or "$": a name at the head of a template
+// literal is followed by the interpolation that adds its modifiers —
+// `noticekind${…}` — and reading that as never applied would ask somebody to
+// delete a rule that is in use.
+export function unusedClasses(names, markup) {
+  return names.filter(
+    (name) =>
+      !foreign.test(name) &&
+      !new RegExp(`[\\s"'\`.]${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}[\\s"'\`:.$]`).test(
+        markup,
+      ),
+  );
+}

@@ -24,6 +24,7 @@ import {
   positionedModifiers,
   rulesIn,
   styleless as unstyled,
+  unusedClasses,
 } from "./class-rules.mjs";
 import { createRequire } from "node:module";
 import { sourceFiles, SRC as src } from "./parsed.mjs";
@@ -162,22 +163,7 @@ for (const full of sourceFiles({ ext: [".ts", ".tsx"], tests: true })) {
 }
 const markup = sources.join("\n");
 
-// Names that come from somewhere other than our own markup, so their absence
-// says nothing: a charting library writes its own, and print rules are matched
-// by the browser rather than by us.
-const foreign = /^(recharts-|markdown-body$)/;
-
-// The trailing class admits "$" because a name at the head of a template
-// literal is followed by the interpolation that adds its modifiers —
-// `noticekind${…}` — and reading that as never applied would ask somebody to
-// delete a rule that is in use.
-const unused = names.filter(
-  (name) =>
-    !foreign.test(name) &&
-    !new RegExp(`[\\s"'\`.]${name.replace(/[-[\]{}()*+?.\\^$|]/g, "\\$&")}[\\s"'\`:.$]`).test(
-      markup,
-    ),
-);
+const unused = unusedClasses(names, markup);
 
 if (unused.length > 0) {
   console.error(`${unused.length} class name(s) are styled and never applied:\n`);

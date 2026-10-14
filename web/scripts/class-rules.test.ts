@@ -2,8 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-// @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { cssRules, emits, positionedModifiers, rulesIn, styleless } from "./class-rules.mjs";
+import {
+  cssRules,
+  emits,
+  positionedModifiers,
+  rulesIn,
+  styleless,
+  unusedClasses,
+  // @ts-expect-error - a gate script, which is plain ESM with no types of its own
+} from "./class-rules.mjs";
 
 // A class used as a modifier beside another, which also has a rule of its own
 // that takes an element out of normal flow, positions anything carrying both
@@ -114,5 +121,17 @@ describe("whether a class is styled", () => {
   it("reports a bespoke name beside a utility that shares its opening", () => {
     const css = ".text-sm { font-size: 1px; }\n.block { display: block; }";
     expect(styleless(["text-sm", "text", "block"], css)).toEqual(["text"]);
+  });
+});
+
+describe("a class the markup never applies", () => {
+  const markup = ` due over \n noticekind\${kind} \n "chip" `;
+
+  it("is reported where no quoted run carries it", () => {
+    expect(unusedClasses(["due", "gone"], markup)).toEqual(["gone"]);
+  });
+
+  it("is not reported at the head of a template, or where a library writes it", () => {
+    expect(unusedClasses(["noticekind", "chip", "recharts-dot"], markup)).toEqual([]);
   });
 });
