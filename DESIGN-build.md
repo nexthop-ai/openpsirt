@@ -931,7 +931,8 @@ the npm half refuses one: an import or re-export that is not type-only, a
 dynamic import, or a stylesheet `@import` naming a package the lockfile marks
 for development. Tests and the test harness are not shipped and are not read.
 A package the bundle carries is declared a dependency, where its license is
-checked.
+checked. A run that reads no import from the source refuses, as one that finds
+no shipped dependency in the lockfile does.
 
 | Exception | Why |
 |---|---|

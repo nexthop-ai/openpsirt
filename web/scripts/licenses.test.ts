@@ -138,7 +138,8 @@ describe("a development dependency in the bundle", () => {
     "node_modules/@build/tool": { license: "GPL-3.0-only", dev: true },
     "node_modules/styles": { license: "MIT", devOptional: true },
   };
-  const found = (files: Record<string, string>) => shippedImports(files, packages) as string[];
+  const found = (files: Record<string, string>) =>
+    (shippedImports(files, packages) as { found: string[] }).found;
 
   it("is reported where the source imports it", () => {
     expect(
@@ -160,5 +161,12 @@ describe("a development dependency in the bundle", () => {
         "ui/b.ts": `import type { X } from "@build/tool"; import { y } from "shipped"; import "./c";`,
       }),
     ).toEqual([]);
+  });
+
+  it("counts every specifier it read, and none from a test", () => {
+    const read = (files: Record<string, string>) =>
+      (shippedImports(files, packages) as { read: number }).read;
+    expect(read({ "ui/a.tsx": `import { y } from "shipped"; import "./c";` })).toBe(2);
+    expect(read({ "ui/a.test.tsx": `import { y } from "shipped";` })).toBe(0);
   });
 });

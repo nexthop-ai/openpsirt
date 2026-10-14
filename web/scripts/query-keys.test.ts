@@ -109,4 +109,23 @@ describe("an invalidation whose key is a name", () => {
       ),
     ).toEqual([null, null]);
   });
+
+  it("is resolved through a shorthand property", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept"], queryFn });`,
+        `const queryKey = ["gone"]; q.invalidateQueries({ queryKey });`,
+        `const queryKey = ["kept"]; q.invalidateQueries({ queryKey });`,
+      ),
+    ).toEqual([["gone"]]);
+  });
+
+  it("is reported as unread where the options are not an object literal", () => {
+    expect(
+      found(`useQuery({ queryKey: ["kept"], queryFn });`, `q.invalidateQueries(opts);`),
+    ).toEqual([null]);
+    expect(found(`useQuery({ queryKey: ["kept"], queryFn });`, `q.invalidateQueries();`)).toEqual(
+      [],
+    );
+  });
 });

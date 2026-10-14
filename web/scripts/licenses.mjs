@@ -205,14 +205,17 @@ function importsOf(file, text) {
 }
 
 // shippedImports is every development dependency the shipped source imports,
-// as a line naming the package and the file. It takes the source as
-// { path relative to src/: text } and a lockfile's `packages`. Tests and the
-// test harness under src/test/ are not shipped and are not read.
+// as a line naming the package and the file, and how many import specifiers
+// it read. It takes the source as { path relative to src/: text } and a
+// lockfile's `packages`. Tests and the test harness under src/test/ are not
+// shipped and are not read.
 export function shippedImports(files, packages) {
   const found = [];
+  let read = 0;
   for (const [file, text] of Object.entries(files)) {
     if (file.includes(".test.") || file.split(/[\\/]/)[0] === "test") continue;
     for (const specifier of importsOf(file, text)) {
+      read++;
       const name = packageNamed(specifier);
       const entry = name && packages[`node_modules/${name}`];
       if (entry && (entry.dev || entry.devOptional)) {
@@ -220,16 +223,19 @@ export function shippedImports(files, packages) {
       }
     }
   }
-  return [...new Set(found)].sort();
+  return { found: [...new Set(found)].sort(), read };
 }
 
-// What to say where no shipped dependency was read, or nothing where some
-// were. A lockfile whose every entry is marked for development, or one that
-// moved, refuses no license for the reason that it examined none.
-export function checkedNothing(checked) {
-  return checked === 0
-    ? "no shipped dependency was found in the lockfile, so this checked nothing"
-    : "";
+// What to say where no shipped dependency or no import was read, or nothing
+// where both were. A lockfile whose every entry is marked for development, or
+// one that moved, refuses no license for the reason that it examined none, and
+// a source tree read from the wrong root passes the bundle check the same way.
+export function checkedNothing(checked, imports) {
+  if (checked === 0)
+    return "no shipped dependency was found in the lockfile, so this checked nothing";
+  if (imports === 0)
+    return "no import was read from the interface's source, so this checked nothing";
+  return "";
 }
 
 // Run when this is the program, not when a test imports it.
@@ -251,9 +257,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       readFileSync(file, "utf8"),
     ]),
   );
-  const imported = shippedImports(source, lock.packages);
+  const { found: imported, read } = shippedImports(source, lock.packages);
 
-  const nothing = checkedNothing(checked);
+  const nothing = checkedNothing(checked, read);
   if (nothing) {
     console.error(nothing);
     process.exit(1);

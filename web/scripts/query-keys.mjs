@@ -17,9 +17,10 @@
 //
 // An invalidation whose key is a name is resolved to the literal it names: a
 // constant holding an array, or the variable of a `for … of` over a literal
-// list of arrays, which is one invalidation per entry. Any other key it cannot
-// read is reported, so a key nobody can check fails the gate rather than
-// passing it.
+// list of arrays, which is one invalidation per entry. A shorthand
+// `{ queryKey }` is the same name. Any other key it cannot read is reported,
+// and so are options handed over as anything but an object literal, so a key
+// nobody can check fails the gate rather than passing it.
 import path from "node:path";
 import ts from "typescript";
 
@@ -38,11 +39,15 @@ function literalPrefix(array) {
   return { words, open: false };
 }
 
-// The expression a `queryKey:` property holds.
+// The expression a `queryKey:` property holds, or the name a shorthand
+// `{ queryKey }` stands for.
 function keyOf(object) {
   for (const property of object.properties) {
     if (ts.isPropertyAssignment(property) && property.name.getText() === "queryKey") {
       return property.initializer;
+    }
+    if (ts.isShorthandPropertyAssignment(property) && property.name.text === "queryKey") {
+      return property.name;
     }
   }
   return null;
@@ -119,6 +124,18 @@ export function keysIn(text, file = "x.tsx", source = parse(text, file)) {
   const reads = [];
   const invalidates = [];
   const walk = (node) => {
+    // Options handed over as anything but an object literal hold a key that
+    // cannot be read here.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "invalidateQueries" &&
+      node.arguments.length > 0 &&
+      !ts.isObjectLiteralExpression(bare(node.arguments[0]))
+    ) {
+      const at = source.getLineAndCharacterOfPosition(node.arguments[0].getStart()).line + 1;
+      invalidates.push({ at, words: [], open: true, unread: true });
+    }
     if (ts.isObjectLiteralExpression(node)) {
       const key = keyOf(node);
       if (key) {

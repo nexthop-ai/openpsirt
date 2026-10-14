@@ -41,10 +41,14 @@ describe("the ladder gate over nothing", () => {
 
 describe("the license gate over nothing", () => {
   it("refuses a lockfile with no shipped dependency", () => {
-    expect(licenses(0)).toContain("checked nothing");
+    expect(licenses(0, 5)).toContain("checked nothing");
   });
 
-  it("says nothing where it checked one", () => {
-    expect(licenses(1)).toBe("");
+  it("refuses source with no import read", () => {
+    expect(licenses(1, 0)).toContain("checked nothing");
+  });
+
+  it("says nothing where it checked one of each", () => {
+    expect(licenses(1, 1)).toBe("");
   });
 });
