@@ -720,7 +720,7 @@ budget, and every bound is configurable.
 | Bounded | Rule |
 |---|---|
 | The report's size | Past the ceiling the run fails. It is not read in part: half a report reads as a product that stopped having problems, which is the failure every other rule here exists to prevent |
-| What the scanner said while running | Past the ceiling the excess is dropped and the run stands. A scanner with a lot to say still scanned |
+| What the scanner said while running | Past the ceiling the beginning is dropped and the end kept, and the run stands. A scanner with a lot to say still scanned, and one that failed says why on its last lines |
 | How many matches one report states | Charged as each match is read rather than after the array, because what a bound stops is the walk |
 | How many addresses one match points at | Bounded separately, because the two multiply: a report inside the match ceiling is still a report of one match pointing at everything |
 | One execution's wall-clock time | A scanner that has stopped making progress fails as a run that failed rather than holding a worker. It stays below the ceiling on one hold (`DESIGN-queue.md`), and the process refuses to start where it does not |

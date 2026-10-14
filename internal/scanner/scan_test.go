@@ -41,6 +41,11 @@ func TestMain(m *testing.M) {
 		fmt.Fprint(os.Stderr, strings.Repeat("x", 200*1024))
 		fmt.Fprint(os.Stderr, "\nthe last thing it said")
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
+	case "complaint-and-fail":
+		// Far more to say than is kept, and the reason it failed last.
+		fmt.Fprint(os.Stderr, strings.Repeat("x", 200*1024))
+		fmt.Fprint(os.Stderr, "\nthe database is out of date")
+		syscall.Exit(1)
 	case "empty":
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
 	case "environment":
@@ -118,8 +123,20 @@ func TestAScannerWithTooMuchToSayStillScanned(t *testing.T) {
 	if len(result.Caution) > 256 {
 		t.Errorf("what it said was kept at %d bytes", len(result.Caution))
 	}
-	if result.Caution == "" {
-		t.Error("what it said was dropped whole rather than bounded")
+	if !strings.Contains(result.Caution, "the last thing it said") {
+		t.Errorf("what it said last was dropped, keeping %q", result.Caution)
+	}
+}
+
+// A scanner that fails says why on its last lines, after whatever else it
+// said. Kept from the front, the reason is what the bound drops.
+func TestAFailedScannersLastWordsAreItsReason(t *testing.T) {
+	_, err := scanning(t, "complaint-and-fail", scanner.Limits{MaxComplaint: 256})
+	if err == nil {
+		t.Fatal("a scanner that exited 1 read as a run that worked")
+	}
+	if !strings.Contains(err.Error(), "the database is out of date") {
+		t.Errorf("the failure does not carry the scanner's last words: %v", err)
 	}
 }
 

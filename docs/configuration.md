@@ -1000,12 +1000,13 @@ each bound left unset keeps the built-in value.
 
 A report past its ceiling fails the run rather than being read in part: half a
 report reads as a product that stopped having problems. Complaints past theirs
-are dropped instead, because a scanner with a lot to say still scanned.
+lose their beginning instead, because a scanner with a lot to say still scanned,
+and one that failed says why at the end.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
 | `OPENPSIRT_SCANNER_MAX_OUTPUT` | `scanner.max_output` | How large one report may be. The load-bearing bound: every count below is bounded by it | 256 MB |
-| `OPENPSIRT_SCANNER_MAX_COMPLAINT` | `scanner.max_complaint` | How much of what a scanner said while running is kept | 1 MB |
+| `OPENPSIRT_SCANNER_MAX_COMPLAINT` | `scanner.max_complaint` | How much of what a scanner said while running is kept, from the end | 1 MB |
 | `OPENPSIRT_SCANNER_MAX_MATCHES` | `scanner.max_matches` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
 | `OPENPSIRT_SCANNER_MAX_REFERENCES` | `scanner.max_references` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |
 

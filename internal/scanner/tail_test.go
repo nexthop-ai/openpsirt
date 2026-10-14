@@ -61,3 +61,35 @@ func TestWhatIsKeptOfAChattyScannerIsStorable(t *testing.T) {
 		}
 	}
 }
+
+// The end-keeping bound is stored too, so it cuts on a character boundary, and
+// it keeps the end whatever size the writes arrive in.
+func TestWhatIsKeptOfTheEndOfAChattyScannerIsStorable(t *testing.T) {
+	for extra := range 4 {
+		kept := trailing{most: int64(1024 + extra)}
+		for range 64 {
+			if _, err := kept.Write([]byte(strings.Repeat("€", 97))); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := kept.Write([]byte("the end")); err != nil {
+			t.Fatal(err)
+		}
+		said := kept.String()
+		if !kept.over {
+			t.Fatalf("at %d bytes nothing was dropped", 1024+extra)
+		}
+		if !utf8.ValidString(said) {
+			t.Errorf("at %d bytes what was kept is not valid UTF-8", 1024+extra)
+		}
+		if int64(len(said)) > kept.most {
+			t.Errorf("at %d bytes it kept %d", 1024+extra, len(said))
+		}
+		if !strings.HasSuffix(said, "the end") {
+			t.Errorf("at %d bytes the end was not kept", 1024+extra)
+		}
+		if int64(kept.kept.Len()) > 2*kept.most {
+			t.Errorf("at %d bytes it held %d between trims", 1024+extra, kept.kept.Len())
+		}
+	}
+}

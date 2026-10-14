@@ -54,3 +54,42 @@ func (b *bounded) String() string { return b.kept.String() }
 // chart ships for the whole process — so a copy taken to read from spends the
 // other half, and the ceiling stops bounding what it was chosen to bound.
 func (b *bounded) Bytes() []byte { return b.kept.Bytes() }
+
+// trailing collects the end of what a subprocess writes, up to a limit.
+//
+// For complaints, where the end is what matters: a scanner that fails says why
+// on its last lines, and a head kept to the limit drops exactly those once it
+// has said more than the limit before them. Trimmed once what is held reaches
+// twice the limit, so memory stays bounded without cutting on every write.
+type trailing struct {
+	kept bytes.Buffer
+	most int64
+	// over says something was dropped from the front.
+	over bool
+}
+
+// Write takes what the subprocess wrote, keeping the end of it.
+func (t *trailing) Write(p []byte) (int, error) {
+	t.kept.Write(p)
+	if int64(t.kept.Len()) > 2*t.most {
+		t.trim()
+	}
+	return len(p), nil
+}
+
+// trim keeps the last of what was written, cut on a character boundary.
+func (t *trailing) trim() {
+	if int64(t.kept.Len()) <= t.most {
+		return
+	}
+	end := bound.Tail(t.kept.String(), int(t.most))
+	t.kept.Reset()
+	t.kept.WriteString(end)
+	t.over = true
+}
+
+// String is the end of what was written, within the limit.
+func (t *trailing) String() string {
+	t.trim()
+	return t.kept.String()
+}

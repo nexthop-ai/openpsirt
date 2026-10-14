@@ -124,7 +124,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 
 	limits := g.Limits.OrDefault()
 	out := bounded{most: limits.MaxOutput}
-	errs := bounded{most: limits.MaxComplaint}
+	errs := trailing{most: limits.MaxComplaint}
 	// Reading the inventory from standard input rather than from a file: a
 	// component name is somebody else's text, and nothing from a scan file is
 	// ever used as a path.
