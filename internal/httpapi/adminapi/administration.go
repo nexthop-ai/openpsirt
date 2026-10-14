@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -563,22 +564,21 @@ func registerAdministration(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		var person *access.Account
-		var productID int64
-		var remaining bool
+		var released int64
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			released = 0
 			store, names, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
 			}
-			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
+			person, err := store.ByIdentity(ctx, in.Identity)
+			if err != nil {
 				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
 			}
 			product, err := names.ProductByName(ctx, in.Product)
 			if err != nil {
 				return core.Undeclared(a.Logger, err, "that product could not be looked up")
 			}
-			productID = product.ID
 			// The role is checked before anything is written, because a word
 			// that is not a role withdraws nothing and would otherwise be
 			// recorded as a withdrawal of it.
@@ -604,8 +604,20 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// than what another administrator leaves behind afterwards. Their
 			// last role here going is what turns their assigned work into work
 			// nobody can reach.
-			if remaining, err = store.HoldsAnythingIn(ctx, person.ID, product.ID); err != nil {
+			remaining, err := store.HoldsAnythingIn(ctx, person.ID, product.ID)
+			if err != nil {
 				return core.WentWrong(a.Logger, "cannot read what they still hold", err)
+			}
+			if remaining || !handsBack(a) {
+				return nil
+			}
+			// Handed back in the withdrawal's own transaction. Done after it,
+			// a failure leaves the role gone and the work with somebody who
+			// can no longer open it, and asking again answers that there is
+			// no such grant before it reaches the hand-back.
+			if released, err = finding.NewStore(tx).ReleaseIn(ctx, subject, person.PartyID,
+				product.ID); err != nil {
+				return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 			}
 			return nil
 		}); err != nil {
@@ -617,17 +629,6 @@ func registerAdministration(api huma.API, a core.Administering) {
 				Released int64 `json:"released" doc:"Findings handed back because that was their last role here"`
 			}
 		}{}
-		if remaining || a.Findings == nil {
-			return out, nil
-		}
-		findings := a.Findings()
-		if findings == nil {
-			return out, nil
-		}
-		released, err := findings.ReleaseIn(ctx, subject, person.PartyID, productID)
-		if err != nil {
-			return nil, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-		}
 		out.Body.Released = released
 		return out, nil
 	})
@@ -712,14 +713,15 @@ func registerAdministration(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		var person *access.Account
-		var unreachable []int64
+		var released int64
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			released = 0
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
 			}
-			if person, err = store.ByIdentity(ctx, in.Identity); err != nil {
+			person, err := store.ByIdentity(ctx, in.Identity)
+			if err != nil {
 				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
 			}
 			role := access.Role(in.Role)
@@ -744,24 +746,28 @@ func registerAdministration(api huma.API, a core.Administering) {
 			// it. An estate role is the last role in every product at once, so
 			// this asks for each.
 			//
-			// The products themselves are read here, in the view the
-			// withdrawal left. Handing the work back is done afterwards: it is
-			// bounded by how much they were holding rather than by the
-			// request, and it is a consequence of the withdrawal rather than
-			// part of it.
+			// The products are read, and the work handed back, in the
+			// withdrawal's own transaction, for the reason the per-product
+			// withdrawal gives: done after it, a failure leaves the work with
+			// somebody who can no longer open it and no request that reaches
+			// the hand-back again.
 			covered, err := store.ProductsCovered(ctx)
 			if err != nil {
 				return core.WentWrong(a.Logger, "cannot read what the grant covered", err)
 			}
-			unreachable = unreachable[:0]
 			for _, productID := range covered {
 				remaining, err := store.HoldsAnythingIn(ctx, person.ID, productID)
 				if err != nil {
 					return core.WentWrong(a.Logger, "cannot read what they still hold", err)
 				}
-				if !remaining {
-					unreachable = append(unreachable, productID)
+				if remaining || !handsBack(a) {
+					continue
 				}
+				moved, err := finding.NewStore(tx).ReleaseIn(ctx, subject, person.PartyID, productID)
+				if err != nil {
+					return core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
+				}
+				released += moved
 			}
 			return nil
 		}); err != nil {
@@ -773,22 +779,15 @@ func registerAdministration(api huma.API, a core.Administering) {
 				Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
 			}
 		}{}
-		if a.Findings == nil {
-			return out, nil
-		}
-		findings := a.Findings()
-		if findings == nil {
-			return out, nil
-		}
-		for _, productID := range unreachable {
-			released, err := findings.ReleaseIn(ctx, subject, person.PartyID, productID)
-			if err != nil {
-				return nil, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-			}
-			out.Body.Released += released
-		}
+		out.Body.Released = released
 		return out, nil
 	})
+}
+
+// handsBack is whether this deployment hands back the work of somebody whose
+// last role in a product went.
+func handsBack(a core.Administering) bool {
+	return a.Findings != nil && a.Findings() != nil
 }
 
 // timeFormat is how a moment is reported.
