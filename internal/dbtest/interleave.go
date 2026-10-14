@@ -132,21 +132,13 @@ func (h *afterRead) AfterQuery(context.Context, *bun.QueryEvent) {}
 
 // Fault makes one statement on a handle fail, by handing the driver a context
 // that has already ended. The failure carries context.Canceled, which is how a
-// test tells it from any other.
+// test tells it from any other. It is a query hook, added to the handle whose
+// statement is to fail.
 type Fault struct {
 	mu    sync.Mutex
 	verb  string
 	table string
 	fired bool
-}
-
-// FailOn returns a handle over db's connections whose armed statement fails,
-// and the fault that arms it.
-func FailOn(db *bun.DB) (*bun.DB, *Fault) {
-	fault := new(Fault)
-	hooked := bun.NewDB(db.DB, db.Dialect())
-	hooked.AddQueryHook(fault)
-	return hooked, fault
 }
 
 // Arm makes the next statement starting with verb and naming table fail.
