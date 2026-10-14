@@ -188,6 +188,7 @@ size limit. A log or an archive is not an inline image and is redirected.
 |---|---|
 | Content type | Chosen by this deployment, never the uploaded one |
 | Disposition | `Content-Disposition: attachment` |
+| File name | The uploaded name without its directory, control characters or format characters, quotes, backslashes and slashes replaced, cut to 120 bytes. A right-to-left override before `fdp.exe` shows a program as a document |
 | Inline display | A small allowlist of raster image types only. A vector image is a document with a scripting engine |
 
 The signed URL carries these as response overrides rather than whatever was

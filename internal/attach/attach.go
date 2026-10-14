@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/uptrace/bun"
 
@@ -150,7 +151,10 @@ func SafeName(name string) string {
 	name = filepath.Base(strings.TrimSpace(name))
 	name = strings.Map(func(r rune) rune {
 		switch {
-		case r < 0x20, r == 0x7f:
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r):
+			// Control characters, and the format characters that reorder or
+			// hide text: a right-to-left override before "fdp.exe" shows a
+			// program as a document.
 			return -1
 		case r == '"', r == '\\', r == '/':
 			return '_'
