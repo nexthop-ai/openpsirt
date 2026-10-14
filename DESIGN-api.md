@@ -178,6 +178,12 @@ it. The harness every route package runs over its mappers reads the whole body
 a fault answers, its list of errors included, and fails a fault that carries any
 detail of its cause.
 
+An act that committed is answered as done. A read made afterwards to name
+things in the answer — who recorded it, which window it counts against — is
+logged where it fails, and the answer carries those names blank. Answered as a
+fault, the caller sends the act again, and an append-only record such as a
+notice is then held twice for good.
+
 A 404 is never built from an error's own text. It asserts that a name reaches
 nothing, and the body then publishes whatever the error carried — for a store
 read, the driver's message. Built that way over a reader returning the driver's

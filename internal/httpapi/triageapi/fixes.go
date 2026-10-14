@@ -50,15 +50,21 @@ func registerFixes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, refusedFix(in, err)
 		}
+		// The naming is recorded. What follows is read for the answer, and a
+		// failure there answers with what the store returned: answered as a
+		// fault, the caller sends it again and is told the record already
+		// names that release.
 		people, err := triage.NewStore(in.DB.DB).PeopleNamed(ctx, []int64{fix.NamedBy})
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "who named this could not be read", err)
+			in.Log().ErrorContext(ctx, "who named a release could not be named",
+				"fix", fix.ID, "error", err)
 		}
 		// Read back as the record's fixes are, so the state of the tag's
 		// scans is answered the same way here as on the record.
 		fixes, err := store.FixesOf(ctx, subject, []int64{fix.ExploitedHereID})
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "the release could not be read back", err)
+			in.Log().ErrorContext(ctx, "a named release could not be read back",
+				"fix", fix.ID, "error", err)
 		}
 		for _, one := range fixes[fix.ExploitedHereID] {
 			if one.ID == fix.ID {

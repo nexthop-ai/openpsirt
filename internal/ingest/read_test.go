@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/uptrace/bun"
 )
 
@@ -168,6 +169,37 @@ func TestAnAcceptedScanBecomesStoredGraph(t *testing.T) {
 		}
 		if waiting.Reference != strconv.FormatInt(f.branch, 10) {
 			t.Errorf("left a scan of %q, want the target just read", waiting.Reference)
+		}
+	})
+}
+
+// A full scan backlog is not the read's failure. The inventory is stored and
+// the scan accepted, and the periodic pass queues the scan once the queue
+// drains.
+func TestAScanReadIntoAFullBacklogIsStillApplied(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		scanID := f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory)
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.queue.Add(ctx, queue.Scan, "somebody else's build"); err != nil {
+			t.Fatal(err)
+		}
+
+		result, err := f.reader.Once(ctx)
+		if err != nil {
+			t.Fatalf("a read into a full backlog failed: %v", err)
+		}
+		if result == nil || result.ScanID != scanID {
+			t.Fatalf("read %+v, want scan %d", result, scanID)
+		}
+		read, err := ingest.NewStore(f.db.DB).ByID(ctx, scanID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if read.Status != ingest.Accepted || read.Failure != "" {
+			t.Errorf("the scan reads %q with %q", read.Status, read.Failure)
 		}
 	})
 }

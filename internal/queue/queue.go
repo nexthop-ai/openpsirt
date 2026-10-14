@@ -624,6 +624,8 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	// The attempt count and the write that acts on it are read in one
 	// transaction, so whether this was the last attempt rests on the value
 	// the statement that buries or re-queues the job was written against.
+	said := head(cause.Error(), mostOfAnError)
+	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		job := new(Job)
 		if err := tx.NewSelect().Model(job).Where("id = ?", id).Scan(ctx); err != nil {
@@ -632,13 +634,20 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 
 		now := q.now().Truncate(time.Microsecond)
 		update := tx.NewUpdate().Model((*Job)(nil)).
-			Set("last_error = ?", head(cause.Error(), mostOfAnError)).
+			Set("last_error = ?", said).
 			Set("claimed_by = NULL").
 			Set("updated_at = ?", now).
 			Where("id = ?", id).
 			Where("state = ?", Running).
 			Where("claimed_by = ?", worker)
 
+		if matched && job.ClaimedBy == nil && job.LastError != nil && *job.LastError == said &&
+			(job.State == Pending || job.State == Dead) {
+			// An earlier attempt matched the row and its commit was reported
+			// refused, and the row reads as that attempt left it: the commit
+			// succeeded and the answer never arrived.
+			return nil
+		}
 		if job.Attempts >= job.MaxAttempts {
 			update = update.Set("state = ?", Dead)
 		} else {
@@ -651,7 +660,11 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 		if err != nil {
 			return err
 		}
-		return held(res)
+		if err := held(res); err != nil {
+			return err
+		}
+		matched = true
+		return nil
 	})
 }
 
@@ -664,6 +677,8 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 // kept where a failure's would be so whoever looks at the queue can read why it
 // is waiting.
 func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after time.Duration, why string) error {
+	said := head(why, mostOfAnError)
+	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
@@ -671,7 +686,7 @@ func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after tim
 			Set("attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END").
 			Set("claimed_by = NULL").
 			Set("run_after = ?", now.Add(after)).
-			Set("last_error = ?", head(why, mostOfAnError)).
+			Set("last_error = ?", said).
 			Set("updated_at = ?", now).
 			Where("id = ?", id).
 			Where("state = ?", Running).
@@ -680,7 +695,25 @@ func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after tim
 		if err != nil {
 			return err
 		}
-		return held(res)
+		lost := held(res)
+		if lost == nil {
+			matched = true
+			return nil
+		}
+		if !matched {
+			return lost
+		}
+		// An earlier attempt matched the row and its commit was reported
+		// refused. Asked of the row rather than assumed, as Succeed asks.
+		ending := new(Job)
+		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+			return lost
+		}
+		if ending.State == Pending && ending.ClaimedBy == nil &&
+			ending.LastError != nil && *ending.LastError == said {
+			return nil
+		}
+		return lost
 	})
 }
 
@@ -779,6 +812,7 @@ var ErrNotSetAside = errors.New("that job was not set aside")
 // transient failure. The last error is kept until something overwrites it, so
 // the evidence of the previous run survives the decision to try again.
 func (q *Queue) Requeue(ctx context.Context, id int64) error {
+	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
@@ -801,10 +835,25 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 		if err != nil {
 			return fmt.Errorf("put job %d back: %w", id, err)
 		}
-		if n == 0 {
+		if n > 0 {
+			matched = true
+			return nil
+		}
+		if !matched {
 			return ErrNotSetAside
 		}
-		return nil
+		// An earlier attempt matched a job set aside and its commit was
+		// reported refused. A job no longer set aside is back on the queue,
+		// which is what was asked: told otherwise, the caller reads the job
+		// as never put back.
+		ending := new(Job)
+		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+			return ErrNotSetAside
+		}
+		if ending.State != Dead {
+			return nil
+		}
+		return ErrNotSetAside
 	})
 }
 

@@ -342,13 +342,13 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// with the scan marked failed and the graph it described current.
 	var applied graph.Applied
 	var claimed finding.ClaimsApplied
-	var overtaken bool
+	var overtaken, backlogged bool
 	if r.beforeApply != nil {
 		r.beforeApply()
 	}
 	if err := database.InTransaction(ctx, r.db.DB,
 		func(ctx context.Context, tx bun.Tx) error {
-			overtaken = false
+			overtaken, backlogged = false, false
 			// Asked again with the build held. The answer above was read
 			// before a parse that can take minutes, and a newer scan applied
 			// meanwhile is replaced by this one if nothing asks. The build's
@@ -374,7 +374,28 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 				claims, stated); err != nil {
 				return err
 			}
-			return NewStore(tx).Made(ctx, scanID, components, placed, rootIdentifier)
+			if err := NewStore(tx).Made(ctx, scanID, components, placed, rootIdentifier); err != nil {
+				return err
+			}
+			// The inventory just stored has to be scanned: it is new, and the
+			// vulnerability data has moved since whatever last looked at this
+			// target. Queued in the transaction that stores it, so the job and
+			// the graph it describes commit together. Queued afterwards, a
+			// failure to queue is reported as the read failing after the read
+			// committed, which marks an applied scan failed and reinstates the
+			// one it overtook.
+			if _, err := r.queue.AddTx(ctx, tx, queue.Scan,
+				strconv.FormatInt(scan.TargetID, 10)); err != nil {
+				// A full backlog is not this scan's failure, and what is due
+				// stays due: the periodic pass asks again once the queue has
+				// drained, which is what it does for a re-scan it could not
+				// queue either.
+				if !errors.Is(err, queue.ErrBacklogFull) {
+					return fmt.Errorf("leave the scanning to be done: %w", err)
+				}
+				backlogged = true
+			}
+			return nil
 		}); err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
 	}
@@ -402,23 +423,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		Retained:       !target.Moves,
 	}
 
-	// The inventory just stored has to be scanned: it is new, and the
-	// vulnerability data has moved since whatever last looked at this target.
-	// The work is left behind rather than done here because it is a different
-	// job with a different rhythm — an inventory is read once and scanned
-	// again and again.
-	//
-	// Asked for after the writes have committed, because a job queued against
-	// an uncommitted graph is worse than one queued a moment late.
-	if _, err := r.queue.Add(ctx, queue.Scan, strconv.FormatInt(scan.TargetID, 10)); err != nil {
-		// A full backlog is not this scan's failure. The inventory was read
-		// and is stored, so marking the scan failed would contradict what is
-		// in the database — and what is due stays due: the periodic pass asks
-		// again once the queue has drained, which is what it does for a
-		// re-scan it could not queue either.
-		if !errors.Is(err, queue.ErrBacklogFull) {
-			return nil, fmt.Errorf("scan %d: leave the scanning to be done: %w", scanID, err)
-		}
+	if backlogged {
 		r.logger.Warn("an inventory was stored with nothing queued to scan it because the "+
 			"queue is full", "scan", scanID, "build", scan.TargetID)
 	}
@@ -427,9 +432,15 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// kept. A tag is not superseded by anything, and re-scanning it years from
 	// now needs both what it contained and what the build had already argued
 	// about its own patches.
+	//
+	// After the apply has committed, so a failure here is not the read's: the
+	// scan is applied, and reported as failed it would be marked so and the
+	// scan it overtook read again over it. The documents are then kept, which
+	// costs storage and changes no answer, and the log line is what says so.
 	if target.Moves {
 		if err := documents.Discard(ctx, scanID); err != nil {
-			return nil, err
+			r.logger.Error("could not let go of what a branch scan sent", "scan", scanID,
+				"build", scan.TargetID, "error", err)
 		}
 	}
 	return result, nil

@@ -5,6 +5,7 @@ package queue_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -271,5 +272,82 @@ func TestWaitingForALeaseOutlastsATakeThatFails(t *testing.T) {
 	}
 	if owner.Unspent() != 0 {
 		t.Errorf("%d commits never happened, so no take failed", owner.Unspent())
+	}
+}
+
+// A commit that succeeded and whose answer never arrived is retried, and the
+// retry finds nothing left to match. Each ending asks the row rather than
+// reporting the job lost or not set aside.
+func TestEndingsAlreadyRecordedAreNotALostClaim(t *testing.T) {
+	const why = "the scanner could not be reached"
+	for _, c := range []struct {
+		name   string
+		landed string
+		act    func(q *queue.Queue, id int64) error
+	}{
+		{"failing", `UPDATE "job" SET "state" = 'pending', "claimed_by" = NULL, "last_error" = '` + why + `'`,
+			func(q *queue.Queue, id int64) error {
+				return q.Fail(t.Context(), id, "worker", errors.New(why))
+			}},
+		{"postponing", `UPDATE "job" SET "state" = 'pending', "claimed_by" = NULL, "last_error" = '` + why + `'`,
+			func(q *queue.Queue, id int64) error {
+				return q.Postpone(t.Context(), id, "worker", time.Minute, why)
+			}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ctx := t.Context()
+			var handle *database.DB
+			var owner *dbtest.Race
+			handle, owner = dbtest.Racing(t, func() {
+				if _, err := handle.ExecContext(context.WithoutCancel(ctx), c.landed); err != nil {
+					t.Errorf("recording the ending between attempts: %v", err)
+				}
+			})
+			q := queue.New(handle, queue.DefaultOptions())
+			if _, err := q.Add(ctx, "ingest", "answer-lost"); err != nil {
+				t.Fatal(err)
+			}
+			job, err := q.Claim(ctx, "worker", "ingest")
+			if err != nil || job == nil {
+				t.Fatalf("claiming: %v", err)
+			}
+			owner.Arm(1)
+			if err := c.act(q, job.ID); err != nil {
+				t.Errorf("%s work whose ending reads recorded answered %v", c.name, err)
+			}
+			if owner.Unspent() != 0 {
+				t.Error("nothing was committed, so no answer was lost")
+			}
+		})
+	}
+}
+
+// The same for putting back work that was set aside: the job is back on the
+// queue, which is what was asked.
+func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
+	ctx := t.Context()
+	var handle *database.DB
+	var owner *dbtest.Race
+	handle, owner = dbtest.Racing(t, func() {
+		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
+			`UPDATE "job" SET "state" = 'pending', "attempts" = 0`); err != nil {
+			t.Errorf("putting the job back between attempts: %v", err)
+		}
+	})
+	q := queue.New(handle, queue.DefaultOptions())
+	job, err := q.Add(ctx, "ingest", "answer-lost")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handle.ExecContext(ctx, `UPDATE "job" SET "state" = 'dead'`); err != nil {
+		t.Fatal(err)
+	}
+	owner.Arm(1)
+	if err := q.Requeue(ctx, job.ID); err != nil {
+		t.Errorf("putting back work that reads put back answered %v", err)
+	}
+	// And a job that was never set aside is still refused.
+	if err := q.Requeue(ctx, job.ID); !errors.Is(err, queue.ErrNotSetAside) {
+		t.Errorf("putting back a job that is waiting answered %v", err)
 	}
 }

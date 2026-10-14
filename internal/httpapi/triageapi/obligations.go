@@ -331,14 +331,20 @@ func registerObligations(api huma.API, in core.Deps) {
 			}
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
+		// The notice is recorded and cannot be taken back. What follows names
+		// things for the answer, and a failure there answers with those names
+		// left blank: answered as a fault, the caller sends it again and a
+		// second notice is recorded for good.
 		byRecord := map[int64][]obligation.Told{told.ExploitedHereID: {*told}}
 		named, err := store.WindowsNamed(ctx, subject, byRecord)
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "the window could not be read", err)
+			in.Log().ErrorContext(ctx, "a recorded notice's window could not be named",
+				"notice", told.ID, "error", err)
 		}
 		people, err := triage.NewStore(in.DB.DB).PeopleNamed(ctx, []int64{told.RecordedBy})
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "who recorded this could not be read", err)
+			in.Log().ErrorContext(ctx, "who recorded a notice could not be named",
+				"notice", told.ID, "error", err)
 		}
 		return &struct{ Body core.NoticeBody }{Body: core.ToldBodies([]obligation.Told{*told}, named, people)[0]}, nil
 	})

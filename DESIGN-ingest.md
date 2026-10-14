@@ -205,6 +205,12 @@ worth more than finding out later. What the build argued is stored against the
 target rather than the scan, because it is what the next vulnerability scan
 has to apply, and by then the documents may be gone.
 
+The scan job is queued in the transaction that applies the scan, so the graph
+and the work to scan it commit together. A full backlog does not fail the read:
+the periodic pass queues the scan once the queue drains. A branch's documents
+are let go after the apply commits, and a failure there is logged and leaves the
+scan applied.
+
 A failure is recorded against the scan, not only against the job. A job that
 keeps retrying is visible only to whoever operates the deployment, which is the
 wrong person to be the only one who knows.
