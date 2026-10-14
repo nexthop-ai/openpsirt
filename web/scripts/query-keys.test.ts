@@ -71,3 +71,42 @@ describe("an invalidation that reaches no read", () => {
     ).toEqual([["gone"]]);
   });
 });
+
+describe("an invalidation whose key is a name", () => {
+  it("is reported per entry of a literal list it loops over", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept"], queryFn });`,
+        `for (const key of [["kept"], ["gone"]]) q.invalidateQueries({ queryKey: key });`,
+      ),
+    ).toEqual([["gone"]]);
+  });
+
+  it("is not reported where every entry it loops over reaches a read", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["a", id], queryFn }); useQuery({ queryKey: ["b"], queryFn });`,
+        `for (const key of [["a"], ["b"]]) q.invalidateQueries({ queryKey: key });`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("is resolved through a constant holding the array", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept"], queryFn });`,
+        `const key = ["gone"] as const; q.invalidateQueries({ queryKey: key });`,
+      ),
+    ).toEqual([["gone"]]);
+  });
+
+  it("is reported as unread where the name is bound to nothing literal", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept"], queryFn });`,
+        `q.invalidateQueries({ queryKey: keyFor(row) });`,
+        `for (const key of keys) q.invalidateQueries({ queryKey: key });`,
+      ),
+    ).toEqual([null, null]);
+  });
+});

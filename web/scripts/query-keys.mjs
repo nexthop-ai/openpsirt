@@ -14,14 +14,16 @@
 // ["home", "trend", scope], and one of ["trend"] does not. A read whose key
 // turns into an expression after its literal part may still match a longer
 // invalidation, so it is counted as one.
+//
+// An invalidation whose key is a name is resolved to the literal it names: a
+// constant holding an array, or the variable of a `for … of` over a literal
+// list of arrays, which is one invalidation per entry. Any other key it cannot
+// read is reported, so a key nobody can check fails the gate rather than
+// passing it.
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
-import { interfaceSources, parse } from "./parsed.mjs";
-
-const here = import.meta.dirname;
-const src = path.join(here, "..", "src");
+import { interfaceSources, parse, SRC } from "./parsed.mjs";
 
 // The string elements a key opens with, and whether anything follows them.
 function literalPrefix(array) {
@@ -36,18 +38,67 @@ function literalPrefix(array) {
   return { words, open: false };
 }
 
-// The array a `queryKey:` property holds, where it is written as one.
+// The expression a `queryKey:` property holds.
 function keyOf(object) {
   for (const property of object.properties) {
-    if (
-      ts.isPropertyAssignment(property) &&
-      property.name.getText() === "queryKey" &&
-      ts.isArrayLiteralExpression(property.initializer)
-    ) {
+    if (ts.isPropertyAssignment(property) && property.name.getText() === "queryKey") {
       return property.initializer;
     }
   }
   return null;
+}
+
+// An expression with any `as`, `satisfies` or parentheses around it taken off.
+function bare(node) {
+  while (
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isParenthesizedExpression(node)
+  ) {
+    node = node.expression;
+  }
+  return node;
+}
+
+// The expression a name is bound to where `at` stands, and whether it is the
+// variable of a `for … of` over that expression. Only a binding by a
+// declaration in an enclosing block, or by an enclosing loop, is found.
+function binding(name, at) {
+  for (let node = at.parent; node; node = node.parent) {
+    if (
+      ts.isForOfStatement(node) &&
+      ts.isVariableDeclarationList(node.initializer) &&
+      node.initializer.declarations.some((d) => ts.isIdentifier(d.name) && d.name.text === name)
+    ) {
+      return { value: node.expression, each: true };
+    }
+    if (ts.isBlock(node) || ts.isSourceFile(node)) {
+      for (const statement of node.statements) {
+        if (!ts.isVariableStatement(statement)) continue;
+        for (const d of statement.declarationList.declarations) {
+          if (ts.isIdentifier(d.name) && d.name.text === name && d.initializer) {
+            return { value: d.initializer, each: false };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// The literal arrays a key stands for: itself where it is one, what a name is
+// bound to where it is a name, and null where neither can be read.
+function literalKeys(key) {
+  const node = bare(key);
+  if (ts.isArrayLiteralExpression(node)) return [node];
+  if (!ts.isIdentifier(node)) return null;
+  const bound = binding(node.text, node);
+  if (!bound) return null;
+  const value = bare(bound.value);
+  if (!ts.isArrayLiteralExpression(value)) return null;
+  if (!bound.each) return [value];
+  const entries = value.elements.map(bare);
+  return entries.every((entry) => ts.isArrayLiteralExpression(entry)) ? entries : null;
 }
 
 // What a call on the query client does with the options it is handed: an
@@ -72,10 +123,14 @@ export function keysIn(text, file = "x.tsx", source = parse(text, file)) {
       const key = keyOf(node);
       if (key) {
         const at = source.getLineAndCharacterOfPosition(key.getStart()).line + 1;
-        const prefix = literalPrefix(key);
         const called = calledAs(node);
-        if (called === "invalidateQueries") invalidates.push({ at, ...prefix });
-        else if (!NAMING.has(called)) reads.push({ at, ...prefix });
+        const keys = literalKeys(key);
+        if (called === "invalidateQueries") {
+          if (keys) for (const each of keys) invalidates.push({ at, ...literalPrefix(each) });
+          else invalidates.push({ at, words: [], open: true, unread: true });
+        } else if (keys && !NAMING.has(called)) {
+          for (const each of keys) reads.push({ at, ...literalPrefix(each) });
+        }
       }
     }
     ts.forEachChild(node, walk);
@@ -95,13 +150,16 @@ export function reaches(invalidation, read) {
 }
 
 // stale is every invalidation, across a set of files, that reaches no read in
-// any of them.
+// any of them, and every invalidation whose key could not be read, which is
+// reported with a null key.
 export function stale(files) {
   const reads = files.flatMap((each) => each.reads);
   const found = [];
   for (const each of files) {
     for (const invalidation of each.invalidates) {
-      if (!reads.some((read) => reaches(invalidation, read))) {
+      if (invalidation.unread) {
+        found.push({ file: each.file, at: invalidation.at, key: null });
+      } else if (!reads.some((read) => reaches(invalidation, read))) {
         found.push({ file: each.file, at: invalidation.at, key: invalidation.words });
       }
     }
@@ -113,7 +171,7 @@ export function stale(files) {
 // invalidations and reads were examined.
 export function sweep() {
   const files = interfaceSources().map(({ file, text, source }) => ({
-    file: path.relative(src, file),
+    file: path.relative(SRC, file),
     ...keysIn(text, file, source),
   }));
   return {
@@ -121,18 +179,4 @@ export function sweep() {
     invalidations: files.reduce((n, each) => n + each.invalidates.length, 0),
     reads: files.reduce((n, each) => n + each.reads.length, 0),
   };
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const { found, invalidations, reads } = sweep();
-  if (invalidations === 0 || reads === 0) {
-    console.error("No invalidation or no read was found, so this checked nothing.");
-    process.exit(1);
-  }
-  for (const each of found) {
-    console.error(
-      `src/${each.file}:${each.at}: invalidates ${JSON.stringify(each.key)}, which no read's key starts with.`,
-    );
-  }
-  if (found.length > 0) process.exit(1);
 }
