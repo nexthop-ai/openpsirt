@@ -580,6 +580,19 @@ func (c *reader) resolveUpstream() {
 	}
 }
 
+// printable drops the control characters from what identifies a component:
+// its name, its version, its identifiers and what it was built from. Dropped
+// before the component is checked, so a name of nothing else is a component
+// with no name.
+func printable(d *graph.Described) {
+	d.Name = graph.Printable(d.Name)
+	d.Version = graph.Printable(d.Version)
+	d.Purl = graph.Printable(d.Purl)
+	d.CPE = graph.Printable(d.CPE)
+	d.UpstreamName = graph.Printable(d.UpstreamName)
+	d.UpstreamVersion = graph.Printable(d.UpstreamVersion)
+}
+
 // into reads one string into dst.
 func (c *reader) into(dst *string) error {
 	value, err := c.b.str()
