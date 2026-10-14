@@ -462,3 +462,52 @@ func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
 		t.Errorf("a whole Zulip configuration was refused: %v", err)
 	}
 }
+
+// The published directory is served to anybody, so it is never the attachment
+// store, a folder holding it, or a folder inside it.
+func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
+	root := t.TempDir()
+	for _, c := range []struct {
+		what    string
+		set     map[string]string
+		refused string
+	}{
+		{"one bucket", map[string]string{"DIRECTORY_BUCKET": "psirt", "ATTACHMENT_BUCKET": "PSIRT"}, "DIRECTORY_BUCKET"},
+		{"one bucket on one endpoint", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://minio.example.test/",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://MINIO.example.test",
+		}, "DIRECTORY_BUCKET"},
+		{"one folder", map[string]string{"DIRECTORY_DIR": root + "/a", "ATTACHMENT_DIR": root + "/a/"}, "DIRECTORY_DIR"},
+		{"the attachments inside the directory", map[string]string{
+			"DIRECTORY_DIR": root, "ATTACHMENT_DIR": root + "/attachments",
+		}, "DIRECTORY_DIR"},
+		{"the directory inside the attachments", map[string]string{
+			"DIRECTORY_DIR": root + "/files/csaf", "ATTACHMENT_DIR": root + "/files",
+		}, "DIRECTORY_DIR"},
+
+		{"two buckets", map[string]string{"DIRECTORY_BUCKET": "csaf", "ATTACHMENT_BUCKET": "psirt"}, ""},
+		{"one name on two stores", map[string]string{
+			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "https://one.example.test",
+			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "https://two.example.test",
+		}, ""},
+		{"sibling folders", map[string]string{"DIRECTORY_DIR": root + "/csaf", "ATTACHMENT_DIR": root + "/csaf-private"}, ""},
+		{"a bucket beside a folder", map[string]string{"DIRECTORY_DIR": root, "ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_DIR": root}, ""},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			t.Setenv(envPrefix+"DIRECTORY_URL", "https://psirt.example.test/csaf")
+			for key, value := range c.set {
+				t.Setenv(envPrefix+key, value)
+			}
+			_, err := Load()
+			if c.refused == "" {
+				if err != nil {
+					t.Errorf("refused: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), envPrefix+c.refused) {
+				t.Errorf("answered %v, want a refusal naming %s", err, envPrefix+c.refused)
+			}
+		})
+	}
+}

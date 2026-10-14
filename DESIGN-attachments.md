@@ -131,6 +131,7 @@ declared length can accept it before the client notices more.
 |---|---|
 | Configured credentials win over the environment's | An operator who names a key means that key |
 | A key without its secret, a secret without its key, and a session token with no key and no name in the endpoint are refused at startup | Dropped, the process runs as whatever identity the environment offers, and nothing says the configured one went unused |
+| The published directory is never the attachment store | Refused at startup: one bucket name on one endpoint, both unset counting as the provider's default, or one folder, or a folder holding or inside the other. Everything in the directory is served to anybody, and an attachment is fetched only after its finding's visibility is checked (REQ-70) |
 | A refusal names the settings of the store it is about | The attachment store and the provider directory's store are configured alike under two prefixes, and a message naming the other store's setting sends the operator to settings that are fine |
 
 ### The filesystem store

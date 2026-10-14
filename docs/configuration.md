@@ -686,7 +686,7 @@ web server serves them, at the address you give below.
 | `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | `directory.session_token` | A session token, where the credentials are temporary ones. Refused without a key and secret, or a name in the endpoint | unset |
 | `OPENPSIRT_DIRECTORY_PATH_STYLE` | `directory.path_style` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
 | `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | `directory.allow_http` | Accept a store endpoint that is not `https` and is not this machine | off |
-| `OPENPSIRT_DIRECTORY_DIR` | `directory.dir` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
+| `OPENPSIRT_DIRECTORY_DIR` | `directory.dir` | A directory on this machine to write the files into instead. The bucket wins where both are set. Refused at startup where it is, holds or sits inside `OPENPSIRT_ATTACHMENT_DIR`, and a bucket is refused where it is the attachment bucket on the same endpoint | unset |
 | `OPENPSIRT_DIRECTORY_LIST` | `directory.list` | Tell aggregators they may list you | on |
 | `OPENPSIRT_DIRECTORY_MIRROR` | `directory.mirror` | Tell aggregators they may mirror your documents | off |
 

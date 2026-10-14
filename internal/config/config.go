@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -607,6 +608,9 @@ func load(given map[string]string) (Config, error) {
 				"OPENPSIRT_DIRECTORY_DIR — a directory written with no address it is " +
 				"served from states addresses nobody can resolve")
 	}
+	if err := apart(c.Directory, c.Attachments); err != nil {
+		return Config{}, err
+	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
@@ -657,6 +661,58 @@ func absoluteBase(base string) error {
 			redact.URL(base))
 	}
 	return nil
+}
+
+// apart refuses a published directory that is the attachment store, or holds
+// it, or sits inside it.
+//
+// What the directory holds is served to anybody, and an attachment is fetched
+// only after its finding's visibility is checked (REQ-70). Sharing one store
+// serves every attachment unauthenticated. A bucket wins over a folder in each,
+// so each is compared in the form it takes.
+func apart(directory, attachments Store) error {
+	if bucket := strings.TrimSpace(directory.Bucket); bucket != "" {
+		if other := strings.TrimSpace(attachments.Bucket); strings.EqualFold(bucket, other) &&
+			sameEndpoint(directory.Endpoint, attachments.Endpoint) {
+			return fmt.Errorf("OPENPSIRT_DIRECTORY_BUCKET: names the attachment store's " +
+				"bucket, and everything in the directory is served to anybody: give the " +
+				"directory a bucket of its own")
+		}
+		return nil
+	}
+	dir, other := strings.TrimSpace(directory.Dir), strings.TrimSpace(attachments.Dir)
+	if dir == "" || other == "" || strings.TrimSpace(attachments.Bucket) != "" {
+		return nil
+	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: %w", err)
+	}
+	other, err = filepath.Abs(other)
+	if err != nil {
+		return fmt.Errorf("OPENPSIRT_ATTACHMENT_DIR: %w", err)
+	}
+	if within(dir, other) || within(other, dir) {
+		return fmt.Errorf("OPENPSIRT_DIRECTORY_DIR: is, holds or sits inside " +
+			"OPENPSIRT_ATTACHMENT_DIR, and everything in the directory is served to " +
+			"anybody: give each a folder of its own")
+	}
+	return nil
+}
+
+// sameEndpoint reports whether two object store endpoints name one service.
+// Both unset is the provider's default for each.
+func sameEndpoint(a, b string) bool {
+	norm := func(endpoint string) string {
+		return strings.TrimRight(strings.ToLower(strings.TrimSpace(endpoint)), "/")
+	}
+	return norm(a) == norm(b)
+}
+
+// within reports whether path is root or a folder below it.
+func within(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // plainAddress reads an address that stands alone: a scheme from schemes, a
