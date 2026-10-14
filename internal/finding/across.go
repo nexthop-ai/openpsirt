@@ -197,22 +197,37 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		})
 	}
 
+	// Two versions of one source in one build are ordered by the ecosystem's
+	// own ordering where the fold has one, so 9.2 lists before 10.1, and by
+	// their text where it has none.
+	schemes := map[string]vercmp.Scheme{}
+	for _, key := range order {
+		if _, ok := schemes[key.fold]; !ok {
+			schemes[key.fold] = held.scheme(key.fold)
+		}
+	}
+	sort.SliceStable(order, func(i, j int) bool {
+		a, b := rows[order[i]], rows[order[j]]
+		if a.Stream != b.Stream {
+			return a.Stream < b.Stream
+		}
+		if a.Variant != b.Variant {
+			return a.Variant < b.Variant
+		}
+		if a.Source != b.Source {
+			return a.Source < b.Source
+		}
+		if scheme := schemes[order[i].fold]; scheme == schemes[order[j].fold] {
+			if n, ok := vercmp.Order(scheme, a.SourceVersion, b.SourceVersion); ok && n != 0 {
+				return n < 0
+			}
+		}
+		return a.SourceVersion < b.SourceVersion
+	})
 	out := make([]PerBuild, 0, len(order))
 	for _, key := range order {
 		out = append(out, *rows[key])
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Stream != out[j].Stream {
-			return out[i].Stream < out[j].Stream
-		}
-		if out[i].Variant != out[j].Variant {
-			return out[i].Variant < out[j].Variant
-		}
-		if out[i].Source != out[j].Source {
-			return out[i].Source < out[j].Source
-		}
-		return out[i].SourceVersion < out[j].SourceVersion
-	})
 	return out, nil
 }
 

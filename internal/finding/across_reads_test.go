@@ -421,3 +421,36 @@ func TestEachBinarysCountIsTheSameReadInThePassOrOnItsOwn(t *testing.T) {
 		}
 	})
 }
+
+func TestTwoVersionsOfASourceInOneBuildAreListedInTheEcosystemsOrder(t *testing.T) {
+	// Two versions of one source in one build are two folds, and the earlier
+	// version lists first by the ecosystem's ordering, where text order puts
+	// 10.1 ahead of 9.2.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		older, newer := builtFrom("libcurl4t64", "9.2"), builtFrom("libcurl3t64-gnutls", "10.1")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, older, newer},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: older}, {Parent: swss, Child: newer},
+			},
+		})
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-81", older), found("CVE-2026-82", newer),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 2 {
+			t.Fatalf("%d entries, want one per version of the source", len(builds))
+		}
+		if builds[0].SourceVersion != "9.2" || builds[1].SourceVersion != "10.1" {
+			t.Errorf("listed as %s then %s, want 9.2 then 10.1",
+				builds[0].SourceVersion, builds[1].SourceVersion)
+		}
+	})
+}

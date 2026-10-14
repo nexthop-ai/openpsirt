@@ -277,6 +277,11 @@ and both ends are drawn.
 Both ends key their rows on the fold, so an upgrade reads the same from either
 direction.
 
+| Ordering | |
+|---|---|
+| The bundle list breaks its last tie on the fold | The fold is the last column a bundle is grouped on, so two bundles equal on every other key keep one order across pages |
+| One source at two versions in one build lists the earlier version first | By the ecosystem's version ordering where the fold has one, and by text where it has none |
+
 The version in hand and the version being moved to are both stored with the
 commitment. They are read off the findings that are still open, and landing the
 upgrade closes them — so a plan deriving them went blank on an upgrade exactly

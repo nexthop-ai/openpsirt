@@ -243,3 +243,43 @@ func TestABundleNamesEachPackageAndBuildOnceInNameOrder(t *testing.T) {
 		}
 	})
 }
+func TestBundlesTiedOnEveryOtherKeyAreOrderedByTheirFold(t *testing.T) {
+	// Two versions of one source, each fixed in the same version with the same
+	// urgency and issue count, tie on every column but the fold. The fold
+	// breaks the tie, so a page boundary between them is a boundary.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		older, newer := builtFrom("libcurl4t64", "8.5.0-3"), builtFrom("libcurl3t64-gnutls", "8.5.0-2")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, older, newer},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: swss, Child: older}, {Parent: swss, Child: newer},
+			},
+		})
+		fixed := func(id string, on graph.Described) finding.Reported {
+			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: on,
+				FixState: finding.FixedUpstream, FixedIn: "8.5.0-9"}
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			fixed("CVE-2026-91", older), fixed("CVE-2026-91", newer),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		var folds []string
+		for offset := 0; offset < 2; offset++ {
+			page, total, err := f.store.Bundles(ctx, who, f.scope, 1, offset, finding.Filter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if total != 2 || len(page) != 1 {
+				t.Fatalf("page %d holds %d of %d, want one of two", offset, len(page), total)
+			}
+			folds = append(folds, page[0].Fold)
+		}
+		if folds[0] >= folds[1] {
+			t.Errorf("the two pages hold folds %v, want two in ascending order", folds)
+		}
+	})
+}
