@@ -131,7 +131,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	if err != nil {
 		return nil, false, err
 	}
-	chains := unwind(climbed)
+	chains := climbed.unwind()
 
 	// Merged by path rather than by component, because a tree is paths: the
 	// same library under two containers is two places somebody is looking at,

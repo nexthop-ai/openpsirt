@@ -6,6 +6,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -13,23 +14,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// depth bounds the recursive walk that carries how far it has come: the climb
-// that draws routes.
+// depth bounds how far up a route is drawn: the way down to a component on a
+// finding, and what sits above it.
 //
 // The graphs an inventory describes are containment a few levels deep — the
 // deepest route measured in a real image was three steps — so this is not a
-// bound on a build, it is a bound on a document in a loop. A cycle in the
-// edges would otherwise be walked until the engine gave up, and the engines
-// give up differently: PostgreSQL and SQLite do not stop, and the other two
-// stop after their bound on rounds — MySQL with an error, MariaDB returning
-// what it has. Bounded here, a cycle costs at most this many steps and the
-// component it hides is reported as unplaced, which is what it is.
+// bound on a build. A component more than this many steps below every root is
+// reported as unplaced, which is what a document in a loop leaves it as.
 //
-// The walks down — the count of what is open beneath a component, and the
-// subtree a list is narrowed to — carry no depth, because carrying one
-// multiplies their rows; the union ends their cycles instead. They run as far
-// as the edges go, which is why the connection lifts the bound on rounds on
-// the two engines that have one.
+// No walk carries a depth in its rows, because carrying one multiplies them:
+// the union adds a node once and that ends a cycle. The walks run as far as
+// the edges go, which is why the connection lifts the bound on rounds on the
+// two engines that have one, and the bound is applied to the routes drawn
+// from what they read.
 const depth = 64
 
 // Within is the components at one component and everywhere beneath it in a
@@ -279,14 +276,13 @@ type adoption struct {
 	IDs []int64
 }
 
-// step is one node on a way up from a component, as the database reports it:
-// which walk it belongs to, where it is, where it was reached from, and how
-// far up it sits.
-type step struct {
-	Start       int64  `bun:"start"`
+// rise is one node above the components asked about, as the database
+// reports it: where it is, what it is, and one node directly above it. A node
+// with several parents is several rows, and one with none — a root, or a
+// component the inventory placed nowhere — is one row with no parent.
+type rise struct {
 	Node        int64  `bun:"node"`
-	Via         int64  `bun:"via"`
-	Depth       int    `bun:"depth"`
+	Parent      *int64 `bun:"parent"`
 	ComponentID int64  `bun:"component_id"`
 	IsRoot      bool   `bun:"is_root"`
 	Name        string `bun:"name"`
@@ -294,9 +290,26 @@ type step struct {
 	Purl        string `bun:"purl"`
 }
 
-// climb reads every way up from each of these components, to the bound, in
-// one statement: each row is a node on a route, with the node it was reached
-// from, so the routes can be unwound.
+// region is everything above a set of components in one build: the nodes, and
+// the open edges between them, which is what a route up is drawn from.
+type region struct {
+	at      map[int64]rise
+	parents map[int64][]int64
+	// starts is the nodes of each component asked about.
+	starts map[int64][]int64
+}
+
+// climb reads everything above each of these components in one statement:
+// every node on any way up, each with the nodes directly above it.
+//
+// The recursion carries a node and nothing else, so the union adds each node
+// once and a cycle ends where it closes. Carrying the start or the depth keeps
+// a node once per start and once per length of route to it, which a document
+// whose components all depend on each other multiplies by both: thirty such
+// components are 870 edges, and with the start and the depth carried one
+// start returned 55,060 rows and thirty starts 1,651,800. Here the rows are
+// the nodes above the page and the edges among them, however many starts
+// there are.
 //
 // The recursive step does not repeat the build, and the two downward walks
 // do. That asymmetry is the indexes rather than an omission: those walk on
@@ -305,30 +318,84 @@ type step struct {
 // which a build predicate cannot help and could push a planner off. The answer
 // is the same either way — a node identifier is unique across builds, so an
 // edge of another build cannot match a node of this one.
-func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) ([]step, error) {
-	var rows []step
+func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) (region, error) {
+	var rows []rise
 	err := s.db.NewRaw(`WITH RECURSIVE "up" AS (
-		SELECT n.id AS "start", n.id AS "node", n.id AS "via", 0 AS "depth"
+		SELECT n.id AS "node"
 		FROM "graph_node" AS "n"
 		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
 		UNION
-		SELECT u.start, e.parent_id, u.node, u.depth + 1
+		SELECT e.parent_id
 		FROM "up" AS "u" CROSS JOIN "graph_edge" AS "e"
-		WHERE e.child_id = u.node AND e.closed_scan_id IS NULL
-		  AND u.depth < ? AND e.parent_id <> e.child_id
+		WHERE e.child_id = u.node AND e.closed_scan_id IS NULL AND e.parent_id <> e.child_id
 	)
-	SELECT u.start AS "start", u.node AS "node", u.via AS "via", u.depth AS "depth",
+	SELECT u.node AS "node", e.parent_id AS "parent",
 	       n.component_id AS "component_id", n.is_root AS "is_root",
 	       c.name AS "name", c.version AS "version", c.purl AS "purl"
 	FROM "up" AS "u"
 	JOIN "graph_node" AS "n" ON n.id = u.node
-	JOIN "component" AS "c" ON c.id = n.component_id`,
-		targetID, bun.List(componentIDs), depth).
+	JOIN "component" AS "c" ON c.id = n.component_id
+	LEFT JOIN "graph_edge" AS "e"
+	  ON e.child_id = u.node AND e.closed_scan_id IS NULL AND e.parent_id <> e.child_id`,
+		targetID, bun.List(componentIDs)).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("walk up from what is on the page: %w", err)
+		return region{}, fmt.Errorf("walk up from what is on the page: %w", err)
 	}
-	return rows, nil
+	return regionOf(rows, componentIDs), nil
+}
+
+// regionOf indexes what climb read. Parents are held in node order, so the
+// route chosen among routes of one length is the same on every read.
+func regionOf(rows []rise, componentIDs []int64) region {
+	r := region{at: map[int64]rise{}, parents: map[int64][]int64{}, starts: map[int64][]int64{}}
+	asked := make(map[int64]bool, len(componentIDs))
+	for _, id := range componentIDs {
+		asked[id] = true
+	}
+	for _, row := range rows {
+		if _, seen := r.at[row.Node]; !seen {
+			r.at[row.Node] = row
+			if asked[row.ComponentID] {
+				r.starts[row.ComponentID] = append(r.starts[row.ComponentID], row.Node)
+			}
+		}
+		if row.Parent != nil {
+			r.parents[row.Node] = append(r.parents[row.Node], *row.Parent)
+		}
+	}
+	for _, held := range r.parents {
+		slices.Sort(held)
+	}
+	for _, held := range r.starts {
+		slices.Sort(held)
+	}
+	return r
+}
+
+// above is every node within the bound above these, breadth first, each once.
+func (r region) above(starts []int64) []int64 {
+	seen := map[int64]bool{}
+	for _, node := range starts {
+		seen[node] = true
+	}
+	var out []int64
+	level := starts
+	for d := 0; d < depth && len(level) > 0; d++ {
+		var next []int64
+		for _, node := range level {
+			for _, parent := range r.parents[node] {
+				if seen[parent] {
+					continue
+				}
+				seen[parent] = true
+				out = append(out, parent)
+				next = append(next, parent)
+			}
+		}
+		level = next
+	}
+	return out
 }
 
 // Above is every component above this one in a build, on any route up to the
@@ -343,13 +410,14 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
 	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
 		return nil, err
 	}
-	rows, err := s.climb(ctx, targetID, []int64{componentID})
+	climbed, err := s.climb(ctx, targetID, []int64{componentID})
 	if err != nil {
 		return nil, err
 	}
 	var ids []int64
 	seen := map[int64]bool{componentID: true}
-	for _, row := range rows {
+	for _, node := range climbed.above(climbed.starts[componentID]) {
+		row := climbed.at[node]
 		if row.IsRoot || seen[row.ComponentID] {
 			continue
 		}
@@ -376,12 +444,12 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
 // is often the same word twice, and two identical rows are not two answers.
 //
 // Read as one recursive statement upward from every component asked about,
-// rather than every edge in the build read into memory and walked here. The
-// first version did the latter, and it was measured at three to eighteen
-// milliseconds — true, and a couple of megabytes allocated on the screen
-// opened most, scaling with the graph rather than with the page. Upward is the
-// cheap direction: a component has few parents and the routes are a handful of
-// rows, so the statement returns what is on the way and nothing else.
+// rather than every edge in the build read into memory and walked here.
+// Reading the whole build was measured at three to eighteen milliseconds and a
+// couple of megabytes allocated on the screen opened most, scaling with the
+// graph rather than with the page. Upward is the cheap direction: a component
+// has few parents, so the statement returns what is on the way and nothing
+// else, and the routes are drawn from it here.
 //
 // With a component reached several ways, the shortest way down is the one
 // returned. A path is being shown to explain a position rather than to
@@ -405,53 +473,86 @@ func (s *Store) Chains(ctx context.Context, subject access.Subject, targetID int
 	if err := s.knowsBuild(ctx, subject, targetID); err != nil {
 		return nil, err
 	}
-	rows, err := s.climb(ctx, targetID, componentIDs)
+	climbed, err := s.climb(ctx, targetID, componentIDs)
 	if err != nil {
 		return nil, err
 	}
-	return unwind(rows), nil
+	return climbed.unwind(), nil
 }
 
-// unwind turns what climb read into one chain per component, root first.
+// unwind draws one chain per component asked about, root first: the shortest
+// way down from a root within the bound.
 //
-// Each route is unwound from the root back down to where it started, a row at
-// a time: the row at one depth names the node it was reached from, which is
-// the row at the depth below. Where several rows sit at the same node and
-// depth they are different routes of the same length, and any one of them is
-// the shortest.
+// One breadth-first walk down from every root in the region, over the edges
+// climb read, gives each node its distance from the nearest root and the node
+// above it on a shortest route. A component's chain is then followed up from
+// whichever of its nodes is nearest, so the work is the size of the region
+// once rather than once per component. Roots, parents and starts are taken in
+// node order, so among routes of one length the same one is drawn every time.
 //
-// Apart from the statement because two callers unwind the same rows: a
-// finding's own chain, and the tree the subject's own work hangs from . Two
+// Apart from the statement because two callers unwind the same region: a
+// finding's own chain, and the tree the subject's own work hangs from. Two
 // copies of this would be two answers to "which way down".
-func unwind(rows []step) map[int64][]Step {
-	chains := map[int64][]Step{}
-	type at struct {
-		start, node int64
-		depth       int
-	}
-	reached := map[at]step{}
-	roots := map[int64]step{}
-	started := map[int64]int64{}
-	for _, row := range rows {
-		reached[at{row.Start, row.Node, row.Depth}] = row
-		if row.Depth == 0 {
-			started[row.Start] = row.ComponentID
-		}
+func (r region) unwind() map[int64][]Step {
+	children := map[int64][]int64{}
+	var roots []int64
+	for node, row := range r.at {
 		if row.IsRoot {
-			if held, seen := roots[row.Start]; !seen || row.Depth < held.Depth {
-				roots[row.Start] = row
+			roots = append(roots, node)
+		}
+		for _, parent := range r.parents[node] {
+			children[parent] = append(children[parent], node)
+		}
+	}
+	slices.Sort(roots)
+	for _, held := range children {
+		slices.Sort(held)
+	}
+
+	// far is how many steps below a root a node sits, and up the node above
+	// it on the way there. A root is its own top.
+	far := map[int64]int{}
+	up := map[int64]int64{}
+	for _, node := range roots {
+		far[node] = 0
+	}
+	level := roots
+	for d := 1; d <= depth && len(level) > 0; d++ {
+		var next []int64
+		for _, node := range level {
+			for _, child := range children[node] {
+				if _, reached := far[child]; reached {
+					continue
+				}
+				far[child], up[child] = d, node
+				next = append(next, child)
 			}
 		}
+		level = next
 	}
-	for start, top := range roots {
-		chain := make([]Step, 0, top.Depth+1)
-		for row, ok := top, true; ok; row, ok = reached[at{start, row.Via, row.Depth - 1}] {
+
+	chains := map[int64][]Step{}
+	for component, starts := range r.starts {
+		best, found := int64(0), false
+		for _, node := range starts {
+			d, reached := far[node]
+			if reached && (!found || d < far[best]) {
+				best, found = node, true
+			}
+		}
+		if !found {
+			continue
+		}
+		chain := make([]Step, 0, far[best]+1)
+		for node := best; ; node = up[node] {
+			row := r.at[node]
 			chain = append(chain, Step{Name: row.Name, Version: row.Version, Purl: row.Purl})
-			if row.Depth == 0 {
+			if far[node] == 0 {
 				break
 			}
 		}
-		chains[started[start]] = chain
+		slices.Reverse(chain)
+		chains[component] = chain
 	}
 	return chains
 }

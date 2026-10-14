@@ -392,12 +392,16 @@ differ between sibling rows; the steps between them rarely distinguish anything,
 so they are counted rather than named.
 
 Both ends cost one recursive statement for the whole page: the database climbs
-from every consumer on the page to the root and returns the nodes on the way.
-Climbing is bounded by the depth of the graph rather than its size, and bounded
-at sixty-four steps so a document in a loop is answered rather than followed.
-Reading every edge of the build into memory instead — 18,561 rows on a switch
-image — and walking them in Go is three to eighteen milliseconds, and scales
-with the graph rather than with the page.
+from every consumer on the page and returns each node above them once, with the
+edges among those nodes. The routes are drawn from that in memory, the shortest
+from a root to each consumer, and a route longer than sixty-four steps is not
+drawn. What the climb reads is bounded by the part of the graph above the page,
+however many consumers it starts from and however the edges loop: a document of
+thirty components that all depend on each other is 33 nodes and 874 edges read
+for all thirty, where carrying each route's start and length in the statement
+read 1,651,800 rows. Reading every edge of the build into memory instead —
+18,561 rows on a switch image — and walking them in Go is three to eighteen
+milliseconds, and scales with the graph rather than with the page.
 
 Where a row's places are reached different ways, the row says the pair it shows is
 one of several. Where the inventory placed the component nowhere, it says that
