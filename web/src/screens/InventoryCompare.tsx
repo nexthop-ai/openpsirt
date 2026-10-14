@@ -12,6 +12,7 @@ import { Loading } from "../ui/Loading";
 import { MovedPage, PAGE, type Kind } from "../ui/NamesMoved";
 import { PickPair, useBuildPair } from "../ui/PickBuild";
 import { comparisonAt } from "../app/routes";
+import { fileAt } from "../api/links";
 
 // Which names any two builds of a product differ on.
 //
@@ -80,13 +81,19 @@ export function InventoryCompare() {
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               <a
                 className="btn quiet"
-                href={`/v1/products/${encodeURIComponent(product)}/comparison/inventory.csv?${asked}`}
+                href={fileAt("/v1/products/{product}/comparison/inventory.{format}", "csv", {
+                  path: { product },
+                  query: asked,
+                })}
               >
                 CSV
               </a>
               <a
                 className="btn quiet"
-                href={`/v1/products/${encodeURIComponent(product)}/comparison/inventory.json?${asked}`}
+                href={fileAt("/v1/products/{product}/comparison/inventory.{format}", "json", {
+                  path: { product },
+                  query: asked,
+                })}
               >
                 JSON
               </a>

@@ -13,8 +13,7 @@ import { Loading } from "../ui/Loading";
 import { Paged } from "../ui/Paged";
 import { Wide } from "../ui/Wide";
 import { own } from "../ui/own";
-import { exportAt } from "../api/exports";
-import { apiBuildPath } from "./list";
+import { fileAt as linkedFile } from "../api/links";
 import { componentAt } from "../app/routes";
 
 const PAGE = 200;
@@ -181,9 +180,12 @@ function fileAt(
   format: "csv" | "json",
   reason: string,
 ): string {
-  return exportAt(
-    apiBuildPath(at) + "/match-coverage",
+  return linkedFile(
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}",
     format,
-    reason ? new URLSearchParams({ reason }) : undefined,
+    {
+      path: at,
+      query: reason ? { reason } : undefined,
+    },
   );
 }

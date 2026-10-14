@@ -28,6 +28,7 @@ import { Count } from "../ui/Count";
 import { QueueFilters, queueNarrowing } from "./QueueFilters";
 import { issuesIn, toggled } from "./outliers";
 import { promised, queueReason, REASONS, wordsFor, type Reason } from "./queueReasons";
+import { fileAt } from "../api/links";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -242,12 +243,14 @@ export function Queue() {
       }
     }
   }
-  const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
+  const asked = exporting.toString();
   // The file the tab on screen was taken from. Mine lists every claim its
   // reader proposed, whatever became of it, which the queue's own file does
   // not hold; it has a file of its own.
-  const file = mine ? "/v1/my-claims" : "/v1/review-queue";
-  const fileQuery = mine ? "" : asked;
+  const file = (format: "csv" | "json") =>
+    mine
+      ? fileAt("/v1/my-claims.{format}", format)
+      : fileAt("/v1/review-queue.{format}", format, { query: asked });
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
   const words = wordsFor(reason);
@@ -331,10 +334,10 @@ export function Queue() {
             offers none rather than another list under its heading. */}
         {!reaffirm && (
           <span style={{ marginLeft: "auto" }}>
-            <a className="btn quiet" href={`${file}.csv${fileQuery}`}>
+            <a className="btn quiet" href={file("csv")}>
               CSV
             </a>{" "}
-            <a className="btn quiet" href={`${file}.json${fileQuery}`}>
+            <a className="btn quiet" href={file("json")}>
               JSON
             </a>
           </span>

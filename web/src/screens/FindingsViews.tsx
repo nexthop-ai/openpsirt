@@ -28,6 +28,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { cut } from "../ui/cut";
 import { componentAt } from "../app/routes";
+import { fileAt } from "../api/links";
 
 // A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
@@ -652,18 +653,17 @@ export function Pager({
 function bundlesFile(
   at: { product: string },
   query: Record<string, unknown>,
-  format: string,
+  format: "csv" | "json",
 ): string {
   const asked = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
     asked.set(key, String(value));
   }
-  const text = asked.toString();
-  return (
-    `/v1/products/${encodeURIComponent(at.product)}/fix-bundles.${format}` +
-    (text ? `?${text}` : "")
-  );
+  return fileAt("/v1/products/{product}/fix-bundles.{format}", format, {
+    path: { product: at.product },
+    query: asked,
+  });
 }
 
 // The address the by-component view comes from as a file.
@@ -675,7 +675,7 @@ function bundlesFile(
 function componentsFile(
   at: { product: string; stream?: string; variant?: string },
   query: Record<string, unknown>,
-  format: string,
+  format: "csv" | "json",
 ): string {
   const asked = new URLSearchParams();
   for (const [key, value] of Object.entries({
@@ -692,9 +692,8 @@ function componentsFile(
       asked.set(key, String(value));
     }
   }
-  const text = asked.toString();
-  return (
-    `/v1/products/${encodeURIComponent(at.product)}/findings/components.${format}` +
-    (text ? `?${text}` : "")
-  );
+  return fileAt("/v1/products/{product}/findings/components.{format}", format, {
+    path: { product: at.product },
+    query: asked,
+  });
 }

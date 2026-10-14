@@ -3,7 +3,6 @@
 
 import { useParams, useSearchParams } from "react-router-dom";
 import { Crumbs } from "../ui/Crumbs";
-import { apiBuildPath } from "./list";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -12,6 +11,7 @@ import { Loading } from "../ui/Loading";
 import { Moved } from "../ui/Moved";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
+import { linkTo } from "../api/links";
 
 // The VEX document for one build: what it says now, what has gone out, and
 // recording another.
@@ -29,8 +29,6 @@ export function VEX() {
     params.get("kind") === "with-suppliers" ? "with-suppliers" : "ours";
   const asked = kind === "with-suppliers" ? { kind } : {};
   const path = { product, stream, variant };
-  const tail = kind === "with-suppliers" ? "?kind=with-suppliers" : "";
-  const base = apiBuildPath(path) + "/vex";
   const queries = useQueryClient();
 
   const gone = useQuery({
@@ -68,7 +66,14 @@ export function VEX() {
           {kind === "with-suppliers"
             ? "Approved dismissals, and suppliers' statements in their name. Public findings only."
             : "Approved dismissals and public findings only."}{" "}
-          <a href={base + tail}>Current document (JSON)</a>
+          <a
+            href={linkTo("/v1/products/{product}/streams/{stream}/variants/{variant}/vex", {
+              path,
+              query: asked,
+            })}
+          >
+            Current document (JSON)
+          </a>
         </p>
         {/* How a customer loads a release, which is the question somebody
             sending this is asked. Both kinds load the same way. */}
@@ -136,7 +141,17 @@ export function VEX() {
                       <td>{row.issued_by}</td>
                       <td className="id">{row.digest}</td>
                       <td>
-                        <a href={`${base}/issuance/${row.version}${tail}`}>JSON</a>
+                        <a
+                          href={linkTo(
+                            "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+                            {
+                              path: { ...path, version: row.version ?? 0 },
+                              query: asked,
+                            },
+                          )}
+                        >
+                          JSON
+                        </a>
                       </td>
                     </tr>
                   ))}
@@ -160,7 +175,17 @@ export function VEX() {
         {record.isSuccess && (
           <p className="hint">
             Recorded as version {record.data.version}.{" "}
-            <a href={`${base}/issuance/${record.data.version}${tail}`}>Download what to send</a>
+            <a
+              href={linkTo(
+                "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+                {
+                  path: { ...path, version: record.data.version },
+                  query: asked,
+                },
+              )}
+            >
+              Download what to send
+            </a>
           </p>
         )}
         <p className="hint">Send the document recording hands back. It carries its version.</p>

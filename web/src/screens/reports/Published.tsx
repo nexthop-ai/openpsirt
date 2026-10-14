@@ -21,6 +21,7 @@ import {
   periodAsked,
 } from "./Window";
 import { Wide } from "../../ui/Wide";
+import { linkTo } from "../../api/links";
 
 // The window back. A year by default, because publishing is rare enough that a
 // month of it is usually nothing and reads as a tool that is not working.
@@ -115,7 +116,9 @@ export function Published() {
                     <td>
                       <a
                         className="id linkish"
-                        href={`/v1/advisories/${encodeURIComponent(row.advisory)}/document`}
+                        href={linkTo("/v1/advisories/{advisory}/document", {
+                          path: { advisory: row.advisory },
+                        })}
                       >
                         {row.advisory}
                       </a>

@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { useOutcomes } from "../../ui/outcomes";
 import { askForScope, useScope } from "../../app/scope";
 import { GROUPS, ON_SCREENS, leadsTo, scopeWords, type Needs, type Report } from "./catalog";
+import { fileAt, linkTo } from "../../api/links";
 
 // The catalog of named reports.
 //
@@ -71,8 +72,12 @@ export function Catalog() {
         <ul className="files catalog">
           <li>
             <div>
-              What is <b>running out of time</b> — <a href="/v1/running-out.csv?days=30">CSV</a> ·{" "}
-              <a href="/v1/running-out.json?days=30">JSON</a>
+              What is <b>running out of time</b> —{" "}
+              <a href={fileAt("/v1/running-out.{format}", "csv", { query: { days: "30" } })}>CSV</a>{" "}
+              ·{" "}
+              <a href={fileAt("/v1/running-out.{format}", "json", { query: { days: "30" } })}>
+                JSON
+              </a>
             </div>
             <div className="hint">
               Open, undecided and due within 30 days. <span className="id">?days=</span> takes up to
@@ -86,7 +91,13 @@ export function Catalog() {
                   components belong in. */}
               <div>
                 A <b>VEX document</b> for <b>{at.stream}</b> · <b>{at.variant}</b> —{" "}
-                <a href={vexAt(at.product, at.stream, at.variant)}>OpenVEX</a>
+                <a
+                  href={linkTo("/v1/products/{product}/streams/{stream}/variants/{variant}/vex", {
+                    path: { product: at.product, stream: at.stream, variant: at.variant },
+                  })}
+                >
+                  OpenVEX
+                </a>
               </div>
               <div className="hint">
                 For a customer&rsquo;s own scanner. Approved dismissals and public findings only.
@@ -165,16 +176,5 @@ function Pick({ name, needs }: { name: string; needs: Needs }) {
       <span className="name">{name}</span>
       <span className="needs">{words.tag}</span>
     </button>
-  );
-}
-
-// The address a file comes from. Built here rather than by the generated client
-// because it is a link somebody follows rather than a request this page makes
-// — the browser fetches it with the session it already has.
-function vexAt(product: string, stream: string, variant: string) {
-  return (
-    `/v1/products/${encodeURIComponent(product)}` +
-    `/streams/${encodeURIComponent(stream)}` +
-    `/variants/${encodeURIComponent(variant)}/vex`
   );
 }

@@ -17,6 +17,7 @@ import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
 import { Wide } from "../ui/Wide";
 import { inventoryChangesAt, runAt } from "../app/routes";
+import { linkTo } from "../api/links";
 
 // Each build's uploads, and what the scan of them found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
@@ -319,10 +320,12 @@ function Sent({
 }) {
   if (sent.length === 0) return <span className="hint">—</span>;
   const where = (document: number) =>
-    `/v1/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}` +
-    `/scans/${scan}/documents/${document}`;
+    linkTo(
+      "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/documents/{document}",
+      {
+        path: { product: at.product, stream: at.stream, variant: at.variant, scan, document },
+      },
+    );
   return (
     <span className="sent">
       {sent.map((doc, i) => {

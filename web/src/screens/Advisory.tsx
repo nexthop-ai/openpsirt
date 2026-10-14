@@ -37,6 +37,7 @@ import {
 import { FlawPicker } from "./FlawPicker";
 import { decisionAt, issueAt } from "../app/routes";
 import { Because, Outcome } from "../ui/Outcome";
+import { linkTo } from "../api/links";
 
 // One advisory, whole: what it is called, what it covers, the document it
 // generates, who agrees to it, and what has gone out.
@@ -425,7 +426,12 @@ function Document({
             <span title="How far the document may travel. Red while anything it covers is still held back">
               {read.data?.document?.distribution?.tlp?.label}
             </span>{" "}
-            · <a href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}>JSON</a>
+            ·{" "}
+            <a
+              href={linkTo("/v1/advisories/{advisory}/document", { path: { advisory: advisory } })}
+            >
+              JSON
+            </a>
           </p>
           <pre className="asis" style={{ maxHeight: 420, overflow: "auto", marginBottom: 10 }}>
             {written}

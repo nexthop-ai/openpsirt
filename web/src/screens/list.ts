@@ -532,16 +532,6 @@ export function identityOf(row: Row): string {
   return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
 }
 
-// The prefix one build's API addresses live under, for an address a browser
-// fetches directly: a file to download, a document to open.
-export function apiBuildPath(at: { product: string; stream: string; variant: string }): string {
-  return (
-    `/v1/products/${encodeURIComponent(at.product)}` +
-    `/streams/${encodeURIComponent(at.stream)}` +
-    `/variants/${encodeURIComponent(at.variant)}`
-  );
-}
-
 // The key the findings list caches a page of rows under. A finding opened from
 // the list reads its neighbors from that page where it can, so both sides name
 // the page through this one key.

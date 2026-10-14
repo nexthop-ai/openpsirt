@@ -23,6 +23,7 @@ import { calendarDay, coveringPeriod, endExclusive, stated } from "./reports/Win
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
 import { allFindingsAt, claimAt } from "../app/routes";
+import { fileAt as linkedFile } from "../api/links";
 
 // The share of the record one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -649,15 +650,14 @@ export function changeKind(params: URLSearchParams): ChangeKind | "" {
 // The address the change history comes from as a file, built the way the
 // record's own link is: the screen's period straight from the address, so the
 // file and the section it was taken from cannot disagree about the stretch.
-function changesAt(params: URLSearchParams, format: string): string {
+function changesAt(params: URLSearchParams, format: "csv" | "json"): string {
   const asked = new URLSearchParams();
   const sent = periodSent(params);
   if (sent.from) asked.set("from", sent.from);
   if (sent.to) asked.set("to", sent.to);
   const kind = changeKind(params);
   if (kind) asked.set("kind", kind);
-  const query = asked.toString();
-  return `/v1/administration/changes.${format}${query ? `?${query}` : ""}`;
+  return linkedFile("/v1/administration/changes.{format}", format, { query: asked });
 }
 
 // The states a claim's matching decisions are in, as the state filter names
@@ -846,7 +846,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
 // The screen's own filters are the file's, straight from the address, so a
 // narrowed screen and the file taken from it cannot disagree about what was
 // asked for.
-function fileAt(params: URLSearchParams, format: string): string {
+function fileAt(params: URLSearchParams, format: "csv" | "json"): string {
   const asked = new URLSearchParams(params);
   asked.delete("offset");
   // The change history's own filter, which the record's route does not take
@@ -857,6 +857,5 @@ function fileAt(params: URLSearchParams, format: string): string {
     if (sent[name]) asked.set(name, sent[name]);
     else asked.delete(name);
   }
-  const query = asked.toString();
-  return `/v1/audit.${format}${query ? `?${query}` : ""}`;
+  return linkedFile("/v1/audit.{format}", format, { query: asked });
 }

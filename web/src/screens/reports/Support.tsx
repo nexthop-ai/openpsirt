@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
-import { exportAt } from "../../api/exports";
+import { fileAt as linkedFile } from "../../api/links";
 import { findingsPath, scopeQuery, useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -219,7 +219,7 @@ const FURTHEST = 3650;
 // request this page makes, so the browser fetches it with the session it
 // already has.
 function fileAt(format: "csv" | "json", asked: string): string {
-  return exportAt("/v1/releases/out-of-support", format, asked);
+  return linkedFile("/v1/releases/out-of-support.{format}", format, { query: asked });
 }
 
 // The findings open on one release, as the findings list shows them.

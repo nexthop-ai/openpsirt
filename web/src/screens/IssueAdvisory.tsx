@@ -10,6 +10,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { standing, statusLabel } from "./advisory";
 import { advisoryAt } from "../app/routes";
+import { linkTo } from "../api/links";
 
 // Starting an advisory about this flaw, and the first look at what it
 // generates.
@@ -201,7 +202,9 @@ export function IssueAdvisory({
             {document && advisory !== "" && (
               <a
                 className="btn quiet"
-                href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}
+                href={linkTo("/v1/advisories/{advisory}/document", {
+                  path: { advisory: advisory },
+                })}
               >
                 JSON
               </a>

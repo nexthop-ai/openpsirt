@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, type Body } from "../../api/client";
 import { unwrap } from "../../api/queries";
-import { exportAt } from "../../api/exports";
+import { fileAt as linkedFile } from "../../api/links";
 import { scopeQuery, useScope } from "../../app/scope";
 import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
@@ -187,7 +187,7 @@ export function Coverage() {
 // request this page makes, so the browser fetches it with the session it
 // already has.
 function fileAt(format: "csv" | "json", asked: string): string {
-  return exportAt("/v1/scanning", format, asked);
+  return linkedFile("/v1/scanning.{format}", format, { query: asked });
 }
 
 function scansAt(product: string, stream: string, variant: string): string {

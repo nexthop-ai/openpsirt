@@ -18,6 +18,7 @@ import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
 import { PickPair, useBuildPair } from "../ui/PickBuild";
 import { inventoryComparisonAt, runAt, type Build } from "../app/routes";
+import { fileAt } from "../api/links";
 
 // The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
@@ -201,13 +202,19 @@ export function Compare() {
                   chances to send somebody two of them. */}
               <a
                 className="btn quiet"
-                href={`/v1/products/${encodeURIComponent(product)}/comparison.csv?${asked}`}
+                href={fileAt("/v1/products/{product}/comparison.{format}", "csv", {
+                  path: { product },
+                  query: asked,
+                })}
               >
                 CSV
               </a>
               <a
                 className="btn quiet"
-                href={`/v1/products/${encodeURIComponent(product)}/comparison.json?${asked}`}
+                href={fileAt("/v1/products/{product}/comparison.{format}", "json", {
+                  path: { product },
+                  query: asked,
+                })}
               >
                 JSON
               </a>

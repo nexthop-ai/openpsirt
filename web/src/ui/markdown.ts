@@ -3,6 +3,7 @@
 
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
+import { linkTo } from "../api/links";
 import { issueAt } from "../app/routes";
 import { LINK_SCHEMES } from "./schemes";
 
@@ -168,7 +169,7 @@ function issuePath(identifier: string): string {
 // The address one is actually fetched from. Same origin, so the content
 // security policy permits it and the request carries who is asking.
 function fetchPath(token: string): string {
-  return `/v1/attachments/${token}`;
+  return linkTo("/v1/attachments/{token}", { path: { token } });
 }
 
 // The schemes a link may use once attachment and issue references have been

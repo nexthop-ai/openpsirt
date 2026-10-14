@@ -10,7 +10,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
-import { apiBuildPath } from "./list";
+import { fileAt as linkedFile } from "../api/links";
 import { own } from "../ui/own";
 import { claimAt } from "../app/routes";
 
@@ -166,6 +166,12 @@ export function Upgrades() {
 }
 
 // The address the file comes from.
-function fileAt(product: string, stream: string, variant: string, format: string): string {
-  return apiBuildPath({ product, stream, variant }) + `/pending-upgrades.${format}`;
+function fileAt(product: string, stream: string, variant: string, format: "csv" | "json"): string {
+  return linkedFile(
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}",
+    format,
+    {
+      path: { product, stream, variant },
+    },
+  );
 }
