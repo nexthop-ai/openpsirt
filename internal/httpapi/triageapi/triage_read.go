@@ -470,7 +470,14 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 
 		all := previously
 		if standing != nil {
-			all = append([]triage.Decision{*standing}, previously...)
+			// The standing decision is read at the place too, and it is
+			// answered once, as what stands.
+			all = []triage.Decision{*standing}
+			for _, d := range previously {
+				if d.ID != standing.ID {
+					all = append(all, d)
+				}
+			}
 		}
 		reasoning, err := store.ReasoningFor(ctx, subject, all)
 		if err != nil {
