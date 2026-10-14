@@ -2031,6 +2031,7 @@ KB) and the renderer (146 KB) fetched only by the screens that use them.
 
     make demo                    # build the image, start it, seed it, say where to go
     make demo DEMO_HOST=yourbox  # if you browse by something but localhost
+    make demo DEMO_BIND=0.0.0.0  # to reach it from another machine
 
 | Target | |
 |---|---|
@@ -2048,6 +2049,7 @@ KB) and the renderer (146 KB) fetched only by the screens that use them.
 | Seeding is idempotent | It can be run repeatedly without tearing anything down |
 | The demo and the dev loop seed through one definition | They differ only in where the API is and how it is reached, and a change to what is seeded is made once. A test holds the export columns and the queue field they read by name to their spelling |
 | It is the real thing behind a real proxy | The application is authenticated by a trusted header, and the demo runs exactly that — the image, with a small proxy in front adding the header — rather than a development server standing in for one. **No mode in the application trusts anybody**: the alternative was a development switch that assumes an identity, which is a hole nobody should ship |
+| The demo's doors and the dev server listen on this machine alone by default | Every request through them is signed in as somebody, the first door as an administrator, so anything that reaches them is that person. Reaching them from another machine is a setting somebody chose |
 | It is a demonstration deployment, not a small production one | It serves plain HTTP and hands administration to whoever the proxy says they are. Both are holes; together they are a machine somebody can click around on |
 
 ## Divergence from the mockup

@@ -34,7 +34,12 @@
 #               it by
 #   DEMO_USER   who you arrive as, and the administrator the demo names. An
 #               identity is the username the proxy asserts, unprefixed
+#   DEMO_BIND   the address the demo's doors and the dev server listen on.
+#               Each door signs every request in as somebody, the first as an
+#               administrator, so only this machine reaches them unless this
+#               is set to 0.0.0.0
 DEMO_HOST ?= localhost
+DEMO_BIND ?= 127.0.0.1
 DEMO_PORT ?= 8080
 DEMO_USER ?= dev
 # The rest of the cast, one per line as port:identity:roles.
@@ -331,8 +336,8 @@ demo-up: demo-down
 	  fi; \
 	done
 	@$(DOCKER) run -d --name openpsirt-demo-proxy --network $(DEMO_NET) \
-	  -p $(DEMO_PORT):80 \
-	  $(foreach c,$(DEMO_CAST),-p $(call cast-port,$(c)):$(call cast-port,$(c)) ) \
+	  -p $(DEMO_BIND):$(DEMO_PORT):80 \
+	  $(foreach c,$(DEMO_CAST),-p $(DEMO_BIND):$(call cast-port,$(c)):$(call cast-port,$(c)) ) \
 	  -v "$(DEMO_DIR)/proxy.conf:/etc/nginx/conf.d/default.conf:ro" \
 	  nginx:1.29-alpine >/dev/null
 	@# A container reported "Up" is not one that answers, the same trap the
@@ -777,7 +782,7 @@ dev-up: dev-down
 	@OPENPSIRT_DEV_USER="$(DEMO_USER)" \
 	 OPENPSIRT_DEV_HOSTS="$(DEV_HOST)" \
 	 OPENPSIRT_DEV_API="http://$(DEV_API)" \
-	 setsid nohup $(NPM) --prefix web run dev -- --host --port $(DEV_PORT) \
+	 setsid nohup $(NPM) --prefix web run dev -- --host $(DEMO_BIND) --port $(DEV_PORT) \
 	   > $(DEV_DIR)/web.log 2>&1 & echo $$! > $(DEV_DIR)/web.pid
 	@# Up once it answers, the way the demo is: a binary that could not bind
 	@# its address has exited by now, and saying it is up sends the seeding

@@ -57,7 +57,12 @@ the demo below stands up, and what a real deployment does with its ingress.
 ```
 make demo                    # build, start, seed two products, print the address
 make demo DEMO_HOST=yourbox  # if you browse by something other than localhost
+make demo DEMO_BIND=0.0.0.0  # to reach it from another machine
 ```
+
+The demo and `make dev` listen on this machine alone unless `DEMO_BIND` says
+otherwise. Every request through them is signed in as somebody, the first door
+as an administrator, so anybody who can reach them is that person.
 
 Docker is all you need, plus `curl` and `xz` to read the compressed fixtures.
 The image builds the interface and the binary inside itself and carries the
