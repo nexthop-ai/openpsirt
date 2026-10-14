@@ -232,6 +232,8 @@ func TestTheRecordIsFoundByWhoActedAndWhatItWasAbout(t *testing.T) {
 			{"proposer", triage.Filter{Proposer: "proposer"}, triage.Filter{Proposer: "approver"}},
 			{"approver", triage.Filter{Approver: "approver"}, triage.Filter{Approver: "proposer"}},
 			{"issue", triage.Filter{Issue: "CVE-2026-1"}, triage.Filter{Issue: "CVE-2026-9999"}},
+			// A name people type is matched without regard to capitals or padding.
+			{"issue as typed", triage.Filter{Issue: " cve-2026-1"}, triage.Filter{Issue: "cve-2026-9999"}},
 			{"component", triage.Filter{Component: "libfoo"}, triage.Filter{Component: "libbar"}},
 		} {
 			if got := counted(each.hit); got != 1 {

@@ -111,10 +111,11 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 	if f.Issue != "" {
 		// The name the issue is filed under, which is the issue the decision
 		// is read as: one filed under an issue that merged into it answers
-		// to the name that stands.
+		// to the name that stands. Typed, so matched on the folded name.
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
 			` JOIN "vulnerability" AS "ik" ON ik.id = iv.issue_id`+
-			` WHERE iv.id = de.vulnerability_id AND ik.identifier = ?)`, f.Issue)
+			` WHERE iv.id = de.vulnerability_id AND ik.identifier_folded = ?)`,
+			finding.FoldIdentifier(f.Issue))
 	}
 	if f.Component != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+

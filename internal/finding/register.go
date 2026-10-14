@@ -337,7 +337,8 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("c.name_folded = ?", graph.Folded(r.Component))
 	}
 	if r.Issue != "" {
-		q = q.Where("v.identifier = ?", r.Issue)
+		// Typed, so matched on the folded name the way the issue was stored.
+		q = q.Where("v.identifier_folded = ?", FoldIdentifier(r.Issue))
 	}
 	// Both sides asked for is both sides, which is the whole register.
 	if r.Open && !r.Closed {

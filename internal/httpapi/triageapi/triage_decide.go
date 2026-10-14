@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -27,6 +28,9 @@ import (
 // which other builds the same judgment is written against in the same
 // transaction, and what a refusal says about a build that could not be
 // resolved.
+
+// namedTwice refuses a judgment naming one build twice.
+const namedTwice = "a build is named twice, and one judgment is recorded against it once"
 
 // FindingDecisionBody is one judgment about a finding, and which of its places
 // it covers.
@@ -164,15 +168,6 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		asked := append([]AlsoBuild{{
 			Stream: input.Stream, Variant: input.Variant, Version: input.Version,
 		}}, input.Body.Also...)
-		named := make(map[string]bool, len(asked))
-		for _, build := range asked {
-			if named[build.Stream+"\x00"+build.Variant] {
-				return nil, huma.Error422UnprocessableEntity(
-					"a build is named twice, and one judgment is recorded against it once")
-			}
-			named[build.Stream+"\x00"+build.Variant] = true
-		}
-
 		var until *time.Time
 		if input.Body.DeferredUntil != "" {
 			when, err := time.Parse(time.DateOnly, input.Body.DeferredUntil)
@@ -247,6 +242,11 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 					return nil, err
 				}
 				return nil, aboutBuild(build.Stream, build.Variant, err)
+			}
+			// Compared as the names resolve, because a name people type is
+			// matched without regard to capitals.
+			if slices.Contains(covering, target) {
+				return nil, huma.Error422UnprocessableEntity(namedTwice)
 			}
 			if i == 0 {
 				sits = all

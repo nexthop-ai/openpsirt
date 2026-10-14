@@ -1232,3 +1232,23 @@ func TestADecisionNeedingNobodyReadsBackWithoutAWait(t *testing.T) {
 		}
 	})
 }
+
+func TestABuildNamedTwiceInAnotherSpellingIsRefused(t *testing.T) {
+	// A build name is matched without regard to capitals, so "Master" beside
+	// the path's "master" is the same build named twice.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		at := "/v1/products/mine/streams/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
+				`"reasoning":"The parser is never reached.",`+
+				`"also":[{"stream":"Master","variant":" broadcom"}]}`)
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a build named twice answered %d: %s", got.Code, got.Body.String())
+		}
+		if !strings.Contains(got.Body.String(), "named twice") {
+			t.Errorf("the refusal does not say the build is named twice: %s", got.Body.String())
+		}
+	})
+}
