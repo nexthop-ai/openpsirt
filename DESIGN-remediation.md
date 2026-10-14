@@ -310,6 +310,7 @@ name to a public index.
 |---|---|
 | An index that lists every version is read with the ecosystem's own ordering | Maven Central's metadata names a "release" and it is whatever was published last: measured on log4j-core, 3.0.0-beta3 while 2.26.1 was the newest release. An ordering is what says 2.25.1 is after 2.9.1 |
 | A pre-release is not what somebody is behind | Telling somebody they are behind a release candidate is not a claim to act on. It is offered only where a package has published nothing else |
+| A Maven version marked preview, pre, ea, eap or dev is a pre-release | Maven orders those words above the release as words it does not know, and publishers use them for versions ahead of one. The ordering is left as Maven has it; only the question of whether a version is a release reads them |
 | An unlisted NuGet version is passed over | Its owner withdrew it from what anybody choosing a version is offered, and nuget.org dates it to 1900 |
 | A paged NuGet registration is read from its newest page back, at most four pages | Pages run oldest to newest, so the answer is usually on the last. The bound is for a package whose newest pages hold only pre-releases, which would otherwise cost a request per page back to its first release |
 | Where the bound stops the walk with no release found, there is no answer | A release may sit on a page that was not read, so the newest pre-release is not offered. The package is recorded as asked with no version |

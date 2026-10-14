@@ -330,14 +330,24 @@ func mavenLevels(a, b []*mavenItem) int {
 	return 0
 }
 
+// mavenUnfinished are words Maven has never heard of that publishers use for a
+// version ahead of a release: "12.9.0.jre11-preview", "21-ea", "2.0.0-dev".
+//
+// Maven sorts them above the release like any unknown word, and the order is
+// left as Maven has it. Only whether a version leads reads them.
+var mavenUnfinished = map[string]bool{
+	"preview": true, "pre": true, "ea": true, "eap": true, "dev": true,
+}
+
 // leads says whether any word in a version, at any level, sorts below the
-// release: "3.0.0-beta3", "2.0.0.M1" and "1.0-SNAPSHOT" all lead to a release.
-// A word Maven has never heard of sorts above the release, so "33.0.0-jre" is
-// one.
+// release or is one a publisher marks an unfinished version with:
+// "3.0.0-beta3", "2.0.0.M1", "1.0-SNAPSHOT" and "21-ea" all lead to a
+// release. Any other word Maven has never heard of sorts above the release,
+// so "33.0.0-jre" is one.
 func (m *mavenItem) leads() bool {
 	switch m.kind {
 	case mavenWord:
-		return strings.Compare(mavenRank(m.word), mavenRelease) < 0
+		return strings.Compare(mavenRank(m.word), mavenRelease) < 0 || mavenUnfinished[m.word]
 	case mavenLevel:
 		for _, each := range m.items {
 			if each.leads() {
