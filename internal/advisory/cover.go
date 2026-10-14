@@ -28,9 +28,10 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	// The distribution label is decided from every place of the issue here,
 	// not from the one a reader sees first: a document saying TLP:WHITE about
 	// an issue with an undisclosed place is the one that travels furthest.
-	// And a reader who may not see every place is refused the document
-	// whole, as byName refuses a cover they may not see, rather than handed
-	// a label that says undisclosed work exists.
+	// A reader who may not see every place is refused by byName before this
+	// is reached, since listing the advisory and refusing its document would
+	// say undisclosed work exists; the refusal here holds the document to
+	// the same rule wherever it is generated from.
 	undisclosed, err := finding.AnyUndisclosed(ctx, s.db, one.ProductID, issue.ID)
 	if err != nil {
 		return err

@@ -175,6 +175,12 @@ func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // everyIssue narrows a statement over "advisory" as "ad" to the advisories
 // every issue of which this reader may see, among the coverage rows the
 // condition over "ac" keeps.
+//
+// Seeing an issue is reading a recorded place of it in its product, and every
+// undisclosed place of it there, open or closed. The second half is the one
+// the document's distribution label is decided from, so an advisory a reader
+// may list is one whose document they may generate: admitted here and refused
+// there, the pair says an undisclosed place exists.
 func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun.SelectQuery {
 	products, all := subject.Products()
 	if all {
@@ -182,16 +188,26 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	}
 	both, public, private := access.Split(products, subject.Reads)
 	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
+	bound := append([]any{finding.Entered}, args...)
+	bound = append(bound, access.Private)
+	bound = append(bound, args...)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
-		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND NOT EXISTS (
+		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND (NOT EXISTS (
 			SELECT 1 FROM `+finding.IssueFindings("f")+`
 			JOIN "target" AS "t" ON t.id = f.target_id
 			JOIN "stream" AS "st" ON st.id = t.stream_id
 			WHERE st.product_id = ac.product_id
 			  AND "si"."id" = ac.vulnerability_id
 			  AND f.kind = ?
-			  AND `+where+`))`,
-		append([]any{finding.Entered}, args...)...)
+			  AND `+where+`) OR EXISTS (
+			SELECT 1 FROM `+finding.IssueFindings("f")+`
+			JOIN "target" AS "t" ON t.id = f.target_id
+			JOIN "stream" AS "st" ON st.id = t.stream_id
+			WHERE st.product_id = ac.product_id
+			  AND "si"."id" = ac.vulnerability_id
+			  AND f.visibility = ?
+			  AND NOT (`+where+`))))`,
+		bound...)
 }
 
 // Sent is one document that went out, as what publishes it reads it.

@@ -572,5 +572,21 @@ func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
 		if _, err := f.store.ForAdvisory(ctx, disclosedOnly, issuer, named); !errors.Is(err, advisory.ErrNoSuchAdvisory) {
 			t.Errorf("a reader of the disclosed half alone generated the document: %v", err)
 		}
+		// Listed or opened by name and then refused its document, the pair
+		// would say an undisclosed place exists, so all three refuse together.
+		if _, _, err := f.store.Covers(ctx, disclosedOnly, named); !errors.Is(err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("a reader of the disclosed half alone opened the advisory by name: %v", err)
+		}
+		listed, total, err := f.store.List(ctx, disclosedOnly, advisory.Covering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 0 || len(listed) != 0 {
+			t.Errorf("a reader of the disclosed half alone was listed %d advisories", total)
+		}
+		// A reader of both halves is listed it.
+		if _, total, err := f.store.List(ctx, f.who, advisory.Covering{}, 50, 0); err != nil || total == 0 {
+			t.Errorf("a reader of both halves was listed %d advisories: %v", total, err)
+		}
 	})
 }
