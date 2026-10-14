@@ -273,8 +273,8 @@ COPY --from=scanner /out/grype /usr/local/bin/grype
 # deployment cannot reach. The server hands the scanner the same setting.
 ENV GRYPE_DB_CACHE_DIR=/var/cache/openpsirt/grype \
     GRYPE_CHECK_FOR_APP_UPDATE=false
-RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories \
- && chown -R 65532:65532 /var/cache/openpsirt
+RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories /var/lib/openpsirt \
+ && chown -R 65532:65532 /var/cache/openpsirt /var/lib/openpsirt
 
 # What the whole image ships, read off the assembled filesystem.
 #

@@ -1445,7 +1445,7 @@ else
 	  "a Slack token given twice|set chat.slack.token or chat.slack.existingSecret, not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set chat.slack.token=xoxb-1 --set chat.slack.existingSecret=mine" \
 	  "a Zulip key given twice|set chat.zulip.key or chat.zulip.existingSecret, not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set chat.zulip.site=https://chat.example.com --set chat.zulip.email=bot@chat.example.com --set chat.zulip.key=k --set chat.zulip.existingSecret=mine" \
 	  "a secret given twice|not both|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc --set auth.oidc.usernameClaim=sub --set auth.oidc.clientSecret=shh --set auth.oidc.existingSecret=mine" \
-	  "SQLite behind more than one replica|SQLite is one file on one pod|--set database.url=sqlite:///data/openpsirt.db --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
+	  "SQLite behind more than one replica|SQLite is one file on one pod|--set database.url=sqlite:///var/lib/openpsirt/openpsirt.db --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
 	  "a scanner cache claim every replica mounts and only one can|no ReadWriteMany access mode|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true" \
 	  "a scanner cache claim given twice|set scanner.persistence.enabled or scanner.persistence.existingClaim|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set scanner.persistence.enabled=true --set scanner.persistence.existingClaim=mine" \
 	  "a group role naming no group|names no group|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].roles={admin}" \
@@ -1454,6 +1454,7 @@ else
 	  "a group role with an empty product|names an empty product|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={public-read} --set auth.groupRoles[0].products={}" \
 	  "administration held on a product|takes no products|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin} --set auth.groupRoles[0].products={router-os}" \
 	  "group roles and nothing reporting groups|set a source of groups for auth.groupRoles|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin}" \
+	  "SQLite where nothing is writable|SQLite outside /var/lib/openpsirt|--set database.url=sqlite:///data/openpsirt.db --set replicaCount=1 --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}" \
 	  "a controller named by its pods alone|set networkPolicy.ingressController.namespaceLabels|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.podLabels.app=router" \
 	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.enabled=false"; do \
 	  refusals=$$((refusals + 1)); \
@@ -1482,6 +1483,18 @@ else
 	case "$$out" in *"app: router"*) ;; *) echo "a controller's own labels were not rendered:"; echo "$$out"; exit 1;; esac; \
 	case "$$out" in *"team: edge"*) ;; *) echo "a controller's own namespace labels were not rendered:"; echo "$$out"; exit 1;; esac
 	@echo "the network policy admits a controller by its own labels alone"
+	@# The root filesystem is read-only, so a single-pod SQLite trial gets a
+	@# writable directory for its file, and nothing else does.
+	@set -e; out=$$(helm template t deploy/helm/openpsirt -s templates/deployment.yaml \
+	  --set database.url=sqlite:///var/lib/openpsirt/openpsirt.db --set replicaCount=1 \
+	  --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources={10.0.0.0/8}); \
+	case "$$out" in *"mountPath: /var/lib/openpsirt"*) ;; *) echo "a SQLite trial has nowhere writable for its file:"; echo "$$out"; exit 1;; esac; \
+	out=$$(helm template t deploy/helm/openpsirt -s templates/deployment.yaml \
+	  --set database.existingSecret=s --set auth.bootstrapAdmins={admin} \
+	  --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8}); \
+	case "$$out" in *"/var/lib/openpsirt"*) echo "a server database was given a SQLite volume:"; echo "$$out"; exit 1;; esac
+	@echo "a single-pod SQLite trial keeps its file on a volume of its own"
 	@# A group or product name holding a character the variable separates on
 	@# is carried encoded, so the process reads the name it was given.
 	@out=$$(helm template t deploy/helm/openpsirt -s templates/deployment.yaml \

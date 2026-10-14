@@ -68,6 +68,13 @@ database:
   url: ""
   existingSecret: ""
   existingSecretKey: "database-url"
+  # Where a SQLite file in database.url is kept, for a single-pod trial. The
+  # root filesystem is read-only, so the chart mounts /var/lib/openpsirt and
+  # refuses a SQLite URL whose file is anywhere else. Scratch space by default,
+  # which is lost when the pod is replaced; name a claim to keep the trial.
+  sqlite:
+    existingClaim: ""
+    sizeLimit: 1Gi
 
 # Who may sign in, and how. **The process refuses to start until somebody can
 # administer it**, because a deployment nobody can administer has one route

@@ -250,6 +250,11 @@ a file inside one pod. The chart sees only a URL given in values; one in an
 operator's own Secret is not checked here, and the process warns at startup that
 SQLite is not a production engine.
 
+| Rule | |
+|---|---|
+| A single-pod SQLite trial keeps its file under `/var/lib/openpsirt` | The root filesystem is read-only, so the chart mounts that one directory for a SQLite URL, on a bounded scratch volume or a claim the operator names. A SQLite URL in values naming any other path is refused at render, because the process would crash-loop failing to create the file |
+| No other install gets the volume | A server database has nothing to keep on the pod |
+
 ## Network policy
 
 Sign-in by a trusted header is believed by address alone, and the addresses it
