@@ -516,3 +516,41 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 		reads("a correction in force beside an agreed claim", "mismatched")
 	})
 }
+
+func TestTheRegisterNarrowsToAnIssueTypedInAnyCase(t *testing.T) {
+	// A name people type is matched without regard to capitals or padding.
+	// Compared as typed, a lower-case identifier empties the register, which
+	// reads as nothing known.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicRead)
+		filed, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{Issue: "CVE-2026-1"}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		whole, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(filed) == 0 || len(filed) == len(whole) {
+			t.Fatalf("the filed name keeps %d of %d rows, so this checks nothing",
+				len(filed), len(whole))
+		}
+		typed, err := f.store.RegisterPage(t.Context(), who, f.target,
+			finding.Registering{Issue: " cve-2026-1"}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(typed) != len(filed) {
+			t.Errorf("the register narrowed to cve-2026-1 holds %d rows, want %d",
+				len(typed), len(filed))
+		}
+	})
+}
