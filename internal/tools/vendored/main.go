@@ -139,6 +139,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 	}
 
 	found := 0
+	needs := map[string]bool{}
 	for _, each := range tracked {
 		why, err := needed(each, read)
 		if err != nil {
@@ -149,6 +150,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 			continue
 		}
 		found++
+		needs[each] = true
 		if _, ok := holds[each]; !ok {
 			faults = append(faults, fmt.Sprintf(
 				"%s %s, and nothing says where it came from or what it may be kept under: "+
@@ -162,6 +164,10 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 	for _, each := range held {
 		if !in[each.Path] {
 			faults = append(faults, fmt.Sprintf("%s is held and is not in the tree", each.Path))
+		} else if !needs[each.Path] && !inNotice[each.Path] {
+			// A line nothing needs is one a change left behind, and it would
+			// hold whatever is copied into that path next without a look.
+			faults = append(faults, fmt.Sprintf("%s is held and nothing in it needs accounting for", each.Path))
 		}
 		if !keepable(each.License, permitted) {
 			faults = append(faults, fmt.Sprintf("%s is under %s, which is not a license this tree may carry",

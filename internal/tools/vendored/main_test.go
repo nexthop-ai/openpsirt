@@ -228,3 +228,14 @@ func TestALicenseExpressionIsReadAsSPDXGroupsIt(t *testing.T) {
 		}
 	}
 }
+
+// A line nothing in its file needs is one a change left behind, and it would
+// hold whatever is copied into that path next without a look.
+func TestALineNothingNeedsIsReported(t *testing.T) {
+	files, held, notice := passing()
+	files["internal/pkg/plain.go"] = "package pkg\n"
+	held = append(held, entry{Path: "internal/pkg/plain.go", License: ours})
+	if faults := faultsFor(t, files, held, notice); !mentions(faults, "internal/pkg/plain.go is held and nothing in it needs") {
+		t.Errorf("a line nothing needs passed: %v", faults)
+	}
+}

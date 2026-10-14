@@ -134,5 +134,4 @@ var Held = []Entry{
 	// identifier they write.
 	{"internal/tools/spdx/main.go", Ours, ""},
 	{"internal/tools/spdx/main_test.go", Ours, ""},
-	{"internal/tools/weakness/main.go", Ours, ""},
 }
