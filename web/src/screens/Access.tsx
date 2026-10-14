@@ -951,7 +951,7 @@ function Credentials({ me }: { me: Who }) {
         error={issueKey.error}
         busy={keyName.trim() === "" || keyProduct === "" || issueKey.isPending}
         ok="Create key"
-        hint="For a build pipeline. Sends scans, reads back only what it sent."
+        hint="For a build pipeline. Sends scans, and reads back what was filed on the builds it may send to."
       >
         <Field
           label="Called"

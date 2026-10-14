@@ -542,8 +542,9 @@ type Retired struct {
 func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 	at, by time.Time) ([]Retired, error) {
 
-	// A person's question. A pipeline key reads back what it sent, and which
-	// releases a deployment has stopped supporting is not that.
+	// A person's question. A pipeline key reads back what was filed on the
+	// builds it may send to, and which releases a deployment has stopped
+	// supporting is not that.
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
 	// nothing is the first, and is answered below.

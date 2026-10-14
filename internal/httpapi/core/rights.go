@@ -39,9 +39,9 @@ const (
 	// AnySubject is any credential this deployment recognizes, a pipeline's
 	// key included. It still answers only what that subject may see.
 	//
-	// What means it is a key reading back what it sent: the scans, their
-	// receipts, and what one of those uploads changed about the build's
-	// inventory. Everything else that carried it refuses a key in the
+	// What means it is a key reading back what was filed on the builds it may
+	// send to: the scans, their receipts, and what one of those uploads
+	// changed about the build's inventory. Everything else that carried it refuses a key in the
 	// handler, which is what AnyPerson is for.
 	AnySubject = "any"
 	// AnyPerson is any credential belonging to somebody who signed in. A

@@ -299,10 +299,9 @@ func registerReceipts(api huma.API, in core.Deps) {
 		// The tools those numbers were arrived at with. Read separately
 		// because it describes the build rather than any upload, and absent
 		// rather than invented where nothing has finished running yet. Not for
-		// a key, which sees its own uploads and nothing more: a key that has
-		// uploaded nothing would otherwise still learn when the build was last
-		// scanned and with what, which is a report about the product rather
-		// than an acknowledgement of its own upload.
+		// a key, which reads the receipts of the builds it may upload to and
+		// nothing more: when a build was last scanned and with what is a report
+		// about the product rather than a receipt for an upload.
 		if subject.Kind == access.Pipeline {
 			return out, nil
 		}
