@@ -7,75 +7,71 @@
 // these two are where saying the wrong thing is a defect rather than a matter
 // of taste.
 
+import type { Body } from "../api/client";
+import { own } from "./own";
+
+// Every kind of notification the server sends, from the published document.
+export type Kind = Body<"NotificationBody">["kind"];
+
 // The words the server sends are for a machine to match on; these are for
-// somebody to read. A kind this does not know is shown as it arrived — a
-// server that grows one before the interface does should leave somebody
-// reading something unfamiliar, not a blank row where a notice was.
+// somebody to read. Keyed on the published kinds, so a kind the server adds
+// is a compile error here until it has words.
+const WORDS: Record<Kind, string> = {
+  assigned: "assigned to you",
+  mentioned: "named in a note",
+  "sent-back": "rejected",
+  "build-quiet": "not being scanned",
+  // Somebody who has not signed in for a while, still holding work.
+  "holding-absent": "somebody away holding work",
+  "critical-on-release": "critical on a release",
+  // An embargo's date, arrived or coming, with nothing decided.
+  "disclosure-due": "embargo date reached",
+  "disclosure-near": "embargo running out",
+  // A VEX publisher changed what a standing decision cited. The decision
+  // stands; the ground under it moved.
+  "statement-revised": "cited statement changed",
+  // The four things that are wrong because nothing has happened. Each says
+  // what has stopped rather than what took place, which is what makes a row
+  // of them read as a list of things to pick up.
+  "claim-waiting": "waiting for a second person",
+  "sent-back-waiting": "sent back and not revised",
+  "deferral-ending": "deferral running out",
+  "queue-untaken": "sitting in a team queue",
+  // The two outcomes a proposer is told about. Approval is not one of them:
+  // it is what they asked for.
+  "approval-undone": "agreement taken back",
+  // Told to an approver: what they agreed to was changed, so their
+  // agreement stopped counting.
+  "approval-withdrawn": "agreed claim changed",
+  "claim-lapsed": "stopped applying",
+  // Two judgments that disagreed met when two issues merged; one stands.
+  "merge-superseded": "superseded by a merge",
+  "brought-in": "brought into a case",
+  disclosed: "disclosed",
+  "unanswered-report": "report not answered",
+  // The conditions about the deployment rather than about anybody's work,
+  // all told to administrators.
+  "vulnerability-data-stale": "vulnerability data not moving",
+  "risk-unagreed": "hidden with nobody agreeing",
+  "pairs-concentrated": "one pair agreeing to most of the work",
+  "supplier-silent": "supplier stopped answering",
+  // An upload that changed much of what a build is made of. Said as what it
+  // was rather than as what it might mean: nothing here knows whether the
+  // base image moved or the pipeline broke.
+  "inventory-moved": "a build's contents changed sharply",
+  // A window after an attack, counted from when it became known, with
+  // nobody outside recorded as told. Said as the fact; whether anybody owed
+  // anything is not the tool's answer to give.
+  "obligation-open": "window after an attack running",
+  "obligation-near": "window after an attack ending soon",
+  "obligation-passed": "window after an attack passed",
+};
+
+// A kind this does not know is shown as it arrived: a server deployed ahead
+// of the interface should leave somebody reading something unfamiliar, not a
+// blank row where a notice was.
 export function label(kind?: string): string {
-  switch (kind) {
-    case "assigned":
-      return "assigned to you";
-    case "sent-back":
-      return "rejected";
-    case "build-quiet":
-      return "not being scanned";
-    case "critical-on-release":
-      return "critical on a release";
-    // An upload that changed much of what a build is made of. Said as what it
-    // was rather than as what it might mean: nothing here knows whether the
-    // base image moved or the pipeline broke.
-    case "inventory-moved":
-      return "a build's contents changed sharply";
-    // A window after an attack, counted from when it became known, with
-    // nobody outside recorded as told. Said as the fact; whether anybody owed
-    // anything is not the tool's answer to give.
-    case "obligation-open":
-      return "window after an attack running";
-    case "obligation-near":
-      return "window after an attack ending soon";
-    case "obligation-passed":
-      return "window after an attack passed";
-    // The conditions about the deployment rather than about anybody's work,
-    // all told to administrators. Each is named here, because on these the
-    // fallthrough below reads as a tool nobody finished rather than as one
-    // the server has grown past.
-    case "vulnerability-data-stale":
-      return "vulnerability data not moving";
-    case "risk-unagreed":
-      return "hidden with nobody agreeing";
-    case "pairs-concentrated":
-      return "one pair agreeing to most of the work";
-    case "supplier-silent":
-      return "supplier stopped answering";
-    // The four things that are wrong because nothing has happened. Each says
-    // what has stopped rather than what took place, which is what makes a row
-    // of them read as a list of things to pick up.
-    case "claim-waiting":
-      return "waiting for a second person";
-    case "sent-back-waiting":
-      return "sent back and not revised";
-    case "deferral-ending":
-      return "deferral running out";
-    case "queue-untaken":
-      return "sitting in a team queue";
-    // The two outcomes a proposer is told about. Approval is not one of them:
-    // it is what they asked for.
-    case "approval-undone":
-      return "agreement taken back";
-    // Told to an approver: what they agreed to was changed, so their
-    // agreement stopped counting.
-    case "approval-withdrawn":
-      return "agreed claim changed";
-    case "claim-lapsed":
-      return "stopped applying";
-    // Two judgments that disagreed met when two issues merged; one stands.
-    case "merge-superseded":
-      return "superseded by a merge";
-    case "disclosed":
-      return "disclosed";
-    default:
-      return kind ?? "";
-  }
+  return own(WORDS, kind) ?? kind ?? "";
 }
 
 // The count on the control that opens it.

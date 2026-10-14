@@ -30,6 +30,15 @@ describe("what a notification is called", () => {
     expect(label("approval-withdrawn")).toBe("agreed claim changed");
     expect(label("claim-lapsed")).toBe("stopped applying");
     expect(label("merge-superseded")).toBe("superseded by a merge");
+    // The kinds that have words only because the table is keyed on the
+    // published union.
+    expect(label("mentioned")).toBe("named in a note");
+    expect(label("holding-absent")).toBe("somebody away holding work");
+    expect(label("disclosure-due")).toBe("embargo date reached");
+    expect(label("disclosure-near")).toBe("embargo running out");
+    expect(label("statement-revised")).toBe("cited statement changed");
+    expect(label("brought-in")).toBe("brought into a case");
+    expect(label("unanswered-report")).toBe("report not answered");
   });
 
   it("shows a kind it does not know rather than hiding it", () => {
