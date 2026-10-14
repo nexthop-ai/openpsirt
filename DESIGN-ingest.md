@@ -1094,10 +1094,19 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 
 | Bound | |
 |---|---|
-| The download | 8 GiB, against 622 MB on 2026-10-07 |
+| The download | 8 GiB, against 622 MB on 2026-10-07, and removed when it passes the bound |
 | The archive inside it | 8 GiB, written to disk before it is read, and removed once it is |
-| One record | 16 MiB |
+| Files in an archive | Four million, counted by walking the archive's directory before the archive is opened, because opening it holds every entry in memory. The count is of entries walked, never the count the directory states |
+| One record in an archive | 16 MiB |
 | Records in a snapshot | A million |
+| One record in a snapshot | 4 MiB, encoded as the snapshot writes it |
+| A snapshot | 128 MiB decompressed, against 534 KB compressed on 2026-10-07. The bound is on what reading it holds in memory, and a bundle carried in is a file from outside |
+
+| Rule | Reason |
+|---|---|
+| Writing a snapshot refuses what reading one refuses | A snapshot no scan can read stalls every scan, and the fetcher, finding it unreadable, fetches and writes it again every hour |
+| What an archive keeps is counted against the snapshot's bounds as it is read | What it keeps is held in memory until it is written |
+| A build past a bound fails before the rename | The snapshot held stays the last one that could be read, and the failure is logged |
 
 ## Analyzer findings
 
