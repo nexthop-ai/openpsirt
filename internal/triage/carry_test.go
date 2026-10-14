@@ -544,3 +544,30 @@ func TestAnUnsetLimitIsTheDeploymentsSetting(t *testing.T) {
 		}
 	})
 }
+
+func TestACorrectionWhoseVersionMovedIsAlreadyApplying(t *testing.T) {
+	// A correction stands at any version, so it reaches the new line however
+	// far the version moved, and carrying it would be refused as the place
+	// already decided.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		corrected, err := f.corrects(t, f.at(), triage.ComponentNotPresent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := agreeTo(ctx, f.store, f.reviewer, corrected.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if offered.Applying != 1 || len(offered.Moved) != 0 {
+			t.Fatalf("offered %+v with %d already applying, want the correction applying",
+				offered.Moved, offered.Applying)
+		}
+	})
+}
