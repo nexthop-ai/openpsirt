@@ -441,7 +441,10 @@ Where it lands:
 `make dist` checks every one of those against the tag rather than assuming
 them: an archive named `0.2.0` whose binary reports `0.1.9` is what makes
 "which version were you running" unanswerable, and nothing else in the build
-compares the two.
+compares the two. A binary for another architecture than the machine's is asked
+its version where an emulator can run it, and is named as not checked where none
+can: a stripped binary built with `-trimpath` records no linker flags to read
+the stamp from without running it.
 
 The binary's inventory is told its version rather than asked for it. A binary
 built here comes from no module the proxy has seen, so its build information

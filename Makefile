@@ -537,6 +537,11 @@ dist-sums: dist-version
 # silent pass would say the assets agree when three of the four checks never
 # ran — which is the shape of green this repository refuses elsewhere.
 #
+# Every architecture's binary is asked its version. One built for another
+# architecture runs only where an emulator is registered, and is named as not
+# checked where none is: a stripped binary built with -trimpath records no
+# linker flags to read the stamp from without running it.
+#
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
 # named for what it signs, not for the release.
@@ -552,17 +557,25 @@ dist-verify: dist-version
 	      *) echo "$$file does not carry $(DIST_VERSION) in its name"; fail=1 ;; \
 	    esac; \
 	  done; \
-	  archive=$(DIST_DIR)/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH).tar.gz; \
-	  if [ -f "$$archive" ]; then \
-	    work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
+	  work=$$(mktemp -d); trap 'rm -rf "$$work"' EXIT; \
+	  for arch in $(DIST_ARCHES); do \
+	    archive=$(DIST_DIR)/openpsirt_$(DIST_VERSION)_linux_$$arch.tar.gz; \
+	    if [ ! -f "$$archive" ]; then \
+	      skipped="$$skipped the $$arch binary (no archive)"; continue; \
+	    fi; \
 	    tar -C "$$work" -xzf "$$archive"; \
-	    binary="$$work"/openpsirt_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH)/openpsirt; \
-	    said=$$("$$binary" -version | awk '{print $$2}'); \
+	    binary="$$work"/openpsirt_$(DIST_VERSION)_linux_$$arch/openpsirt; \
+	    if ! said=$$("$$binary" -version 2>/dev/null | awk '{print $$2}') || [ -z "$$said" ]; then \
+	      [ "$$arch" != "$(DIST_IMAGE_ARCH)" ] \
+	        || { echo "the $$arch binary does not run on the machine it was built for"; fail=1; continue; }; \
+	      skipped="$$skipped the $$arch binary (cannot run here)"; continue; \
+	    fi; \
 	    [ "$$said" = "$(DIST_VERSION)" ] \
-	      || { echo "the binary reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
-	    $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
+	      || { echo "the $$arch binary reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
+	    [ "$$arch" != "$(DIST_IMAGE_ARCH)" ] \
+	      || $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
 	      || fail=1; \
-	  else skipped="$$skipped the binary (no archive for $(DIST_IMAGE_ARCH))"; fi; \
+	  done; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
 	  elif ! command -v helm >/dev/null 2>&1; then skipped="$$skipped the chart (no helm)"; \
