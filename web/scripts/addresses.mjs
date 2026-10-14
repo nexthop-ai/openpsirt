@@ -22,7 +22,6 @@
 // is not an address into this application.
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
 import { interfaceSources, parse } from "./parsed.mjs";
@@ -357,17 +356,4 @@ export function sweep() {
     routes: Object.keys(routes).length,
     screens: screens.size,
   };
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  const result = sweep();
-  if (result.files === 0 || result.literals === 0 || result.routes === 0 || result.screens === 0) {
-    console.error("No source, route or screen was read, so this checked nothing.");
-    process.exit(1);
-  }
-  for (const each of result.found)
-    console.error(`src/${each.file}:${each.at}: ${each.address}: ${each.why}`);
-  for (const each of result.unread)
-    console.error(`routes.json: ${each.route} lists "${each.key}": ${each.why}`);
-  if (result.found.length + result.unread.length > 0) process.exit(1);
 }

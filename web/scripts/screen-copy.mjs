@@ -25,11 +25,6 @@ const src = path.join(here, "..", "src");
 // The most words one paragraph, hint, or empty-state detail may put on screen.
 export const BOUND = 20;
 
-// Paragraphs that stay longer, each with the reason. Keyed on file and the
-// paragraph's first words, so an edit that moves it keeps it allowed and an
-// edit that rewrites it has to earn its place again.
-const ALLOWED = new Map([]);
-
 // Props that render as standing text: a field's hint and an empty state's
 // detail. A title is a tooltip, which is where clarification belongs.
 const TEXT_PROPS = new Set(["hint", "detail"]);
@@ -226,8 +221,8 @@ function sources() {
   return interfaceSources().filter(({ file }) => file.endsWith(".tsx"));
 }
 
-// The whole tree: every finding past the bound that is not allowed, and how
-// many paragraphs were examined.
+// The whole tree: every paragraph past the bound, and how many paragraphs were
+// examined.
 export function sweep() {
   const found = [];
   let examined = 0;
@@ -235,12 +230,7 @@ export function sweep() {
     const rel = path.relative(src, file);
     const result = proseIn(text, file, BOUND, source);
     examined += result.examined;
-    for (const each of result.found) {
-      const allowed = [...ALLOWED.keys()].some(
-        (key) => key.startsWith(rel + ":") && each.lead.startsWith(key.slice(rel.length + 1)),
-      );
-      if (!allowed) found.push({ file: rel, ...each });
-    }
+    for (const each of result.found) found.push({ file: rel, ...each });
   }
   return { found, examined };
 }
