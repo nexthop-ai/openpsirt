@@ -29,8 +29,10 @@ export function EndOfLife({
   admin: boolean;
   onSet: (on: string) => void;
 }) {
-  const [value, setValue] = useState(on);
-  const changed = value !== on;
+  // An inherited date starts the box empty, so typing that same date states it:
+  // the release then keeps it when the product's moves.
+  const [value, setValue] = useState(inherited ? "" : on);
+  const changed = inherited ? value !== "" : value !== on;
 
   if (!admin) {
     if (!on) return <span className="hint">—</span>;
@@ -47,7 +49,7 @@ export function EndOfLife({
         type="date"
         // Empty clears it, which is how extended support is recorded: a date
         // taken back rather than a release recreated.
-        value={inherited && !changed ? "" : value}
+        value={value}
         aria-label={`When ${what}`}
         placeholder={inherited ? on : ""}
         onChange={(event) => setValue(event.target.value)}

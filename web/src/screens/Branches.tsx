@@ -231,14 +231,14 @@ export function Branches() {
                         —
                       </span>
                     ) : (who.data?.admin ?? false) ? (
-                      <input
-                        type="date"
-                        style={{ width: 150 }}
-                        value={stream.released_on ?? ""}
-                        onChange={(event) =>
+                      <ReleasedOn
+                        key={`${stream.name} ${stream.released_on ?? ""}`}
+                        on={stream.released_on ?? ""}
+                        busy={setRelease.isPending}
+                        onSet={(on) =>
                           setRelease.mutate({
                             stream: stream.name ?? "",
-                            on: event.target.value,
+                            on,
                             from: stream.parent ?? "",
                           })
                         }
@@ -391,5 +391,36 @@ export function Branches() {
         )}
       </Declare>
     </>
+  );
+}
+
+// The day a tag was released, written on Save. A date box fires a change for
+// every segment typed, so a write per change records 0002, 0020 and 0202 on the
+// way to 2026, each with a trail row.
+function ReleasedOn({
+  on,
+  busy,
+  onSet,
+}: {
+  on: string;
+  busy: boolean;
+  onSet: (on: string) => void;
+}) {
+  const [value, setValue] = useState(on);
+  return (
+    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="date"
+        style={{ width: 150 }}
+        aria-label="Released"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      {value !== on && (
+        <button type="button" className="btn" disabled={busy} onClick={() => onSet(value)}>
+          Save
+        </button>
+      )}
+    </span>
   );
 }
