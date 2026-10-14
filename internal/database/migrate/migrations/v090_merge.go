@@ -565,50 +565,65 @@ func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) e
 	}
 
 	type decided struct {
-		ID              int64   `bun:"id"`
-		ProductID       int64   `bun:"product_id"`
-		VulnerabilityID int64   `bun:"vulnerability_id"`
-		PlaceIdentity   string  `bun:"place_identity"`
-		Component       string  `bun:"component"`
-		Consumer        string  `bun:"consumer"`
-		LiveKey         *string `bun:"live_key"`
-		State           string  `bun:"state"`
+		ID              int64     `bun:"id"`
+		ProductID       int64     `bun:"product_id"`
+		VulnerabilityID int64     `bun:"vulnerability_id"`
+		PlaceIdentity   string    `bun:"place_identity"`
+		Component       string    `bun:"component"`
+		Consumer        string    `bun:"consumer"`
+		LiveKey         *string   `bun:"live_key"`
+		State           string    `bun:"state"`
+		ProposedAt      time.Time `bun:"proposed_at"`
 	}
 	type moved struct {
 		decided
 		component, consumer, key string
 	}
-	var changes []moved
+	// Read a product at a time, its places a batch at a time. No index on
+	// the decisions leads with the place, so a read per place is a read of
+	// the product's decisions per place.
+	byProduct := map[int64][]string{}
 	for k := range keys {
-		var rows []decided
-		if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
-			ColumnExpr(`de.id, de.product_id, de.vulnerability_id, de.place_identity, de.live_key, de.state`).
-			ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "component"`).
-			ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer"`).
-			Where("de.product_id = ?", k.product).
-			Where("de.place_identity = ?", k.place).
-			Where("de.live_key IS NOT NULL").
-			Scan(m.ctx, &rows); err != nil {
-			return fmt.Errorf("read the decisions beneath %s: %w", stored.Name, err)
+		byProduct[k.product] = append(byProduct[k.product], k.place)
+	}
+	var live []decided
+	for product, places := range byProduct {
+		slices.Sort(places)
+		for from := 0; from < len(places); from += 500 {
+			var rows []decided
+			if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
+				ColumnExpr(`de.id, de.product_id, de.vulnerability_id, de.place_identity, de.live_key, de.state`).
+				ColumnExpr(`de.proposed_at`).
+				ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "component"`).
+				ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer"`).
+				Where("de.product_id = ?", product).
+				Where("de.place_identity IN (?)", bun.List(places[from:min(from+500, len(places))])).
+				Where("de.live_key IS NOT NULL").
+				Scan(m.ctx, &rows); err != nil {
+				return fmt.Errorf("read the decisions beneath %s: %w", stored.Name, err)
+			}
+			live = append(live, rows...)
 		}
-		for _, row := range rows {
-			c, u := strings.TrimSpace(row.Component), strings.TrimSpace(row.Consumer)
-			nc, nu := c, u
-			if component[k][c] {
-				nc = becomes
-			}
-			if consumer[k][u] {
-				nu = becomes
-			}
-			if nc == c && nu == u {
-				continue
-			}
-			key := *row.LiveKey
-			if key == liveKeyV090(row.ProductID, row.VulnerabilityID, row.PlaceIdentity, c, u) {
-				key = liveKeyV090(row.ProductID, row.VulnerabilityID, row.PlaceIdentity, nc, nu)
-			}
-			changes = append(changes, moved{decided: row, component: nc, consumer: nu, key: key})
+	}
+	var changes []moved
+	for _, row := range live {
+		k := at{row.ProductID, row.PlaceIdentity}
+		c, u := strings.TrimSpace(row.Component), strings.TrimSpace(row.Consumer)
+		nc, nu := c, u
+		if component[k][c] {
+			nc = becomes
 		}
+		if consumer[k][u] {
+			nu = becomes
+		}
+		if nc == c && nu == u {
+			continue
+		}
+		key := *row.LiveKey
+		if key == liveKeyV090(row.ProductID, row.VulnerabilityID, row.PlaceIdentity, c, u) {
+			key = liveKeyV090(row.ProductID, row.VulnerabilityID, row.PlaceIdentity, nc, nu)
+		}
+		changes = append(changes, moved{decided: row, component: nc, consumer: nu, key: key})
 	}
 	if len(changes) == 0 {
 		return nil
@@ -626,25 +641,42 @@ func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) e
 	for k := range wanted {
 		keyList = append(keyList, k)
 	}
+	slices.Sort(keyList)
 	var holding []decided
-	if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
-		ColumnExpr(`de.id, de.live_key, de.state`).
-		Where("de.live_key IN (?)", bun.List(keyList)).
-		Scan(m.ctx, &holding); err != nil {
-		return fmt.Errorf("read the decisions already keyed there: %w", err)
+	for from := 0; from < len(keyList); from += 500 {
+		var some []decided
+		if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
+			ColumnExpr(`de.id, de.live_key, de.state, de.proposed_at`).
+			Where("de.live_key IN (?)", bun.List(keyList[from:min(from+500, len(keyList))])).
+			Scan(m.ctx, &some); err != nil {
+			return fmt.Errorf("read the decisions already keyed there: %w", err)
+		}
+		holding = append(holding, some...)
 	}
 	type claimant struct {
 		id       int64
 		approved bool
+		proposed time.Time
+	}
+	// Approved over proposed, then the one proposed last, then the later
+	// row: the order a settled decision is read in.
+	outranks := func(a, b claimant) bool {
+		if a.approved != b.approved {
+			return a.approved
+		}
+		if !a.proposed.Equal(b.proposed) {
+			return a.proposed.After(b.proposed)
+		}
+		return a.id > b.id
 	}
 	by := map[string][]claimant{}
 	for _, h := range holding {
 		if !moving[h.ID] {
-			by[*h.LiveKey] = append(by[*h.LiveKey], claimant{h.ID, h.State == "approved"})
+			by[*h.LiveKey] = append(by[*h.LiveKey], claimant{h.ID, h.State == "approved", h.ProposedAt})
 		}
 	}
 	for _, c := range changes {
-		by[c.key] = append(by[c.key], claimant{c.ID, c.State == "approved"})
+		by[c.key] = append(by[c.key], claimant{c.ID, c.State == "approved", c.ProposedAt})
 	}
 	lapsing := map[int64]bool{}
 	for _, held := range by {
@@ -653,7 +685,7 @@ func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) e
 		}
 		best := held[0]
 		for _, h := range held[1:] {
-			if (h.approved && !best.approved) || (h.approved == best.approved && h.id > best.id) {
+			if outranks(h, best) {
 				best = h
 			}
 		}

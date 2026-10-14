@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -73,13 +74,33 @@ func TestMeasureTheV090UpgradeOnTenNightlyBuilds(t *testing.T) {
 				1, false, false, true, now(), now(), CASE WHEN c.version <> 'master.10' THEN now() END
 			FROM "component" c CROSS JOIN "component" pc CROSS JOIN generate_series(1,8) k
 			WHERE c.identity LIKE 'i%' AND pc.identity LIKE 'p%'`)
+		if _, err := access.NewStore(db.DB).Ensure(ctx, "measurer", "", nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		// Six live decisions at every place beneath the image as the last
+		// stamp holds it: 122,400, each keyed on that stamp, and every one
+		// of them re-keyed by the upgrade.
+		exec(`INSERT INTO "vulnerability" ("identifier","identifier_folded","exploited","first_seen_at","issue_id")
+			SELECT 'CVE-D-'||k, 'cve-d-'||k, false, now(), 0 FROM generate_series(1,6) k`)
+		exec(`UPDATE "vulnerability" SET "issue_id" = "id"`)
+		exec(`INSERT INTO "claim" ("kind","proposed_by","proposed_at","outcome")
+			SELECT 'finding', MIN("id"), now(), 'not-applicable' FROM "person"`)
+		exec(`INSERT INTO "decision" ("claim_id","product_id","vulnerability_id","place_identity","visibility",
+				"component_upstream_version","consumer_upstream_version","needs_approval","state",
+				"proposed_by","proposed_at","live_key")
+			SELECT (SELECT MIN("id") FROM "claim"), ` + fmt.Sprint(d.Product.ID) + `, v.id, md5(c.name||pc.name), 'public',
+				'1', c.version, true, 'approved', (SELECT MIN("id") FROM "person"), now(),
+				md5(v.id||c.name||pc.name)
+			FROM "component" c CROSS JOIN "component" pc CROSS JOIN "vulnerability" v
+			WHERE c.identity LIKE 'i%v10' AND pc.identity LIKE 'p%' AND v.identifier LIKE 'CVE-D-%'`)
 		exec(`ANALYZE`)
-		var findings, edges int
+		var findings, edges, decisions int
 		_ = db.DB.NewRaw(`SELECT COUNT(*) FROM "finding"`).Scan(ctx, &findings)
+		_ = db.DB.NewRaw(`SELECT COUNT(*) FROM "decision"`).Scan(ctx, &decisions)
 		_ = db.DB.NewRaw(`SELECT COUNT(*) FROM "graph_edge"`).Scan(ctx, &edges)
 		start := time.Now()
 		dbtest.MigrateTo(t, db, v090)
-		t.Logf("merged %d findings, %d edges in %s", findings, edges, time.Since(start))
+		t.Logf("merged %d findings, %d edges and %d decisions in %s", findings, edges, decisions, time.Since(start))
 		_ = db.DB.NewRaw(`SELECT COUNT(*) FROM "graph_edge"`).Scan(ctx, &edges)
 		var comps, versions int
 		_ = db.DB.NewRaw(`SELECT COUNT(*) FROM "component" WHERE "name" LIKE 'docker-%'`).Scan(ctx, &comps)

@@ -444,14 +444,14 @@ for a container image to an image identified by its name
 
 | Step | What it does |
 |---|---|
+| The image version table is made | By v0.9.0's declaration. On MySQL and MariaDB in a transaction of its own, before the rest: both commit a data-definition statement as it runs, so the steps after it would otherwise run a statement at a time and a merge stopped part way would stay part done. The next start steps over the table and runs the rest again whole |
 | Every build's row is taken | The lock a scan's apply and a run's apply take, so on a server a replica of v0.8.0 still running waits rather than writing a graph part way through the upgrade |
-| The image version table is made | By v0.9.0's declaration |
 | Images are found by their package identifier | A component whose identifier is of type `oci` or `docker`. v0.8.0 kept nothing saying the format called a component a container, so one with no identifier is not found, and its next upload stores it by name |
 | Each image's components are grouped by name | The identifier with no version, reduced the way identity reduces it |
-| A name some build held at two versions at once is left as it is | Two of its nodes in one build with intervals that overlap. v0.9.0 keeps such images apart by version too |
+| A name some build held at two versions at once is left as it is, in every build | Two of its nodes in one build with intervals that overlap. v0.9.0 keeps such images apart by version too. A build holding that name once moves to the name on its next upload, once, as a version moving would |
 | One component is kept per name | The one already identified by the name where there is one, and otherwise the earliest. It takes the name's identity, no version, the identifier with no version, and the fold key that follows; a supplier, license or platform enumeration it lacks is taken from the others |
-| Live decisions are keyed on the merged image | A live decision at a place an image's finding sits at, keyed on that image's upstream version as the component or as what pulls it in, is keyed on the merged image's instead, which is none. Its live key is worked out again where it was keyed on the versions. An ended decision stays as it was recorded |
-| Two live decisions that became one claim keep one | The approved over the proposed, then the one proposed last. The other lapses, with the moment of the upgrade |
+| Live decisions are keyed on the merged image | A live decision at a place an image's finding sits at, keyed on that image's upstream version as the component or as what pulls it in, is keyed on the merged image's instead, which is none. Its live key is worked out again where it was keyed on the versions. An ended decision stays as it was recorded. Read a product at a time, its places a batch at a time: no index on the decisions leads with the place |
+| Two live decisions that became one claim keep one | The approved over the proposed, then the one proposed last, then the later row: the order a settled decision is read in. The other lapses, with the moment of the upgrade |
 | Upgrade commitments move to the merged image's fold | A build already committed on it keeps that commitment, and drops the one on the old fold |
 | Nodes are pointed at the kept component, and joined | A build's nodes whose intervals meet, one closing at the scan the next opened, are one node across both: the first is kept, its interval reaches the last one's end, and its identifier is the last one's with no version. A gap stays two nodes |
 | Each old node is a version the build stated | One image version row per node, on the node kept: the old component's version and the node's identifier, across the old node's interval |
@@ -468,14 +468,19 @@ as v0.9.0 stores the same image.
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.8.0 build whose image was restamped between two scans, with findings, a tag and three decisions beneath it, and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, both findings and one tag on it, the decision made at the later stamp live on the merged key, the one at the earlier stamp lapsed, the one already lapsed as recorded, and both layers left by version |
+| A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decisions beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the decision proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the decision about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
+| The same on MySQL and MariaDB, stopped after the table was made | The next start steps over the table and leaves the same |
 | The next build restamping the image | Writes one image version opened and one closed, and nothing else |
 
 Measured on PostgreSQL 16 with ten nightly builds of 34 images restamped every
-night over 600 packages, 1,632,000 findings and 204,000 edges beneath them: the
-upgrade takes 2 min 17 s, and leaves 34 image components, 340 image versions and
-20,400 edges. `make measure` re-runs it. The chart's startup probe allows ten
-minutes (`DESIGN-packaging.md`).
+night over 600 packages, 1,632,000 findings and 204,000 edges beneath them, and
+122,400 live decisions keyed on the last stamp: the upgrade takes 2 min 41 s, and
+leaves 34 image components, 340 image versions and 20,400 edges. `make measure`
+re-runs it. The time is mostly rewriting the findings, which grow with images
+times stamps, so a deployment with a month of nightly history takes three times
+as long. The chart's startup probe allows ten minutes (`DESIGN-packaging.md`),
+and a probe that ends the upgrade rolls it back on PostgreSQL and SQLite, so the
+upgrade notes say to give it longer or to run it before deploying.
 
 Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
@@ -532,7 +537,7 @@ in the gate.
 | The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, judgments and an approval, an assignment, and a recorded flaw |
 | What it held | Its status report's open findings per build, and every table's row count with it stopped |
 | The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
-| The rows | Each table's count: a table both sides hold keeps its count, and a table only the upgrade holds starts empty. From a release before v0.9.0, the components, nodes and edges may hold fewer, and the image versions start filled, because its upgrade merges the first three and fills the fourth from them |
+| The rows | Each table's count: a table both sides hold keeps its count, and a table only the upgrade holds starts empty. From a release before v0.9.0, the components, nodes and edges may hold fewer, by no more than the release held for container images, and the image versions start filled, with no more rows than the release held image nodes, because its upgrade merges the first three and fills the fourth from them |
 | Served | This tree's server on the upgraded database reports the same open findings per build, and no GET its API document lists answers 5xx. A GET with a path parameter the seed has no name for is skipped |
 
 | Rule | |

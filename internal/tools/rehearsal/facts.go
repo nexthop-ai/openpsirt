@@ -12,12 +12,19 @@ import (
 type Counts map[string]int64
 
 // Movement is what an upgrade may do to a table's count from the rows the
-// release held.
-type Movement int
+// release held: fill a new table, or merge rows of one, with at most Most rows
+// filled or merged away.
+type Movement struct {
+	Kind MovementKind
+	Most int64
+}
+
+// MovementKind is which of the two a movement is.
+type MovementKind int
 
 const (
 	// Fills is a new table the upgrade writes from rows the release held.
-	Fills Movement = iota + 1
+	Fills MovementKind = iota + 1
 	// Merges is a table the upgrade merges rows of, which may hold fewer.
 	Merges
 )
@@ -27,15 +34,23 @@ const (
 // of one image, and records each version a build stated from those nodes.
 const imagesByName = 43
 
+// Images is the rows a release held for container images, counted before the
+// upgrade: what the merge may remove at most, and what it may fill from.
+type Images struct {
+	Components, Nodes, Edges int64
+}
+
 // Moved is what the upgrade from a release whose last migration is given may
-// do to each table's count, beyond keeping it.
-func Moved(fromLast int64) map[string]Movement {
+// do to each table's count, beyond keeping it. The merge removes no more than
+// the rows the release held for images, and records no more versions than it
+// held image nodes.
+func Moved(fromLast int64, images Images) map[string]Movement {
 	moved := map[string]Movement{}
 	if fromLast < imagesByName {
-		moved["image_version"] = Fills
-		moved["component"] = Merges
-		moved["graph_node"] = Merges
-		moved["graph_edge"] = Merges
+		moved["image_version"] = Movement{Fills, images.Nodes}
+		moved["component"] = Movement{Merges, images.Components}
+		moved["graph_node"] = Movement{Merges, images.Nodes}
+		moved["graph_edge"] = Movement{Merges, images.Edges}
 	}
 	return moved
 }
@@ -65,10 +80,10 @@ func Compare(before, after Counts, moved map[string]Movement) []string {
 		switch {
 		case held && !holds:
 			faults = append(faults, fmt.Sprintf("%s held %d rows and is gone, and nothing says where they went", name, was))
-		case held && moved[name] == Merges && is <= was && (is > 0 || was == 0):
+		case held && moved[name].Kind == Merges && is <= was && was-is <= moved[name].Most:
 		case held && is != was:
 			faults = append(faults, fmt.Sprintf("%s held %d rows and holds %d", name, was, is))
-		case !held && moved[name] == Fills:
+		case !held && moved[name].Kind == Fills && is <= moved[name].Most:
 		case !held && is != 0:
 			faults = append(faults, fmt.Sprintf("%s is new and holds %d rows, and nothing the release held fills it", name, is))
 		}

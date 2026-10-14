@@ -250,6 +250,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			r.from, strings.Join(empty, ", "))
 	}
 
+	images, err := r.images(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
@@ -264,7 +269,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, Moved(record.Last)))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, Moved(record.Last, images)))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -482,6 +487,34 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 		counts[table] = n
 	}
 	return counts, nil
+}
+
+// images counts the rows the release held for container images: components
+// whose package identifier is of type oci or docker, their nodes, and the
+// edges at those nodes. Matched on the identifier's prefix in its lowest
+// spelling, which is the one every recorded producer writes.
+func (r *run) images(ctx context.Context) (Images, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return Images{}, err
+	}
+	defer func() { _ = db.Close() }()
+	const image = `SELECT "id" FROM "component" WHERE "purl" LIKE 'pkg:oci/%' OR "purl" LIKE 'pkg:docker/%'`
+	const nodes = `SELECT "id" FROM "graph_node" WHERE "component_id" IN (` + image + `)`
+	var out Images
+	for _, each := range []struct {
+		query string
+		into  *int64
+	}{
+		{`SELECT COUNT(*) FROM (` + image + `) AS "i"`, &out.Components},
+		{`SELECT COUNT(*) FROM (` + nodes + `) AS "n"`, &out.Nodes},
+		{`SELECT COUNT(*) FROM "graph_edge" WHERE "parent_id" IN (` + nodes + `) OR "child_id" IN (` + nodes + `)`, &out.Edges},
+	} {
+		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
+			return Images{}, fmt.Errorf("count the release's images: %w", err)
+		}
+	}
+	return out, nil
 }
 
 // container is what every run of this tree's image shares: the release's

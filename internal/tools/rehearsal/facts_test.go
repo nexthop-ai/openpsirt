@@ -57,14 +57,17 @@ func TestATotalThatMovesOrVanishesIsReported(t *testing.T) {
 func TestAnUpgradeMergingImagesMayHoldFewerOfThemAndFillTheirVersions(t *testing.T) {
 	before := Counts{"component": 40, "graph_node": 50, "graph_edge": 60, "finding": 10}
 	after := Counts{"component": 30, "graph_node": 45, "graph_edge": 55, "finding": 10, "image_version": 20}
-	if faults := Compare(before, after, Moved(42)); len(faults) != 0 {
+	images := Images{Components: 12, Nodes: 20, Edges: 8}
+	if faults := Compare(before, after, Moved(42, images)); len(faults) != 0 {
 		t.Errorf("merging images from a release before it was reported: %v", faults)
 	}
-	if faults := Compare(before, after, Moved(43)); len(faults) != 4 {
+	if faults := Compare(before, after, Moved(43, images)); len(faults) != 4 {
 		t.Errorf("from a release that already merged them, want every moved count reported: %v", faults)
 	}
-	grown := Counts{"component": 41, "graph_node": 0, "graph_edge": 60, "finding": 10, "image_version": 20}
-	if faults := Compare(before, grown, Moved(42)); len(faults) != 2 {
-		t.Errorf("a merge that grew a table or emptied one is reported: want two, got %v", faults)
+	// More gone than the release held for images, a table grown, and more
+	// versions than image nodes.
+	wrong := Counts{"component": 27, "graph_node": 51, "graph_edge": 51, "finding": 10, "image_version": 21}
+	if faults := Compare(before, wrong, Moved(42, images)); len(faults) != 4 {
+		t.Errorf("a merge reaching past the images is reported: want four, got %v", faults)
 	}
 }
