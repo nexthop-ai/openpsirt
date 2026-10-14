@@ -52,14 +52,18 @@ func meantToBeSent(r *http.Request, session *access.Session, base string) bool {
 // hostile page cannot make a browser send some other site's Host, and the
 // Origin it sends is the page's own rather than one it chose.
 func sameOrigin(r *http.Request, base string) bool {
-	stated := r.Header.Get("Origin")
-	if stated == "" {
+	stated := ""
+	if origin := r.Header.Get("Origin"); origin != "" {
+		// "null", or anything else that is not an origin, matches nothing.
+		stated = origin
+		if parsed, err := url.Parse(origin); err == nil && parsed.Host != "" {
+			stated = originOf(parsed.Scheme, parsed.Host)
+		}
+	} else if referrer := r.Header.Get("Referer"); referrer != "" {
 		// Older browsers, and a few request shapes, send Referer instead.
 		// Its origin is the part that matters.
-		if referrer := r.Header.Get("Referer"); referrer != "" {
-			if parsed, err := url.Parse(referrer); err == nil && parsed.Host != "" {
-				stated = parsed.Scheme + "://" + parsed.Host
-			}
+		if parsed, err := url.Parse(referrer); err == nil && parsed.Host != "" {
+			stated = originOf(parsed.Scheme, parsed.Host)
 		}
 	}
 	if stated == "" {
@@ -94,12 +98,26 @@ func origins(r *http.Request, base string) []string {
 		if err != nil || parsed.Host == "" {
 			return nil
 		}
-		return []string{parsed.Scheme + "://" + parsed.Host}
+		return []string{originOf(parsed.Scheme, parsed.Host)}
 	}
 	if r.Host == "" {
 		return nil
 	}
 	// Both schemes, because what reaches this process says nothing about what
 	// the browser used to reach whatever is in front of it.
-	return []string{"https://" + r.Host, "http://" + r.Host}
+	return []string{originOf("https", r.Host), originOf("http", r.Host)}
+}
+
+// originOf is a scheme and host as a browser serializes an origin: lower case,
+// and with no port where the port is the scheme's default. A base address
+// naming https://host:443 is the origin https://host.
+func originOf(scheme, host string) string {
+	scheme, host = strings.ToLower(scheme), strings.ToLower(host)
+	switch {
+	case scheme == "https" && strings.HasSuffix(host, ":443"):
+		host = strings.TrimSuffix(host, ":443")
+	case scheme == "http" && strings.HasSuffix(host, ":80"):
+		host = strings.TrimSuffix(host, ":80")
+	}
+	return scheme + "://" + host
 }

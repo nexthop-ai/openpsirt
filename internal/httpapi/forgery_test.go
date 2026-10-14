@@ -89,3 +89,28 @@ func TestAMisconfiguredAddressDoesNotBecomeTheRequestsOwn(t *testing.T) {
 		t.Error("a request from our own page was refused")
 	}
 }
+
+// A browser names an origin without the scheme's default port and in lower
+// case, so a base address that names the port or capitals is still the
+// deployment's own page.
+func TestAnOriginIsComparedAsABrowserWritesIt(t *testing.T) {
+	for _, c := range []struct {
+		base, origin string
+		want         bool
+	}{
+		{"https://psirt.example.com:443", "https://psirt.example.com", true},
+		{"http://psirt.internal:80", "http://psirt.internal", true},
+		{"https://PSIRT.example.com", "https://psirt.example.com", true},
+		{"https://psirt.example.com", "https://psirt.example.com:443", true},
+		{"https://psirt.example.com:8443", "https://psirt.example.com", false},
+		{"https://psirt.example.com:443", "http://psirt.example.com", false},
+		{"http://psirt.example.com:443", "http://psirt.example.com", false},
+		{"https://psirt.example.com:443", "null", false},
+	} {
+		asked := httptest.NewRequest(http.MethodPost, "/v1/products", nil)
+		asked.Header.Set("Origin", c.origin)
+		if got := sameOrigin(asked, c.base); got != c.want {
+			t.Errorf("base %s, origin %s: answered %v, want %v", c.base, c.origin, got, c.want)
+		}
+	}
+}

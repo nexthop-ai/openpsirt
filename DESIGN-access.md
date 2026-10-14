@@ -825,6 +825,12 @@ echoed value has leaked. Requests carrying a key or a token are exempt: nothing
 sends those automatically. Safe methods are named as a list, so a method nobody
 thought of is guarded rather than exempt by having been forgotten.
 
+Both sides of the comparison are origins as a browser serializes them: scheme
+and host in lower case, and no port where it is the scheme's default. A base
+address naming `https://psirt.example.com:443` is the origin a browser calls
+`https://psirt.example.com`, and compared as written every write from the
+deployment's own page would be refused.
+
 ## Group name matching
 
 Exactly, with its capitals. A group name is an identity the provider hands over,
