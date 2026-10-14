@@ -9,6 +9,7 @@ import { unwrap } from "../api/queries";
 import { Markdown } from "./Markdown";
 import { keep, restore } from "../app/drafts";
 import { Icon } from "./Icons";
+import { mentionOf } from "./mention";
 
 // Write and Preview over a plain textarea, with a formatting toolbar. Not a
 // rich-text editor: what is stored is markdown, and an editor that hides that
@@ -133,12 +134,13 @@ export function Editor({
     const upto = value.slice(0, field.selectionStart);
     const start = upto.lastIndexOf("@");
     if (start < 0) return;
-    const next = value.slice(0, start) + "@" + identity + " " + value.slice(field.selectionStart);
+    const written = mentionOf(identity);
+    const next = value.slice(0, start) + written + " " + value.slice(field.selectionStart);
     onChange(next);
     setTyping(null);
     queueMicrotask(() => {
       field.focus();
-      const at = start + identity.length + 2;
+      const at = start + written.length + 1;
       field.setSelectionRange(at, at);
     });
   }

@@ -125,6 +125,8 @@ names is told at once.
 | A name nobody holds and a name held by somebody who may not read this are not distinguished | Both reach nobody. A refusal naming which would answer, one comment at a time, whether a given person can see undisclosed work |
 | Never the author | They are not asking themselves a question |
 | Never a failure of the write | The words are on record by the time anybody is told |
+| A name is written plain, `@ana`, where it is letters, digits and `. _ : @ -`, starting and ending with a letter or digit, and delimited, `@\<ana+psirt@example.com>`, otherwise | The plain form stops at the first character outside it, so `ana+psirt@example.com` or `auth0|abc` would be read as `ana` or `auth0` and somebody else, or nobody, would be told. The backslash keeps markdown from reading the brackets as a tag or an address. The editor writes whichever form the identity needs, and `@<…>` is read too where markdown leaves it as text or links it as an address |
+| A run of text is read whole | The parser splits one run into several text nodes where it pleases, and a delimited name holding a space would otherwise be cut in two |
 
 ## New criticals in a shipped release
 

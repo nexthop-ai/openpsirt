@@ -118,6 +118,19 @@ func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 		// "proxy", the person named is never told.
 		{"an identity with a colon in it", "Asking @proxy:dev to look.", []string{"proxy:dev"}},
 		{"a colon that ends the sentence", "@ana: could you?", []string{"ana"}},
+		// An identity outside the plain form is written delimited, and read
+		// whole rather than as the prefix the plain form would stop at.
+		{"a delimited identity with a plus", `Asking @\<ana+psirt@example.com> now`, []string{"ana+psirt@example.com"}},
+		{"a delimited identity with a bar", `Asking @\<auth0|abc123> now`, []string{"auth0|abc123"}},
+		{"a delimited identity with a space", `Asking @\<Ana Smith>.`, []string{"Ana Smith"}},
+		{"a delimited identity outside ASCII", `Asking @\<josé> now`, []string{"josé"}},
+		{"a bar left as text", "Asking @<auth0|abc123> now", []string{"auth0|abc123"}},
+		{"an address markdown links", "Asking @<ana+psirt@example.com> now", []string{"ana+psirt@example.com"}},
+		{"an address linked with no @ before it", "Mail <ana+psirt@example.com> now", nil},
+		{"a delimited identity in a code span", "Write `@\\<auth0|abc>` to call somebody", nil},
+		{"a delimited identity after a word", `mail@\<auth0|abc> is not one`, nil},
+		{"names on two lines", "@ana\n@ben", []string{"ana", "ben"}},
+		{"a delimited identity split across lines is not one", "@\\<Ana\nSmith>", nil},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			got := markdown.Mentions(c.source)
