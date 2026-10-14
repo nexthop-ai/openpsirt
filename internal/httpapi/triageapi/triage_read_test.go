@@ -414,10 +414,16 @@ func TestWhatAppliesToAFindingIsReadableWithItsHistory(t *testing.T) {
 				} `json:"decision"`
 				Reasoning string `json:"reasoning"`
 			} `json:"standing"`
+			Previously []struct{} `json:"previously"`
 		}
 		httpapitest.Read(t, r, "triager", path, &after)
 		if after.Standing == nil {
 			t.Fatal("an agreed decision does not read as standing where it was made")
+		}
+		// The one claim now stands, so nothing was decided here before it.
+		if len(after.Previously) != 0 {
+			t.Errorf("the standing decision is listed again under previously: %d rows",
+				len(after.Previously))
 		}
 		if after.Standing.Decision.Outcome != "not-applicable" || after.Standing.Reasoning == "" {
 			t.Errorf("what stands here reads as %+v", after.Standing)
