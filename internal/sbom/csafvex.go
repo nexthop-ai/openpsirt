@@ -962,6 +962,13 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 			}
 			out = append(out, *claim)
 		}
+		// The claim bound counts claims returned, and one vulnerability
+		// returns one per status its products are listed under. The objects
+		// counted on the way in are a quarter of what this can come to; the
+		// walk itself is bounded by what each identifier holds.
+		if len(out) > r.lim.MaxStatements {
+			return nil, refusal.Errorf("more claims than the %d limit", r.lim.MaxStatements)
+		}
 	}
 	return out, nil
 }

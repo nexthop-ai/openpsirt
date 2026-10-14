@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
@@ -525,5 +526,34 @@ func TestTheLastJustificationForTheWholeClaimStands(t *testing.T) {
 	}
 	if got[0].Justification != "vulnerable_code_not_present" {
 		t.Errorf("the claim is justified by %q", got[0].Justification)
+	}
+}
+
+func TestTheClaimBoundCountsTheClaimsACSAFDocumentReturns(t *testing.T) {
+	// One vulnerability returns a claim per status its products are listed
+	// under, so counting vulnerabilities lets a document return several
+	// times the bound.
+	tree, _ := csafProducts(2, "")
+	vulnerabilities := func(claims int) string {
+		var out strings.Builder
+		out.WriteString("[")
+		for i := 0; i < claims; i += 2 {
+			if i > 0 {
+				out.WriteString(",")
+			}
+			status := `"fixed": ["P0"]`
+			if i+1 < claims {
+				status += `, "known_affected": ["P1"]`
+			}
+			fmt.Fprintf(&out, `{"cve": "CVE-2026-%d", "product_status": {%s}}`, i+1, status)
+		}
+		return out.String() + "]"
+	}
+	for _, reader := range []string{"VEX", "advisory"} {
+		t.Run(reader, func(t *testing.T) {
+			boundtest.Edges(t, 3, func(n int) error {
+				return bothCSAFReaders(tree, vulnerabilities(n), sbom.Limits{MaxStatements: 3})[reader]
+			}, func(err error) bool { return strings.Contains(err.Error(), "more claims than the 3 limit") })
+		})
 	}
 }

@@ -255,6 +255,7 @@ million edges between them.
 | A suppression document's product identifiers are charged against the component bound | The claim bound counts claims, and one claim names any number of products — so a document holding a single statement that lists millions of identifiers was inside every bound in force, and the map holding them was charged against nothing |
 | A CycloneDX document's license entries are charged against ten times the component bound, with a refusal of their own | Each is kept, so one component could otherwise hold as many as the byte bound allows. A real component states one to three, and the real switch images average under one. The claim bound would refuse a large image that makes no claim, naming the wrong setting |
 | The claim bound is spent across a scan's documents rather than per document | Every other bound is per document, and a scan carries as many as a build attaches. Passed whole to each, a producer sending fifty each inside the limit made this hold fifty times what the limit allows |
+| The claim bound counts the claims a document returns | A CSAF vulnerability returns one claim per status its products are listed under, so a count of vulnerabilities lets one document return several times the bound and overspend what a scan's other documents have left |
 | How many documents arrive with one scan is bounded too | It is what makes every per-document bound mean something: without it they are multiplied by a number nothing decides |
 
 | Rule | Reason |
