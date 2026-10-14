@@ -548,7 +548,7 @@ in the gate.
 | Counted with nothing running | A server runs passes that write rows. Counted between the migrations alone, a changed count is the migration's |
 | This tree is served with the release's configuration | The environment the release's server container was started with, less its image's own and the database URL, reaches every container of this tree, by name with the values in the environment. A setting the demo turned on is then on for both sides of the comparison |
 | An engine `make engines-up` made is joined to the rehearsal's network | It publishes its port on this machine's loopback alone, which no container reaches. The container publishing the port the URL names joins the rehearsal's network and is addressed by its name, which holds on Docker Desktop, rootless Docker and Podman alike. A docker command failing on the way refuses with what docker said, and so do two containers publishing the port. An engine on another host, or a loopback port no container publishes, is reached through `host.docker.internal` |
-| Everything it made is removed | Pass, fail or interrupt: its containers, network and database. The release's worktree, both images, the run's directory with its logs, and the scanner's database are kept. `-keep` leaves everything in place |
+| Everything it made is removed | Pass, fail or interrupt: its containers, network and database. The release's worktree, both images, the run's directory with its logs, and the scanner's database are kept. `-keep` leaves everything in place. A second interrupt during the removal stops it |
 
 ## Migration locks
 

@@ -131,11 +131,14 @@ func main() {
 	r.base = fmt.Sprintf("http://127.0.0.1:%d", port)
 
 	// An interrupt cancels the run and still removes what it made: the
-	// cleanup takes a context the interrupt does not cancel.
+	// cleanup takes a context the interrupt does not cancel. The signals are
+	// released before the cleanup, so a second interrupt stops a cleanup that
+	// hangs.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	began := time.Now()
 	faults, err := r.rehearse(ctx)
+	stop()
 	if !keep {
 		r.clean(context.WithoutCancel(ctx))
 	}
