@@ -15,8 +15,8 @@ import (
 	"strings"
 )
 
-// Hidden is what stands in for anything taken out.
-const Hidden = "xxxxx"
+// hidden is what stands in for anything taken out.
+const hidden = "xxxxx"
 
 // secretParams are query keys that carry a credential, compared without
 // regard to capitals. Drivers accept a password in the query as well as in the
@@ -39,14 +39,14 @@ func Parsed(u *url.URL) string {
 	clone := *u
 	if u.User != nil {
 		if _, set := u.User.Password(); set {
-			clone.User = url.UserPassword(u.User.Username(), Hidden)
+			clone.User = url.UserPassword(u.User.Username(), hidden)
 		}
 	}
 	if clone.RawQuery != "" {
 		pairs := strings.Split(clone.RawQuery, "&")
 		for i, pair := range pairs {
 			if key, _, _ := strings.Cut(pair, "="); Secret(key) {
-				pairs[i] = key + "=" + Hidden
+				pairs[i] = key + "=" + hidden
 			}
 		}
 		clone.RawQuery = strings.Join(pairs, "&")
@@ -68,7 +68,7 @@ func Parsed(u *url.URL) string {
 func URL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return Hidden
+		return hidden
 	}
 	if u.Scheme == "" || u.Opaque != "" || u.Host == "" {
 		// A scheme the parser did not separate from a host leaves the
@@ -96,7 +96,7 @@ func Secret(key string) bool {
 // password whether or not the parser read it as user information.
 func beforeLastAt(text string) string {
 	if at := strings.LastIndex(text, "@"); at >= 0 {
-		return Hidden + "@" + text[at+1:]
+		return hidden + "@" + text[at+1:]
 	}
 	return text
 }
