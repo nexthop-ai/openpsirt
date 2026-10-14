@@ -127,6 +127,7 @@ func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 		{"a bar left as text", "Asking @<auth0|abc123> now", []string{"auth0|abc123"}},
 		{"an address markdown links", "Asking @<ana+psirt@example.com> now", []string{"ana+psirt@example.com"}},
 		{"an address linked with no @ before it", "Mail <ana+psirt@example.com> now", nil},
+		{"an address linked after a word, with a mention earlier in the run", "ping @ana, or mail team@<ops@example.com>", []string{"ana"}},
 		{"a delimited identity in a code span", "Write `@\\<auth0|abc>` to call somebody", nil},
 		{"a delimited identity after a word", `mail@\<auth0|abc> is not one`, nil},
 		{"names on two lines", "@ana\n@ben", []string{"ana", "ben"}},

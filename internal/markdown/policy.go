@@ -539,6 +539,11 @@ func mintedToken(token string) bool {
 // read too, where markdown leaves it as text.
 var mention = regexp.MustCompile(`(^|[^\w@.:-])@(?:\\?<([^<>\n]{1,191})>|([A-Za-z0-9][A-Za-z0-9._:@-]{0,190}))`)
 
+// trailingAt is a run of text ending in an @ that begins a mention: one
+// standing at the start, or after a character that cannot end a word or an
+// address.
+var trailingAt = regexp.MustCompile(`(^|[^\w@.:-])@$`)
+
 // Mentions lists the identities a piece of text names, without repeats.
 //
 // Read from the parsed document like References, so that a name inside a
@@ -616,8 +621,7 @@ func Mentions(source string) []string {
 		}
 		// `@<ana+psirt@example.com>` written without the backslash is an @
 		// and then an address markdown links. The address is the identity.
-		if link, ok := last.NextSibling().(*ast.AutoLink); ok && strings.HasSuffix(said, "@") &&
-			mention.MatchString(said+"<x>") {
+		if link, ok := last.NextSibling().(*ast.AutoLink); ok && trailingAt.MatchString(said) {
 			add(string(link.Label([]byte(source))))
 		}
 		return ast.WalkContinue, nil
