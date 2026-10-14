@@ -430,7 +430,9 @@ renderer's to apply. The rules are in `DESIGN-text.md`.
 
 A moment is stated in UTC, in RFC 3339, in a response and in its file alike. A
 driver hands back a time in the process's own zone, so a moment is converted
-before it is written rather than formatted behind a literal `Z`.
+before it is written rather than formatted behind a literal `Z`. A day is the
+UTC day of its moment, in a response, a report and an export alike, and a field
+answered as a time is converted to UTC before it is answered.
 
 ## Addresses and labels
 

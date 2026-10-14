@@ -207,12 +207,12 @@ func findingColumns() []string {
 func findingCells(g finding.Group) []string {
 	due, opened := "", ""
 	if g.DueAt != nil {
-		due = g.DueAt.Format("2006-01-02")
+		due = g.DueAt.UTC().Format("2006-01-02")
 	} else if g.NoDeadline != "" {
 		due = string(g.NoDeadline)
 	}
 	if !g.OpenedAt.IsZero() {
-		opened = g.OpenedAt.Format("2006-01-02")
+		opened = g.OpenedAt.UTC().Format("2006-01-02")
 	}
 	return []string{
 		g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),

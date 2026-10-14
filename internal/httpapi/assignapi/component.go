@@ -174,7 +174,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				var stated []StatedVersionBody
 				for _, each := range one.Stated {
 					stated = append(stated, StatedVersionBody{Version: each.Version, Purl: each.Purl,
-						From: each.From, Until: each.Until})
+						From: each.From.UTC(), Until: core.InUTC(each.Until)})
 				}
 				if ecosystem == "" {
 					ecosystem = graph.EcosystemOf(one.Purl)
@@ -185,7 +185,7 @@ func registerComponent(api huma.API, in core.Deps) {
 					PackagePageURL: page, PackagePageName: called,
 					Summary: one.Summary, ProjectURL: one.ProjectURL,
 					Supplier: one.Supplier, License: one.License,
-					Newest: one.Newest, NewestAt: one.NewestAt, FirstSeen: one.FirstSeen,
+					Newest: one.Newest, NewestAt: core.InUTC(one.NewestAt), FirstSeen: one.FirstSeen.UTC(),
 					Issues: one.Issues, Consumers: one.Consumers,
 					StatedVersions: stated,
 				})
@@ -198,7 +198,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
-				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,
+				DueAt:    core.InUTC(build.DueAt), CommittedTo: core.InUTC(build.CommittedTo), UpgradeTo: build.UpgradeTo,
 			})
 		}
 		return out, nil

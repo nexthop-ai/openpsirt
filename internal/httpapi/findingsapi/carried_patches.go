@@ -102,10 +102,10 @@ func registerCarried(api huma.API, in core.Deps) {
 				Statement: row.Statement, Pedigree: row.Pedigree,
 				Within: row.Within, WithinVersion: row.WithinVersion,
 				Suppresses: row.Suppresses,
-				Since:      row.Since.Format(time.DateOnly),
+				Since:      row.Since.UTC().Format(time.DateOnly),
 			}
 			if row.Until != nil {
-				body.Until = row.Until.Format(time.DateOnly)
+				body.Until = row.Until.UTC().Format(time.DateOnly)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

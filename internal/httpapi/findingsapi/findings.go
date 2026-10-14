@@ -284,13 +284,13 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Undisclosed:  group.Undisclosed,
 	}
 	if group.DiscloseAt != nil {
-		row.DiscloseAt = group.DiscloseAt.Format(time.DateOnly)
+		row.DiscloseAt = group.DiscloseAt.UTC().Format(time.DateOnly)
 	}
 	if !group.OpenedAt.IsZero() {
-		row.Opened = group.OpenedAt.Format(time.DateOnly)
+		row.Opened = group.OpenedAt.UTC().Format(time.DateOnly)
 	}
 	if group.DueAt != nil {
-		row.Due = group.DueAt.Format(time.DateOnly)
+		row.Due = group.DueAt.UTC().Format(time.DateOnly)
 		// Rounded down, not toward zero, the way the running-out list
 		// rounds it: truncation reports something twelve hours overdue
 		// as having zero days left, which reads as due today.
@@ -751,7 +751,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 				Source: core.EvidenceSource(one.Source), Identifier: one.Identifier,
 				Status: one.Status, About: one.About,
 				Justification: one.Justification, Statement: one.Statement,
-				Document: one.Document, At: one.UploadedAt.Format(time.DateOnly),
+				Document: one.Document, At: one.UploadedAt.UTC().Format(time.DateOnly),
 				Offers: core.OutcomeOffered(offers),
 			})
 		}
@@ -787,10 +787,10 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Said:      []core.SaidBody{},
 	}
 	if !e.OpenedAt.IsZero() {
-		body.Opened = e.OpenedAt.Format(time.DateOnly)
+		body.Opened = e.OpenedAt.UTC().Format(time.DateOnly)
 	}
 	if e.DueAt != nil {
-		body.Due = e.DueAt.Format(time.DateOnly)
+		body.Due = e.DueAt.UTC().Format(time.DateOnly)
 		// Rounded down, not toward zero, the way every other screen rounds it:
 		// truncation reports something twelve hours overdue as having zero
 		// days left, which reads as due today rather than as late.
@@ -810,13 +810,13 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		}
 	}
 	if e.LatestReleasedAt != nil {
-		body.LatestReleasedAt = e.LatestReleasedAt.Format(time.DateOnly)
+		body.LatestReleasedAt = e.LatestReleasedAt.UTC().Format(time.DateOnly)
 	}
 	if e.FixedAt != nil {
-		body.FixedAt = e.FixedAt.Format(time.DateOnly)
+		body.FixedAt = e.FixedAt.UTC().Format(time.DateOnly)
 	}
 	if e.DiscloseAt != nil {
-		body.DiscloseAt = e.DiscloseAt.Format(time.DateOnly)
+		body.DiscloseAt = e.DiscloseAt.UTC().Format(time.DateOnly)
 	}
 	for _, reference := range e.References {
 		body.References = append(body.References, ReferenceBody{

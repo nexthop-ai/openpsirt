@@ -173,7 +173,7 @@ func registerIssue(api huma.API, in core.Deps) {
 				Undisclosed: row.Undisclosed, Recorded: row.Recorded, FixedIn: row.FixedIn,
 			}
 			if row.DueAt != nil {
-				body.Due = row.DueAt.Format(time.DateOnly)
+				body.Due = row.DueAt.UTC().Format(time.DateOnly)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

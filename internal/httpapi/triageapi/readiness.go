@@ -175,7 +175,7 @@ func registerReadiness(api huma.API, in core.Deps) {
 				Places: group.Places, State: core.StandingUnsettled(group.State),
 			}
 			if group.DueAt != nil {
-				one.Due = group.DueAt.Format(time.DateOnly)
+				one.Due = group.DueAt.UTC().Format(time.DateOnly)
 			}
 			out.Body.Blocking = append(out.Body.Blocking, one)
 		}

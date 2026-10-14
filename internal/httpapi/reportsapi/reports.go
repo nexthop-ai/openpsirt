@@ -117,7 +117,7 @@ func registerReports(api huma.API, in core.Deps) {
 		out.Body.Items = make([]PointBody, 0, len(points))
 		for _, p := range points {
 			out.Body.Items = append(out.Body.Items, PointBody{
-				At: p.At.Format(time.DateOnly), Open: p.Open,
+				At: p.At.UTC().Format(time.DateOnly), Open: p.Open,
 				Opened: p.Opened, Resolved: p.Resolved, BySeverity: p.BySeverity,
 				OpenedBySeverity: p.OpenedBySeverity, ResolvedBySeverity: p.ResolvedBySeverity,
 			})
@@ -436,7 +436,7 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 			body.State = core.Standing(row.State)
 			body.Outcome, body.Justification = core.Outcome(row.Outcome), core.Justification(row.Justification)
 			if row.Due != nil {
-				body.Due = row.Due.Format(time.DateOnly)
+				body.Due = row.Due.UTC().Format(time.DateOnly)
 			}
 		}
 		out = append(out, body)

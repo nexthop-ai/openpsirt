@@ -151,7 +151,7 @@ func registerBulk(api huma.API, in core.Deps) {
 				Likelihood: float64(each.LikelihoodPPM) / 1_000_000,
 			}
 			if due := soonest[each.VulnerabilityID]; due != nil {
-				row.Due = due.Format(time.DateOnly)
+				row.Due = due.UTC().Format(time.DateOnly)
 			}
 			out.Body.Items = append(out.Body.Items, row)
 		}

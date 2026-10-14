@@ -122,7 +122,7 @@ func registerWork(api huma.API, in core.Deps) {
 		}
 		out := &answer{}
 		out.Body.Version = data.Version
-		out.Body.Since = data.Since
+		out.Body.Since = core.InUTC(data.Since)
 		out.Body.StaleAt = data.After.String()
 		// Answered here as well as said by the condition, because a screen
 		// somebody opens after being told is a screen that has to agree with
@@ -130,7 +130,7 @@ func registerWork(api huma.API, in core.Deps) {
 		out.Body.Stale = data.StaleAt(time.Now())
 		if data.Records != nil {
 			out.Body.Records = RecordsDataBody{
-				Version: data.Records.Version, Since: data.Records.Since,
+				Version: data.Records.Version, Since: core.InUTC(data.Records.Since),
 				Stale: data.Records.StaleAt(time.Now()),
 			}
 		}
@@ -193,7 +193,7 @@ func registerWork(api huma.API, in core.Deps) {
 		for _, job := range jobs {
 			body := SetAsideBody{
 				ID: job.ID, Kind: job.Kind, Reference: job.Reference,
-				Attempts: job.Attempts, StoppedAt: job.UpdatedAt,
+				Attempts: job.Attempts, StoppedAt: job.UpdatedAt.UTC(),
 			}
 			if job.LastError != nil {
 				body.LastError = *job.LastError

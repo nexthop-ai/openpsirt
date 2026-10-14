@@ -111,7 +111,7 @@ func registerDue(api huma.API, in core.Deps) {
 				StreamName:  row.StreamName,
 				VariantName: row.VariantName,
 				Places:      row.Places,
-				Due:         row.Due.Format(time.DateOnly),
+				Due:         row.Due.UTC().Format(time.DateOnly),
 				// Rounded down, not toward zero. Truncation reports something
 				// twelve hours overdue as having zero days left, which reads
 				// as due today rather than as late.

@@ -807,7 +807,7 @@ func dayOf(at *time.Time) string {
 	if at == nil {
 		return ""
 	}
-	return at.Format(time.DateOnly)
+	return at.UTC().Format(time.DateOnly)
 }
 
 // movementBody names the people a movement record refers to by the identity

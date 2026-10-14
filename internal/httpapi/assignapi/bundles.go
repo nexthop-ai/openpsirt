@@ -400,7 +400,7 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 			Fold: one.Fold, Upstream: one.Upstream, From: one.From, To: one.To,
 			Components: one.Components,
 			Issues:     one.Issues, Places: one.Places,
-			DeclaredAt: one.DeclaredAt.Format(time.DateOnly),
+			DeclaredAt: one.DeclaredAt.UTC().Format(time.DateOnly),
 			HeldBy:     one.HeldBy, State: core.UpgradeState(one.State),
 			ClaimID: one.ClaimID,
 		}
@@ -408,7 +408,7 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 			row.Components = []string{}
 		}
 		if one.By != nil {
-			row.By = one.By.Format(time.DateOnly)
+			row.By = one.By.UTC().Format(time.DateOnly)
 		}
 		out = append(out, row)
 	}

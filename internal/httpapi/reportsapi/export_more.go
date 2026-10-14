@@ -125,7 +125,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 						row.Stream, row.StreamName,
 						row.Variant, row.VariantName,
 						strconv.Itoa(row.Places), held, heldName,
-						row.Due.Format(time.DateOnly),
+						row.Due.UTC().Format(time.DateOnly),
 						// Rounded down rather than toward zero, the way the
 						// screen rounds it: truncation reports something twelve
 						// hours overdue as having zero days left, which reads
@@ -689,7 +689,7 @@ func registerTrendExport(api huma.API, in core.Deps) {
 				rows := make([][]string, 0, len(points))
 				for _, point := range points {
 					row := []string{
-						point.At.Format(time.DateOnly), strconv.Itoa(point.Opened),
+						point.At.UTC().Format(time.DateOnly), strconv.Itoa(point.Opened),
 						strconv.Itoa(point.Resolved), strconv.Itoa(point.Open),
 					}
 					for _, split := range []map[string]int{
