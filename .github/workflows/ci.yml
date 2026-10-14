@@ -108,9 +108,18 @@ jobs:
           # The whole history, so the vulnerability gates can find where this
           # change left main and fail only what it introduced.
           fetch-depth: 0
+      # The Go release is the one the image builds with. The Dockerfile's
+      # golang tag is the one pin of the patch, and go.mod's go line is only
+      # the oldest release the module accepts.
+      - name: Read the Go release the image builds with
+        id: go
+        run: |
+          version=$(make -s --no-print-directory go-version)
+          [ -n "$version" ] || { echo "::error::the Dockerfile names no golang release"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go.outputs.version }}
           # Off, because setup-go keeps the modules and the build cache in one
           # entry under one key, and the two answer different questions. Left
           # on, the entry holding both is downloaded and extracted over the top

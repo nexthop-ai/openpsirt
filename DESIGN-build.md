@@ -135,6 +135,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
 | `make spdx` | Every source file opens with this project's copyright and an SPDX license identifier. `make spdx-fix` writes it where missing. See below |
 | `make pins-check` | Every version pinned in two files still agrees |
+| `make go-version` | The Go release the image builds with, which every workflow installs |
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
@@ -751,7 +752,7 @@ separates a harness that stopped asking from a server nobody may configure.
 ## Pinned pairs
 
 A version written in two files is a version somebody moves in one of them: the Go
-toolchain the container builds with against the one the module declares, the Node
+toolchain the container builds with against the one the module accepts, the Node
 the image uses against the one every workflow runs, the SBOM generator in the
 image against the one the SBOM target invokes, and the Python the documentation
 closure was resolved on against the one the workflows build it with.
@@ -761,16 +762,21 @@ tests run against, this answers what the release is built from. An image
 carrying two defaults for the version passed in is what it catches — a build
 with none then reports `dev` in the binary and `0.0.0` in its own inventory.
 
-The Go patch counts. A floating base image and a comparison truncated to the
-minor cannot tell one patch apart, so a tarball and an image built from the same
-commit are a release built twice by two toolchains with the gate green. The
-image names the patch `go.mod` declares and the check compares the whole
-version.
+The Go patch counts. A floating base image cannot tell one patch apart, so a
+tarball and an image built from the same commit would be a release built twice
+by two toolchains with the gate green.
+
+| Rule | Why |
+|---|---|
+| The image's `golang` tag is the one pin of the Go patch release | One number to move, in the file Dependabot's image update edits |
+| Every workflow installs the release `make go-version` reads from that tag | The tarball, the image and the tests are built by one toolchain |
+| `go.mod`'s `go` line is held at or below the image's release, compared as versions | It is the oldest release the module accepts. Held equal, an image bump would fail until somebody edited `go.mod` by hand on the same pull request |
+| A `go` line above the image's release fails | A module needing a newer Go lands after the image moves, never before |
 
 | What that costs | What answers it |
 |---|---|
-| The image no longer picks up a Go release by itself | Dependabot watches the images and a bump arrives as a pull request |
-| A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities, and now reports them about the toolchain both artifacts are built with rather than about one of the two |
+| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own |
+| A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities against the toolchain both artifacts are built with, and the image update carries the fix |
 
 ## Hash pinning per ecosystem
 
@@ -850,9 +856,16 @@ it (REQ-75).
 | An npm run refuses when its output is not a report, with npm's own message where it gave one | npm exits non-zero whenever it finds anything, and without the registry it prints a message in place of a report |
 | On the base branch itself nothing is introduced | The common commit is the commit checked, so a push to `main` reports and does not fail |
 
-An advisory already on the base reaches a fix through the repository's
-dependency alerts and the automated security updates, which open the bump as a
-pull request of its own.
+An advisory already on the base blocks neither `main` nor a release. It
+reaches a fix through Dependabot, which opens the bump as a pull request of its
+own:
+
+| Advisory against | The pull request that fixes it |
+|---|---|
+| A Go module | The weekly `gomod` update, grouped into one pull request |
+| The Go standard library | The weekly image update moving the `golang` tag, which is the toolchain every workflow installs |
+| An interface package | The weekly `npm` update of `web/`, grouped into one pull request |
+| A documentation build package | The weekly `pip` update of `docs/`, which regenerates the hashed lock |
 
 A new call into an affected function of an unchanged module is not introduced
 by this rule. The module was already affected and already reported.
@@ -1080,7 +1093,7 @@ long precisely so the checklist holds only what a machine cannot decide.
 |---|---|
 | Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
 | The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
-| Dependabot moves the pins, weekly, as one pull request | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| Dependabot moves the pins, weekly, as one pull request per ecosystem: actions, images, Go modules, interface packages and the documentation closure | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
 | An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
 
 ## Repository settings

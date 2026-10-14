@@ -28,9 +28,11 @@ updates:
   # its packages receive no security backports, and pinning without watching
   # is how that happened.
   #
-  # The Go toolchain is here for a second reason: it is pinned to the patch
-  # go.mod declares, so the image stops picking up Go releases by itself. A
-  # bump arriving as a pull request is what replaces that.
+  # The Go toolchain is here for a second reason: the build stage's golang tag
+  # is the one pin of the Go patch release. Both workflows install the release
+  # it names, so this pull request moves the toolchain everything is built and
+  # tested with, standard-library fixes included, and passes `pins-check` on
+  # its own: go.mod's go line is held at or below the image's, not equal to it.
   #
   # **A bump to the node image will fail `pins-check`, and should.** The
   # version the image builds the interface with is written in the Dockerfile
@@ -42,4 +44,35 @@ updates:
       interval: weekly
     groups:
       images:
+        patterns: ["*"]
+
+  # The Go modules. A module that needs a newer Go than the image raises
+  # go.mod's go line past it, and `pins-check` fails that pull request until
+  # the image's own has landed. Red there means the toolchain moves first.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+
+  # The interface's packages, moved in the lockfile the build installs from.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      web:
+        patterns: ["*"]
+
+  # The documentation build's Python closure. The lock is generated from
+  # requirements.in with a hash for every package, and the update regenerates
+  # it the same way.
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+    groups:
+      docs:
         patterns: ["*"]

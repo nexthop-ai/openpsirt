@@ -1114,6 +1114,13 @@ engines-check:
 docs-site:
 	$(PYTHON) -m mkdocs build --strict
 
+# The Go release the image builds with. It is written once, in the image's
+# build stage, and every workflow installs the release this prints, so the
+# tarball and the image are built by one toolchain.
+.PHONY: go-version
+go-version:
+	@sed -n 's/^FROM golang:\([0-9.]*\)-.*/\1/p' Dockerfile
+
 # The other pinned pairs, checked the same way and for the same reason.
 #
 # A version written in two files is one somebody moves in one of them. The
@@ -1130,6 +1137,11 @@ docs-site:
 # an earlier stage, scratch, or a build argument, whose default is read from its
 # ARG line instead. A name with no tag is still a base, since alpine is
 # alpine:latest, and every base is named by digest.
+#
+# go.mod's go line is the oldest Go release the module accepts, and is held at
+# or below the image's: the image moves first, through its own pull request,
+# and a dependency raising the go line past it fails here until it has.
+#
 # The tidy run rewrites the tree, so what it found there is put back on every
 # exit path — including an interrupt, which used to leave the tree as tidy had
 # made it and the copies behind under a name every checkout on the machine
@@ -1147,10 +1159,13 @@ pins-check:
 	  echo "README.md and docs/index.md describe what this does in different words."; \
 	  echo "They are the same list maintained twice; make them the same words."; fail=1; }; \
 	declared=$$(awk '/^go /{print $$2}' go.mod); \
-	image=$$(sed -n 's/^FROM golang:\([0-9.]*\)-.*/\1/p' Dockerfile); \
-	[ "$$declared" = "$$image" ] || { \
-	  echo "go.mod declares Go $$declared and the image builds with $$image."; \
-	  echo "The patch counts: the release ships a binary built by each."; fail=1; }; \
+	image=$$($(MAKE) -s --no-print-directory go-version); \
+	[ -n "$$declared" ] && [ -n "$$image" ] || { \
+	  echo "go.mod's go line or the image's Go release was not found, so they were not compared."; fail=1; }; \
+	[ -z "$$declared" ] || [ -z "$$image" ] || \
+	  [ "$$(printf '%s\n%s\n' "$$declared" "$$image" | sort -V | head -n 1)" = "$$declared" ] || { \
+	  echo "go.mod declares Go $$declared and the image builds with $$image, which is older."; \
+	  echo "Move the image's golang tag first: it is the one pin of the toolchain."; fail=1; }; \
 	here=$$(awk -F'= ' '/^CDXGOMOD_VERSION/{print $$2}' Makefile | tr -d ' \t'); \
 	there=$$(awk -F= '/^ARG CDXGOMOD_VERSION/{print $$2}' Dockerfile); \
 	[ "$$here" = "$$there" ] || { \
