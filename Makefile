@@ -42,15 +42,18 @@ ENGINES_MISSING := $(strip \
 # every tool below is, and to the versions CI runs: an engine that has drifted
 # from CI's turns "it passed locally" into a different claim from "it passes".
 # Two pinned lists in two files drift silently, so "engines-check" asserts they
-# still agree rather than trusting that whoever moved one moved the other.
+# still agree rather than trusting that whoever moved one moved the other. Each
+# is named by digest as well as tag, because a tag is moved by a rebuild
+# upstream, and "pins-check" refuses one named by tag alone. Dependabot reads
+# no workflow service, so these move by hand, the two lists together.
 DOCKER               ?= docker
 PYTHON               ?= python3
-ENGINE_PG_IMAGE      ?= postgres:16-alpine
-ENGINE_MYSQL_IMAGE   ?= mysql:8.4
-ENGINE_MARIADB_IMAGE ?= mariadb:11.4
+ENGINE_PG_IMAGE      ?= postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+ENGINE_MYSQL_IMAGE   ?= mysql:8.4@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
+ENGINE_MARIADB_IMAGE ?= mariadb:11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6
 # Deliberately below the supported floor, so the refusal to run against an old
 # server is exercised rather than skipped.
-ENGINE_FLOOR_IMAGE   ?= postgres:13-alpine
+ENGINE_FLOOR_IMAGE   ?= postgres:13-alpine@sha256:fb9065b6e3e213bdc07edd372a5b2a26245840b7fb65d1fd8b6700106d51805c
 ENGINE_PG_PORT       ?= 5432
 ENGINE_MYSQL_PORT    ?= 3306
 ENGINE_MARIADB_PORT  ?= 3307
@@ -1206,6 +1209,15 @@ pins-check:
 	    *@sha256:*) ;; \
 	    *) echo "the base $$base is named by a tag alone, which its owner can move under a rebuild."; \
 	       echo "Name it by digest as well: $$base@sha256:..."; fail=1 ;; \
+	  esac; \
+	done; \
+	services=$$(awk '/^[[:space:]]+image:/ { print $$2 }' .github/workflows/*.yml); \
+	[ -n "$$services" ] || { echo "no workflow names a service image, so no pin was compared."; fail=1; }; \
+	for service in $$services; do \
+	  case "$$service" in \
+	    *@sha256:*) ;; \
+	    *) echo "the service image $$service is named by a tag alone, which its owner can move under a rebuild."; \
+	       echo "Name it by digest as well: $$service@sha256:..."; fail=1 ;; \
 	  esac; \
 	done; \
 	quota=$$(sed -n 's/^const DefaultQuota = \([0-9]*\) << \([0-9]*\)$$/\1 \2/p' internal/patchbranch/copies.go); \

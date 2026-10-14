@@ -55,7 +55,7 @@ jobs:
     # run here is the only thing that makes "runs on four engines" a fact.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: openpsirt
@@ -64,7 +64,7 @@ jobs:
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mysql:
-        image: mysql:8.4
+        image: mysql:8.4@sha256:24989179f58856db763f418010c1169fecc944e3ec1ea7e921572d83eb070f70
         env:
           MYSQL_ROOT_PASSWORD: test
           MYSQL_DATABASE: openpsirt
@@ -75,7 +75,7 @@ jobs:
       # Deliberately below the floor, so the refusal is exercised. Without it
       # that test skips in every run, and the design claims it is proved.
       postgres-old:
-        image: postgres:13-alpine
+        image: postgres:13-alpine@sha256:fb9065b6e3e213bdc07edd372a5b2a26245840b7fb65d1fd8b6700106d51805c
         env:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: openpsirt
@@ -84,7 +84,7 @@ jobs:
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.4@sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6
         env:
           MARIADB_ROOT_PASSWORD: test
           MARIADB_DATABASE: openpsirt

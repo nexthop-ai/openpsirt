@@ -413,6 +413,7 @@ nothing failed, which is also what running almost nothing looks like.
 | `local.mk` is never overwritten | It is machine-local, and may point at an operator's own servers |
 | Starting is idempotent | A running engine is left alone; a stopped container is started rather than replaced |
 | Images are pinned and compared against CI's, in both directions, with CI running the check | A local four-engine pass means what CI's means only if they are the same servers |
+| Each image is named by tag and digest, here and in CI, and `pins-check` refuses a workflow service named by tag alone | A tag is moved by an upstream rebuild, which would change both servers with no change here. Dependabot reads no workflow service, so the two lists move by hand, together |
 | One of the four is below the supported version floor | The refusal to run against an old server is exercised rather than skipped |
 
 The URLs are read when make starts, so the run that writes `local.mk` is not the
