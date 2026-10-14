@@ -177,6 +177,8 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			// queue forever, which is the failure that makes sending back
 			// unusable.
 			Set("sent_back_at = ?", nil).
+			// Live again, so it has no moment it stopped applying.
+			Set("ended_at = ?", nil).
 			Where("id = ?", row.ID).Exec(ctx); err != nil {
 			// Another claim has taken the place since this one ended. The
 			// unique index is the only thing that can say so, for the reason

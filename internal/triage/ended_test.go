@@ -519,3 +519,28 @@ func TestWithdrawingAClaimLeavesARowThatHasEndedAsItEnded(t *testing.T) {
 		}
 	})
 }
+
+func TestARevivedClaimHasNoMomentItStoppedApplying(t *testing.T) {
+	// Revising a withdrawn claim brings its rows back to life, and a live row
+	// carries no end.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		first := f.claims(t, f.at())
+		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.row(t, first.ID); got.EndedAt == nil {
+			t.Fatal("the withdrawn row has no end, so this checks nothing")
+		}
+		if _, err := f.store.Revise(ctx, f.triager, first.ClaimID, "On reflection it holds."); err != nil {
+			t.Fatal(err)
+		}
+		got := f.row(t, first.ID)
+		if got.State != triage.Proposed || got.LiveKey == nil {
+			t.Fatalf("the revised row is %q holding key %v, want it live", got.State, got.LiveKey)
+		}
+		if got.EndedAt != nil {
+			t.Errorf("the revived row still ended at %v", got.EndedAt)
+		}
+	})
+}
