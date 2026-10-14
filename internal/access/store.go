@@ -245,6 +245,30 @@ func staleEnough(recorded *time.Time, now time.Time) bool {
 	return recorded == nil || now.Sub(*recorded) >= seenResolution
 }
 
+// touch records that a credential or a person was used, where what was
+// recorded has gone stale, and reports the moment it wrote or nil.
+//
+// Every credential's last use goes through here, so none is written on every
+// request. Every authenticated request passes through a resolver, so writing
+// each time makes the row the hottest in the database and every read a write,
+// which a replica cannot serve from a follower and which, on a cluster, turns
+// two concurrent requests on one credential into a certification conflict at
+// commit. The date is what anybody reads it for, so an hour's resolution loses
+// nothing.
+func (s *Store) touch(ctx context.Context, model any, id int64, column string,
+	recorded *time.Time) (*time.Time, error) {
+
+	now := s.now().Truncate(time.Microsecond)
+	if !staleEnough(recorded, now) {
+		return nil, nil
+	}
+	if _, err := s.db.NewUpdate().Model(model).
+		Set("? = ?", bun.Ident(column), now).Where("id = ?", id).Exec(ctx); err != nil {
+		return nil, err
+	}
+	return &now, nil
+}
+
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store {
 	return &Store{
@@ -354,6 +378,24 @@ func (s *Store) Restate(ctx context.Context, identity, displayName string,
 	if identity == "" {
 		return nil, nil, ErrNoIdentity
 	}
+	// The read and the write are one act, taken again whole where another
+	// writer recorded the same person first: the second pass finds the row
+	// the first could not see. A caller already inside a transaction has its
+	// act taken again instead.
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		var err error
+		before, after, err = s.over(tx).restate(ctx, identity, displayName, admin, audits)
+		return err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return before, after, nil
+}
+
+// restate is Restate's act, over one transaction.
+func (s *Store) restate(ctx context.Context, identity, displayName string,
+	admin, audits *bool) (before, after *Account, err error) {
 
 	existing, err := s.ByIdentity(ctx, identity)
 	if err == nil {
@@ -401,6 +443,13 @@ func (s *Store) record(ctx context.Context, person *Account) error {
 		}
 		person.PartyID = party.ID
 		_, err := db.NewInsert().Model(person).Exec(ctx)
+		if database.IsDuplicate(err) {
+			// Another writer recorded them between the caller's look and
+			// this write, which is two requests of one first sign-in, or two
+			// replicas naming one administrator at start. The act is taken
+			// again whole, and its look then finds them.
+			return fmt.Errorf("record %q: %w", person.Identity, database.ErrGoAgain)
+		}
 		return err
 	}
 	// Through the one helper, so the whole of it is retried: a cluster
@@ -672,18 +721,8 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		return Subject{}, ErrDenied
 	}
 
-	// Written only when it has gone stale, not on every request. Every
-	// authenticated request passes through here, so writing each time makes a
-	// person's own row the hottest in the database and makes every read a
-	// write — which a replica cannot serve from a follower and which, on a
-	// cluster, turns two concurrent requests from one person into a
-	// certification conflict at commit. The date is what anybody reads it for,
-	// so an hour's resolution loses nothing.
-	if seen := s.now().Truncate(time.Microsecond); staleEnough(person.LastSeenAt, seen) {
-		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("last_seen_at = ?", seen).Where("id = ?", person.ID).Exec(ctx); err != nil {
-			return Subject{}, fmt.Errorf("record that %q was seen: %w", identity, err)
-		}
+	if _, err := s.touch(ctx, (*Account)(nil), person.ID, "last_seen_at", person.LastSeenAt); err != nil {
+		return Subject{}, fmt.Errorf("record that %q was seen: %w", identity, err)
 	}
 	// Theirs is their own name in the assignable space, and
 	// the name of every team they are on. Read here because this is the
@@ -868,9 +907,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 		return Subject{}, ErrDenied
 	}
 
-	used := s.now().Truncate(time.Microsecond)
-	if _, err := s.db.NewUpdate().Model((*Key)(nil)).
-		Set("last_used_at = ?", used).Where("id = ?", key.ID).Exec(ctx); err != nil {
+	if _, err := s.touch(ctx, (*Key)(nil), key.ID, "last_used_at", key.LastUsedAt); err != nil {
 		return Subject{}, fmt.Errorf("record that a key was used: %w", err)
 	}
 	return NewPipeline(key.ID, key.Name, Scope{

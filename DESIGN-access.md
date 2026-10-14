@@ -249,6 +249,14 @@ swept and that anybody can fill.
 | The key is stored, not held in memory | A sign-in begun on one replica is finished by whichever answers the callback, and it has to survive a restart. Minted the first time it is wanted |
 | The return address is checked on the way in and again on the way out | An address that left here is an address this deployment sent |
 
+When a person, a session, a personal token or a pipeline key was last used is
+written only once what is recorded is an hour old, through one helper every
+resolver calls. Every authenticated request resolves one of them, and a write
+on every request makes that row the hottest in the database, turns a read into
+a write a follower cannot serve, and on a cluster turns two concurrent requests
+on one credential into a conflict at commit. The date is what a credential
+review reads.
+
 ## Departure
 
 Nothing tells this software somebody has gone. Membership is read at sign-in and

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -707,6 +708,103 @@ func TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing(t *testing.T) {
 		}
 		if live != 1 {
 			t.Errorf("granting the same role twice left %d live rows: %+v", live, held)
+		}
+	})
+}
+
+// A key's last use is written once it has gone stale, not on every request.
+// Every pipeline request resolves its key, and a write each time makes the
+// key's row the hottest in the database and, on a cluster, two concurrent
+// uploads from one pipeline a conflict at commit.
+func TestAKeysLastUseIsRewrittenOnlyOnceItIsStale(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		key, secret, err := f.store.NewKey(ctx, "nightly", access.Scope{ProductID: f.products["sonic"]})
+		if err != nil {
+			t.Fatal(err)
+		}
+		lastUse := func() *time.Time {
+			t.Helper()
+			var used *time.Time
+			if err := f.db.DB.NewSelect().TableExpr(`"api_key"`).Column("last_used_at").
+				Where("id = ?", key.ID).Scan(ctx, &used); err != nil {
+				t.Fatal(err)
+			}
+			return used
+		}
+		resolve := func() {
+			t.Helper()
+			if _, err := f.store.ResolveKey(ctx, secret); err != nil {
+				t.Fatal(err)
+			}
+		}
+		set := func(at time.Time) {
+			t.Helper()
+			if _, err := f.db.DB.NewUpdate().TableExpr(`"api_key"`).Set("last_used_at = ?", at).
+				Where("id = ?", key.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		resolve()
+		if lastUse() == nil {
+			t.Fatal("a key's first use was not recorded")
+		}
+		recent := time.Now().UTC().Add(-time.Minute).Truncate(time.Second)
+		set(recent)
+		resolve()
+		if used := lastUse(); used == nil || !used.Equal(recent) {
+			t.Errorf("a use a minute after the last was written over it: %v, want %v", used, recent)
+		}
+		stale := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Second)
+		set(stale)
+		resolve()
+		if used := lastUse(); used == nil || !used.After(stale) {
+			t.Errorf("a use two hours after the last was not recorded: %v", used)
+		}
+	})
+}
+
+// Two recordings of one person at once both succeed, and one person is
+// recorded. The second looked before the first wrote and writes after, which
+// is two requests of one first sign-in, or two replicas naming one
+// administrator at start; refused for the duplicate, it answered a fault.
+// Taken again, its look finds the person the first recorded. The same holds
+// for authorizing one name to sign in with.
+func TestTwoRecordingsOfOnePersonAtOnceBothSucceed(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		plain := access.NewStore(db.DB)
+		hooked, rival := dbtest.RivalAfterRead(t, db, "person", "party", 5*time.Second, func() error {
+			_, err := plain.Ensure(context.Background(), "someone@example.com", "Someone", nil, nil)
+			return err
+		})
+		person, err := access.NewStore(hooked).Ensure(ctx, "someone@example.com", "Someone", nil, nil)
+		if err != nil {
+			t.Errorf("the second of two recordings at once answered %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Errorf("the first of two recordings at once answered %v", err)
+		}
+		recorded, err := db.DB.NewSelect().TableExpr(`"person"`).
+			Where("identity = ?", "someone@example.com").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if recorded != 1 {
+			t.Errorf("%d people are recorded as one identity", recorded)
+		}
+		if person == nil {
+			return
+		}
+
+		named, rivalNaming := dbtest.RivalAfterRead(t, db, "person_identity", "person_identity", 5*time.Second,
+			func() error { return plain.Claim(context.Background(), person.ID, "someone") })
+		if err := access.NewStore(named).Claim(ctx, person.ID, "someone"); err != nil {
+			t.Errorf("the second of two authorizations at once answered %v", err)
+		}
+		if err := rivalNaming(); err != nil {
+			t.Errorf("the first of two authorizations at once answered %v", err)
 		}
 	})
 }

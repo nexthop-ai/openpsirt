@@ -4,13 +4,19 @@
 package catalog_test
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes pins the contract the
@@ -129,6 +135,100 @@ func TestDeclaringSomethingElseUnderAKnownNameIsStillRefused(t *testing.T) {
 		}
 		if _, _, err := store.EnsureProduct(ctx, "mine", "Something Else"); !errors.Is(err, catalog.ErrDiffers) {
 			t.Errorf("a product redeclared with another display name answered %v", err)
+		}
+	})
+}
+
+// A declaration inside somebody else's transaction that loses the race says
+// it lost, and the transaction around it takes the whole act again and finds
+// what the other writer made. That is how the declare routes run: the store
+// is handed the request's transaction, where the failed statement has already
+// aborted it on one engine, and the error is passed through the route's
+// refusal to the retry helper.
+//
+// The other writer lands between the declaration's read and its insert, every
+// time, rather than when two goroutines happen to meet.
+func TestADeclarationThatLosesItsRaceInsideATransactionIsTakenAgain(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		store := catalog.NewStore(db.DB)
+		product, _, err := store.EnsureProduct(ctx, "mine", "Mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		quiet := slog.New(slog.DiscardHandler)
+		for _, c := range []struct {
+			table   string
+			declare func(context.Context, *catalog.Store) error
+		}{
+			{"product", func(ctx context.Context, s *catalog.Store) error {
+				_, _, err := s.EnsureProduct(ctx, "racing", "Racing")
+				return err
+			}},
+			{"stream", func(ctx context.Context, s *catalog.Store) error {
+				_, _, err := s.EnsureStream(ctx, product.ID, "raced", catalog.Branch, nil)
+				return err
+			}},
+			{"variant", func(ctx context.Context, s *catalog.Store) error {
+				_, _, err := s.EnsureVariant(ctx, product.ID, "raced", true)
+				return err
+			}},
+		} {
+			t.Run(c.table, func(t *testing.T) {
+				hooked, rival := dbtest.RivalAfterRead(t, db, c.table, c.table, 5*time.Second, func() error {
+					return c.declare(context.Background(), store)
+				})
+				attempts := 0
+				err := database.InTransaction(ctx, hooked, func(ctx context.Context, tx bun.Tx) error {
+					attempts++
+					if err := c.declare(ctx, catalog.NewStore(tx)); err != nil {
+						return core.DeclineDeclaration(quiet, err)
+					}
+					return nil
+				})
+				if err != nil {
+					t.Errorf("a declaration that lost its race was refused: %v", err)
+				}
+				if err := rival(); err != nil {
+					t.Errorf("the other declaration: %v", err)
+				}
+				if attempts < 2 {
+					t.Errorf("the act ran %d times, so the race was never lost", attempts)
+				}
+			})
+		}
+	})
+}
+
+// Two declarations bringing one retired product back at once record one act:
+// the one whose write lands second finds the product back already and says it
+// restored nothing, so the trail reads one return to use and not two.
+func TestTwoDeclarationsBringingOneProductBackRecordOneReturn(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		store := catalog.NewStore(db.DB)
+		product, _, err := store.EnsureProduct(ctx, "retiring", "Retiring")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.RetireProduct(ctx, product.ID); err != nil {
+			t.Fatal(err)
+		}
+		var first catalog.Declared
+		hooked, rival := dbtest.RivalAfterRead(t, db, "product", "product", 5*time.Second, func() error {
+			var err error
+			_, first, err = store.EnsureProduct(context.Background(), "retiring", "Retiring")
+			return err
+		})
+		_, second, err := catalog.NewStore(hooked).EnsureProduct(ctx, "retiring", "Retiring")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rival(); err != nil {
+			t.Fatal(err)
+		}
+		if first.Restored == second.Restored {
+			t.Errorf("two declarations at once said restored %v and %v, want exactly one", first.Restored, second.Restored)
 		}
 	})
 }

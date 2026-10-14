@@ -809,6 +809,7 @@ A search box is not a pattern language. Typing "50%" means a name containing
 | The escape character is `#`, and never a backslash | MySQL and MariaDB treat a backslash as an escape inside a string literal, so `ESCAPE '\'` is an unterminated string: a syntax error on two engines and parsed happily by the other two |
 | The escaping lives here, with the other engine differences | Written out per package it is unexported in one and copied into the next, and the predicates in the package after that have none |
 | A pattern the code wrote is not escaped; a value somebody supplied is | A trailing `/%` matching an ecosystem prefix is the pattern. The ecosystem inside it is not |
+| A prefix that has to match exactly is also compared exactly | SQLite's `LIKE` ignores the case of ASCII letters. The trail's history of one identity, matched as the identity followed by " on ", would otherwise report the roles of another identity differing only in case |
 
 What its absence costs: the picker deciding who may be named on an embargoed
 case answers a term of "%" with every person the deployment can offer, in one
@@ -1045,6 +1046,16 @@ critical, and from what" is the question being asked of it.
 | Holding rows of a claim back, and setting them aside | Still waiting, and still the claim they were read from |
 | Filling in what a tag was cut from | An empty parent; a lost race reads back what won and refuses a different branch |
 | Changing a setting | The value read |
+| Bringing a retired product, release or variant back | Still retired. A match of none is another declaration that got there first, and this one records no return to use |
+| Collecting an upload nothing refers to | Still unattached, and not redacted since the page was read |
+
+An insert that can lose a race on a unique key hands the race back rather than
+reporting the duplicate: recording a person, authorizing a name to sign in with,
+numbering an advisory or its next edition. The act is taken again whole, and its
+look then finds the row the other writer made or numbers after it. A bound
+counted before an insert takes turns on the owner's row first, written as an
+ordinary update every engine locks the row for: a person's saved filters count
+one under the limit in two transactions at once otherwise, and both add.
 
 A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
 for this: it is spelled per engine, and the condition works the same on all
@@ -1308,6 +1319,16 @@ The harness also offers a handle whose `COMMIT` can be made to fail.
 | What a test asserts with it | Both directions. That a value from the attempt which was rolled back does not survive into the next one, and that the work still happens — and that the path under test committed something the handle could refuse, because a write outside a transaction passes every other assertion by never running the code they are about |
 | Why it is SQLite underneath | What is pinned does not vary by engine: the retry is driven by the error, and the error is synthesized. Opened with the pragmas every other SQLite connection gets, so foreign keys are enforced on it |
 
+The harness owns the other seams a test uses to put a writer or a failure at
+one point, so that every test schedules them the same way.
+
+| Seam | What it does |
+|---|---|
+| A rival after a read | Arms once a statement reads one table, and starts another writer before the next statement writing a second, waiting a bounded time for it. A rival blocked on a lock the transaction holds lands once it commits. A rival that never ran fails the test. Skipped on SQLite, which has one writer |
+| A failing statement | The armed statement runs on a context that has already ended, so its failure carries the cancellation a test can tell from any other |
+| A hidden table | Renamed away and put back when the test ends, whatever ends it: a server database is shared by a package's tests |
+| A closed database | Opened and closed, so every call fails. A missing database is refused by a different arm |
+
 The rule has to be applied. Routing rules, VEX statements, teams, saved filters
 and the administration trail have handler tests on the two-engine form, and
 between them they hold a `LIKE` with an explicit escape, a case-folded `IN`, and
@@ -1327,7 +1348,9 @@ What the suite pins:
   than against arithmetic
 - Migrations apply and are idempotent on every engine, and a database ahead of the binary is refused
 - The advisory lock excludes a second connection while held and admits it once
-  released, driven directly from two pools
+  released, driven directly from two pools, and a refusal names the session
+  holding it
+- A migration whose lock is lost part way fails, by ending the holder's session
 - Reading the schema version performs no schema changes
 
 ## Not built

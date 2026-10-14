@@ -4,12 +4,15 @@
 package advisory_test
 
 import (
+	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -587,6 +590,51 @@ func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
 		// A reader of both halves is listed it.
 		if _, total, err := f.store.List(ctx, f.who, advisory.Covering{}, 50, 0); err != nil || total == 0 {
 			t.Errorf("a reader of both halves was listed %d advisories: %v", total, err)
+		}
+	})
+}
+
+// Two edits of one advisory at once both land, numbered one after the other,
+// and two advisories minted at once in one year take the next two numbers.
+// The second of each read the highest number before the first wrote, and the
+// unique number refused it; taken again whole, it numbers after the first.
+func TestTwoEditsAtOnceTakeTheNextTwoNumbers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		named := f.covering(t)
+
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "advisory_edition", "advisory_edition", 5*time.Second,
+			func() error {
+				_, _, err := f.store.Retitle(context.Background(), f.who, named, "Retitled by one")
+				return err
+			})
+		if _, _, err := advisory.NewStore(hooked).Retitle(ctx, f.who, named, "Retitled by the other"); err != nil {
+			t.Errorf("the second of two edits at once answered %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Errorf("the first of two edits at once answered %v", err)
+		}
+		var ordinals []int
+		if err := f.db.DB.NewSelect().TableExpr(`"advisory_edition" AS "ae"`).
+			Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ae"."advisory_id"`).
+			ColumnExpr(`"ae"."ordinal"`).Where(`"ad"."identifier" = ?`, named).
+			OrderExpr(`"ae"."ordinal"`).Scan(ctx, &ordinals); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(ordinals, []int{1, 2, 3}) {
+			t.Errorf("the advisory holds editions %v, want 1, 2 and 3", ordinals)
+		}
+
+		minting, rivalMint := dbtest.RivalAfterRead(t, f.db, "advisory", "advisory", 5*time.Second,
+			func() error {
+				_, err := f.store.Mint(context.Background(), f.who, issuer, "")
+				return err
+			})
+		if _, err := advisory.NewStore(minting).Mint(ctx, f.who, issuer, ""); err != nil {
+			t.Errorf("the second of two advisories minted at once answered %v", err)
+		}
+		if err := rivalMint(); err != nil {
+			t.Errorf("the first of two advisories minted at once answered %v", err)
 		}
 	})
 }

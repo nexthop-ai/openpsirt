@@ -100,11 +100,12 @@ func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*P
 				name, ErrDiffers, existing.DisplayName, displayName)
 		}
 		if existing.Retired() {
-			if err := s.restoreProduct(ctx, existing.ID); err != nil {
+			restored, err := s.restoreProduct(ctx, existing.ID)
+			if err != nil {
 				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			return existing, Declared{Restored: true}, nil
+			return existing, Declared{Restored: restored}, nil
 		}
 		return existing, Declared{}, nil
 	case !errors.Is(err, ErrNotFound):
@@ -155,11 +156,12 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 		// is still spoken for while retired.
 		var did Declared
 		if existing.Retired() {
-			if err := s.restoreStream(ctx, existing.ID); err != nil {
+			restored, err := s.restoreStream(ctx, existing.ID)
+			if err != nil {
 				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			did.Restored = true
+			did.Restored = restored
 		}
 		// Filling in one that was never stated is not a change. Without it
 		// a tag declared with no parent stays that way, and release
@@ -219,11 +221,12 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 		// spoken for while retired, so the alternative is a build script that
 		// starts failing because an administrator tidied a list.
 		if existing.Retired() {
-			if err := s.restoreVariant(ctx, existing.ID); err != nil {
+			restored, err := s.restoreVariant(ctx, existing.ID)
+			if err != nil {
 				return nil, Declared{}, err
 			}
 			existing.RetiredAt = nil
-			return existing, Declared{Restored: true}, nil
+			return existing, Declared{Restored: restored}, nil
 		}
 		return existing, Declared{}, nil
 	case !errors.Is(err, ErrNotFound):

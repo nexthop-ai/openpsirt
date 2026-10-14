@@ -221,13 +221,8 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 		return Subject{}, err
 	}
 
-	// Coarse, like the others: a script driving this token makes as many
-	// requests as it likes, and each one would otherwise rewrite the same row.
-	if used := s.now().Truncate(time.Microsecond); staleEnough(token.LastUsedAt, used) {
-		if _, err := s.db.NewUpdate().Model((*Token)(nil)).
-			Set("last_used_at = ?", used).Where("id = ?", token.ID).Exec(ctx); err != nil {
-			return Subject{}, fmt.Errorf("record that a token was used: %w", err)
-		}
+	if _, err := s.touch(ctx, (*Token)(nil), token.ID, "last_used_at", token.LastUsedAt); err != nil {
+		return Subject{}, fmt.Errorf("record that a token was used: %w", err)
 	}
 
 	// Marked before any narrowing, because it is true of every token: what

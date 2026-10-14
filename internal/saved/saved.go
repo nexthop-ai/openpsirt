@@ -241,6 +241,15 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	// portable spelling of an upsert and because what the insert writes
 	// against has to be what the update just saw.
 	write := func(ctx context.Context, db bun.IDB) error {
+		// One person's saves take turns, on the person's own row: the count
+		// below bounds only what this transaction can see, and two saves of
+		// different names at once both count one under the limit and both
+		// add. A write to the row is a lock every engine takes without being
+		// asked in words of its own.
+		if _, err := db.NewUpdate().TableExpr(`"person"`).
+			Set(`"id" = "id"`).Where(`"id" = ?`, personID).Exec(ctx); err != nil {
+			return err
+		}
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
 			Set("query = ?", kept.Query).
 			Set("display_name = ?", kept.DisplayName).
@@ -268,9 +277,9 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 				Where("name = ?", matched).
 				Limit(1).Scan(ctx)
 		}
-		// Counted inside the same transaction as the write it bounds, and
-		// only on the path that adds a row: replacing one of your own is not
-		// how a table fills up.
+		// Counted inside the same transaction as the write it bounds, after
+		// the turn above, and only on the path that adds a row: replacing one
+		// of your own is not how a table fills up.
 		held, err := db.NewSelect().Model((*Filter)(nil)).
 			Where("person_id = ?", personID).
 			Count(ctx)

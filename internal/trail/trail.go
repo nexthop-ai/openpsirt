@@ -12,6 +12,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -398,6 +399,11 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // escape character is "#" rather than a backslash, because a backslash inside a
 // string literal is itself an escape on two of the four engines and `ESCAPE
 // '\'` does not parse there at all — the same reason the routing rules use it.
+//
+// The prefix is compared exactly as well. SQLite's LIKE ignores the case of
+// ASCII letters, and identities are compared exactly, so `alice@example.com`
+// would otherwise report the roles of `Alice@example.com`. The pattern stays,
+// because it is what an index on the column serves.
 func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name string,
 	limit, offset int) ([]Change, int, error) {
 
@@ -410,8 +416,10 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 			q = q.Where("kind = ?", kind)
 		}
 		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			prefix := name + " on "
 			return q.Where("about = ?", name).
-				WhereOr(`about LIKE ?`+database.LikeClause, database.LikeEscaped(name)+" on %")
+				WhereOr(`(about LIKE ?`+database.LikeClause+` AND SUBSTR(about, 1, ?) = ?)`,
+					database.LikeEscaped(name)+" on %", utf8.RuneCountInString(prefix), prefix)
 		})
 	}
 	return s.page(ctx, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))

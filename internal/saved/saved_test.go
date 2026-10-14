@@ -10,13 +10,11 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/uptrace/bun"
-
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
 )
@@ -259,62 +257,33 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 	})
 }
 
-// insertsFilter starts rival before the first statement adding a saved
-// filter, on another connection, and gives it a moment to land.
-//
-// A moment rather than until it finishes: on the two engines whose empty
-// update holds a gap lock, the rival waits on this transaction and lands only
-// once it commits, so which of the two adds the row differs by engine and the
-// test asks only that both are kept as one.
-type insertsFilter struct {
-	once  sync.Once
-	rival func() error
-	done  chan error
-}
-
-func (h *insertsFilter) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if strings.HasPrefix(e.Query, "INSERT ") && strings.Contains(e.Query, "saved_filter") {
-		h.once.Do(func() {
-			go func() { h.done <- h.rival() }()
-			select {
-			case err := <-h.done:
-				h.done <- err
-			case <-time.After(2 * time.Second):
-			}
-		})
-	}
-	return ctx
-}
-
-func (h *insertsFilter) AfterQuery(context.Context, *bun.QueryEvent) {}
-
 func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
 	// A second press of save, or a second tab. Both find no filter by that
 	// name and both add one; the unique index refuses the later addition,
 	// and taken again it finds the filter the other kept and replaces it.
 	// The harness holds SQLite to one connection, so nothing lands between
 	// the two there.
+	//
+	// A moment rather than until the rival finishes: on the two engines whose
+	// empty update holds a gap lock, the rival waits on this transaction and
+	// lands only once it commits, so which of the two adds the row differs by
+	// engine and the test asks only that both are kept as one.
 	each(t, func(t *testing.T, f *fixture) {
-		if f.DB.Stats().MaxOpenConnections == 1 {
-			t.Skip("one connection: nothing lands between a read and a write")
-		}
 		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		hook := &insertsFilter{done: make(chan error, 1), rival: func() error {
+		hooked, rival := dbtest.RivalAfterRead(t, f.DB, "saved_filter", "saved_filter", 2*time.Second, func() error {
 			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID,
 				"Kernel", "component=linux", saved.Filter{}, 10)
 			return err
-		}}
-		hooked := bun.NewDB(f.DB.DB.DB, f.DB.Dialect())
-		hooked.AddQueryHook(hook)
+		})
 
 		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
 			"kernel", "component=linux-image", saved.Filter{}, 10); err != nil {
 			t.Errorf("one of two saves of one name answered %v", err)
 		}
-		if err := <-hook.done; err != nil {
+		if err := rival(); err != nil {
 			t.Errorf("the other of two saves of one name answered %v", err)
 		}
 		kept, _, err := f.store.SavedFilters(t.Context(), person.ID, 10)
@@ -383,4 +352,38 @@ func TestTheScopeWordsAreTheOnesTheInterfaceDrops(t *testing.T) {
 	if got := saved.ScopeWords(); !slices.Equal(got, doc.Words) {
 		t.Errorf("the server drops %v and testdata/scope-words.json says %v", got, doc.Words)
 	}
+}
+
+// Two saves of different new names at once, one under the limit, keep one
+// filter and refuse the other. Each counts what it can see, and without the
+// two taking turns each sees one under the limit and both add.
+func TestTwoNewFiltersAtOnceStopAtTheLimit(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
+			"first", "component=linux", saved.Filter{}, 2); err != nil {
+			t.Fatal(err)
+		}
+		hooked, rival := dbtest.RivalAfterRead(t, f.DB, "saved_filter", "saved_filter", 2*time.Second, func() error {
+			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID,
+				"second", "component=busybox", saved.Filter{}, 2)
+			return err
+		})
+		_, one := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
+			"third", "component=openssl", saved.Filter{}, 2)
+		other := rival()
+		if (one == nil) == (other == nil) {
+			t.Errorf("two saves at the limit answered %v and %v, want one of them refused", one, other)
+		}
+		_, total, err := f.store.SavedFilters(t.Context(), person.ID, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 {
+			t.Errorf("the person keeps %d filters against a limit of 2", total)
+		}
+	})
 }

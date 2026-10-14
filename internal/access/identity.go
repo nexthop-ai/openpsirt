@@ -100,7 +100,15 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 	if username == "" {
 		return refusal.Errorf("a way to sign in needs a username")
 	}
+	// The look and the write are one act, taken again whole where another
+	// writer authorized the name first: the second pass finds their row.
+	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		return s.over(tx).claim(ctx, personID, username)
+	})
+}
 
+// claim is Claim's act, over one transaction.
+func (s *Store) claim(ctx context.Context, personID int64, username string) error {
 	at := s.now().Truncate(time.Microsecond)
 	until := at.Add(s.window())
 
@@ -130,12 +138,17 @@ func (s *Store) Claim(ctx context.Context, personID int64, username string) erro
 		}
 		return nil
 	}
+	if !database.IsNoRows(err) {
+		return fmt.Errorf("read who %q authorizes: %w", username, err)
+	}
 
 	claim := &Identity{
 		PersonID: personID, Username: username,
 		CreatedAt: at, ClaimableUntil: &until,
 	}
-	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
+	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); database.IsDuplicate(err) {
+		return fmt.Errorf("authorize %q: %w", username, database.ErrGoAgain)
+	} else if err != nil {
 		return fmt.Errorf("authorize %q: %w", username, err)
 	}
 	return nil

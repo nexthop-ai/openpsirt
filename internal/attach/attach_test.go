@@ -828,6 +828,42 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 	})
 }
 
+// A file redacted between the sweep reading its page and acting on it keeps
+// its row. The delete repeats what the page was read under, and a row
+// carrying who redacted it and why is the record a redaction leaves.
+func TestAFileRedactedWhileTheSweepRunsKeepsItsRecord(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		racing := f.upload(t, who, "a-credential.log", []byte("about to be redacted"))
+		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+			Set("uploaded_at = ?", time.Now().UTC().Add(-48*time.Hour)).
+			Where("token = ?", racing.Token).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		attach.AfterPage(f.store, func() {
+			if err := f.store.Redact(ctx, f.admin(t), racing.Token, "a credential"); err != nil {
+				t.Error(err)
+			}
+		})
+
+		gone, err := f.store.Sweep(ctx, 24*time.Hour)
+		if err != nil {
+			t.Fatalf("sweep: %v", err)
+		}
+		if gone != 0 {
+			t.Errorf("the sweep reported collecting %d, and the file was redacted", gone)
+		}
+		row, err := f.store.Find(ctx, who, racing.Token)
+		if err != nil {
+			t.Fatalf("the record of a redaction was swept: %v", err)
+		}
+		if !row.Redacted() {
+			t.Error("the row came back without its redaction")
+		}
+	})
+}
+
 func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
 	// The one writer here that destroys somebody's data names each row it
 	// could not claim. Counted alone, the same number comes back every pass,

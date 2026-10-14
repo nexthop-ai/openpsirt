@@ -152,6 +152,13 @@ func openEdition(ctx context.Context, tx bun.Tx, advisoryID, who int64,
 		Title: title, WrittenBy: who, WrittenAt: now,
 	}
 	if _, err := tx.NewInsert().Model(edition).Exec(ctx); err != nil {
+		// Two people editing at once both read the same highest number on
+		// the engines that read only what is committed, and the unique
+		// ordinal refuses the second. Taken again whole, it reads the first
+		// person's edition and numbers its own after it.
+		if database.IsDuplicate(err) {
+			return nil, fmt.Errorf("open an edition: %w", database.ErrGoAgain)
+		}
 		return nil, err
 	}
 	if _, err := tx.NewUpdate().Model((*Advisory)(nil)).

@@ -305,9 +305,13 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		// It inverts which side can be orphaned. Bytes surviving a deleted
 		// row are recoverable, because the key is logged; a row surviving its
 		// bytes is not.
+		// Repeats both conditions the page was read under. A row redacted
+		// since the page was read carries who redacted it and why, and the
+		// record of that is what a redaction leaves.
 		res, err := s.db.NewDelete().Model((*Attachment)(nil)).
 			Where("id = ?", row.ID).
 			Where("attached_at IS NULL").
+			Where("redacted_at IS NULL").
 			Exec(ctx)
 		if err != nil {
 			failed++

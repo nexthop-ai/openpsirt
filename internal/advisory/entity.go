@@ -172,6 +172,12 @@ func (s *Store) Mint(ctx context.Context, subject access.Subject, who publisher.
 		}
 		made.Folded = fold(made.Identifier)
 		if _, err := tx.NewInsert().Model(made).Exec(ctx); err != nil {
+			// Two advisories minted at once in one year both read the same
+			// highest number, and the unique number refuses the second.
+			// Taken again whole, it numbers its own after the first.
+			if database.IsDuplicate(err) {
+				return fmt.Errorf("mint an advisory: %w", database.ErrGoAgain)
+			}
 			return err
 		}
 		// The first edition, so that an advisory always has words somebody

@@ -83,7 +83,7 @@ func (s *Store) RetireVariant(ctx context.Context, variantID int64) error {
 // Declaring is idempotent because a pipeline runs it on every build, so a
 // retired name has to answer that call with the variant rather than with a
 // constraint violation.
-func (s *Store) restoreVariant(ctx context.Context, variantID int64) error {
+func (s *Store) restoreVariant(ctx context.Context, variantID int64) (bool, error) {
 	return s.restore(ctx, (*Variant)(nil), variantID, "variant")
 }
 
@@ -146,7 +146,7 @@ func (s *Store) RetireProduct(ctx context.Context, productID int64) error {
 	return s.retire(ctx, (*Product)(nil), productID, "product")
 }
 
-func (s *Store) restoreProduct(ctx context.Context, productID int64) error {
+func (s *Store) restoreProduct(ctx context.Context, productID int64) (bool, error) {
 	return s.restore(ctx, (*Product)(nil), productID, "product")
 }
 
@@ -183,7 +183,7 @@ func (s *Store) RetireStream(ctx context.Context, streamID int64) error {
 	return s.retire(ctx, (*Stream)(nil), streamID, "release")
 }
 
-func (s *Store) restoreStream(ctx context.Context, streamID int64) error {
+func (s *Store) restoreStream(ctx context.Context, streamID int64) (bool, error) {
 	return s.restore(ctx, (*Stream)(nil), streamID, "release")
 }
 
@@ -222,15 +222,24 @@ func (s *Store) retire(ctx context.Context, model any, id int64, what string) er
 }
 
 // restore clears one row of model's retirement.
-func (s *Store) restore(ctx context.Context, model any, id int64, what string) error {
+// restore brings a retired row back, and reports whether this write is the
+// one that did. The write repeats that the row is retired, so two declarations
+// bringing one row back at once record one act: the second matches nothing,
+// and rows are never deleted, so nothing means another writer got there first.
+func (s *Store) restore(ctx context.Context, model any, id int64, what string) (bool, error) {
 	res, err := s.db.NewUpdate().Model(model).
 		Set("retired_at = NULL").
 		Where("id = ?", id).
+		Where("retired_at IS NOT NULL").
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("bring %s %d back: %w", what, id, err)
+		return false, fmt.Errorf("bring %s %d back: %w", what, id, err)
 	}
-	return counted(res, what, id, "bring it back")
+	n, err := database.Affected(res)
+	if err != nil {
+		return false, fmt.Errorf("bring %s %d back: %w", what, id, err)
+	}
+	return n > 0, nil
 }
 
 // counted turns an update that matched nothing into the reason it did.

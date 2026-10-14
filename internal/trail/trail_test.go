@@ -134,6 +134,9 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 			// escape character itself.
 			"a%b@example.com on sonic",
 			"a#b@example.com on sonic",
+			// Another identity differing in case alone, which an
+			// engine whose LIKE folds ASCII would also match.
+			"A_B@example.com on sonic",
 		} {
 			if err := s.Record(ctx, by, trail.Role, about,
 				nil, trail.Said("private-triage", true)); err != nil {
@@ -152,6 +155,7 @@ func TestOnePersonsHistoryIsNotAnothersThatMatchesItUnderLike(t *testing.T) {
 			{"axb@example.com", 1},
 			{"a%b@example.com", 1},
 			{"a#b@example.com", 1},
+			{"A_B@example.com", 1},
 		} {
 			got, total, err := s.About(ctx, by, trail.Role, want.name, 100, 0)
 			if err != nil {

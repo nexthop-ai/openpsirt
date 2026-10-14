@@ -136,16 +136,12 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Subject, *Ses
 		return Subject{}, nil, err
 	}
 
-	// Coarse, for the same reason a person's own row is: every request on this
-	// session comes through here, and writing each time makes the row a
-	// contention point that a cluster then has to certify on every parallel
-	// request from one browser.
-	if used := s.now().Truncate(time.Microsecond); staleEnough(session.LastUsedAt, used) {
-		if _, err := s.db.NewUpdate().Model((*Session)(nil)).
-			Set("last_used_at = ?", used).Where("id = ?", session.ID).Exec(ctx); err != nil {
-			return Subject{}, nil, fmt.Errorf("record that a session was used: %w", err)
-		}
-		session.LastUsedAt = &used
+	used, err := s.touch(ctx, (*Session)(nil), session.ID, "last_used_at", session.LastUsedAt)
+	if err != nil {
+		return Subject{}, nil, fmt.Errorf("record that a session was used: %w", err)
+	}
+	if used != nil {
+		session.LastUsedAt = used
 	}
 	return subject, session, nil
 }
