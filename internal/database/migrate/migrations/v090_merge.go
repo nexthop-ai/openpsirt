@@ -119,13 +119,81 @@ func mergeImagesV090(ctx context.Context, tx bun.Tx) error {
 	sort.Strings(keys)
 
 	m := &mergerV090{ctx: ctx, tx: tx, now: time.Now().UTC().Truncate(time.Microsecond),
-		survivors: map[int64][]int64{}}
+		survivors: map[int64][]int64{}, merged: map[int64]int64{}}
+	var all []int64
+	for _, key := range keys {
+		for _, row := range groups[key] {
+			all = append(all, row.ID)
+		}
+	}
+	if err := m.readPlaces(all); err != nil {
+		return err
+	}
 	for _, key := range keys {
 		if err := m.merge(key, groups[key]); err != nil {
 			return err
 		}
 	}
-	return m.joinEdges()
+	if err := m.joinEdges(); err != nil {
+		return err
+	}
+	return m.moveFindings()
+}
+
+// readPlaces reads every place a finding against or beneath one of these
+// components sits at.
+func (m *mergerV090) readPlaces(ids []int64) error {
+	for from := 0; from < len(ids); from += 500 {
+		batch := ids[from:min(from+500, len(ids))]
+		var some []placeV090
+		if err := m.tx.NewSelect().TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			ColumnExpr(`st.product_id, f.place_identity, f.component_id, f.consumer_id`).
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.Where("f.component_id IN (?)", bun.List(batch)).
+					WhereOr("f.consumer_id IN (?)", bun.List(batch))
+			}).
+			Distinct().
+			Scan(m.ctx, &some); err != nil {
+			return fmt.Errorf("read the places beneath the images: %w", err)
+		}
+		m.places = append(m.places, some...)
+	}
+	return nil
+}
+
+// moveFindings points every finding against or beneath a merged component at
+// the component it was merged into, and removes the merged ones: nothing
+// points at them any more.
+func (m *mergerV090) moveFindings() error {
+	gone := make([]int64, 0, len(m.merged))
+	for id := range m.merged {
+		gone = append(gone, id)
+	}
+	slices.Sort(gone)
+	for from := 0; from < len(gone); from += 250 {
+		batch := gone[from:min(from+250, len(gone))]
+		for _, column := range []string{"component_id", "consumer_id"} {
+			becomes := "CASE " + `"` + column + `"` + strings.Repeat(" WHEN ? THEN ?", len(batch)) + " END"
+			args := make([]any, 0, 2*len(batch))
+			for _, id := range batch {
+				args = append(args, id, m.merged[id])
+			}
+			if _, err := m.tx.NewUpdate().Table("finding").
+				Set(`? = `+becomes, append([]any{bun.Ident(column)}, args...)...).
+				Where(`? IN (?)`, bun.Ident(column), bun.List(batch)).
+				Exec(m.ctx); err != nil {
+				return fmt.Errorf("point the findings at the merged images: %w", err)
+			}
+		}
+		if _, err := m.tx.NewDelete().Table("component").
+			Where(`"id" IN (?)`, bun.List(batch)).
+			Exec(m.ctx); err != nil {
+			return fmt.Errorf("remove the components merged into one: %w", err)
+		}
+	}
+	return nil
 }
 
 type mergerV090 struct {
@@ -135,6 +203,23 @@ type mergerV090 struct {
 	// survivors is the nodes each build kept, whose edges are joined once
 	// every image is merged: an edge can run between two of them.
 	survivors map[int64][]int64
+	// places is every place a finding against or beneath an image sits at,
+	// read once for every image rather than once per image: the finding
+	// table is the largest there is, and nothing indexes it by component
+	// alone.
+	places []placeV090
+	// merged is the component each merged one is now, and the findings
+	// pointing at it are moved together once every image is merged, for the
+	// same reason.
+	merged map[int64]int64
+}
+
+// placeV090 is one place a finding sits at, in its product.
+type placeV090 struct {
+	ProductID     int64  `bun:"product_id"`
+	PlaceIdentity string `bun:"place_identity"`
+	ComponentID   int64  `bun:"component_id"`
+	ConsumerID    *int64 `bun:"consumer_id"`
 }
 
 // merge moves one image's components onto one.
@@ -217,23 +302,10 @@ func (m *mergerV090) merge(key string, group []imageRowV090) error {
 	if len(others) == 0 {
 		return nil
 	}
-	for _, column := range []string{"component_id", "consumer_id"} {
-		if _, err := m.tx.NewUpdate().Table("finding").
-			Set(`? = ?`, bun.Ident(column), survivor.ID).
-			Where(`? IN (?)`, bun.Ident(column), bun.List(others)).
-			Exec(m.ctx); err != nil {
-			return fmt.Errorf("point the findings at %s: %w", survivor.Name, err)
-		}
+	for _, id := range others {
+		m.merged[id] = survivor.ID
 	}
-	if err := m.moveTags(ids, survivor.ID); err != nil {
-		return err
-	}
-	if _, err := m.tx.NewDelete().Table("component").
-		Where(`"id" IN (?)`, bun.List(others)).
-		Exec(m.ctx); err != nil {
-		return fmt.Errorf("remove the components merged into %s: %w", survivor.Name, err)
-	}
-	return nil
+	return m.moveTags(ids, survivor.ID)
 }
 
 // sideBySideV090 reports whether a build held two of these nodes at once.
@@ -453,38 +525,18 @@ func (m *mergerV090) moveTags(ids []int64, survivor int64) error {
 // proposed last over an earlier one; the other lapses, as a sweep lapses a
 // decision the code moved out from under.
 func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) error {
-	ids := make([]int64, 0, len(group))
 	old := map[int64]string{}
 	for _, row := range group {
-		ids = append(ids, row.ID)
 		old[row.ID] = upstreamOfV090(row)
 	}
 	becomes := upstreamOfV090(stored)
 
-	var places []struct {
-		ProductID     int64  `bun:"product_id"`
-		PlaceIdentity string `bun:"place_identity"`
-		ComponentID   int64  `bun:"component_id"`
-		ConsumerID    *int64 `bun:"consumer_id"`
-	}
-	if err := m.tx.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`st.product_id, f.place_identity, f.component_id, f.consumer_id`).
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("f.component_id IN (?)", bun.List(ids)).
-				WhereOr("f.consumer_id IN (?)", bun.List(ids))
-		}).
-		Distinct().
-		Scan(m.ctx, &places); err != nil {
-		return fmt.Errorf("read the places beneath %s: %w", stored.Name, err)
-	}
 	type at struct {
 		product int64
 		place   string
 	}
 	component, consumer := map[at]map[string]bool{}, map[at]map[string]bool{}
-	for _, p := range places {
+	for _, p := range m.places {
 		k := at{p.ProductID, p.PlaceIdentity}
 		if _, ok := old[p.ComponentID]; ok {
 			if component[k] == nil {

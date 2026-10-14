@@ -1158,7 +1158,7 @@ v0.5.0's schema in one step and carries none of the upgrades before it.
 
 | Change | What to do |
 |---|---|
-| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | Nothing. The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version |
+| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | Nothing. The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: about two minutes on PostgreSQL for 1.6 million findings, inside the chart's ten-minute startup probe |
 | A live judgment beneath an image is keyed on the image with no version | Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
 | Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
 | A build holding one image name at two versions at once keeps them apart by version, as before | Nothing |

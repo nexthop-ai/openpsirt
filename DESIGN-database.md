@@ -457,6 +457,7 @@ for a container image to an image identified by its name
 | Each old node is a version the build stated | One image version row per node, on the node kept: the old component's version and the node's identifier, across the old node's interval |
 | Edges are pointed at the kept nodes, and joined | After every image is merged, an edge whose pair and scope match one that closed at the scan it opened is joined into that one |
 | Findings and tags are pointed at the kept component | Both the component a finding is against and what pulls it in. A tag the merged image carried twice for one issue in one product keeps the first added |
+| The findings are read and moved once for every image | Read for the places decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
 
 The rules an identity, a fold key and a live key are worked out by are copied
@@ -469,6 +470,12 @@ as v0.9.0 stores the same image.
 |---|---|
 | A v0.8.0 build whose image was restamped between two scans, with findings, a tag and three decisions beneath it, and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, both findings and one tag on it, the decision made at the later stamp live on the merged key, the one at the earlier stamp lapsed, the one already lapsed as recorded, and both layers left by version |
 | The next build restamping the image | Writes one image version opened and one closed, and nothing else |
+
+Measured on PostgreSQL 16 with ten nightly builds of 34 images restamped every
+night over 600 packages, 1,632,000 findings and 204,000 edges beneath them: the
+upgrade takes 2 min 17 s, and leaves 34 image components, 340 image versions and
+20,400 edges. `make measure` re-runs it. The chart's startup probe allows ten
+minutes (`DESIGN-packaging.md`).
 
 Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
