@@ -33,7 +33,7 @@ func TestAConfigurationPipeIsRefusedWithoutWaiting(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		// Unblocks the open, so the goroutine ends with the test.
-		if w, err := os.OpenFile(pipe, os.O_WRONLY, 0); err == nil {
+		if w, err := os.OpenFile(pipe, os.O_WRONLY, 0); err == nil { //nolint:gosec // G304: the pipe this test made
 			_ = w.Close()
 		}
 		t.Fatal("a pipe with no writer held the start")
