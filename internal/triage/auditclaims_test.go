@@ -101,9 +101,9 @@ func TestTheRecordListsAClaimOnceHoweverManyPlacesItCovers(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, row := range judged {
-			if row.Decision.ClaimID == bulk.ClaimID && row.Reasoning != "" {
+			if row.ClaimID == bulk.ClaimID && row.Reasoning != "" {
 				t.Errorf("the record shows decision %d the reasoning of a claim reaching an undisclosed place",
-					row.Decision.ID)
+					row.ID)
 			}
 		}
 		for _, row := range listed {

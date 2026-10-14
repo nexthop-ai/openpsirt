@@ -94,8 +94,8 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	if err := rights.GrantRole(ctx, insider.ID, product.ID, access.PrivateTriage); err != nil {
 		return cast{}, err
 	}
-	// Told of the issue and triaging nothing, so a refusal asking for
-	// triage is the one that turns them away.
+	// Somebody who reads the product and triages nothing, so a refusal
+	// asking for triage is the one that turns them away.
 	reader, err := rights.Ensure(ctx, "reader", "Reader", nil, nil)
 	if err != nil {
 		return cast{}, err
