@@ -459,6 +459,7 @@ func (s *Store) registerQuery(productID int64,
 		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
 		// The supplier's statement answering the place, where one does.
 		Join(`LEFT JOIN "vex_statement" AS "sr" ON sr.id = f.stated_by`).
+		Join(wordsJoin("sr")).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
@@ -509,7 +510,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE(sr.publisher, '') AS "stated_who"`).
 		ColumnExpr(`COALESCE(sr.within, sr.component, '') AS "stated_in"`).
 		ColumnExpr(`COALESCE(sr.justification, '') AS "stated_why"`).
-		ColumnExpr(`COALESCE(sr.statement, '') AS "stated_words"`).
+		ColumnExpr(wordsColumn + ` AS "stated_words"`).
 		ColumnExpr(`COALESCE(sr.document, '') AS "stated_file"`).
 		OrderExpr("v.identifier, c.name, f.place_identity")
 }

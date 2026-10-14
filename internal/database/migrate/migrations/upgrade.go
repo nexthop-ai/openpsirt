@@ -116,6 +116,9 @@ type change struct {
 	add []added
 	// relax is the columns that stop refusing a null.
 	relax []string
+	// drop is the columns the release no longer declares. Whatever a column
+	// held is moved before the change, which removes it.
+	drop []string
 	// then runs once every column is in place and before any constraint is.
 	then func() error
 	// constraints and indexes are named as the release names them. An
@@ -132,7 +135,8 @@ func (c change) addsOnly() bool {
 			return false
 		}
 	}
-	return len(c.relax) == 0 && len(c.constraints) == 0 && len(c.indexes) == 0 && c.then == nil
+	return len(c.relax) == 0 && len(c.drop) == 0 && len(c.constraints) == 0 && len(c.indexes) == 0 &&
+		c.then == nil
 }
 
 // added is one column, and the value existing rows take in it. No fill is a
@@ -197,6 +201,9 @@ func (u *upgrader) change(statements []string, c change) error {
 		default:
 			stmts = append(stmts, `ALTER TABLE "`+c.table+`" MODIFY COLUMN `+def)
 		}
+	}
+	for _, column := range c.drop {
+		stmts = append(stmts, `ALTER TABLE "`+c.table+`" DROP COLUMN "`+column+`"`)
 	}
 	if err := u.run(stmts); err != nil {
 		return err
@@ -362,6 +369,29 @@ func (u *upgrader) sqliteIndexes(table string, declared []string) ([]string, err
 		}
 	}
 	return out, rows.Err()
+}
+
+// hasColumn reports whether a table already holds a column of this name.
+func (u *upgrader) hasColumn(table, column string) (bool, error) {
+	if u.engine == database.SQLite {
+		had, err := u.sqliteColumns(table)
+		return had[column], err
+	}
+	query := `SELECT 1 FROM "information_schema"."COLUMNS"
+		WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`
+	if u.engine == database.Postgres {
+		query = `SELECT 1 FROM "information_schema"."columns"
+			WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+	}
+	var probe int
+	err := u.tx.QueryRowContext(u.ctx, query, table, column).Scan(&probe)
+	if database.IsNoRows(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("ask whether %s has column %s: %w", table, column, err)
+	}
+	return true, nil
 }
 
 // hasIndex reports whether a table already holds an index of this name.

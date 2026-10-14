@@ -45,9 +45,13 @@ func StatementsV080(engine database.Engine) map[string][]string {
 }
 
 // StatementsV090 is the untagged release's declaration of each table it
-// creates.
+// creates or changes.
 func StatementsV090(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
 	return map[string][]string{
-		"image_version": imageVersionV090(typesFor(engine)),
+		"image_version":  imageVersionV090(t),
+		"statement_text": statementTextV090(t),
+		"suppression":    suppressionV090(t),
+		"vex_statement":  vexStatementsV090(t),
 	}
 }

@@ -440,7 +440,8 @@ row moves. § Indexes says what each index serves.
 
 Migration 43. It adds the image version table, and moves what v0.8.0 stored
 for a container image to an image identified by its name
-(`DESIGN-data-model.md` § Container images).
+(`DESIGN-data-model.md` § Container images). It stores a claim's reasoning
+once, keys a build's claim on it, and keys a reference on its address as given.
 
 | Step | What it does |
 |---|---|
@@ -485,6 +486,27 @@ upgrade notes say to give it longer or to run it before deploying.
 Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
 opened.
+
+The claims and references move after the images, in three steps of their own.
+On MySQL and MariaDB each runs in a transaction of its own, and each steps over
+what a stopped attempt already did.
+
+| Step | What it does |
+|---|---|
+| The statement text table is made, and `suppression` and `vex_statement` gain the reference to it | By v0.9.0's declarations. A column added holds a null and is added where the table stands, on SQLite too. A table already holding the column is stepped over |
+| Each piece of reasoning is stored once | Every build claim and supplier statement giving reasoning points at the one copy of its words, cut the way v0.9.0 cuts them. Read a page of rows at a time, by identifier: the copies being removed are what made these tables large |
+| Every build claim is keyed again | On its reasoning beside what it says, with the issue's identifier and the justification cut as v0.9.0 writes them. Only a row whose key, identifier or justification moves is written |
+| Every reference is keyed on its address as given | v0.8.0 keyed it on the address in capitals, cut to an index key's width. No two keys of one issue collide on the way: two references v0.8.0 held apart differ in capitals or past the cut, and so differ as given |
+| The copy each claim row carried is removed | SQLite rebuilds both tables from their declarations; the others drop the column. A table whose column is already gone is stepped over, and so is the move above |
+
+| Rule | |
+|---|---|
+| A claim's reference to its reasoning has no foreign key | Stored reasoning is never deleted, so the reference cannot dangle |
+| The ways reasoning is cut and each key is worked out are copied into the migration | The same reason as the image merge's copies |
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.8.0 build with claims sharing one explanation, a claim giving none, a claim whose identifier is longer than an indexed name, two supplier statements giving the first explanation, and two references | Upgraded, each explanation is stored once and every row giving it points at that copy, the first scan restating every claim writes nothing, each reference is keyed on its address as given, and each declaration describes the table the migrations built |
 
 ### Release records
 

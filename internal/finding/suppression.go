@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -36,7 +37,14 @@ type Claim struct {
 	Vulnerability string `bun:"vulnerability,notnull"`
 	Status        string `bun:"status,notnull"`
 	Justification string `bun:"justification"`
-	Statement     string `bun:"statement"`
+	// StatementID is the stored copy of the reasoning the claim gives, and
+	// nil where it gave none. The reasoning of one statement is stored once
+	// however many subjects it names.
+	StatementID *int64 `bun:"statement_id"`
+	// Statement is the reasoning, carried on the way in so that it is keyed
+	// and stored. A claim read back carries StatementID alone, and a reader
+	// wanting the words joins them.
+	Statement string `bun:"-"`
 	// Origin says whether this came attached to a component or in a document
 	// of its own, which is the difference between a claim that knows exactly
 	// what it is about and one that names something we have to match.
@@ -113,8 +121,10 @@ func (c Claim) fixes() bool { return sbom.Status(c.Status).Fixes() }
 // version is part of it where one is stated, so a claim about 4.2 and one about
 // 5.0 are two claims; a claim stating none outside its package identifier
 // keys as it did before a version could be stored. The product the subject
-// ships inside and the statement a claim was taken from are part of it the same
-// way.
+// ships inside, the statement a claim was taken from, and the reasoning it
+// gives are part of it the same way: a build that changes only its
+// explanation closes the claim it made and opens the new one, and the history
+// keeps both.
 func claimIdentity(c Claim) string {
 	parts := []string{
 		strings.ToUpper(strings.TrimSpace(c.Vulnerability)),
@@ -130,6 +140,9 @@ func claimIdentity(c Claim) string {
 	}
 	if c.StatedBy != nil {
 		parts = append(parts, "stated", fmt.Sprint(*c.StatedBy))
+	}
+	if c.Statement != "" {
+		parts = append(parts, "statement", c.Statement)
 	}
 	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
@@ -197,11 +210,17 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	err := func() error {
 		wanted := map[string]Claim{}
 		for _, claim := range claims {
+			// Cut once per statement rather than once per subject: each row
+			// repeats the identifier and the term, and points at one stored
+			// copy of the reasoning.
+			vulnerability := bound.HeadRunes(claim.Vulnerability, identifierLimit)
+			justification := bound.HeadRunes(claim.Justification, database.NameWidth)
+			words := WordsOf(claim.Statement)
 			for _, subject := range claim.Targets {
 				row := Claim{
-					TargetID: targetID, Vulnerability: claim.Vulnerability,
-					Status: string(claim.Status), Justification: claim.Justification,
-					Statement: claim.Statement, Origin: string(claim.Origin),
+					TargetID: targetID, Vulnerability: vulnerability,
+					Status: string(claim.Status), Justification: justification,
+					Statement: words, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
 					SubjectFolded:  graph.Folded(subject.Name),
 					SubjectVersion: statedBeside(subject),
@@ -239,6 +258,9 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			}
 		}
 		if len(opening) > 0 {
+			if err := pointAtWords(ctx, tx, opening); err != nil {
+				return err
+			}
 			if err := database.InBatches(ctx, tx, opening); err != nil {
 				return fmt.Errorf("record %d claims: %w", len(opening), err)
 			}
@@ -274,6 +296,23 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		return nil
 	}()
 	return applied, err
+}
+
+// pointAtWords stores the reasoning the claims give, once each, and points
+// every claim at its copy.
+func pointAtWords(ctx context.Context, tx bun.IDB, claims []Claim) error {
+	said := make([]string, 0, len(claims))
+	for _, claim := range claims {
+		said = append(said, claim.Statement)
+	}
+	held, err := internWords(ctx, tx, said)
+	if err != nil {
+		return err
+	}
+	for i := range claims {
+		claims[i].StatementID = wordsID(held, claims[i].Statement)
+	}
+	return nil
 }
 
 func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error) {
@@ -396,12 +435,13 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// identifiers, and a screen needs moments.
 		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
 		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
+		Join(wordsJoin("sup")).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
 		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
 		ColumnExpr(`COALESCE(sup.subject_version, '') AS "version"`).
 		ColumnExpr(`sup.status AS "status"`).
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
+		ColumnExpr(wordsColumn + ` AS "statement"`).
 		ColumnExpr(`sup.origin AS "origin"`).
 		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
 		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
