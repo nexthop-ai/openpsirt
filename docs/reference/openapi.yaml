@@ -9505,6 +9505,9 @@ components:
         team_name:
           description: The team's display name, where it differs from its name
           type: string
+        team_retired:
+          description: Whether the team is retired. A rule whose team is retired places nothing
+          type: boolean
         upstream:
           description: A source package name. Catches every binary package built from it
           type: string
