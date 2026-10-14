@@ -356,6 +356,10 @@ licenses:
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
 	@command -v $(NPM) >/dev/null 2>&1 \
 	  || { echo "npm not found, so the interface's licenses are unchecked here"; exit 1; }
+	@# The npm half parses the interface's source with the TypeScript compiler
+	@# to find what it imports, so it needs an install. One already there is
+	@# used: the licenses are read from the lockfile, and the compiler only reads.
+	@[ -d web/node_modules/typescript ] || $(MAKE) --no-print-directory web-deps
 	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) LICENSE_EXCEPTIONS=$(WEB_LICENSE_EXCEPTIONS) \
 	  $(NPM) --prefix web run --silent licenses
 
