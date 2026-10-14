@@ -356,6 +356,8 @@ func direct(q *bun.SelectQuery, platform string, offered []string,
 		Where("nt.read_at IS NULL").
 		Where("nt.created_at >= ?", since).
 		Where(`"pe"."email" IS NOT NULL AND "pe"."email" <> ?`, "").
+		// Nothing goes to somebody who has left.
+		Where(`"pe"."deactivated_at" IS NULL`).
 		Where(`NOT EXISTS (SELECT 1 FROM "chat_preference" AS "off" `+
 			`WHERE "off"."person_id" = "nt"."person_id" AND "off"."direct" = ?)`, false).
 		Where(`NOT EXISTS (SELECT 1 FROM "chat_delivery" AS "went" `+

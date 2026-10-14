@@ -392,6 +392,18 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 	if err := attributable(t.Kind, t.Private, t.ProductID); err != nil {
 		return err
 	}
+	// Somebody who has left is told nothing. Their grants and assignments
+	// stay in place, so every caller's audience can still name them.
+	left, err := s.db.NewSelect().Model((*access.Account)(nil)).
+		Where(`"id" = ?`, t.PersonID).
+		Where(`"deactivated_at" IS NOT NULL`).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read whether they are still here: %w", err)
+	}
+	if left {
+		return nil
+	}
 	row := &Notification{
 		PersonID: t.PersonID, Kind: t.Kind, Lifetime: Event,
 		Body: t.Body, Link: t.Link, Private: t.Private,

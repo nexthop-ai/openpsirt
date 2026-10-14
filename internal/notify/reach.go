@@ -85,7 +85,22 @@ func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) 
 	if err != nil {
 		return nil, fmt.Errorf("read who may hear about this: %w", err)
 	}
-	return actsOf(people, held), nil
+	return actsOf(present(people), held), nil
+}
+
+// present is the people who have not left.
+//
+// Every audience starts from it. A departed person's grants stay in place, so
+// a question answered from grants alone would keep telling somebody who has
+// left (DESIGN-access.md § Somebody who has left).
+func present(people []access.Account) []access.Account {
+	out := make([]access.Account, 0, len(people))
+	for _, person := range people {
+		if person.DeactivatedAt == nil {
+			out = append(out, person)
+		}
+	}
+	return out
 }
 
 // actsOf is whoActs over people and grants already read.

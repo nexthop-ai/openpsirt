@@ -170,6 +170,9 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		// query rather than skipped after reading, so a deployment
 		// where nobody has an address does no work at all.
 		Where("pe.email IS NOT NULL AND pe.email <> ?", "").
+		// Nothing goes to somebody who has left, including what was
+		// opened for them before they did.
+		Where(`"pe"."deactivated_at" IS NULL`).
 		OrderExpr("nt.created_at ASC, nt.id ASC").
 		Limit(sweepBatch).
 		Scan(ctx, &rows)
@@ -239,12 +242,19 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 		// Somebody with no address asked for something this cannot deliver.
 		// Narrowed here so a deployment where nobody has one does no work.
 		Where("email IS NOT NULL AND email <> ?", "").
+		// Somebody who has left keeps the switch and is sent nothing. A
+		// digest is assembled as its reader, which refuses them anyway, and
+		// reselecting them would spend the batch on people it cannot serve.
+		Where(`"deactivated_at" IS NULL`).
 		// One a day. The sweep runs far more often than that, because it
 		// carries the immediate messages too.
 		Where("digest_sent_at IS NULL OR digest_sent_at < ?", p.now().Add(-aDay)).
 		// Bounded like every other read here. A deployment with more people
 		// than this sends the rest on the next cycle rather than holding the
-		// lease for as long as it takes.
+		// lease for as long as it takes. Everybody a cycle reaches has their
+		// stamp moved, so ordering by person is enough for the next cycle to
+		// reach the rest.
+		OrderExpr("id ASC").
 		Limit(sweepBatch).
 		Scan(ctx, &people); err != nil {
 		return 0, fmt.Errorf("read who asked for a digest: %w", err)
@@ -260,18 +270,19 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 		asOf := p.now()
 		digest, err := Assemble(ctx, p.db, person, atMostInADigest)
 		if err != nil {
+			// The stamp still moves, below, on the rule a refusing mailbox
+			// follows: one that cannot be assembled is tried tomorrow rather
+			// than every minute.
 			p.logger.Warn("could not assemble a digest",
 				"person", person.Identity, "error", err)
-			continue
-		}
-		// Nothing to say is not a message. A daily "nothing" is how somebody
-		// learns to stop opening the daily message, and the ones that say
-		// something go unread with it.
-		//
-		// The stamp still moves. Otherwise a quiet week means the next digest
-		// reports the whole week as new, and "since the last digest" stops
-		// meaning what it says.
-		if !digest.Empty() {
+		} else if !digest.Empty() {
+			// Nothing to say is not a message. A daily "nothing" is how
+			// somebody learns to stop opening the daily message, and the ones
+			// that say something go unread with it.
+			//
+			// The stamp still moves. Otherwise a quiet week means the next
+			// digest reports the whole week as new, and "since the last
+			// digest" stops meaning what it says.
 			if err := p.channel.Send(ctx, person.Email, digest.Message(p.baseURL)); err != nil {
 				p.logger.Warn("could not send a digest",
 					"channel", p.channel.Name(), "person", person.Identity, "error", err)

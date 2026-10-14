@@ -174,6 +174,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("read who may hear about this: %w", err)
 	}
+	people = present(people)
 	admins := administrators(people)
 	s := &sweep{Watch: w, people: people, held: held, reach: actsOf(people, held)}
 
