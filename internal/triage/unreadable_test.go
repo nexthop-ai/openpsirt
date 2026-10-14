@@ -6,11 +6,9 @@ package triage_test
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
-	"github.com/uptrace/bun"
-
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -40,30 +38,30 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 		another := f.at()
 		another.PlaceIdentity = "under-a"
 
-		hook := &failingRead{}
-		f.db.AddQueryHook(hook)
+		fault := new(dbtest.Fault)
+		f.db.AddQueryHook(fault)
 
 		for _, c := range []struct {
-			name, reading string
-			refusal       error
-			act           func(context.Context) error
+			name, table string
+			refusal     error
+			act         func(context.Context) error
 		}{
-			{"reading a claim whole", `FROM "claim" AS "cl"`, triage.ErrNotTheirs,
+			{"reading a claim whole", "claim", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Whole(ctx, f.triager, claimed.ClaimID)
 					return err
 				}},
-			{"reading a claim's revisions", `FROM "claim" AS "cl"`, triage.ErrNotTheirs,
+			{"reading a claim's revisions", "claim", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Revisions(ctx, f.triager, claimed.ClaimID)
 					return err
 				}},
-			{"reading a decision", `FROM "decision" AS "de"`, triage.ErrNotTheirs,
+			{"reading a decision", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, _, err := f.store.Read(ctx, f.triager, claimed.ID)
 					return err
 				}},
-			{"re-making a decision", `FROM "decision" AS "de"`, triage.ErrNotTheirs,
+			{"re-making a decision", "decision", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 						PreviousID: claimed.ID, Place: f.at(),
@@ -71,7 +69,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					})
 					return err
 				}},
-			{"re-making a claim", `FROM "claim" AS "cl"`, triage.ErrNotTheirs,
+			{"re-making a claim", "claim", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
 						PreviousClaimID: claimed.ClaimID, Reasoning: "Still true.",
@@ -79,7 +77,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					})
 					return err
 				}},
-			{"carrying a claim to another place", `FROM "claim" AS "cl"`, triage.ErrNotTheirs,
+			{"carrying a claim to another place", "claim", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Extend(ctx, f.triager, claimed.ClaimID, []triage.Proposal{{
 						Place: another, Outcome: triage.NotApplicable,
@@ -88,33 +86,32 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 					}})
 					return err
 				}},
-			{"changing a comment", `FROM "claim_comment" AS "dc"`, triage.ErrNotTheirs,
+			{"changing a comment", "claim_comment", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Reword(ctx, f.triager, said.ID, "Checked twice.")
 					return err
 				}},
-			{"reading what a comment said before", `FROM "claim_comment" AS "dc"`, triage.ErrNotTheirs,
+			{"reading what a comment said before", "claim_comment", triage.ErrNotTheirs,
 				func(ctx context.Context) error {
 					_, err := f.store.Earlier(ctx, f.triager, said.ID)
 					return err
 				}},
-			{"reading what a note said before", `FROM "issue_note" AS "nt"`, triage.ErrNoSuchNote,
+			{"reading what a note said before", "issue_note", triage.ErrNoSuchNote,
 				func(ctx context.Context) error {
 					_, err := f.store.EarlierNote(ctx, f.triager, note.ID)
 					return err
 				}},
-			{"clearing a record of being exploited", `FROM "exploited_here" AS "eh"`,
+			{"clearing a record of being exploited", "exploited_here",
 				triage.ErrNoSuchExploitedHere,
 				func(ctx context.Context) error {
 					return f.store.ClearExploitedHere(ctx, f.triager, record.ID, "It was a test harness.")
 				}},
 		} {
 			t.Run(c.name, func(t *testing.T) {
-				hook.arm(c.reading)
+				fault.Arm("SELECT", c.table)
 				err := c.act(ctx)
-				fired := hook.disarm()
-				if !fired {
-					t.Fatalf("no read matching %q was made, so this tests nothing", c.reading)
+				if !fault.Disarm() {
+					t.Fatalf("no read of %s was made, so this tests nothing", c.table)
 				}
 				if err == nil {
 					t.Fatal("a read that failed was answered as a success")
@@ -129,36 +126,3 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 		}
 	})
 }
-
-// failingRead makes the first select naming a table fail, by handing the
-// driver a context that is already cancelled.
-type failingRead struct {
-	reading string
-	fired   bool
-}
-
-func (h *failingRead) arm(reading string) {
-	h.reading, h.fired = reading, false
-}
-
-func (h *failingRead) disarm() bool {
-	fired := h.fired
-	h.reading, h.fired = "", false
-	return fired
-}
-
-func (h *failingRead) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	// Compared with the identifiers quoted the standard way, which is not how
-	// the two MySQL-protocol engines quote them.
-	query := strings.ReplaceAll(e.Query, "`", `"`)
-	if h.reading == "" || h.fired || !strings.HasPrefix(query, "SELECT") ||
-		!strings.Contains(query, h.reading) {
-		return ctx
-	}
-	h.fired = true
-	failed, cancel := context.WithCancel(ctx)
-	cancel()
-	return failed
-}
-
-func (h *failingRead) AfterQuery(context.Context, *bun.QueryEvent) {}

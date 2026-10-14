@@ -67,14 +67,34 @@ func leaseDatabase(ctx context.Context, engine database.Engine, base, namespace,
 		return nil, "", err
 	}
 	own, created, err := prepareServer(ctx, engine, base, held.key)
-	if err == nil && created {
-		err = dropStale(ctx, engine, base, namespace, held.key)
-	}
 	if err != nil {
 		_ = held.release(ctx)
 		return nil, "", err
 	}
+	// Housekeeping this lease does not need. A stale database that will not
+	// drop — a session still open on it, or a role this account may not drop —
+	// leaves the database just built usable, and the clean reports it.
+	if created {
+		if err := dropStale(ctx, engine, base, namespace, held.key); err != nil {
+			fmt.Fprintf(os.Stderr, "dbtest: stale databases left on %s: %v\n", engine, err)
+		}
+	}
 	return held, own, nil
+}
+
+// lockBase is the URL every slot lock on a server is taken through.
+//
+// A MySQL named lock belongs to the server. A PostgreSQL advisory lock
+// belongs to the database the connection is in while the slot databases
+// belong to the cluster, so two URLs naming different databases would take
+// two lock spaces over one set of databases: two runs would share a slot, and
+// a clean would find every slot free. Every lock on PostgreSQL is taken in the
+// maintenance database every cluster has.
+func lockBase(base string, engine database.Engine) (string, error) {
+	if engine != database.Postgres {
+		return base, nil
+	}
+	return databaseURL(base, engine, "postgres")
 }
 
 // takeSlot leases the lowest free slot of the schema fingerprint identifies,
@@ -88,7 +108,11 @@ func leaseDatabase(ctx context.Context, engine database.Engine, base, namespace,
 // package: a package's binary that exits frees its slot, and its database, to
 // the next binary of any package.
 func takeSlot(ctx context.Context, engine database.Engine, base, namespace, fingerprint string) (*lease, error) {
-	target, err := database.ParseURL(base)
+	locks, err := lockBase(base, engine)
+	if err != nil {
+		return nil, err
+	}
+	target, err := database.ParseURL(locks)
 	if err != nil {
 		return nil, err
 	}
@@ -134,10 +158,8 @@ func (l *lease) release(ctx context.Context) error {
 // waiting, and reports whether it did.
 //
 // Both locks live with the session: a connection that closes, however it
-// closes, releases what it held. On PostgreSQL an advisory lock belongs to the
-// database the connection is in, so every lease and every clean connects to
-// the database the configured URL names. A MySQL named lock belongs to the
-// server.
+// closes, releases what it held. Every lease and every clean takes them on a
+// connection to the URL lockBase gives.
 func tryLock(ctx context.Context, conn *sql.Conn, engine database.Engine, key string) (bool, error) {
 	switch engine {
 	case database.Postgres:
@@ -271,7 +293,11 @@ func CleanServers(ctx context.Context, out io.Writer) error {
 // across the drop. A check followed by a drop would leave a moment in which a
 // test binary leases the slot and starts using the database being dropped.
 func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string, want func(string) bool) (dropped, held []string, err error) {
-	target, err := database.ParseURL(base)
+	locks, err := lockBase(base, engine)
+	if err != nil {
+		return nil, nil, err
+	}
+	target, err := database.ParseURL(locks)
 	if err != nil {
 		return nil, nil, err
 	}

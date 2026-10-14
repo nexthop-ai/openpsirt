@@ -4,6 +4,7 @@
 package dbtest
 
 import (
+	"os"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -33,7 +34,8 @@ func TestATestConnectionDoesNotWaitForACommitToReachDisk(t *testing.T) {
 				t.Errorf("synchronous_commit is %q, so every commit waits for the log to reach disk", setting)
 			}
 		case database.MySQL, database.MariaDB:
-			// Global on this protocol, so the harness sets it on the server.
+			// Global on this protocol, so the harness sets it on the server,
+			// where the server is declared a throwaway.
 			// Read before anything is written, because a read that repairs
 			// what it is checking cannot fail.
 			var flush, binlog int
@@ -43,6 +45,9 @@ func TestATestConnectionDoesNotWaitForACommitToReachDisk(t *testing.T) {
 			}
 			if flush == 0 && binlog == 0 {
 				return
+			}
+			if os.Getenv(relaxDurabilityEnv) != "1" {
+				t.Skipf("%s is not 1, so the server keeps its own durability", relaxDurabilityEnv)
 			}
 			// Still durable, and the two reasons are different: a connection
 			// that may not set a global is one the suite runs on anyway, and

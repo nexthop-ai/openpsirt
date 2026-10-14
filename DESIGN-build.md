@@ -542,7 +542,7 @@ binaries built from it that were alive there at once.
 | The lease is a lock the server keeps for one connection: a named lock on MySQL and MariaDB, a session advisory lock on PostgreSQL | A binary that exits or crashes closes the connection, and the server releases the lock with it |
 | Each slot is asked for without waiting | Two binaries starting at once are granted different slots, and neither waits on the other |
 | The lock is keyed on the schema and the slot | Two checkouts of different migrations hold different slots, and neither builds over the other's database |
-| On PostgreSQL the lock belongs to the database the configured URL names | An advisory lock is scoped to one database, so a run and a clean agree when they name the same one |
+| On PostgreSQL every lock is taken in the maintenance database, `postgres` | An advisory lock is scoped to one database while the slot databases belong to the cluster. Two URLs naming different databases would otherwise take two lock spaces over one set of databases, share a slot, and empty each other's rows |
 | Sixty-four slots per schema | Every binary of every run on a server draws on them. A binary finding every one held refuses in words |
 
 What one package's tests leave in a database is what the next package's tests
@@ -564,7 +564,7 @@ from another.
 | Named for this build's schema, at the version its migrations end at | Uses it; the first test empties it as every test does |
 | Named for this build's schema, at any other version, or none | Drops it and builds it again. A run killed while it migrated leaves one, and on MySQL and MariaDB a schema statement commits on its own, so the part a migration applied before it stopped is recorded by no version |
 | Named for another schema, its slot held | Leaves it. A checkout of that schema is running its tests |
-| Named for another schema, its slot free | Drops it when a binary creates a database for its own schema, under the same locks as the clean below |
+| Named for another schema, its slot free | Drops it when a binary creates a database for its own schema, under the same locks as the clean below. A drop the server refuses — a session still open on it, or a role this account may not drop — is reported and leaves the lease standing, since the database the binary built is whole |
 
 `make engines-clean` drops the harness's databases on every configured server
 whose slot nobody holds, and is safe while other checkouts run their tests.
@@ -713,7 +713,13 @@ run costs.
 |---|---|---|
 | SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens, the racing handle included |
 | PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
-| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
+| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server's command line, for the containers `make engines-up` starts; and the server, once per engine per binary, where `OPENPSIRT_TEST_RELAX_DURABILITY` is 1. Both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
+
+The harness changes a server's globals only where it is told the server is a
+throwaway. `make engines-up` writes `OPENPSIRT_TEST_RELAX_DURABILITY ?= 1` into
+the `local.mk` it creates, and CI sets it beside its URLs. A URL naming a
+server of somebody's own, which may hold other databases, leaves that server's
+durability as it is, and the test pinning the settings skips there.
 
 Nothing a test can observe changes. The settings govern what survives a crash,
 not what a statement returns, what a transaction sees, or which constraint an

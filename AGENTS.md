@@ -795,13 +795,17 @@ What it writes, for reference:
  OPENPSIRT_TEST_MYSQL_URL ?= mysql://root:test@127.0.0.1:3306/openpsirt
  OPENPSIRT_TEST_MARIADB_URL ?= mariadb://root:test@127.0.0.1:3307/openpsirt
  OPENPSIRT_TEST_TOO_OLD_URL ?= postgres://postgres:test@127.0.0.1:5433/openpsirt?sslmode=disable
+ OPENPSIRT_TEST_RELAX_DURABILITY ?= 1
 
 `?=` rather than `:=`, so setting one in the environment for a single run still
 wins. A makefile assignment beats an environment variable; the conditional form
 does not.
 
-The last one is a server *below* the supported floor, so the refusal to run
-against it is exercised instead of skipped. CI runs a postgres:13 for it.
+The fourth URL is a server *below* the supported floor, so the refusal to run
+against it is exercised instead of skipped. CI runs a postgres:13 for it. The
+last line says the MySQL and MariaDB servers are throwaways, so the harness may
+turn off their commit durability, which is global there and reaches every
+database on the server. Left out, a server of somebody's own keeps its own.
 
 An existing `local.mk` is never overwritten — it may point at servers of
 somebody's own — and the URLs are read when make starts, so the run that writes

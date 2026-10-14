@@ -16,6 +16,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
@@ -815,23 +816,15 @@ func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
 // way to make the record fail without making the change fail first.
 func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		ctx := t.Context()
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"medium"}`); got.Code >= 300 {
 			t.Fatalf("setting the floor answered %d: %s", got.Code, got.Body.String())
 		}
 
-		hide := func(from, to string) {
-			t.Helper()
-			if _, err := r.DB.ExecContext(ctx,
-				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
-				t.Fatalf("cannot rename %q to %q: %v", from, to, err)
-			}
-		}
-		hide("admin_change", "admin_change_hidden")
+		restore := dbtest.Hide(t, r.DB, "admin_change")
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"critical"}`)
-		hide("admin_change_hidden", "admin_change")
+		restore()
 
 		if got.Code < 500 {
 			t.Errorf("a change nothing could record answered %d, want a refusal", got.Code)
@@ -1030,19 +1023,10 @@ func TestBothThingsHeldOverTheDeploymentAreRecorded(t *testing.T) {
 // race detector on four cores, two renames per act take 15 s and the acts 1 s.
 func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		ctx := t.Context()
 		r.ScannedWithEvidence(t)
 		seen := &seeded{issue: r.Embargoed(t)}
 
-		hide := func(from, to string) {
-			t.Helper()
-			if _, err := r.DB.ExecContext(ctx,
-				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
-				t.Fatalf("cannot rename %q to %q: %v", from, to, err)
-			}
-		}
-
-		hide("admin_change", "admin_change_hidden")
+		restore := dbtest.Hide(t, r.DB, "admin_change")
 		examined := 0
 		for _, act := range administrativeActs {
 			who := act.who
@@ -1072,7 +1056,7 @@ func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 				}
 			}
 		}
-		hide("admin_change_hidden", "admin_change")
+		restore()
 		if examined == 0 {
 			t.Fatal("no administrative act was driven, so this checked nothing")
 		}

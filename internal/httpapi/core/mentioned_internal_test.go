@@ -55,11 +55,8 @@ func TestAMentionThatWasNotToldIsReportedAsNotTold(t *testing.T) {
 
 // Who may be told could not be read, so every name is reported as not told.
 func TestMentionsAreAllNotToldWhenTheReadersCannotBeRead(t *testing.T) {
-	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		if err := db.DB.DB.Close(); err != nil {
-			t.Fatal(err)
-		}
-		dropped, err := Mentioned(t.Context(), Deps{DB: db},
+	dbtest.Only(t, database.SQLite, func(t *testing.T, _ *database.DB) {
+		dropped, err := Mentioned(t.Context(), Deps{DB: dbtest.Closed(t)},
 			access.Everything("a test asking who may be told"),
 			MentionTarget{ProductID: 1, VulnerabilityID: 1, Visibility: access.Public},
 			"@alice and @bob, look", "/claims/1")

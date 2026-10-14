@@ -58,6 +58,9 @@ const (
 	PostgresURLEnv = "OPENPSIRT_TEST_POSTGRES_URL"
 	MySQLURLEnv    = "OPENPSIRT_TEST_MYSQL_URL"
 	MariaDBURLEnv  = "OPENPSIRT_TEST_MARIADB_URL"
+	// relaxDurabilityEnv set to 1 lets the harness turn off commit
+	// durability on a MySQL or MariaDB server, which is a global setting there.
+	relaxDurabilityEnv = "OPENPSIRT_TEST_RELAX_DURABILITY"
 )
 
 // EnginesEnv narrows which engines run. The rule and its reasoning live in
@@ -767,8 +770,17 @@ func ensureDatabase(ctx context.Context, admin *database.DB, engine database.Eng
 //
 // A connection without the privilege to set a global leaves the server as it
 // is and the suite runs slower, which is the answer a speed setting deserves.
+//
+// Asked for, never assumed. The settings outlive the run and reach every
+// database on the server, and a test URL may name a server that holds other
+// databases, so the harness changes them only where relaxDurabilityEnv says
+// the server is a throwaway: `make engines-up` writes it beside the URLs of
+// the containers it starts, and CI sets it beside its own.
 func transient(ctx context.Context, admin *database.DB, engine database.Engine) {
 	if engine != database.MySQL && engine != database.MariaDB {
+		return
+	}
+	if os.Getenv(relaxDurabilityEnv) != "1" {
 		return
 	}
 	for _, statement := range []string{
@@ -1056,39 +1068,7 @@ func Reset(t *testing.T, db *database.DB) {
 // clear is Reset without a test to fail: the harness empties a server
 // database with it before every test.
 func clear(ctx context.Context, db *database.DB) error {
-	err := clearOf(ctx, db, tables)
-	if err == nil {
-		return nil
-	}
-	// A database a test migrated to an earlier release's schema lacks the tables a
-	// later one added, and asking after one that is not there fails the whole
-	// statement. The version is asked only then, because the ordinary reset
-	// runs between every pair of tests and a round trip there is paid by all
-	// of them.
-	at, verr := schema.Version(ctx, db)
-	if verr != nil {
-		return err
-	}
-	var held []string
-	for _, table := range tables {
-		if since, later := addedAt[table]; !later || since <= at {
-			held = append(held, table)
-		}
-	}
-	if len(held) == len(tables) {
-		return err
-	}
-	return clearOf(ctx, db, held)
-}
-
-// addedAt is the migration each table a release after v0.2.0 added arrived
-// in. Every table not named here exists in every schema a test resets.
-var addedAt = map[string]int64{
-	"chat_delivery":   39,
-	"chat_preference": 39,
-	"told_place":      40,
-	"exploited_fix":   40,
-	"image_version":   43,
+	return clearOf(ctx, db, tables)
 }
 
 // clearOf empties the named tables, which are in the order tables holds them.
@@ -1124,9 +1104,7 @@ func clearOf(ctx context.Context, db *database.DB, tables []string) error {
 			}
 		}
 		// A window points at the window it counts from, the same shape again.
-		// The column arrived with the notice's places, so a database migrated
-		// to a schema before them has neither.
-		if occupied["obligation_window"] && slices.Contains(tables, "told_place") {
+		if occupied["obligation_window"] {
 			if _, err := tx.ExecContext(ctx, `UPDATE "obligation_window" SET "from_window_id" = NULL`); err != nil {
 				return fmt.Errorf("detach windows counting from others: %w", err)
 			}

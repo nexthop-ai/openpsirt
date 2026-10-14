@@ -708,10 +708,7 @@ func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
 		// which is this deployment failing and not the repository.
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
 			outward.Excluded{}, func(string) string {
-				if _, err := db.ExecContext(t.Context(),
-					`ALTER TABLE "patch_commit_branch" RENAME TO "patch_commit_branch_away"`); err != nil {
-					t.Fatal(err)
-				}
+				dbtest.Hide(t, db, "patch_commit_branch")
 				return made.dir
 			})
 		if _, err := pass.Once(t.Context()); err == nil {

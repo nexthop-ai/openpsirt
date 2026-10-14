@@ -101,6 +101,9 @@ jobs:
       OPENPSIRT_TEST_MYSQL_URL: mysql://root:test@127.0.0.1:3306/openpsirt
       OPENPSIRT_TEST_MARIADB_URL: mariadb://root:test@127.0.0.1:3307/openpsirt
       OPENPSIRT_TEST_TOO_OLD_URL: postgres://postgres:test@127.0.0.1:5433/openpsirt?sslmode=disable
+      # The service containers are throwaways, so the harness may turn off
+      # their commit durability, which is global on MySQL and MariaDB.
+      OPENPSIRT_TEST_RELAX_DURABILITY: "1"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

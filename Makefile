@@ -29,6 +29,11 @@ export OPENPSIRT_TEST_POSTGRES_URL
 export OPENPSIRT_TEST_MYSQL_URL
 export OPENPSIRT_TEST_MARIADB_URL
 export OPENPSIRT_TEST_TOO_OLD_URL
+# 1 where the MySQL and MariaDB servers above are throwaways, so the harness
+# may turn off their commit durability, which is global on those two and
+# outlives the run. "engines-up" writes it beside the URLs of the containers it
+# starts; a server of somebody's own is left as it is.
+export OPENPSIRT_TEST_RELAX_DURABILITY
 ENGINES_SET := $(strip $(OPENPSIRT_TEST_POSTGRES_URL)$(OPENPSIRT_TEST_MYSQL_URL)$(OPENPSIRT_TEST_MARIADB_URL))
 # Named one at a time, because "all three are missing" and "one is missing" are
 # different states and only the first used to be reported. With postgres alone
@@ -1083,6 +1088,9 @@ engines-up: engines-check
 	    "# A server below the supported floor, so the refusal to run against one" \
 	    "# is exercised rather than skipped." \
 	    "OPENPSIRT_TEST_TOO_OLD_URL  ?= postgres://postgres:test@127.0.0.1:$(ENGINE_FLOOR_PORT)/openpsirt?sslmode=disable" \
+	    "# The servers above are throwaways, so the harness may turn off their" \
+	    "# commit durability. A server of somebody's own needs this left out." \
+	    "OPENPSIRT_TEST_RELAX_DURABILITY ?= 1" \
 	    > local.mk; \
 	  echo; echo "wrote local.mk"; \
 	fi

@@ -39,18 +39,22 @@ func SettleStatistics(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(ctx, db); err != nil {
 			t.Fatal(err)
 		}
+		t.Logf("statistics refreshed on %s in %s", db.Server.Engine,
+			time.Since(started).Round(time.Millisecond))
 	default:
+		analyzed := 0
 		for _, table := range tables {
 			if err := analyze(ctx, db, table); err != nil {
 				t.Fatal(err)
 			}
+			analyzed++
 		}
+		if analyzed == 0 {
+			t.Fatal("no table was analyzed, so no statistics were refreshed")
+		}
+		t.Logf("statistics refreshed on %s over %d tables in %s", db.Server.Engine, analyzed,
+			time.Since(started).Round(time.Millisecond))
 	}
-	if len(tables) == 0 {
-		t.Fatal("no tables were named, so no statistics were refreshed")
-	}
-	t.Logf("statistics refreshed on %s over %d tables in %s", db.Server.Engine, len(tables),
-		time.Since(started).Round(time.Millisecond))
 
 	// The layout a plan was chosen over, printed beside the timings that
 	// plan produced. Two runs reading different layouts are two different

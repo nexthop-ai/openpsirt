@@ -4,7 +4,6 @@
 package findingsapi_test
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -330,18 +330,7 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 	// look like an engine disagreement.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		ctx := t.Context()
-		if _, err := r.DB.ExecContext(ctx,
-			`ALTER TABLE "vulnerability_alias" RENAME TO "vulnerability_alias_away"`); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if _, err := r.DB.ExecContext(context.WithoutCancel(ctx),
-				`ALTER TABLE "vulnerability_alias_away" RENAME TO "vulnerability_alias"`); err != nil {
-				t.Fatalf("the table was not put back, so every later test reads a "+
-					"schema with a hole in it: %v", err)
-			}
-		})
+		dbtest.Hide(t, r.DB, "vulnerability_alias")
 
 		for _, at := range []string{
 			"/v1/issues/CVE-2026-9999",

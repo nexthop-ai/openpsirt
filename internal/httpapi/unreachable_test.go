@@ -8,14 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -132,21 +130,7 @@ func overAClosedDatabaseAs(t *testing.T, r *httpapitest.Reach, logged slog.Handl
 	who publisher.Named) http.Handler {
 
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "gone.db")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	target, err := database.ParseURL("sqlite://" + path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gone, err := database.Open(context.Background(), target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := gone.Close(); err != nil {
-		t.Fatal(err)
-	}
+	gone := dbtest.Closed(t)
 
 	files, err := attach.NewFiles(t.TempDir())
 	if err != nil {
@@ -208,21 +192,7 @@ func (c *counting) WithGroup(string) slog.Handler      { return c }
 // database nobody can reach.
 func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		path := filepath.Join(t.TempDir(), "gone.db")
-		if err := os.WriteFile(path, nil, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		target, err := database.ParseURL("sqlite://" + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		gone, err := database.Open(context.Background(), target)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := gone.Close(); err != nil {
-			t.Fatal(err)
-		}
+		gone := dbtest.Closed(t)
 		sources, err := access.ParseSources("192.0.2.1")
 		if err != nil {
 			t.Fatal(err)

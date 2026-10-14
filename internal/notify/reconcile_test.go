@@ -7,8 +7,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -161,22 +161,6 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 	})
 }
 
-// openingSecond is a query hook that has another process open one condition
-// the moment the first statement opening conditions is about to run.
-type openingSecond struct {
-	fired   atomic.Bool
-	opening func()
-}
-
-func (o *openingSecond) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
-	if strings.HasPrefix(event.Query, "INSERT") && o.fired.CompareAndSwap(false, true) {
-		o.opening()
-	}
-	return ctx
-}
-
-func (*openingSecond) AfterQuery(context.Context, *bun.QueryEvent) {}
-
 func TestAConditionAnotherSweepOpensMidBatchIsLeftToItAndTheRestStillOpen(t *testing.T) {
 	// Two replicas sweep at once. When the other one opens a condition
 	// between this one reading what is open and writing what is new, the
@@ -197,20 +181,21 @@ func TestAConditionAnotherSweepOpensMidBatchIsLeftToItAndTheRestStillOpen(t *tes
 			held[i] = notify.Holds{About: fmt.Sprintf("build %04d", i), Body: fmt.Sprintf("quiet %d", i)}
 		}
 		other := held[database.BatchSize/2]
-		hook := &openingSecond{opening: func() {
-			if opened, _, err := notify.NewStore(db.DB).Reconcile(ctx, who.ID, notify.BuildQuiet,
-				[]notify.Holds{other}); err != nil || opened != 1 {
-				t.Errorf("the other sweep opened %d (err %v), want 1", opened, err)
+		hooked, rival := dbtest.RivalAfterRead(t, db, "notification", "notification", 5*time.Second, func() error {
+			opened, _, err := notify.NewStore(db.DB).Reconcile(ctx, who.ID, notify.BuildQuiet,
+				[]notify.Holds{other})
+			if err == nil && opened != 1 {
+				err = fmt.Errorf("opened %d, want 1", opened)
 			}
-		}}
-		db.AddQueryHook(hook)
+			return err
+		})
 
-		opened, cleared, err := notify.NewStore(db.DB).Reconcile(ctx, who.ID, notify.BuildQuiet, held)
+		opened, cleared, err := notify.NewStore(hooked).Reconcile(ctx, who.ID, notify.BuildQuiet, held)
 		if err != nil {
 			t.Fatalf("a sweep failed because another opened one of its conditions first: %v", err)
 		}
-		if !hook.fired.Load() {
-			t.Fatal("nothing opened a condition mid-batch, so this checked nothing")
+		if err := rival(); err != nil {
+			t.Errorf("the other sweep: %v", err)
 		}
 		if opened != len(held)-1 || cleared != 0 {
 			t.Errorf("opened %d cleared %d, want %d and 0", opened, cleared, len(held)-1)

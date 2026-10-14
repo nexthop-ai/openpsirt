@@ -112,6 +112,19 @@ func TestTwoLesseesRunningAtOnceNeverShareASlot(t *testing.T) {
 			t.Errorf("lessees running at once shared a slot: %v", slots)
 		}
 
+		// A lessee whose URL names another database on the same server sees
+		// the same locks, because the databases the slots name are the
+		// server's and not the one a URL names.
+		if engine == database.Postgres {
+			elsewhere, err := databaseURL(base, engine, "postgres")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if held := leaseFor(t, engine, elsewhere, namespace, schemaOne); slices.Contains(slots, held.slot) {
+				t.Errorf("a lessee naming another database took slot %d, which another lessee holds", held.slot)
+			}
+		}
+
 		// Another schema's slots are its own: while every slot above is held,
 		// a binary built from another still takes the first of its own.
 		other := leaseFor(t, engine, base, namespace, "abcabcabcabcabca")
@@ -225,7 +238,7 @@ func TestASlotIsFreedWhenItsConnectionCloses(t *testing.T) {
 		_ = held.conn.Close()
 		_ = held.db.Close()
 
-		admin := Open(t, base)
+		admin := Open(t, locksOn(t, engine, base))
 		conn, err := admin.DB.DB.Conn(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -275,7 +288,7 @@ func TestTheCleanLeavesAHeldSlotAndDropsAnUnheldOne(t *testing.T) {
 		// A package-keyed harness's database and the slot lock it holds.
 		packageSlot := namespace + "httpapi_1a2b3c_01"
 		keyed := packageSlot + "_4d5e6f"
-		holder := Open(t, base)
+		holder := Open(t, locksOn(t, engine, base))
 		conn, err := holder.DB.DB.Conn(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -319,5 +332,56 @@ func TestTheCleanLeavesAHeldSlotAndDropsAnUnheldOne(t *testing.T) {
 		if again.slot != freed.slot {
 			t.Errorf("after the clean the next lease took slot %d, want %d", again.slot, freed.slot)
 		}
+	})
+}
+
+// locksOn is the URL a test takes slot locks through, the one every lease
+// takes them through.
+func locksOn(t *testing.T, engine database.Engine, base string) string {
+	t.Helper()
+	locks, err := lockBase(base, engine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return locks
+}
+
+// A stale database that will not drop leaves the database a lease just built
+// usable. Dropping another schema's databases is housekeeping the lease does
+// not need, and a session still open on one, which a binary exiting a moment
+// ago leaves on PostgreSQL, refuses the drop.
+func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
+	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
+		ctx := t.Context()
+		admin := Open(t, base)
+		namespace := slotSpace(t, engine)
+		dropAfter(t, admin, engine, namespace)
+
+		const older = "bbbbbbbbbbbbbbbb"
+		stale := leaseFor(t, engine, base, namespace, older)
+		if _, err := ensureDatabase(ctx, admin, engine, stale.key); err != nil {
+			t.Fatal(err)
+		}
+		if err := stale.release(ctx); err != nil {
+			t.Fatal(err)
+		}
+		inside, err := databaseURL(base, engine, stale.key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		session := Open(t, inside)
+		if err := session.PingContext(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		held, own, err := leaseDatabase(ctx, engine, base, namespace, schemaOne)
+		if err != nil {
+			t.Fatalf("a stale database's refused drop failed the lease of one built whole: %v", err)
+		}
+		t.Cleanup(func() { _ = held.release(context.Background()) })
+		if own == "" {
+			t.Error("the lease answered no database")
+		}
+		_ = session.Close()
 	})
 }
