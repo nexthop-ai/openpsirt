@@ -3,6 +3,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useClickAway } from "./away";
+import { moved, summary, toggled } from "./choices";
 
 // A filter as one button that names itself and what it is set to, and opens a
 // short menu of its values.
@@ -49,12 +50,7 @@ export function FilterMenu({
   const offered = multi ? options.filter(([word]) => word !== "") : options;
   const picked = offered.filter(([word]) => word !== "" && chosen.includes(word));
   const on = picked.length > 0;
-  const says =
-    picked.length === 0
-      ? anything
-      : picked.length === 1
-        ? picked[0]![1]
-        : `${picked[0]![1]} +${picked.length - 1}`;
+  const says = summary(picked, anything);
 
   useClickAway(box, open, () => setOpen(false), false);
 
@@ -82,12 +78,7 @@ export function FilterMenu({
       close();
       return;
     }
-    // Kept in the order offered, so the same selection is the same address
-    // however it was reached.
-    const next = new Set(chosen);
-    if (next.has(word)) next.delete(word);
-    else next.add(word);
-    onChange(offered.map(([each]) => each).filter((each) => next.has(each)));
+    onChange(toggled(offered, chosen, word, !chosen.includes(word)));
   }
 
   function onTriggerKey(event: KeyboardEvent<HTMLButtonElement>) {
@@ -98,17 +89,10 @@ export function FilterMenu({
   }
 
   function onMenuKey(event: KeyboardEvent<HTMLDivElement>) {
-    const last = offered.length - 1;
-    // eslint-disable-next-line no-restricted-syntax -- Keyed on keyboard keys.
-    const move: Record<string, number> = {
-      ArrowDown: active === last ? 0 : active + 1,
-      ArrowUp: active === 0 ? last : active - 1,
-      Home: 0,
-      End: last,
-    };
-    if (event.key in move) {
+    const next = moved(event.key, active, offered.length);
+    if (next !== undefined) {
       event.preventDefault();
-      setActive(move[event.key]!);
+      setActive(next);
       return;
     }
     if (event.key === "Escape") {

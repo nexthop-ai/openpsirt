@@ -1,8 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useClickAway } from "./away";
+import { moved, summary, toggled } from "./choices";
 
 // Several answers to one question, as a list of checkboxes behind a control
 // that says what is ticked.
@@ -16,7 +17,12 @@ import { useClickAway } from "./away";
 // The ticked values sit on the control, not behind it. A closed control that
 // says "Any" while three boxes are ticked inside it is how a narrowed list
 // comes to look like an unnarrowed one. One choice reads as itself, several
-// read as a count, and the chips above the list name each of them.
+// as the first and how many more, and the chips above the list name each of
+// them.
+//
+// Operated from the keyboard as the filter bar's menus are: an arrow key on
+// the control opens it, the arrows, Home and End move between the boxes, and
+// Escape closes it and returns to the control.
 
 export type Choice = readonly [string, string];
 
@@ -45,53 +51,81 @@ export function Choices({
   bare?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const boxes = useRef<(HTMLInputElement | null)[]>([]);
 
   useClickAway(box, open, () => setOpen(false));
 
+  useEffect(() => {
+    if (open) boxes.current[active]?.focus();
+  }, [open, active]);
+
   const offered = options.filter(([word]) => word !== "");
   const ticked = offered.filter(([word]) => chosen.includes(word));
-  // One is named; several are counted. Naming several fits nothing and
-  // truncating reads as a single value with a strange name.
-  const says =
-    ticked.length === 0
-      ? anything
-      : ticked.length === 1
-        ? ticked[0]![1]
-        : `${ticked.length} chosen`;
+  const says = summary(ticked, anything);
 
-  function toggle(word: string, on: boolean) {
-    // Kept in the order they are offered rather than the order they were
-    // ticked, so the same selection makes the same address however it was
-    // reached — two links that ask the same thing are the same link.
-    const next = new Set(chosen);
-    if (on) next.add(word);
-    else next.delete(word);
-    onChange(offered.map(([each]) => each).filter((each) => next.has(each)));
+  function show() {
+    // Opened on the first box ticked, so a keyboard lands where the answer is.
+    setActive(
+      Math.max(
+        0,
+        offered.findIndex(([word]) => chosen.includes(word)),
+      ),
+    );
+    setOpen(true);
+  }
+
+  function onTriggerKey(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      show();
+    }
+  }
+
+  function onListKey(event: KeyboardEvent<HTMLDivElement>) {
+    const next = moved(event.key, active, offered.length);
+    if (next !== undefined) {
+      event.preventDefault();
+      setActive(next);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    }
   }
 
   const control = (
     <div className="choices" ref={box}>
       <button
+        ref={trigger}
         type="button"
         className="choicesat"
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="true"
         data-on={ticked.length > 0 ? "yes" : undefined}
-        onClick={() => setOpen(!open)}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onTriggerKey}
       >
         <span>{says}</span>
         <span aria-hidden>{open ? "▴" : "▾"}</span>
       </button>
       {open && (
-        <div className="choicelist" role="group" aria-label={label}>
-          {offered.map(([word, said]) => (
+        <div className="choicelist" role="group" aria-label={label} onKeyDown={onListKey}>
+          {offered.map(([word, said], i) => (
             <label key={word} className="check">
               <input
+                ref={(node) => {
+                  boxes.current[i] = node;
+                }}
                 type="checkbox"
                 checked={chosen.includes(word)}
-                onChange={(event) => toggle(word, event.target.checked)}
+                onFocus={() => setActive(i)}
+                onChange={(event) => onChange(toggled(offered, chosen, word, event.target.checked))}
               />
               <span>{said}</span>
             </label>
