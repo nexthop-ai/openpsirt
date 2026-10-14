@@ -146,6 +146,7 @@ func TestReAffirmingCarriesEverythingTheClaimRestsOn(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.38.0"
+		f.lapsed(t, claimed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: claimed.ID, Place: moved,
 			Reasoning: "Checked again: the newer package carries it too.",
@@ -183,6 +184,7 @@ func TestReAffirmingCarriesWhatStopsIt(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, claimed.ID)
 		if _, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: claimed.ID, Place: moved,
 			Reasoning: "Still not reachable at the new version.",

@@ -266,8 +266,26 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 			Where("id = ?", *at.EditionID).Limit(1).Scan(ctx); err != nil {
 			return err
 		}
-		if edition.WrittenBy == subject.ID {
-			return ErrSamePerson
+		// Whoever wrote the words standing: the title, and every change to
+		// what the advisory covers since it was set. A change to the covers
+		// opens an edition that carries the title forward and is written by
+		// whoever made the change, so the editions back to the one that set
+		// this title are all asked, and asking only the one in force let the
+		// title's own author agree to it.
+		var written []Edition
+		if err := tx.NewSelect().Model(&written).
+			Where("advisory_id = ?", row.ID).
+			Where("ordinal <= ?", edition.Ordinal).
+			Order("ordinal DESC").Scan(ctx); err != nil {
+			return err
+		}
+		for _, each := range written {
+			if each.Title != edition.Title {
+				break
+			}
+			if each.WrittenBy == subject.ID {
+				return ErrSamePerson
+			}
 		}
 		var already int
 		if err := tx.NewSelect().Model((*Approval)(nil)).

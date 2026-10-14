@@ -302,11 +302,16 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	// Narrowed to what this person may reach before anything is undone. A
 	// batch is one reviewer's afternoon and may span products, so undoing it
 	// wholesale would let somebody act on products they hold nothing on.
+	//
+	// And to the agreements this person gave. A batch is named by whoever
+	// gives it, so two reviewers may each have one of the same name, and
+	// undoing yours is not a way to take back somebody else's agreement.
 	var decisions []int64
 	covered := s.db.NewSelect().Model((*Approval)(nil)).
 		ColumnExpr("d.id").
 		Join(`JOIN "decision" AS "d" ON d.claim_id = da.claim_id`).
-		Where("da.batch = ?", batch).Where("da.withdrawn_at IS NULL")
+		Where("da.batch = ?", batch).Where("da.withdrawn_at IS NULL").
+		Where("da.approved_by = ?", subject.ID)
 	covered = approvableBy(covered, subject, "d")
 	if err := covered.Scan(ctx, &decisions); err != nil {
 		return Undone{}, fmt.Errorf("read what that approval covered: %w", err)
@@ -344,6 +349,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		Set("withdrawn_at = ?", now).
 		Set("withdrawn_by = ?", subject.ID).
 		Where("batch = ?", batch).Where("withdrawn_at IS NULL").
+		Where("approved_by = ?", subject.ID).
 		Where("claim_id IN (?)", bun.List(claims)).Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
@@ -537,6 +543,33 @@ func (s *Store) authorOf(ctx context.Context, claim Claim) (int64, error) {
 		return 0, fmt.Errorf("read who wrote this: %w", err)
 	}
 	return revision.WrittenBy, nil
+}
+
+// secondPerson refuses an agreement to a claim from somebody who proposed any
+// row of it or wrote any of its reasoning.
+//
+// Asked by every write that makes a decision stand on an agreement — one given
+// now and one carried from an earlier claim — so no path to a standing row
+// skips the control REQ-24 names.
+func (s *Store) secondPerson(ctx context.Context, claimID, approver int64) error {
+	ownWords, err := s.db.NewSelect().Model((*Revision)(nil)).
+		Where("dr.claim_id = ?", claimID).
+		Where("dr.written_by = ?", approver).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read who wrote this: %w", err)
+	}
+	ownRows, err := s.db.NewSelect().Model((*Decision)(nil)).
+		Where("de.claim_id = ?", claimID).
+		Where("de.proposed_by = ?", approver).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read who proposed this: %w", err)
+	}
+	if ownWords || ownRows {
+		return ErrSamePerson
+	}
+	return nil
 }
 
 // covering counts the open findings a claim covers right now.

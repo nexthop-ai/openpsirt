@@ -582,6 +582,9 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, ids []int64,
 	batch string, now time.Time) error {
 
+	if err := s.secondPerson(ctx, claim.ID, subject.ID); err != nil {
+		return err
+	}
 	covered, err := s.covering(ctx, subject, ids)
 	if err != nil {
 		return err

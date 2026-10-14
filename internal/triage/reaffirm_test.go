@@ -4,8 +4,12 @@
 package triage_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -28,6 +32,18 @@ func (f *fixture) judged(t *testing.T, at triage.Place, severity int) *triage.De
 	return decision
 }
 
+// lapsed has a decision stop standing now, which is what a version moving
+// under it does, without standing up a scan to move it.
+func (f *fixture) lapsed(t *testing.T, id int64) {
+	t.Helper()
+	if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+		Set("state = ?", triage.LapsedState).
+		Set("ended_at = ?", time.Now().UTC()).
+		Where("id = ?", id).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestReAffirmingAfterABumpNeedsNoSecondPerson(t *testing.T) {
 	// Two people already agreed to this claim. A version bump is a prompt to
 	// re-check rather than a new claim, and asking for full approval every
@@ -42,6 +58,7 @@ func TestReAffirmingAfterABumpNeedsNoSecondPerson(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, agreed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Checked again at the new version; still not reached.",
@@ -80,6 +97,7 @@ func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, agreed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Still not reached.", By: f.proposer,
@@ -149,6 +167,7 @@ func TestASeverityRiseEscalatesOnlyAClaimItBearsOn(t *testing.T) {
 			moved := f.at()
 			moved.PlaceIdentity = "place-" + c.name
 			moved.ComponentUpstream = "1.2.4"
+			f.lapsed(t, agreed[i].ID)
 			again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 				PreviousID: agreed[i].ID, Place: moved,
 				Reasoning: "Checked again at the new version.", By: f.proposer,
@@ -186,6 +205,7 @@ func TestARatingMadeHereAlsoSendsItBackForFullApproval(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, agreed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Still not reached.", By: f.proposer,
@@ -211,6 +231,7 @@ func TestNothingIsCarriedFromAClaimNobodyAgreedTo(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, neverAgreed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: neverAgreed.ID, Place: moved,
 			Reasoning: "Still true.", By: f.proposer,
@@ -299,6 +320,7 @@ func TestRepetitionAloneChangesNothing(t *testing.T) {
 		at := f.at()
 		for i, version := range []string{"1.2.4", "1.2.5", "1.2.6", "1.2.7"} {
 			at.ComponentUpstream = version
+			f.lapsed(t, previous.ID)
 			again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 				PreviousID: previous.ID, Place: at,
 				Reasoning: "Checked again; still not reached.", By: f.proposer,
@@ -332,14 +354,13 @@ func TestAWithdrawnAgreementIsNotResurrectedByAVersionBump(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
-		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+		if _, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Trying again.", By: f.proposer,
-		})
-		if err != nil {
-			t.Fatal(err)
+		}); err == nil {
+			t.Error("a withdrawn claim was re-affirmed")
 		}
-		if again.State == triage.Approved {
+		if standing, _ := f.store.Applying(ctx, moved); standing != nil {
 			t.Error("a withdrawn agreement came back through a version bump")
 		}
 	})
@@ -364,6 +385,7 @@ func TestACarriedAgreementSaysItWasCarried(t *testing.T) {
 
 		moved := f.at()
 		moved.ComponentUpstream = "1.2.4"
+		f.lapsed(t, agreed.ID)
 		again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
 			PreviousID: agreed.ID, Place: moved,
 			Reasoning: "Checked again at the new version; still not reached.",
@@ -399,6 +421,81 @@ func TestACarriedAgreementSaysItWasCarried(t *testing.T) {
 		// The agreement given for the original names nothing: it was given.
 		if first[0].CarriedFrom != nil {
 			t.Error("an agreement somebody gave reads as carried")
+		}
+	})
+}
+
+func TestOnlyItsMakerReaffirmsALapsedDecisionAtItsOwnPlace(t *testing.T) {
+	// Each refusal is reached by a request that passes every other check.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		moved := f.at()
+		moved.ComponentUpstream = "1.2.4"
+		reaffirm := func(as access.Subject, by int64, at triage.Place) error {
+			_, err := f.store.Reaffirm(ctx, as, triage.Reaffirmation{
+				PreviousID: agreed.ID, Place: at,
+				Reasoning: "Checked again at the new version.", By: by,
+			})
+			return err
+		}
+
+		// Still standing: re-made elsewhere, it would carry the agreement to a
+		// place no second person saw.
+		if err := reaffirm(f.triager, f.proposer, moved); err == nil ||
+			!strings.Contains(err.Error(), "has not lapsed") {
+			t.Errorf("a decision still standing was re-affirmed: %v", err)
+		}
+		if standing, _ := f.store.Applying(ctx, moved); standing != nil {
+			t.Error("a refused re-affirmation stands at the new version")
+		}
+
+		f.lapsed(t, agreed.ID)
+		if err := reaffirm(f.reviewer, f.approver, moved); err == nil ||
+			!strings.Contains(err.Error(), "only the person who made") {
+			t.Errorf("somebody other than its maker re-affirmed it: %v", err)
+		}
+		elsewhere := moved
+		elsewhere.PlaceIdentity = "another-place"
+		if err := reaffirm(f.triager, f.proposer, elsewhere); err == nil ||
+			!strings.Contains(err.Error(), "different place") {
+			t.Errorf("it was re-affirmed at another place: %v", err)
+		}
+
+		// Something decided at the place since replaces it.
+		later := f.at()
+		later.ComponentUpstream = "1.2.5"
+		f.claims(t, later)
+		if err := reaffirm(f.triager, f.proposer, moved); err == nil ||
+			!strings.Contains(err.Error(), "decided at that place since") {
+			t.Errorf("a decision replaced since was re-affirmed: %v", err)
+		}
+	})
+}
+
+func TestSomebodyWhoWroteAnyOfAClaimsReasoningMayNotAgreeToIt(t *testing.T) {
+	// The words agreed to are the latest revision's, and the control is that
+	// the person agreeing is not one who argued the claim. A reviewer who
+	// revised it, then saw the proposer revise it back, wrote part of it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.claims(t, f.at())
+		if _, err := f.store.Revise(ctx, f.reviewer, claimed.ClaimID,
+			"The parser is compiled out of this image."); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Revise(ctx, f.triager, claimed.ClaimID,
+			"The parser is never reached: we only call the encoder."); err != nil {
+			t.Fatal(err)
+		}
+		if err := agreeTo(ctx, f.store, f.reviewer, claimed.ClaimID, ""); !errors.Is(err, triage.ErrSamePerson) {
+			t.Errorf("somebody who wrote part of the reasoning agreed to it: %v", err)
+		}
+		if standing, _ := f.store.Applying(ctx, f.at()); standing != nil {
+			t.Error("the claim stands on its own author's agreement")
 		}
 	})
 }

@@ -12874,9 +12874,9 @@ paths:
   /v1/approval-batches/{batch}:
     delete:
       description: |-
-        Withdraws every approval recorded under this batch name, returning those decisions to the review queue. The decisions themselves stand — only the approvals are undone. Returns how many were affected.
+        Withdraws every approval you recorded under this batch name, returning those decisions to the review queue. The decisions themselves stand — only the approvals are undone. Returns how many were affected.
 
-        Only decisions you may reach are touched.
+        Only decisions you may reach are touched, and only agreements you gave: another reviewer's batch of the same name stands.
 
         Requires: approver or public-triage or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
       operationId: undo-batch

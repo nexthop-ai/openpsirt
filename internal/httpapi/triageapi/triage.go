@@ -487,10 +487,11 @@ func registerTriage(api huma.API, in core.Deps) {
 	huma.Register(api, core.Answering(huma.Operation{
 		OperationID: "undo-batch", Method: http.MethodDelete, Path: "/v1/approval-batches/{batch}",
 		Summary: "Undo a bulk approval",
-		Description: "Withdraws every approval recorded under this batch name, returning those " +
+		Description: "Withdraws every approval you recorded under this batch name, returning those " +
 			"decisions to the review queue. The decisions themselves stand — only the approvals " +
 			"are undone. Returns how many were affected.\n\n" +
-			"Only decisions you may reach are touched.",
+			"Only decisions you may reach are touched, and only agreements you gave: another " +
+			"reviewer's batch of the same name stands.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "A batch is one reviewer's afternoon and may span products, so it "+
 		"is undone as far as you reach and no further.", core.ApproveRights()...),

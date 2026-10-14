@@ -127,6 +127,18 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		return nil, refusal.Errorf(
 			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
+	// And only a decision that lapsed, with nothing decided at its place
+	// since: the rule the list of what is yours to re-affirm holds. A
+	// decision still standing carried its agreement to whatever place it was
+	// re-made at, and a second person never saw the new one.
+	reaffirmable, err := s.yoursToReaffirm(subject).Where("de.id = ?", previous.ID).Exists(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read whether that decision is yours to re-affirm: %w", err)
+	}
+	if !reaffirmable {
+		return nil, refusal.Errorf(
+			"that decision has not lapsed, or something has been decided at that place since")
+	}
 
 	// And it keeps the visibility it had. A re-affirmation says the same claim
 	// still holds; it is not an occasion to change who may see it.
@@ -366,6 +378,9 @@ func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Cla
 	}
 	if claim.RevisionID == nil {
 		return refusal.Errorf("a re-affirmed claim has no reasoning to stand on")
+	}
+	if err := s.secondPerson(ctx, claim.ID, earlier.ApprovedBy); err != nil {
+		return err
 	}
 
 	now := s.now().Truncate(time.Microsecond)

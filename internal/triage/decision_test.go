@@ -637,6 +637,50 @@ func TestUndoingABatchTouchesOnlyWhatTheUndoerMayReach(t *testing.T) {
 	})
 }
 
+func TestUndoingABatchTakesBackOnlyTheUndoersOwnAgreements(t *testing.T) {
+	// A batch is named by whoever gives it, so two reviewers may each have one
+	// of the same name. Undoing yours takes back nobody else's agreement.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		const batch = "one-afternoon"
+		theirs := f.claims(t, f.at())
+		if err := agreeTo(ctx, f.store, f.reviewer, theirs.ClaimID, batch); err != nil {
+			t.Fatal(err)
+		}
+		elsewhere := f.at()
+		elsewhere.PlaceIdentity = "another-place"
+		mine, err := f.store.Propose(ctx, f.reviewer, triage.Proposal{
+			Place: elsewhere, Outcome: triage.NotApplicable,
+			Justification: triage.CodeNotInExecutePath,
+			Reasoning:     "The decoder is never linked.", By: f.approver, NeedsApproval: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := agreeTo(ctx, f.store, f.triager, mine.ClaimID, batch); err != nil {
+			t.Fatal(err)
+		}
+
+		undone, err := f.store.UndoBatch(ctx, f.reviewer, batch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if undone.Rows != 1 {
+			t.Errorf("undoing one reviewer's batch returned %d rows, want their one", undone.Rows)
+		}
+		kept, err := f.store.Approvals(ctx, f.triager, mine.ClaimID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(kept) != 1 || kept[0].WithdrawnAt != nil {
+			t.Errorf("another reviewer's agreement under the same name was taken back: %+v", kept)
+		}
+		if standing, _ := f.store.Applying(ctx, elsewhere); standing == nil {
+			t.Error("the claim another reviewer agreed to no longer stands")
+		}
+	})
+}
+
 func TestABatchIsUndoneWholeOrNotAtAll(t *testing.T) {
 	// A claim is one action over many places whose rows need not agree about
 	// visibility, and the agreement is one row keyed on the claim. Taking the

@@ -187,6 +187,7 @@ deployment with one person cannot approve anything.
 | Rule | |
 |---|---|
 | An approval names one revision of the reasoning, not the decision | A second pair of eyes read particular words. An approval floating free of them would still stand after somebody rewrote them, and nothing would report it |
+| Nobody who proposed any row of a claim or wrote any of its reasoning agrees to it | Asked by both writes that make a row stand on an agreement: one given now, and one carried by a re-affirmation (REQ-24) |
 | **The row count is the control, so an engine that cannot report it refuses** | The rows move only while the approved revision is still what the claim rests on, and that condition is checked by counting what moved. Read as optional, the check was skipped on any driver that does not answer — after the approval row was already written |
 | The reasoning is revised, never overwritten; every revision is readable | |
 | Editing the reasoning takes back the approval | The item returns to the queue marked as previously approved rather than as a fresh proposal |
@@ -254,6 +255,7 @@ holds the ones nobody has agreed to yet.
 |---|---|
 | Each list carries the reasoning and the names with the row | A list where seeing why means opening every entry is a list nobody reads before acting. A row saying product 4, issue 91 is two more requests to understand, fifty times a page |
 | Undoing a bulk approval narrows to what the person undoing may reach | A batch is one reviewer's afternoon and may span products |
+| Undoing a bulk approval takes back only the agreements the person undoing gave | A batch is named by whoever gives it, so two reviewers may each hold one of the same name. Undoing one is not a way to withdraw another reviewer's agreement |
 | A claim it reaches only part of is left alone whole | The agreement is one row keyed on the claim, so taking it back takes it back for every row. Returning only the part they reach leaves the rest standing as approved under an agreement the record says was withdrawn, which is the state the approval record exists to make impossible |
 | What an undo reports is what returned to waiting | A decision another agreement still stands on, and one that has ended, is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
@@ -1215,6 +1217,7 @@ above.
 | A count of re-affirmations deliberately does not trigger it | That would fire on nothing having changed |
 | What may be carried is read from the row, not from what a caller supplied | A caller holding a stale copy would carry an agreement since withdrawn; a caller inventing one would carry an agreement that never existed. A withdrawn decision keeps its approval rows, so without this a version bump would undo a withdrawal |
 | All of it is one transaction | Written as three steps, a process stopping in the middle leaves a claim standing that nobody agreed to and that no review queue shows |
+| Only a decision that lapsed is re-affirmed, with nothing decided at its place since | The rule the list of what is yours to re-affirm holds, asked again of the one decision named. A decision still standing re-made at another version carried its agreement there, and no second person saw the new place |
 | The carried agreement is guarded on the revision | An agreement is an agreement to particular words |
 
 ### Re-affirmation across claims

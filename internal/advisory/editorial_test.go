@@ -153,6 +153,29 @@ func TestWhoeverWroteWhatAnAdvisorySaysMayNotAgreeToIt(t *testing.T) {
 	})
 }
 
+// A change to what an advisory covers opens an edition that carries the title
+// forward, written by whoever made the change. The title's author still wrote
+// the words standing, and may not agree to them.
+func TestTheAuthorOfACarriedTitleMayNotAgreeToIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		if _, _, err := f.store.Retitle(ctx, f.approver, named,
+			"Authentication bypass in the recovery console"); err != nil {
+			t.Fatalf("retitling as the second person: %v", err)
+		}
+		// The minter names a second flaw, which opens an edition of theirs
+		// carrying the second person's title.
+		if _, err := f.store.Add(ctx, f.who, named, "sonic", f.recorded(t, f.tagged)); err != nil {
+			t.Fatalf("naming a second flaw: %v", err)
+		}
+		if _, err := f.store.Approve(ctx, f.approver, named); !errors.Is(err, advisory.ErrSamePerson) {
+			t.Errorf("the author of a carried title agreeing to it answered %v", err)
+		}
+	})
+}
+
 // TestAgreeingTwiceIsRefusedAndTakingItBackIsNot pins the two ends of one
 // agreement.
 func TestAgreeingTwiceIsRefusedAndTakingItBackIsNot(t *testing.T) {
