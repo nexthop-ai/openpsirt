@@ -26,11 +26,16 @@ func init() {
 // transaction, the hold on every build and the merge after it would run a
 // statement at a time, and a merge stopped part way would be committed part
 // way. In a transaction of their own they are held and undone together, and
-// the next start steps over the table and merges again.
+// the next start steps over the table and merges again. The destinations are
+// folded in a transaction between the two, which asks whether its column is
+// there before adding it.
 func upV090(ctx context.Context, sqldb *sql.DB) error {
 	switch migrate.EngineFrom(ctx) {
 	case database.MySQL, database.MariaDB:
 		if err := inV020(ctx, sqldb, createImageVersionV090); err != nil {
+			return err
+		}
+		if err := inV020(ctx, sqldb, foldDestinationsV090); err != nil {
 			return err
 		}
 		return inV020(ctx, sqldb, mergeImagesV090)
@@ -58,8 +63,13 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //   - A container image is identified by its name: the components v0.8.0
 //     made per version of one are merged into one, and everything pointing at
 //     them is pointed at it.
+//   - A destination's name is held folded, as the key it is matched on, beside
+//     the spelling it was typed in.
 func upgradeV090(ctx context.Context, tx bun.Tx) error {
 	if err := createImageVersionV090(ctx, tx); err != nil {
+		return err
+	}
+	if err := foldDestinationsV090(ctx, tx); err != nil {
 		return err
 	}
 	return mergeImagesV090(ctx, tx)

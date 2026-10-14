@@ -57,8 +57,12 @@ const signalTimeout = 15 * time.Second
 type Outbound struct {
 	bun.BaseModel `bun:"table:outbound,alias:ob"`
 
-	ID   int64  `bun:"id,pk,autoincrement"`
-	Name string `bun:"name,notnull"`
+	ID int64 `bun:"id,pk,autoincrement"`
+	// Name is the key a destination is matched under, and DisplayName the
+	// spelling it was typed in. Two names differing only in capitals are one
+	// destination.
+	Name        string `bun:"name,notnull"`
+	DisplayName string `bun:"display_name,notnull"`
 	// Kind is which notifications go here, or "*" for all of them.
 	Kind string `bun:"kind,notnull"`
 	URL  string `bun:"url,notnull"`
@@ -536,6 +540,13 @@ func foldedKind(kind string) string {
 	return strings.ToLower(strings.TrimSpace(kind))
 }
 
+// DestinationKey is the key a destination's name is stored and matched under:
+// the name folded, by the rule its kind follows. The spelling typed is kept
+// beside it for display.
+func DestinationKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
 // chatMarkup escapes the three characters a chat channel reads as its own
 // markup.
 var chatMarkup = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
@@ -652,7 +663,7 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 	out := make([]Configured, 0, len(rows))
 	for _, row := range rows {
 		one := Configured{
-			Name: row.Name, Kind: row.Kind, Platform: row.Platform, URL: row.URL,
+			Name: row.DisplayName, Kind: row.Kind, Platform: row.Platform, URL: row.URL,
 			Channel: deref(row.Channel), Topic: deref(row.Topic),
 			Product: row.Product, Team: row.Team,
 		}
@@ -725,7 +736,8 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		// The kind is normalized on the way in rather than compared loosely
 		// on the way out, so the write that adds a destination and the read
 		// that retires it agree on what it is called.
-		Name: strings.TrimSpace(d.Name), Kind: foldedKind(d.Kind),
+		Name: DestinationKey(d.Name), DisplayName: strings.TrimSpace(d.Name),
+		Kind:     foldedKind(d.Kind),
 		Platform: strings.ToLower(strings.TrimSpace(d.Platform)),
 		URL:      strings.TrimSpace(d.URL), Secret: d.Secret,
 		ProductID: d.ProductID, TeamID: d.TeamID,
@@ -757,6 +769,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 
 	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", nil).
+		Set("display_name = ?", row.DisplayName).
 		Set("url = ?", row.URL).
 		Set("secret = ?", row.Secret).
 		Set("platform = ?", row.Platform).
@@ -869,7 +882,7 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 	}
 	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", time.Now().UTC().Truncate(time.Microsecond)).
-		Where("name = ?", strings.TrimSpace(name)).
+		Where("name = ?", DestinationKey(name)).
 		Where("kind = ?", foldedKind(kind)).
 		Where("retired_at IS NULL").Exec(ctx)
 	if err != nil {

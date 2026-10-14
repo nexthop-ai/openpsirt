@@ -443,9 +443,10 @@ row moves. § Indexes says what each index serves.
 
 ### The v0.9.0 upgrade
 
-Migration 43. It adds the image version table, and moves what v0.8.0 stored
-for a container image to an image identified by its name
-(`DESIGN-data-model.md` § Container images).
+Migration 43. It adds the image version table, moves what v0.8.0 stored for
+a container image to an image identified by its name
+(`DESIGN-data-model.md` § Container images), and folds each destination's
+name into the key it is matched under.
 
 | Step | What it does |
 |---|---|
@@ -464,6 +465,7 @@ for a container image to an image identified by its name
 | Findings and tags are pointed at the kept component | Both the component a finding is against and what pulls it in. A tag the merged image carried twice for one issue in one product keeps the first added |
 | The findings are read and moved once for every image | Read for the places decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
+| Each destination's name is folded | The name becomes its lower-case key and the spelling typed is kept beside it (`DESIGN-notifications.md` § Outbound HTTP). Two names one kind held that fold to one key stay two: the one already spelled as the key keeps it, or else the earliest, and the other takes the key followed by its own number. On MySQL and MariaDB in a transaction of its own between the image version table and the merge, which asks whether the column is there before adding it, so a start after one stopped part way folds rather than failing on the column |
 
 The rules an identity, a fold key and a live key are worked out by are copied
 into the migration rather than called, so a later change to the application

@@ -155,3 +155,27 @@ func TestAShareIsRefusedAboveTheWhole(t *testing.T) {
 		}
 	})
 }
+
+// A word is typed, so it is taken without regard to capitals or the spaces
+// around it, stored as the list spells it, and the product's own floor and
+// the deployment's agree on what they accept.
+func TestAWordSettingIsTakenWhateverItsCapitals(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+			`{"value":" High "}`); got.Code >= 300 {
+			t.Fatalf("a floor typed with a capital answered %d: %s", got.Code, got.Body.String())
+		}
+		var offered struct {
+			Items []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/settings", &offered)
+		for _, each := range offered.Items {
+			if each.Name == "triage.floor" && each.Value != "high" {
+				t.Errorf("the floor reads back as %q, want %q", each.Value, "high")
+			}
+		}
+	})
+}

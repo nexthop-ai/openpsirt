@@ -29,7 +29,7 @@ import (
 // A destination is told apart from another by its name and kind, which is what
 // retiring one takes.
 type OutboundBody struct {
-	Name     string `json:"name" doc:"The name, so a log line and a screen can use it"`
+	Name     string `json:"name" doc:"The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling"`
 	Kind     string `json:"kind" doc:"The notifications that go here, or * for all of them"`
 	Platform string `json:"platform" enum:"webhook,slack,zulip" doc:"How it is reached: a signed request, or a chat platform"`
 	Host     string `json:"host,omitempty" doc:"The host a webhook sends to. The rest of the address is never returned"`
@@ -116,7 +116,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Body struct {
-			Name     string `json:"name" minLength:"1" maxLength:"191"`
+			Name     string `json:"name" minLength:"1" maxLength:"191" doc:"What to call it. Matched without regard to capitals: a name differing from one in use only in capitals names that one"`
 			Kind     string `json:"kind" minLength:"1" maxLength:"191" doc:"One notification kind, or * for all of them"`
 			Platform string `json:"platform,omitempty" enum:"webhook,slack,zulip" doc:"How it is reached. A webhook where absent"`
 			URL      string `json:"url,omitempty" maxLength:"1000" doc:"A webhook's address. https only"`
@@ -209,7 +209,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			Status int
 			Body   OutboundBody
 		}{Status: http.StatusCreated, Body: OutboundBody{
-			Name: row.Name, Kind: row.Kind, Platform: row.Platform, Host: hostOf(row.URL),
+			Name: row.DisplayName, Kind: row.Kind, Platform: row.Platform, Host: hostOf(row.URL),
 			Channel: deref(row.Channel), Topic: deref(row.Topic),
 			Product: productName, Team: teamName,
 		}}, nil
@@ -244,7 +244,8 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			case err != nil:
 				return core.WentWrong(a.Logger, "that could not be retired", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+input.Name+" · "+input.Kind,
+			// The key the name is matched under, as the addition's row names it.
+			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+notify.DestinationKey(input.Name)+" · "+input.Kind,
 				trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}

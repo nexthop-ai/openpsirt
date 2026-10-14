@@ -49,5 +49,6 @@ func StatementsV080(engine database.Engine) map[string][]string {
 func StatementsV090(engine database.Engine) map[string][]string {
 	return map[string][]string{
 		"image_version": imageVersionV090(typesFor(engine)),
+		"outbound":      outboundV090(typesFor(engine)),
 	}
 }

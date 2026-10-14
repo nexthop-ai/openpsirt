@@ -6196,6 +6196,7 @@ export interface components {
             channel?: string;
             /** @description One notification kind, or * for all of them */
             kind: string;
+            /** @description What to call it. Matched without regard to capitals: a name differing from one in use only in capitals names that one */
             name: string;
             /**
              * @description How it is reached. A webhook where absent
@@ -10132,7 +10133,7 @@ export interface components {
             host?: string;
             /** @description The notifications that go here, or * for all of them */
             kind: string;
-            /** @description The name, so a log line and a screen can use it */
+            /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
              * @description How it is reached: a signed request, or a chat platform

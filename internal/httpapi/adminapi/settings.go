@@ -395,12 +395,16 @@ func registerSettings(api huma.API, in core.Deps) {
 		// every caller falling back to the shipped one, which is a policy that
 		// quietly stopped applying — and every reader here treats zero and
 		// negative as unset, so those would do the same while looking set.
+		value := input.Body.Value
 		switch settable[row].kind {
 		case aSwitch, aWord:
 			// Against the row's own list, which is the one the response
 			// offers. Two tables keyed on the name is how an offered word and
-			// an accepted word come to differ.
-			if !slices.Contains(settable[row].words, input.Body.Value) {
+			// an accepted word come to differ. A word is typed, so it is
+			// matched and stored without regard to capitals or the spaces
+			// around it, as the product's own floor is.
+			value = strings.ToLower(strings.TrimSpace(value))
+			if !slices.Contains(settable[row].words, value) {
 				return nil, huma.Error422UnprocessableEntity(
 					fmt.Sprintf("%q is not one this setting takes — write one of %s",
 						input.Body.Value, strings.Join(settable[row].words, ", ")))
@@ -455,12 +459,12 @@ func registerSettings(api huma.API, in core.Deps) {
 			if settings == nil {
 				return core.NoDatabase(in.Log())
 			}
-			before, had, err := settings.Change(ctx, input.Name, input.Body.Value)
+			before, had, err := settings.Change(ctx, input.Name, value)
 			if err != nil {
 				return recording(in.Logger, "that setting could not be recorded", err)
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, input.Name,
-				trail.Said(before, had), trail.Said(input.Body.Value, true)); err != nil {
+				trail.Said(before, had), trail.Said(value, true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
 			return nil
@@ -483,7 +487,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			// costs is some findings keeping the old deadline until the next
 			// scan or the next edit, which is the state they were already in
 			// a moment ago.
-			deadlinesRewritten(in)(ctx, input.Name, input.Body.Value)
+			deadlinesRewritten(in)(ctx, input.Name, value)
 		}
 		return &struct{}{}, nil
 	})

@@ -202,6 +202,13 @@ func TestAWordSettingOffersTheListItIsCheckedAgainst(t *testing.T) {
 				t.Errorf("%s ships %q, which is not one of %v",
 					each.name, each.shipped(core.Deps{}), each.words)
 			}
+			// A typed word is folded before it is checked, so a word with a
+			// capital in the list could never be matched.
+			for _, word := range each.words {
+				if word != strings.ToLower(strings.TrimSpace(word)) {
+					t.Errorf("%s offers %q, which a folded value can never be", each.name, word)
+				}
+			}
 		default:
 			if len(each.words) != 0 {
 				t.Errorf("%s is a %s and offers words, which nothing checks against",
