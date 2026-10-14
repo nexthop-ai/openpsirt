@@ -63,7 +63,7 @@ func (s *Snapshot) Len() int {
 	return len(s.records)
 }
 
-// Bounds on what a snapshot file may hold. It is either written here or
+// What a snapshot file may hold. It is either written here or
 // carried in by an operator, and the second is a file from outside. Writing
 // refuses what reading refuses, so a snapshot built here is always one a scan
 // can read.
