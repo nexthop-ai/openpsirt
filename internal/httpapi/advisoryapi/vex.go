@@ -56,7 +56,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			if in.DB == nil {
 				return nil, core.NoDatabase(in.Logger)
 			}
-			doc, err := vex.NewStore(in.DB.DB).For(ctx, subject, in.Publisher,
+			doc, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).For(ctx, subject, in.Publisher,
 				input.Product, input.Stream, input.Variant, input.Undisclosed, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "the document could not be generated")
@@ -96,7 +96,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			if in.DB == nil {
 				return nil, core.NoDatabase(in.Logger)
 			}
-			store := vex.NewStore(in.DB.DB)
+			store := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling)
 			gone, err := store.Issuances(ctx, subject,
 				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			if err != nil {
@@ -163,7 +163,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			if in.DB == nil {
 				return nil, core.NoDatabase(in.Logger)
 			}
-			recorded, err := vex.NewStore(in.DB.DB).Issued(ctx, subject, in.Publisher,
+			recorded, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Issued(ctx, subject, in.Publisher,
 				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			if err != nil {
 				return nil, vexRefused(in, err, "that could not be recorded")
@@ -207,7 +207,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			if in.DB == nil {
 				return nil, core.NoDatabase(in.Logger)
 			}
-			sent, err := vex.NewStore(in.DB.DB).Sent(ctx, subject,
+			sent, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Sent(ctx, subject,
 				input.Product, input.Stream, input.Variant, input.Kind.kind(), input.Version)
 			if errors.Is(err, vex.ErrNoSuchRevision) {
 				return nil, huma.Error404NotFound("no document went out as that revision")

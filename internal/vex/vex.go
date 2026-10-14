@@ -190,7 +190,7 @@ func NewStore(db *bun.DB) *Store {
 }
 
 // NewStoreCarrying returns a store whose documents carry at most most
-// statements, for a test that wants the refusal rather than the document.
+// statements. Zero or less is the ceiling a document is built to hold.
 func NewStoreCarrying(db *bun.DB, most int) *Store {
 	s := NewStore(db)
 	s.most = most
