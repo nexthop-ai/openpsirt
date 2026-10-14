@@ -318,7 +318,7 @@ func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) 
 			RecordedAt: row.RecordedAt.UTC().Format(time.RFC3339),
 		}
 		if row.ReceivedOn != nil {
-			body.Received = row.ReceivedOn.Format(time.DateOnly)
+			body.Received = row.ReceivedOn.UTC().Format(time.DateOnly)
 		}
 		if row.AcknowledgedAt != nil {
 			body.Acknowledged = row.AcknowledgedAt.UTC().Format(time.RFC3339)

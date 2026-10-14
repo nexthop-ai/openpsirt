@@ -100,7 +100,7 @@ func registerMeasures(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "how triage is going could not be read", err)
 		}
 		body := MeasuresBody{
-			Since: got.Since.Format(time.DateOnly), Until: got.Until.Format(time.DateOnly),
+			Since: got.Since.UTC().Format(time.DateOnly), Until: got.Until.UTC().Format(time.DateOnly),
 			ToDecide: spreadBodies(got.ToDecide), ToAgree: spreadBodies(got.ToAgree),
 			SentBack: got.SentBack, Sampled: got.Sampled, Capped: got.Capped,
 			Worked: make([]WorkedBody, 0, len(got.Throughput)),

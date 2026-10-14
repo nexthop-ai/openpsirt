@@ -118,7 +118,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 			body.FixedVersion = *said.FixedVersion
 		}
 		if said.DeferredUntil != nil {
-			body.DeferredUntil = said.DeferredUntil.Format(time.DateOnly)
+			body.DeferredUntil = said.DeferredUntil.UTC().Format(time.DateOnly)
 		}
 		if d.EndedAt != nil {
 			body.EndedAt = d.EndedAt.UTC().Format(time.RFC3339)

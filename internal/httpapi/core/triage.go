@@ -307,10 +307,10 @@ func ClaimArgument(c triage.Claim, reasoning string) DecisionBody {
 		body.FixedVersion = *c.FixedVersion
 	}
 	if c.DeferredUntil != nil {
-		body.DeferredUntil = c.DeferredUntil.Format(time.DateOnly)
+		body.DeferredUntil = c.DeferredUntil.UTC().Format(time.DateOnly)
 	}
 	if c.CommittedTo != nil {
-		body.CommittedTo = c.CommittedTo.Format(time.DateOnly)
+		body.CommittedTo = c.CommittedTo.UTC().Format(time.DateOnly)
 	}
 	if c.UpgradeTo != nil {
 		body.UpgradeTo = *c.UpgradeTo

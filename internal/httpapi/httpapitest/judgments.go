@@ -595,7 +595,7 @@ func (r *Reach) EndingIn(t *testing.T, stream string, days int) {
 	if made.Code != http.StatusCreated {
 		t.Fatalf("declaring a release answered %d: %s", made.Code, made.Body.String())
 	}
-	on := time.Now().UTC().AddDate(0, 0, days).Format(time.DateOnly)
+	on := time.Now().UTC().AddDate(0, 0, days).UTC().Format(time.DateOnly)
 	ended := AsPerson(t, r, "admin", http.MethodPut,
 		"/v1/products/mine/streams/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
 	if ended.Code != http.StatusNoContent {

@@ -369,16 +369,16 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		Justification: core.Justification(row.Justification),
 		ProposedBy:    row.ProposedBy, ApprovedBy: row.ApprovedBy,
 		AgreementCarried: row.AgreementCarried,
-		Opened:           row.OpenedAt.Format(time.DateOnly), Met: row.Met,
+		Opened:           row.OpenedAt.UTC().Format(time.DateOnly), Met: row.Met,
 	}
 	if row.ProposedAt != nil {
-		body.ProposedAt = row.ProposedAt.Format(time.DateOnly)
+		body.ProposedAt = row.ProposedAt.UTC().Format(time.DateOnly)
 	}
 	if row.ApprovedAt != nil {
-		body.ApprovedAt = row.ApprovedAt.Format(time.DateOnly)
+		body.ApprovedAt = row.ApprovedAt.UTC().Format(time.DateOnly)
 	}
 	if row.ClosedAt != nil {
-		body.Closed = row.ClosedAt.Format(time.DateOnly)
+		body.Closed = row.ClosedAt.UTC().Format(time.DateOnly)
 		body.ClosedBecause, body.ClosedNote = closure(row.ClosedBecause), row.ClosedNote
 		body.Unaffected = core.RecordLines(row.UnaffectedBy)
 	}
@@ -390,7 +390,7 @@ func disposedBody(row finding.Disposed) DisposedBody {
 		}
 	}
 	if row.DueAt != nil {
-		body.Due = row.DueAt.Format(time.DateOnly)
+		body.Due = row.DueAt.UTC().Format(time.DateOnly)
 	}
 	return body
 }

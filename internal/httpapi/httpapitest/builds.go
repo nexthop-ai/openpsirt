@@ -479,7 +479,7 @@ func (r *Reach) AlsoScannedInto(t *testing.T, product, stream, variant string) {
 // tomorrow already behind it. Two days rather than a month, because a promise
 // past the deadline it covers is gated and these tests are about what a
 // promise reaches — the shortest window in the fixture is three days.
-var AheadOfUs = time.Now().UTC().AddDate(0, 0, 2).Format(time.DateOnly)
+var AheadOfUs = time.Now().UTC().AddDate(0, 0, 2).UTC().Format(time.DateOnly)
 
 // ScannedSiblings puts two packages built from one source into a build, each
 // carrying the same two issues, plus one issue nothing has released a fix for.

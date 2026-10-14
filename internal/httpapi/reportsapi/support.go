@@ -236,7 +236,7 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
 			Product: release.Product, Stream: release.Stream,
-			Kind: core.LineKind(release.Kind), EndedOn: release.EndedOn.Format(time.DateOnly),
+			Kind: core.LineKind(release.Kind), EndedOn: release.EndedOn.UTC().Format(time.DateOnly),
 			Inherited: release.Inherited,
 			EndedDays: since,
 			Ended:     !release.EndedOn.After(now),
