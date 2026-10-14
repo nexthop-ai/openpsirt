@@ -419,10 +419,12 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			carried.Absent++
 			continue
 		}
-		if row.Was == row.Now && row.ConsumerWas == row.ConsumerNow {
-			// The versions match, so it reaches the new line by matching.
-			// Offering it would ask somebody to agree to something that has
-			// already happened.
+		if Outcome(row.Outcome).StandsAtAnyVersion() ||
+			(row.Was == row.Now && row.ConsumerWas == row.ConsumerNow) {
+			// The versions match, or the outcome stands at any version, so it
+			// reaches the new line by matching. Offering it would ask somebody
+			// to agree to something that has already happened, and carrying a
+			// correction is refused as the place already decided.
 			carried.Applying++
 			continue
 		}
