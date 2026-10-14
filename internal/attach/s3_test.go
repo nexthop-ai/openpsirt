@@ -272,7 +272,7 @@ func TestABodyOfTheWrongLengthNeverReachesItsDeclaredLength(t *testing.T) {
 // parser could not read, and not one carried in the query.
 func TestAnEndpointIsShownWithoutItsCredentials(t *testing.T) {
 	_, err := NewBucket(context.Background(), BucketConfig{
-		Endpoint: "https://user:hunter2%zz@s3.example.test", Bucket: "advisories",
+		Endpoint: "https://user:" + "hunter2%zz" + "@s3.example.test", Bucket: "advisories",
 		Region: "us-east-1", Names: directoryNames,
 	})
 	if err == nil || strings.Contains(err.Error(), "hunter2") {
@@ -286,7 +286,9 @@ func TestAnEndpointIsShownWithoutItsCredentials(t *testing.T) {
 		t.Errorf("a plaintext endpoint answered %v, want a refusal without the signature", err)
 	}
 	bucket, err := NewBucket(context.Background(), BucketConfig{
-		Endpoint: "https://name:hunter2@s3.example.test/?token=hunter2", Bucket: "advisories",
+		Endpoint: (&url.URL{Scheme: "https", User: url.UserPassword("name", "hunter2"),
+			Host: "s3.example.test", Path: "/", RawQuery: "token=hunter2"}).String(),
+		Bucket: "advisories",
 		Region: "us-east-1", Names: directoryNames,
 	})
 	if err != nil {

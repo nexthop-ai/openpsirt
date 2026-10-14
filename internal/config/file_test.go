@@ -553,10 +553,8 @@ func TestGroupRolesWithNoSourceOfGroupsAreRefused(t *testing.T) {
 // A configuration file is a regular file. A directory cannot be read as one,
 // and a pipe would hold the start until something wrote to it.
 func TestAConfigurationFileThatIsNotAFileIsRefused(t *testing.T) {
+	// Made owner-only, so the refusal is not the mode's.
 	dir := t.TempDir()
-	if err := os.Chmod(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := LoadFile(dir, nil); err == nil || !strings.Contains(err.Error(), "not a regular file") {
 		t.Errorf("a directory answered %v, want it refused as not a regular file", err)
 	}
