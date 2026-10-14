@@ -82,6 +82,23 @@ type Config struct {
 	Mirror bool
 }
 
+// Store is where the published directory is written.
+//
+// A type of its own rather than the storage it wraps, so that only a package
+// importing this one can hold it. Nothing in this deployment serves the
+// directory, and the test saying so asks whether a serving package imports
+// this one: a handler handed the bare storage could serve its keys without
+// importing anything here.
+type Store struct{ files attach.Storage }
+
+// Published is the directory's store over files, or nil where there are none.
+func Published(files attach.Storage) *Store {
+	if files == nil {
+		return nil
+	}
+	return &Store{files: files}
+}
+
 // Writer writes the directory on a timer.
 type Writer struct {
 	advisories *advisory.Store
@@ -111,14 +128,14 @@ type Writer struct {
 // The address is not checked here. It is checked and given its trailing slash
 // where the setting is read, because a document states it too and reaches that
 // without passing through here.
-func New(db *bun.DB, files attach.Storage, who publisher.Named, settings Config,
+func New(db *bun.DB, published *Store, who publisher.Named, settings Config,
 	logger *slog.Logger) *Writer {
 
-	if files == nil || !who.Publishes() || !who.Stated() {
+	if published == nil || !who.Publishes() || !who.Stated() {
 		return nil
 	}
 	return &Writer{
-		advisories: advisory.NewStore(db), files: files, who: who,
+		advisories: advisory.NewStore(db), files: published.files, who: who,
 		settings: settings, logger: logger,
 	}
 }

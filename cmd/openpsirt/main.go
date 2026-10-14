@@ -1205,7 +1205,7 @@ func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
 // attachments are, a web server running as its own user is refused every file
 // and the directory looks empty.
 func directoryStore(ctx context.Context, cfg config.Config,
-	logger *slog.Logger) (attach.Storage, error) {
+	logger *slog.Logger) (*directory.Store, error) {
 
 	bucket, err := attach.NewBucket(ctx, bucketOf(cfg.Directory, attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
 		AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
@@ -1227,7 +1227,7 @@ func directoryStore(ctx context.Context, cfg config.Config,
 		}
 		logger.Info("published advisories are written to an object store",
 			"bucket", cfg.Directory.Bucket)
-		return bucket, nil
+		return directory.Published(bucket), nil
 	}
 	local, err := attach.NewServedFiles(cfg.Directory.Dir)
 	// Named with the setting the operator typed. The store says "file
@@ -1245,7 +1245,7 @@ func directoryStore(ctx context.Context, cfg config.Config,
 	}
 	logger.Info("published advisories are written to a directory on this machine",
 		"directory", cfg.Directory.Dir)
-	return local, nil
+	return directory.Published(local), nil
 }
 
 // bucketOf is the object store one configured store names, refusing under the

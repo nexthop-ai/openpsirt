@@ -87,13 +87,19 @@ func TestAPlaintextStoreSaysSoAtEveryStart(t *testing.T) {
 func TestTheRefusalNamesTheWayThrough(t *testing.T) {
 	for _, each := range []struct {
 		store string
-		open  func(context.Context, config.Config, *slog.Logger) (attach.Storage, error)
+		open  func(context.Context, config.Config, *slog.Logger) (any, error)
 		cfg   config.Config
 	}{
-		{"OPENPSIRT_ATTACHMENT_ALLOW_HTTP", attachmentStore,
+		{"OPENPSIRT_ATTACHMENT_ALLOW_HTTP", func(ctx context.Context, cfg config.Config,
+			logger *slog.Logger) (any, error) {
+			return attachmentStore(ctx, cfg, logger)
+		},
 			config.Config{Attachments: config.Store{Endpoint: withPassword, Bucket: "attachments",
 				Region: "us-east-1"}}},
-		{"OPENPSIRT_DIRECTORY_ALLOW_HTTP", directoryStore,
+		{"OPENPSIRT_DIRECTORY_ALLOW_HTTP", func(ctx context.Context, cfg config.Config,
+			logger *slog.Logger) (any, error) {
+			return directoryStore(ctx, cfg, logger)
+		},
 			config.Config{Directory: config.Store{Endpoint: withPassword, Bucket: "advisories",
 				Region: "us-east-1"}}},
 	} {

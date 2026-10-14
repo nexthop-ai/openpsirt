@@ -21,6 +21,11 @@ import (
 // another package, rather than of the routes. A handler cannot serve what its
 // program cannot reach, and a check over route paths would pass a handler that
 // read the store directly and served the same bytes under any name it liked.
+//
+// The store the directory is written to is a type of this package, so a
+// serving package holding it imports this one and is reported here. Handed
+// the storage it wraps instead, a handler would import nothing of this
+// package; the wiring never has that storage outside the type.
 func TestNothingInThisDeploymentServesTheDirectory(t *testing.T) {
 	const mine = "github.com/nexthop-ai/openpsirt/internal/directory"
 	listed, err := exec.CommandContext(t.Context(), "go", "list", "-deps",

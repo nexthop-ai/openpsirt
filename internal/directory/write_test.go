@@ -432,12 +432,12 @@ func TestNoAddressAndNoStoreIsNoWriter(t *testing.T) {
 		anonymous.Name, anonymous.Namespace = "", ""
 		for _, one := range []struct {
 			what  string
-			store attach.Storage
+			store *directory.Store
 			who   publisher.Named
 		}{
 			{"no store", nil, issuer},
-			{"no address", f.files, bare},
-			{"no publisher", f.files, anonymous},
+			{"no address", directory.Published(f.files), bare},
+			{"no publisher", directory.Published(f.files), anonymous},
 		} {
 			if writer := directory.New(f.db, one.store, one.who,
 				directory.Config{}, f.logger); writer != nil {
@@ -499,7 +499,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // writer is one writer over the fixture's store.
 func (f *fixture) writer(t *testing.T) *directory.Writer {
 	t.Helper()
-	writer := directory.New(f.db, f.files, issuer,
+	writer := directory.New(f.db, directory.Published(f.files), issuer,
 		directory.Config{List: true, Mirror: false}, f.logger)
 	if writer == nil {
 		t.Fatal("no writer was started")

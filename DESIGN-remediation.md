@@ -836,6 +836,7 @@ writes them (REQ-63).
 | The files are readable by whoever serves them | Another process serves them, running as somebody else. Written the way an authorized download is, a web server is refused every one and the directory reads as a deployment that has published nothing |
 | A directory with nothing in it is not written | It would have to state when it was last updated, and nothing has been published for it to say |
 | A store of its own | Every file here is served to anybody, and every attachment is authorized before it is handed over (REQ-70). One destination would have to be both |
+| The store is a type of the package that writes the directory | Nothing in the application reaches that package, which a test checks. Handed the storage underneath instead, a handler could serve the files without reaching the package, and the check would pass it |
 | The address is configuration and is required | Every address the directory states about itself is built from it, and an aggregator follows those. It must be an `https` address, which the standard requires of the documents and is refused at startup otherwise |
 
 ### The files
