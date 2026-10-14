@@ -214,11 +214,14 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 			AND da.withdrawn_at IS NULL`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
-		ColumnExpr(`de.proposed_at AS "proposed_at"`).
+		ColumnExpr(`MIN(de.proposed_at) AS "proposed_at"`).
 		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
 		Where("de.proposed_at < ?", until).
-		GroupExpr("de.id, de.proposed_at, " + rating.EffectiveExpr).
-		OrderExpr("de.proposed_at DESC").
+		// One observation per claim and band. A claim writes a row per
+		// place and is agreed to once, so counted per row one claim over
+		// four hundred places is four hundred waits for one agreement.
+		GroupExpr("de.claim_id, " + rating.EffectiveExpr).
+		OrderExpr("MIN(de.proposed_at) DESC").
 		Limit(measuredAtMost + 1)
 	if !since.IsZero() {
 		q = q.Where("de.proposed_at >= ?", since)
@@ -263,7 +266,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	// answer and nothing counted it, so a queue that is moving because claims
 	// are good and one that is moving because nobody reads them looked alike.
 	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
-		ColumnExpr(`COUNT(*) AS "number"`).
+		// Each send-back moves the rows it returns into a claim of their
+		// own, so the distinct claims are the send-backs.
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at < ?", until)
 	if !since.IsZero() {
