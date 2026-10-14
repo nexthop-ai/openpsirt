@@ -328,6 +328,11 @@ Fix velocity, average time to remediate by severity, and aging buckets over a
 period. A finding records when it opened and when it closed, so how long
 something took is a subtraction rather than a second record somebody maintains.
 
+A fix is counted in issues, the unit what opened is counted in. An issue closed
+in two products is one fix, timed from its earliest opening to its last
+closing, in the strictest band any of those products gives it — the reduction
+the aging buckets make.
+
 The aging buckets are cut two ways. One number per bucket says a hundred
 things are over three months old, and neither whether any of them matters nor
 whether anybody has looked. So each bucket carries the same count by severity,
