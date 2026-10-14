@@ -134,7 +134,7 @@ same transaction as the act itself.
 Visibility is enforced in the data layer. A product somebody holds no role on
 is invisible to them in every list, count, search and export. Public and
 private work are granted separately, and a pipeline's credential can only
-upload and read back its own uploads.
+upload to its builds and read back what was filed there.
 
 ## Deployment
 
