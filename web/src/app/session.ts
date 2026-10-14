@@ -38,7 +38,7 @@ export type Who = {
   // Their reach over this deployment's own records, which grants no write to
   // them. A separate answer from admin: one of them changes things.
   audits?: boolean;
-  kind: "person" | "key";
+  kind: "person";
   reach: Can[];
   // The digest they asked for, and whether anything can be sent: a screen
   // offering the switches has to know their state, and a switch that changes

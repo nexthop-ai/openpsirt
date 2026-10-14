@@ -75,7 +75,7 @@ export interface paths {
          *
          *     `product` and `vulnerability` narrow it to what covers them, which is what a screen about one flaw asks before somebody starts another advisory about it.
          *
-         *     Requires: public-triage or private-triage. What you hold decides what comes back rather than whether you may ask
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. What you hold decides what comes back rather than whether you may ask
          */
         get: operations["list-advisories"];
         put?: never;
@@ -89,7 +89,7 @@ export interface paths {
          *
          *     Requires a prefix configured for this deployment to mint under.
          *
-         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
          */
         post: operations["start-advisory"];
         delete?: never;
@@ -159,7 +159,7 @@ export interface paths {
          *
          *     Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
          *
-         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         patch: operations["retitle-advisory"];
         trace?: never;
@@ -183,7 +183,7 @@ export interface paths {
          *
          *     Requires a triage role on every product the advisory covers.
          *
-         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         post: operations["approve-advisory"];
         /**
@@ -194,7 +194,7 @@ export interface paths {
          *
          *     Answers 422 where no agreement is standing.
          *
-         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         delete: operations["withdraw-advisory-approval"];
         options?: never;
@@ -265,7 +265,7 @@ export interface paths {
          *
          *     Answers 409 where nobody has agreed to what the advisory says.
          *
-         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         post: operations["record-advisory-issued"];
         delete?: never;
@@ -291,7 +291,7 @@ export interface paths {
          *
          *     Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
          */
         post: operations["add-advisory-issue"];
         delete?: never;
@@ -316,7 +316,7 @@ export interface paths {
          *
          *     Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
          */
         delete: operations["drop-advisory-issue"];
         options?: never;
@@ -342,7 +342,7 @@ export interface paths {
          *
          *     A release the issue is not in answers 404.
          *
-         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         put: operations["mark-advisory-release"];
         post?: never;
@@ -851,7 +851,7 @@ export interface paths {
          *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-claim"];
         delete?: never;
@@ -1679,7 +1679,7 @@ export interface paths {
          *
          *     Two lifetimes, and the difference matters to a caller. An event happened once and goes away when you acknowledge it. A condition is true while something is true and clears itself when that stops, so a build that resumes being scanned leaves this list without anybody dismissing it.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         get: operations["list-notifications"];
         put?: never;
@@ -1688,7 +1688,7 @@ export interface paths {
          * Acknowledge everything waiting on you
          * @description Takes everything off your list at once, and says how many that was. Conditions that are still true will not come back while they hold.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         delete: operations["acknowledge-all-notifications"];
         options?: never;
@@ -1714,7 +1714,7 @@ export interface paths {
          *
          *     Acknowledging a condition hides it rather than resolving it: what it is about is still true, and the pass that derives it will not raise it again while it holds.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         delete: operations["acknowledge-notification"];
         options?: never;
@@ -5019,7 +5019,7 @@ export interface paths {
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-many"];
         delete?: never;
@@ -5402,7 +5402,7 @@ export interface paths {
          * Sign out
          * @description Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         delete: operations["sign-out"];
         options?: never;
@@ -5425,7 +5425,7 @@ export interface paths {
          *
          *     Capabilities, not roles, for that reason. Which roles produce which capability is the server's rule and stays there.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         get: operations["get-current-subject"];
         put?: never;
@@ -5452,7 +5452,7 @@ export interface paths {
          *
          *     You are found on a chat platform by the address recorded against you, which `GET /v1/session/me` reports as `reachable`. Refused where this deployment offers no chat platform, which `GET /v1/session/me` reports as `chat`.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         put: operations["set-chat"];
         post?: never;
@@ -5480,7 +5480,7 @@ export interface paths {
          *
          *     Nothing is sent anywhere without an address recorded against you, which `GET /v1/session/me` reports as `reachable`.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         put: operations["set-digest"];
         post?: never;
@@ -5775,7 +5775,7 @@ export interface paths {
          *
          *     A token is a live reference to you rather than a copy of what you could do when it was made, so what one reaches shrinks the moment your roles do.
          *
-         *     Requires: your own credential
+         *     Requires: your own sign-in, as a person and not a pipeline key
          */
         get: operations["list-my-tokens"];
         put?: never;
@@ -5785,7 +5785,7 @@ export interface paths {
          *
          *     Expiry is not optional, and `lifetime` may not exceed the ceiling an administrator has set. A credential that never runs out is one nobody ever revokes, and those are found when somebody leaves and nobody knows what breaks if it is turned off.
          *
-         *     Requires: your own credential. Signed in, not through a token: a token cannot mint another.
+         *     Requires: your own sign-in, as a person and not a pipeline key. Signed in, not through a token: a token cannot mint another.
          */
         post: operations["mint-token"];
         delete?: never;
@@ -5810,7 +5810,7 @@ export interface paths {
          *
          *     Yours alone. An administrator withdraws anybody else's through the administration paths.
          *
-         *     Requires: your own credential. Signed in, not through a token: a token cannot withdraw another.
+         *     Requires: your own sign-in, as a person and not a pipeline key. Signed in, not through a token: a token cannot withdraw another.
          */
         delete: operations["revoke-my-token"];
         options?: never;
@@ -12863,10 +12863,10 @@ export interface components {
             /** @description The identity this deployment holds for them */
             identity: string;
             /**
-             * @description A person who signed in, or a credential
+             * @description Always a person. A pipeline key is refused this route
              * @enum {string}
              */
-            kind: "person" | "key";
+            kind: "person";
             /** @description The display name, where one is recorded */
             name: string;
             /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims */

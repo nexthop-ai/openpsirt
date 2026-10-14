@@ -358,6 +358,11 @@ The line in the description is rendered from that same value rather than written
 beside it. Two hand-written copies disagree within a month, and a wrong
 permission is worse than the silence it replaced.
 
+The line states the scope and the roles both. A scope the middleware enforces
+whatever roles are held — yourself, any signed-in person, the deployment's own
+records — is said after the roles, so a pipeline key holding every role listed
+is not told it may call an operation only a person may.
+
 A declaration states which of two kinds of rule it is:
 
 | Kind | Behavior |
