@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"net/http"
+	"net/url"
 	"sort"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -28,8 +29,17 @@ func refuseUnknownParameters(api huma.API) {
 			next(ctx)
 			return
 		}
+		// Parsed here rather than through the address's own reader, which
+		// drops a pair it cannot read — a malformed escape, a semicolon — and
+		// says nothing. Dropped, the filter that pair carried is read as
+		// absent and the unfiltered list answers.
 		address := ctx.URL()
-		query := address.Query()
+		query, err := url.ParseQuery(address.RawQuery)
+		if err != nil {
+			_ = huma.WriteErr(api, ctx, http.StatusBadRequest,
+				"the query string could not be read: "+err.Error())
+			return
+		}
 		if len(query) == 0 {
 			next(ctx)
 			return

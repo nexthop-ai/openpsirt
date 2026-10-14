@@ -34,6 +34,17 @@ func TestAQueryParameterNoOperationTakesIsRefusedByName(t *testing.T) {
 			t.Errorf("the refusal does not name the parameter: %s", got.Body.String())
 		}
 
+		// A pair that cannot be read is refused rather than dropped. Dropped,
+		// the filter it carried is read as absent and the unfiltered list
+		// answers.
+		for _, query := range []string{"stream=master%", "stream=master;stat=open"} {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+				"/v1/products/mine/findings?"+query, "")
+			if got.Code != http.StatusBadRequest {
+				t.Errorf("?%s answered %d, want 400: %s", query, got.Code, got.Body.String())
+			}
+		}
+
 		// A caller who may not reach the operation is refused as that first,
 		// so the refusal says nothing about what the operation takes.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,

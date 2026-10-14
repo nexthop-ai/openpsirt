@@ -313,6 +313,7 @@ part of the statement.
 | A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
 | A filter taking words from a fixed set takes each word once, and is refused with a 422 where one repeats | Each word is bound into the statement, and the set of words bounds how many there are only where none repeats. A free-text filter carries a count of items instead. A test walks every repeatable query parameter the document declares and fails one declaring neither |
 | A query parameter the operation does not declare is refused with a 400 naming it | Ignored, a mistyped filter returns the unfiltered list, which reads as a correct answer. The list is read from the operation's own declaration, so what is accepted is what the document publishes |
+| A query string that cannot be read is refused with a 400 | A pair with a malformed escape or a semicolon is otherwise dropped before anything looks at it, and the filter it carried is read as absent |
 | That refusal comes after the scope on the operation's declaration is checked | A caller outside the scope learns nothing about what it takes. A role on the product is checked by the handler, after it; the parameters are published, so the order discloses nothing there |
 
 This also prevents a sort exposing a column the caller was never meant to order
