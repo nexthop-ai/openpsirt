@@ -10,7 +10,9 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Unread } from "../../ui/Reading";
 import { Loading } from "../../ui/Loading";
+import { Paged } from "../../ui/Paged";
 import { Sheet } from "./Sheet";
+import { byProduct } from "./catalog";
 import {
   PeriodPicker,
   WindowPicker,
@@ -84,7 +86,8 @@ export function Effort() {
       settled={spent.isSuccess}
       name="Effort by component"
       answers="what the judgments in this period were about."
-      asked={coveringPeriod(period, days)}
+      of={byProduct(at.product)}
+      asked={[coveringPeriod(period, days), team ? `team ${team}` : ""].filter(Boolean).join(" · ")}
     >
       <WindowPicker offered={WINDOWS} days={days} />
       <PeriodPicker period={period} />
@@ -166,6 +169,7 @@ export function Effort() {
               </tbody>
             </table>
           </Wide>
+          <Paged shown={rows.length} total={spent.data?.total} limit={SHOWN} what="listed" />
         </section>
       )}
     </Sheet>

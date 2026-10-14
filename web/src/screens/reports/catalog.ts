@@ -259,6 +259,12 @@ export function leadsTo(report: Report, at: Scoped): { to: string | null; needs:
 // figure narrowed to one variant and a figure spanning a program are the same
 // figure with very different meanings, and a printed sheet has nothing else to
 // say which of the two it holds.
+// What a sheet counted by product alone covers. Its reads take a product and no
+// branch or variant, so the scope the picker states is not its population.
+export function byProduct(product: string | undefined): string {
+  return product ? `${product}, every branch and variant` : "Every product";
+}
+
 export function scopeWords(at: Scoped): string {
   return [
     at.product ?? "Every product",

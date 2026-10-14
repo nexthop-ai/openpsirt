@@ -11,6 +11,7 @@ import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { byProduct } from "./catalog";
 import {
   PeriodPicker,
   WindowPicker,
@@ -63,6 +64,7 @@ export function Published() {
       settled={gone.isSuccess}
       name="Advisories issued"
       answers="what has been published about our own flaws, and what was published twice."
+      of={byProduct(at.product)}
       asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />

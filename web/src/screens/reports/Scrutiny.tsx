@@ -13,6 +13,7 @@ import { Outcome } from "../../ui/Outcome";
 import { useOutcomes } from "../../ui/outcomes";
 import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
+import { byProduct } from "./catalog";
 import {
   PeriodPicker,
   WindowPicker,
@@ -57,7 +58,10 @@ export function Scrutiny() {
   const [params] = useSearchParams();
   const days = daysAsked(params, 90);
   const period = periodAsked(params);
-  const when = askedFor(period, days);
+  // A rolling window is sent as the date its links open the record from. Sent
+  // as a count of days the server counts from this minute, and the record's
+  // list from midnight, so the list held rows the figure did not count.
+  const when = stated(period) ? askedFor(period, days) : { from: windowStart(days) };
   const product = at.product ?? "";
 
   const got = useQuery({
@@ -98,6 +102,7 @@ export function Scrutiny() {
       settled={got.isSuccess}
       name="Approval quality"
       answers="how much a second pair of eyes actually did."
+      of={byProduct(at.product)}
       asked={coveringPeriod(period, days)}
     >
       <WindowPicker offered={WINDOWS} days={days} />

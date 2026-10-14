@@ -16,6 +16,7 @@ import { Severity } from "../../ui/Severity";
 import { Because, Outcome } from "../../ui/Outcome";
 import { useOutcomes } from "../../ui/outcomes";
 import { Sheet } from "./Sheet";
+import { byProduct } from "./catalog";
 import {
   PeriodPicker,
   WindowPicker,
@@ -67,13 +68,6 @@ export function openFor(
   // of its own defaults either, or the two numbers disagree.
   asked.set("below", "yes");
   return findingsPath(at, true, asked);
-}
-
-// What the sections that are counted by product alone say they cover. Their
-// reads take a product and no branch or variant, so the scope the sheet's
-// heading states is not theirs.
-export function byProduct(product: string | undefined): string {
-  return product ? `${product}, every branch and variant` : "Every product";
 }
 
 // The state of the work, rather than the work itself: how fast things are

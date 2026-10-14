@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { UNNARROWED } from "../../app/scope";
-import { byProduct, openFor } from "./Overview";
+import { openFor } from "./Overview";
+import { byProduct } from "./catalog";
 
 // The parameters an address carries, one list per name.
 function query(path: string): Record<string, string[]> {

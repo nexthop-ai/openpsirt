@@ -107,6 +107,15 @@ export function Register() {
       settled={register.isSuccess}
       name="Disposition register"
       answers="every vulnerability known in one build, and what became of it."
+      asked={
+        [
+          ...states.map(said),
+          standing ? "still open" : "",
+          ...closedBy.map((word) => CLOSED_BY_LABEL[word]),
+        ]
+          .filter(Boolean)
+          .join(", ") || undefined
+      }
     >
       {!whole ? (
         <section className="panel">

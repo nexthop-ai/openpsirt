@@ -55,6 +55,7 @@ export function Support() {
       settled={ended.isSuccess}
       name="Releases out of support"
       answers="what is still shipped and no longer maintained."
+      asked={within > 0 ? `warning ${within} days ahead` : undefined}
     >
       <div className="controls">
         <Segments

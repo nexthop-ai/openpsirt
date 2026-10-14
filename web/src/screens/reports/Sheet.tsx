@@ -20,12 +20,17 @@ import { scopeWords } from "./catalog";
 export function Sheet({
   name,
   answers,
+  of,
   asked,
   settled = true,
   children,
 }: {
   name: string;
   answers: string;
+  // What the figures cover, where that is not the scope. A read that takes a
+  // product and no branch or variant covers every build of the product, and a
+  // sheet printed under the full scope states a population its figures do not.
+  of?: string;
   // The parameters beyond the scope, where the report has controls of its
   // own. The controls themselves do not print, so a sheet whose figures cover
   // ninety days and does not say so is a sheet nobody can check.
@@ -38,6 +43,7 @@ export function Sheet({
   children: ReactNode;
 }) {
   const at = useScope();
+  const covers = of ?? scopeWords(at);
   const taken = minute(new Date().toISOString());
 
   return (
@@ -47,7 +53,7 @@ export function Sheet({
       <div className="screen-head noprint">
         <h2>{name}</h2>
         <p>
-          {scopeWords(at)} — {answers}
+          {covers} — {answers}
         </p>
         <span style={{ marginLeft: "auto" }} className="noprint">
           <Link className="linkish" to="/reports">
@@ -71,7 +77,7 @@ export function Sheet({
       <div className="printhead">
         <h1>OpenPSIRT — {name}</h1>
         <p>
-          {scopeWords(at)}
+          {covers}
           {asked ? ` · ${asked}` : ""} · taken {taken}
         </p>
       </div>
