@@ -18,7 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
-// Bounds on reading the CVE List's archive. The archive is fetched from
+// What reading the CVE List's archive is bounded by. The archive is fetched from
 // outside, so what it holds is bounded before it is read. What it keeps is
 // bounded by what a snapshot holds, so a fetch fails before it replaces a
 // snapshot with one no scan could read.
