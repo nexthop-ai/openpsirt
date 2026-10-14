@@ -27,7 +27,8 @@ import (
 // string somebody typed — and inventing the vocabulary first is guessing at
 // which states matter.
 
-// Tag is one word on one issue in one component of one product.
+// Tag is one word on one issue in one component of one product. A tag belongs
+// to the fold, so a word on a fold is one row per package of it.
 type Tag struct {
 	bun.BaseModel `bun:"table:finding_tag,alias:ft"`
 
@@ -53,6 +54,10 @@ func TagAs(tag string) string { return strings.ToLower(strings.TrimSpace(tag)) }
 // somebody who may only read a product should not be able to move work into or
 // out of somebody else's saved filter.
 //
+// A tag belongs to the fold, the unit a judgment covers and the finding screen
+// shows, so it is written on every component of the fold this product holds the
+// issue at. Each list row, which is one component, then carries it.
+//
 // Tagging what is already tagged is not a failure — the state asked for is the
 // state that holds — and the first spelling is kept, because a tag that
 // re-spelled itself on every use would make the list of what exists unstable.
@@ -63,86 +68,106 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 	if folded == "" {
 		return refusal.Errorf("a tag has to say something")
 	}
-	if err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
+	held, err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID)
+	if err != nil {
 		return err
 	}
-	row := &Tag{
-		ProductID: productID, VulnerabilityID: vulnerabilityID, ComponentID: componentID,
-		Tag: folded, Typed: strings.TrimSpace(typed),
-		AddedBy: subject.ID, AddedAt: s.now().UTC().Truncate(time.Microsecond),
-	}
-	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-		if on, err := s.tagged(ctx, productID, vulnerabilityID, componentID, folded); err == nil && on {
-			return nil
+	at := s.now().UTC().Truncate(time.Microsecond)
+	for _, component := range held {
+		row := &Tag{
+			ProductID: productID, VulnerabilityID: vulnerabilityID, ComponentID: component,
+			Tag: folded, Typed: strings.TrimSpace(typed),
+			AddedBy: subject.ID, AddedAt: at,
 		}
-		return fmt.Errorf("mark it: %w", err)
+		if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
+			if on, err := s.tagged(ctx, productID, vulnerabilityID, component, folded); err == nil && on {
+				continue
+			}
+			return fmt.Errorf("mark it: %w", err)
+		}
 	}
 	return nil
 }
 
-// Untag takes a word off. Taking one off that is not there is not a failure.
+// Untag takes a word off the fold. Taking one off that is not there is not a
+// failure.
 func (s *Store) Untag(ctx context.Context, subject access.Subject, productID,
 	vulnerabilityID, componentID int64, typed string) error {
 
-	if err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
+	if _, err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
+		return err
+	}
+	fold, err := InTheFold(ctx, s.db, componentID)
+	if err != nil {
 		return err
 	}
 	if _, err := s.db.NewDelete().Model((*Tag)(nil)).
 		Where("product_id = ?", productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
+		Where("component_id IN (?)", bun.List(fold)).
 		Where("tag = ?", TagAs(typed)).Exec(ctx); err != nil {
 		return fmt.Errorf("take the mark off: %w", err)
 	}
 	return nil
 }
 
-// mayMark refuses somebody who may not argue about this finding.
+// mayMark refuses somebody who may not argue about this finding, and answers
+// the components of its fold this product holds the issue at.
 //
-// A tag names one issue at one component, so it is asked of the finding
-// rather than of the product: triage at a visibility some finding of it in
-// this product carries. Somebody triaging undisclosed work alone does not mark
-// a disclosed finding because the same issue is undisclosed at another
-// component.
+// A tag names one issue in one fold, so it is asked of the finding rather than
+// of the product: triage at a visibility some finding of the fold in this
+// product carries. Somebody triaging undisclosed work alone does not mark a
+// disclosed finding because the same issue is undisclosed in another fold.
 func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
-	vulnerabilityID, componentID int64) error {
+	vulnerabilityID, componentID int64) ([]int64, error) {
 
 	refused := access.Denied(fmt.Sprintf("mark work in product %d", productID))
 	triaged := triagedIn(subject, productID)
 	if len(triaged) == 0 {
-		return refused
+		return nil, refused
 	}
-	there, err := s.db.NewSelect().Model((*Finding)(nil)).
-		Column("id").
-		Where(inThisProduct, productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
-		Where("visibility IN (?)", bun.List(triaged)).
-		Exists(ctx)
-	if err != nil {
-		return fmt.Errorf("read whether that finding may be marked: %w", err)
+	var held []int64
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr("f.component_id").
+		Where(inThisProductAs("f.target_id"), productID).
+		Where("f.vulnerability_id = ?", vulnerabilityID)
+	if err := InTheFoldOf(q, componentID).
+		GroupExpr("f.component_id").
+		Having("SUM(CASE WHEN f.visibility IN (?) THEN 1 ELSE 0 END) > 0", bun.List(triaged)).
+		OrderExpr("f.component_id").
+		Scan(ctx, &held); err != nil {
+		return nil, fmt.Errorf("read whether that finding may be marked: %w", err)
 	}
-	if !there {
-		return refused
+	if len(held) == 0 {
+		return nil, refused
 	}
-	return nil
+	return held, nil
 }
 
-// TagsOn is what is on one finding, as they were typed.
+// TagsOn is what is on one finding's fold, as first typed, one entry per word.
 func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 	componentID int64) ([]string, error) {
 
+	fold, err := InTheFold(ctx, s.db, componentID)
+	if err != nil {
+		return nil, err
+	}
 	var rows []Tag
 	if err := s.db.NewSelect().Model(&rows).
 		Where("product_id = ?", productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
-		Order("tag").Scan(ctx); err != nil {
+		Where("component_id IN (?)", bun.List(fold)).
+		Order("tag", "id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what it is marked with: %w", err)
 	}
 	out := make([]string, 0, len(rows))
+	seen := map[string]bool{}
 	for _, row := range rows {
-		out = append(out, row.Typed)
+		if !seen[row.Tag] {
+			seen[row.Tag] = true
+			out = append(out, row.Typed)
+		}
 	}
 	return out, nil
 }
@@ -218,8 +243,8 @@ type markKey struct{ Vulnerability, Component int64 }
 
 // tagsFor reads the words on a page of rows, in one statement.
 //
-// Keyed on the pair the list groups by rather than on a place: a tag is put on
-// one issue in one component, which is the row somebody is looking at.
+// Keyed on the pair the list groups by rather than on a place: a tag on a fold
+// is a row on each of its packages, so each row of the list carries its own.
 func (s *Store) tagsFor(ctx context.Context, productID int64,
 	rows []decorated) (map[markKey][]string, error) {
 

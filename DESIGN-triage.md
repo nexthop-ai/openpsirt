@@ -1516,7 +1516,8 @@ promoting one.
 | Rule | |
 |---|---|
 | What is in use is narrowed to findings the asker may read | A tag carries no visibility of its own, and free text typed while triaging an embargo says what the embargo is about: "waiting on the reporter" beside an undisclosed issue is the disclosure |
-| At the grain somebody looks at | One issue, in one component, in one product. Not per place — a kernel flaw at sixty places is one thing somebody is tagging — and not per build, because a tag is about the work rather than a release |
+| At the grain somebody looks at | One issue, in one fold, in one product: the unit a judgment covers and the finding screen shows. Not per place — a kernel flaw at sixty places is one thing somebody is tagging — and not per build, because a tag is about the work rather than a release |
+| Put on, read and taken off across the fold | Putting one on writes it on every package of the fold the product holds the issue at, so each row of the list carries it. The finding screen reads the words on any package of the fold, once each. Taking one off through any package takes it off them all |
 | Matched without regard to capitals and shown as it was typed | Showing the folded form back would read as the tool having rewritten what somebody wrote. Tagging what already carries the tag succeeds and keeps the first spelling |
 | Tagging is triage | A tag changes what a filtered list answers. Somebody who may only read sees the tags and is not offered the control, because a control offered and then refused teaches people to distrust the ones that work |
 | On the row, not only on the finding | The tags come back with each group, read for the whole page in one statement, and each is itself a filter |

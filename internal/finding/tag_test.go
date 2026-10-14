@@ -160,3 +160,57 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		}
 	})
 }
+
+// A tag belongs to the fold. Put on through one package of a source, it is read
+// through every package of it, each list row carries it, and taking it off
+// through any package takes it off them all.
+func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, tool := f.curlFold(t)
+		who := f.someoneElse(t, access.PublicTriage)
+		issue := f.issueID(t, "CVE-2026-CURL")
+		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
+
+		if err := f.store.TagIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
+			t.Fatal(err)
+		}
+		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(on) != 1 || on[0] != "Vendor" {
+			t.Errorf("read through the other package of the fold, the marks are %q", on)
+		}
+		rows, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		marked, ofTheFold := 0, 0
+		for _, row := range rows {
+			if row.Vulnerability != "CVE-2026-CURL" {
+				continue
+			}
+			ofTheFold++
+			if len(row.Tags) == 1 && row.Tags[0] == "Vendor" {
+				marked++
+			}
+		}
+		if ofTheFold == 0 || marked != ofTheFold {
+			t.Errorf("%d of %d rows of the fold carry the mark, want every one", marked, ofTheFold)
+		}
+
+		if err := f.store.Untag(ctx, who, f.productID, issue, viaLib, "vendor"); err != nil {
+			t.Fatal(err)
+		}
+		for _, component := range []int64{viaLib, viaTool} {
+			on, err := f.store.TagsOn(ctx, f.productID, issue, component)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(on) != 0 {
+				t.Errorf("taken off through one package, the fold is still marked %q", on)
+			}
+		}
+	})
+}
