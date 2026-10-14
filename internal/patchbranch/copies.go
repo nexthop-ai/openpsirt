@@ -92,6 +92,9 @@ func (c copies) prepare() error {
 func (c copies) ensure(ctx context.Context, g git, repository string) (string, error) {
 	dir := c.dirFor(repository)
 	if c.has(repository) {
+		if err := unlock(dir); err != nil {
+			return "", err
+		}
 		err := c.watched(ctx, dir, false, func(ctx context.Context) error {
 			return g.fetch(ctx, repository, dir)
 		})
@@ -127,6 +130,47 @@ func (c copies) ensure(ctx context.Context, g git, repository string) (string, e
 	}
 	c.touch(dir)
 	return dir, nil
+}
+
+// unlock removes the lock files a git stopped part way left in a copy.
+//
+// A git killed mid-write — the process killed, out of memory, or not stopping
+// within the delay after it was asked to — leaves the lock it held, and git
+// then refuses every later write of that kind: the copy is fetched into and
+// its graph rewritten on every visit, so the repository fails every day. Only
+// this pass writes into a copy, one visit at a time, so a lock found before a
+// visit begins is one nobody holds. Taken from where git keeps them: the
+// copy's own files, its references, and the commit graph.
+func unlock(dir string) error {
+	var stale []string
+	tops, err := filepath.Glob(filepath.Join(dir, "*.lock"))
+	if err != nil {
+		return fmt.Errorf("look for what a stopped git left: %w", err)
+	}
+	stale = append(stale, tops...)
+	for _, under := range []string{"refs", filepath.Join("objects", "info")} {
+		root := filepath.Join(dir, under)
+		err := filepath.WalkDir(root, func(at string, entry fs.DirEntry, err error) error {
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				return nil
+			case err != nil:
+				return err
+			case !entry.IsDir() && strings.HasSuffix(entry.Name(), ".lock"):
+				stale = append(stale, at)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("look for what a stopped git left: %w", err)
+		}
+	}
+	for _, at := range stale {
+		if err := os.Remove(at); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("remove what a stopped git left: %w", err)
+		}
+	}
+	return nil
 }
 
 // watched runs write, which adds to the copy at dir, measuring the copy as it

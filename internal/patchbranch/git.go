@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -144,8 +145,12 @@ func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, s
 	var stderr bytes.Buffer
 	command.Stdout = stdout
 	command.Stderr = &limited{buffer: &stderr, most: 4096}
-	// Where the program is killed at the deadline, the pipes it held are not
-	// waited on for ever by anything it started.
+	// Stopped with a request rather than killed, so git removes the lock files
+	// it holds as it goes; killed, it leaves them, and every later write into
+	// that copy is refused until somebody deletes them. One that does not
+	// stop within the delay is killed, and the pipes it held are not waited
+	// on for ever by anything it started.
+	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
 	command.WaitDelay = time.Minute
 	if err := background.Run(command); err != nil {
 		complaint := strings.TrimSpace(stderr.String())
