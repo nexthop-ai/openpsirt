@@ -105,8 +105,13 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           # A registry reference is lower case, and the repository's name need
-          # not be.
-          echo "image=ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          # not be. Every later reference to the image or the chart is one of
+          # these two. The signing identity keeps the repository's own case,
+          # because the certificate carries it.
+          image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          charts="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/charts"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "charts=$charts" >> "$GITHUB_OUTPUT"
           # Anything with a hyphen after the patch number is a prerelease:
           # 0.1.0-rc.1 is, 0.1.0 is not. A prerelease moves no alias and takes
           # no floating tag — it exists to be tried, not to be landed on by
@@ -172,9 +177,9 @@ jobs:
         id: chart
         env:
           VERSION: ${{ steps.release.outputs.version }}
+          CHARTS: ${{ steps.release.outputs.charts }}
         run: |
-          out=$(helm push "bin/dist/openpsirt-$VERSION.tgz" \
-            "oci://ghcr.io/$GITHUB_REPOSITORY_OWNER/charts" 2>&1)
+          out=$(helm push "bin/dist/openpsirt-$VERSION.tgz" "oci://$CHARTS" 2>&1)
           echo "$out"
           digest=$(printf '%s\n' "$out" | awk '/^Digest: /{print $2}')
           [ -n "$digest" ] || { echo "::error::helm push named no digest, so the chart cannot be signed"; exit 1; }
@@ -183,16 +188,16 @@ jobs:
       - name: Sign the image
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE: ${{ steps.release.outputs.image }}
         run: |
-          cosign sign --yes \
-            "ghcr.io/$GITHUB_REPOSITORY@$DIGEST"
+          cosign sign --yes "$IMAGE@$DIGEST"
 
       - name: Sign the chart
         env:
           DIGEST: ${{ steps.chart.outputs.digest }}
+          CHARTS: ${{ steps.release.outputs.charts }}
         run: |
-          cosign sign --yes \
-            "ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt@$DIGEST"
+          cosign sign --yes "$CHARTS/openpsirt@$DIGEST"
 
       # One signature over the checksum file rather than one per asset: the
       # file already covers every asset, so a verifier checks one signature
@@ -210,16 +215,18 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
           CHART_DIGEST: ${{ steps.chart.outputs.digest }}
+          IMAGE: ${{ steps.release.outputs.image }}
+          CHARTS: ${{ steps.release.outputs.charts }}
         run: |
           identity="^https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/"
           cosign verify \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp "$identity" \
-            "ghcr.io/$GITHUB_REPOSITORY@$IMAGE_DIGEST" > /dev/null
+            "$IMAGE@$IMAGE_DIGEST" > /dev/null
           cosign verify \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             --certificate-identity-regexp "$identity" \
-            "ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt@$CHART_DIGEST" > /dev/null
+            "$CHARTS/openpsirt@$CHART_DIGEST" > /dev/null
           echo "the image and the chart verify against this workflow's identity at $GITHUB_REF_NAME"
 
       # The same principle as the step above, for the signature that covers
@@ -238,7 +245,7 @@ jobs:
       - name: Attest the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-name: ghcr.io/${{ github.repository }}
+          subject-name: ${{ steps.release.outputs.image }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
 
@@ -252,6 +259,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.release.outputs.version }}
           IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE: ${{ steps.release.outputs.image }}
+          CHARTS: ${{ steps.release.outputs.charts }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
           LATEST: ${{ steps.release.outputs.latest }}
         run: |
@@ -260,7 +269,7 @@ jobs:
             echo "## Container image"
             echo
             echo '```'
-            echo "docker pull ghcr.io/$GITHUB_REPOSITORY:$version"
+            echo "docker pull $IMAGE:$version"
             echo '```'
             echo
             echo "Digest \`$IMAGE_DIGEST\`, signed with cosign against this workflow's identity."
@@ -268,7 +277,7 @@ jobs:
             echo "## Helm chart"
             echo
             echo '```'
-            echo "helm install openpsirt oci://ghcr.io/$GITHUB_REPOSITORY_OWNER/charts/openpsirt --version $version"
+            echo "helm install openpsirt oci://$CHARTS/openpsirt --version $version"
             echo '```'
             echo
             echo "## Everything else"

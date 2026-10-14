@@ -504,6 +504,7 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 |---|---|
 | Keyless signatures | cosign, against the workflow's own identity. No key to hold, rotate, or lose to whoever holds it next |
 | What is signed | The image, the chart in the registry, and the checksum file that covers every attached asset. The chart is signed where it is installed from, which is the registry copy rather than the archive |
+| Every registry reference is named once, in lower case | A registry reference is lower case and a repository's owner and name need not be. The image and chart addresses are computed in one step and every push, signature, verification, attestation and release note reads them; the signing identity keeps the repository's own case, because the certificate carries it |
 | Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
 | What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
 
