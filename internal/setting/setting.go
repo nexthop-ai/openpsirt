@@ -261,6 +261,15 @@ const (
 	// remedy for a compiled-in one short of a new binary, and the producer
 	// that is refused is a build.
 	QueueBacklog = "queue.backlog"
+	// UploadsAtOnce is how many uploads one server reads at the same time.
+	//
+	// An upload is written to the temporary directory as it arrives, before
+	// anything reads it, so the most that directory has to hold is this many
+	// times the largest request a route takes. Settable because how much
+	// scratch space a deployment has, and how many builds send at once, is a
+	// question about that deployment. A request past it is answered 503 and
+	// asked to send again.
+	UploadsAtOnce = "upload.max-concurrent"
 	// RoutingBatch is how many findings one pass of the routing sweep may
 	// place. A bulk judgment is bounded, and the bound is a setting: an
 	// operator on a large estate has a reason to move it either way, and
@@ -399,6 +408,13 @@ const DefaultWriteCeiling = 50000
 // shallow enough that a producer which has genuinely run away is refused
 // before the table is the problem.
 const DefaultQueueBacklog = 1000
+
+// DefaultUploadsAtOnce is how many uploads one server reads at once where
+// nobody has said.
+//
+// Four: room for several builds finishing together, and a bound on scratch
+// space of four of the largest requests a route takes.
+const DefaultUploadsAtOnce = 4
 
 // DefaultAttachmentMaxSize is what one file may be where nobody has said.
 //

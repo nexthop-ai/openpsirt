@@ -249,7 +249,10 @@ file, never both (REQ-83).
 
 Non-root, read-only root filesystem, every capability dropped, the default
 seccomp profile, and no service-account token mounted — this application never
-talks to the Kubernetes API. `/tmp` is an `emptyDir` with a size limit.
+talks to the Kubernetes API. `/tmp` is an `emptyDir` with a size limit, sized
+for the uploads one server reads at once: `upload.max-concurrent` of the
+largest request a route takes, four of 512 MiB at the shipped values, which the
+shipped 3 GiB holds with room for the rest of the process's scratch files.
 
 The pod's termination grace is twice the process's own shutdown grace: the
 process drains requests for that long and then waits the same again for a worker
