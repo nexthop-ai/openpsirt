@@ -38,7 +38,7 @@ func accessModels(t *testing.T) models {
 		if err != nil {
 			t.Fatal(err)
 		}
-		types = merged(types, typesIn(file))
+		types = merged(types, typesIn(file, scope{}))
 	}
 	return models{accessPath: types}
 }
@@ -177,6 +177,45 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			func f() { q.Join(perProduct[0]) }
 			func g() { q.Join(perProduct[0]).Join(estate[0]) }`,
 			map[string]string{"perProduct": "role_grant_all", "estate": "role_grant", "f": "role_grant_all"},
+		},
+		{
+			"an alias of the per-product model",
+			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
+			type row = access.Grant
+			func f() { var rows []row; db.NewSelect().Model(&rows).Scan(ctx) }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			// bun's way of extending a model with columns of its own.
+			"a struct embedding the per-product model",
+			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
+			type row struct {
+				access.Grant ` + "`bun:\",extend\"`" + `
+				Name string
+			}
+			func f() { var rows []row; db.NewSelect().Model(&rows).Scan(ctx) }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			"a type built from one built from the per-product model",
+			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
+			type outer struct{ *inner }
+			type inner = access.Grant
+			func f() { var rows []outer; db.NewSelect().Model(&rows).Scan(ctx) }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			// A query built from the struct does not select from the field's
+			// table.
+			"a struct holding the model in a named field",
+			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
+			type answer struct{ Held access.Grant }
+			func f() { var a answer; _ = a }`,
+			map[string]string{},
 		},
 		{
 			// A field of the same name on something else is not the model.

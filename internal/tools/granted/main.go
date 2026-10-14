@@ -23,9 +23,10 @@
 // A table is reached two ways, and both are read: by its name in a string, and
 // by the model a query is built from, since a model binds its table in a struct
 // tag and the query never spells it. A model is recognized by that tag, under
-// whatever name it is declared and whatever name its package is imported as. The rule is applied per function, because
-// a file holding one query of each kind names both tables while each query
-// names one.
+// whatever name it is declared and whatever name its package is imported as,
+// and so is a type built from one: an alias of it, or a struct embedding it.
+// The rule is applied per function, because a file holding one query of each
+// kind names both tables while each query names one.
 package main
 
 import (
@@ -144,7 +145,15 @@ func (r reach) missing() (string, bool) {
 
 // typesIn is the reach of every type a file declares, by name. Struct tags are
 // strings, so a model's `table:` tag is read the way any other string is.
-func typesIn(file *ast.File) map[string]reach {
+//
+// A type built from a model takes on its reach: an alias or a definition from
+// it, `type row = access.Grant`, and a struct embedding it, which is how bun
+// extends a model. Those names are resolved in scope, which is the file's
+// package's types and the types of what it imports, so a caller reaches a
+// fixed point by asking again with what this answered until nothing grows. A
+// named field holding a model is not a model, because a query built from the
+// struct does not select from the field's table.
+func typesIn(file *ast.File, in scope) map[string]reach {
 	types := map[string]reach{}
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
@@ -153,11 +162,46 @@ func typesIn(file *ast.File) map[string]reach {
 		}
 		for _, spec := range gen.Specs {
 			if typ, ok := spec.(*ast.TypeSpec); ok {
-				types[typ.Name.Name] = types[typ.Name.Name].or(reached(typ.Type, scope{}))
+				r := reached(typ.Type, scope{}).or(builtFrom(typ.Type, in))
+				types[typ.Name.Name] = types[typ.Name.Name].or(r)
 			}
 		}
 	}
 	return types
+}
+
+// builtFrom is the reach of the types a type expression is built from: the
+// type it names, and the types a struct embeds.
+func builtFrom(expr ast.Expr, in scope) reach {
+	switch e := expr.(type) {
+	case *ast.StarExpr:
+		return builtFrom(e.X, in)
+	case *ast.Ident:
+		return in.names[e.Name]
+	case *ast.SelectorExpr:
+		if pkg, ok := e.X.(*ast.Ident); ok {
+			return in.imports[pkg.Name][e.Sel.Name]
+		}
+	case *ast.StructType:
+		var r reach
+		for _, field := range e.Fields.List {
+			if len(field.Names) == 0 {
+				r = r.or(builtFrom(field.Type, in))
+			}
+		}
+		return r
+	}
+	return reach{}
+}
+
+// grown reports whether b reaches anything a does not.
+func grown(a, b map[string]reach) bool {
+	for name, r := range b {
+		if a[name].or(r) != a[name] {
+			return true
+		}
+	}
+	return false
 }
 
 // declared is the reach of every package-level constant and variable a file
@@ -251,9 +295,17 @@ func oneAlone(path string, src []byte, pkg map[string]reach, types models, packa
 		return nil, err
 	}
 	imports := imported(file, types, packages)
-	own := declared(file, scope{names: typesIn(file), imports: imports})
+	local := typesIn(file, scope{imports: imports})
+	for {
+		next := merged(local, typesIn(file, scope{names: local, imports: imports}))
+		if !grown(local, next) {
+			break
+		}
+		local = next
+	}
+	own := declared(file, scope{names: local, imports: imports})
 	if pkg == nil {
-		pkg = merged(own, typesIn(file))
+		pkg = merged(own, local)
 	}
 	in := scope{names: pkg, imports: imports}
 	found := map[string]string{}
@@ -276,7 +328,7 @@ func oneAlone(path string, src []byte, pkg map[string]reach, types models, packa
 
 // learn reads the whole tree, tests aside, for what `tree` holds. A file's
 // package-level names are judged with its own package's types and the types of
-// what it imports, so types are read in a pass of their own first.
+// what it imports, so types are read in passes of their own first.
 func learn(module string) (tree, error) {
 	t := tree{names: map[string]map[string]reach{}, types: models{}, packages: map[string]string{}}
 	files := map[string]*ast.File{}
@@ -291,11 +343,25 @@ func learn(module string) (tree, error) {
 		files[path] = file
 		importPath := module + "/" + filepath.ToSlash(filepath.Dir(path))
 		t.packages[importPath] = file.Name.Name
-		t.types[importPath] = merged(t.types[importPath], typesIn(file))
+		t.types[importPath] = merged(t.types[importPath], typesIn(file, scope{}))
 		return nil
 	})
 	if err != nil {
 		return t, err
+	}
+	// A type built from a model in another package needs that package's types
+	// first, in whatever order the walk read them, so the passes repeat until
+	// no type reaches anything new.
+	for changed := true; changed; {
+		changed = false
+		for path, file := range files {
+			importPath := module + "/" + filepath.ToSlash(filepath.Dir(path))
+			in := scope{names: t.types[importPath], imports: imported(file, t.types, t.packages)}
+			if next := typesIn(file, in); grown(t.types[importPath], next) {
+				t.types[importPath] = merged(t.types[importPath], next)
+				changed = true
+			}
+		}
 	}
 	for path, file := range files {
 		dir := filepath.Dir(path)
