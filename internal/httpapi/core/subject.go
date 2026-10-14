@@ -99,10 +99,10 @@ func ReadingTheDeployment(ctx context.Context) error {
 // instead: recording a person — an administrator, even — and creating a
 // pipeline key. Both outlive the token and neither is bounded by it, so the
 // narrow credential can always ask for a wide one. Unbinding somebody's
-// provider identifier is the third: whoever next arrives under their username
+// provider identifier is refused too: whoever next arrives under their username
 // is taken to be them, with every role they hold.
 //
-// Only these three. The rest of administration is reversible by another
+// Only these. The rest of administration is reversible by another
 // administrator and leaves the record every change here leaves; these are the
 // ones that hand out a new way in.
 func MintingCredentials(ctx context.Context) error {

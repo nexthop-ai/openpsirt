@@ -88,7 +88,7 @@ by a rule about acting lets none.
 
 | Rule | Reason |
 |---|---|
-| Creating a credential asks for a session (REQ-44) | A credential may not mint another. That held for a personal token issuing a token, and was got around by what an administrator's token could make instead: a person, an administrator even, and a pipeline key, both outliving the token and neither bounded by it. Recording a person, creating a key and unbinding a provider identifier are the three acts refused to a delegated subject. Unbinding is among them because whoever next arrives under the username is taken to be its holder |
+| Creating a credential asks for a session (REQ-44) | A credential may not mint another. That held for a personal token issuing a token, and was got around by what an administrator's token could make instead: a person, an administrator even, and a pipeline key, both outliving the token and neither bounded by it. Recording a person, creating a key and unbinding a provider identifier are the acts refused to a delegated subject. Unbinding is among them because whoever next arrives under the username is taken to be its holder |
 | Admin is a property of the person rather than a grant against a product | Modeling it as a grant means a row whose product is absent, and a uniqueness rule over a nullable column behaves differently on each of the four engines |
 | The `reporting` role is retired rather than defined | What such a role would gate is breadth of view, and statistics are what breadth looks like once aggregated. It gated nothing: one use outside tests, and a field in the session answer no screen read. A test asserts the refusal rather than its absence from a list |
 

@@ -4,7 +4,12 @@
 package triage
 
 import (
+	"database/sql"
+	"strings"
 	"testing"
+
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/sqlitedialect"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
@@ -27,6 +32,22 @@ func TestTheDeploymentReadsEverythingAndActsOnNothing(t *testing.T) {
 	} {
 		if unnarrowedMay(everything, rule) {
 			t.Errorf("the deployment may %s everything", name)
+		}
+	}
+}
+
+func TestTheDeploymentIsOfferedNothingToApproveOrDecide(t *testing.T) {
+	// The doors those rules guard: the queries that list what a subject may
+	// approve and what it may decide. Rendered rather than run, so the
+	// assertion is about the narrowing each one applies.
+	everything := access.Everything("a background pass")
+	db := bun.NewDB(&sql.DB{}, sqlitedialect.New())
+	for name, narrowed := range map[string]*bun.SelectQuery{
+		"approve": approvableBy(db.NewSelect().TableExpr(`"decision" AS "de"`), everything, "de"),
+		"decide":  onlyDecidable(db.NewSelect().TableExpr(`"finding" AS "f"`), everything),
+	} {
+		if rendered := narrowed.String(); !strings.Contains(rendered, "1 = 0") {
+			t.Errorf("the deployment is offered everything to %s: %s", name, rendered)
 		}
 	}
 }
