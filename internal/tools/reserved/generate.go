@@ -110,8 +110,18 @@ func wordsFrom(ctx context.Context, url, query string) ([]string, error) {
 	return words, rows.Err()
 }
 
-// writeGenerated renders the asked half of the list as Go.
+// writeGenerated writes the asked half of the list as Go.
 func writeGenerated(path string, words []string) error {
+	body, err := renderGenerated(words)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, body, 0o600)
+}
+
+// renderGenerated renders the asked half of the list as Go source, six words
+// to a line in the order given.
+func renderGenerated(words []string) ([]byte, error) {
 	var out strings.Builder
 	out.WriteString(`// Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -141,9 +151,9 @@ package main
 	out.WriteString("}\n")
 	body, err := format.Source([]byte(out.String()))
 	if err != nil {
-		return fmt.Errorf("format the generated list: %w", err)
+		return nil, fmt.Errorf("format the generated list: %w", err)
 	}
-	return os.WriteFile(path, body, 0o600)
+	return body, nil
 }
 
 // generate rewrites the asked half of the word list and reports what moved.

@@ -150,7 +150,7 @@ func q() {
 	if !ok {
 		t.Fatal("the fixture's first declaration is not a function")
 	}
-	pieces := assembled(fset, fn, map[int]bool{})
+	pieces := assembled(fn, map[token.Pos]bool{})
 	if got := pieces["where"]; !strings.Contains(got, "FROM finding") ||
 		!strings.Contains(got, "FROM component") {
 		t.Errorf("a variable built in two statements read as %q", got)
@@ -161,8 +161,12 @@ func q() {
 
 	// A piece already read where it was written is not read again, so one
 	// defect is reported once rather than at both lines.
-	written := fset.Position(fn.Body.List[0].Pos()).Line
-	if got := assembled(fset, fn, map[int]bool{written: true})["where"]; strings.Contains(got, "FROM finding") {
+	assign, ok := fn.Body.List[0].(*ast.AssignStmt)
+	if !ok {
+		t.Fatal("the fixture's first statement is not an assignment")
+	}
+	written := assign.Rhs[0].Pos()
+	if got := assembled(fn, map[token.Pos]bool{written: true})["where"]; strings.Contains(got, "FROM finding") {
 		t.Errorf("a statement already read was read again: %q", got)
 	}
 

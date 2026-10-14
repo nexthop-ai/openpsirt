@@ -55,7 +55,6 @@ import (
 	"go/token"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -193,12 +192,7 @@ func main() {
 	// that name.
 	schema := map[string]bool{}
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
-		if !strings.Contains(path, "database/migrate/migrations/") {
-			return nil
-		}
-		for _, match := range creating.FindAllStringSubmatch(string(body), -1) {
-			schema[strings.ToLower(match[1])] = true
-		}
+		tablesDeclared(path, body, schema)
 		return nil
 	})
 	if err != nil {
@@ -224,161 +218,7 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		// The data-definition half. Read from the string literals in a
-		// migration rather than from the file, because the prose beside them
-		// is full of the same words — and with the SQL comments inside those
-		// strings taken off first, for the same reason.
-		// The data-definition half reads the migrations and not their tests:
-		// every string in a migration is DDL, and a test beside them writes
-		// English about what it declared — "the index's table reads as" is a
-		// sentence, and read as a declaration it names a word two engines
-		// reserve.
-		definitions := strings.Contains(path, "database/migrate/migrations/") &&
-			!strings.HasSuffix(path, "_test.go")
-		// Every SQL literal, wherever it is written. A pass of its own, and
-		// first, so the walk below can tell whether a literal it reaches has
-		// already been read as a statement in its own right — a node is
-		// visited before its children, so one walk could not.
-		seen := map[int]bool{}
-		ast.Inspect(file, func(node ast.Node) bool {
-			lit, ok := node.(*ast.BasicLit)
-			if !ok || lit.Kind != token.STRING {
-				return true
-			}
-			text, err := strconv.Unquote(lit.Value)
-			if err != nil {
-				text = lit.Value
-			}
-			text = withoutSQLComments(text)
-			at := fset.Position(lit.Pos()).Line
-			// The table half reads every literal, because what admits one is
-			// this schema's own table names rather than a marker: a query
-			// whose tables are all bare carries no quoted table to be
-			// recognized by, and that is exactly the query nothing looked at.
-			if !definitions {
-				bad = append(bad, unquotedTables(text, schema, path, at)...)
-			}
-			// The alias half still needs the marker. An invented name is any
-			// bare word after AS, and "as" is a word in nearly every English
-			// sentence in this repository.
-			if !statement.MatchString(text) {
-				return true
-			}
-			seen[at] = true
-			for _, match := range invented.FindAllStringSubmatch(text, -1) {
-				bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
-			}
-			return true
-		})
-
-		ast.Inspect(file, func(node ast.Node) bool {
-			if definitions {
-				if lit, ok := node.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-					text, err := strconv.Unquote(lit.Value)
-					if err != nil {
-						return true
-					}
-					for _, match := range declared.FindAllStringSubmatch(withoutSQLComments(text), -1) {
-						word := strings.ToLower(match[1])
-						if reserved[word] && !clause[word] {
-							bad = append(bad, found{
-								word: word, file: path,
-								line: fset.Position(lit.Pos()).Line,
-							})
-						}
-					}
-				}
-			}
-			// The alias a model declares, which is written in a struct tag
-			// rather than passed to anything.
-			if field, ok := node.(*ast.Field); ok && field.Tag != nil {
-				for _, match := range aliased.FindAllStringSubmatch(field.Tag.Value, -1) {
-					word := strings.ToLower(match[1])
-					if reserved[word] {
-						bad = append(bad, found{
-							word: word, file: path,
-							line: fset.Position(field.Tag.Pos()).Line,
-						})
-					}
-				}
-				return true
-			}
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			named, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || !writing[named.Sel.Name] {
-				return true
-			}
-			for _, arg := range call.Args {
-				text, at, ok := literal(fset, arg)
-				if !ok {
-					continue
-				}
-				// A table expression may be the table and nothing else, which
-				// no pattern over the text alone can tell from a constant.
-				if naming[named.Sel.Name] && !definitions {
-					if match := alone.FindStringSubmatch(text); match != nil {
-						word := strings.ToLower(match[2])
-						if match[1] != `"` && schema[word] {
-							bad = append(bad, found{
-								word: word, file: path, line: at,
-								table: true, bare: true,
-							})
-						}
-					}
-				}
-				if seen[at] {
-					continue // already read as a statement in its own right
-				}
-				for _, match := range invented.FindAllStringSubmatch(text, -1) {
-					bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
-				}
-				if !definitions {
-					bad = append(bad, unquotedTables(text, schema, path, at)...)
-				}
-			}
-			return true
-		})
-		// A clause handed over as a variable rather than written at the call.
-		// literal() reads what it can see and returns nothing for the rest,
-		// so a fragment assembled a line earlier was skipped in silence —
-		// which is precisely the fragment nobody has read.
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Body == nil {
-				continue
-			}
-			pieces := assembled(fset, fn, seen)
-			ast.Inspect(fn.Body, func(node ast.Node) bool {
-				call, ok := node.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				method, ok := call.Fun.(*ast.SelectorExpr)
-				if !ok || !writing[method.Sel.Name] {
-					return true
-				}
-				for _, arg := range call.Args {
-					if _, _, readable := literal(fset, arg); readable {
-						continue // read at the call, above
-					}
-					text, ok := pieces[assembledFrom(arg)]
-					if !ok {
-						continue
-					}
-					at := fset.Position(arg.Pos()).Line
-					for _, match := range invented.FindAllStringSubmatch(text, -1) {
-						bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
-					}
-					if !definitions {
-						bad = append(bad, unquotedTables(text, schema, path, at)...)
-					}
-				}
-				return true
-			})
-		}
+		bad = append(bad, checkFile(fset, path, file, schema, reserved)...)
 		return nil
 	})
 	if err != nil {
@@ -393,13 +233,7 @@ func main() {
 			"%d tables)\n", len(reservedWords()), read, len(schema))
 		return
 	}
-	sort.Slice(bad, func(i, j int) bool {
-		if bad[i].file != bad[j].file {
-			return bad[i].file < bad[j].file
-		}
-		return bad[i].line < bad[j].line
-	})
-	for _, one := range bad {
+	for _, one := range ordered(bad) {
 		if one.table {
 			fmt.Fprintf(os.Stderr, "%s:%d: the table %q is named bare. "+
 				"Quote it: %q\n", one.file, one.line, one.word, one.word)
@@ -413,7 +247,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s:%d: %q is reserved by one of the four engines. "+
 			"Quote it, or call it something else\n", one.file, one.line, one.word)
 	}
-	fmt.Fprintf(os.Stderr, "\n%d name(s) an engine may refuse to parse.\n", len(bad))
+	fmt.Fprintf(os.Stderr, "\n%d name(s) an engine may refuse to parse.\n", len(ordered(bad)))
 	os.Exit(1)
 }
 
@@ -446,7 +280,7 @@ func assembledFrom(arg ast.Expr) string {
 //
 // Everything the statement pass has already read is left out, so a clause
 // written whole and then handed over as a variable is one defect and not two.
-func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[string]string {
+func assembled(fn *ast.FuncDecl, seen map[token.Pos]bool) map[string]string {
 	pieces := map[string]string{}
 	keep := func(name string, from ast.Expr) {
 		if name == "" || from == nil {
@@ -460,7 +294,7 @@ func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[str
 			// Already read where it is written, as a statement in its own
 			// right. Reading it again here would name one defect twice, at
 			// the line it was written and at the line it was handed over.
-			if seen[fset.Position(lit.Pos()).Line] {
+			if seen[lit.Pos()] {
 				return true
 			}
 			text, err := strconv.Unquote(lit.Value)
@@ -511,16 +345,31 @@ func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[str
 // without a list of keywords somebody typed and nothing refreshes.
 func unquotedTables(text string, schema map[string]bool, path string, line int) []found {
 	var bare []found
-	matches := named.FindAllStringSubmatch(text, -1)
-	if match := opening.FindStringSubmatch(text); match != nil {
+	for _, one := range bareTables(text, schema) {
+		bare = append(bare, found{word: one.word, file: path, line: line, table: true, bare: true})
+	}
+	return bare
+}
+
+// A bareTable is a table of this schema written bare, and the span of the
+// clause naming it.
+type bareTable struct {
+	word       string
+	start, end int
+}
+
+func bareTables(text string, schema map[string]bool) []bareTable {
+	var bare []bareTable
+	matches := named.FindAllStringSubmatchIndex(text, -1)
+	if match := opening.FindStringSubmatchIndex(text); match != nil {
 		matches = append(matches, match)
 	}
 	for _, match := range matches {
-		word := strings.ToLower(match[2])
-		if match[1] == `"` || !schema[word] {
+		word := strings.ToLower(text[match[4]:match[5]])
+		if text[match[2]:match[3]] == `"` || !schema[word] {
 			continue
 		}
-		bare = append(bare, found{word: word, file: path, line: line, table: true, bare: true})
+		bare = append(bare, bareTable{word: word, start: match[0], end: match[1]})
 	}
 	return bare
 }
@@ -547,31 +396,9 @@ func withoutSQLComments(text string) string {
 // are written as: a clause built from three pieces on three lines is one
 // string to the engine and has to be one string here.
 func literal(fset *token.FileSet, node ast.Expr) (string, int, bool) {
-	switch typed := node.(type) {
-	case *ast.BasicLit:
-		if typed.Kind != token.STRING {
-			return "", 0, false
-		}
-		text, err := strconv.Unquote(typed.Value)
-		if err != nil {
-			// A raw string with something Unquote will not take. The value
-			// itself is close enough to search.
-			text = typed.Value
-		}
-		return text, fset.Position(typed.Pos()).Line, true
-	case *ast.BinaryExpr:
-		if typed.Op != token.ADD {
-			return "", 0, false
-		}
-		left, at, leftOK := literal(fset, typed.X)
-		right, rightAt, rightOK := literal(fset, typed.Y)
-		if !leftOK && !rightOK {
-			return "", 0, false
-		}
-		if !leftOK {
-			return right, rightAt, true
-		}
-		return left + right, at, true
+	parts := piecesOf(fset, node)
+	if len(parts) == 0 {
+		return "", 0, false
 	}
-	return "", 0, false
+	return joined(parts), parts[0].line, true
 }
