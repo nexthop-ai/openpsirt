@@ -20,6 +20,7 @@ import (
 // more than one team that is somebody else's answer with their name on it.
 func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		var workedAs func(t *testing.T, who, query string) map[string]int
 		ctx := t.Context()
 		r.ScannedTwoIssues(t)
 
@@ -45,13 +46,17 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 
 		worked := func(t *testing.T, query string) map[string]int {
 			t.Helper()
+			return workedAs(t, "private-triage", query)
+		}
+		workedAs = func(t *testing.T, who, query string) map[string]int {
+			t.Helper()
 			var body struct {
 				Worked []struct {
 					Person   string `json:"person"`
 					Proposed int    `json:"proposed"`
 				} `json:"throughput"`
 			}
-			httpapitest.Read(t, r, "private-triage", "/v1/measures"+query, &body)
+			httpapitest.Read(t, r, who, "/v1/measures"+query, &body)
 			out := map[string]int{}
 			for _, one := range body.Worked {
 				out[one.Person] = one.Proposed
@@ -65,13 +70,20 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 			t.Fatalf("the deployment's own figures read %v", all)
 		}
 
-		// The team's own, which is one of the two.
-		theirs := worked(t, "?team=platform")
+		// The team's own, which is one of the two. Asked by an
+		// administrator, because the rows name who is on the team.
+		theirs := workedAs(t, "admin-reader", "?team=platform")
 		if theirs["triager"] != 1 {
 			t.Errorf("the team's member proposed %d in the team's figures", theirs["triager"])
 		}
 		if _, held := theirs["private-triage"]; held {
 			t.Errorf("somebody not on the team is in the team's figures: %v", theirs)
+		}
+
+		// Anybody else is given the team's totals and no row naming a
+		// member.
+		if named := worked(t, "?team=platform"); len(named) != 0 {
+			t.Errorf("somebody who is not an administrator learned the team's members: %v", named)
 		}
 
 		// A product the judgments were made in, and one nobody made any in.

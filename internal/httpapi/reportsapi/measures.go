@@ -38,7 +38,7 @@ type MeasuresBody struct {
 	Until    string       `json:"until"`
 	ToDecide []SpreadBody `json:"time_to_decide" doc:"The wait before anybody proposed anything, per severity"`
 	ToAgree  []SpreadBody `json:"time_to_agree" doc:"The wait for a second person, per severity"`
-	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first"`
+	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members"`
 	SentBack int          `json:"sent_back" doc:"Claims an approver asked more of in the window. Counted for the deployment rather than per person: the record holds that a claim was sent back and not by whom"`
 	Sampled  int          `json:"sampled" doc:"The number of observations behind the two spans"`
 	Capped   bool         `json:"capped,omitempty" doc:"The ceiling was reached, so the spans describe the most recent part of the window rather than all of it"`
@@ -81,7 +81,7 @@ func registerMeasures(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.Period
 		Product string `query:"product" doc:"Limit to judgments made in one product, by name"`
-		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name"`
+		Team    string `query:"team" doc:"Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows"`
 	}) (*struct{ Body MeasuresBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
@@ -104,6 +104,12 @@ func registerMeasures(api huma.API, in core.Deps) {
 			ToDecide: spreadBodies(got.ToDecide), ToAgree: spreadBodies(got.ToAgree),
 			SentBack: got.SentBack, Sampled: got.Sampled, Capped: got.Capped,
 			Worked: make([]WorkedBody, 0, len(got.Throughput)),
+		}
+		// Who is on a team is an administrator's to know. Per-person rows
+		// narrowed to a team name its members, so anybody else asking about
+		// a team is given its totals alone.
+		if input.Team != "" && core.Administrating(ctx) != nil {
+			got.Throughput = nil
 		}
 		for _, one := range got.Throughput {
 			body.Worked = append(body.Worked, WorkedBody{

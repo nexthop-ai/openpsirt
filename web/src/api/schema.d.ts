@@ -9769,7 +9769,7 @@ export interface components {
              */
             sent_back: number;
             since: string;
-            /** @description Each person's throughput, most first */
+            /** @description Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members */
             throughput: components["schemas"]["WorkedBody"][] | null;
             /** @description The wait for a second person, per severity */
             time_to_agree: components["schemas"]["SpreadBody"][] | null;
@@ -15387,7 +15387,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to judgments made in one product, by name */
                 product?: string;
-                /** @description Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name */
+                /** @description Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows */
                 team?: string;
             };
             header?: never;

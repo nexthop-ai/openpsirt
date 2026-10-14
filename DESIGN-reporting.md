@@ -408,6 +408,7 @@ had.
 | It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
 | A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A claim belongs to whoever argued it, which is the rule the record of judgments dates by — narrowed by the approver, a team's time to agree would be about claims its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
 | A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
+| Asked about a team, only an administrator is given the per-person rows | Rows narrowed to a team name its members, and membership is an administrator's to know (DESIGN-access § Teams). Anybody else is given the team's totals |
 
 ## Repeated deferrals
 

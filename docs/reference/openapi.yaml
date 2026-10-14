@@ -6513,7 +6513,7 @@ components:
         since:
           type: string
         throughput:
-          description: Each person's throughput, most first
+          description: Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members
           items:
             $ref: "#/components/schemas/WorkedBody"
           type:
@@ -16389,12 +16389,12 @@ paths:
           schema:
             description: Limit to judgments made in one product, by name
             type: string
-        - description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+        - description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
           explode: false
           in: query
           name: team
           schema:
-            description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name
+            description: Limit to judgments this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
             type: string
       responses:
         "200":
