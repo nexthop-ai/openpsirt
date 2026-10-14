@@ -85,6 +85,10 @@ DEMO_URL    := http://$(DEMO_HOST):$(DEMO_PORT)
 # configuration nobody deploys.
 DEV_HOST ?= localhost
 DEV_PORT ?= 5173
+# One member of DEMO_CAST, port:who:roles, read by part.
+cast-port = $(word 1,$(subst :, ,$(1)))
+cast-who = $(word 2,$(subst :, ,$(1)))
+
 # A port no member of DEMO_CAST publishes: the demo's proxy holds those, and a
 # dev API that cannot bind one would be reported up while its seeding reached
 # the demo instead.
@@ -291,7 +295,7 @@ demo-up: demo-down
 	@# the cast is configuration: adding somebody is adding a line to
 	@# DEMO_CAST, not editing this three times.
 	@: > $(DEMO_DIR)/proxy.conf
-	@for entry in $(DEMO_USER):80 $(foreach c,$(DEMO_CAST),$(word 2,$(subst :, ,$(c))):$(word 1,$(subst :, ,$(c)))); do \
+	@for entry in $(DEMO_USER):80 $(foreach c,$(DEMO_CAST),$(call cast-who,$(c)):$(call cast-port,$(c))); do \
 	    who=$${entry%%:*}; port=$${entry##*:}; \
 	    printf '%s\n' \
 	      'server {' \
@@ -318,7 +322,7 @@ demo-up: demo-down
 	@# The "|| true" is load-bearing: recipes run under "-eo pipefail", so a
 	@# grep that matches nothing — a free port, the good case — would otherwise
 	@# end the recipe right here, before a word of any of this is printed.
-	@for want in $(DEMO_PORT) $(foreach c,$(DEMO_CAST),$(word 1,$(subst :, ,$(c)))); do \
+	@for want in $(DEMO_PORT) $(foreach c,$(DEMO_CAST),$(call cast-port,$(c))); do \
 	  held=$$($(DOCKER) ps --format '{{.Names}} {{.Ports}}' | grep ":$$want->" | cut -d' ' -f1 || true); \
 	  if [ -n "$$held" ]; then \
 	    echo "  port $$want is already held by $$held."; \
@@ -328,7 +332,7 @@ demo-up: demo-down
 	done
 	@$(DOCKER) run -d --name openpsirt-demo-proxy --network $(DEMO_NET) \
 	  -p $(DEMO_PORT):80 \
-	  $(foreach c,$(DEMO_CAST),-p $(word 1,$(subst :, ,$(c))):$(word 1,$(subst :, ,$(c))) ) \
+	  $(foreach c,$(DEMO_CAST),-p $(call cast-port,$(c)):$(call cast-port,$(c)) ) \
 	  -v "$(DEMO_DIR)/proxy.conf:/etc/nginx/conf.d/default.conf:ro" \
 	  nginx:1.29-alpine >/dev/null
 	@# A container reported "Up" is not one that answers, the same trap the
@@ -371,28 +375,55 @@ seed-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(4
 	  "$(1)/v1/people"
 demo-grant = $(call seed-grant,$(DEMO_URL),,$(DEMO_URL),$(1))
 
+# Each "path|body" in $(4) posted to the API at $(1), with the headers in $(2)
+# and the origin $(3). Pass the specs as a variable: a body holds commas, which
+# would split a literal argument.
+seed-declare = for spec in $(4); do \
+	  path=$${spec%%|*}; body=$${spec\#*|}; \
+	  curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
+	    -X POST $(2) -H "Origin: $(3)" \
+	    -H 'Content-Type: application/json' -d "$$body" \
+	    "$(1)$$path"; \
+	done
+
+# This deployment declared as a product of its own: by the container demo, with
+# a released tag and both of the image's inventories, and by the local loop,
+# with the one inventory the binary has.
+demo-self-specs = \
+	'/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
+	'/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
+	'/v1/products/openpsirt/streams|{"name":"v1.0","kind":"tag","parent":"main"}' \
+	'/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}' \
+	'/v1/products/openpsirt/variants|{"name":"container","customer_facing":true}'
+dev-self-specs = \
+	'/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
+	'/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
+	'/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}'
+
+# The inventory $(4) uploaded to product $(5), stream $(6) and variant $(7),
+# through the API at $(1) with the headers in $(2) and the origin $(3).
+seed-upload = curl -sS --noproxy '*' -o /dev/null -w "  upload $(5)/$(6)/$(7) %{http_code}\n" \
+	  -X POST $(2) -H "Origin: $(3)" \
+	  -F "inventory=@$(4)" \
+	  "$(1)/v1/products/$(5)/streams/$(6)/variants/$(7)/scans"
+
 # Every build DEMO_BUILDS names: its product, branch and variant declared, the
 # grant on its product, and its inventory uploaded. The same arguments as
 # seed-grant, with $(4) the directory the inventories are written to.
 seed-builds = for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
 	  xz -dc "$$file" > "$(4)/$$product-$$stream-$$variant.cdx.json"; \
-	  for spec in \
-	    "/v1/products|{\"name\":\"$$product\",\"display_name\":\"$$display\"}" \
-	    "/v1/products/$$product/streams|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
-	    "/v1/products/$$product/variants|{\"name\":\"$$variant\",\"customer_facing\":true}"; do \
-	    path=$${spec%%|*}; body=$${spec\#*|}; \
-	    curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
-	      -X POST $(2) -H "Origin: $(3)" \
-	      -H 'Content-Type: application/json' -d "$$body" \
-	      "$(1)$$path"; \
-	  done; \
+	  $(call seed-declare,$(1),$(2),$(3),$(build-specs)); \
 	  $(call seed-grant,$(1),$(2),$(3),$$product); \
-	  curl -sS --noproxy '*' -o /dev/null -w "  upload $$product/$$stream/$$variant %{http_code}\n" \
-	    -X POST $(2) -H "Origin: $(3)" \
-	    -F "inventory=@$(4)/$$product-$$stream-$$variant.cdx.json" \
-	    "$(1)/v1/products/$$product/streams/$$stream/variants/$$variant/scans"; \
+	  $(call seed-upload,$(1),$(2),$(3),$(4)/$$product-$$stream-$$variant.cdx.json,$$product,$$stream,$$variant); \
 	done
+
+# What seed-builds declares for one build, read from the shell variables its
+# loop sets.
+build-specs = \
+	"/v1/products|{\"name\":\"$$product\",\"display_name\":\"$$display\"}" \
+	"/v1/products/$$product/streams|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
+	"/v1/products/$$product/variants|{\"name\":\"$$variant\",\"customer_facing\":true}"
 
 # Where each build's scan stands and how much is open in it: every build
 # DEMO_BUILDS names, and the product/stream/variant triples in $(3). The API is
@@ -428,34 +459,17 @@ demo-seed:
 	@# on itself, on the first screen they open.
 	@$(DOCKER) cp openpsirt-demo:/usr/share/openpsirt/openpsirt.cdx.json $(DEMO_DIR)/openpsirt-binary.cdx.json
 	@$(DOCKER) cp openpsirt-demo:/usr/share/openpsirt/image.cdx.json $(DEMO_DIR)/openpsirt-container.cdx.json
-	@for spec in \
-	  '/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
-	  '/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
-	  '/v1/products/openpsirt/streams|{"name":"v1.0","kind":"tag","parent":"main"}' \
-	  '/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}' \
-	  '/v1/products/openpsirt/variants|{"name":"container","customer_facing":true}'; do \
-	  path=$${spec%%|*}; body=$${spec#*|}; \
-	  curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
-	    -X POST -H "Origin: $(DEMO_URL)" \
-	    -H 'Content-Type: application/json' -d "$$body" \
-	    "$(DEMO_URL)$$path"; \
-	done
+	@$(call seed-declare,$(DEMO_URL),,$(DEMO_URL),$(demo-self-specs))
 	@$(call demo-grant,openpsirt)
 	@for variant in binary container; do \
-	  curl -sS --noproxy '*' -o /dev/null -w "  upload openpsirt/main/$$variant %{http_code}\n" \
-	    -X POST -H "Origin: $(DEMO_URL)" \
-	    -F "inventory=@$(DEMO_DIR)/openpsirt-$$variant.cdx.json" \
-	    "$(DEMO_URL)/v1/products/openpsirt/streams/main/variants/$$variant/scans"; \
+	  $(call seed-upload,$(DEMO_URL),,$(DEMO_URL),$(DEMO_DIR)/openpsirt-$$variant.cdx.json,openpsirt,main,$$variant); \
 	done
 	@# The tag as well, so there is something released to compare the branch
 	@# against. Release readiness is a branch beside the last release cut from
 	@# it, and a deployment with only branches cannot show it at all — which
 	@# is also true of the alert about a critical on something shipped.
 	@for variant in binary container; do \
-	  curl -sS --noproxy '*' -o /dev/null -w "  upload openpsirt/v1.0/$$variant %{http_code}\n" \
-	    -X POST -H "Origin: $(DEMO_URL)" \
-	    -F "inventory=@$(DEMO_DIR)/openpsirt-$$variant.cdx.json" \
-	    "$(DEMO_URL)/v1/products/openpsirt/streams/v1.0/variants/$$variant/scans"; \
+	  $(call seed-upload,$(DEMO_URL),,$(DEMO_URL),$(DEMO_DIR)/openpsirt-$$variant.cdx.json,openpsirt,v1.0,$$variant); \
 	done
 	@# The rest of the cast, with roles on every product just declared.
 	@#
@@ -574,8 +588,8 @@ demo-triage:
 	@product='$(word 2,$(first-build))'; \
 	stream='$(word 4,$(first-build))'; \
 	variant='$(word 5,$(first-build))'; \
-	proposer=$$(echo "$(word 1,$(DEMO_CAST))" | cut -d: -f1); \
-	approver=$$(echo "$(word 2,$(DEMO_CAST))" | cut -d: -f1); \
+	proposer='$(call cast-port,$(word 1,$(DEMO_CAST)))'; \
+	approver='$(call cast-port,$(word 2,$(DEMO_CAST)))'; \
 	at="http://$(DEMO_HOST):$$proposer"; \
 	agrees="http://$(DEMO_HOST):$$approver"; \
 	rows=$$(curl -sS --noproxy '*' \
@@ -615,7 +629,7 @@ demo-triage:
 	fi; \
 	curl -sS --noproxy '*' -o /dev/null -w "  team platform %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d '{"name":"platform","display_name":"Platform","members":["'"$$(echo "$(word 1,$(DEMO_CAST))" | cut -d: -f2)"'"]}' \
+	  -d '{"name":"platform","display_name":"Platform","members":["$(call cast-who,$(word 1,$(DEMO_CAST)))"]}' \
 	  "$(DEMO_URL)/v1/teams"; \
 	decided=$$(echo "$$rows" | awk -F'|' 'NR == 1 { print $$2 }'); \
 	one=$$(echo "$$rows" | awk -F'|' -v skip="$$decided" \
@@ -818,21 +832,9 @@ dev-seed:
 	@# image build reads with a cataloger this loop does not install. So an
 	@# advisory against one of those shows in the demo and not here.
 	@$(MAKE) --no-print-directory sbom >/dev/null
-	@for spec in \
-	  '/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
-	  '/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
-	  '/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}'; do \
-	  path=$${spec%%|*}; body=$${spec#*|}; \
-	  curl -sS --noproxy '*' -o /dev/null -w "  $$path %{http_code}\n" \
-	    -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
-	    -H 'Content-Type: application/json' -d "$$body" \
-	    "http://$(DEV_API)$$path"; \
-	done
+	@$(call seed-declare,http://$(DEV_API),-H "X-User: $(DEMO_USER)",$(DEV_URL),$(dev-self-specs))
 	@$(call dev-grant,openpsirt)
-	@curl -sS --noproxy '*' -o /dev/null -w "  upload %{http_code}\n" \
-	  -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
-	  -F "inventory=@bin/openpsirt.cdx.json" \
-	  "http://$(DEV_API)/v1/products/openpsirt/streams/main/variants/binary/scans"
+	@$(call seed-upload,http://$(DEV_API),-H "X-User: $(DEMO_USER)",$(DEV_URL),bin/openpsirt.cdx.json,openpsirt,main,binary)
 	@echo "  the scans run in the background; make dev-status shows when they land"
 
 dev-status:
