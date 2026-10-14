@@ -473,27 +473,6 @@ func TestDeeperNestingThanAllowedIsRefused(t *testing.T) {
 	}
 }
 
-func TestMoreEdgesThanAllowedAreRefused(t *testing.T) {
-	var b strings.Builder
-	b.WriteString(`{"bomFormat": "CycloneDX", "specVersion": "1.6",
-	 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1"}},
-	 "components": [{"bom-ref": "a", "name": "a", "version": "1"}],
-	 "dependencies": [{"ref": "root", "dependsOn": [`)
-	for i := range 40 {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		b.WriteString(`"a"`)
-	}
-	b.WriteString(`]}]}`)
-
-	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 10}); err == nil {
-		t.Fatal("a document past the dependency limit was accepted")
-	} else if !strings.Contains(err.Error(), "dependency limit") {
-		t.Errorf("refusal does not name the limit: %v", err)
-	}
-}
-
 func TestTheHeaderReadsWithoutTheContents(t *testing.T) {
 	// The fields an arriving scan is judged on — when it was built, what it
 	// is, and the identity that joins it to anything produced from it — is
@@ -588,25 +567,34 @@ func TestOneHugeDependencyListIsRefusedWhileItIsRead(t *testing.T) {
 	// already spent by the time the bound is consulted, which is the thing the
 	// bound exists to prevent. A single component can name as many
 	// dependencies as it likes.
-	var b strings.Builder
-	b.WriteString(`{"bomFormat": "CycloneDX", "specVersion": "1.6",
+	//
+	// The list breaks off into malformed text one entry past the bound. A
+	// reader charging each entry as it reads it refuses at the bound and never
+	// reaches the break; one collecting the list first reports the break.
+	list := func(entries int, tail string) string {
+		var b strings.Builder
+		b.WriteString(`{"bomFormat": "CycloneDX", "specVersion": "1.6",
 	 "metadata": {"component": {"bom-ref": "root", "name": "p", "version": "1"}},
 	 "components": [{"bom-ref": "a", "name": "a", "version": "1"}],
 	 "dependencies": [{"ref": "root", "dependsOn": [`)
-	for i := range 500 {
-		if i > 0 {
-			b.WriteString(",")
+		for i := range entries {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(`"a"`)
 		}
-		b.WriteString(`"a"`)
+		return b.String() + tail
 	}
-	b.WriteString(`]}]}`)
 
-	_, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 50})
+	if _, err := sbom.Read(strings.NewReader(list(50, `]}]}`)), sbom.Limits{MaxEdges: 50}); err != nil {
+		t.Fatalf("a list of exactly the limit was refused: %v", err)
+	}
+	_, err := sbom.Read(strings.NewReader(list(51, `, ]] not json`)), sbom.Limits{MaxEdges: 50})
 	if err == nil {
 		t.Fatal("a single dependency list past the limit was accepted")
 	}
 	if !strings.Contains(err.Error(), "dependency limit") {
-		t.Errorf("refusal does not name the limit: %v", err)
+		t.Errorf("the list was read past the limit before it was refused: %v", err)
 	}
 }
 
