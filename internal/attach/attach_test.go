@@ -564,6 +564,13 @@ func TestANameCannotBreakOutOfTheHeaderItIsWrittenInto(t *testing.T) {
 		"a\r\nb": "ab",
 		"\x00":   "attachment",
 		"..":     "attachment",
+		// Bidirectional overrides and isolates, a C1 control, and a
+		// zero-width format character.
+		"invoice\u202efdp.exe": "invoicefdp.exe",
+		"a\u2066b\u2069c":      "abc",
+		"a\u200fb":             "ab",
+		"a\u0085b":             "ab",
+		"a\u200bb":             "ab",
 	} {
 		if got := attach.SafeName(typed); got != want {
 			t.Errorf("%q is kept as %q, want %q", typed, got, want)

@@ -39,8 +39,8 @@ func Addressable(address string) error {
 // Autolinkable is Addressable for an address written *into* a document rather
 // than parsed out of one.
 //
-// A destination inside angle brackets ends at the first space or bracket,
-// so an address carrying either is not a link: it is the rest of the line
+// A destination inside angle brackets ends at the first space, control
+// character or bracket, so an address carrying any of them is not a link: it is the rest of the line
 // becoming content, and the lines after it becoming document. A scan file is
 // hostile input (REQ-66 and REQ-69) and a feed's address reaches a release
 // note and an issue document, both of which leave the building — so one
@@ -54,12 +54,12 @@ func Addressable(address string) error {
 // Addressable answers the other half, which is what a reader's machine would
 // do if they followed it.
 func Autolinkable(address string) error {
-	if strings.ContainsAny(address, " \t\r\n<>") {
+	if strings.IndexFunc(address, endsAutolink) >= 0 {
 		return Fault{
 			Offending: address,
-			Reason: "an address written into a document carries no spaces or angle " +
-				"brackets: inside <> it would end at the first of them and the rest " +
-				"of the line would become content",
+			Reason: "an address written into a document carries no spaces, control " +
+				"characters or angle brackets: inside <> it would end at the first of " +
+				"them and the rest of the line would become content",
 		}
 	}
 	switch target, _ := schemeOf(address); target.scheme {
@@ -71,4 +71,10 @@ func Autolinkable(address string) error {
 		}
 	}
 	return Addressable(address)
+}
+
+// endsAutolink reports whether a character ends an address inside angle
+// brackets: an ASCII control character, a space, or either bracket.
+func endsAutolink(r rune) bool {
+	return r <= ' ' || r == 0x7f || r == '<' || r == '>'
 }

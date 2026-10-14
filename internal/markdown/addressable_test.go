@@ -114,7 +114,13 @@ func TestTextPastTheBoundIsMatchableAsWhatItIs(t *testing.T) {
 
 func TestOnlyAnAbsoluteAddressIsWrittenInsideAngleBrackets(t *testing.T) {
 	// Inside <> anything but an absolute address is read as markup.
-	for _, address := range []string{"style", "script", "findings/1", "issue:CVE-2026-1", "ftp://example.com/x"} {
+	for _, address := range []string{"style", "script", "findings/1", "issue:CVE-2026-1", "ftp://example.com/x",
+		// A character that ends the address inside <> turns the rest into
+		// markdown: here a live link nobody chose to publish.
+		"https://a.example/\x0b[x](https://evil.example/p)", "https://a.example/\x01",
+		"https://a.example/\x7f", "https://a.example/ x", "https://a.example/\nx",
+		"https://a.example/>x", "https://a.example/\tx", "https://a.example/<x",
+	} {
 		if markdown.Autolinkable(address) == nil {
 			t.Errorf("%q is written into a document as <%s>", address, address)
 		}
