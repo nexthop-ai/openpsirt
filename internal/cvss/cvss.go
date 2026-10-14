@@ -53,6 +53,30 @@ func (s *Scored) Scheme() string {
 	return strings.TrimPrefix(named, "CVSS:")
 }
 
+// BaseVector is the base vector the given one contains: the scheme and its base
+// metrics in the order the specification writes them, with every other metric
+// left out.
+//
+// What a vector states outside the base set is accepted and not checked, so it
+// is not published as part of one: a consumer validating a vector against the
+// specification's grammar refuses a metric name or value it does not define.
+func (s *Scored) BaseVector() string {
+	parts := strings.Split(s.Vector, "/")
+	given, err := stated(parts[1:])
+	if err != nil {
+		return s.Vector
+	}
+	base := baseThree
+	if parts[0] == "CVSS:4.0" {
+		base = baseFour
+	}
+	written := []string{parts[0]}
+	for _, metric := range base {
+		written = append(written, metric+":"+given[metric])
+	}
+	return strings.Join(written, "/")
+}
+
 // The base metrics, and what each value weighs.
 //
 // Spelled as tables rather than as a switch so that the vector's grammar and

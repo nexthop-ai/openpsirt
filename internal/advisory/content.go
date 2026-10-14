@@ -279,7 +279,7 @@ func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []
 		return []Score{{
 			CVSSv3: &CVSSv3{
 				Version:      scored.Scheme(),
-				VectorString: scored.Vector,
+				VectorString: scored.BaseVector(),
 				BaseScore:    float64(scored.ScoreCenti) / 100,
 				BaseSeverity: strings.ToUpper(scored.Severity),
 			},

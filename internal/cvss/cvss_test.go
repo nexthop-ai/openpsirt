@@ -103,3 +103,21 @@ func TestTheVectorIsKeptAsGivenApartFromItsCase(t *testing.T) {
 		t.Errorf("the vector came back as %q", got.Vector)
 	}
 }
+
+// The base vector is the scheme and its base metrics in the specification's
+// order, whatever else the vector carried and in whatever order.
+func TestTheBaseVectorLeavesOutEveryOtherMetric(t *testing.T) {
+	for given, want := range map[string]string{
+		"CVSS:3.1/E:Q/C:H/AV:N/AC:L/PR:N/UI:N/S:U/I:H/A:H/FOO:BAR":            "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+		"CVSS:3.0/AV:L/AC:H/PR:L/UI:R/S:C/C:L/I:N/A:N":                        "CVSS:3.0/AV:L/AC:H/PR:L/UI:R/S:C/C:L/I:N/A:N",
+		"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:A": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
+	} {
+		scored, err := cvss.Score(given)
+		if err != nil {
+			t.Fatalf("%s: %v", given, err)
+		}
+		if got := scored.BaseVector(); got != want {
+			t.Errorf("%s gives the base vector %s, want %s", given, got, want)
+		}
+	}
+}
