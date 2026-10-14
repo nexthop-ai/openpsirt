@@ -7,13 +7,11 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -56,18 +54,12 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int
 	if len(scanIDs) == 0 {
 		return map[int64]Delta{}, nil
 	}
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
-	if err != nil {
+	// What a build shipped, rather than what is open against it: arithmetic
+	// over the document a build sent, in the same class as the component and
+	// placed counts a receipt already carries, and the pipeline that sent it
+	// is who asks.
+	if err := s.shipsTo(ctx, subject, targetID); err != nil {
 		return nil, err
-	}
-	// What a build shipped, rather than what is open against it. The
-	// visibility a finding carries narrows no part of this: the answer is
-	// arithmetic over the document a build sent, in the same class as the
-	// component and placed counts a receipt already carries, and the pipeline
-	// that sent it is who asks. So the question is whether this subject
-	// reaches the build at all.
-	if !subject.Sees(productID) {
-		return nil, access.Denied(fmt.Sprintf("read what product %d contains", productID))
 	}
 
 	wanted, err := s.comparable(ctx, targetID, scanIDs)
@@ -342,35 +334,10 @@ const (
 func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, scanID int64,
 	only ChangeKind, limit, offset int) ([]Change, int, error) {
 
-	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
-	if err != nil {
-		return nil, 0, err
-	}
 	// The rule the counts are answered under, for the reason they are: this is
-	// what a build sent rather than what is open against it, so what it asks
-	// is whether this subject reaches the build at all.
-	if !subject.Sees(productID) {
-		return nil, 0, access.Denied(fmt.Sprintf("read what product %d contains", productID))
-	}
-	// A key reads back what it sent and nothing more, the rule its receipts
-	// and retained documents are read under. Another sender's upload to the
-	// same build is refused as one it cannot reach.
-	if subject.Kind == access.Pipeline {
-		sent, err := s.db.NewSelect().
-			TableExpr(`"scan" AS "sc"`).
-			ColumnExpr("sc.id").
-			Where("sc.id = ?", scanID).
-			Where("sc.target_id = ?", targetID).
-			// The sender as ingest records it: a key by its identifier, so a
-			// person or another key sharing its name reads nothing here.
-			Where("sc.credential = ?", "key:"+strconv.FormatInt(subject.ID, 10)).
-			Exists(ctx)
-		if err != nil {
-			return nil, 0, fmt.Errorf("read who sent scan %d: %w", scanID, err)
-		}
-		if !sent {
-			return nil, 0, access.Denied(fmt.Sprintf("read what scan %d changed", scanID))
-		}
+	// what a build sent rather than what is open against it.
+	if err := s.shipsTo(ctx, subject, targetID); err != nil {
+		return nil, 0, err
 	}
 
 	wanted, err := s.comparable(ctx, targetID, []int64{scanID})

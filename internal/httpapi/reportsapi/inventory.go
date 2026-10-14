@@ -72,6 +72,14 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 			return nil, core.NoDatabase(in.Logger)
 		}
 
+		// What an upload changed is the product's to read, and a case grant
+		// reaches one issue rather than the product: somebody brought into a
+		// case is answered as a stranger is, before any name past the product
+		// is resolved.
+		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
+			return nil, err
+		}
+
 		// Resolved and authorized together, so a build somebody may not reach
 		// reads as one that was never declared.
 		names := catalog.NewStore(in.DB.DB)

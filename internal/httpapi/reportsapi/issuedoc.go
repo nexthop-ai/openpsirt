@@ -106,7 +106,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 	if total == 0 {
 		return unaffected(name), nil
 	}
-	known, err := issues.Describe(ctx, id)
+	known, err := issues.DescribeFor(ctx, subject, id)
 	if err != nil {
 		return "", core.WentWrong(in.Logger, "what this issue is could not be read", err)
 	}

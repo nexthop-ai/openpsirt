@@ -6,6 +6,7 @@ package finding_test
 import (
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -77,7 +78,7 @@ func TestEachGenerationAReportRatesAnIssueUnderIsKept(t *testing.T) {
 		}
 
 		// And the issue as a page reads it carries them, newest first.
-		described, err := issues.Describe(ctx, id)
+		described, err := issues.DescribeFor(ctx, access.Everything("a test"), id)
 		if err != nil {
 			t.Fatal(err)
 		}

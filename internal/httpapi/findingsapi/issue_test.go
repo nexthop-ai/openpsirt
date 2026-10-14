@@ -265,6 +265,58 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 	})
 }
 
+func TestAnIssueIsNotDescribedInTheWordsOfAFlawItsReaderMayNotRead(t *testing.T) {
+	// A flaw recorded here writes its summary as the issue's description and
+	// its minted name among the issue's names. Where that record is
+	// undisclosed to the reader, both are left out, whatever else of the
+	// issue they may see.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedWithEvidence(t)
+		var issue struct {
+			ID int64 `bun:"id"`
+		}
+		if err := r.DB.DB.NewSelect().TableExpr(`"vulnerability"`).Column("id").
+			Where("identifier = ?", "CVE-2026-9999").Scan(ctx, &issue); err != nil {
+			t.Fatal(err)
+		}
+		const summary = "The management socket answers before anyone has authenticated."
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"vulnerability"`).
+			Set("description = ?", summary).Where("id = ?", issue.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// The record of it, undisclosed, beside the scanned finding.
+		var scanned finding.Finding
+		if err := r.DB.DB.NewSelect().Model(&scanned).
+			Where("f.vulnerability_id = ?", issue.ID).Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		recorded := scanned
+		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
+		recorded.PlaceIdentity = "recorded-" + scanned.PlaceIdentity
+		if _, err := r.DB.DB.NewInsert().Model(&recorded).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		var said struct {
+			Description string `json:"description"`
+			Total       int    `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999", &said)
+		if said.Total == 0 {
+			t.Fatal("the reader of the disclosed finding is told of nothing")
+		}
+		if said.Description != "" {
+			t.Errorf("a reader of disclosed work was told the undisclosed record's words: %q",
+				said.Description)
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/issues/CVE-2026-9999", &said)
+		if said.Description != summary {
+			t.Errorf("a reader of both halves was told %q", said.Description)
+		}
+	})
+}
+
 func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 	// "Nothing of yours is affected" is the answer an inquiry is usually
 	// asking for, which is why it is a document rather than a refusal — and

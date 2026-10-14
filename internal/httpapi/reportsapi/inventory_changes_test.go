@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -102,10 +103,10 @@ func TestAnUploadSaysWhichNamesItMoved(t *testing.T) {
 	})
 }
 
-func TestAKeyReadsWhatOnlyItsOwnUploadsChanged(t *testing.T) {
-	// A key reads back what it sent and nothing more, which is the rule the
-	// receipts and the retained documents apply. Another key sending to the
-	// same build is told the upload is not there.
+func TestAKeyReadsWhatAnyUploadToItsBuildChanged(t *testing.T) {
+	// A key reads what was filed on a build it may upload to, whichever key
+	// sent it, which is the rule the receipts and the retained documents
+	// apply. A key pinned to another build of the product reads none of it.
 	httpapitest.EachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
 		scanID := twoUploads(t, f,
 			map[string]string{"libc6": "2.41"},
@@ -115,13 +116,28 @@ func TestAKeyReadsWhatOnlyItsOwnUploadsChanged(t *testing.T) {
 		if code, _ := moved(t, f, f.Key, at); code != http.StatusOK {
 			t.Fatalf("the key that sent it read what it changed with %d", code)
 		}
-		_, secret, err := access.NewStore(f.DB.DB).NewKey(t.Context(), "somebody-else",
+		rights := access.NewStore(f.DB.DB)
+		_, secret, err := rights.NewKey(t.Context(), "somebody-else",
 			access.Scope{ProductID: httpapitest.ProductHere(t, f)})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if code, out := moved(t, f, secret, at); code != http.StatusNotFound {
-			t.Errorf("another key read what somebody else's upload changed with %d: %+v",
+		if code, out := moved(t, f, secret, at); code != http.StatusOK || len(out.Body.Items) == 0 {
+			t.Errorf("another key on the build read what an upload to it changed with %d: %+v",
+				code, out.Body.Items)
+		}
+		other, err := catalog.NewStore(f.DB.DB).DeclareVariant(t.Context(),
+			httpapitest.ProductHere(t, f), "elsewhere", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, pinned, err := rights.NewKey(t.Context(), "pinned-elsewhere",
+			access.Scope{ProductID: httpapitest.ProductHere(t, f), VariantID: &other.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if code, out := moved(t, f, pinned, at); code != http.StatusForbidden {
+			t.Errorf("a key pinned to another build read what an upload here changed with %d: %+v",
 				code, out.Body.Items)
 		}
 	})

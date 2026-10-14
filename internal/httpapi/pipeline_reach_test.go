@@ -12,8 +12,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// A pipeline's key reads back what it sent and nothing else, on every read
-// this deployment serves. The reads are taken from the registered operations
+// A pipeline's key reads back what was filed on a build it may upload to and
+// nothing else, on every read this deployment serves. The reads are taken from the registered operations
 // rather than a list, so a route added later is held to the rule the day it
 // is added.
 //
@@ -25,14 +25,14 @@ import (
 // then answer a key 404, the answer for a name it may not see, where they
 // refused it.
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
-	// What a sender may read, and what each answers here: its receipts, what
-	// one upload changed, and a document it sent. The fixture's scan was not
-	// sent by the key, so what it changed and its document are not the key's
-	// to read.
+	// What a sender may read, and what each answers here: the build's
+	// receipts, what one upload changed, and a document it kept. The
+	// fixture's scan is the first the build had, so it changed nothing, and
+	// it kept no document by that name.
 	const build = "/v1/products/{product}/streams/{stream}/variants/{variant}"
 	sent := map[string]int{
 		build + "/scans":                             http.StatusOK,
-		build + "/scans/{scan}/changes":              http.StatusNotFound,
+		build + "/scans/{scan}/changes":              http.StatusOK,
 		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
 	}
 	parameter := regexp.MustCompile(`\{[^}]+\}`)

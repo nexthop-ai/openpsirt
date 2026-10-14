@@ -180,3 +180,29 @@ func TestTwoBuildsAreComparedOnlyForSomebodyWhoSeesThem(t *testing.T) {
 		}
 	})
 }
+
+func TestAKeyReadsWhatOnlyTheBuildsItMaySendToShipped(t *testing.T) {
+	// What a build shipped is read by a key for a build it may upload to, the
+	// rule its receipts are read under. A key pinned to one variant compares
+	// no build of another.
+	each(t, func(t *testing.T, f *fixture) {
+		appliedTo(t, f, f.targetID, holding(openssl))
+		tagged := taggedBuild(t, f)
+		appliedTo(t, f, tagged, holding(openssl))
+
+		product := *f.scope.ProductID
+		branch := f.world.Branch.ID
+		sendsHere := access.NewPipeline(7, "nightly", access.Scope{
+			ProductID: product, StreamID: &branch, VariantID: f.scope.VariantID,
+		})
+		if _, _, err := f.store.Between(t.Context(), sendsHere, f.targetID, f.targetID, "", 0, 0); err != nil {
+			t.Errorf("a key compared the build it sends to with itself and was refused: %v", err)
+		}
+		if _, _, err := f.store.Between(t.Context(), sendsHere, f.targetID, tagged, "", 0, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a key pinned to one build compared another: %v", err)
+		}
+		if _, err := f.store.Deltas(t.Context(), sendsHere, tagged, []int64{1}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a key pinned to one build read what an upload to another changed: %v", err)
+		}
+	})
+}

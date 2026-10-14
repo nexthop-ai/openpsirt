@@ -8222,7 +8222,7 @@ export interface components {
             told?: components["schemas"]["NoticeBody"][] | null;
             /**
              * Format: int64
-             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
+             * @description Decisions you may read that this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
              */
             undone?: number;
             /** @description The issue this is about */
@@ -10089,7 +10089,7 @@ export interface components {
             undisclosed: boolean;
             /**
              * Format: int64
-             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
+             * @description Decisions you may read that this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
              */
             undone?: number;
             /** @description The issue this is about */

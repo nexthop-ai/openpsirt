@@ -4,7 +4,9 @@
 package triage
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/uptrace/bun"
@@ -301,6 +303,54 @@ func unnarrowedMay(subject access.Subject,
 	allowed func(access.Subject, int64, access.Visibility) bool) bool {
 
 	return allowed(subject, 0, access.Public) && allowed(subject, 0, access.Private)
+}
+
+// partlyHidden is which of these claims hold a row this subject may not read.
+//
+// A claim is one argument over every place it was made at, and its reasoning
+// is written about all of them. A list showing the rows a reader may read
+// leaves that reasoning off a claim they may read only part of: shown half,
+// they would read words whose other half is about a finding they may not see,
+// which is the rule claimRows holds for a claim read by its identifier.
+func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
+	claims []int64) (map[int64]bool, error) {
+
+	hidden := map[int64]bool{}
+	if len(claims) == 0 {
+		return hidden, nil
+	}
+	out, args := notReadableWhere(subject, "dn")
+	var ids []int64
+	if err := s.db.NewSelect().TableExpr(`"decision" AS "dn"`).
+		ColumnExpr("DISTINCT dn.claim_id").
+		Where("dn.claim_id IN (?)", bun.List(claims)).
+		Where(out, args...).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which claims reach past what you may read: %w", err)
+	}
+	for _, id := range ids {
+		hidden[id] = true
+	}
+	return hidden, nil
+}
+
+// notReadableWhere is the condition a decision row meets where the subject may
+// not read it, cases included — the complement of readableBy.
+func notReadableWhere(subject access.Subject, column string) (string, []any) {
+	if subject.Kind != access.Person {
+		return "1 = 1", nil
+	}
+	products, all := subject.Products()
+	if all {
+		return "1 = 0", nil
+	}
+	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
+		return readable(subject, id, v)
+	})
+	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
+	where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
+	// Neither column is ever null, so negating it is exact.
+	return "NOT (" + where + ")", args
 }
 
 // notApprovableWhere is the condition a decision row meets where the subject

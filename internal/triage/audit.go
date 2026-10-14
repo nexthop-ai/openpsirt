@@ -242,6 +242,9 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 	if err != nil {
 		return nil, 0, err
 	}
+	if err := s.withholdPartReasoning(ctx, subject, decisions, reasoning); err != nil {
+		return nil, 0, err
+	}
 	proposers := make([]int64, 0, len(decisions))
 	for _, decision := range decisions {
 		proposers = append(proposers, decision.ProposedBy)
@@ -269,6 +272,23 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		out = append(out, row)
 	}
 	return out, total, nil
+}
+
+// withholdPartReasoning drops the reasoning of each decision whose claim holds a
+// row this subject may not read.
+func (s *Store) withholdPartReasoning(ctx context.Context, subject access.Subject,
+	decisions []Decision, reasoning map[int64]string) error {
+
+	hidden, err := s.partlyHidden(ctx, subject, claimsOf(decisions))
+	if err != nil {
+		return err
+	}
+	for _, decision := range decisions {
+		if hidden[decision.ClaimID] {
+			delete(reasoning, decision.ID)
+		}
+	}
+	return nil
 }
 
 // agreedAndNamed reads every agreement on these claims and the sign-in

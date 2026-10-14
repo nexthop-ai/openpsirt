@@ -130,7 +130,7 @@ func registerIssue(api huma.API, in core.Deps) {
 			// said about it is said to somebody who can see it somewhere.
 			return out, nil
 		}
-		known, err := issues.Describe(ctx, id)
+		known, err := issues.DescribeFor(ctx, subject, id)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what this issue is could not be read", err)
 		}

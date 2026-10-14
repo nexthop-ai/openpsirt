@@ -211,6 +211,13 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 	if err != nil {
 		return nil, 0, err
 	}
+	hidden, err := s.partlyHidden(ctx, subject, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+	for id := range hidden {
+		delete(reasoning, id)
+	}
 	representatives := make([]Decision, 0, len(sizes))
 	for _, size := range sizes {
 		representatives = append(representatives, Decision{ID: size.Earliest})

@@ -233,6 +233,9 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	if err != nil {
 		return nil, err
 	}
+	if err := s.withholdPartReasoning(ctx, subject, rows, reasoning); err != nil {
+		return nil, err
+	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
 		Where("claim_id IN (?)", bun.List(claimsOf(rows))).
@@ -349,6 +352,9 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	if err != nil {
 		return nil, err
 	}
+	if err := s.withholdPartReasoning(ctx, subject, heads, reasoning); err != nil {
+		return nil, err
+	}
 
 	out := make([]Similar, 0, len(order))
 	for _, id := range order {
@@ -441,6 +447,9 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	}
 	reasoning, err := s.currentReasoning(ctx, picked)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.withholdPartReasoning(ctx, subject, picked, reasoning); err != nil {
 		return nil, err
 	}
 

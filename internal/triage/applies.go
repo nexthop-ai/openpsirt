@@ -201,6 +201,9 @@ func (s *Store) Read(ctx context.Context, subject access.Subject, decisionID int
 	if err != nil {
 		return nil, "", err
 	}
+	if err := s.withholdPartReasoning(ctx, subject, []Decision{*decision}, reasoning); err != nil {
+		return nil, "", err
+	}
 	return decision, reasoning[decision.ID], nil
 }
 
@@ -353,6 +356,9 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 	// nobody reads before acting on.
 	reasoning, err := s.currentReasoning(ctx, decisions)
 	if err != nil {
+		return nil, nil, 0, err
+	}
+	if err := s.withholdPartReasoning(ctx, subject, decisions, reasoning); err != nil {
 		return nil, nil, 0, err
 	}
 	return decisions, reasoning, total, nil

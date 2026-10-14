@@ -36,7 +36,8 @@ func TestTheRecordListsAClaimOnceHoweverManyPlacesItCovers(t *testing.T) {
 	// One argument by one person across several places is one entry, counted
 	// once in the total, and the entry says how much it covers. Only the rows
 	// the reader may see are counted: a claim with an undisclosed row reads to
-	// somebody holding public reading alone as the rows they may read.
+	// somebody holding public reading alone as the rows they may read, without
+	// the reasoning written about all of them.
 	each(t, func(t *testing.T, f *fixture) {
 		in := f.build(t, f.product, "for-the-record")
 		libfoo := f.component(t, "libfoo", "1.2.3")
@@ -76,11 +77,40 @@ func TestTheRecordListsAClaimOnceHoweverManyPlacesItCovers(t *testing.T) {
 		if got.Components != 2 {
 			t.Errorf("a public reader is told of %d components, want libfoo and libbar alone", got.Components)
 		}
-		if got.Component != "libfoo" || got.Issue == "" || got.Reasoning == "" || got.ProposedByName == "" {
+		if got.Component != "libfoo" || got.Issue == "" || got.ProposedByName == "" {
 			t.Errorf("the entry does not say what it was about, or who argued it: %+v", got)
+		}
+		// The reasoning is about every place the claim was made at, the
+		// undisclosed one included, so a reader of part of it is not shown it.
+		if got.Reasoning != "" {
+			t.Errorf("a public reader was shown the reasoning of a claim reaching an undisclosed place: %q",
+				got.Reasoning)
 		}
 		if got.State() != string(triage.Proposed) || got.Standing != 0 {
 			t.Errorf("a claim waiting for agreement reads %q with %d standing", got.State(), got.Standing)
+		}
+
+		// The per-decision record and the list of decisions hold to the same.
+		judged, _, err := f.store.Audit(t.Context(), f.reviewer, triage.Filter{},
+			time.Time{}, time.Time{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listed, reasoning, _, err := f.store.List(t.Context(), f.reviewer, triage.Filter{}, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range judged {
+			if row.Decision.ClaimID == bulk.ClaimID && row.Reasoning != "" {
+				t.Errorf("the record shows decision %d the reasoning of a claim reaching an undisclosed place",
+					row.Decision.ID)
+			}
+		}
+		for _, row := range listed {
+			if row.ClaimID == bulk.ClaimID && reasoning[row.ID] != "" {
+				t.Errorf("the list shows decision %d the reasoning of a claim reaching an undisclosed place",
+					row.ID)
+			}
 		}
 
 		// Its proposer reads every row, the undisclosed one included.
@@ -89,6 +119,9 @@ func TestTheRecordListsAClaimOnceHoweverManyPlacesItCovers(t *testing.T) {
 			if row.Claim.ID == bulk.ClaimID && (row.Decisions != 4 || row.Components != 4) {
 				t.Errorf("a reader of both visibilities is told of %d decisions and %d components, want 4 and 4",
 					row.Decisions, row.Components)
+			}
+			if row.Reasoning == "" {
+				t.Errorf("a reader of every row of claim %d is not shown its reasoning", row.Claim.ID)
 			}
 		}
 

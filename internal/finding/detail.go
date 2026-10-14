@@ -789,7 +789,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// One name for the whole finding, and empty where the places disagree: the
 	// assignment is set for a group at once, so a disagreement is a state
 	// nobody chose and naming one of them would hide it.
-	held, err := s.heldBy(ctx, targetID, vulnerabilityID, componentID)
+	held, err := s.heldBy(ctx, targetID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +797,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	// And which standing rule put it there, where one did. Read here rather
 	// than left to a caller for the same reason the holder is: the screen
 	// somebody reads a finding on is where "why is this mine" gets asked.
-	placed, err := s.routedBy(ctx, targetID, vulnerabilityID, componentID)
+	placed, err := s.routedBy(ctx, targetID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +817,11 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 // Over the fold, which is the unit the rows beside it use and the unit a
 // judgment covers. Over one component it answered about a third of what the
 // screen was showing.
-func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, componentID int64) (string, error) {
+//
+// Over the places the reader may read, which are the rows beside it: a holder
+// read off a place they may not read names who is working undisclosed work.
+func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, componentID int64,
+	visible []access.Visibility) (string, error) {
 	var holders []struct {
 		Identity *string `bun:"identity"`
 	}
@@ -831,6 +835,7 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("p.identity"), componentID).
 		Scan(ctx, &holders)
 	if err != nil {
@@ -851,8 +856,10 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 // routing places findings one at a time — so asked about one component this
 // reported no rule where a rule had placed part of the fold, and the whole
 // thing where the name given happened to be the part it placed.
+//
+// Over the places the reader may read, for the reason the holder is.
 func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
-	componentID int64) (string, error) {
+	componentID int64, visible []access.Visibility) (string, error) {
 
 	var named []struct {
 		Name *string `bun:"name"`
@@ -864,6 +871,7 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 		Where("f.target_id = ?", targetID).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
+		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("rr.name"), componentID).
 		Scan(ctx, &named)
 	if err != nil {

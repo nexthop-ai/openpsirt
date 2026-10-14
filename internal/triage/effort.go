@@ -75,6 +75,15 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 
 	// The joins, the narrowing and the grouping on their own, so the page and
 	// the count ask the same question.
+	// The findings a component name is read off are the ones in the
+	// judgment's own product that this reader may read: a place is a pair of
+	// names with no product in it, so it matches the same pair in every
+	// product, and a name read off a finding the reader may not read is the
+	// disclosure.
+	readableHere, readableArgs := readableFindingsOn(subject, "pf", "de.product_id")
+	if readableHere == "" {
+		readableHere = "1 = 1"
+	}
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(finding.Decisions).
@@ -98,7 +107,11 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision table however many builds share the place it names.
 			Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = dv.issue_id
-			AND pf.place_identity = de.place_identity`).
+			AND pf.place_identity = de.place_identity
+			AND pf.target_id IN (SELECT "et"."id" FROM "target" AS "et"
+				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
+				WHERE "es"."product_id" = de.product_id)
+			AND `+readableHere, readableArgs...).
 			Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
 			Where("de.proposed_at < ?", until).
 			GroupExpr(`de.product_id, COALESCE(pc.name, '')`)

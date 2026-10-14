@@ -1205,7 +1205,9 @@ would be a reply about something that has not happened yet.
 
 The finding says which rule placed it, on the same card that says who is dealing
 with it, along with what somebody needs to know next: taking it is picking up
-work nobody holds, and the rule will not take it back.
+work nobody holds, and the rule will not take it back. Both are read off the
+places the reader may read, the places the card shows: read off one they may
+not, the holder names who is working undisclosed work.
 
 ## Catalog and inventories
 
