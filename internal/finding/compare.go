@@ -534,13 +534,15 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		Outcome       string `bun:"outcome"`
 		Justification string `bun:"justification"`
 	}
+	inForce, held := InForce()
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		// The decision at this place, in this product, at the versions the
-		// place holds now — the same match the counts above are made with.
+		// The decision at this place, in this product, in force at the
+		// versions the place holds now — the same match the agreed count above
+		// is made with, so a place counted as agreed contributes its outcome.
 		//
 		// The match is a condition of the query rather than of the join,
 		// because it asks the claim what outcome it is and the claim hangs off
@@ -549,7 +551,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// MariaDB refuse. Both joins are inner, so the two are the same
 		// question asked in the one place every engine agrees on.
 		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
-			AND de.state = ? AND de.live_key IS NOT NULL`, productID, "approved").
+			AND `+inForce+` AND de.live_key IS NOT NULL`, append([]any{productID}, held...)...).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Where(KeyMatches).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
