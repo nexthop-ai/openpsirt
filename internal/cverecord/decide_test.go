@@ -185,31 +185,41 @@ func TestADefaultStatusAloneNeverNarrows(t *testing.T) {
 }
 
 func TestADistributionsLineIsNeverReadAgainstAnUpstreamRelease(t *testing.T) {
-	// A distribution's build of 2.12 with the fix backported. Read as an
-	// upstream version it says 2.14 is past the fix; the upstream entry says
-	// 2.14 is affected.
-	record := cverecord.Record{ID: "CVE-2025-61662", Affected: []cverecord.Entry{
-		{Vendor: "GNU", Product: "grub2", CollectionURL: "https://git.savannah.gnu.org/git/grub.git",
-			DefaultStatus: "unaffected", Versions: []cverecord.Line{
-				{Version: "0", LessThanOrEqual: "2.14", Status: "affected"},
-			}},
-		{Vendor: "Red Hat", Product: "Red Hat Enterprise Linux 10", PackageName: "grub2",
-			CPEs: []string{"cpe:/o:redhat:enterprise_linux:10.1"}, DefaultStatus: "affected",
-			Versions: []cverecord.Line{
-				{Version: "1:2.12-29.el10_1.2", LessThan: "*", Status: "unaffected", VersionType: "rpm"},
-			}},
-		{Vendor: "Red Hat", Product: "A product writing its builds as releases",
-			CPEs: []string{"cpe:/o:redhat:enterprise_linux:10.1"}, DefaultStatus: "affected",
-			Versions: []cverecord.Line{
-				{Version: "2.12", LessThanOrEqual: "2.*", Status: "unaffected", VersionType: "semver"},
-			}},
-	}}
+	// A distribution's build of 2.12 with the fix backported, written as a
+	// line in release numbers. Read as an upstream version it says 2.14 is
+	// past the fix. Each entry carries upstream's own CPE, so each reaches the
+	// tie, and only who wrote it keeps the line off an upstream release.
+	upstreamCPE := "cpe:2.3:a:gnu:grub2:*:*:*:*:*:*:*:*"
+	backported := []cverecord.Line{
+		{Version: "2.12", LessThanOrEqual: "2.*", Status: "unaffected", VersionType: "semver"},
+	}
 	grub := graph.Described{
 		Name: "grub", Version: "2.14", Purl: "pkg:generic/grub@2.14",
 		CPE: "cpe:2.3:a:gnu:grub2:2.14:*:*:*:*:*:*:*",
 	}
-	if snapshotOf(t, record).Decide([]string{"CVE-2025-61662"}, grub).Narrows() {
-		t.Error("a distribution's statement about its own build narrowed an upstream release")
+	for _, each := range []struct {
+		why     string
+		entry   cverecord.Entry
+		narrows bool
+	}{
+		{"upstream's own entry, which is what a tie is for",
+			cverecord.Entry{Vendor: "GNU", Product: "grub2", CPEs: []string{upstreamCPE},
+				DefaultStatus: "affected", Versions: backported}, true},
+		{"an entry naming nobody, as one assigned on a project's behalf does",
+			cverecord.Entry{Vendor: "n/a", Product: "n/a", CPEs: []string{upstreamCPE},
+				DefaultStatus: "affected", Versions: backported}, true},
+		{"a distribution's entry naming itself and its release",
+			cverecord.Entry{Vendor: "Red Hat", Product: "Red Hat Enterprise Linux 10", PackageName: "grub2",
+				CPEs: []string{upstreamCPE}, DefaultStatus: "affected", Versions: backported}, false},
+		{"a distribution's entry naming the package, with the release it was built for",
+			cverecord.Entry{Vendor: "Example Distribution", Product: "grub2",
+				CPEs:          []string{upstreamCPE, "cpe:/o:exampledistribution:linux:10"},
+				DefaultStatus: "affected", Versions: backported}, false},
+	} {
+		record := cverecord.Record{ID: "CVE-2025-61662", Affected: []cverecord.Entry{each.entry}}
+		if got := snapshotOf(t, record).Decide([]string{"CVE-2025-61662"}, grub).Narrows(); got != each.narrows {
+			t.Errorf("%s: narrows is %v, want %v", each.why, got, each.narrows)
+		}
 	}
 }
 

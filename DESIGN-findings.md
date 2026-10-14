@@ -1200,6 +1200,18 @@ it is tied to it, and in no other case.
 | The entry's package identifier names the component's type, namespace and name | The same |
 | The entry carries neither, and its vendor and product are a name this knows | The components that name is listed for |
 | A distribution's or a vendor's package, by its own CPE or identifier | Nothing. Those describe the distribution's build, and its lines are in the distribution's numbering |
+| A distribution's or a vendor's entry, by upstream's CPE it carries | Nothing (REQ-31). The entry describes that writer's build, and its lines are in that build's numbering whatever CPE it carries |
+
+| An entry is another's statement where | |
+|---|---|
+| It names neither the vendor nor the product of the CPE, letters and digits compared without regard to case | A distribution's entry names itself and its release: vendor `Red Hat`, product `Red Hat Enterprise Linux 10`, carrying `gnu:grub2` |
+| It carries an operating-system CPE of another vendor | A distribution's entry names the release it was built for |
+| It names nobody, vendor and product both empty or `n/a` | Never. A record assigned on a project's behalf is written that way, and is the project's |
+
+Measured against the CVE List of 2026-10-14: of 163,913 entries carrying a
+CPE, the two signs refuse the tie for four, two of them with a line in release
+numbers. Neither is a kernel entry, so the ONIE and SONiC figures above do not
+move.
 
 | Known name | Components |
 |---|---|

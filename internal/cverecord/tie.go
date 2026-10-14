@@ -5,6 +5,7 @@ package cverecord
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -22,13 +23,18 @@ import (
 // describe the distribution's build, and an entry they match is the
 // distribution's statement about that build, whose version lines are in the
 // distribution's numbering rather than upstream's.
+//
+// The same holds from the entry's side. An entry a distribution or another
+// vendor wrote about its own build may carry upstream's CPE, and its lines are
+// still in that build's numbering, so a CPE ties only an entry that speaks as
+// its publisher (see upstreams).
 func tied(entry Entry, component graph.Described) bool {
 	parts := graph.PartsOfPurl(component.Purl)
 	if !Distribution(parts.Type) {
 		if vendor, product, ok := cpeProduct(component.CPE); ok {
 			for _, stated := range entry.CPEs {
 				v, p, ok := cpeProduct(stated)
-				if ok && v == vendor && p == product {
+				if ok && v == vendor && p == product && upstreams(entry, v, p) {
 					return true
 				}
 			}
@@ -46,6 +52,47 @@ func tied(entry Entry, component graph.Described) bool {
 		}
 	}
 	return false
+}
+
+// upstreams reports whether an entry speaks as the publisher a CPE it carries
+// names, rather than as a distribution or vendor describing its own build.
+//
+// Two signs mark another's statement. The entry names neither the CPE's
+// vendor nor its product, the way a distribution's entry names itself and its
+// release; and the entry carries a platform CPE of another vendor, the way a
+// distribution's entry names the release it was built for. An entry naming
+// nobody at all, as a record assigned on a project's behalf often does, is
+// read as the project's.
+func upstreams(entry Entry, vendor, product string) bool {
+	named, called := folded(entry.Vendor), folded(entry.Product)
+	if named != "" || called != "" {
+		if !strings.Contains(named, folded(vendor)) && !strings.Contains(called, folded(product)) {
+			return false
+		}
+	}
+	for _, stated := range entry.CPEs {
+		part, v, _, ok := cpeParts(stated)
+		if ok && part == "o" && v != vendor {
+			return false
+		}
+	}
+	return true
+}
+
+// folded is a name with everything but its letters and digits taken out, in
+// lower case: "Red Hat" and "redhat" are one vendor. A name written "n/a" is
+// no name.
+func folded(name string) string {
+	var out strings.Builder
+	for _, r := range strings.ToLower(name) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			out.WriteRune(r)
+		}
+	}
+	if out.String() == "na" {
+		return ""
+	}
+	return out.String()
 }
 
 // name ties entries that carry no CPE and no package identifier to the
@@ -119,6 +166,13 @@ func (n name) covers(component graph.Described, parts graph.Parts) bool {
 // A backslash escapes the character after it in the formatted form, so it is
 // dropped before comparing: "linux\-image" and "linux-image" are one name.
 func cpeProduct(cpe string) (vendor, product string, ok bool) {
+	_, vendor, product, ok = cpeParts(cpe)
+	return vendor, product, ok
+}
+
+// cpeParts is the part, the vendor and the product a CPE names, folded: "a"
+// for an application, "o" for an operating system, "h" for hardware.
+func cpeParts(cpe string) (part, vendor, product string, ok bool) {
 	cpe = strings.TrimSpace(cpe)
 	var fields []string
 	switch {
@@ -127,16 +181,17 @@ func cpeProduct(cpe string) (vendor, product string, ok bool) {
 	case strings.HasPrefix(cpe, "cpe:/"):
 		fields = strings.Split(strings.TrimPrefix(cpe, "cpe:/"), ":")
 	default:
-		return "", "", false
+		return "", "", "", false
 	}
 	if len(fields) < 3 {
-		return "", "", false
+		return "", "", "", false
 	}
+	part = strings.ToLower(fields[0])
 	vendor, product = strings.ToLower(fields[1]), strings.ToLower(fields[2])
 	if vendor == "" || product == "" || vendor == "*" || product == "*" {
-		return "", "", false
+		return "", "", "", false
 	}
-	return vendor, product, true
+	return part, vendor, product, true
 }
 
 // splitFormatted splits a formatted CPE on the colons that are not escaped,
