@@ -532,3 +532,18 @@ func TestADecisionUndisclosedSinceIsNotReaffirmedBySomebodyWhoMayNotArgueIt(t *t
 		}
 	})
 }
+
+func TestOnlyAPersonIsAnsweredAboutWhatTheyMustRevisit(t *testing.T) {
+	// A key reaches neither list. "Here is nothing" and "you cannot ask" are
+	// different statements, and a key is told the second.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		key := access.NewPipeline(9, "nightly", access.Scope{ProductID: f.product})
+		if _, _, err := f.store.ToReaffirm(ctx, key, f.product, 50, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a key read what is its to re-affirm: %v", err)
+		}
+		if _, _, err := f.store.RepeatsPage(ctx, key, f.product, 0, 50, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a key read which deferrals repeat: %v", err)
+		}
+	})
+}
