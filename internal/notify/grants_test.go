@@ -326,3 +326,37 @@ func TestATeamQueueReachesEachMemberAtTheVisibilityTheyRead(t *testing.T) {
 		}
 	})
 }
+
+// One issue in one component is one piece of work in a queue, however its
+// places differ in visibility, and the queue is undisclosed where any of them
+// is.
+func TestAnIssueAtPlacesOfBothVisibilitiesIsOnePieceOfQueuedWork(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		s := aSplit(t, w)
+		privateReader := s.person(t, "private-reader", access.PrivateRead)
+		publicReader := s.person(t, "public-reader", access.PublicRead)
+		admin := s.person(t, "admin")
+		queue, err := s.rights.DeclareTeam(ctx, "Kernel", "Kernel")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, who := range []int64{privateReader, publicReader} {
+			if _, err := s.rights.AddToTeam(ctx, queue.ID, who, admin); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.queued(t, queue, access.Public)
+		s.queued(t, queue, access.Private)
+		sweep(t, db)
+
+		told := openFor(t, db, privateReader, notify.QueueUntaken)
+		if len(told) != 1 || len(saying(told, "1 piece of work")) != 1 {
+			t.Errorf("one issue in one component was told as %q, want 1 piece of work", told)
+		}
+		if told := openFor(t, db, publicReader, notify.QueueUntaken); len(told) != 0 {
+			t.Errorf("a member reading only disclosed work was told of a queue holding undisclosed work: %q", told)
+		}
+	})
+}

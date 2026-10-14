@@ -240,7 +240,9 @@ findings list.
 
 The queue is counted per team and product; the others per claim. A claim is one
 person's action and one thing to read, however many rows it wrote. A queue is a
-population: one routing rule places thousands of findings in a sweep.
+population: one routing rule places thousands of findings in a sweep. Within it
+the unit is an issue in a component, whatever its places' visibility, and the
+condition is undisclosed where any of those places is.
 
 ## Reports that must come back empty
 

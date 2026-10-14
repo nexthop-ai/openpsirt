@@ -403,9 +403,11 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	}
 	// One row per issue in a component, which is the unit every other list
 	// of work counts in: one flaw in a kernel is one thing to deal with
-	// and dozens of finding rows.
+	// and dozens of finding rows. Grouped rather than distinct over the
+	// visibility, which would make one issue at an undisclosed place and a
+	// disclosed one two pieces of work; the group is undisclosed where any of
+	// its rows is.
 	work := w.db.NewSelect().
-		Distinct().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
@@ -418,7 +420,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`st.product_id AS "product_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(access.PrivateCountAs("f.visibility", "private_rows")).
 		Where("f.closed_at IS NULL").
 		Where("f.assigned_at IS NOT NULL").
 		Where("f.assigned_at <= ?", since).
@@ -429,7 +431,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			ColumnExpr("1").
 			Where(finding.DecisionAt("st.product_id")).
 			Where("de.live_key IS NOT NULL").
-			Where(finding.KeyMatches))
+			Where(finding.KeyMatches)).
+		GroupExpr("tm.id, tm.display_name, tm.name, st.product_id, f.vulnerability_id, f.component_id")
 
 	err = w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
@@ -441,7 +444,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`q.product_id AS "product_id"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
-		ColumnExpr(access.PrivateCountAs("q.visibility", "private_rows")).
+		ColumnExpr(`MAX(q.private_rows) AS "private_rows"`).
 		Join(`JOIN "product" AS "p" ON p.id = q.product_id`).
 		GroupExpr("q.team_id, q.product_id").
 		Scan(ctx, &rows)
