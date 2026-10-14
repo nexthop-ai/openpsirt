@@ -64,3 +64,65 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 		}
 	})
 }
+
+// A second claim promising a bump of the same package for another build
+// leaves the first claim's commitment where it is: only the claim that made
+// a commitment withdraws it. The same promise stated again by a second claim
+// is accepted and changes nothing.
+func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		component, err := f.graph.ComponentAs(ctx, f.target, "libnl-3-200", graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherBranch(t, "release-2")
+		who := f.planner(t, access.PublicTriage)
+		commit := func(to string, claim int64, builds ...int64) error {
+			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
+				to, nil, &claim, builds, nil)
+			return err
+		}
+		owner := func(target int64) *int64 {
+			var rows []finding.Upgrade
+			if err := f.db.DB.NewSelect().Model(&rows).
+				Where("target_id = ?", target).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			return rows[0].ClaimID
+		}
+
+		const first, second = int64(101), int64(202)
+		if err := commit("3.9.0", first, f.target); err != nil {
+			t.Fatalf("the first commitment: %v", err)
+		}
+		if err := commit("3.9.0", second, other); err != nil {
+			t.Fatalf("the second claim's commitment: %v", err)
+		}
+		if got := owner(f.target); got == nil || *got != first {
+			t.Errorf("the first claim's commitment is now held by %v, want claim %d", got, first)
+		}
+		if got := owner(other); got == nil || *got != second {
+			t.Errorf("the second build's commitment is held by %v, want claim %d", got, second)
+		}
+
+		if err := commit("3.9.0", second, f.target, other); err != nil {
+			t.Errorf("the same promise stated again by a second claim: %v", err)
+		}
+		if got := owner(f.target); got == nil || *got != first {
+			t.Errorf("restating the promise moved the commitment to %v, want claim %d", got, first)
+		}
+
+		// The claim that made a commitment still withdraws it by narrowing.
+		if err := commit("3.9.0", second, f.target); err != nil {
+			t.Fatal(err)
+		}
+		if got := owner(other); got != nil {
+			t.Errorf("the second claim narrowed its builds and its commitment is held by %v", got)
+		}
+	})
+}

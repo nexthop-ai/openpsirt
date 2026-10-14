@@ -77,12 +77,20 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	declared := 0
-	// Everything that is no longer wanted goes. Withdrawing a commitment is not
-	// a different kind of act from making one, and making it one produces two
-	// paths that drift.
+	// Everything this claim no longer wants goes. Withdrawing a commitment is
+	// not a different kind of act from making one, and making it one produces
+	// two paths that drift. A commitment another claim argued for is that
+	// claim's to move, so it is kept: its decisions still stand on it.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
 		Where("fold_key = ?", fold).
 		Where(inThisProduct, productID)
+	if claimID != nil {
+		remove = remove.WhereGroup(" AND ", func(q *bun.DeleteQuery) *bun.DeleteQuery {
+			return q.Where("claim_id IS NULL").WhereOr("claim_id = ?", *claimID)
+		})
+	} else {
+		remove = remove.Where("claim_id IS NULL")
+	}
 	if len(wanted) > 0 {
 		remove = remove.Where("target_id NOT IN (?)", bun.List(wanted))
 	}
@@ -330,6 +338,8 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is already committed: %w", err)
 	}
+	// The same promise stated again is accepted and changes nothing, whoever
+	// states it. The commitment stays with the claim that made it.
 	if standing.ToVersion == to && sameDate(standing.CommittedTo, by) {
 		return nil
 	}
