@@ -424,7 +424,7 @@ func TestASupplierWithdrawnMidPassStopsBeingRead(t *testing.T) {
 		// reads back.
 		fetch := fetching(t, f, p)
 		fetch.Pause = time.Millisecond
-		if err := store.Retire(ctx, f.by, f.product, "example linux"); err != nil {
+		if _, err := store.Retire(ctx, f.by, f.product, "example linux"); err != nil {
 			t.Fatal(err)
 		}
 		took, err := fetch.From(ctx, f.by, source)
@@ -485,7 +485,7 @@ func TestASupplierIsMatchedWithoutRegardToCapitals(t *testing.T) {
 		if _, err := store.Add(ctx, f.by, f.product, "suse", described); err == nil {
 			t.Error("the same supplier was taken on twice under two spellings")
 		}
-		if err := store.Retire(ctx, f.by, f.product, "SuSE"); err != nil {
+		if _, err := store.Retire(ctx, f.by, f.product, "SuSE"); err != nil {
 			t.Errorf("withdrawing it by another spelling: %v", err)
 		}
 		// And the spelling somebody typed is what comes back.

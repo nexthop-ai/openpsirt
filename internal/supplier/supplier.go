@@ -356,32 +356,56 @@ func (s *Store) productInUse(ctx context.Context, productID int64) (bool, error)
 // somebody may have granted an approval on the strength of, and withdrawing the
 // address we read them from does not make them unsaid.
 func (s *Store) Retire(ctx context.Context, subject access.Subject, productID int64,
-	name string) error {
+	name string) (*Source, error) {
 
 	if err := administering(subject, "configure which suppliers are fetched from"); err != nil {
-		return err
+		return nil, err
 	}
-	res, err := s.db.NewUpdate().Model((*Source)(nil)).
-		Set("retired_at = ?", s.now().UTC().Truncate(time.Microsecond)).
-		Where("product_id = ?", productID).
-		Where("name = ?", matching(name)).
-		Where("retired_at IS NULL").Exec(ctx)
+	// The row is answered so the caller names it as it is stored, whatever
+	// capitals the request carried.
+	var retired *Source
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		retired = nil
+		row := new(Source)
+		err := tx.NewSelect().Model(row).
+			Where("product_id = ?", productID).
+			Where("name = ?", matching(name)).
+			Where("retired_at IS NULL").
+			Limit(1).Scan(ctx)
+		// A source believed retired that was not goes on fetching, which is a
+		// request leaving this deployment that somebody thought they had
+		// stopped.
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("no supplier is fetched from under the name %q: %w",
+				name, access.ErrNothingMatched)
+		}
+		if err != nil {
+			return fmt.Errorf("stop fetching from that supplier: %w", err)
+		}
+		at := s.now().UTC().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Source)(nil)).
+			Set("retired_at = ?", at).
+			Where("id = ?", row.ID).
+			Where("retired_at IS NULL").Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("stop fetching from that supplier: %w", err)
+		}
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("stop fetching from that supplier: %w", err)
+		}
+		if n == 0 {
+			return fmt.Errorf("no supplier is fetched from under the name %q: %w",
+				name, access.ErrNothingMatched)
+		}
+		row.RetiredAt = &at
+		retired = row
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("stop fetching from that supplier: %w", err)
+		return nil, err
 	}
-	// A source believed retired that was not goes on fetching, which is a
-	// request leaving this deployment that somebody thought they had stopped.
-	// Answered as success, the only thing that would say otherwise is reading
-	// the list back.
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("stop fetching from that supplier: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("no supplier is fetched from under the name %q: %w",
-			name, access.ErrNothingMatched)
-	}
-	return nil
+	return retired, nil
 }
 
 // Reached records what one attempt at a supplier found.

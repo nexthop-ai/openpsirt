@@ -66,7 +66,7 @@ func TestASupplierIsConfiguredListedAndWithdrawn(t *testing.T) {
 			t.Fatalf("the product reads as configured with %+v", rows)
 		}
 
-		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+		if _, err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
 			t.Fatal(err)
 		}
 		rows, err = store.For(ctx, f.admin, f.product)
@@ -104,7 +104,7 @@ func TestAWithdrawnSupplierTakenUpAgainResumesWhereItStopped(t *testing.T) {
 		if err := store.Reached(ctx, row.ID, lastMonth, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+		if _, err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -144,7 +144,7 @@ func TestASupplierTakenUpAgainAtAnotherAddressStartsAfresh(t *testing.T) {
 		if err := store.Reached(ctx, row.ID, time.Now().UTC(), supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+		if _, err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
 			t.Fatal(err)
 		}
 		again, err := store.Add(ctx, f.admin, f.product, "SUSE",
@@ -174,7 +174,7 @@ func TestOnlyAnAdministratorConfiguresASupplier(t *testing.T) {
 		if _, err := store.For(ctx, f.anybody, f.product); err == nil {
 			t.Error("somebody who administers nothing read which suppliers are configured")
 		}
-		if err := store.Retire(ctx, f.anybody, f.product, "SUSE"); err == nil {
+		if _, err := store.Retire(ctx, f.anybody, f.product, "SUSE"); err == nil {
 			t.Error("somebody who administers nothing withdrew a supplier")
 		}
 		// And a key, which holds no person at all.

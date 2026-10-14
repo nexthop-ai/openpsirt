@@ -37,7 +37,9 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 			"vulnerable_code_not_present", "The affected routine is not built.")),
 			http.StatusForbidden)
 
-		got := r.Vexed(t, "admin", "debian", httpapitest.Said("not_affected",
+		// Named with capitals, so the answer shows whether it names the
+		// publisher as given or as folded for matching.
+		got := r.Vexed(t, "admin", "Debian", httpapitest.Said("not_affected",
 			"vulnerable_code_not_present", "The affected routine is not built here."))
 		if got.Code != http.StatusCreated {
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
@@ -51,7 +53,7 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
 			t.Fatal(err)
 		}
-		if taken.Recorded != 1 || taken.Publisher != "debian" || taken.Digest == "" {
+		if taken.Recorded != 1 || taken.Publisher != "Debian" || taken.Digest == "" {
 			t.Fatalf("the upload reports %+v", taken)
 		}
 
