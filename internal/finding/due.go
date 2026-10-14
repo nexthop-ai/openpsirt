@@ -261,14 +261,32 @@ type Late struct {
 // the caller; product is the SQL naming the finding's product, which a list
 // across products reads from the stream and a list within one binds.
 func OffTheClock(product string, now time.Time) (string, []any) {
+	return offTheClock(product, now, "")
+}
+
+// StandingDeferral is OffTheClock narrowed to a deferral: the decision taking
+// the finding off the clock is one that moved its date. The same joins, the
+// same binding order.
+func StandingDeferral(product string, now time.Time) (string, []any) {
+	return offTheClock(product, now, "deferred")
+}
+
+func offTheClock(product string, now time.Time, outcome string) (string, []any) {
 	standing, held := InForce()
+	args := append(held, now.UTC())
+	narrowed := ""
+	if outcome != "" {
+		narrowed = `
+		  AND cl.outcome = ?`
+		args = append(args, outcome)
+	}
 	return `EXISTS (SELECT 1 FROM ` + Decisions + `
 		JOIN "claim" AS "cl" ON cl.id = de.claim_id
 		WHERE ` + DecisionAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `
-		  AND (cl.deferred_until IS NULL OR cl.deferred_until > ?))`,
-		append(held, now.UTC())
+		  AND (cl.deferred_until IS NULL OR cl.deferred_until > ?)` + narrowed + `)`,
+		args
 }
 
 // InForce is the test for a claim that is in force: agreed, or made by

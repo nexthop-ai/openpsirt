@@ -90,20 +90,17 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		within, bounds = within+` AND f.closed_at < ?`, append(bounds, until)
 	}
 	// A standing deferral at the place, asked as a correlated existence test
-	// rather than a join, so a place with two of them counts once.
+	// rather than a join, so a place with two of them counts once. It is the
+	// test that takes a finding off the clock, narrowed to a deferral: one
+	// past its date, or keyed on versions the place no longer holds, stands
+	// for nothing.
 	//
 	// Correlated by product as well as by place, because a place identity
 	// carries none — without it a deferral made in another product that ships
 	// the same component would answer here.
-	standing, held := InForce()
-	deferred := `EXISTS (SELECT 1 FROM ` + Decisions + `
-		JOIN "claim" AS "cl" ON cl.id = de.claim_id
-		WHERE ` + DecisionAt("?") + `
-		  AND de.live_key IS NOT NULL
-		  AND ` + standing + `
-		  AND cl.outcome = 'deferred')`
+	deferred, covering := StandingDeferral("?", now)
 	// The product, then whatever the standing test binds, in that order.
-	covers := append([]any{productID}, held...)
+	covers := append([]any{productID}, covering...)
 	// Grouped to the unit every other screen counts in — one issue at one
 	// component — rather than to the row. Counted per row, a kernel flaw at
 	// forty-five places was forty-five late things and one late thing on the
@@ -113,6 +110,8 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	group := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(rating.BandExpr+` AS "band"`).
 		ColumnExpr("SUM(CASE WHEN f.closed_at IS NOT NULL AND f.due_at IS NOT NULL "+

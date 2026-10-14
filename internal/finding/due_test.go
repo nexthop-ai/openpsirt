@@ -357,6 +357,25 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 					because, overdue, want)
 			}
 		}
+		// The compliance rate reads a deferral the same way: one in force at
+		// the versions the place holds, before its date, is deferred; any
+		// other leaves the finding overdue.
+		rated := func(deferred bool, because string) {
+			t.Helper()
+			rates, err := f.store.Compliance(ctx, triager, f.wholeProduct(), time.Time{}, time.Time{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			held, late := 0, 0
+			for _, rate := range rates {
+				held += rate.Deferred
+				late += rate.Overdue
+			}
+			if (held == 1) != deferred || (late == 1) == deferred {
+				t.Errorf("%s: the compliance rate counts %d deferred and %d overdue, want deferred: %v",
+					because, held, late, deferred)
+			}
+		}
 		// Sending the standing claim back, which is the other way one stops
 		// applying: only a claim needing nobody can be both sent back and
 		// standing, and while it is returned nobody is relying on it.
@@ -382,8 +401,13 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		onTheClock(true, "an approved claim about another version does not apply here")
 		record("approved", true, "deferred", &nextMonth, swss.Version)
 		onTheClock(false, "a deferral applies until its date")
+		rated(true, "a deferral applies until its date")
 		record("approved", true, "deferred", &yesterday, swss.Version)
 		onTheClock(true, "a deferral past its date is back on the clock")
+		rated(false, "a deferral past its date is back on the clock")
+		record("approved", true, "deferred", &nextMonth, "0.9.0")
+		onTheClock(true, "a deferral about another version does not apply here")
+		rated(false, "a deferral about another version does not apply here")
 
 		// The rule the triage store asks when it decides whether a decision
 		// applies, asked here — because it was added to that store's own copy
@@ -393,8 +417,10 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		// said it applied to nothing until it was revised.
 		record("proposed", false, "deferred", &nextMonth, swss.Version)
 		onTheClock(false, "a deferral needing no agreement applies")
+		rated(true, "a deferral needing no agreement applies")
 		sendBack()
 		onTheClock(true, "a claim an approver sent back holds nothing off the clock")
+		rated(false, "a claim an approver sent back holds nothing off the clock")
 	})
 }
 
