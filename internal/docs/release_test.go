@@ -167,15 +167,20 @@ func TestEveryPlaceholderIsOneTheBuildFills(t *testing.T) {
 		t.Fatal("the hook declares no placeholders, so this checked nothing")
 	}
 
-	// The hook's own pattern: a workflow expression, ${{ matrix.variant }}, in
-	// a pipeline example follows a dollar sign and holds a dot.
-	placeholder := regexp.MustCompile(`(?:^|[^$])\{\{\s*([a-z0-9_]+)\s*\}\}`)
+	// The hook's own pattern, read from the hook: a workflow expression,
+	// ${{ matrix.variant }}, in a pipeline example follows a dollar sign and
+	// holds a dot.
+	placeholder, notAfter := hookPattern(t, hook, "PLACEHOLDER")
 	seen := map[string]bool{}
 	for name, text := range publishedPages(t) {
-		for _, found := range placeholder.FindAllStringSubmatch(text, -1) {
-			seen[found[1]] = true
-			if !known[found[1]] {
-				t.Errorf("%s writes {{ %s }}, which the documentation build does not fill in", name, found[1])
+		for _, at := range placeholder.FindAllStringSubmatchIndex(text, -1) {
+			if notAfter != "" && strings.HasSuffix(text[:at[0]], notAfter) {
+				continue
+			}
+			found := text[at[2]:at[3]]
+			seen[found] = true
+			if !known[found] {
+				t.Errorf("%s writes {{ %s }}, which the documentation build does not fill in", name, found)
 			}
 		}
 	}
@@ -191,20 +196,62 @@ func TestEveryPlaceholderIsOneTheBuildFills(t *testing.T) {
 	}
 	// The stage that fetches the scanner, as the hook reads it: another stage
 	// pins another tool's checksums the same way.
-	stage := regexp.MustCompile(`(?ms)^FROM \S+ AS scanner$(.*?)^FROM `).FindSubmatch(dockerfile)
+	stagePattern, _ := hookPattern(t, hook, "SCANNER_STAGE")
+	stage := stagePattern.FindSubmatch(dockerfile)
 	if stage == nil {
 		t.Fatal("the Dockerfile has no scanner stage, so this checked nothing")
 	}
 	dockerfile = stage[1]
-	for what, pin := range map[string]string{
-		"the scanner":                  `(?m)^ARG GRYPE_VERSION=\d+\.\d+\.\d+\s*$`,
-		"the scanner's amd64 checksum": `(?m)^\s*amd64\) expected=[0-9a-f]{64} ;;`,
-		"the scanner's arm64 checksum": `(?m)^\s*arm64\) expected=[0-9a-f]{64} ;;`,
-	} {
-		if n := len(regexp.MustCompile(pin).FindAll(dockerfile, -1)); n != 1 {
-			t.Errorf("the Dockerfile pins %s %d times, and the pages need exactly one", what, n)
+	pin, _ := hookPattern(t, hook, "SCANNER_PIN")
+	if n := len(pin.FindAll(dockerfile, -1)); n != 1 {
+		t.Errorf("the Dockerfile pins the scanner %d times, and the pages need exactly one", n)
+	}
+	sum, _ := hookPattern(t, hook, "SCANNER_SUM")
+	for _, arch := range []string{"amd64", "arm64"} {
+		n := 0
+		for _, found := range sum.FindAllSubmatch(dockerfile, -1) {
+			if string(found[1]) == arch {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("the Dockerfile pins the scanner's %s checksum %d times, and the pages need exactly one", arch, n)
 		}
 	}
+}
+
+// hookPattern is the regular expression the documentation hook binds to a
+// name, read from the hook's source so the two cannot drift. Python's
+// MULTILINE and DOTALL flags become Go's inline flags. A leading negative
+// lookbehind on a literal, which Go's engine lacks, is returned as the text a
+// match must not follow, for the caller to check.
+func hookPattern(t *testing.T, hook []byte, name string) (*regexp.Regexp, string) {
+	t.Helper()
+	found := regexp.MustCompile(`(?m)^` + name + ` = re\.compile\(r"((?:[^"\\]|\\.)*)"(?:,\s*([A-Za-z.| ]+))?\)`).FindSubmatch(hook)
+	if found == nil {
+		t.Fatalf("the hook binds no pattern to %s, so this checked nothing", name)
+	}
+	pattern, flags := string(found[1]), string(found[2])
+	notAfter := ""
+	if lookbehind := regexp.MustCompile(`^\(\?<!((?:[^()\\]|\\.)+)\)`).FindStringSubmatch(pattern); lookbehind != nil {
+		pattern = pattern[len(lookbehind[0]):]
+		notAfter = regexp.MustCompile(`\\(.)`).ReplaceAllString(lookbehind[1], "$1")
+	}
+	inline := ""
+	if strings.Contains(flags, "MULTILINE") {
+		inline += "m"
+	}
+	if strings.Contains(flags, "DOTALL") {
+		inline += "s"
+	}
+	if inline != "" {
+		pattern = "(?" + inline + ")" + pattern
+	}
+	compiled, err := regexp.Compile(pattern)
+	if err != nil {
+		t.Fatalf("the hook's %s does not read as a Go pattern: %v", name, err)
+	}
+	return compiled, notAfter
 }
 
 func TestReleaseLiteralsAreToldFromWhatIsNotARelease(t *testing.T) {
