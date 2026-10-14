@@ -2883,6 +2883,9 @@ components:
           type:
             - array
             - "null"
+        unaffected_unreadable:
+          description: Whether the CVE record lines this row was closed by were recorded and cannot be read back
+          type: boolean
         version:
           type: string
         vulnerability:

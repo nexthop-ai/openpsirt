@@ -55,6 +55,9 @@ type DisposedBody struct {
 	// reader can check the closure against the record without the snapshot
 	// the run read, which the next replaces.
 	Unaffected []core.RecordLineBody `json:"unaffected,omitempty" doc:"The CVE record lines stating this version is unaffected. Only on a row closed as unaffected"`
+	// UnaffectedUnreadable says the lines were recorded and cannot be read
+	// back, so a row with none is not taken for a closure with no evidence.
+	UnaffectedUnreadable bool `json:"unaffected_unreadable,omitempty" doc:"Whether the CVE record lines this row was closed by were recorded and cannot be read back"`
 	// Stated is the supplier's own words for why this is answered, so a
 	// reader can check the closure against the statement.
 	Stated *StatedBody `json:"stated,omitempty" doc:"The supplier's statement answering this place: the one that closed a row closed as disclaimed, or one answering an open row on the routes through the supplier's product"`
@@ -229,7 +232,7 @@ func registerRegister(api huma.API, in core.Deps) {
 		}
 		out.Body.Items = make([]DisposedBody, 0, len(rows))
 		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, disposedBody(row))
+			out.Body.Items = append(out.Body.Items, disposedBody(ctx, in, row))
 		}
 		return out, nil
 	})
@@ -298,7 +301,7 @@ func registerRegister(api huma.API, in core.Deps) {
 			Stream: func(ctx context.Context, each func([]string) error) error {
 				return store.RegisterEach(ctx, subject, target, input.narrow(),
 					func(row finding.Disposed) error {
-						body := disposedBody(row)
+						body := disposedBody(ctx, in, row)
 						met := ""
 						if body.Met != nil {
 							met = strconv.FormatBool(*body.Met)
@@ -309,7 +312,7 @@ func registerRegister(api huma.API, in core.Deps) {
 							body.ProposedBy, body.ProposedAt, body.ApprovedBy, body.ApprovedAt,
 							strconv.FormatBool(body.AgreementCarried),
 							body.Opened, body.Closed, string(body.ClosedBecause), body.ClosedNote,
-							body.Due, met, saidLines(body.Unaffected), statedBy(body.Stated),
+							body.Due, met, saidLines(body), statedBy(body.Stated),
 						})
 					})
 			},
@@ -351,15 +354,18 @@ func statedBy(said *StatedBody) string {
 }
 
 // saidLines writes a closure's record lines into one cell.
-func saidLines(lines []core.RecordLineBody) string {
-	said := make([]string, 0, len(lines))
-	for _, l := range lines {
+func saidLines(body DisposedBody) string {
+	if body.UnaffectedUnreadable {
+		return core.UnreadableLines
+	}
+	said := make([]string, 0, len(body.Unaffected))
+	for _, l := range body.Unaffected {
 		said = append(said, l.Said())
 	}
 	return strings.Join(said, "; ")
 }
 
-func disposedBody(row finding.Disposed) DisposedBody {
+func disposedBody(ctx context.Context, in core.Deps, row finding.Disposed) DisposedBody {
 	body := DisposedBody{
 		Vulnerability: row.Vulnerability, Severity: row.Severity,
 		Component: row.Component, Version: row.Version, Place: row.Place,
@@ -380,7 +386,13 @@ func disposedBody(row finding.Disposed) DisposedBody {
 	if row.ClosedAt != nil {
 		body.Closed = row.ClosedAt.Format(time.DateOnly)
 		body.ClosedBecause, body.ClosedNote = closure(row.ClosedBecause), row.ClosedNote
-		body.Unaffected = core.RecordLines(row.UnaffectedBy)
+		lines, err := core.RecordLines(row.UnaffectedBy)
+		if err != nil {
+			in.Log().ErrorContext(ctx, "a register row's evidence could not be read",
+				"vulnerability", row.Vulnerability, "component", row.Component, "error", err)
+			body.UnaffectedUnreadable = true
+		}
+		body.Unaffected = lines
 	}
 	if row.Stated != nil {
 		body.Stated = &StatedBody{

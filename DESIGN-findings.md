@@ -1266,7 +1266,9 @@ changes on top of 6.18.55, and those changes are what a record cannot speak for.
 
 The lines are kept on the closed row, because the snapshot the run read is
 replaced by the next. The run records which snapshot it read, beside the
-scanner's data version (REQ-13).
+scanner's data version (REQ-13). The lines are read back in the shape the run wrote
+them in, the record's own. Lines kept and unreadable are stated on the register
+row and logged, so the row does not read as a closure nothing was recorded for.
 
 | A scan without a snapshot to read | |
 |---|---|

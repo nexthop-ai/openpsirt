@@ -5,7 +5,10 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 )
 
 // RecordLineBody is one version line of a CVE record, beside the entry it
@@ -19,21 +22,19 @@ type RecordLineBody struct {
 }
 
 // RecordLines reads the lines a finding was closed as unaffected by, as the
-// store keeps them. Lines that cannot be read are none rather than a failure:
-// the closure stands whether or not its evidence can be shown.
-func RecordLines(stored string) []RecordLineBody {
+// store keeps them.
+//
+// Read in the shape the scan wrote them in, the record's own type, so the two
+// cannot drift apart. Lines that cannot be read are an error the caller states
+// on the row: the closure stands whether or not its evidence can be shown, and
+// shown as no lines it reads as a closure nothing was ever recorded for.
+func RecordLines(stored string) ([]RecordLineBody, error) {
 	if strings.TrimSpace(stored) == "" {
-		return nil
+		return nil, nil
 	}
-	var lines []struct {
-		Entry           string `json:"entry"`
-		Status          string `json:"status"`
-		Version         string `json:"version"`
-		LessThan        string `json:"lessThan"`
-		LessThanOrEqual string `json:"lessThanOrEqual"`
-	}
+	var lines []cverecord.Stated
 	if err := json.Unmarshal([]byte(stored), &lines); err != nil {
-		return nil
+		return nil, fmt.Errorf("read the CVE record lines a finding was closed by: %w", err)
 	}
 	out := make([]RecordLineBody, 0, len(lines))
 	for _, l := range lines {
@@ -42,8 +43,12 @@ func RecordLines(stored string) []RecordLineBody {
 			LessThan: l.LessThan, LessThanOrEqual: l.LessThanOrEqual,
 		})
 	}
-	return out
+	return out, nil
 }
+
+// UnreadableLines is what a row says where the lines it was closed by cannot
+// be read.
+const UnreadableLines = "the CVE record lines this was closed by could not be read"
 
 // Said is a line as a sentence, for a file rather than a screen: "Linux Linux
 // unaffected from 6.18.27 to 6.18.*".

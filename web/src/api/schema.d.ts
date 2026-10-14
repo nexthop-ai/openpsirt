@@ -7808,6 +7808,8 @@ export interface components {
             stated?: components["schemas"]["StatedBody"];
             /** @description The CVE record lines stating this version is unaffected. Only on a row closed as unaffected */
             unaffected?: components["schemas"]["RecordLineBody"][] | null;
+            /** @description Whether the CVE record lines this row was closed by were recorded and cannot be read back */
+            unaffected_unreadable?: boolean;
             version?: string;
             vulnerability: string;
         };

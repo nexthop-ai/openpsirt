@@ -307,6 +307,9 @@ export function Register() {
                                   {recordLine(line)}
                                 </div>
                               ))}
+                              {row.unaffected_unreadable && (
+                                <div className="hint">CVE record lines couldn't be read</div>
+                              )}
                               {row.stated && <div className="hint">{statedLine(row.stated)}</div>}
                             </>
                           ) : row.stated ? (
