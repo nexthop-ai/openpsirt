@@ -663,12 +663,14 @@ Recursive traversal is portable across all four engines. Every walk is one
 `WITH RECURSIVE` statement: upward from the components on a page, downward from a
 component for the set beneath it, and downward from a row of the tree's children
 for the components under each, whose open issues are united per row in the
-application. The walk upward carries how far it has come
-and is bounded at sixty-four steps. The walks down carry no depth: the union
-adds a component once, which ends a cycle, and carrying a depth keeps a
-component once per path to it. A component more than sixty-four steps below the
-root is therefore counted beneath it and found in a list narrowed beneath it,
-and shown on a finding as placed nowhere.
+application. No walk carries a depth: the union adds a node once, which ends a
+cycle, and carrying a depth keeps a node once per length of route to it — thirty
+components that all depend on each other return 55,060 rows for one start that
+way, measured on SQLite. The walk upward returns the nodes above the components
+asked about and the edges among them, and the shortest route from a root to
+each is drawn from those in memory, to sixty-four steps. A component more than
+sixty-four steps below the root is therefore counted beneath it and found in a
+list narrowed beneath it, and shown on a finding as placed nowhere.
 
 The downward walks are spelled `CROSS JOIN ... WHERE`, which is an inner join
 everywhere and, on SQLite, the instruction to keep the recursion's queue on the
