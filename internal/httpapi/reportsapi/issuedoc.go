@@ -99,7 +99,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		}
 		return unaffected(name), nil
 	}
-	rows, total, err := finding.NewStore(in.DB.DB).Everywhere(ctx, subject, id, howManyJudgments)
+	rows, total, _, err := finding.NewStore(in.DB.DB).Everywhere(ctx, subject, id, howManyJudgments)
 	if err != nil {
 		return "", core.WentWrong(in.Logger, "where this issue sits could not be read", err)
 	}
