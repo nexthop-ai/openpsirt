@@ -715,13 +715,19 @@ func clip(text string, n int) string {
 }
 
 // ReasoningFor returns the reasoning each decision currently rests on, keyed
-// by decision.
+// by decision, leaving out the reasoning of a claim that holds a row this
+// subject may not read.
 //
 // Read through the claim, which is where the words are: a row of a claim rests
 // on the claim's argument, and asking per row is asking the same question
-// once per place.
-func (s *Store) ReasoningFor(ctx context.Context, decisions []Decision) (map[int64]string, error) {
-	return s.currentReasoning(ctx, decisions)
+// once per place. The argument is about every place of the claim, so a reader
+// of only part of it is not given it.
+func (s *Store) ReasoningFor(ctx context.Context, subject access.Subject, decisions []Decision) (map[int64]string, error) {
+	reasoning, err := s.currentReasoning(ctx, decisions)
+	if err != nil {
+		return nil, err
+	}
+	return reasoning, s.withholdPartReasoning(ctx, subject, decisions, reasoning)
 }
 
 func (s *Store) currentReasoning(ctx context.Context, decisions []Decision) (map[int64]string, error) {

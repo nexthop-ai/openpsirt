@@ -472,7 +472,7 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 		if standing != nil {
 			all = append([]triage.Decision{*standing}, previously...)
 		}
-		reasoning, err := store.ReasoningFor(ctx, all)
+		reasoning, err := store.ReasoningFor(ctx, subject, all)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the reasoning could not be read", err)
 		}

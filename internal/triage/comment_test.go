@@ -186,7 +186,7 @@ func TestTextThePolicyAdmitsFitsTheColumn(t *testing.T) {
 		if err != nil {
 			t.Fatalf("a field of exactly the admitted size could not be stored: %v", err)
 		}
-		kept, err := f.store.ReasoningFor(ctx, []triage.Decision{*made})
+		kept, err := f.store.ReasoningFor(ctx, f.triager, []triage.Decision{*made})
 		if err != nil {
 			t.Fatal(err)
 		}

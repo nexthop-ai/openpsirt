@@ -112,6 +112,30 @@ func TestTheRecordListsAClaimOnceHoweverManyPlacesItCovers(t *testing.T) {
 					row.ID)
 			}
 		}
+		// So does the reasoning a single place's decision is shown with.
+		var ofBulk []triage.Decision
+		for _, row := range listed {
+			if row.ClaimID == bulk.ClaimID {
+				ofBulk = append(ofBulk, row)
+			}
+		}
+		if len(ofBulk) == 0 {
+			t.Fatal("the public reader lists no row of the claim, so this checked nothing")
+		}
+		shown, err := f.store.ReasoningFor(t.Context(), f.reviewer, ofBulk)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for id, said := range shown {
+			t.Errorf("decision %d is shown the reasoning of a claim reaching an undisclosed place: %q", id, said)
+		}
+		whole, err := f.store.ReasoningFor(t.Context(), insider, ofBulk)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if whole[ofBulk[0].ID] == "" {
+			t.Error("a reader of every row of the claim is not shown its reasoning beside one decision")
+		}
 
 		// Its proposer reads every row, the undisclosed one included.
 		rows, _ = f.auditedClaims(t, insider, triage.Filter{})
