@@ -323,7 +323,7 @@ What comes back is classified, because the classes want opposite treatment.
 | A version | Yes | The thing being asked for |
 | The index has never heard of it | Asked, with no version | A private module and a vendored fork both look like this, and neither is a fault. Recorded so the question is not asked again tomorrow |
 | A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read, a status other than a bad day's, a redirect the client refuses. An answer we will never get is still an answer about this component |
-| A bad day — too many requests, the index itself unwell, or no answer at all | Nothing | The one class worth coming back to: it stays due and the next pass asks again. A Maven project document that fails this way fails the whole answer, so its date is asked for again too |
+| A bad day — too many requests, the index itself unwell, or no answer at all | Nothing | The one class worth coming back to: it stays due and the next pass asks again. A Maven project document that fails this way fails the whole answer, so its date is asked for again too. Where npm's full document is refused and the abbreviated one falls back into a bad day, the answer is the bad day |
 
 Everything that is not a bad day is recorded. Read as one, a refusal the index
 repeats every time leaves the component unrecorded, and the window takes the

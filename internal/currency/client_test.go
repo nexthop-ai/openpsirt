@@ -273,6 +273,24 @@ func TestNpmFallsBackToTheVersionAloneOnABadDay(t *testing.T) {
 	}
 }
 
+// The full document refused the same way every time, and the abbreviated one
+// having a bad day, is a bad day. Answered with the refusal, the package is
+// recorded as asked with no version and not asked again for a month.
+func TestNpmAnswersABadDayWhenTheFallbackHasOne(t *testing.T) {
+	a := serving(t, `{}`)
+	a.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Accept") == "application/json" {
+			_, _ = w.Write([]byte(`{ this is not a document`))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	_, err := client(a).For("npm").Latest(t.Context(), "left-pad")
+	if !errors.Is(err, currency.ErrNotAnswering) {
+		t.Errorf("a refused full document beside a bad day answered %v, want the bad day", err)
+	}
+}
+
 // Of the addresses an index states for a project, the first that may be stored
 // is taken: an absolute web address, and nothing relative or on another scheme.
 func TestTheProjectAddressIsTheFirstWebAddressStated(t *testing.T) {

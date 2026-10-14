@@ -386,6 +386,13 @@ func (n npmRegistry) Latest(ctx context.Context, name string) (Latest, error) {
 		// mistake this date exists to prevent.
 		version, second := n.abbreviated(ctx, at)
 		if second != nil {
+			// A bad day on the second answer wins over a refusal of the
+			// first. The refusal is recorded as an answer and not asked again
+			// for a month; a bad day leaves the component due, which is what a
+			// passing failure should do.
+			if !errors.Is(second, ErrUnknown) && !errors.Is(second, ErrUnaskable) {
+				return Latest{}, second
+			}
 			return Latest{}, err
 		}
 		return Latest{Version: version}, nil
