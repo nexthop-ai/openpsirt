@@ -168,6 +168,7 @@ export const DEADLINES = [
 //
 // Names only. Which kinds are offered is the server's answer about the scope
 // on screen, counted over what the reader may see.
+// eslint-disable-next-line no-restricted-syntax -- A package kind is whatever a package identifier spells.
 const KIND_NAMES: Record<string, string> = {
   generic: "Generic",
   golang: "Go (golang)",

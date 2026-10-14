@@ -267,6 +267,7 @@ const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
   planned: { planned: true, unplanned: true, either: true },
   across_variants: { only: true, every: true },
   sort: { urgency: true, age: true, deadline: true, places: true, epss: true, severity: true },
+  claim_state: { proposed: true, approved: true, withdrawn: true, lapsed: true },
 };
 
 type ClosedParameter =
@@ -283,7 +284,8 @@ type ClosedParameter =
   | "origin"
   | "planned"
   | "across_variants"
-  | "sort";
+  | "sort"
+  | "claim_state";
 
 // The words the address carries for one closed parameter that the server
 // takes, in the order they came, and none of the others.
@@ -391,9 +393,7 @@ export function listQuery(params: URLSearchParams) {
   // The claim whose places the list is narrowed to, as the claim page links to.
   // The states narrow its rows and are sent only with it.
   const claim = num(params.get("claim"), 1, Number.MAX_SAFE_INTEGER);
-  const claimStates = params
-    .getAll("claim_state")
-    .filter((word) => ["proposed", "approved", "withdrawn", "lapsed"].includes(word));
+  const claimStates = pick("claim_state", params.getAll("claim_state"));
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   const openedAfter = day(params.get("opened_after"));
   const openedBefore = day(params.get("opened_before"));
@@ -414,9 +414,7 @@ export function listQuery(params: URLSearchParams) {
     ...(claim !== undefined ? { claim } : {}),
     ...(claim !== undefined && claimStates.length > 0
       ? {
-          claim_state: [...new Set(claimStates)] as (
-            "proposed" | "approved" | "withdrawn" | "lapsed"
-          )[],
+          claim_state: [...new Set(claimStates)],
         }
       : {}),
     ...(proposedAfter ? { proposed_after: proposedAfter } : {}),

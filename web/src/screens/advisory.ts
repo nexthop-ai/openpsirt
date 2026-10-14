@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { Body } from "../api/client";
 import { own } from "../ui/own";
 
 // What the advisory screens work out, apart from what draws them.
@@ -10,7 +11,10 @@ import { own } from "../ui/own";
 // The three are the standard's own, so they are shown under their own names
 // rather than translated. What each is underneath them, because "interim" is
 // not a word whose meaning a reader guesses.
-const said: Record<string, { label: string; tone: string; means: string }> = {
+const said: Record<
+  Body<"AdvisoryListedBody">["status"],
+  { label: string; tone: string; means: string }
+> = {
   draft: {
     label: "Draft",
     tone: "",
@@ -31,7 +35,7 @@ const said: Record<string, { label: string; tone: string; means: string }> = {
 };
 
 // This table's entry for a word, or nothing.
-export function standing(status?: string): (typeof said)[string] | undefined {
+export function standing(status?: string): (typeof said)[keyof typeof said] | undefined {
   return own(said, status);
 }
 
@@ -96,7 +100,7 @@ export function nameable(
 
 // What a document states about a release, in words and a tone. The standard's
 // three statuses.
-const stated: Record<string, { label: string; tone: string }> = {
+const stated: Record<Body<"AdvisoryReleaseBody">["status"], { label: string; tone: string }> = {
   known_affected: { label: "Affected", tone: "bad" },
   known_not_affected: { label: "Not affected", tone: "agreed" },
   fixed: { label: "Fixed", tone: "agreed" },

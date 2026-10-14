@@ -5,7 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -15,7 +15,7 @@ import { own } from "../ui/own";
 import { claimAt } from "../app/routes";
 
 // A promise's state, said in words rather than left to a color.
-const STANDING: Record<string, string> = {
+const STANDING: Record<Body<"PlannedBody">["state"], string> = {
   planned: "promised, with work outstanding and the date still ahead",
   landed: "every piece of it gone, which the scans say",
   lapsed: "the date has passed and work is outstanding",

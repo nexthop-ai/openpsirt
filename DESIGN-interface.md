@@ -137,6 +137,10 @@ than a screen rendering `undefined`. `make web-api` regenerates it and fails if
 the result differs from what is committed — the generated types say a list may be
 `null`, which the hand-written version would have discovered in a browser.
 
+| Rule | |
+|---|---|
+| A table of words over a word the server sends is keyed on the generated union | A word the server adds is then a compile error in the table until it has words, rather than the bare token on screen. A lint refuses a string-keyed table written as a literal in the screens, and a table over an open set — a package kind, a keyboard key, this interface's own names — says why beside it |
+
 The session is a cookie the browser holds and nothing in the application ever
 sees. The application holds the cross-site-request token, deliberately readable
 by script where the session cookie is not: echoing it distinguishes a request our

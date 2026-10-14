@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { own } from "../ui/own";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
@@ -21,7 +22,11 @@ import { Wide } from "../ui/Wide";
 type Destination = Body<"OutboundBody">;
 
 // What a platform is called on screen.
-const PLATFORMS: Record<string, string> = { slack: "Slack", zulip: "Zulip" };
+const PLATFORMS: Record<Destination["platform"], string> = {
+  webhook: "Webhook",
+  slack: "Slack",
+  zulip: "Zulip",
+};
 
 // What a channel belongs to, as somebody would say it.
 function scopeOf(row: Destination) {
@@ -187,7 +192,7 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
             >
               {platforms.map((each) => (
                 <option key={each} value={each}>
-                  {PLATFORMS[each] ?? each}
+                  {own(PLATFORMS, each) ?? each}
                 </option>
               ))}
             </select>

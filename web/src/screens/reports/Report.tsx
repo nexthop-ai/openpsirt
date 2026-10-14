@@ -22,6 +22,7 @@ import { own } from "../../ui/own";
 // the catalog with no page behind it is a link that goes nowhere, and a page
 // no catalog entry names is a report nobody finds. A test pins both
 // directions.
+// eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own report addresses.
 export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
   "scan-coverage": <Coverage />,
@@ -37,6 +38,7 @@ export const PAGES: Record<string, ReactElement> = {
 // Addresses a report has been reached at under an earlier name. A link to one
 // sits in mail and chat messages already sent and in notifications already
 // stored, so it opens the report it named, with the window it asked for.
+// eslint-disable-next-line no-restricted-syntax -- Keyed on report addresses that have moved.
 const RENAMED: Record<string, string> = {
   "rubber-stamp": "approval-quality",
   "where-the-effort-went": "effort-by-component",

@@ -207,7 +207,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
 // "Undone" is drawn apart from "waiting" though the claim is waiting in both:
 // somebody had agreed, and the proposer is entitled to find that surprising.
 export function Happened({ word, by }: { word?: string; by?: string }) {
-  const how: Record<string, { cls: string; said: string }> = {
+  const how: Record<Body<"BecameBody">["happened"], { cls: string; said: string }> = {
     waiting: { cls: "waiting", said: "Waiting" },
     "sent-back": { cls: "lapsed", said: "Sent back" },
     approved: { cls: "agreed", said: "Approved" },

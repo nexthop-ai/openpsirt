@@ -11,7 +11,8 @@ import { Fragment, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
+import { api, type Body } from "../api/client";
+import { own } from "../ui/own";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
 import { mayOf, useWho } from "../app/session";
@@ -156,10 +157,8 @@ export function References({
   const [whole, setWhole] = useState(false);
   const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
   if (all.length === 0) return null;
-  const order: Record<string, number> = { patch: 0, advisory: 1, report: 2, other: 3 };
-  const sorted = [...all].sort(
-    (a, b) => (order[a.kind ?? "other"] ?? 9) - (order[b.kind ?? "other"] ?? 9),
-  );
+  const order: Record<Body<"ReferenceBody">["kind"], number> = { patch: 0, advisory: 1, report: 2 };
+  const sorted = [...all].sort((a, b) => (own(order, a.kind) ?? 9) - (own(order, b.kind) ?? 9));
   return (
     <div className="evblock">
       <h4>References</h4>

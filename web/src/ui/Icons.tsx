@@ -4,6 +4,7 @@
 // The rail's and the bar's icons: stroke paths on a 24-unit grid, the
 // mockup's, so a screen is found by its shape as well as its word.
 
+// eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own icon names.
 const PATHS: Record<string, string> = {
   home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>',
   inbox: '<path d="M4 4h16v16H4z"/><path d="M4 14h5l1.5 2h3L15 14h5"/>',

@@ -28,6 +28,25 @@ export default tseslint.config(
       globals: globals.browser,
     },
   },
+  // A label table over a word the server sends is keyed on the generated
+  // union, so a word the server adds is a compile error rather than a raw
+  // token on screen. A table over an open set says so with a disable naming
+  // why.
+  {
+    files: ["src/screens/**/*.{ts,tsx}", "src/ui/**/*.{ts,tsx}", "src/app/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "VariableDeclarator[init.type='ObjectExpression'][init.properties.length>0] > Identifier > TSTypeAnnotation > TSTypeReference[typeName.name='Record'] > TSTypeParameterInstantiation > TSStringKeyword:first-child",
+          message:
+            "Key this table on the generated union for the word it labels, or say why its keys are an open set.",
+        },
+      ],
+    },
+  },
   {
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },

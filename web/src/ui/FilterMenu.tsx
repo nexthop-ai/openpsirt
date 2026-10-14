@@ -99,6 +99,7 @@ export function FilterMenu({
 
   function onMenuKey(event: KeyboardEvent<HTMLDivElement>) {
     const last = offered.length - 1;
+    // eslint-disable-next-line no-restricted-syntax -- Keyed on keyboard keys.
     const move: Record<string, number> = {
       ArrowDown: active === last ? 0 : active + 1,
       ArrowUp: active === 0 ? last : active - 1,
