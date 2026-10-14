@@ -47,52 +47,88 @@ func (t *took) handle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// count is how many requests the destination received.
+func (t *took) count() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.requests
+}
+
+// sharedSecret is the signing secret every test destination is configured
+// with.
+const sharedSecret = "a-shared-secret-long-enough"
+
+// webhook is a deployment with one administrator and one destination, pointed
+// at a test server that records what it takes.
+type webhook struct {
+	store  *notify.Store
+	signal *notify.Signal
+	saw    *took
+	admin  *access.Account
+	server *httptest.Server
+}
+
+// webhookWorld configures one destination by name and kind, administered by
+// Ana, at a test server that records every request.
+func webhookWorld(t *testing.T, db *database.DB, name, kind string) *webhook {
+	t.Helper()
+	saw := &took{}
+	hook := webhookAnswering(t, db, name, kind, http.HandlerFunc(saw.handle))
+	hook.saw = saw
+	return hook
+}
+
+// webhookAnswering is webhookWorld with a server that answers through the
+// handler given, and records nothing.
+func webhookAnswering(t *testing.T, db *database.DB, name, kind string, handler http.Handler) *webhook {
+	t.Helper()
+	ctx := t.Context()
+	admin, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(handler)
+	t.Cleanup(server.Close)
+
+	store := notify.NewStore(db.DB)
+	if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
+		Name: name, Kind: kind, URL: server.URL, Secret: sharedSecret,
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// The client refuses anything but https and does not follow a redirect,
+	// so the test server's own certificate is trusted the way a deployment
+	// trusts its destination's.
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+	notify.TrustForTest(signal, server.Client())
+	return &webhook{store: store, signal: signal, admin: admin, server: server}
+}
+
 func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 	// One signed request gives a chat channel, a tracker and paging without
 	// an adapter for any of them.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
-		const secret = "a-shared-secret-long-enough"
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: secret,
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
-		if err := store.Tell(ctx, notify.Telling{
-			PersonID: who.ID, Kind: notify.Assigned,
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		saw := hook.saw
+		if err := hook.store.Tell(ctx, notify.Telling{
+			PersonID: hook.admin.ID, Kind: notify.Assigned,
 			Body: "CVE-2026-9999 in libnl-3-200 is yours", Link: "/products/x",
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		// The client refuses anything but https and will not follow a
-		// redirect, so the test server's own certificate has to be trusted the
-		// way a deployment would trust its destination's.
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-
-		sent, failed, err := signal.Once(ctx)
+		sent, failed, err := hook.signal.Once(ctx)
 		if err != nil {
 			t.Fatalf("signalling: %v", err)
 		}
 		if sent != 1 || failed != 0 {
 			t.Fatalf("sent %d and failed %d, want one sent", sent, failed)
 		}
-		if saw.requests != 1 {
-			t.Fatalf("the destination received %d requests", saw.requests)
+		if got := saw.count(); got != 1 {
+			t.Fatalf("the destination received %d requests", got)
 		}
 
 		// It carries what a mail would carry, composed by the same code.
@@ -117,7 +153,7 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 
 		// Signed over the timestamp and the body, so a receiver can tell one
 		// of ours from one anybody could make and cannot replay yesterday's.
-		mac := hmac.New(sha256.New, []byte(secret))
+		mac := hmac.New(sha256.New, []byte(sharedSecret))
 		mac.Write([]byte(saw.stamped[0]))
 		mac.Write([]byte("."))
 		mac.Write([]byte(saw.bodies[0]))
@@ -128,11 +164,11 @@ func TestOneSignedRequestCarriesWhatWasSaid(t *testing.T) {
 
 		// And it goes once. A sweep every minute must not repeat what it has
 		// already said.
-		if sent, _, err := signal.Once(ctx); err != nil || sent != 0 {
+		if sent, _, err := hook.signal.Once(ctx); err != nil || sent != 0 {
 			t.Errorf("a second sweep sent %d (%v)", sent, err)
 		}
-		if saw.requests != 1 {
-			t.Errorf("the destination received %d requests in total", saw.requests)
+		if got := saw.count(); got != 1 {
+			t.Errorf("the destination received %d requests in total", got)
 		}
 	})
 }
@@ -144,34 +180,17 @@ func TestAWebhookCarriesThirdPartyTextAsTextToAChatChannel(t *testing.T) {
 	// anything. The three characters that open it are escaped.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
-		if err := store.Tell(ctx, notify.Telling{
-			PersonID: who.ID, Kind: notify.StatementRevised,
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		saw := hook.saw
+		if err := hook.store.Tell(ctx, notify.Telling{
+			PersonID: hook.admin.ID, Kind: notify.StatementRevised,
 			Body: "<!channel> <https://evil.example|security update> & Sons changed a statement " +
 				"on [Download the fix](https://evil.example/p)",
 			Link: "/issues/CVE-2026-1?from=a&to=b",
 		}); err != nil {
 			t.Fatal(err)
 		}
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if sent, _, err := signal.Once(ctx); err != nil || sent != 1 {
+		if sent, _, err := hook.signal.Once(ctx); err != nil || sent != 1 {
 			t.Fatalf("sent %d (%v), want one", sent, err)
 		}
 
@@ -214,13 +233,8 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		rights := access.NewStore(db.DB)
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		saw := hook.saw
 		product := w.Product
 		ids, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
 			[]finding.Named{{Identifier: "SONIC-2026-7002", Severity: "critical"}})
@@ -229,22 +243,12 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 		}
 		issue := ids["SONIC-2026-7002"]
 
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
 		// The shape a disclosure notice takes: every part of what it is about
 		// is in the path.
 		const where = "/products/sonic/streams/master/variants/broadcom" +
 			"/findings/SONIC-2026-7002/components/swss"
-		if err := store.Tell(ctx, notify.Telling{
-			PersonID: who.ID, Kind: notify.DisclosureDue,
+		if err := hook.store.Tell(ctx, notify.Telling{
+			PersonID: hook.admin.ID, Kind: notify.DisclosureDue,
 			Body: "SONIC-2026-7002 in swss reached its date",
 			Link: where, Private: true,
 			ProductID: &product.ID, VulnerabilityID: &issue,
@@ -252,13 +256,11 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if sent, failed, err := signal.Once(ctx); err != nil || sent != 1 || failed != 0 {
+		if sent, failed, err := hook.signal.Once(ctx); err != nil || sent != 1 || failed != 0 {
 			t.Fatalf("signalling sent %d and failed %d (%v)", sent, failed, err)
 		}
-		if saw.requests != 1 {
-			t.Fatalf("the destination received %d requests", saw.requests)
+		if got := saw.count(); got != 1 {
+			t.Fatalf("the destination received %d requests", got)
 		}
 
 		// Whole-body, not field by field: the rule is about what crosses the
@@ -297,48 +299,32 @@ func TestNothingUndisclosedTravelsInAWebhookAddress(t *testing.T) {
 func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
 		// Paging takes what is worth interrupting somebody for, and nothing
 		// else — which is the whole reason a destination names a kind.
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "paging", Kind: string(notify.CriticalOnRelease), URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
-		if err := store.Tell(ctx, notify.Telling{
+		hook := webhookWorld(t, db, "paging", string(notify.CriticalOnRelease))
+		who := hook.admin
+		if err := hook.store.Tell(ctx, notify.Telling{
 			PersonID: who.ID, Kind: notify.Assigned, Body: "yours", Link: "/x",
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if sent, _, err := signal.Once(ctx); err != nil || sent != 0 {
+		if sent, _, err := hook.signal.Once(ctx); err != nil || sent != 0 {
 			t.Errorf("a destination took a kind it did not ask for: %d (%v)", sent, err)
 		}
-		if saw.requests != 0 {
-			t.Errorf("it received %d requests", saw.requests)
+		if got := hook.saw.count(); got != 0 {
+			t.Errorf("it received %d requests", got)
 		}
 
 		// A kind nothing is of is refused rather than stored as a
 		// destination that never receives anything. Case is folded first.
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "typo", Kind: "asigned", URL: server.URL, Secret: "a-shared-secret-long-enough",
+		if _, err := hook.store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "typo", Kind: "asigned", URL: hook.server.URL, Secret: sharedSecret,
 		}, nil); err == nil {
 			t.Error("a destination was stored for a kind nothing is of")
 		}
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "folded", Kind: " Assigned ", URL: server.URL, Secret: "a-shared-secret-long-enough",
+		if _, err := hook.store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+			Name: "folded", Kind: " Assigned ", URL: hook.server.URL, Secret: sharedSecret,
 		}, nil); err != nil {
 			t.Errorf("a kind written in capitals was refused: %v", err)
 		}
@@ -363,7 +349,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		store := notify.NewStore(db.DB)
 		// Refused where it is configured, which is the first of the two.
 		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "plain", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
+			Name: "plain", Kind: notify.Everything, URL: server.URL, Secret: sharedSecret,
 		}, nil); err == nil {
 			t.Fatal("a plain http destination was accepted")
 		}
@@ -373,7 +359,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		// database. The row is written directly here for exactly that reason.
 		if _, err := db.DB.NewInsert().Model(&notify.Outbound{
 			Name: "plain", Kind: notify.Everything, Platform: notify.Webhook, URL: server.URL,
-			Secret: "a-shared-secret-long-enough", CreatedBy: who.ID,
+			Secret: sharedSecret, CreatedBy: who.ID,
 			CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
 		}).Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -392,8 +378,8 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		if sent != 0 || failed != 1 {
 			t.Errorf("plain http sent %d and failed %d", sent, failed)
 		}
-		if saw.requests != 0 {
-			t.Errorf("something reached a plain http destination: %d", saw.requests)
+		if got := saw.count(); got != 0 {
+			t.Errorf("something reached a plain http destination: %d", got)
 		}
 	})
 }
@@ -406,22 +392,8 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 	// reaches that in the first two hundred events of its life.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "everything", Kind: string(notify.Everything), URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
+		hook := webhookWorld(t, db, "everything", notify.Everything)
+		store, signal, saw, who := hook.store, hook.signal, hook.saw, hook.admin
 
 		// A backlog the size of one sweep, so the next thing said falls
 		// outside the window the sweep reads.
@@ -433,8 +405,6 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
 		if sent, _, err := signal.Once(ctx); err != nil || sent != notify.SweepBatch {
 			t.Fatalf("the backlog carried %d of %d (%v)", sent, notify.SweepBatch, err)
 		}
@@ -478,7 +448,7 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 
 		store := notify.NewStore(db.DB)
 		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: "https://chat.example.test/hook", Secret: "a-shared-secret-long-enough",
+			Name: "chat", Kind: notify.Everything, URL: "https://chat.example.test/hook", Secret: sharedSecret,
 		}, nil); err != nil {
 			t.Fatal(err)
 		}
@@ -488,7 +458,7 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 			t.Errorf("reading where things go as a non-administrator answered %v", err)
 		}
 		if _, err := store.AddDestination(ctx, asks(t, db, other), notify.Destination{
-			Name: "theirs", Kind: notify.Everything, URL: "https://elsewhere.example.test/hook", Secret: "a-shared-secret-long-enough",
+			Name: "theirs", Kind: notify.Everything, URL: "https://elsewhere.example.test/hook", Secret: sharedSecret,
 		}, nil); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("configuring a destination as a non-administrator answered %v", err)
 		}
@@ -510,7 +480,7 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(shown), "a-shared-secret-long-enough") {
+		if strings.Contains(string(shown), sharedSecret) {
 			t.Errorf("the signing secret crossed the store boundary: %s", shown)
 		}
 	})
@@ -524,22 +494,8 @@ func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
 	// destination takes every kind.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "paging", Kind: string(notify.CriticalOnRelease), URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
+		hook := webhookWorld(t, db, "paging", string(notify.CriticalOnRelease))
+		store, who := hook.store, hook.admin
 
 		// A window's worth of a kind this destination does not take.
 		for i := range notify.SweepBatch {
@@ -559,9 +515,7 @@ func TestADestinationTakingOneKindReachesPastABacklogOfAnother(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		sent, _, err := signal.Once(ctx)
+		sent, _, err := hook.signal.Once(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -583,23 +537,9 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 	// advancing.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		store, first := hook.store, hook.admin
 		rights := access.NewStore(db.DB)
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, first), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
 
 		// One condition, opened for several people: one thing to say and
 		// several rows saying it.
@@ -611,6 +551,7 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 		for i := range 6 {
 			who := first
 			if i > 0 {
+				var err error
 				who, err = rights.Ensure(ctx,
 					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
 				if err != nil {
@@ -622,23 +563,18 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 			}
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if _, _, err := signal.Once(ctx); err != nil {
+		if _, _, err := hook.signal.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// One request, which is the point of keying on what was said.
-		saw.mu.Lock()
-		requests := saw.requests
-		saw.mu.Unlock()
-		if requests != 1 {
+		if requests := hook.saw.count(); requests != 1 {
 			t.Errorf("a condition opened for six people was sent %d times", requests)
 		}
 
 		// And every one of the six has left the window. Asked of what was
 		// sent, six rows still fit inside it and the sweep reaches past them
 		// — so the question is put to the predicate, which is what wedges.
-		left, err := notify.StillToTell(signal, ctx, "chat")
+		left, err := notify.StillToTell(hook.signal, ctx, "chat")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -655,34 +591,12 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		rights := access.NewStore(db.DB)
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		store, signal, admin := hook.store, hook.signal, hook.admin
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
 			Link: "/reports/approval-quality",
 		}}
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		requests := func() int {
-			saw.mu.Lock()
-			defer saw.mu.Unlock()
-			return saw.requests
-		}
 
 		for _, step := range []struct {
 			holding []notify.Holds
@@ -699,7 +613,7 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 			if _, _, err := signal.Once(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if got := requests(); got != step.want {
+			if got := hook.saw.count(); got != step.want {
 				t.Fatalf("the channel was sent %d requests, want %d", got, step.want)
 			}
 		}
@@ -719,38 +633,16 @@ func TestAConditionThatClearsAndReturnsIsCarriedAgain(t *testing.T) {
 func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		rights := access.NewStore(db.DB)
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		ana, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		store, signal, ana := hook.store, hook.signal, hook.admin
+		ben, err := access.NewStore(db.DB).Ensure(ctx, "ben@example.com", "Ben", access.Stated(true), nil)
 		if err != nil {
-			t.Fatal(err)
-		}
-		ben, err := rights.Ensure(ctx, "ben@example.com", "Ben", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, ana), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
 			t.Fatal(err)
 		}
 		held := []notify.Holds{{
 			About: "risk-unagreed", Body: "A claim stands with nobody agreeing.",
 			Link: "/reports/approval-quality",
 		}}
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		requests := func() int {
-			saw.mu.Lock()
-			defer saw.mu.Unlock()
-			return saw.requests
-		}
 
 		// Ana's row opens first, so the delivery is claimed for it.
 		for _, step := range []struct {
@@ -773,7 +665,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 			if _, _, err := signal.Once(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if got := requests(); got != step.want {
+			if got := hook.saw.count(); got != step.want {
 				t.Fatalf("%s: the channel was sent %d requests, want %d", step.name, got, step.want)
 			}
 		}
@@ -793,10 +685,9 @@ func TestADestinationSaysWhyItLastFailed(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		// Answers by what it is sent, so each delivery fails its own way.
-		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hook := webhookAnswering(t, db, "chat", notify.Everything, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			switch {
 			case strings.Contains(string(body), "first"):
@@ -807,21 +698,7 @@ func TestADestinationSaysWhyItLastFailed(t *testing.T) {
 				w.WriteHeader(http.StatusNoContent)
 			}
 		}))
-		defer server.Close()
-
-		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, admin), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
+		store, signal, admin := hook.store, hook.signal, hook.admin
 
 		var holding []notify.Holds
 		for _, step := range []struct{ said, want string }{
@@ -859,28 +736,15 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 	// the shape the condition arm above already refuses.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
+		hook := webhookWorld(t, db, "chat", notify.Everything)
+		store, first := hook.store, hook.admin
 		rights := access.NewStore(db.DB)
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, first), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
 
 		// One upload, told to six people, each of them naming the same thing.
 		for i := range 6 {
 			who := first
 			if i > 0 {
+				var err error
 				who, err = rights.Ensure(ctx,
 					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
 				if err != nil {
@@ -897,21 +761,16 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 			}
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if _, _, err := signal.Once(ctx); err != nil {
+		if _, _, err := hook.signal.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		saw.mu.Lock()
-		requests := saw.requests
-		saw.mu.Unlock()
-		if requests != 1 {
+		if requests := hook.saw.count(); requests != 1 {
 			t.Errorf("one upload told to six people was sent %d times", requests)
 		}
 
 		// And the five that rode on the first one's delivery have left the
 		// window, or they hold the front of it for ever.
-		left, err := notify.StillToTell(signal, ctx, "chat")
+		left, err := notify.StillToTell(hook.signal, ctx, "chat")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -927,27 +786,11 @@ func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
 	// night of a build that keeps changing would be silently dropped.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		rights := access.NewStore(db.DB)
-		saw := &took{}
-		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
-		defer server.Close()
-
-		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		store := notify.NewStore(db.DB)
-		if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
-			Name: "chat", Kind: notify.Everything, URL: server.URL, Secret: "a-shared-secret-long-enough",
-		}, nil); err != nil {
-			t.Fatal(err)
-		}
+		hook := webhookWorld(t, db, "chat", notify.Everything)
 
 		for _, upload := range []string{"scan-4", "scan-5"} {
-			if err := store.Tell(ctx, notify.Telling{
-				PersonID: who.ID, Kind: notify.InventoryMoved,
+			if err := hook.store.Tell(ctx, notify.Telling{
+				PersonID: hook.admin.ID, Kind: notify.InventoryMoved,
 				Body: "sonic master broadcom moved a great deal in " + upload,
 				Link: "/scans/" + upload + "/changes", Together: upload,
 			}); err != nil {
@@ -955,15 +798,10 @@ func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
 			}
 		}
 
-		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
-		notify.TrustForTest(signal, server.Client())
-		if _, _, err := signal.Once(ctx); err != nil {
+		if _, _, err := hook.signal.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		saw.mu.Lock()
-		requests := saw.requests
-		saw.mu.Unlock()
-		if requests != 2 {
+		if requests := hook.saw.count(); requests != 2 {
 			t.Errorf("two uploads were sent %d times, want one each", requests)
 		}
 	})
