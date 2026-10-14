@@ -1,0 +1,24 @@
+# Store methods that query with no subject, each with the reason it takes none.
+# One per line: package.Type.Method, a space, and the reason. DESIGN-access
+# § Store methods with no subject holds the three kinds of reason there are.
+
+finding.Store.Apply A background pass: it records what a scanner run found, for the deployment.
+finding.Store.Begin A background pass: it records that a scanner run started.
+finding.Store.Finish A background pass: it records how a scanner run ended.
+finding.Store.LastRecordsVersion A background pass: the scanner asks which CVE record snapshot a build last read.
+finding.Store.Recompute A background pass: it rewrites deadlines and urgency when the policy moves.
+finding.Store.ComponentName Not varying by reader: what one component is called, for an answer about a row the caller already wrote or was authorized for.
+finding.Store.TagsOn A helper over a narrowed read: the finding detail reads it after authorizing the finding.
+finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
+finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
+finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
+finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.
+triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
+triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
+triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
+triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was rated worse.
+triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a record already read under its own authorization.
+triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
+triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
+graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
+graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.

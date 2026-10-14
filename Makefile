@@ -165,7 +165,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-clean engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined release-freeze release-check
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed subjected all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-clean engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined release-freeze release-check
 
 all: check build
 
@@ -655,7 +655,7 @@ openapi:
 
 # Everything CI runs, reachable from one command, except the container and the
 # chart: those need docker and helm, and check-packaging holds them.
-check: build lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed subjected attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -812,6 +812,13 @@ granted:
 # received the approved statements for a whole build.
 narrowed:
 	$(GO) run ./internal/tools/narrowed
+
+# A store method that queries with no subject. Visibility is enforced in the
+# data layer and every query carries one; a method taking none reads whatever a
+# caller's identifier names, whoever asked. The ones that rightly take none are
+# named in the tool's exempt list, each with its reason.
+subjected:
+	$(GO) run ./internal/tools/subjected
 
 # A doc comment describing something other than what it sits on, which is what
 # a file split leaves behind and what nothing else here can see: the code is

@@ -157,7 +157,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 	//
 	// Read on its own, because the issue itself and the places it is written
 	// up are two questions and the screens ask one each.
-	references, err := issues.PointsAt(ctx, id)
+	references, err := issues.PointsAtFor(ctx, subject, id)
 	if err != nil {
 		return "", core.WentWrong(in.Logger, "where this is written up could not be read", err)
 	}

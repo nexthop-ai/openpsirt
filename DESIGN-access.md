@@ -476,6 +476,10 @@ subject is exactly what a leak looks like from the outside.
 3. A question whose answer does not vary by who is asking. Whether a finding is
    suppressed is the same fact for everybody.
 
+The exported methods of the finding, triage and graph stores that query and
+take no subject are each named, with which of the three they are, in a list a
+gate holds them to (`make subjected`, `DESIGN-build.md` § Make targets).
+
 Anything else takes a subject. What a routing rule would catch and which words
 are in use on a product both read findings and both answer for the whole
 product, so a reader reached straight from a request is a product-wide read

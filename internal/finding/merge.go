@@ -348,7 +348,7 @@ func (v *Vulnerabilities) saidOf(ctx context.Context, row Vulnerability) (Named,
 		said.Score = float64(*row.ScoreCenti) / 100
 		said.Vector = row.Vector
 	}
-	references, err := v.PointsAt(ctx, row.ID)
+	references, err := v.pointsAt(ctx, row.ID)
 	if err != nil {
 		return Named{}, err
 	}

@@ -82,7 +82,7 @@ var runs = map[tier][]string{
 	web:         {"web-check", "spdx", "readable", "secrets"},
 	webPackages: {"licenses"},
 	code: {"build", "lint", "vet-other-os", "unreachable", "readable", "negatives", "confined", "granted",
-		"narrowed", "attached", "vendored", "spdx", "pins-check", "sbom-shape", "secrets", "test"},
+		"narrowed", "subjected", "attached", "vendored", "spdx", "pins-check", "sbom-shape", "secrets", "test"},
 	api:     {"openapi-current", "web-api"},
 	engines: {"reserved", "test-all", "check-engines"},
 	modules: {"govulncheck", "licenses", "sbom"},
@@ -100,7 +100,7 @@ var runs = map[tier][]string{
 // The order targets are printed in, which is the order make runs them.
 var order = []string{
 	"build", "lint", "vet-other-os", "unreachable", "readable", "negatives", "reserved", "confined", "granted",
-	"narrowed", "attached", "vendored", "spdx", "pins-check", "secrets",
+	"narrowed", "subjected", "attached", "vendored", "spdx", "pins-check", "secrets",
 	"docs-check", "unclaimed", "openapi-current", "govulncheck", "licenses", "sbom",
 	"test", "sbom-shape", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
 }

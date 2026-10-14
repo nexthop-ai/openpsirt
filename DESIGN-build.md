@@ -131,7 +131,8 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make unreachable` | Exported code nothing reaches |
 | `make negatives` | A 404 built from an error's own text, or given an error as a detail: it asserts a name reaches nothing, and publishes whatever the error carried. Read as parsed Go, so a call spread over lines and an error under any name are one shape. The text counts however it arrives: read with its method, formatted from a value named like an error, or bound to a name earlier in the same declaration |
 | `make granted` | Every function that reaches one grant table reaches the other, by the table's name, by a model whose struct tag binds it under whatever name the model and its package carry, by a type built from such a model as an alias or an embedding, or through a package-level name whose value does. Each package-level name is judged by its own value as well. The functions that legitimately ask one — writing or listing that table's own rows — are named in the gate with a reason each, and a name nothing matches fails it |
-| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by an assignment or by `var` is followed; one used inline without a binding is not |
+| `make narrowed` | A build resolved for somebody brought into one case is read with a subject, or refused before anything is read. A resolution bound by an assignment or by `var` is followed, and so is every value copied, collected or built from it; one used inline without a binding is not. The call around a use that decides is the innermost one |
+| `make subjected` | An exported method of the finding, triage or graph store that builds a query and takes no subject, unless the tool's exempt list names it with the reason it takes none. A method querying through a helper of its own, or taking a subject and not applying it, is not seen |
 | `make attached` | A doc comment describing something other than the declaration it sits on |
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
@@ -172,7 +173,7 @@ query runs both.
 | `web/**` alone | `web-check`, `spdx`, `readable`, `secrets` |
 | the interface's manifest, lockfile or source | `licenses` as well as the interface's tier |
 | the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
-| Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
+| Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
