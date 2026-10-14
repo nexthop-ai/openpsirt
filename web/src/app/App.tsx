@@ -264,7 +264,7 @@ function Resume() {
       role="dialog"
       aria-modal="true"
       aria-label="Your session ended"
-      className="fixed inset-0 z-50 overflow-y-auto bg-[var(--backdrop)] backdrop-blur-sm"
+      className="fixed inset-0 z-[var(--z-resume)] overflow-y-auto bg-[var(--backdrop)] backdrop-blur-sm"
     >
       <SignIn resuming />
     </div>

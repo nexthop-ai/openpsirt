@@ -2300,6 +2300,18 @@ select.triageline {
 .files > li:last-child {
   border-bottom: 0;
 }
+/* Named under the panel, whose own lists are a ruled row of flex items: a
+   file is one block with one rule under it, not a row of columns with a rule
+   above and below. */
+.panel .files {
+  margin-top: 6px;
+  gap: var(--gap-tight);
+}
+.panel .files > li {
+  display: block;
+  border-top: 0;
+  padding: 6px 0;
+}
 
 /* The report catalog: a name on its own line, what it answers beneath it.
    Side by side the two wrap into each other on a narrow screen, and a report

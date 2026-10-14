@@ -102,6 +102,9 @@
   --z-rail-scrim: 48;
   --z-rail: 50;
   --z-modal: 60;
+  /* The way back in after a session ends, over everything: a sheet or the
+     open rail drawn over it would take the clicks meant for signing in. */
+  --z-resume: 70;
 
   /* How far a disabled control is faded, one ratio for every control. At 0.45
      text composites to about 2.2:1 against white, below the floor for text.

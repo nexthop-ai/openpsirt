@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Drawer, Fab } from "./Drawer";
 import { Failed } from "./Failed";
 import { Icon } from "./Icons";
+import { notACredential } from "./noautofill";
 
 // Declaring something into the catalog: an action, not a form above the table.
 // Products, branches and variants are declared rather than discovered — a
@@ -105,18 +106,25 @@ export function FacingField({
 }
 
 // One labeled input, so the forms look like one thing.
+//
+// No field here is a sign-in, so every one says so to a password manager. A
+// secret one is masked and kept out of the browser's form history, which would
+// otherwise hold a signing secret or a token-bearing address and offer it in
+// the next field of the same name.
 export function Field({
   label,
   value,
   onChange,
   placeholder,
   hint,
+  secret = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   hint?: string;
+  secret?: boolean;
 }) {
   const id = `declare-${label.replace(/\s+/g, "-").toLowerCase()}`;
   return (
@@ -124,7 +132,8 @@ export function Field({
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
-        type="text"
+        {...notACredential}
+        {...(secret ? { type: "password", autoComplete: "new-password" } : { type: "text" })}
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}

@@ -1612,6 +1612,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/my-claims.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the outcomes of your own claims
+         * @description What `GET /v1/my-claims` lists, as a file: every claim you proposed, newest first, with what became of each and who did it, rather than one page.
+         *
+         *     Narrowed to what you may still read.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-my-claims"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notes/{id}": {
         parameters: {
             query?: never;
@@ -15407,6 +15431,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BecameOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-my-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

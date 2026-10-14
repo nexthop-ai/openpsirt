@@ -8,7 +8,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./app/App";
 import { Boundary } from "./app/Boundary";
 import { sessionEnded } from "./app/ended";
-import { statusOf } from "./api/queries";
+import { retryable, statusOf } from "./api/queries";
 import "./index.css";
 
 const queries = new QueryClient({
@@ -41,14 +41,7 @@ const queries = new QueryClient({
       // A finding list read a second ago is still the finding list. What
       // changes underneath a reader is a nightly scan, not a keystroke.
       staleTime: 30_000,
-      // A 401 means the session ended, and retrying cannot fix that — it just
-      // delays the sign-in prompt by three round trips. A 409 is an answer
-      // too: "say which one" names the choices, and asking again changes none
-      // of them.
-      retry: (count, error) => {
-        const status = statusOf(error);
-        return status !== 401 && status !== 409 && count < 2;
-      },
+      retry: (count, error) => count < 2 && retryable(error),
       refetchOnWindowFocus: false,
     },
   },

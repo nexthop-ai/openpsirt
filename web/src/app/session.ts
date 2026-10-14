@@ -143,24 +143,32 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 // A full load rather than a route change, because signing out has to drop
 // every cached answer and starting again is the way to be sure.
 //
-// It does not fail. A server that never heard is not something a caller
-// can act on — the drafts are gone, the forward is marked, and the page is
-// already being replaced — and the caller is a click handler, so a rejection
-// there is an unhandled one in the browser console rather than anything
-// anybody sees. The one thing left of the session is a row on the server that
-// expires on its own.
+// It leaves only once the server has ended the session. The server clears the
+// cookie only when it ends the session, so a sign-out it refused or never
+// heard leaves the browser signed in, and on a shared machine the next person
+// to open it would be the last. The answer is whether it ended, and the caller
+// stays and offers it again where it did not. It never rejects: the caller is
+// a click handler, where a rejection is one nobody sees.
 export async function signOut(
-  end: () => Promise<unknown>,
+  end: () => Promise<boolean>,
   go: (where: string) => void,
-): Promise<void> {
+): Promise<boolean> {
   forgetAll();
   forgetSession();
+  let ended: boolean;
   try {
-    await end();
+    ended = await end();
   } catch {
-    // Said above: there is nothing to do with it and nowhere to say it.
-  } finally {
-    rememberForward();
-    go(signedOutHere);
+    ended = false;
   }
+  if (!ended) return false;
+  rememberForward();
+  go(signedOutHere);
+  return true;
+}
+
+// Whether a sign-out's answer means nobody is signed in on this browser any
+// more: the session ended, or there was none to end.
+export function signedOutBy(status: number): boolean {
+  return (status >= 200 && status < 300) || status === 400 || status === 401;
 }

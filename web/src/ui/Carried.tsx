@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterClaim } from "../api/claims";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -19,6 +20,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
   const [from, setFrom] = useState("");
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const queries = useQueryClient();
+  const after = useAfterClaim();
 
   // The other lines of this product, to carry from.
   const streams = useQuery({
@@ -53,7 +55,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
     onSuccess: async () => {
       setPicked(new Set());
       await queries.invalidateQueries({ queryKey: ["carried"] });
-      await queries.invalidateQueries({ queryKey: ["queue"] });
+      after();
     },
   });
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Refused, at, notYours, statusOf, unwrap } from "./queries";
+import { Refused, at, notYours, retryable, statusOf, unwrap } from "./queries";
 
 const answered = (status: number, statusText: string, error?: unknown) => ({
   error,
@@ -126,5 +126,20 @@ describe("the choices a refusal offers", () => {
 
   it("reads nothing from something that is not a refusal", () => {
     expect(at(new Error("network"), "component")).toEqual([]);
+  });
+});
+
+describe("whether a failed read is asked again", () => {
+  it("leaves every refusal as the answer it is", () => {
+    for (const status of [400, 401, 403, 404, 409, 422]) {
+      expect(retryable(new Refused(status, "no")), String(status)).toBe(false);
+    }
+  });
+
+  it("asks again after a fault, a timeout, a rate limit or no answer at all", () => {
+    for (const status of [408, 429, 500, 503]) {
+      expect(retryable(new Refused(status, "later")), String(status)).toBe(true);
+    }
+    expect(retryable(new TypeError("Failed to fetch"))).toBe(true);
   });
 });

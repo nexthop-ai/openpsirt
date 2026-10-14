@@ -36,6 +36,9 @@ export function Advisories() {
   const [offset, setOffset] = useState(0);
   const rows = useAdvisories(offset);
   const [starting, setStarting] = useState(false);
+  // An advisory name minted by a start whose naming was refused, kept for the
+  // next attempt.
+  const [minted, setMinted] = useState("");
   const who = useWho();
   // Whoever may record a flaw in a product may write an advisory about one,
   // which is the server's own gate. Drawn to somebody holding no triage
@@ -60,7 +63,16 @@ export function Advisories() {
         )}
       </div>
 
-      {starting && <Start onStarted={(made) => navigate(advisoryAt(made))} />}
+      {starting && (
+        <Start
+          minted={minted}
+          onMinted={setMinted}
+          onStarted={(made) => {
+            setMinted("");
+            navigate(advisoryAt(made));
+          }}
+        />
+      )}
 
       {items.length === 0 ? (
         <Empty
@@ -123,18 +135,26 @@ export function Advisories() {
 // Two requests, because they are two acts on the server: a name is minted,
 // then the flaw is named on it. A name already minted is kept for the next
 // attempt when the naming is refused, so a mistyped identifier does not spend
-// another number from the year's sequence.
-function Start({ onStarted }: { onStarted: (advisory: string) => void }) {
+// another number from the year's sequence. The name is held by the screen
+// rather than the card, so closing the card and opening it again keeps it.
+function Start({
+  minted,
+  onMinted,
+  onStarted,
+}: {
+  minted: string;
+  onMinted: (advisory: string) => void;
+  onStarted: (advisory: string) => void;
+}) {
   const [product, setProduct] = useState("");
   const [flaw, setFlaw] = useState("");
-  const [minted, setMinted] = useState("");
   const after = useAfterAdvisory();
   const start = useMutation({
     mutationFn: async () => {
       let name = minted;
       if (name === "") {
         name = unwrap(await api.POST("/v1/advisories", { body: {} })).advisory;
-        setMinted(name);
+        onMinted(name);
       }
       unwrap(
         await api.POST("/v1/advisories/{advisory}/issues", {

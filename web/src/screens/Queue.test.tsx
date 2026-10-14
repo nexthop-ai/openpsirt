@@ -13,7 +13,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const exports = () =>
   Array.from(mount.host().querySelectorAll<HTMLAnchorElement>("a")).filter((each) =>
-    each.getAttribute("href")?.startsWith("/v1/review-queue."),
+    /^\/v1\/(review-queue|my-claims)\./.test(each.getAttribute("href") ?? ""),
   );
 
 describe("the review queue", () => {
@@ -35,6 +35,16 @@ describe("the review queue", () => {
     expect(exports().map((each) => each.getAttribute("href"))).toEqual([
       "/v1/review-queue.csv?severity=high",
       "/v1/review-queue.json?severity=high",
+    ]);
+  });
+
+  it("exports what became of your claims on the Mine tab", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    mount.render(screen(<Queue />, "/review-queue?mine=1&severity=high"));
+    await settle();
+    expect(exports().map((each) => each.getAttribute("href"))).toEqual([
+      "/v1/my-claims.csv",
+      "/v1/my-claims.json",
     ]);
   });
 

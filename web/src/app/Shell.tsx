@@ -21,7 +21,7 @@ import {
 } from "./routes";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
-import { mayOf, signOut } from "./session";
+import { mayOf, signedOutBy, signOut } from "./session";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -656,6 +656,10 @@ function Group({
 // The signed-in person, with the look menu and the way out underneath.
 function Me({ who }: { who: Who }) {
   const [open, setOpen] = useState(false);
+  // A sign-out in flight, and one the server did not complete, which keeps
+  // the page and offers it again.
+  const [leaving, setLeaving] = useState(false);
+  const [stuck, setStuck] = useState(false);
   // The choice made, and the machine's own answer. They differ for somebody who
   // has chosen nothing: the operating system is answering, and the menu has to
   // show which of the two that came out as while still marking the choice as
@@ -754,16 +758,28 @@ function Me({ who }: { who: Who }) {
             // asserted: what makes it correct is which parts run before the
             // await and outside the try, and a click handler is not somewhere
             // a test can reach that from.
-            onClick={() =>
-              signOut(
-                () => api.DELETE("/v1/session", {}),
+            disabled={leaving}
+            onClick={() => {
+              setLeaving(true);
+              setStuck(false);
+              void signOut(
+                async () => signedOutBy((await api.DELETE("/v1/session", {})).response.status),
                 (where) => window.location.assign(where),
-              )
-            }
+              ).then((ended) => {
+                if (ended) return;
+                setLeaving(false);
+                setStuck(true);
+              });
+            }}
           >
-            Sign out
+            {stuck ? "Try signing out again" : "Sign out"}
             <span className="tag">{who.identity}</span>
           </button>
+          {stuck && (
+            <p className="hint" role="alert" style={{ margin: "4px 10px" }}>
+              Sign-out didn&rsquo;t reach the server. You&rsquo;re still signed in here.
+            </p>
+          )}
         </div>
       )}
     </div>

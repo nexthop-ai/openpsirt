@@ -1,8 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterClaim } from "../api/claims";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap, whichOf } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
@@ -283,7 +284,7 @@ export function Decide({
   // a value merged into what is on screen — "start from this" means this and
   // not what somebody had half written — so the screen that offers one mounts
   // the form again, and the fields below seed themselves from it.
-  const queries = useQueryClient();
+  const after = useAfterClaim();
   const draftKey = draftKeyFor(at);
   // The draft chosen here and not sent, read once as the form is built.
   //
@@ -561,10 +562,7 @@ export function Decide({
       rememberUsed({ outcome, justification: reason });
       forget(draftKey);
       setReviewing(false);
-      void queries.invalidateQueries({ queryKey: ["finding"] });
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-      void queries.invalidateQueries({ queryKey: ["queue"] });
-      void queries.invalidateQueries({ queryKey: ["home"] });
+      after();
       onDone(recorded);
     },
   });

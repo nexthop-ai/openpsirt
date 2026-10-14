@@ -63,6 +63,7 @@ export function Queue() {
   const [refused, setRefused] = useState(0);
   const approveClaim = useApproveClaim();
   const queries = useQueryClient();
+  const afterClaim = useAfterClaim();
   const undo = useMutation({
     mutationFn: async (name: string) =>
       unwrap(
@@ -232,7 +233,7 @@ export function Queue() {
   // taken from rather than being the whole backlog under a narrowed heading.
   const exporting = new URLSearchParams();
   if (!aside && reason !== "approval") exporting.set("reason", reason);
-  if (mine || (!aside && own && reason !== "approval")) exporting.set("mine", "true");
+  if (!aside && own && reason !== "approval") exporting.set("mine", "true");
   if (product) exporting.set("product", product);
   if (!aside) {
     for (const [key, value] of Object.entries(narrowing)) {
@@ -242,6 +243,11 @@ export function Queue() {
     }
   }
   const asked = [...exporting].length > 0 ? "?" + exporting.toString() : "";
+  // The file the tab on screen was taken from. Mine lists every claim its
+  // reader proposed, whatever became of it, which the queue's own file does
+  // not hold; it has a file of its own.
+  const file = mine ? "/v1/my-claims" : "/v1/review-queue";
+  const fileQuery = mine ? "" : asked;
   const claims = (queue.data?.items ?? []).map(claimOf);
   const records = claims.reduce((sum, c) => sum + c.records, 0);
   const words = wordsFor(reason);
@@ -319,16 +325,16 @@ export function Queue() {
             </>
           )}
         </p>
-        {/* The backlog as a file. One row per claim, the way this
+        {/* The list on screen as a file. One row per claim, the way this
             screen counts them, because that is the unit somebody works
             through. There is no file of what is to re-affirm, so that tab
-            offers none rather than the queue under its heading. */}
+            offers none rather than another list under its heading. */}
         {!reaffirm && (
           <span style={{ marginLeft: "auto" }}>
-            <a className="btn quiet" href={`/v1/review-queue.csv${asked}`}>
+            <a className="btn quiet" href={`${file}.csv${fileQuery}`}>
               CSV
             </a>{" "}
-            <a className="btn quiet" href={`/v1/review-queue.json${asked}`}>
+            <a className="btn quiet" href={`${file}.json${fileQuery}`}>
               JSON
             </a>
           </span>
@@ -539,8 +545,7 @@ export function Queue() {
           query={lapsedMine}
           onDone={() => {
             void queries.invalidateQueries({ queryKey: ["to-reaffirm"] });
-            void queries.invalidateQueries({ queryKey: ["my-claims"] });
-            void queries.invalidateQueries({ queryKey: ["queue"] });
+            afterClaim();
           }}
         />
       ) : mine ? (
@@ -628,7 +633,6 @@ function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked
   const [by, setBy] = useState("");
   const [because, setBecause] = useState("");
   const [moved, setMoved] = useState(false);
-  const queries = useQueryClient();
   const after = useAfterClaim();
   // The queue is read again only once the confirmation is put away. The
   // promise leaves this list when its date moves, and the card carrying the
@@ -644,9 +648,7 @@ function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked
     onSuccess: () => {
       setMoving(false);
       setMoved(true);
-      for (const key of [["claim"], ["decision"], ["finding"], ["findings"], ["my-claims"]]) {
-        void queries.invalidateQueries({ queryKey: key });
-      }
+      after();
     },
   });
   const decideAgain = f ? findingPath(f) : claimAt(claim.id);

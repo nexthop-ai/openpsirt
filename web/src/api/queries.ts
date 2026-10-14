@@ -32,6 +32,16 @@ export function statusOf(error: unknown): number | undefined {
   return error instanceof Refused ? error.status : undefined;
 }
 
+// Whether asking again could get a different answer. A refusal is an answer:
+// 403 and 404 say what is visible, 400 and 422 what was asked wrongly, 401
+// that the session ended, 409 which of several was meant. Retrying any of
+// those delays the answer by three round trips. A fault, a request that never
+// arrived, a timeout and a rate limit can each go differently next time.
+export function retryable(error: unknown): boolean {
+  const status = statusOf(error);
+  return status === undefined || status >= 500 || status === 408 || status === 429;
+}
+
 // A refusal that is the server saying this is not somebody's to see.
 //
 // A card that is quiet for one person and drawn for another is the shape

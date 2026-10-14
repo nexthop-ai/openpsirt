@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterClaim } from "../api/claims";
 import { notACredential } from "../ui/noautofill";
 import { Icon } from "../ui/Icons";
 import { useMemo, useState } from "react";
@@ -86,6 +87,7 @@ export function Together() {
   const [typed, setTyped] = useState(contains);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const queries = useQueryClient();
+  const after = useAfterClaim();
   const opener = useRowOpener();
 
   const at = { product, stream, variant, component };
@@ -129,7 +131,7 @@ export function Together() {
       forget(draftKey);
       setPicked(new Set());
       void queries.invalidateQueries({ queryKey: ["at-component"] });
-      void queries.invalidateQueries({ queryKey: ["queue"] });
+      after();
     },
   });
 

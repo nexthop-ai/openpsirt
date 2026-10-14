@@ -196,11 +196,13 @@ export function Webhooks() {
           value={url}
           onChange={setUrl}
           placeholder="https://hooks.example.com/services/…"
+          secret
         />
         <Field
           label="Signing secret"
           value={secret}
           onChange={setSecret}
+          secret
           hint="At least 16 characters. It signs our requests rather than authenticating anybody to us, and no endpoint ever returns it."
         />
       </Declare>

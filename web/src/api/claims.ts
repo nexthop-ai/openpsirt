@@ -106,10 +106,11 @@ export function useQueueCount(product?: string, options: { enabled?: boolean } =
   });
 }
 
-// Anything that changes a claim invalidates the same set: the queue it may
-// have left, the decisions it wrote, and the findings they hang off.
+// Anything that makes or changes a claim invalidates the same set: the queue it
+// may have joined or left, the decisions it wrote, and the findings they hang
+// off.
 //
-// One list, shared by every act on a claim. A revision takes back every
+// One list, shared by every act on a claim, recording one included. A revision takes back every
 // standing approval, and a set missing the claim's own blocks leaves the
 // approvals beside the editor showing the old approval as standing — the one
 // state the second-person control exists to make visible, reported wrong at

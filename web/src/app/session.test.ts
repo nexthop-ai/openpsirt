@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mayOf, signOut } from "./session";
+import { mayOf, signedOutBy, signOut } from "./session";
 import type { Who } from "./session";
 import { belongTo, keep, restore } from "./drafts";
 
@@ -31,7 +31,7 @@ describe("signing out", () => {
         // Read inside the call the sequence awaits, which is the only place
         // that can tell "before" from "after".
         clearedFirst = restore("revise:1") === "";
-        return Promise.resolve();
+        return Promise.resolve(true);
       },
       () => {},
     ).then(() => {
@@ -49,23 +49,39 @@ describe("signing out", () => {
     expect(restore("revise:2")).toBe("");
   });
 
-  it("marks the forward and leaves, whether or not the server answered", async () => {
+  it("marks the forward and leaves once the server has ended the session", async () => {
     // Both halves, because either alone signs somebody straight back in where
     // there is one provider: the address is lost the moment somebody presses
     // Back, and the tab's mark is what survives it.
+    const went = vi.fn();
+    expect(await signOut(() => Promise.resolve(true), went)).toBe(true);
+    expect(went).toHaveBeenCalledTimes(1);
+    expect(String(went.mock.calls[0]?.[0])).toContain("signed-out");
+    expect(window.sessionStorage.length, "nothing marks the forward in this tab").toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("stays, with drafts cleared, where the server did not end the session", async () => {
+    // The server clears the cookie only when it ends the session, so leaving
+    // here hands the next person on this browser a live session.
     for (const end of [
-      () => Promise.resolve(),
+      () => Promise.resolve(false),
       () => Promise.reject(new Error("the network went away")),
     ]) {
-      window.sessionStorage.clear();
+      keep("revise:3", "text nobody outside should ever see");
       const went = vi.fn();
-      await signOut(end, went);
-      expect(went).toHaveBeenCalledTimes(1);
-      expect(String(went.mock.calls[0]?.[0])).toContain("signed-out");
-      expect(window.sessionStorage.length, "nothing marks the forward in this tab").toBeGreaterThan(
-        0,
-      );
+      expect(await signOut(end, went)).toBe(false);
+      expect(went).not.toHaveBeenCalled();
+      expect(restore("revise:3")).toBe("");
     }
+  });
+
+  it("reads a refusal for want of any session as signed out", () => {
+    expect(signedOutBy(204)).toBe(true);
+    expect(signedOutBy(401)).toBe(true);
+    expect(signedOutBy(503)).toBe(false);
+    expect(signedOutBy(500)).toBe(false);
   });
 });
 

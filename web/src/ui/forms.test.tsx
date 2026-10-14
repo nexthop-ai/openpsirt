@@ -10,6 +10,7 @@ import { forecast } from "./Decide";
 import { classesOf } from "./outcomes";
 import { PUBLISHED } from "../test/outcomes";
 import { Editor } from "./Editor";
+import { Field } from "./Declare";
 import { revisionStart } from "./ReasonEditor";
 import { Scoring } from "./Scoring";
 import { pasted } from "./Words";
@@ -227,5 +228,22 @@ describe("carrying decisions from another line", () => {
     pick("202505");
     await settle();
     expect(carry()?.textContent).not.toContain("Carry 1");
+  });
+});
+
+describe("a declaration form's field", () => {
+  it("masks a secret and keeps it out of the browser's form history", () => {
+    mount.render(<Field label="Signing secret" value="" onChange={() => undefined} secret />);
+    const input = mount.host().querySelector("input");
+    expect(input?.type).toBe("password");
+    expect(input?.getAttribute("autocomplete")).toBe("new-password");
+    expect(input?.getAttribute("data-lpignore")).toBe("true");
+  });
+
+  it("tells a password manager an ordinary field is not a credential", () => {
+    mount.render(<Field label="Name" value="" onChange={() => undefined} />);
+    const input = mount.host().querySelector("input");
+    expect(input?.type).toBe("text");
+    expect(input?.getAttribute("autocomplete")).toBe("off");
   });
 });

@@ -42,6 +42,7 @@ func registerMoreExports(api huma.API, in core.Deps) {
 	registerChangeExport(api, in)
 	registerTrendExport(api, in)
 	registerQueueExport(api, in)
+	registerMyClaimsExport(api, in)
 	registerComponentExport(api, in)
 	registerDueExport(api, in)
 	registerComparisonExport(api, in)

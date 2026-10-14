@@ -4,7 +4,7 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Decide, type At } from "./Decide";
-import { accept, mounted, screen, serve, settle } from "../test/mount";
+import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
 import { PUBLISHED } from "../test/outcomes";
 
 const mount = mounted();
@@ -124,7 +124,7 @@ describe("proposing a deferral past the threshold", () => {
 });
 
 describe("the decision form's Ctrl+Enter", () => {
-  async function ready() {
+  async function ready(queries = client()) {
     serve((path) => {
       if (path === "/v1/session/me") {
         return {
@@ -154,6 +154,9 @@ describe("the decision form's Ctrl+Enter", () => {
           />
           <textarea aria-label="A comment elsewhere" />
         </>,
+        "/",
+        "*",
+        queries,
       ),
     );
     await settle();
@@ -193,5 +196,17 @@ describe("the decision form's Ctrl+Enter", () => {
     press(host.querySelector('textarea[aria-label="A comment elsewhere"]'));
     await settle();
     expect(sent()).toHaveLength(0);
+  });
+
+  it("refreshes everything a new claim changes, the proposer's own list among it", async () => {
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
+    const { sent, reasoning } = await ready(queries);
+    press(reasoning);
+    await settle();
+    expect(sent()).toHaveLength(1);
+    expect(invalidated()).toEqual(
+      expect.arrayContaining(["my-claims", "decided", "decision", "claim", "finding", "findings"]),
+    );
   });
 });

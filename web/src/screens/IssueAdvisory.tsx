@@ -176,8 +176,11 @@ export function IssueAdvisory({
                 value={product}
                 onChange={(event) => {
                   setProduct(event.target.value);
+                  // A name minted by an attempt that failed is kept, so trying
+                  // the other product does not spend another number. One that
+                  // already covers this issue is finished with.
+                  if (draft.data) setAdvisory("");
                   draft.reset();
-                  setAdvisory("");
                 }}
               >
                 {products.map((each) => (

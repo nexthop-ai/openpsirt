@@ -9,6 +9,7 @@
 // question, which is why they are one file: what does the record say, and how
 // did it come to say that.
 
+import { useAfterClaim } from "../api/claims";
 import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
 import { at, on } from "../ui/when";
@@ -618,7 +619,7 @@ function Prior({
   undecided: boolean;
   onReuse: (reasoning: string, outcome: string, justification: string) => void;
 }) {
-  const queries = useQueryClient();
+  const after = useAfterClaim();
   const [note, setNote] = useState("");
   const [asking, setAsking] = useState(false);
   // What reaffirming answered, said on the card it was done from.
@@ -637,9 +638,7 @@ function Prior({
     onSuccess: (made) => {
       setAsking(false);
       setDone({ claimId: made.claim_id ?? 0, waiting: !!made.needs_approval });
-      void queries.invalidateQueries({ queryKey: ["finding"] });
-      void queries.invalidateQueries({ queryKey: ["decided"] });
-      void queries.invalidateQueries({ queryKey: ["queue"] });
+      after();
     },
   });
   const lapsed = item.state === "lapsed";
