@@ -420,8 +420,11 @@ cumulative threshold refuses a *further* deferral past a point, one item at a
 time; what it cannot show is the shape across everything, and one item deferred
 three times is a judgment where forty of them is a policy nobody wrote down.
 
-Counted over the judgments rather than the findings they cover. A withdrawn
-deferral is not time anything spent put off.
+Counted over the claims rather than the findings they cover: how often is how
+many claims put the place off, and how long is the time it was put off for,
+counted the way the deferral threshold counts it (`DESIGN-triage.md` § The
+deferral threshold). A withdrawn or lapsed deferral counts for the part that
+ran, and stretches that overlap count once.
 
 ## Subtree trends
 
