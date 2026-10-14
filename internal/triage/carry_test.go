@@ -301,6 +301,44 @@ func TestSomebodyWhoMayNotDecideHereCarriesNothing(t *testing.T) {
 	})
 }
 
+func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
+	// The visibility a carried judgment is written at is the new line's. A
+	// triager of disclosed work carrying a disclosed judgment onto a line
+	// where the place is undisclosed would write on work they may not argue
+	// about, so it is neither offered nor written.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.agreed(t, f.at())
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("visibility = ?", access.Private).
+			Where("target_id = ?", next).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered.Moved) != 0 {
+			t.Errorf("a place undisclosed on the new line was offered: %+v", offered.Moved)
+		}
+		if _, err := f.store.Carry(ctx, f.triager, was, next,
+			[]int64{agreed.ID}, triage.DefaultBounds()); err == nil {
+			t.Error("a judgment was carried onto a place undisclosed to its carrier")
+		}
+		written, err := f.db.DB.NewSelect().Model((*triage.Decision)(nil)).
+			Where("visibility = ?", access.Private).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if written != 0 {
+			t.Errorf("%d undisclosed decisions were written by somebody who may not argue them", written)
+		}
+	})
+}
+
 // anotherLine declares a build of this product holding the fixture's own place
 // at the given versions, and returns its target.
 //

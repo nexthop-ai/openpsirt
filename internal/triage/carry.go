@@ -152,9 +152,12 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 				by := *old.CommittedTo
 				proposal.CommittedTo = &by
 			}
-			// The same check every other write path makes: a dated judgment
-			// is refused on a line built once, as it is when proposed there.
-			if err := proposal.valid(s.now()); err != nil {
+			// The same checks every other write path makes, asked of the
+			// place it lands at: the visibility there is the new line's,
+			// which may be undisclosed where the old line's was not, and a
+			// dated judgment is refused on a line built once, as it is when
+			// proposed there.
+			if err := permitted(subject, []Proposal{proposal}, s.now()); err != nil {
 				return fmt.Errorf("carry decision %d: %w", one.DecisionID, err)
 			}
 			// The inner form, because this is already inside a transaction:
@@ -368,7 +371,11 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// Carried so a postponement can be told how long it has already run.
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		PlaceIdentity   string `bun:"place_identity"`
+		// Landing is the visibility the place has on the new line, which is
+		// what a carried judgment would be written at.
+		Landing string `bun:"landing"`
 	}
+	undisclosed, private := access.AnyPrivate("f.visibility")
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The issue each decision is read as, which is the one the new line holds.
@@ -399,6 +406,13 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
 			AS "still_there"`, toTarget).
+		// The visibility the place lands at, read as placeOnLine reads it.
+		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
+				WHEN `+undisclosed+` THEN ? ELSE ? END
+			FROM "finding" AS "f"
+			WHERE f.target_id = ? AND f.vulnerability_id = dv.issue_id
+			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
+			AS "landing"`, private, string(access.Private), string(access.Public), toTarget).
 		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
 			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
@@ -418,6 +432,12 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		if !row.StillThere {
 			carried.Absent++
+			continue
+		}
+		// A place this subject may not argue about on the new line is not
+		// theirs to carry onto, and not theirs to count: the new line's
+		// contents there are undisclosed to them.
+		if !mayDecideOn(subject, productID, row.VulnerabilityID, access.AsVisibility(row.Landing)) {
 			continue
 		}
 		if row.Was == row.Now && row.ConsumerWas == row.ConsumerNow {
