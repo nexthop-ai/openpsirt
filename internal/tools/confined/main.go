@@ -34,7 +34,10 @@ import (
 // some of them accept.
 var asking = regexp.MustCompile(
 	`(database\.Postgres|database\.MySQL|database\.MariaDB|database\.SQLite|` +
-		`mysql\.MySQLError|pgconn\.PgError|` +
+		`mysql\.MySQLError|pgconn\.PgError|sqlite\.Error|` +
+		// bun's own names for the engines, which a branch on the handle's
+		// dialect compares against.
+		`dialect\.(?:PG|MySQL|SQLite|MSSQL)\b|` +
 		// The handle is asked which engine it is, which is how a branch is
 		// written without naming a constant. It was not looked for at all, so
 		// the one live branch in the tree that spells it this way —
@@ -77,38 +80,50 @@ var allowed = []string{
 	"internal/tools/reserved/",
 }
 
+// violations is every line of one file that asks an engine directly, outside
+// where that is allowed. A file on the allowed list has none.
+func violations(path string, text []byte) []string {
+	for _, where := range allowed {
+		if strings.HasPrefix(path, where) {
+			return nil
+		}
+	}
+	var bad []string
+	for i, line := range strings.Split(string(text), "\n") {
+		// Comments name engines constantly, and correctly: what is being
+		// looked for is code that branches on one.
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		// Choosing which engine a test runs on is not branching a query on
+		// one. `dbtest.Only(t, database.SQLite, …)` says this question has
+		// the same answer everywhere and is asked once — which is the
+		// distinction the whole rule is about, and the reason the harness
+		// itself is allowed to name all four.
+		if selecting.MatchString(line) {
+			continue
+		}
+		if match := asking.FindString(line); match != "" {
+			bad = append(bad, fmt.Sprintf("%s:%d: %s", path, i+1, match))
+		}
+	}
+	return bad
+}
+
 func main() {
 	var bad []string
 	// web holds the interface, which reaches no engine at all: it talks to
 	// this server over HTTP.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, text []byte) error {
-		for _, where := range allowed {
-			if strings.HasPrefix(path, where) {
-				return nil
-			}
-		}
-		for i, line := range strings.Split(string(text), "\n") {
-			// Comments name engines constantly, and correctly: what is being
-			// looked for is code that branches on one.
-			if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
-				continue
-			}
-			// Choosing which engine a test runs on is not branching a query on
-			// one. `dbtest.Only(t, database.SQLite, …)` says this question has
-			// the same answer everywhere and is asked once — which is the
-			// distinction the whole rule is about, and the reason the harness
-			// itself is allowed to name all four.
-			if selecting.MatchString(line) {
-				continue
-			}
-			if match := asking.FindString(line); match != "" {
-				bad = append(bad, fmt.Sprintf("%s:%d: %s", path, i+1, match))
-			}
-		}
+		bad = append(bad, violations(path, text)...)
 		return nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if read == 0 {
+		fmt.Fprintln(os.Stderr, "no Go file was read, so this checked nothing")
 		os.Exit(2)
 	}
 	if len(bad) == 0 {

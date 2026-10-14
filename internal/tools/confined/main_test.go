@@ -22,6 +22,9 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"a named engine", "\tif db.Engine == database.Postgres {", true},
 		{"MySQL's own error type", "\tvar fault *mysql.MySQLError", true},
 		{"PostgreSQL's own error type", "\tvar fault *pgconn.PgError", true},
+		{"SQLite's own error type", "\tvar lite *sqlite.Error", true},
+		{"bun's name for an engine", "\tif db.Dialect().Name() == dialect.PG {", true},
+		{"bun's name for an engine, alone", "\tcase dialect.SQLite:", true},
 		{
 			// Written without naming a constant, which is how the one live
 			// branch in the tree spells it — and it was not looked for at all,
@@ -94,5 +97,17 @@ func TestWhereAnEngineMayBeNamedIsTheListTheDocumentHolds(t *testing.T) {
 		if !found {
 			t.Errorf("%q is not allowed to name an engine", want)
 		}
+	}
+}
+
+func TestAFileOutsideTheAllowedPathsIsReportedAndOneInsideIsNot(t *testing.T) {
+	text := []byte("package finding\n\n// sqlite.Error is named in a comment\n" +
+		"func f(err error) {\n\tvar lite *sqlite.Error\n\t_ = errors.As(err, &lite)\n}\n")
+	got := violations("internal/finding/x.go", text)
+	if len(got) != 1 || !strings.HasPrefix(got[0], "internal/finding/x.go:5:") {
+		t.Errorf("outside the allowed paths, got %q, want the one line of code", got)
+	}
+	if got := violations("internal/database/x.go", text); got != nil {
+		t.Errorf("inside the database package, got %q, want nothing", got)
 	}
 }
