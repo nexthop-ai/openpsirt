@@ -629,7 +629,15 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 // work.
 func seenBy(ctx context.Context, in core.Deps, identity string, productID int64, undisclosed bool) bool {
 	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
-	if err != nil {
+	switch {
+	case errors.Is(err, access.ErrDenied):
+		// Somebody granted nothing, or nobody: there is no one to tell.
+		return false
+	case err != nil:
+		// A read that failed drops the notice, and says so: a notification
+		// that could not be sent is logged rather than failing the act.
+		in.Log().ErrorContext(ctx, "could not say that work was assigned",
+			"person", identity, "error", err)
 		return false
 	}
 	if undisclosed {
