@@ -43,7 +43,7 @@ func TestOneIssueUnderTwoNamesIsOneIssue(t *testing.T) {
 			t.Errorf("the same issue under another name wrote %+v", applied)
 		}
 
-		var issues int
+		var issues int64
 		if issues, err = f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).Count(t.Context()); err != nil {
 			t.Fatal(err)
 		}

@@ -138,7 +138,7 @@ func (s *Store) registerSize(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return 0, fmt.Errorf("count what this build holds: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // registerNarrowing is the one place that says which of a build's findings a
@@ -187,7 +187,7 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 
 	var rows []registerRow
 	err = only.narrow(s.registerQuery(productID, narrow)).
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what was decided about this build: %w", err)

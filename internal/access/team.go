@@ -170,7 +170,7 @@ func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, erro
 		// "all of them" fell past the 200 ceiling and took the 50-row default
 		// — so a deployment past fifty teams rendered every routing rule owned
 		// by an alphabetically-later team with a blank team name.
-		Limit(database.InBulk.Of(limit))
+		Limit(int64(database.InBulk.Of(limit)))
 	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams there are: %w", err)
 	}
@@ -186,7 +186,7 @@ func (s *Store) CountTeams(ctx context.Context, term string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("count which teams there are: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // narrowTeams is the team listing's own matching, spelled once so the listing

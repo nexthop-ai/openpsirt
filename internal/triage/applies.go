@@ -343,7 +343,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 
 	var decisions []Decision
 	if err := narrow(s.db.NewSelect().Model(&decisions)).Relation("Claim").
-		Order("de.id DESC").Limit(limit).Offset(offset).Scan(ctx); err != nil {
+		Order("de.id DESC").Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, nil, 0, fmt.Errorf("read what was decided: %w", err)
 	}
 
@@ -354,5 +354,5 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	return decisions, reasoning, total, nil
+	return decisions, reasoning, int(total), nil
 }

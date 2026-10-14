@@ -57,7 +57,7 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	// variants of one release commonly share the identifier, and a statement
 	// about one of them is not about the other. Sent with each inventory, the
 	// statements are told apart by the upload they arrive in.
-	var holding int
+	var holding int64
 	if rootBase != "" {
 		if holding, err = tx.NewSelect().
 			TableExpr(`"target" AS "t"`).

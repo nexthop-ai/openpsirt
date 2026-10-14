@@ -353,7 +353,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
-		Limit(s.carrying() + 1)
+		Limit(int64(s.carrying() + 1))
 	// Every open place agreed, and agreed the same way.
 	err := finding.WhollyCovered(q, named.ProductID, visible, finding.ForStatements).Scan(ctx, &rows)
 	if err != nil {
@@ -626,7 +626,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 				AND o.closed_at IS NULL AND oc.name = c.name
 				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
 		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
-		Limit(s.carrying()+1).
+		Limit(int64(s.carrying()+1)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what the build's patches fix: %w", err)
@@ -769,7 +769,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		// format names the component once: credited to either, the document
 		// says one of them spoke for the other's.
 		Having("COUNT(DISTINCT f.stated_by) = 1").
-		Limit(s.carrying()+1).
+		Limit(int64(s.carrying()+1)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)

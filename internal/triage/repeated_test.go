@@ -64,7 +64,7 @@ func (f *fixture) putOffAt(t *testing.T, product int64, place string, from, unti
 	}
 	// The key carries the product, as a real one does: two products may hold
 	// the same place and both may be decided about.
-	live := fmt.Sprintf("%d\x00%s%s", product, place, until.Format(time.RFC3339Nano))
+	live := fmt.Sprintf("%d|%s|%s", product, place, until.Format(time.RFC3339Nano))
 	row := &triage.Decision{
 		ClaimID: claim.ID, ProductID: product, VulnerabilityID: f.issue,
 		PlaceIdentity: place, Visibility: access.Public,

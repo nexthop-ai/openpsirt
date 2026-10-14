@@ -142,10 +142,10 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 	if err != nil {
 		return nil, 0, fmt.Errorf("count what keeps being put off: %w", err)
 	}
-	if err := q.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+	if err := q.Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what keeps being put off: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // deferredDays sums how long each deferral ran for, in whole days, through the

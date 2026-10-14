@@ -608,7 +608,7 @@ func trailed(t *testing.T, f *fixture, name string) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 func TestTwoRetirementsAtOnceRecordOneAct(t *testing.T) {

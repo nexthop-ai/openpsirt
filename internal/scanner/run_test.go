@@ -680,7 +680,7 @@ func (f *runFixture) finishedRunsOn(t *testing.T, target int64) int {
 	if err != nil {
 		t.Fatalf("count the scan runs: %v", err)
 	}
-	return n
+	return int(n)
 }
 
 // recording keeps the worst thing a loop said, so a test can assert that
@@ -834,7 +834,7 @@ func (f *runFixture) runs(t *testing.T) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 // snapshotFile is a snapshot of no records, taken at a known moment.

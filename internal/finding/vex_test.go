@@ -469,7 +469,7 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 		// a pass before was given.
 		var given []int64
 		if err := f.db.DB.NewSelect().TableExpr(`"vex_statement"`).Column("id").Order("id").
-			Limit(len(claims)).Scan(ctx, &given); err != nil {
+			Limit(int64(len(claims))).Scan(ctx, &given); err != nil {
 			t.Fatal(err)
 		}
 		for i := range claims {

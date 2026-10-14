@@ -477,7 +477,7 @@ func (f *readerFixture) jobsFor(t *testing.T, scanID int64) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {

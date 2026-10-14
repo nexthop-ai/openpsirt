@@ -249,7 +249,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	}
 	if err := paged(s.db, page, "product_id", "vulnerability_id", "fold", "component_id",
 		"places", "urgency").OrderExpr(sorted).
-		Limit(limit).Offset(offset).Scan(ctx, &heads); err != nil {
+		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open anywhere: %w", err)
 	}
 	total := 0

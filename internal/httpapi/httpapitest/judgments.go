@@ -173,7 +173,7 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 			t.Fatal(err)
 		}
 	}
-	var lapsed int
+	var lapsed int64
 	lapsed, err := r.DB.DB.NewSelect().Table("decision").
 		Where("claim_id = ?", made.ClaimID).Where("state = ?", "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {

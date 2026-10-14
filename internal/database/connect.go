@@ -6,6 +6,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -22,6 +23,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" // MySQL and MariaDB
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib" // PostgreSQL
 	_ "modernc.org/sqlite"           // SQLite, pure Go so the binary stays static
 )
@@ -359,10 +361,31 @@ func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
 	}
 	config, err := pgx.ParseConfig(dsn)
 	if err != nil {
-		return nil, err
+		return nil, unparsed(err)
 	}
 	config.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
 	return stdlib.OpenDB(*config), nil
+}
+
+// unparsed is the driver's refusal of a connection string, without the string.
+//
+// The driver quotes what it refused, masked where its own reading puts the
+// password. A string it cannot parse is one whose boundaries it cannot find: a
+// password parameter holding an "@" reads to it as user information, and the
+// half of the password after the "@" is printed. What it objected to is kept,
+// except a URL error, which repeats the URL, and the scrub every driver error
+// takes on its way out of this package still runs over what is left.
+func unparsed(err error) error {
+	var refused *pgconn.ParseConfigError
+	if !errors.As(err, &refused) {
+		return err
+	}
+	text := "the driver could not parse the connection string"
+	var urlErr *url.Error
+	if inner := refused.Unwrap(); inner != nil && !errors.As(inner, &urlErr) {
+		text += ": " + inner.Error()
+	}
+	return scrubbed{text: text, err: err}
 }
 
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {
