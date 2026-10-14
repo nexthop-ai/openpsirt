@@ -91,8 +91,8 @@ func TestAnUnknownEndpointStaysAnEndpoint(t *testing.T) {
 		"/Docs", "/OpenAPI.json",
 	} {
 		got := fetch(t, handler, http.MethodGet, path)
-		if got.Code == http.StatusOK {
-			t.Errorf("GET %s answered %d with %q", path, got.Code, got.Body.String())
+		if got.Code != http.StatusUnauthorized {
+			t.Errorf("GET %s answered %d, want 401, with %q", path, got.Code, got.Body.String())
 		}
 		if body := got.Body.String(); len(body) > 0 && body[0] == '<' {
 			t.Errorf("GET %s answered with a page: %q", path, body)
@@ -140,8 +140,8 @@ func TestABinaryBuiltWithoutTheInterfaceServesTheAPIAlone(t *testing.T) {
 	// must not do is answer as though a page were there.
 	handler, _ := httpapi.New(nil, nil, core.Deps{})
 	got := fetch(t, handler, http.MethodGet, "/products")
-	if got.Code == http.StatusOK {
-		t.Errorf("a binary with no interface served %q", got.Body.String())
+	if got.Code != http.StatusUnauthorized {
+		t.Errorf("a binary with no interface answered %d, want 401: %q", got.Code, got.Body.String())
 	}
 }
 
@@ -161,8 +161,8 @@ func TestServingAPageDoesNotOpenAnythingElse(t *testing.T) {
 		"/v1/version", "/v1/products", "/v1/session/me",
 	} {
 		got := fetch(t, handler, http.MethodGet, path)
-		if got.Code == http.StatusOK {
-			t.Errorf("%s answered %d with an interface mounted (%d bytes)",
+		if got.Code != http.StatusUnauthorized {
+			t.Errorf("%s answered %d with an interface mounted, want 401 (%d bytes)",
 				path, got.Code, got.Body.Len())
 		}
 	}

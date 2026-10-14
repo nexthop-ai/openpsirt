@@ -379,8 +379,8 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 		if got := r.AsKey(t, http.MethodGet, "/v1/version"); got != http.StatusForbidden {
 			t.Errorf("a pipeline read the running version: %d", got)
 		}
-		if got := r.AsKey(t, http.MethodPost, "/v1/products"); got == http.StatusCreated {
-			t.Error("a pipeline declared a product")
+		if got := r.AsKey(t, http.MethodPost, "/v1/products"); got != http.StatusForbidden {
+			t.Errorf("a pipeline declaring a product answered %d, want 403", got)
 		}
 	})
 }
@@ -445,8 +445,9 @@ func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 			"/v1/version", "/v1/products", "/v1/scanning", "/v1/notifications",
 		} {
 			got := r.Body(t, "", http.MethodGet, path)
-			if got.Code == http.StatusOK {
-				t.Errorf("%s answered %d without a credential (%d bytes)", path, got.Code, len(got.Text))
+			if got.Code != http.StatusUnauthorized {
+				t.Errorf("%s answered %d without a credential, want 401 (%d bytes)",
+					path, got.Code, len(got.Text))
 			}
 		}
 

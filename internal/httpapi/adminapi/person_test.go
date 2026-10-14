@@ -206,8 +206,8 @@ func TestLeavingIsRecordedAndCannotLockOutWhoeverRecordsIt(t *testing.T) {
 
 		// And they are out, at once, on the path a browser uses.
 		gone := r.Body(t, "triager", http.MethodGet, "/v1/findings")
-		if gone.Code == http.StatusOK {
-			t.Error("somebody who has left still reads findings")
+		if gone.Code != http.StatusUnauthorized {
+			t.Errorf("somebody who has left reading findings answered %d, want 401", gone.Code)
 		}
 
 		// Not a deletion: they are still a person, and still named by the

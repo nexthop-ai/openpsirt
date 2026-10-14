@@ -486,9 +486,9 @@ func TestASignInNobodyStartedHereIsRefused(t *testing.T) {
 		rec := httptest.NewRecorder()
 		r.handler.ServeHTTP(rec, req)
 
-		if rec.Code == http.StatusFound {
-			t.Fatalf("a sign-in nobody started here completed: %s",
-				rec.Header().Get("Location"))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("a sign-in nobody started here answered %d, want 401: %s",
+				rec.Code, rec.Header().Get("Location"))
 		}
 		for _, cookie := range rec.Result().Cookies() {
 			if cookie.Name == "openpsirt_session" && cookie.Value != "" {
@@ -702,8 +702,8 @@ func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
 			t.Fatalf("a sign-in sealed just now answered %d", got)
 		}
 		// Older than the window it was given.
-		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got == http.StatusFound {
-			t.Error("a sign-in sealed long ago was still completed")
+		if got := complete(sealed(time.Now().UTC().Add(-2 * pendingLifeForTest))); got != http.StatusUnauthorized {
+			t.Errorf("a sign-in sealed long ago answered %d, want 401", got)
 		}
 		// And one carrying no time at all, which is what every value sealed
 		// before this check looks like.
@@ -715,8 +715,8 @@ func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := complete(r.sealed(t, body)); got == http.StatusFound {
-			t.Error("a sign-in carrying no mint time was read as fresh")
+		if got := complete(r.sealed(t, body)); got != http.StatusUnauthorized {
+			t.Errorf("a sign-in carrying no mint time answered %d, want 401", got)
 		}
 	})
 }

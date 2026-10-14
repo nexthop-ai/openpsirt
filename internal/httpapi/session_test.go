@@ -202,8 +202,8 @@ func TestSigningOutStopsTheCookieWorking(t *testing.T) {
 
 func TestSigningOutIsNotSomethingAKeyCanDo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if got := r.AsKey(t, http.MethodDelete, "/v1/session"); got == http.StatusNoContent {
-			t.Error("a pipeline signed out of a session it never had")
+		if got := r.AsKey(t, http.MethodDelete, "/v1/session"); got != http.StatusForbidden {
+			t.Errorf("a pipeline signing out of a session it never had answered %d, want 403", got)
 		}
 	})
 }
