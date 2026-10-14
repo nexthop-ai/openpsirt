@@ -501,3 +501,43 @@ func TestBringingSomebodyInTwiceChangesNothingTheSecondTime(t *testing.T) {
 		}
 	})
 }
+
+func TestACollaboratorIsToldNothingOfWhatWasFiledAgainstABuild(t *testing.T) {
+	// Resolving a build's names admits a collaborator; what was filed against
+	// the build is about the whole build. A scanned build, a build declared
+	// and never scanned, and a build nobody declared each answer them as a
+	// stranger is answered, so the receipts say nothing about which is which.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		embargoed := r.Embargoed(t)
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
+			"/v1/products/mine/issues/"+embargoed+"/collaborators/outsider",
+			""); got.Code != http.StatusNoContent {
+			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
+		}
+		product, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := catalog.NewStore(r.DB.DB).DeclareVariant(t.Context(), product.ID,
+			"never-scanned", true); err != nil {
+			t.Fatal(err)
+		}
+
+		stranger := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
+			"/v1/products/nobody-declared/streams/master/variants/broadcom/scans", "")
+		httpapitest.RefusedWith(t, stranger, http.StatusNotFound)
+		for _, path := range []string{
+			"/v1/products/mine/streams/master/variants/broadcom/scans",
+			"/v1/products/mine/streams/master/variants/never-scanned/scans",
+			"/v1/products/mine/streams/master/variants/nobody-declared/scans",
+			"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1",
+		} {
+			got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
+			if got.Code != stranger.Code || got.Body.String() != stranger.Body.String() {
+				t.Errorf("%s answers a collaborator %d %s, where a stranger is answered %d %s",
+					path, got.Code, got.Body.String(), stranger.Code, stranger.Body.String())
+			}
+		}
+	})
+}

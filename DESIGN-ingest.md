@@ -784,7 +784,7 @@ alphabetical list buries the one that stopped among the ones that are fine.
 | An upload turned away is recorded against the build, and the report says when and why | Quiet says nothing arrived. It does not say whether anybody tried, and those are different faults with different people to tell: a pipeline nobody wired up, against one failing nightly and reporting success to its own log. A refusal never becomes a scan, so without a row of its own the producer was told and the deployment was not |
 | One refusal per build, replaced | A producer retrying a document nothing can read writes one a minute. What a report asks is whether this build is being refused now, not for a history of it |
 | Recording a refusal is best-effort, and that is the one place it belongs | It is a note about something that already failed. Failing the failure would turn a refusal the producer needs to read into a fault they cannot |
-| It is a person's question | A pipeline key sees the receipts for what it sent and nothing more |
+| It is a person's question | A pipeline key reads the receipts of a build it may upload to and nothing more |
 
 ## Receipts
 
@@ -794,13 +794,14 @@ nothing could read.
 
 What was filed against a build can be asked for, newest first, each reporting how
 far it got: taken and not yet read, read and awaiting a vulnerability scan,
-done, or refused with the reason. A key sees the uploads it sent itself
-(REQ-44).
+done, or refused with the reason. A key reads every upload to a build it may
+upload to, whichever sender filed it (REQ-44).
 
 | Rule | Reason |
 |---|---|
-| A sender is recorded as a key or a person, and its identifier | A key's name is unique only among keys in force, so a new key may hold a withdrawn one's name, and a key may share a name with a person. Recorded as a name, either would read back uploads it never sent |
-| Which sender a key is narrowed to is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets, and a pipeline sees its whole product, so the product check alone does not stop it |
+| A sender is recorded as a key or a person, and its identifier | A key's name is unique only among keys in force, so a new key may hold a withdrawn one's name, and a key may share a name with a person. Recorded as a name, the receipt would credit an upload to a sender that never made it |
+| A key reads every receipt of a build it may upload to, whoever sent it | A rotated key, or a second key on one build, re-sends what another sender already sent, and the answer to the re-send is the first upload's scan. Read back by sender, that answer named a scan its receiver could not read |
+| Which builds a key reads is decided in the store, from the subject | A narrowing a handler passes in is one the next handler forgets. A key pinned to one release or one variant reads that build's receipts and refuses every other build's, and a product-wide key reads every build of its product |
 | A read whose job died is failed on the receipt, in fixed words | The scan row is not always marked: marking it can be what failed. The job's last error is whatever failed, a dropped connection's address included, and a refusal reaches the receipt through the scan row |
 
 The four states are this deployment's, not the queue's. Reading and scanning are
@@ -865,7 +866,7 @@ the build system, which is the copy that may have moved since.
 |---|---|
 | The bytes as they arrived, not parsed and not re-serialized | The hash on the receipt covers what was received, so anything rewritten on the way out would fail the check the hash exists for |
 | Named through the scan it belongs to | Whoever may read the receipt may read what it describes. A document identifier resolving on its own would be a second way in that has to remember the same rule |
-| Narrowed in the store, not the handler | A key reads back what it sent and nothing more, so the two endpoints cannot come to differ |
+| Narrowed in the store, not the handler | A key reads what was filed on a build it may upload to, and the two endpoints cannot come to differ |
 
 ## Administrator-supplied VEX
 

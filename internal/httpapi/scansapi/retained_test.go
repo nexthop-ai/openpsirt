@@ -141,10 +141,8 @@ func TestADocumentABuildSentReadsBackAsItArrived(t *testing.T) {
 			}
 		}
 
-		// Another credential reads back what it sent and nothing more, which
-		// is the rule the receipts list applies. Answered as a scan that does
-		// not exist, because telling the two apart is telling somebody what
-		// exists elsewhere.
+		// Another key that may upload to this build reads back what was filed
+		// on it, whoever sent it, which is the rule the receipts list applies.
 		_, secret, err := access.NewStore(f.DB.DB).NewKey(context.Background(), "somebody-else",
 			access.Scope{ProductID: httpapitest.ProductHere(t, f)})
 		if err != nil {
@@ -154,8 +152,9 @@ func TestADocumentABuildSentReadsBackAsItArrived(t *testing.T) {
 		elsewhere.Header.Set("Authorization", "Bearer "+secret)
 		other := httptest.NewRecorder()
 		f.Handler.ServeHTTP(other, elsewhere)
-		if other.Code != http.StatusNotFound {
-			t.Errorf("another key read back somebody else's upload with %d", other.Code)
+		if other.Code != http.StatusOK {
+			t.Errorf("another key on the build could not read back an upload filed there: %d",
+				other.Code)
 		}
 
 		// A branch build's contents are let go once they have been read, and

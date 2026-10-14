@@ -379,8 +379,8 @@ a pipeline's key is not somebody. An operation declaring the second and then
 refusing every credential that is not a person makes the reference, the
 extension a client generator reads and an access review all state a rule the
 code contradicts. The word cannot be redefined instead: two operations really
-do mean any credential — a key reads back the scans it sent, and the receipts
-for them.
+do mean any credential — a key reads back the scans filed on a build it may
+upload to, and the receipts for them.
 
 The part of a requirement that is about the subject alone is enforced before any
 handler runs, which is what makes the handler's own check the second statement

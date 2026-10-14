@@ -483,7 +483,8 @@ Product-scoped configuration is no exception. A product's routing rules, the
 obligation windows and the products each is limited to, an upload's receipt and
 the documents it kept are each read with the subject, and the store decides
 what that subject reaches: the rules for whoever triages the product, a window
-narrowed to the products the reader may know exist, and a key's own uploads.
+narrowed to the products the reader may know exist, and the builds a key may
+upload to.
 The sweeps that apply rules and watch windows read as the deployment.
 
 The trail's readers are the same shape. A row there names who was brought into
@@ -606,10 +607,10 @@ being applied correctly to it.
 |---|---|
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
-| A key reads back its own receipts and nothing else | The same holds for the documents it sent and what its own uploads changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many builds somebody else runs |
+| A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
-| A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so the new key reads back nothing the withdrawn one sent. Withdrawing by name reaches the key in force |
+| A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |
 
 ## Provider sign-in
 
@@ -1024,8 +1025,8 @@ program. Treating absence as "nobody, so show nothing" hides that until somebody
 writes the query that treats absence as "everybody": one of those is a blank
 screen and the other is a disclosure.
 
-A pipeline is refused a read rather than shown an empty one, receipts for its
-own uploads excepted. "Here is nothing" and "you cannot ask" are different
+A pipeline is refused a read rather than shown an empty one, the receipts of the
+builds it may upload to excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
 Every read of findings in one product or one build asks one question first:
@@ -1038,7 +1039,7 @@ question widened by a case the subject was brought into.
 |---|---|
 | Findings, places, runs, promised upgrades, carried patches, publisher statements, readiness, standing, what each release holds, the release trend, the tags in use | Refused |
 | What each run opened and closed | Refused, for an empty list of runs as well |
-| The receipts list | The receipts, with no counts of what each run changed. The receipts are the pipeline's own; the counts are a report on findings |
+| The receipts list | The receipts, with no counts of what each run changed. The receipts are about what the pipeline sends; the counts are a report on findings |
 
 Refused where the read is, not only at the edge. A store read answering a
 credential that is not a person with an empty result leaves the invariant the
@@ -1333,6 +1334,7 @@ private access.
 | Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
 | How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refuse the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the screens offering to carry a judgment across builds fault on the one finding the grant exists to open |
 | Resolving a build's names admits a collaborator; reading what that build holds does not | The names their own issue sits at have to resolve, or the grant refuses them the one thing it gave. So every read reached through that lookup puts the product-wide question for itself, and a document about the whole build is not a question about one named issue |
+| What was filed against a build is withheld | The receipts and the documents a build kept are about the whole build. A collaborator asking for them is answered as a stranger is, before any name past the product resolves, so the answer says nothing about which builds were declared or scanned |
 | That every read past it does put the question is checked | A sentence beside the resolver is not enforcement: a read asking whether a single issue is undisclosed and never whether the subject may read the product hands a collaborator on one case the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |
 
 The product-wide question keeps answering no, and that is the whole of the

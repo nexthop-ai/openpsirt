@@ -25919,7 +25919,7 @@ paths:
       description: |-
         Returns uploads newest first, each with its state: `reading` (accepted, not yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), or `failed` with the reason.
 
-        Because uploads return 202 before parsing, this is how a build pipeline finds out whether its SBOM was usable. An API key sees only the uploads it sent itself.
+        Because uploads return 202 before parsing, this is how a build pipeline finds out whether its SBOM was usable. An API key sees every upload on a build it may upload to, whichever key sent it.
 
         Requires: any recognized credential. Answers only what you may see.
       operationId: list-scans

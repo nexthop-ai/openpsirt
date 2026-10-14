@@ -4,6 +4,7 @@
 package scansapi_test
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -96,12 +97,10 @@ func TestAnUnreadableUploadSaysSoToWhoeverSentIt(t *testing.T) {
 	})
 }
 
-func TestASenderIsToldNothingOfAnotherSendersUploads(t *testing.T) {
-	// Two pipelines on one product is the expected arrangement, and a key
-	// reading back the whole product's upload history would be a report about
-	// the product rather than a receipt for its own work. The count has to
-	// narrow with the list: a total covering rows nobody was shown says how
-	// many other builds there are.
+func TestAKeyIsToldOfEveryUploadOnABuildItMayUploadTo(t *testing.T) {
+	// Two keys on one build, or a key rotated part way through a retry, send
+	// the same build, and the second is answered with the first one's scan.
+	// Each reads every receipt of the build, and the count matches the list.
 	httpapitest.EachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
 		ctx := t.Context()
 		rights := access.NewStore(f.DB.DB)
@@ -114,7 +113,9 @@ func TestASenderIsToldNothingOfAnotherSendersUploads(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if code, _ := f.Send(t, httpapitest.Upload(t, f.Path, httpapitest.Inventory(httpapitest.Nowish(), "libc6"))); code != http.StatusAccepted {
+		first := httpapitest.Inventory(httpapitest.Nowish(), "libc6")
+		code, sent := f.Send(t, httpapitest.Upload(t, f.Path, first))
+		if code != http.StatusAccepted {
 			t.Fatalf("first upload returned %d", code)
 		}
 		req := httpapitest.Upload(t, f.Path, httpapitest.Inventory(httpapitest.Nowish().Add(time.Minute), "zlib1g"))
@@ -130,13 +131,32 @@ func TestASenderIsToldNothingOfAnotherSendersUploads(t *testing.T) {
 			secret string
 		}{{"nightly", f.Key}, {"nightly-other", other}} {
 			_, out := httpapitest.Receipts(t, f, who.secret, f.Path)
-			if len(out.Body.Items) != 1 {
-				t.Errorf("%s was shown %d uploads, want only its own", who.name, len(out.Body.Items))
+			if len(out.Body.Items) != 2 || out.Body.Total != 2 {
+				t.Errorf("%s was shown %d uploads of %d, want both on the build",
+					who.name, len(out.Body.Items), out.Body.Total)
 			}
-			if out.Body.Total != 1 {
-				t.Errorf("%s was told the total is %d, which counts uploads it was not shown",
-					who.name, out.Body.Total)
-			}
+		}
+
+		// The first upload's bytes again, from the other key: answered with
+		// the first upload's scan, which the other key reads back.
+		again := httpapitest.Upload(t, f.Path, first)
+		again.Header.Set("Authorization", "Bearer "+other)
+		resent := httptest.NewRecorder()
+		f.Handler.ServeHTTP(resent, again)
+		var held scansapi.UploadResult
+		if err := json.Unmarshal(resent.Body.Bytes(), &held); err != nil || resent.Code >= 300 {
+			t.Fatalf("re-sending answered %d: %s", resent.Code, resent.Body.String())
+		}
+		if held.ScanID != sent.ScanID {
+			t.Fatalf("re-sending was answered with scan %d, want %d", held.ScanID, sent.ScanID)
+		}
+		_, out := httpapitest.Receipts(t, f, other, f.Path)
+		found := false
+		for _, each := range out.Body.Items {
+			found = found || each.ScanID == held.ScanID
+		}
+		if !found {
+			t.Errorf("the scan a re-send was answered with is not among the sender's receipts")
 		}
 	})
 }

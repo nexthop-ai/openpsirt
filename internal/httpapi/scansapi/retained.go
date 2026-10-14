@@ -59,6 +59,12 @@ func registerRetained(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		// A case grant resolves the build's names and reaches one issue, not
+		// what the build holds: somebody brought into a case is answered as
+		// a build that does not resolve is.
+		if !subject.Sees(named.ProductID) {
+			return nil, core.NoSuchProduct()
+		}
 		if subject.Kind == access.Pipeline &&
 			!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
 			return nil, huma.Error403Forbidden("not authorized")
@@ -68,9 +74,9 @@ func registerRetained(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		// The scan has to be this build's, and one this caller may see: a key
-		// reads back what it sent and nothing more, which is the rule the
-		// receipts list applies. Asked of the store rather than here, so the
-		// two endpoints cannot come to differ about it.
+		// reads what was filed on a build it may upload to, which is the rule
+		// the receipts list applies. Asked of the store rather than here, so
+		// the two endpoints cannot come to differ about it.
 		if _, err := ingest.NewStore(in.DB.DB).Of(ctx, subject, target.ID,
 			input.Scan); err != nil {
 			return nil, core.Absent(in.Logger, err, "that scan could not be looked up",

@@ -5,6 +5,7 @@ package ingest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -15,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
@@ -76,40 +76,61 @@ type Receipt struct {
 //
 // Answered here rather than in a handler for the same reason the list is: a
 // check beside the query cannot be skipped by adding another endpoint, and
-// that covers which sender a key is narrowed to as well as which product it
-// sees. A scan that belongs to another build, or that a key did not send,
-// answers as one that does not exist — the two are the same sentence
-// deliberately, because telling them apart is telling somebody what exists
-// elsewhere.
+// that covers which builds a key reaches as well as which product it sees. A
+// scan that belongs to another build answers as one that does not exist.
 func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID int64) (*Scan, error) {
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
+	if err := s.mayRead(ctx, subject, targetID); err != nil {
+		if errors.Is(err, access.ErrDenied) {
+			return nil, ErrNoScan
+		}
 		return nil, err
 	}
-	if !subject.Sees(productID) {
-		return nil, ErrNoScan
-	}
 	held := new(Scan)
-	q := s.db.NewSelect().Model(held).
+	if err := s.db.NewSelect().Model(held).
 		Where("id = ?", scanID).
-		Where("target_id = ?", targetID)
-	if credential := narrowedTo(subject); credential != "" {
-		q = q.Where("credential = ?", credential)
-	}
-	if err := q.Scan(ctx); err != nil {
+		Where("target_id = ?", targetID).
+		Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNoScan,
 			fmt.Sprintf("look up scan %d on this build", scanID))
 	}
 	return held, nil
 }
 
+// mayRead refuses a subject who may not read what was filed against a build.
+//
+// A person reads the receipts of a product they read. A key reads every
+// receipt of a build it may upload to, whichever key sent each one: a key that
+// is rotated, or two keys on one build, re-send what the other already sent,
+// and the answer to the second is the first one's scan.
+func (s *Store) mayRead(ctx context.Context, subject access.Subject, targetID int64) error {
+	var build struct {
+		ProductID int64 `bun:"product_id"`
+		StreamID  int64 `bun:"stream_id"`
+		VariantID int64 `bun:"variant_id"`
+	}
+	if err := s.db.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr("st.product_id, tg.stream_id, tg.variant_id").
+		Where("tg.id = ?", targetID).
+		Scan(ctx, &build); err != nil {
+		return fmt.Errorf("look up which build %d is: %w", targetID, err)
+	}
+	reads := subject.Sees(build.ProductID)
+	if subject.Kind == access.Pipeline {
+		reads = subject.MaySend(build.ProductID, build.StreamID, build.VariantID)
+	}
+	if !reads {
+		return access.Denied(fmt.Sprintf("read what was filed against product %d", build.ProductID))
+	}
+	return nil
+}
+
 // Receipts reports what became of the scans filed against a target, newest
 // first, with how many there are in total.
 //
-// A key is narrowed to what it sent, decided here from the subject. Filtering
-// a page after it has been read returns short pages and a total counting rows
-// the reader was not shown, and a narrowing a caller chooses is one the next
-// caller forgets.
+// Who may read them is decided here from the subject, and is the rule Of
+// holds.
 func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID int64,
 	limit, offset int) ([]Receipt, int, error) {
 
@@ -117,28 +138,20 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// cannot be skipped by adding another endpoint, which is the whole reason
 	// visibility is decided in this layer — and receipts carry a producer's
 	// own failure text, so reaching them is reaching something.
-	productID, err := productOf(ctx, s.db, targetID)
-	if err != nil {
+	//
+	// A typed refusal, so the handler answers it the way a build nobody
+	// declared is answered rather than as a fault: a 500 where a stranger
+	// gets a 404 says the build is there, one name at a time.
+	if err := s.mayRead(ctx, subject, targetID); err != nil {
 		return nil, 0, err
-	}
-	if !subject.Sees(productID) {
-		// A typed refusal, so the handler answers it the way a build nobody
-		// declared is answered rather than as a fault: a 500 where a stranger
-		// gets a 404 says the build is there, one name at a time.
-		return nil, 0, access.Denied(fmt.Sprintf("read what was filed against product %d", productID))
 	}
 
 	// Clamped here rather than trusted from the caller: one more endpoint over
 	// the same store, and a limit of zero asks for the whole table.
 	limit = database.AList.Of(limit)
 
-	credential := narrowedTo(subject)
 	sent := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where("target_id = ?", targetID)
-		if credential != "" {
-			q = q.Where("credential = ?", credential)
-		}
-		return q
+		return q.Where("target_id = ?", targetID)
 	}
 
 	total, err := sent(s.db.NewSelect().Model((*Scan)(nil))).Count(ctx)
@@ -203,7 +216,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// of us, a run claimed on page one is claimed again on page two by the
 	// first older upload it also covered, and its counts render twice. The
 	// claim is a property of the scan, not of the page it appears on.
-	claimed, err := s.claims(ctx, targetID, credential, runs)
+	claimed, err := s.claims(ctx, targetID, runs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -293,13 +306,6 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 	return Scanning, "", "", nil
 }
 
-// productOf is which product a build belongs to.
-//
-// Through the catalog, which tells a failed read from a build nobody declared.
-func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
-	return catalog.NewStore(db).ProductOf(ctx, targetID)
-}
-
 // claims says which upload each run's numbers belong to: the newest one it
 // covered, decided over the whole history rather than over one page of it.
 //
@@ -309,7 +315,7 @@ func productOf(ctx context.Context, db bun.IDB, targetID int64) (int64, error) {
 // came after, so the distinction cannot change the answer without the two
 // having arrived either side of the run finishing, in which case arrival is
 // the more truthful of the two anyway.
-func (s *Store) claims(ctx context.Context, targetID int64, credential string,
+func (s *Store) claims(ctx context.Context, targetID int64,
 	runs []finding.Run) (map[int64]int64, error) {
 
 	var filed []struct {
@@ -319,9 +325,6 @@ func (s *Store) claims(ctx context.Context, targetID int64, credential string,
 	q := s.db.NewSelect().TableExpr(`"scan" AS "sc"`).
 		Column("sc.id", "sc.received_at").
 		Where("sc.target_id = ?", targetID)
-	if credential != "" {
-		q = q.Where("sc.credential = ?", credential)
-	}
 	// Newest first by when it arrived, which is what "the newest upload this
 	// run covered" asks about. By arrival rather than by identifier because
 	// two uploads recorded at the same moment take their identifiers in

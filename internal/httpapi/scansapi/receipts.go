@@ -134,7 +134,8 @@ func registerReceipts(api huma.API, in core.Deps) {
 			"yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), " +
 			"or `failed` with the reason.\n\n" +
 			"Because uploads return 202 before parsing, this is how a build pipeline finds out " +
-			"whether its SBOM was usable. An API key sees only the uploads it sent itself.",
+			"whether its SBOM was usable. An API key sees every upload on a build it may upload to, " +
+			"whichever key sent it.",
 		Tags: []string{"Ingest"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -149,6 +150,15 @@ func registerReceipts(api huma.API, in core.Deps) {
 		}
 		if in.DB == nil {
 			return nil, core.NoDatabase(in.Logger)
+		}
+
+		// What was filed against a build is the product's to read, and a case
+		// grant reaches one issue rather than the product: somebody brought
+		// into a case is answered as a stranger is, before any name past the
+		// product is resolved, so the answer says nothing about which builds
+		// exist or were scanned.
+		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
+			return nil, err
 		}
 
 		// Resolved and authorized together, so a build somebody may not reach
@@ -175,17 +185,14 @@ func registerReceipts(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that build could not be looked up", err)
 		}
 
-		// A key sees the receipts for what it sent and nothing more, which
-		// the store decides from the subject.
+		// A key reads the receipts of a build it may upload to, which the
+		// store decides from the subject.
 		scans := ingest.NewStore(in.DB.DB)
 		receipts, total, err := scans.Receipts(ctx, subject, target.ID, input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			// The answer a build nobody declared gets. A 500 here against a
-			// 404 for a stranger says which builds exist, one name at a time
-			// — and the reach that meets it is a case collaborator, who holds
-			// nothing on the product and may reach the one finding they were
-			// brought in on.
+			// 404 for a stranger says which builds exist, one name at a time.
 			return nil, core.NothingScannedThere()
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "the scans could not be read", err)

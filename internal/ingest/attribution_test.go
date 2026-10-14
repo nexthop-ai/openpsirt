@@ -354,15 +354,24 @@ func TestEveryRunKeepsItsOwnUploadAcrossALongHistory(t *testing.T) {
 	})
 }
 
-func TestAKeyReadsBackWhatItSentAndNotWhatAPersonOfItsNameSent(t *testing.T) {
-	// The narrowing is the store's, from the subject, and a sender is a key or
-	// a person rather than a name: a key named like a person does not read
-	// that person's uploads back as its own.
+func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
+	// A rotated key, or a second key on the same build, re-sends what another
+	// sender already sent, and the answer to it is the first upload's scan.
+	// So a key reads every receipt of a build it may upload to, whoever sent
+	// each one, and a key pinned to another build of the product reads none.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
 		target := quietTarget(t, s, ours)
+		var variant int64
+		if err := s.DB().NewSelect().TableExpr(`"target"`).Column("variant_id").
+			Where("id = ?", target).Scan(ctx, &variant); err != nil {
+			t.Fatal(err)
+		}
 		now := time.Now().UTC()
 		key := access.NewPipeline(7, "ci-nightly", access.Scope{ProductID: ours})
+		anotherVariant := variant + 1
+		pinned := access.NewPipeline(8, "ci-pinned",
+			access.Scope{ProductID: ours, VariantID: &anotherVariant})
 		person := access.NewPerson(7, "ci-nightly", false,
 			map[int64][]access.Role{ours: {access.PublicRead}}, 0)
 
@@ -378,31 +387,27 @@ func TestAKeyReadsBackWhatItSentAndNotWhatAPersonOfItsNameSent(t *testing.T) {
 			sent[string(by.Kind)] = scan.ID
 		}
 
+		_, every, err := s.Receipts(ctx, reader, target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
 		receipts, total, err := s.Receipts(ctx, key, target, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if total != 1 || len(receipts) != 1 || receipts[0].Scan.ID != sent[string(access.Pipeline)] {
-			t.Errorf("the key reads back %d of %d receipts: %+v, want its own alone",
-				len(receipts), total, receipts)
+		if total != every || len(receipts) != every {
+			t.Errorf("the key reads back %d of %d receipts, want all %d filed on the build",
+				len(receipts), total, every)
 		}
-		if _, err := s.Of(ctx, key, target, sent[string(access.Person)]); !errors.Is(err, ingest.ErrNoScan) {
-			t.Errorf("the key reads the person's scan: %v", err)
+		if _, err := s.Of(ctx, key, target, sent[string(access.Person)]); err != nil {
+			t.Errorf("the key cannot read a scan another sender filed on its build: %v", err)
 		}
-		if _, err := s.Of(ctx, key, target, sent[string(access.Pipeline)]); err != nil {
-			t.Errorf("the key cannot read its own scan: %v", err)
+
+		if _, _, err := s.Receipts(ctx, pinned, target, 50, 0); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a key pinned to another build read its receipts: %v", err)
 		}
-		// Somebody who reads the product reads both.
-		all, _, err := s.Receipts(ctx, reader, target, 50, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		read := map[int64]bool{}
-		for _, receipt := range all {
-			read[receipt.Scan.ID] = true
-		}
-		if !read[sent[string(access.Person)]] || !read[sent[string(access.Pipeline)]] {
-			t.Errorf("a reader of the product reads %+v, want both uploads", all)
+		if _, err := s.Of(ctx, pinned, target, sent[string(access.Pipeline)]); !errors.Is(err, ingest.ErrNoScan) {
+			t.Errorf("a key pinned to another build read a scan of this one: %v", err)
 		}
 	})
 }

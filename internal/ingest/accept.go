@@ -143,16 +143,6 @@ func Sender(subject access.Subject) string {
 	return ""
 }
 
-// narrowedTo is the sender whose scans alone a subject may read back, and
-// empty for a subject that reads every scan of a product it sees. A key reads
-// back what it sent and nothing more (REQ-44).
-func narrowedTo(subject access.Subject) string {
-	if subject.Kind == access.Pipeline {
-		return Sender(subject)
-	}
-	return ""
-}
-
 // Scan is a scan we took.
 type Scan struct {
 	bun.BaseModel `bun:"table:scan,alias:sc"`
