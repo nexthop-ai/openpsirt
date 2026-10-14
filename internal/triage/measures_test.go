@@ -117,3 +117,43 @@ func TestAPercentileIsTheValueAtOrPastThatPosition(t *testing.T) {
 		})
 	}
 }
+
+func TestAClaimOverManyPlacesIsOneWaitAndOneSendBack(t *testing.T) {
+	// A claim writes a row per place and is agreed to, or sent back, once.
+	// Counted per row, one claim over three places is three waits and three
+	// send-backs, and a large claim fills the sample on its own.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		wide := f.claimsMany(t, f.places("wide-a", "wide-b", "wide-c"))
+		if err := agreeTo(ctx, f.store, f.reviewer, wide[0].ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		narrow := f.claimsMany(t, f.places("narrow-a"))
+		if err := agreeTo(ctx, f.store, f.reviewer, narrow[0].ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		returned := f.claimsMany(t, f.places("back-a", "back-b", "back-c"))
+		if _, err := f.store.SendBackClaim(ctx, f.reviewer, returned[0].ClaimID,
+			"Say which build this was checked on."); err != nil {
+			t.Fatal(err)
+		}
+
+		measured, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{}, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if measured.Sampled != 3 {
+			t.Errorf("%d observations measured, want one per claim", measured.Sampled)
+		}
+		agreed := 0
+		for _, band := range measured.ToAgree {
+			agreed += band.Count
+		}
+		if agreed != 2 {
+			t.Errorf("%d waits for a second person, want the two claims agreed to", agreed)
+		}
+		if measured.SentBack != 1 {
+			t.Errorf("%d claims sent back, want the one", measured.SentBack)
+		}
+	})
+}
