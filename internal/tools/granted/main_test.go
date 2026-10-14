@@ -4,9 +4,56 @@
 package main
 
 import (
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+const accessPath = "github.com/nexthop-ai/openpsirt/internal/access"
+
+// accessModels is the types the access package declares, read from its source
+// the way the walk reads them, so the models are found by their tags.
+func accessModels(t *testing.T) models {
+	t.Helper()
+	source := os.DirFS(filepath.Join("..", "..", "access"))
+	paths, err := fs.Glob(source, "*.go")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("the access package's source was not found: %v", err)
+	}
+	types := map[string]reach{}
+	for _, path := range paths {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		text, err := fs.ReadFile(source, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file, err := parser.ParseFile(token.NewFileSet(), path, text, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		types = merged(types, typesIn(file))
+	}
+	return models{accessPath: types}
+}
+
+// The two models are found from their struct tags rather than from a list of
+// their names.
+func TestTheAccessModelsAreFoundByTheirTags(t *testing.T) {
+	types := accessModels(t)[accessPath]
+	if r := types["Grant"]; !r.perProduct || r.estate {
+		t.Errorf("Grant reaches %+v, want the per-product table alone", r)
+	}
+	if r := types["EstateGrant"]; r.perProduct || !r.estate {
+		t.Errorf("EstateGrant reaches %+v, want the estate table alone", r)
+	}
+}
 
 // A role is held in two tables — one against a product, one across the estate
 // — and a query reaching one alone answers no for somebody who holds exactly
@@ -49,12 +96,14 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			// it never spells the name.
 			"the per-product model alone, from another package",
 			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
 			func f() { db.NewSelect().Model((*access.Grant)(nil)).Where("role = ?", r).Exists(ctx) }`,
 			map[string]string{"f": "role_grant_all"},
 		},
 		{
 			"both models, from another package",
 			`package p
+			import "github.com/nexthop-ai/openpsirt/internal/access"
 			func f() {
 				db.NewSelect().Model((*access.Grant)(nil)).Exists(ctx)
 				db.NewSelect().Model((*access.EstateGrant)(nil)).Exists(ctx)
@@ -64,8 +113,41 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 		{
 			"the estate model alone, inside the access package",
 			`package access
+			type EstateGrant struct {
+				bun.BaseModel ` + "`bun:\"table:role_grant_all,alias:rga\"`" + `
+			}
 			func f() { var grants []EstateGrant; db.NewSelect().Model(&grants).Scan(ctx) }`,
 			map[string]string{"f": "role_grant"},
+		},
+		{
+			// The package is imported under another name, and the model is
+			// still the model.
+			"the per-product model alone, through an import alias",
+			`package p
+			import acc "github.com/nexthop-ai/openpsirt/internal/access"
+			func f() { db.NewSelect().Model((*acc.Grant)(nil)).Exists(ctx) }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			// A model is recognized by its tag, so one declared under another
+			// name in another package is a model all the same.
+			"a model of the per-product table under a name of its own",
+			`package p
+			type grantRow struct {
+				bun.BaseModel ` + "`bun:\"table:role_grant,alias:rg\"`" + `
+				PersonID int64
+			}
+			func f() { var rows []grantRow; db.NewSelect().Model(&rows).Scan(ctx) }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			// A package named access that is not this one declares nothing
+			// this gate knows about.
+			"a selector on a package that declares no model",
+			`package p
+			import access "example.com/elsewhere/access"
+			func f() { db.NewSelect().Model((*access.Grant)(nil)).Exists(ctx) }`,
+			map[string]string{},
 		},
 		{
 			// A file naming both tables in two functions is two queries that
@@ -104,13 +186,27 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			map[string]string{},
 		},
 	} {
-		got, err := oneAlone("x.go", []byte(c.src), nil)
+		got, err := oneAlone("x.go", []byte(c.src), nil, accessModels(t), nil)
 		if err != nil {
 			t.Fatalf("%s: %v", c.what, err)
 		}
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
 		}
+	}
+}
+
+// An exemption is used by a match, and one nothing matches is reported, since
+// a function of that name added later would be waved through unread.
+func TestAnExemptionIsHonoredAndOneNothingMatchesIsReported(t *testing.T) {
+	exempt := map[string]string{"a.go:f": "why", "a.go:gone": "why"}
+	got := verdict(map[string]string{"a.go:f": "role_grant_all", "a.go:g": "role_grant"}, exempt)
+	want := []string{
+		"a.go:g: reaches one grant table and not role_grant",
+		"a.go:gone: named as reaching one table alone, and nothing there does",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reported %q, want %q", got, want)
 	}
 }
 
