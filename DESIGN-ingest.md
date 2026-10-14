@@ -489,6 +489,7 @@ they fill in. A document that is valid and sparse is not a broken one.
 | An edge end is the format's word for nothing | Read as nothing. "Contains nothing" is a statement a producer makes, and reading it literally puts an identifier nothing describes into the count that says the graph has a hole in it |
 | A relationship naming what a build is about, stated by anything other than the document | Left out. Taken as a root claim, any element could make itself the build's root and re-parent the whole inventory under it |
 | The third version's version written with the second's prefix, `SPDX-3.0.1` | Read as `3.0.1`. The format states a bare semantic version; a producer carrying the second version's habit over writes the prefix, and it names the format the reader already is. A fourth major version with the prefix is still refused |
+| A control character in a component's name, version, package identifier or what it was built from, written or escaped | Dropped before the component is identified. Names and versions are joined into keys with control characters as separators, so one carrying a separator reads as another component, or two version pairs share one key. A name of control characters alone is a component with no name |
 | Unread fields | Ignored. A producer carrying more than is read is the ordinary case |
 
 Two things a document states twice are resolved once it has closed rather than

@@ -254,6 +254,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	if err != nil {
 		return graph.Described{}, "", nil, err
 	}
+	printable(&described)
 	if err := described.Valid(); err != nil {
 		return graph.Described{}, "", nil, refusal.Errorf("%w, so it cannot be tracked", err)
 	}

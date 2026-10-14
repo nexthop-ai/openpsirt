@@ -465,6 +465,7 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 		// name (IsImage).
 		Container: e.purpose == "container",
 	}
+	printable(&described)
 	if err := described.Valid(); err != nil {
 		return refusal.Errorf("%w, so it cannot be tracked", err)
 	}

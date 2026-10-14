@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -280,12 +282,39 @@ func UpstreamFromPurl(purl string) (name, version string) {
 
 // decoded resolves percent-escapes, leaving the text alone where they are
 // malformed — a producer's identifier is not ours to reject over spelling.
+//
+// A control character an escape decodes to is dropped, as it is from every
+// name and version a scan file states.
 func decoded(s string) string {
 	unescaped, err := url.PathUnescape(s)
 	if err != nil {
 		return s
 	}
-	return unescaped
+	return Printable(unescaped)
+}
+
+// Printable drops the control characters from s and keeps everything else
+// byte for byte, a malformed sequence included.
+//
+// A name or a version is joined with others wherever it is part of a key, and
+// a control character inside it can stand in for the separator: two different
+// pairs then join to one key. No real name or version carries one.
+func Printable(s string) string {
+	at := strings.IndexFunc(s, unicode.IsControl)
+	if at < 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	b.WriteString(s[:at])
+	for rest := s[at:]; rest != ""; {
+		r, size := utf8.DecodeRuneInString(rest)
+		if (r == utf8.RuneError && size == 1) || !unicode.IsControl(r) {
+			b.WriteString(rest[:size])
+		}
+		rest = rest[size:]
+	}
+	return b.String()
 }
 
 // AsRoot returns how the product itself is stored: its name, and nothing that
