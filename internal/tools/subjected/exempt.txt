@@ -10,9 +10,20 @@ finding.Store.Recompute A background pass: it rewrites deadlines and urgency whe
 finding.Store.ComponentName Not varying by reader: what one component is called, for an answer about a row the caller already wrote or was authorized for.
 finding.Store.TagsOn A helper over a narrowed read: the finding detail reads it after authorizing the finding.
 finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
+finding.Store.Unacknowledged A background pass: the stale watch reads every unanswered report and decides who hears of each.
+finding.Store.ApplyRules A background pass: the routing sweep places a product's open findings by its rules.
+finding.Store.RecordClaims A background pass: it records the claims a scan's inventory makes, for the deployment.
+finding.Store.Builds Not varying by reader: which builds a scope names. The scope's product was resolved for the caller first.
+finding.Store.BuildsWithin Not varying by reader: Builds against a handle the caller chooses.
+finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
+finding.Store.RetiredWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
+finding.Vulnerabilities.Intern A background pass: it files the issues a scan or an authorized recording names.
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
 finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
 finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.
+triage.Store.NoteVisibility Not varying by reader: how disclosed a note is, which the caller then asks of its own reader.
+triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
+triage.Store.NeedsApproval A helper over a narrowed read: the second-person rule asks it of a proposal the write already authorized.
 triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
 triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
 triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
@@ -22,3 +33,6 @@ triage.Store.AgreedSince A background pass: the health report counts agreements 
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
+graph.Store.Apply A background pass: it records a scan's graph against a build.
+graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
+graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.

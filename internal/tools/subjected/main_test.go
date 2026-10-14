@@ -30,13 +30,29 @@ func (s *Store) unexported(ctx context.Context) error {
 func (o *Other) Elsewhere(ctx context.Context) error {
 	return o.db.NewSelect().Scan(ctx)
 }
+
+func (s *Store) Through(ctx context.Context, id int64) error {
+	return s.helper(ctx, id)
+}
+
+func (s *Store) helper(ctx context.Context, id int64) error {
+	return read(ctx, s.db, id)
+}
+
+func read(ctx context.Context, db bun.IDB, id int64) error {
+	return db.NewSelect().Where("id = ?", id).Scan(ctx)
+}
+
+func (s *Store) Pure(a int) int { return twice(a) }
+
+func twice(a int) int { return a * 2 }
 `)
 	found, examined, err := inSource("finding", "x.go", source)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if examined != 4 {
-		t.Errorf("%d store methods were examined, want the four exported ones", examined)
+	if examined != 6 {
+		t.Errorf("%d store methods were examined, want the six exported ones", examined)
 	}
 	reported := map[string]bool{}
 	for _, one := range found {
@@ -49,6 +65,8 @@ func (o *Other) Elsewhere(ctx context.Context) error {
 		"finding.Store.Arithmetic":    false,
 		"finding.Store.unexported":    false,
 		"finding.Other.Elsewhere":     false,
+		"finding.Store.Through":       true,
+		"finding.Store.Pure":          false,
 	} {
 		if reported[name] != want {
 			t.Errorf("%s reported = %v, want %v", name, reported[name], want)

@@ -12,9 +12,12 @@
 // a query and takes no access.Subject fails the gate unless it is named in
 // exempt.txt with the reason it takes none.
 //
-// What it does not see is a method that queries through a helper of its own,
-// or a subject taken and then not applied. It asks whether the subject arrives
-// at all, which is the half of the rule a gate can check.
+// A method queries when it builds a query or calls a function or method of its
+// own package that queries, followed to a fixed point. A call is matched by
+// name, so a method name shared by two receivers counts as either. What it
+// does not see is a query reached through another package, or a subject taken
+// and then not applied. It asks whether the subject arrives at all, which is
+// the half of the rule a gate can check.
 package main
 
 import (
@@ -111,8 +114,7 @@ func inPackage(dir string) ([]method, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	var found []method
-	examined := 0
+	sources := map[string][]byte{}
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -123,28 +125,50 @@ func inPackage(dir string) ([]method, int, error) {
 		if err != nil {
 			return nil, 0, err
 		}
-		some, seen, err := inSource(filepath.Base(dir), path, source)
-		if err != nil {
-			return nil, 0, err
-		}
-		found = append(found, some...)
-		examined += seen
+		sources[path] = source
 	}
-	return found, examined, nil
+	return inSources(filepath.Base(dir), sources)
 }
 
 // inSource is inPackage for one file.
 func inSource(pkg, path string, source []byte) ([]method, int, error) {
+	return inSources(pkg, map[string][]byte{path: source})
+}
+
+// declared is one function or method of the package, by the name a call
+// reaches it under.
+type declared struct {
+	fn   *ast.FuncDecl
+	path string
+}
+
+// inSources is inPackage over the files of one package, keyed by path.
+func inSources(pkg string, sources map[string][]byte) ([]method, int, error) {
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, source, 0)
-	if err != nil {
-		return nil, 0, fmt.Errorf("%s: %w", path, err)
+	paths := make([]string, 0, len(sources))
+	for path := range sources {
+		paths = append(paths, path)
 	}
+	sort.Strings(paths)
+	var all []declared
+	for _, path := range paths {
+		file, err := parser.ParseFile(fset, path, sources[path], 0)
+		if err != nil {
+			return nil, 0, fmt.Errorf("%s: %w", path, err)
+		}
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
+				all = append(all, declared{fn: fn, path: path})
+			}
+		}
+	}
+	querying := queryingNames(all)
+
 	var found []method
 	examined := 0
-	for _, decl := range file.Decls {
-		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Recv == nil || fn.Body == nil || !fn.Name.IsExported() {
+	for _, one := range all {
+		fn := one.fn
+		if fn.Recv == nil || !fn.Name.IsExported() {
 			continue
 		}
 		receiver := receiverOf(fn)
@@ -152,15 +176,72 @@ func inSource(pkg, path string, source []byte) ([]method, int, error) {
 			continue
 		}
 		examined++
-		if takesSubject(fn) || !queries(fn.Body) {
+		if takesSubject(fn) || !querying[nameOf(fn)] {
 			continue
 		}
 		found = append(found, method{
 			name: pkg + "." + receiver + "." + fn.Name.Name,
-			at:   fmt.Sprintf("%s:%d", path, fset.Position(fn.Pos()).Line),
+			at:   fmt.Sprintf("%s:%d", one.path, fset.Position(fn.Pos()).Line),
 		})
 	}
 	return found, examined, nil
+}
+
+// nameOf is the name a call reaches a declaration under: ".Name" for a method,
+// whatever its receiver, and "Name" for a function.
+func nameOf(fn *ast.FuncDecl) string {
+	if fn.Recv != nil {
+		return "." + fn.Name.Name
+	}
+	return fn.Name.Name
+}
+
+// queryingNames is every declaration name that builds a query or calls one
+// that does, followed to a fixed point.
+func queryingNames(all []declared) map[string]bool {
+	querying := map[string]bool{}
+	calls := map[string][]string{}
+	for _, one := range all {
+		name := nameOf(one.fn)
+		if builds(one.fn.Body) {
+			querying[name] = true
+		}
+		calls[name] = append(calls[name], calledBy(one.fn.Body)...)
+	}
+	for changed := true; changed; {
+		changed = false
+		for name, called := range calls {
+			if querying[name] {
+				continue
+			}
+			for _, callee := range called {
+				if querying[callee] {
+					querying[name], changed = true, true
+					break
+				}
+			}
+		}
+	}
+	return querying
+}
+
+// calledBy is every name a body calls, in the form nameOf gives a declaration.
+func calledBy(body *ast.BlockStmt) []string {
+	var called []string
+	ast.Inspect(body, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			called = append(called, fun.Name)
+		case *ast.SelectorExpr:
+			called = append(called, "."+fun.Sel.Name)
+		}
+		return true
+	})
+	return called
 }
 
 // receiverOf is the name of the type a method is declared on.
@@ -188,8 +269,8 @@ func takesSubject(fn *ast.FuncDecl) bool {
 	return false
 }
 
-// queries reports whether a body starts a query.
-func queries(body *ast.BlockStmt) bool {
+// builds reports whether a body starts a query itself.
+func builds(body *ast.BlockStmt) bool {
 	found := false
 	ast.Inspect(body, func(node ast.Node) bool {
 		if selector, ok := node.(*ast.SelectorExpr); ok && building[selector.Sel.Name] {

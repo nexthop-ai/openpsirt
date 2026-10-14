@@ -478,7 +478,8 @@ subject is exactly what a leak looks like from the outside.
 
 The exported methods of the finding, triage and graph stores that query and
 take no subject are each named, with which of the three they are, in a list a
-gate holds them to (`make subjected`, `DESIGN-build.md` § Make targets).
+gate holds them to (`make subjected`, `DESIGN-build.md` § Make targets). A
+method querying through a helper of its own package counts as querying.
 
 Anything else takes a subject. What a routing rule would catch and which words
 are in use on a product both read findings and both answer for the whole
