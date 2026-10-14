@@ -785,3 +785,47 @@ func TestCreationInformationWrittenInPlaceIsRead(t *testing.T) {
 		t.Error("a document stating a version this does not read, in place, was read")
 	}
 }
+
+func TestTheDocumentElementIsTheOneImportingTheOthers(t *testing.T) {
+	// A file inlining a document it imported carries that document's element
+	// as well. Its time does not move between builds and its root is another
+	// product's, so taking it would date every later build as not newer.
+	own := `{"spdxId": "https://example.invalid/product-1.0", "type": "SpdxDocument",
+     "creationInfo": "_:creationInfo", "rootElement": ["urn:root"],
+     "import": [{"type": "ExternalMap", "externalSpdxId": "https://example.invalid/imported"}]}`
+	imported := `{"spdxId": "https://example.invalid/imported", "type": "SpdxDocument",
+     "creationInfo": "_:importedInfo", "rootElement": ["urn:a"]},
+    {"@id": "_:importedInfo", "type": "CreationInfo", "specVersion": "3.0.1",
+     "created": "2020-01-01T00:00:00Z"}`
+	original := `{"spdxId": "https://example.invalid/product-1.0", "type": "SpdxDocument",
+     "creationInfo": "_:creationInfo", "rootElement": ["urn:root"]}`
+	if !strings.Contains(minimalSPDX3, original) {
+		t.Fatal("the fixture's document element moved")
+	}
+	for _, tc := range []struct{ name, elements string }{
+		{"own first", own + ",\n    " + imported},
+		{"imported first", imported + ",\n    " + own},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := read(t, strings.Replace(minimalSPDX3, original, tc.elements, 1))
+			if doc.Serial != "https://example.invalid/product-1.0" {
+				t.Errorf("serial is %q", doc.Serial)
+			}
+			if got := doc.BuiltAt.Format(time.RFC3339); got != "2026-08-14T09:12:33Z" {
+				t.Errorf("built at %s, the imported document's time", got)
+			}
+			assertMinimal(t, doc)
+		})
+	}
+
+	t.Run("neither importing the other", func(t *testing.T) {
+		body := strings.Replace(minimalSPDX3, original, original+",\n    "+imported, 1)
+		_, err := sbom.Read(strings.NewReader(body), sbom.DefaultLimits())
+		if err == nil || !strings.Contains(err.Error(), "SpdxDocument") {
+			t.Fatalf("two unrelated document elements were read: %v", err)
+		}
+		if _, err := sbom.ReadHeader(strings.NewReader(body), sbom.DefaultLimits()); err == nil {
+			t.Fatal("the header pass read two unrelated document elements")
+		}
+	})
+}

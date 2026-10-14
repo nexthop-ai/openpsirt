@@ -151,6 +151,11 @@ type reader struct {
 	// third states it as an element, and there can be more than one because
 	// a document may carry an inventory element beside its own.
 	spdx3DocumentRefs map[string]bool
+	// spdx3Documents are the document elements as they were read. A file
+	// that inlines a document it imported carries that document's element
+	// too, and which one is the file's own is settled once every element is
+	// in hand.
+	spdx3Documents []spdx3Element
 	// spdx3Describes are the describes relationships as they were read, kept
 	// until the walk is over. Which element is the document is itself stated
 	// by an element, in no fixed position, so whether a relationship came
