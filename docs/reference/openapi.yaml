@@ -7935,6 +7935,7 @@ components:
           description: The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version
           items:
             $ref: "#/components/schemas/BuildName"
+          maxItems: 2000
           minItems: 1
           type:
             - array
@@ -24389,6 +24390,7 @@ paths:
           name: contains
           schema:
             description: Match the text of the report
+            maxLength: 200
             type: string
         - explode: false
           in: query

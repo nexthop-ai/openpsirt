@@ -214,7 +214,7 @@ type PlanUpgradeBody struct {
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
 	// ordinary case.
-	Builds    []BuildName `json:"builds" minItems:"1" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
+	Builds    []BuildName `json:"builds" minItems:"1" maxItems:"2000" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
 	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
 	// Person is who carries it. A team as readily as a person: moving a
 	// package is work a queue tracks rather than a judgment one person

@@ -175,12 +175,6 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 				}
 				want.TeamID, teamName = &team.ID, team.Name
 			}
-			if want.Platform == "" || want.Platform == notify.Webhook {
-				if n := len([]rune(want.Secret)); n < 16 {
-					return huma.Error422UnprocessableEntity(
-						"a webhook's secret is at least 16 characters")
-				}
-			}
 			var err error
 			row, err = notify.NewStore(tx).AddDestination(ctx, by, want, in.Chats)
 			if err != nil {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -58,6 +59,10 @@ type Membership struct {
 	AddedBy  int64     `bun:"added_by,notnull"`
 }
 
+// MostTeamMembers bounds how many people one request puts on a team. Each is
+// resolved and written on its own.
+const MostTeamMembers = 500
+
 // ErrNoSuchTeam is returned when a name matches no team in use.
 var ErrNoSuchTeam = refusal.New("no team is known by that name")
 
@@ -73,6 +78,12 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 		return nil, refusal.Errorf("a team needs a name")
 	}
 	shown := strings.TrimSpace(displayName)
+	// A longer name is refused. Cut, the name stored and the name typed
+	// would differ, and declaring the typed one again would make a second
+	// team.
+	if utf8.RuneCountInString(matched) > database.NameWidth || utf8.RuneCountInString(shown) > database.NameWidth {
+		return nil, refusal.Errorf("a team's name is at most %d characters", database.NameWidth)
+	}
 
 	team := new(Team)
 	// Both statements or neither, for the reason a person and their party
