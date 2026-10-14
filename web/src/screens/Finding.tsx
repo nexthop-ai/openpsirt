@@ -30,7 +30,7 @@ import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/
 import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
-import { Decide, said, type Recorded } from "../ui/Decide";
+import { Decide, said, type At, type Recorded } from "../ui/Decide";
 import { Because } from "../ui/Outcome";
 import { useFindingNeighbors } from "./findingNeighbors";
 import { useDecisionPrefill } from "./findingPrefill";
@@ -114,6 +114,9 @@ export function Finding() {
   const from = params.get("from") ?? "";
   const who = useWho();
   const at = { product, stream, variant, vulnerability, component };
+  // The same finding with what picks its component, as the panes acting on it
+  // take it.
+  const located: At = { ...at, version, ecosystem, namespace };
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   // The decision form, for the one act that has to put it in front of
   // somebody: reusing an earlier reasoning fills it in and then has to show
@@ -412,8 +415,7 @@ export function Finding() {
             the world's, and somebody scanning the head for what state this is
             in is the person who put the mark here. */}
         <Marks
-          at={at}
-          which={{ version, ecosystem, namespace }}
+          at={located}
           tags={it.tags ?? []}
           mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
@@ -1063,13 +1065,12 @@ export function Finding() {
             {prefill.settled && (
               <div ref={form}>
                 <Decide
-                  at={{ ...at, version, ecosystem, namespace }}
+                  at={located}
                   places={places}
                   undisclosed={!!it.undisclosed}
                   assigning={
                     <Assignee
-                      at={at}
-                      which={{ version, ecosystem, namespace }}
+                      at={located}
                       assigned={it.assigned_to ?? ""}
                       undisclosed={!!it.undisclosed}
                       routedBy={it.routed_by ?? ""}
@@ -1140,8 +1141,7 @@ export function Finding() {
             reassigning a decided finding is still ordinary. */}
         {!undecided && (
           <Assignee
-            at={at}
-            which={{ version, ecosystem, namespace }}
+            at={located}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
             routedBy={it.routed_by ?? ""}

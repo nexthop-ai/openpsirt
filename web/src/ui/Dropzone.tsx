@@ -3,6 +3,7 @@
 
 import { useState, type DragEvent, type ReactNode } from "react";
 import { Icon } from "./Icons";
+import { sizeSaid } from "./size";
 
 // Picking files: a zone that takes a click or a drop, with what was picked
 // listed under it as chips that can be taken off again.
@@ -26,11 +27,6 @@ export function picked(current: readonly File[], added: readonly File[], many: b
     out.push(each);
   }
   return out;
-}
-
-export function sizeSaid(bytes: number): string {
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export function Dropzone({

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { picked, sizeSaid } from "./Dropzone";
+import { picked } from "./Dropzone";
+import { sizeSaid } from "./size";
 
 const file = (name: string, size: number) => new File([new Uint8Array(size)], name);
 

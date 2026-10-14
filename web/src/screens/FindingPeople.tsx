@@ -10,7 +10,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { notYours, unwrap, whichOf } from "../api/queries";
+import { notYours, unwrap } from "../api/queries";
+import { whereOf, type At } from "../ui/Decide";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
 import { Holder, type Held } from "../ui/Holder";
@@ -177,24 +178,13 @@ export function Collaborators({
   );
 }
 
-// Which is what picks the component where its name is not enough.
-type Which = { version?: string; ecosystem?: string; namespace?: string };
-
 export function Assignee({
   at,
-  which,
   assigned,
   undisclosed,
   routedBy,
 }: {
-  at: {
-    product: string;
-    stream: string;
-    variant: string;
-    vulnerability: string;
-    component: string;
-  };
-  which?: Which;
+  at: At;
   assigned: string;
   undisclosed: boolean;
   // The standing rule that placed this, where one did. A placement nobody can
@@ -210,7 +200,7 @@ export function Assignee({
         await api.PUT(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment",
           {
-            params: { path: at, query: whichOf(which ?? {}) },
+            params: whereOf(at),
             body:
               held === null
                 ? {}
@@ -458,19 +448,11 @@ export function Attachments({
 // to distrust the ones that work.
 export function Marks({
   at,
-  which,
   tags,
   mayMark,
   onChanged,
 }: {
-  at: {
-    product: string;
-    stream: string;
-    variant: string;
-    vulnerability: string;
-    component: string;
-  };
-  which?: Which;
+  at: At;
   tags: string[];
   mayMark: boolean;
   onChanged: () => void;
@@ -489,13 +471,14 @@ export function Marks({
     enabled: mayMark && adding,
   });
 
-  const path = (tag: string) => ({ ...at, tag });
+  const where = whereOf(at);
+  const path = (tag: string) => ({ ...where.path, tag });
   const mark = useMutation({
     mutationFn: async (tag: string) =>
       unwrap(
         await api.PUT(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
-          { params: { path: path(tag), query: whichOf(which ?? {}) } },
+          { params: { path: path(tag), query: where.query } },
         ),
       ),
     onSuccess: () => {
@@ -509,7 +492,7 @@ export function Marks({
       unwrap(
         await api.DELETE(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
-          { params: { path: path(tag), query: whichOf(which ?? {}) } },
+          { params: { path: path(tag), query: where.query } },
         ),
       ),
     onSuccess: onChanged,

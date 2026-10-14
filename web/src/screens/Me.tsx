@@ -14,6 +14,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
 import { UNITS, write, type Unit } from "./duration";
+import { Composer } from "./Composer";
 import { Wide } from "../ui/Wide";
 
 // A person's own page: what they can reach, what is sent to them, and the
@@ -436,27 +437,14 @@ function Tokens() {
         <label className="field" style={{ margin: 0 }}>
           <span>Lasts</span>
           <div style={{ display: "flex", gap: 6 }}>
-            <input
-              {...notACredential}
-              type="number"
-              min={1}
-              style={{ width: 90 }}
-              value={count}
-              onChange={(event) => setCount(event.target.value)}
+            <Composer
+              unitLabel="Lifetime unit"
+              count={count}
+              onCount={setCount}
+              unit={unit}
+              onUnit={setUnit}
+              units={UNITS}
             />
-            <select
-              aria-label="Lifetime unit"
-              {...notACredential}
-              style={{ width: "auto" }}
-              value={unit}
-              onChange={(event) => setUnit(event.target.value as Unit)}
-            >
-              {UNITS.map((each) => (
-                <option key={each.unit} value={each.unit}>
-                  {each.unit}
-                </option>
-              ))}
-            </select>
           </div>
         </label>
         <label className="field" style={{ margin: 0 }}>

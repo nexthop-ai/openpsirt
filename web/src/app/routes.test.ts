@@ -38,6 +38,16 @@ const SAMPLES: Record<string, () => string[]> = {
       odd,
     ),
   ],
+  findingOf: () => [
+    routes.findingOf({ ...build, vulnerability: odd, component: odd }),
+    routes.findingOf({
+      ...build,
+      vulnerability: odd,
+      component: odd,
+      version: odd,
+      namespace: odd,
+    }),
+  ],
   dependenciesAt: () => [
     routes.dependenciesAt(build),
     routes.dependenciesAt(build, { at: odd, path: odd }),

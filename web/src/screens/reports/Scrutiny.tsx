@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
@@ -19,10 +19,9 @@ import {
   WindowPicker,
   asked as askedFor,
   coveringPeriod,
-  daysAsked,
-  periodAsked,
   stated,
   windowStart,
+  useSheetWindow,
 } from "./Window";
 import { useRowOpener } from "../../ui/opens";
 import { Wide } from "../../ui/Wide";
@@ -55,9 +54,7 @@ const SECTION = 100;
 export function Scrutiny() {
   const at = useScope();
   const opener = useRowOpener();
-  const [params] = useSearchParams();
-  const days = daysAsked(params, 90);
-  const period = periodAsked(params);
+  const { days, period } = useSheetWindow(90);
   // A rolling window is sent as the date its links open the record from. Sent
   // as a count of days the server counts from this minute, and the record's
   // list from midnight, so the list held rows the figure did not count.

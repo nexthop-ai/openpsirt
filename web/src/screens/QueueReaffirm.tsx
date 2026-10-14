@@ -13,7 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because, Outcome } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { claimAt, findingAt, reviewQueueAt } from "../app/routes";
+import { claimAt, findingOf, reviewQueueAt } from "../app/routes";
 
 type Row = Body<"ToReaffirmBody">;
 
@@ -215,24 +215,7 @@ export function ToReaffirm({
                     </td>
                     <td className="id">
                       {row.finding ? (
-                        <Link
-                          to={findingAt(
-                            {
-                              product: row.finding.product ?? "",
-                              stream: row.finding.stream ?? "",
-                              variant: row.finding.variant ?? "",
-                            },
-                            {
-                              vulnerability: row.finding.vulnerability ?? "",
-                              component: row.finding.component ?? "",
-                              version: row.finding.version ?? "",
-                              ecosystem: row.finding.ecosystem,
-                              namespace: row.finding.namespace,
-                            },
-                          )}
-                        >
-                          {row.finding.component}
-                        </Link>
+                        <Link to={findingOf(row.finding)}>{row.finding.component}</Link>
                       ) : (
                         "—"
                       )}

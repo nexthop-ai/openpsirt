@@ -238,3 +238,13 @@ export function WindowPicker({ offered, days }: { offered: readonly number[]; da
     </div>
   );
 }
+
+// The window a report sheet covers, read once from its address: the rolling
+// days with the sheet's own default, the period named instead, and what the
+// sheet is sent for whichever was asked.
+export function useSheetWindow(fallback: number) {
+  const [params, setParams] = useSearchParams();
+  const days = daysAsked(params, fallback);
+  const period = periodAsked(params);
+  return { params, setParams, days, period, when: asked(period, days) };
+}

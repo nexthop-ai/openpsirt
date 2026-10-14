@@ -15,7 +15,7 @@ export type Happened = Body<"ClaimDetail">["happened"];
 // | approved | in force: agreed to, or proposed where nothing waits on a second person |
 // | lapsed | stopped applying under it |
 // | none | withdrawn by its proposer, which ends it without standing either way |
-export type Stripe = "pending" | "approved" | "lapsed" | "";
+type Stripe = "pending" | "approved" | "lapsed" | "";
 
 export function stripeOf(happened: Happened | undefined, needsApproval: boolean): Stripe {
   switch (happened) {

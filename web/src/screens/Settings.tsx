@@ -16,6 +16,7 @@ import { Failed } from "../ui/Failed";
 import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
+import { Composer } from "./Composer";
 import { settingsAt } from "../app/routes";
 
 // The decisions this deployment has made for everybody in it, one section at a
@@ -153,6 +154,10 @@ const NOTES: Partial<Record<Tab, string>> = {
 // a copy here offers a new setting as a text field somebody types a refused
 // value into, and a word the write path refuses.
 
+// The form names a setting row's count and unit carry, the names its other
+// controls carry too.
+const NAMES = { count: "setting", unit: "unit" };
+
 function Field({
   setting,
   canSet,
@@ -286,59 +291,27 @@ function Field({
             ))}
           </select>
         ) : takes ? (
-          <>
-            <input
-              id={field}
-              name="setting"
-              {...notACredential}
-              type="number"
-              min={1}
-              style={{ width: 90 }}
-              value={count}
-              onChange={(event) => setCount(event.target.value)}
-            />
-            <select
-              aria-label={`${setting.title} unit`}
-              name="unit"
-              {...notACredential}
-              style={{ width: "auto" }}
-              value={unit}
-              onChange={(event) => setUnit(event.target.value as Unit)}
-            >
-              {UNITS.map((each) => (
-                <option key={each.unit} value={each.unit}>
-                  {each.unit}
-                </option>
-              ))}
-            </select>
-          </>
+          <Composer
+            id={field}
+            names={NAMES}
+            unitLabel={`${setting.title} unit`}
+            count={count}
+            onCount={setCount}
+            unit={unit}
+            onUnit={setUnit}
+            units={UNITS}
+          />
         ) : sizes ? (
-          <>
-            <input
-              id={field}
-              name="setting"
-              {...notACredential}
-              type="number"
-              min={1}
-              style={{ width: 90 }}
-              value={count}
-              onChange={(event) => setCount(event.target.value)}
-            />
-            <select
-              aria-label={`${setting.title} unit`}
-              name="unit"
-              {...notACredential}
-              style={{ width: "auto" }}
-              value={size}
-              onChange={(event) => setSize(event.target.value as Size)}
-            >
-              {SIZES.map((each) => (
-                <option key={each.unit} value={each.unit}>
-                  {each.unit}
-                </option>
-              ))}
-            </select>
-          </>
+          <Composer
+            id={field}
+            names={NAMES}
+            unitLabel={`${setting.title} unit`}
+            count={count}
+            onCount={setCount}
+            unit={size}
+            onUnit={setSize}
+            units={SIZES}
+          />
         ) : (
           <input
             id={field}

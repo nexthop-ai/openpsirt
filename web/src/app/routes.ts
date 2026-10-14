@@ -147,6 +147,24 @@ export function findingAt(
   );
 }
 
+// The finding a row names when it carries its build beside the rest, as the
+// queue's rows do: one record holding all of it, each part possibly absent.
+export function findingOf(row: {
+  product?: string | null;
+  stream?: string | null;
+  variant?: string | null;
+  vulnerability?: string | null;
+  component?: string | null;
+  version?: string | null;
+  ecosystem?: string | null;
+  namespace?: string | null;
+}): string {
+  return findingAt(
+    { product: row.product ?? "", stream: row.stream ?? "", variant: row.variant ?? "" },
+    row,
+  );
+}
+
 // The screens of one build.
 export const dependenciesAt = (build: Build, query?: Query) => at("dependencies", build, query);
 export const decideAt = (build: Build, component: string, which: Which = {}) =>

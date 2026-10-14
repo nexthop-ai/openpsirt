@@ -101,6 +101,22 @@ export function said(outcome: string): string {
   }
 }
 
+// One finding's address as a request carries it: the build, the issue and
+// the component in the path, and the rest of what picks the component in the
+// query.
+export function whereOf(at: At) {
+  return {
+    path: {
+      product: at.product,
+      stream: at.stream,
+      variant: at.variant,
+      vulnerability: at.vulnerability,
+      component: at.component,
+    },
+    query: whichOf(at),
+  };
+}
+
 export type Recorded = {
   claimId: number;
   recorded: number;
@@ -412,16 +428,7 @@ export function Decide({
         await api.GET(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/reach",
           {
-            params: {
-              path: {
-                product: at.product,
-                stream: at.stream,
-                variant: at.variant,
-                vulnerability: at.vulnerability,
-                component: at.component,
-              },
-              query: whichOf(at),
-            },
+            params: whereOf(at),
           },
         ),
       ),
@@ -519,16 +526,7 @@ export function Decide({
         await api.POST(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/decision",
           {
-            params: {
-              path: {
-                product: at.product,
-                stream: at.stream,
-                variant: at.variant,
-                vulnerability: at.vulnerability,
-                component: at.component,
-              },
-              query: whichOf(at),
-            },
+            params: whereOf(at),
             body: {
               ...body(),
               // The version the reach named, because the other build may ship

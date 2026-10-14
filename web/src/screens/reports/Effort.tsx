@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useQuery } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
@@ -13,14 +12,7 @@ import { Loading } from "../../ui/Loading";
 import { Paged } from "../../ui/Paged";
 import { Sheet } from "./Sheet";
 import { byProduct } from "./catalog";
-import {
-  PeriodPicker,
-  WindowPicker,
-  asked,
-  coveringPeriod,
-  daysAsked,
-  periodAsked,
-} from "./Window";
+import { PeriodPicker, WindowPicker, coveringPeriod, useSheetWindow } from "./Window";
 import { Wide } from "../../ui/Wide";
 
 // The windows this question is worth asking over: a month, a quarter, a year.
@@ -45,10 +37,7 @@ const SHOWN = 50;
 // and one claim over a thousand are different afternoons.
 export function Effort() {
   const at = useScope();
-  const [params, setParams] = useSearchParams();
-  const days = daysAsked(params, 90);
-  const period = periodAsked(params);
-  const when = asked(period, days);
+  const { params, setParams, days, period, when } = useSheetWindow(90);
   const product = at.product ?? "";
   // Whose work, which is the question the report was built for: a manager
   // asking how their own people are doing read the deployment's numbers

@@ -34,13 +34,13 @@ export function Compare() {
   const { from, fromVariant, to, toVariant, ready, pair, set } = builds;
   const undisclosed = builds.params.get("undisclosed") === "yes";
 
-  // The request the file is asked for with, which is the screen's own. Built
-  // once so that a comparison somebody exports is the comparison in front of
-  // them rather than one assembled again from parts.
-  const asked = new URLSearchParams({
-    ...pair,
-    ...(undisclosed ? { include_undisclosed: "true" } : {}),
-  }).toString();
+  // The question, built once: the columns, the prose and the files are asked
+  // it alike, so a comparison somebody exports or reads as notes is the one in
+  // front of them rather than one assembled again from parts.
+  const query = { ...pair, ...(undisclosed ? { include_undisclosed: true } : {}) };
+  const asked = new URLSearchParams(
+    Object.entries(query).map(([key, value]) => [key, String(value)]),
+  ).toString();
   // The same comparison as prose, fetched rather than assembled here: what an
   // API caller gets and what this shows have to be the same words, and two
   // implementations of "how a release note reads" is one that drifts.
@@ -62,13 +62,7 @@ export function Compare() {
         await api.GET("/v1/products/{product}/comparison/notes", {
           params: {
             path: { product },
-            query: {
-              from,
-              from_variant: fromVariant,
-              to,
-              to_variant: toVariant,
-              ...(undisclosed ? { include_undisclosed: true } : {}),
-            },
+            query,
           },
           parseAs: "text",
         }),
@@ -82,13 +76,7 @@ export function Compare() {
         await api.GET("/v1/products/{product}/comparison", {
           params: {
             path: { product },
-            query: {
-              from,
-              from_variant: fromVariant,
-              to,
-              to_variant: toVariant,
-              ...(undisclosed ? { include_undisclosed: true } : {}),
-            },
+            query,
           },
         }),
       ),

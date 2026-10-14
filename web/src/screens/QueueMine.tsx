@@ -13,7 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { findingAt } from "../app/routes";
+import { findingOf } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 import { OutlierRows } from "../ui/OutlierRows";
 
@@ -94,23 +94,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         </td>
         <td>
           {row.finding ? (
-            <Link
-              to={findingAt(
-                {
-                  product: row.finding.product ?? "",
-                  stream: row.finding.stream ?? "",
-                  variant: row.finding.variant ?? "",
-                },
-                {
-                  vulnerability: row.finding.vulnerability ?? "",
-                  component: row.finding.component ?? "",
-                  version: row.finding.version ?? "",
-                  ecosystem: row.finding.ecosystem,
-                  namespace: row.finding.namespace,
-                },
-              )}
-              className="id"
-            >
+            <Link to={findingOf(row.finding)} className="id">
               {row.place?.vulnerability}
             </Link>
           ) : (
