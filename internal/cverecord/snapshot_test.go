@@ -93,7 +93,7 @@ func TestAnArchiveKeepsOnlyRecordsThatCanNarrow(t *testing.T) {
 		"README.md":       []byte("not a record"),
 	})
 	dir := t.TempDir()
-	if err := cverecord.Build(archive, dir, ""); err != nil {
+	if _, err := cverecord.Build(archive, dir, ""); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := cverecord.NewHeld(dir).Current()
@@ -151,7 +151,7 @@ func TestAThirdPartysAffectedLineStopsTheAuthoritysNarrowing(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	if err := cverecord.Build(listArchive(t, map[string][]byte{"CVE-2026-5.json": body}), dir, ""); err != nil {
+	if _, err := cverecord.Build(listArchive(t, map[string][]byte{"CVE-2026-5.json": body}), dir, ""); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := cverecord.NewHeld(dir).Current()
@@ -176,7 +176,7 @@ func TestALineWithStatusChangesReadFromAnArchiveNarrowsNothing(t *testing.T) {
 		}},
 	})
 	dir := t.TempDir()
-	if err := cverecord.Build(listArchive(t, map[string][]byte{
+	if _, err := cverecord.Build(listArchive(t, map[string][]byte{
 		"CVE-2026-7.json":     body,
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T00:00:00Z", kernelEntry),
 	}), dir, ""); err != nil {
@@ -195,7 +195,7 @@ func TestALineWithStatusChangesReadFromAnArchiveNarrowsNothing(t *testing.T) {
 
 func TestAnArchiveHoldingNoRecordsIsRefused(t *testing.T) {
 	archive := listArchive(t, map[string][]byte{"README.md": []byte("nothing")})
-	if err := cverecord.Build(archive, t.TempDir(), ""); err == nil {
+	if _, err := cverecord.Build(archive, t.TempDir(), ""); err == nil {
 		t.Error("an archive with no records built a snapshot")
 	}
 }
@@ -256,5 +256,57 @@ func TestASnapshotInAnotherFormatIsRefused(t *testing.T) {
 	_, err := cverecord.Read(&written)
 	if err == nil || !strings.Contains(err.Error(), "format 2") {
 		t.Errorf("a snapshot in format 2 answered %v, want a refusal naming it", err)
+	}
+}
+
+// One record that cannot be read is left out, named, and the rest of the
+// archive still builds a snapshot. Failing the archive on it keeps the last
+// snapshot closing findings on what records said before they changed.
+func TestARecordThatCannotBeReadIsLeftOutAndTheRestBuilt(t *testing.T) {
+	dir := t.TempDir()
+	skipped, err := cverecord.Build(listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T00:00:00Z", kernelEntry),
+		"CVE-2026-8.json":     []byte(`{"cveMetadata": {"cveId": 8}}`),
+	}), dir, "")
+	if err != nil {
+		t.Fatalf("one unreadable record stopped the snapshot: %v", err)
+	}
+	if len(skipped) != 1 || !strings.Contains(skipped[0].Error(), "CVE-2026-8.json") {
+		t.Errorf("left out %v, want the one unreadable record named", skipped)
+	}
+	snapshot, err := cverecord.NewHeld(dir).Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Len() != 1 {
+		t.Errorf("kept %d records, want the one that read", snapshot.Len())
+	}
+}
+
+// An archive in which no record could be read builds nothing.
+func TestAnArchiveOfOnlyUnreadableRecordsIsRefused(t *testing.T) {
+	if _, err := cverecord.Build(listArchive(t, map[string][]byte{
+		"CVE-2026-8.json": []byte("not a record"),
+	}), t.TempDir(), ""); err == nil {
+		t.Error("an archive with nothing readable built a snapshot")
+	}
+}
+
+// The record format allows a moment of update written without an offset, and
+// defines it as UTC.
+func TestAMomentOfUpdateWithNoOffsetIsReadAsUTC(t *testing.T) {
+	dir := t.TempDir()
+	skipped, err := cverecord.Build(listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-08T10:00:00", kernelEntry),
+	}), dir, "")
+	if err != nil || len(skipped) != 0 {
+		t.Fatalf("a moment with no offset was not read: %v %v", skipped, err)
+	}
+	snapshot, err := cverecord.NewHeld(dir).Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Version() != "2026-10-08T10:00:00Z" {
+		t.Errorf("taken %q, want the moment read as UTC", snapshot.Version())
 	}
 }

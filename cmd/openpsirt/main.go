@@ -732,9 +732,11 @@ func runRecords(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 		if archive == "" {
 			return errors.New("openpsirt records import: name the CVE List archive to read")
 		}
-		if err := cverecord.Build(archive, cfg.RecordsDir, ""); err != nil {
+		skipped, err := cverecord.Build(archive, cfg.RecordsDir, "")
+		if err != nil {
 			return err
 		}
+		cverecord.Report(logger, skipped)
 	case "status", "":
 	default:
 		return fmt.Errorf("openpsirt records: unknown action %q: the actions are \"fetch\", \"import\" and \"status\"", action)

@@ -26,6 +26,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -107,9 +108,12 @@ type Writer struct {
 	settings   Config
 	logger     *slog.Logger
 	// wrote is the set this process last wrote, so that a pass finding it
-	// unmoved leaves the store alone. Read and written by the one goroutine
-	// the pass runs in.
+	// unmoved leaves the store alone, and held how many advisories the last
+	// pass with nothing to publish held back, so that the count is said once
+	// each time it moves. Read and written by the one goroutine the pass
+	// runs in.
 	wrote string
+	held  int
 }
 
 // New returns the writer, or nil where this deployment publishes no directory.
@@ -147,6 +151,11 @@ type Written struct {
 	// Both count advisories.
 	Documents int
 	Held      int
+	// Skipped is how many issued documents could not be read back, each
+	// logged as the pass met it. Counted in issuances: an advisory whose
+	// newest revision cannot be read is carried under the one before it
+	// where that one may travel.
+	Skipped int
 	// Unchanged says the pass found the directory already holding what it
 	// would have written, and wrote nothing.
 	Unchanged bool
@@ -159,19 +168,33 @@ func (w *Writer) Run(ctx context.Context, interval time.Duration) {
 		// store that cannot be reached is not a reason to stop serving, and
 		// what could not be written is written by the next pass.
 		written, err := w.Write(ctx)
-		switch {
-		case err != nil:
-			w.logger.ErrorContext(ctx, "writing the published advisory directory",
-				"error", err)
-		case written.Unchanged:
-		case written.Held > 0:
-			w.logger.InfoContext(ctx, "wrote the published advisory directory",
-				"documents", written.Documents, "held back", written.Held)
-		case written.Documents > 0:
-			w.logger.InfoContext(ctx, "wrote the published advisory directory",
-				"documents", written.Documents)
-		}
+		w.report(ctx, written, err)
 	})
+}
+
+// report says what one pass did.
+func (w *Writer) report(ctx context.Context, written Written, err error) {
+	switch {
+	case err != nil:
+		w.logger.ErrorContext(ctx, "writing the published advisory directory",
+			"error", err)
+	case written.Skipped > 0:
+		// Said on every pass, unchanged or not, because the record behind it
+		// is wrong until somebody looks.
+		w.logger.ErrorContext(ctx, "wrote the published advisory directory past documents "+
+			"that could not be read", "documents", written.Documents,
+			"held back", written.Held, "skipped", written.Skipped)
+	case written.Unchanged:
+	case written.Documents == 0 && written.Held > 0:
+		w.logger.InfoContext(ctx, "nothing in the published advisory directory may travel",
+			"held back", written.Held)
+	case written.Held > 0:
+		w.logger.InfoContext(ctx, "wrote the published advisory directory",
+			"documents", written.Documents, "held back", written.Held)
+	case written.Documents > 0:
+		w.logger.InfoContext(ctx, "wrote the published advisory directory",
+			"documents", written.Documents)
+	}
 }
 
 // Write writes the whole directory.
@@ -195,16 +218,29 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 		return Written{}, err
 	}
 
-	published, held, err := publishable(sent)
-	if err != nil {
-		return Written{}, err
+	// A document that cannot be read back is skipped rather than stopping
+	// the pass. Issued bytes are kept for ever, and one that no longer reads
+	// would otherwise keep every advisory issued after it out of the
+	// directory for good. Failed only where nothing at all could be read.
+	published, held, unread := publishable(sent)
+	if len(unread) > 0 && len(unread) == len(sent) {
+		return Written{}, fmt.Errorf("no published document could be read back: %w",
+			errors.Join(unread...))
 	}
+	for _, one := range unread {
+		w.logger.ErrorContext(ctx, "a published document could not be read back", "error", one)
+	}
+	skipped := len(unread)
 	// Nothing to serve. A directory describing a feed with no entries would
 	// have to date itself, and there is no moment to date it from: nothing
-	// has been published. Written once something is.
+	// has been published. Written once something is. A count of what was
+	// held back is reported once each time it moves.
 	if len(published) == 0 {
-		return Written{Held: held, Unchanged: true}, nil
+		unchanged := held == w.held
+		w.held = held
+		return Written{Held: held, Skipped: skipped, Unchanged: unchanged}, nil
 	}
+	w.held = 0
 
 	// What the store already holds, where this process put it there. Writing
 	// the same bytes again is not free to a reader: a versioned store keeps
@@ -219,7 +255,8 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// also what makes a store somebody emptied fill again.
 	fingerprinted := fingerprint(published)
 	if fingerprinted == w.wrote {
-		return Written{Documents: len(published), Held: held, Unchanged: true}, nil
+		return Written{Documents: len(published), Held: held, Skipped: skipped,
+			Unchanged: true}, nil
 	}
 
 	for _, one := range published {
@@ -231,7 +268,7 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 		return Written{}, err
 	}
 	w.wrote = fingerprinted
-	return Written{Documents: len(published), Held: held}, nil
+	return Written{Documents: len(published), Held: held, Skipped: skipped}, nil
 }
 
 // fingerprint is the set of files a pass would write, as one value.
@@ -271,14 +308,18 @@ type entry struct {
 }
 
 // publishable is the newest document of each advisory that this directory may
-// carry, and how many were held back.
+// carry, how many were held back, and why each document that could not be read
+// back could not.
+//
+// A document that cannot be read is passed over the way one that may not
+// travel is: the revision before it is carried where that one may be.
 //
 // Walked per advisory rather than taking the newest of each outright. Whether
 // a document may be served is a property of the bytes, and an advisory whose
 // newest revision went to a coordinating body under embargo has a revision
 // before it that is already public — so the directory keeps carrying that one
 // rather than dropping the advisory out of every list it is in.
-func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
+func publishable(sent []advisory.Sent) (out []entry, held int, unread []error) {
 	seen := map[string]bool{}
 	// Counted per advisory rather than per revision walked past. An advisory
 	// with two revisions that may not travel over one that may is in the
@@ -292,8 +333,9 @@ func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
 		walked[one.Advisory] = true
 		var doc advisory.Document
 		if err := json.Unmarshal([]byte(one.Document), &doc); err != nil {
-			return nil, 0, fmt.Errorf(
-				"read what %s issuance %d published: %w", one.Advisory, one.Ordinal, err)
+			unread = append(unread, fmt.Errorf(
+				"read what %s issuance %d published: %w", one.Advisory, one.Ordinal, err))
+			continue
 		}
 		if !mayTravel(&doc) {
 			continue
@@ -314,7 +356,7 @@ func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
 			held++
 		}
 	}
-	return out, held, nil
+	return out, held, unread
 }
 
 // mayTravel reports whether these bytes may be served from a directory

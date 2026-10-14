@@ -132,3 +132,26 @@ func stated(t *testing.T, id, label string) string {
 	}
 	return string(body)
 }
+
+// Issued bytes are kept for ever. One that no longer reads is skipped and
+// counted, the advisories beside it are still published, and an advisory
+// whose newest revision cannot be read is carried under the one before it.
+func TestADocumentThatCannotBeReadBackIsSkippedAndTheRestPublished(t *testing.T) {
+	published, held, unread := publishable([]advisory.Sent{
+		{Advisory: "EXNET-2026-0003", Ordinal: 2, Document: `{"document": {"title": 7}}`},
+		{Advisory: "EXNET-2026-0003", Ordinal: 1, Document: stated(t, "EXNET-2026-0003", "WHITE")},
+		{Advisory: "EXNET-2026-0004", Ordinal: 1, Document: "not a document"},
+		{Advisory: "EXNET-2026-0005", Ordinal: 1, Document: stated(t, "EXNET-2026-0005", "WHITE")},
+	})
+	if len(unread) != 2 {
+		t.Errorf("%d documents were reported unreadable, want 2: %v", len(unread), unread)
+	}
+	if len(published) != 2 {
+		t.Fatalf("published %d documents, want the two that read and may travel",
+			len(published))
+	}
+	// The advisory with nothing readable is not in the directory, and counted.
+	if held != 1 {
+		t.Errorf("held back %d, want the one advisory nothing of could be read", held)
+	}
+}

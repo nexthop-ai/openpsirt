@@ -164,7 +164,7 @@ func TestAnArchiveKeepingMoreThanASnapshotHoldsBuildsNothing(t *testing.T) {
 			id := fmt.Sprintf("CVE-2026-%d", i+1)
 			files[id+".json"] = published(id, "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry)
 		}
-		_, _, err := cverecord.FromArchive(listArchive(t, files), t.TempDir())
+		_, _, _, err := cverecord.FromArchive(listArchive(t, files), t.TempDir())
 		return err
 	}, cverecord.IsTooLarge)
 }
@@ -177,7 +177,7 @@ func TestARecordLargerThanASnapshotHoldsLeavesTheSnapshotHeld(t *testing.T) {
 	first := listArchive(t, map[string][]byte{
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
 	})
-	if err := cverecord.Build(first, dir, "first"); err != nil {
+	if _, err := cverecord.Build(first, dir, "first"); err != nil {
 		t.Fatal(err)
 	}
 	cverecord.LowerBounds(t, cverecord.Bounds{Line: 512})
@@ -186,7 +186,7 @@ func TestARecordLargerThanASnapshotHoldsLeavesTheSnapshotHeld(t *testing.T) {
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
 		"CVE-2026-43465.json": published("CVE-2026-43465", "PUBLISHED", "2026-10-07T00:40:00Z", long),
 	})
-	if err := cverecord.Build(second, dir, "second"); !cverecord.IsTooLarge(err) {
+	if _, err := cverecord.Build(second, dir, "second"); !cverecord.IsTooLarge(err) {
 		t.Fatalf("building past the bound answered %v, want a refusal", err)
 	}
 	held, err := cverecord.NewHeld(dir).Current()
@@ -334,10 +334,10 @@ func refusedEverywhere(t *testing.T, path string) {
 	if err := cverecord.CountMembers(path); !cverecord.IsTooLarge(err) {
 		t.Errorf("counting the archive answered %v, want a refusal", err)
 	}
-	if _, _, err := cverecord.FromArchive(path, t.TempDir()); !cverecord.IsTooLarge(err) {
+	if _, _, _, err := cverecord.FromArchive(path, t.TempDir()); !cverecord.IsTooLarge(err) {
 		t.Errorf("reading the archive answered %v, want a refusal", err)
 	}
-	if _, _, err := cverecord.FromArchive(wrapped(t, path), t.TempDir()); !cverecord.IsTooLarge(err) {
+	if _, _, _, err := cverecord.FromArchive(wrapped(t, path), t.TempDir()); !cverecord.IsTooLarge(err) {
 		t.Errorf("reading the archive inside another answered %v, want a refusal", err)
 	}
 }
@@ -381,7 +381,7 @@ func TestAnArchiveRecordLargerThanTheBoundIsRefused(t *testing.T) {
 	cverecord.LowerBounds(t, cverecord.Bounds{Record: uint64(most)})
 	boundtest.Edges(t, most, func(n int) error {
 		padded := append(append([]byte{}, body...), bytes.Repeat([]byte(" "), n-len(body))...)
-		_, _, err := cverecord.FromArchive(listArchive(t, map[string][]byte{"CVE-2026-31589.json": padded}),
+		_, _, _, err := cverecord.FromArchive(listArchive(t, map[string][]byte{"CVE-2026-31589.json": padded}),
 			t.TempDir())
 		return err
 	}, cverecord.IsTooLarge)
@@ -441,7 +441,7 @@ func TestAnInnerArchiveLargerThanTheBoundIsRefusedAndRemoved(t *testing.T) {
 	cverecord.LowerBounds(t, cverecord.Bounds{Inner: int64(most)})
 	boundtest.Edges(t, most, func(n int) error {
 		scratch := t.TempDir()
-		_, _, err := cverecord.FromArchive(innerSized(t, n), scratch)
+		_, _, _, err := cverecord.FromArchive(innerSized(t, n), scratch)
 		if left, _ := filepath.Glob(filepath.Join(scratch, ".cves-*")); len(left) > 0 {
 			t.Fatalf("the inner archive was left behind: %v", left)
 		}
@@ -486,7 +486,7 @@ func TestAnArchiveWhoseRecordsCarryNoUpdateTimeLeavesTheSnapshotHeld(t *testing.
 	first := listArchive(t, map[string][]byte{
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
 	})
-	if err := cverecord.Build(first, dir, "first"); err != nil {
+	if _, err := cverecord.Build(first, dir, "first"); err != nil {
 		t.Fatal(err)
 	}
 	undated, err := json.Marshal(map[string]any{
@@ -497,7 +497,7 @@ func TestAnArchiveWhoseRecordsCarryNoUpdateTimeLeavesTheSnapshotHeld(t *testing.
 		t.Fatal(err)
 	}
 	second := listArchive(t, map[string][]byte{"CVE-2026-43465.json": undated})
-	if err := cverecord.Build(second, dir, "second"); err == nil {
+	if _, err := cverecord.Build(second, dir, "second"); err == nil {
 		t.Fatal("an archive whose records carry no update time was built")
 	}
 	held, err := cverecord.NewHeld(dir).Current()

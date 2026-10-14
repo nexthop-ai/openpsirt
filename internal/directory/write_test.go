@@ -713,3 +713,28 @@ func TestWhatIsWrittenIsReadableByWhoeverServesIt(t *testing.T) {
 		}
 	})
 }
+
+// A published document that no longer reads back does not stop the directory:
+// what was issued after it is still written. A pass fails only where nothing
+// at all could be read.
+func TestADocumentThatNoLongerReadsDoesNotStopTheDirectory(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.issued(t, "A flaw in the recovery console")
+		if _, err := f.db.NewUpdate().Table("advisory_issuance").
+			Set(`"document" = ?`, "not a document any longer").
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.writer(t).Write(ctx); err == nil {
+			t.Error("a pass that could read nothing reported success")
+		}
+
+		f.issued(t, "A second flaw")
+		written := f.write(t)
+		if written.Documents != 1 || written.Skipped != 1 {
+			t.Errorf("a pass past one unreadable document reported %+v, want the newer "+
+				"advisory written and one skipped", written)
+		}
+	})
+}

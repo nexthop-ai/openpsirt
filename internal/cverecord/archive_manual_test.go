@@ -26,7 +26,7 @@ func TestAgainstARealArchive(t *testing.T) {
 		t.Skip("set OPENPSIRT_CVE_ARCHIVE to a CVE List archive to read it")
 	}
 	dir := t.TempDir()
-	if err := cverecord.Build(archive, dir, ""); err != nil {
+	if _, err := cverecord.Build(archive, dir, ""); err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := cverecord.NewHeld(dir).Current()

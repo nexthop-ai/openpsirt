@@ -1111,6 +1111,8 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 | An archive downloaded some other way is read into the same place | `openpsirt records import`, for a deployment whose route out is not this one |
 | The snapshot is replaced by a rename | A scan reads the old file or the new one, never half of either |
 | A snapshot that cannot be read is an error, never no records | A damaged bundle read as none would close nothing and say so nowhere |
+| A record in the archive that cannot be read is left out, and the snapshot is built from the rest | Failing the archive on one record keeps the last snapshot for as long as that record stands, and the last snapshot goes on closing findings on what records said before they changed. Left out, the record narrows nothing, which is the conservative outcome. How many were left out, and the first, are logged; an archive in which no record could be read builds nothing |
+| A moment of update with no offset is read as UTC | The record format allows one and defines it so |
 | Kept on the scanner's volume | Each replica's own on scratch space, and one shared where the replicas mount one claim; the rename keeps that safe |
 | Scratch files older than two hours are removed at the start of a fetch | A fetch killed part way leaves an archive of hundreds of megabytes on the volume. A fetch takes minutes, so one younger than that may be an import still being written |
 

@@ -48,13 +48,20 @@ var (
 //
 // The moment returned is the newest any record read was updated, withdrawn
 // and rejected ones included, which is what the snapshot describes.
-func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
+//
+// A record that cannot be read is left out and named among what is returned
+// as skipped. Left out, it narrows nothing, which is the conservative outcome;
+// failing the whole archive on it keeps the last snapshot for as long as that
+// record stands, and that snapshot goes on closing findings on what records
+// said before they changed. The archive fails only where no record in it could
+// be read.
+func FromArchive(archive, scratch string) ([]Record, time.Time, []error, error) {
 	if err := countMembers(archive); err != nil {
-		return nil, time.Time{}, fmt.Errorf("open the CVE List archive: %w", err)
+		return nil, time.Time{}, nil, fmt.Errorf("open the CVE List archive: %w", err)
 	}
 	outer, err := zip.OpenReader(archive)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("open the CVE List archive: %w", err)
+		return nil, time.Time{}, nil, fmt.Errorf("open the CVE List archive: %w", err)
 	}
 	defer func() { _ = outer.Close() }()
 
@@ -64,15 +71,16 @@ func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
 		}
 		inner, err := unpack(member, scratch)
 		if err != nil {
-			return nil, time.Time{}, err
+			return nil, time.Time{}, nil, err
 		}
 		defer func() { _ = os.Remove(inner) }()
 		if err := countMembers(inner); err != nil {
-			return nil, time.Time{}, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
+			return nil, time.Time{}, nil, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
 		}
 		held, err := zip.OpenReader(inner)
 		if err != nil {
-			return nil, time.Time{}, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
+			return nil, time.Time{}, nil,
+				fmt.Errorf("open the archive inside the CVE List archive: %w", err)
 		}
 		defer func() { _ = held.Close() }()
 		return records(held.File)
@@ -116,9 +124,9 @@ func unpack(member *zip.File, scratch string) (string, error) {
 // authority's would.
 type published struct {
 	Metadata struct {
-		ID      string    `json:"cveId"`
-		State   string    `json:"state"`
-		Updated time.Time `json:"dateUpdated"`
+		ID      string `json:"cveId"`
+		State   string `json:"state"`
+		Updated stamp  `json:"dateUpdated"`
 	} `json:"cveMetadata"`
 	Containers struct {
 		CNA container   `json:"cna"`
@@ -137,15 +145,46 @@ type container struct {
 	} `json:"affected"`
 }
 
+// stamp is a record's moment of update.
+//
+// The record format allows a moment written without an offset and defines it
+// as UTC. The standard library reads only a moment that carries one.
+type stamp time.Time
+
+func (s *stamp) UnmarshalJSON(raw []byte) error {
+	var said string
+	if err := json.Unmarshal(raw, &said); err != nil {
+		return err
+	}
+	said = strings.TrimSpace(said)
+	if said == "" {
+		*s = stamp{}
+		return nil
+	}
+	if at, err := time.Parse(time.RFC3339Nano, said); err == nil {
+		*s = stamp(at)
+		return nil
+	}
+	at, err := time.ParseInLocation("2006-01-02T15:04:05.999999999", said, time.UTC)
+	if err != nil {
+		return fmt.Errorf("a moment of update reading %q: %w", said, err)
+	}
+	*s = stamp(at)
+	return nil
+}
+
 // records reads every record file among an archive's members and keeps those
-// that can narrow a match, in identifier order.
-func records(members []*zip.File) ([]Record, time.Time, error) {
+// that can narrow a match, in identifier order, naming each record it could
+// not read.
+func records(members []*zip.File) ([]Record, time.Time, []error, error) {
 	if len(members) > mostMembers {
-		return nil, time.Time{}, tooLarge(fmt.Sprintf("the CVE List archive holds more than %d files", mostMembers))
+		return nil, time.Time{}, nil,
+			tooLarge(fmt.Sprintf("the CVE List archive holds more than %d files", mostMembers))
 	}
 	var kept []Record
 	var count sized
 	var taken time.Time
+	var skipped []error
 	read := 0
 	for _, member := range members {
 		name := path.Base(member.Name)
@@ -155,7 +194,8 @@ func records(members []*zip.File) ([]Record, time.Time, error) {
 		read++
 		record, updated, keep, err := readRecord(member)
 		if err != nil {
-			return nil, time.Time{}, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
+			skipped = append(skipped, fmt.Errorf("read %s from the CVE List archive: %w", name, err))
+			continue
 		}
 		// Every record read, kept or not and withdrawn or not: a record
 		// withdrawn or changed so it no longer narrows changes what the
@@ -168,19 +208,23 @@ func records(members []*zip.File) ([]Record, time.Time, error) {
 			// memory is bounded by what a snapshot holds.
 			line, err := json.Marshal(&record)
 			if err != nil {
-				return nil, time.Time{}, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
+				return nil, time.Time{}, nil, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
 			}
 			if err := count.add(record.ID, len(line)+1); err != nil {
-				return nil, time.Time{}, err
+				return nil, time.Time{}, nil, err
 			}
 			kept = append(kept, record)
 		}
 	}
 	if read == 0 {
-		return nil, time.Time{}, errors.New("the CVE List archive holds no records")
+		return nil, time.Time{}, nil, errors.New("the CVE List archive holds no records")
+	}
+	if len(skipped) == read {
+		return nil, time.Time{}, nil, fmt.Errorf("no record in the CVE List archive could be "+
+			"read, the first: %w", skipped[0])
 	}
 	sort.Slice(kept, func(i, j int) bool { return kept[i].ID < kept[j].ID })
-	return kept, taken, nil
+	return kept, taken, skipped, nil
 }
 
 // readRecord reads one record, and says whether it is one to keep.
@@ -198,8 +242,9 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 	if err := json.NewDecoder(io.LimitReader(opened, int64(largestRecord))).Decode(&doc); err != nil {
 		return Record{}, time.Time{}, false, err
 	}
+	updated := time.Time(doc.Metadata.Updated)
 	if !strings.EqualFold(doc.Metadata.State, "PUBLISHED") {
-		return Record{}, doc.Metadata.Updated, false, nil
+		return Record{}, updated, false, nil
 	}
 	record := Record{ID: strings.TrimSpace(doc.Metadata.ID)}
 	keep := false
@@ -211,7 +256,7 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 			}
 		}
 	}
-	return record, doc.Metadata.Updated, keep && record.ID != "", nil
+	return record, updated, keep && record.ID != "", nil
 }
 
 // kept adds one entry to a record, without the lines it never reads, and
