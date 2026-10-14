@@ -197,3 +197,34 @@ func TestACheckThatFoundNothingSaysSo(t *testing.T) {
 		t.Errorf("a NOTICE naming nothing passed: %v", faults)
 	}
 }
+
+// A license expression is read with AND binding tighter than OR and
+// parentheses grouping, as SPDX reads it.
+func TestALicenseExpressionIsReadAsSPDXGroupsIt(t *testing.T) {
+	permitted := map[string]bool{"MIT": true, "Apache-2.0": true, "BSD-2-Clause": true,
+		"GPL-2.0-only WITH Classpath-exception-2.0": true}
+	for _, c := range []struct {
+		expression string
+		want       bool
+	}{
+		{"MIT", true},
+		{"GPL-3.0-only", false},
+		{"MIT OR GPL-3.0-only", true},
+		{"MIT AND GPL-3.0-only", false},
+		{"GPL-3.0-only AND (MIT OR Apache-2.0)", false},
+		{"Apache-2.0 AND (BSD-2-Clause OR GPL-3.0-only)", true},
+		{"GPL-3.0-only OR MIT AND Apache-2.0", true},
+		{"(GPL-3.0-only OR MIT) AND GPL-3.0-only", false},
+		{"Apache-2.0 AND (MIT)", true},
+		{"GPL-2.0-only WITH Classpath-exception-2.0", true},
+		{"GPL-2.0-only", false},
+		{"(Apache-2.0", false},
+		{"Apache-2.0)", false},
+		{"MIT OR", false},
+		{"", false},
+	} {
+		if got := keepable(c.expression, permitted); got != c.want {
+			t.Errorf("%q kept=%v, want %v", c.expression, got, c.want)
+		}
+	}
+}
