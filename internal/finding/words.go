@@ -35,8 +35,10 @@ type Words struct {
 // a markdown field typed here is held to.
 const MostWords = markdown.MaxBytes
 
-// WordsOf is reasoning as it is kept: valid UTF-8, without the NUL character
-// PostgreSQL refuses in text, and cut to MostWords on a character boundary.
+// WordsOf is reasoning as it is kept: valid UTF-8, without NUL, and cut to
+// MostWords on a character boundary. The query builder makes the same two
+// repairs on the way to the engine, so they are made here first: the words
+// keyed and compared are then the words stored.
 //
 // Cut rather than refused. The reasoning is somebody else's, and one
 // over-long explanation is no reason to refuse the scan or the document that

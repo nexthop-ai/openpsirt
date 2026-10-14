@@ -5,11 +5,10 @@
 // character.
 //
 // A cut at a byte offset lands inside a multi-byte character about two times
-// in three, and what is left is not valid UTF-8. PostgreSQL refuses such a
-// value outright and MySQL and MariaDB refuse it in strict mode, so a write
-// recording why something failed fails in turn, leaving no record of either
-// failure. SQLite stores it happily, and SQLite is the engine the quick test
-// loop uses, so nothing local sees it.
+// in three, and what is left is not valid UTF-8. The query builder replaces the
+// broken character on the way to the engine, so the cut value is stored with a
+// replacement character where its last character was, and a lookup or a
+// digest over the cut value no longer matches what was stored.
 //
 // One package, because a bound written by hand at each call site is the same
 // slice spelled again by somebody who has not been bitten yet. The direction
