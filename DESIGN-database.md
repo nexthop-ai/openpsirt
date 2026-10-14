@@ -469,7 +469,7 @@ as v0.9.0 stores the same image.
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decisions beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the decision proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the decision about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
-| The same on MySQL and MariaDB, stopped after the table was made | The next start steps over the table and leaves the same |
+| The same on MySQL and MariaDB, the merge stopped at its last step | No version is recorded, no image version written and every stamp is still its own component. The next start steps over the table and leaves what an upgrade that did not stop leaves |
 | The next build restamping the image | Writes one image version opened and one closed, and nothing else |
 
 Measured on PostgreSQL 16 with ten nightly builds of 34 images restamped every
@@ -479,7 +479,7 @@ leaves 34 image components, 340 image versions and 20,400 edges. `make measure`
 re-runs it. The time is mostly rewriting the findings, which grow with images
 times stamps, so a deployment with a month of nightly history takes three times
 as long. The chart's startup probe allows ten minutes (`DESIGN-packaging.md`),
-and a probe that ends the upgrade rolls it back on PostgreSQL and SQLite, so the
+and a probe that ends the upgrade undoes it on every engine, so the
 upgrade notes say to give it longer or to run it before deploying.
 
 Findings a rebuild closed before the upgrade stay closed. They are history: a
