@@ -3,7 +3,10 @@
 
 package main
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // This gate had no test, and its only consumer is a makefile line that reads
 // an exit code. An exit code cannot tell a check that found nothing from a
@@ -25,6 +28,7 @@ func TestACommentIsReportedOnlyWhereItDescribesAnotherSymbolOfItsPackage(t *test
 		source   string
 		declared map[string]bool
 		want     int
+		file     string
 	}{
 		{
 			"a comment left on the symbol it moved away from",
@@ -37,6 +41,7 @@ func Widen() {}
 `,
 			inPackage("Narrow", "Widen"),
 			1,
+			"",
 		},
 		{
 			// The accident this exists for, and the one the same-file test
@@ -50,6 +55,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow", "Widen"),
 			1,
+			"",
 		},
 		{
 			"a comment on its own declaration",
@@ -60,6 +66,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow"),
 			0,
+			"",
 		},
 		{
 			// The distinction the rule turns on. A first word that names
@@ -73,6 +80,7 @@ func compare() {}
 `,
 			inPackage("compare"),
 			0,
+			"",
 		},
 		{
 			// A verb nobody put on a list is still the convention's shape,
@@ -85,6 +93,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow", "Widen"),
 			1,
+			"",
 		},
 		{
 			// A test's name is a sentence, so the convention does not apply
@@ -98,6 +107,87 @@ func TestWidenLeavesTheOriginalAlone() {}
 `,
 			inPackage("Widen", "TestWidenLeavesTheOriginalAlone"),
 			0,
+			"thing_test.go",
+		},
+		{
+			// The testing package runs a function in a test file. A constant
+			// named like one in an ordinary file is a declaration like any
+			// other, and its comment is held to the convention.
+			"a constant whose name opens with a test prefix",
+			`package p
+
+// Shown is what a reader sees.
+const TestHeader = "X-Test"
+
+const Shown = 1
+`,
+			inPackage("TestHeader", "Shown"),
+			1,
+			"",
+		},
+		{
+			// Test followed by a lower-case letter is not a test to the
+			// testing package, so it is not one here either.
+			"a function in a test file named Testify",
+			`package p
+
+// Shown is what a reader sees.
+func Testify() {}
+
+const Shown = 1
+`,
+			inPackage("Testify", "Shown"),
+			1,
+			"thing_test.go",
+		},
+		{
+			// A comment inside a function body is an ordinary comment.
+			"a comment inside a function body",
+			`package p
+
+func Narrow() {
+	// Widen is called below.
+	Widen()
+}
+
+func Widen() {}
+`,
+			inPackage("Narrow", "Widen"),
+			0,
+			"",
+		},
+		{
+			// A package-level function literal has a body too.
+			"a comment inside a package-level function literal",
+			`package p
+
+var rated = func() map[string]bool {
+	// Widen is read once here.
+	return map[string]bool{"x": Widen()}
+}()
+
+func Widen() bool { return true }
+`,
+			inPackage("rated", "Widen"),
+			0,
+			"",
+		},
+		{
+			// An element of a package-level literal is commented as an
+			// element, and nothing documents it.
+			"a comment inside a package-level composite literal",
+			`package p
+
+var names = map[string]int{
+	// Widen is the wide one.
+	"wide": 1,
+}
+
+func Widen() {}
+`,
+			inPackage("names", "Widen"),
+			0,
+			"",
 		},
 		{
 			"a type whose comment describes a function beside it",
@@ -110,6 +200,7 @@ func Resolve() {}
 `,
 			inPackage("Resolver", "Resolve"),
 			1,
+			"",
 		},
 		{
 			"a var block whose comment names one of its own",
@@ -120,6 +211,7 @@ var Limit = 50
 `,
 			inPackage("Limit"),
 			0,
+			"",
 		},
 		{
 			// Read at the group alone, every comment inside a const or var
@@ -136,6 +228,7 @@ const (
 `,
 			inPackage("Narrow", "Widen"),
 			1,
+			"",
 		},
 		{
 			"a spec inside a grouped declaration whose comment is its own",
@@ -149,6 +242,7 @@ const (
 `,
 			inPackage("Narrow", "Widen"),
 			0,
+			"",
 		},
 		{
 			// The shape a block left behind takes once somebody corrects its
@@ -166,6 +260,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow"),
 			1,
+			"",
 		},
 		{
 			// The ordinary shape, and it has to stay quiet: a doc comment
@@ -180,6 +275,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow", "narrow"),
 			0,
+			"",
 		},
 		{
 			// A run of constants introduced by a paragraph about the run is
@@ -199,6 +295,7 @@ const (
 `,
 			inPackage("Narrow", "Widen"),
 			0,
+			"",
 		},
 		{
 			// A block separated from its declaration by another block is not
@@ -214,6 +311,7 @@ func Narrow() {}
 `,
 			inPackage("Narrow", "Widen"),
 			1,
+			"",
 		},
 		{
 			// A file this tree opens with a paragraph about what the file is,
@@ -230,6 +328,7 @@ func Narrow() { fmt.Println() }
 `,
 			inPackage("Narrow"),
 			0,
+			"",
 		},
 		{
 			// A file the compiler will complain about, better than this can.
@@ -237,9 +336,14 @@ func Narrow() { fmt.Println() }
 			"package p\n\nfunc (\n",
 			inPackage(),
 			0,
+			"",
 		},
 	} {
-		if got := detached("thing.go", []byte(c.source), c.declared); len(got) != c.want {
+		file := c.file
+		if file == "" {
+			file = "thing.go"
+		}
+		if got := detached(file, []byte(c.source), c.declared); len(got) != c.want {
 			t.Errorf("%s: reported %d (%v), want %d", c.what, len(got), got, c.want)
 		}
 	}
@@ -261,6 +365,8 @@ func Build() {
 	Reading := 1
 	_ = Reading
 }
+
+func (Record) Close() {}
 `), declared)
 
 	for _, want := range []string{"Record", "Build"} {
@@ -268,9 +374,26 @@ func Build() {
 			t.Errorf("%s is declared at the top level and was not counted", want)
 		}
 	}
-	for _, unwanted := range []string{"Default", "Reading"} {
+	for _, unwanted := range []string{"Default", "Reading", "Close"} {
 		if declared[unwanted] {
-			t.Errorf("%s is a field or a local and was counted as a symbol", unwanted)
+			t.Errorf("%s is a field, a local or a method and was counted as a symbol", unwanted)
 		}
+	}
+}
+
+// A symbol is counted against the package it is declared in, which is every
+// file of its directory and none of another's.
+func TestWhatEachPackageDeclaresIsReadAcrossItsFiles(t *testing.T) {
+	got := packages(map[string][]byte{
+		"a/one.go":   []byte("package a\n\nfunc Narrow() {}\n"),
+		"a/two.go":   []byte("package a\n\nconst Widen = 1\n"),
+		"b/three.go": []byte("package b\n\ntype Other struct{}\n"),
+	})
+	want := map[string]map[string]bool{
+		"a": {"Narrow": true, "Widen": true},
+		"b": {"Other": true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("read %v, want %v", got, want)
 	}
 }

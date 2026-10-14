@@ -47,6 +47,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
@@ -64,18 +66,15 @@ func main() {
 	// Every name each package declares, read first, because a comment left
 	// behind by a symbol that moved names something its own file no longer
 	// declares.
-	declared := map[string]map[string]bool{}
+	sources := map[string][]byte{}
 	if _, err := walk.Only(".go", []string{skip}, func(path string, source []byte) error {
-		where := filepath.Dir(path)
-		if declared[where] == nil {
-			declared[where] = map[string]bool{}
-		}
-		declares(source, declared[where])
+		sources[path] = source
 		return nil
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	declared := packages(sources)
 
 	var bad []string
 	read, err := walk.Only(".go", []string{skip}, func(path string, source []byte) error {
@@ -84,6 +83,10 @@ func main() {
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if read == 0 {
+		fmt.Fprintln(os.Stderr, "no Go file was read, so this checked nothing")
 		os.Exit(2)
 	}
 	if len(bad) == 0 {
@@ -97,6 +100,20 @@ func main() {
 	fmt.Fprintf(os.Stderr, "\n%d doc comment(s) left on the wrong declaration. "+
 		"Move the block, or delete it where it survives on the symbol it moved with.\n", len(bad))
 	os.Exit(1)
+}
+
+// packages is every name each package declares at its top level, keyed by the
+// directory holding it, from every file's source keyed by its path.
+func packages(sources map[string][]byte) map[string]map[string]bool {
+	declared := map[string]map[string]bool{}
+	for path, source := range sources {
+		where := filepath.Dir(path)
+		if declared[where] == nil {
+			declared[where] = map[string]bool{}
+		}
+		declares(source, declared[where])
+	}
+	return declared
 }
 
 // detached reports every doc comment in one file that sits on a declaration it
@@ -114,7 +131,7 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 		return nil
 	}
 	var bad []string
-	for _, block := range documented(file) {
+	for _, block := range documented(path, file) {
 		first := strings.TrimSpace(block.doc.List[0].Text)
 		first = strings.TrimPrefix(first, "//")
 		match := opens.FindStringSubmatch(strings.TrimSpace(first))
@@ -129,7 +146,7 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 		// convention does not apply to it and its comment opens with whatever
 		// the test is about — usually the symbol under test, which is exactly
 		// what this looks for. Every one of them is prose.
-		if aTest(block.names) {
+		if block.test {
 			continue
 		}
 		// A comment naming some other symbol entirely is the accident. One
@@ -157,7 +174,7 @@ func detached(path string, source []byte, declared map[string]bool) []string {
 func glued(path string, fset *token.FileSet, file *ast.File,
 	declared map[string]bool) []string {
 	var bad []string
-	for _, block := range documented(file) {
+	for _, block := range documented(path, file) {
 		// Only where the block above is itself somebody's doc comment, which
 		// is what makes this two blocks rather than one. A run of constants
 		// introduced by a paragraph about the run is the ordinary shape here,
@@ -230,14 +247,18 @@ func floating(path string, fset *token.FileSet, file *ast.File,
 		}
 		return true
 	})
-	// Everything inside a function body, which is where an ordinary comment
-	// lives and where none of this applies.
-	var bodies []*ast.BlockStmt
-	for _, decl := range file.Decls {
-		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil {
-			bodies = append(bodies, fn.Body)
+	// Everything inside braces: a function body, a function literal's body, a
+	// composite literal, and a struct's or an interface's fields. That is where
+	// an ordinary comment lives and where none of this applies, and a
+	// package-level literal is as much inside braces as a function is.
+	var bodies []ast.Node
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch node.(type) {
+		case *ast.BlockStmt, *ast.CompositeLit, *ast.FieldList:
+			bodies = append(bodies, node)
 		}
-	}
+		return true
+	})
 	inside := func(at token.Pos) bool {
 		for _, body := range bodies {
 			if at > body.Pos() && at < body.End() {
@@ -281,22 +302,38 @@ func floating(path string, fset *token.FileSet, file *ast.File,
 	return bad
 }
 
-// aTest says whether a declaration is one the testing package runs.
-func aTest(names []string) bool {
-	for _, name := range names {
-		for _, prefix := range []string{"Test", "Benchmark", "Fuzz", "Example"} {
-			if strings.HasPrefix(name, prefix) {
-				return true
-			}
+// aTest says whether a function is one the testing package runs: a function
+// with no receiver, in a test file, named for one of its prefixes followed by
+// nothing or by a rune that is not lower case. That is the testing package's
+// own rule, so a constant or a type that happens to open with one of the
+// words is read like any other declaration.
+func aTest(path string, fn *ast.FuncDecl) bool {
+	if fn.Recv != nil || !strings.HasSuffix(path, "_test.go") {
+		return false
+	}
+	for _, prefix := range []string{"Test", "Benchmark", "Fuzz", "Example"} {
+		rest, ok := strings.CutPrefix(fn.Name.Name, prefix)
+		if !ok {
+			continue
+		}
+		if rest == "" {
+			return true
+		}
+		if next, _ := utf8.DecodeRuneInString(rest); !unicode.IsLower(next) {
+			return true
 		}
 	}
 	return false
 }
 
 // block is one doc comment and the names the declaration under it declares.
+//
+// A test's own name is a sentence rather than a symbol, so the convention does
+// not apply to it and its comment opens with whatever the test is about.
 type block struct {
 	doc   *ast.CommentGroup
 	names []string
+	test  bool
 }
 
 // documented is every doc comment in a file with what it sits on.
@@ -304,7 +341,7 @@ type block struct {
 // A spec inside a grouped declaration carries its own doc comment, and reading
 // only the group's left every comment inside a const or var block unread —
 // which is where a good part of this tree's documentation is.
-func documented(file *ast.File) []block {
+func documented(path string, file *ast.File) []block {
 	var blocks []block
 	keep := func(doc *ast.CommentGroup, names ...string) {
 		if doc != nil && len(doc.List) > 0 && len(names) > 0 {
@@ -314,7 +351,9 @@ func documented(file *ast.File) []block {
 	for _, decl := range file.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
-			keep(d.Doc, d.Name.Name)
+			if d.Doc != nil && len(d.Doc.List) > 0 {
+				blocks = append(blocks, block{doc: d.Doc, names: []string{d.Name.Name}, test: aTest(path, d)})
+			}
 		case *ast.GenDecl:
 			var all []string
 			for _, spec := range d.Specs {
@@ -339,8 +378,8 @@ func documented(file *ast.File) []block {
 
 // declares adds every name one file declares at package level to the set.
 //
-// Package level only. A local variable and a struct field are named for what
-// they hold in one function or one record, and half the ordinary English
+// Package level only. A method, a local variable and a struct field are named
+// for what they do or hold on one type, in one function or in one record, and half the ordinary English
 // words in this tree are one of those somewhere — reading them as symbols is
 // what turns the check into noise.
 func declares(source []byte, into map[string]bool) {
@@ -351,7 +390,9 @@ func declares(source []byte, into map[string]bool) {
 	for _, decl := range file.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
-			into[d.Name.Name] = true
+			if d.Recv == nil {
+				into[d.Name.Name] = true
+			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
 				switch s := spec.(type) {
