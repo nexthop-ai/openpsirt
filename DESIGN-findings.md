@@ -644,7 +644,7 @@ exception agree rather than contradict.
 | Surface | What it does |
 |---|---|
 | A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
-| An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it |
+| An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it. A place two edges reach under two words shows the word from the earliest scan, and of two words one scan stated, the first in byte order, so every engine and every read shows the same one |
 
 It appears nowhere else: not in the urgency ranking, not as a prefilled
 outcome on a claim, and not as a default narrowing on any list. A person deciding that a

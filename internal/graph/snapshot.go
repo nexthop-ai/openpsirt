@@ -502,13 +502,23 @@ func NamespaceOf(purl string) string {
 
 // EcosystemOf reads the ecosystem out of a package identifier, which with the
 // namespace is what tells two components with one name and one version apart.
+//
+// The scheme is compared without regard to capitals and the type is decoded,
+// as PartsOfPurl reads them and as the statement narrowing by ecosystem
+// compares them. An identifier naming a type and nothing after it still
+// answers the type.
 func EcosystemOf(purl string) string {
-	rest, found := strings.CutPrefix(strings.TrimSpace(purl), "pkg:")
-	if !found {
+	if ecosystem := PartsOfPurl(purl).Type; ecosystem != "" {
+		return ecosystem
+	}
+	body, _, _ := strings.Cut(strings.TrimSpace(purl), "#")
+	body, _, _ = strings.Cut(body, "?")
+	scheme, rest, found := strings.Cut(body, ":")
+	if !found || !strings.EqualFold(scheme, "pkg") {
 		return ""
 	}
-	ecosystem, _, _ := strings.Cut(rest, "/")
-	return strings.ToLower(ecosystem)
+	ecosystem, _, _ := strings.Cut(strings.Trim(rest, "/"), "/")
+	return strings.ToLower(decoded(ecosystem))
 }
 
 // Neighbor is one component next to another in the graph.
@@ -1180,6 +1190,10 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 		Where("e.closed_scan_id IS NULL").
 		Where("e.kind <> ?", "").
 		Where("child.component_id IN (?)", bun.List(componentIDs)).
+		// The earliest scan first, and within one scan the words in byte
+		// order, so the word kept below is the same on every engine and every
+		// read. One scan opens its edges in no particular order.
+		OrderExpr("e.opened_scan_id, e.kind, e.id").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what the producer called these dependencies: %w", err)
@@ -1191,9 +1205,9 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 			puller = 0
 		}
 		at := [2]int64{row.ChildComponentID, puller}
-		// The first stated word for a pair. A component reached from one
-		// consumer by two edges is one place, and two words for it is the
-		// producer having said two things about the same dependency.
+		// The first word for a pair, in the order above. A component reached
+		// from one consumer by two edges is one place, and two words for it is
+		// the producer having said two things about the same dependency.
 		if _, already := scopes[at]; !already {
 			scopes[at] = row.Kind
 		}
