@@ -25,6 +25,22 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
+	// The distribution label is decided from every place of the issue here,
+	// not from the one a reader sees first: a document saying TLP:WHITE about
+	// an issue with an undisclosed place is the one that travels furthest.
+	// And a reader who may not see every place is refused the document
+	// whole, as byName refuses a cover they may not see, rather than handed
+	// a label that says undisclosed work exists.
+	undisclosed, err := finding.AnyUndisclosed(ctx, s.db, one.ProductID, issue.ID)
+	if err != nil {
+		return err
+	}
+	if undisclosed {
+		if !subject.Reads(access.Private, one.ProductID) {
+			return ErrNoSuchAdvisory
+		}
+		a.undisclosed = true
+	}
 	aliases, err := s.namesOf(ctx, issue.ID)
 	if err != nil {
 		return err
@@ -45,9 +61,6 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	opened := entered.OpenedAt.UTC()
 	if a.opened.IsZero() || opened.Before(a.opened) {
 		a.opened = opened
-	}
-	if entered.Visibility == access.Private {
-		a.undisclosed = true
 	}
 
 	summary := summaryOf(issue, one.Issue)

@@ -125,6 +125,25 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 	return out, nil
 }
 
+// AnyUndisclosed reports whether any place of this issue in this product is
+// undisclosed, open or closed, whoever is asking.
+//
+// Asked where a statement about the whole issue is made from it, such as the
+// distribution label an advisory carries: one undisclosed place makes the
+// issue embargoed there, whichever place a reader happens to see first.
+func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
+	held, err := db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
+		Where(inThisProductAs("f.target_id"), productID).
+		Where("f.visibility = ?", access.Private).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether this issue is undisclosed: %w", err)
+	}
+	return held, nil
+}
+
 // undisclosedHere reads whether anything of this issue in this product is
 // undisclosed, and where its embargo ends.
 //

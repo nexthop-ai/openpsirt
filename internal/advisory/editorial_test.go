@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // standingOn is the agreements standing on what the advisory says now.
@@ -530,6 +531,46 @@ func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
 			if got != asked.want {
 				t.Errorf("whether a document named %s answered %v, want %v", asked.what, got, asked.want)
 			}
+		}
+	})
+}
+
+// An issue disclosed at one place and undisclosed at another is embargoed in
+// the product, whichever place was recorded first. The label is decided from
+// every place, and a reader who may see only the disclosed half is refused the
+// document rather than told a label that says the other half exists.
+func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.disclosed(t, f.master)
+		// The same issue at a second release, recorded later and undisclosed.
+		var first finding.Finding
+		if err := f.db.DB.NewSelect().Model(&first).
+			Where("f.target_id = ?", f.master).Where("f.kind = ?", finding.Entered).
+			Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		second := first
+		second.ID, second.TargetID = 0, f.tagged
+		second.Visibility = access.Private
+		second.OpenedAt = first.OpenedAt.Add(time.Hour)
+		if _, err := f.db.DB.NewInsert().Model(&second).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		doc, err := f.store.ForAdvisory(ctx, f.who, issuer, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if label := doc.Document.Distribution.TLP.Label; label != "RED" {
+			t.Errorf("an issue with an undisclosed place is labelled %q", label)
+		}
+
+		disclosedOnly := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{f.product: {access.PublicRead, access.PublicTriage}}, 0)
+		if _, err := f.store.ForAdvisory(ctx, disclosedOnly, issuer, named); !errors.Is(err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("a reader of the disclosed half alone generated the document: %v", err)
 		}
 	})
 }
