@@ -13,6 +13,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -206,7 +207,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("record what we think of this: %w", err)
 		}
 		if recorded.State == AssessmentLive {
-			return liveRating(ctx, tx, productID, vulnerabilityID, severity)
+			return liveRating(ctx, tx, productID, vulnerabilityID, severity, s.now())
 		}
 		return nil
 	})
@@ -282,7 +283,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 			return err
 		}
 		agreed = claim
-		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, claim.Severity)
+		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, claim.Severity, s.now())
 	})
 	if err != nil {
 		return nil, err
@@ -339,7 +340,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if err := movedOne(result, "withdraw the claim"); err != nil {
 			return err
 		}
-		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "")
+		return liveRating(ctx, tx, claim.ProductID, claim.VulnerabilityID, "", s.now())
 	})
 	if err != nil {
 		return nil, err
@@ -359,7 +360,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 // holding nothing would read as a rating of nothing in every expression that
 // coalesces onto the published one.
 func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
-	severity string) error {
+	severity string, now time.Time) error {
 
 	// Held for the issue the claim is read as. A claim filed under an issue
 	// that merged into another rates the other, and where a claim under each
@@ -429,7 +430,7 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 	if err := rerank(ctx, tx, productID, vulnerabilityID, severity); err != nil {
 		return err
 	}
-	return redue(ctx, tx, productID, vulnerabilityID)
+	return redue(ctx, tx, productID, vulnerabilityID, now)
 }
 
 // rank orders the four words that rank. Anything else folds to medium first,
@@ -565,15 +566,31 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		FixedAt   *time.Time `bun:"fixed_at"`
 		DueAt     *time.Time `bun:"due_at"`
 		StatedBy  *int64     `bun:"stated_by"`
+		// OnTheClock is whether the release the finding is in carries
+		// deadlines at all: a tag and a release past end of life do not,
+		// whatever the issue has become.
+		OnTheClock int `bun:"on_the_clock"`
 	}
+	clocked, clockedArgs := catalog.OnTheClock("st", "p", observedAt)
 	// Read before the flag is raised: afterwards there is nothing to tell the
 	// rows learning it from the ones that already carried it.
-	if err := tx.NewSelect().Model((*Finding)(nil)).
-		Column("id", "kind", "urgency_exploited", "opened_at", "fix_state", "fixed_at", "due_at",
-			"stated_by").
-		Where("vulnerability_id = ?", issue).
-		Where("closed_at IS NULL").
-		Where("urgency_exploited = ? OR exploited_learned_at > ?", false, known).
+	if err := tx.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		ColumnExpr(`f.id AS "id"`).
+		ColumnExpr(`f.kind AS "kind"`).
+		ColumnExpr(`f.urgency_exploited AS "urgency_exploited"`).
+		ColumnExpr(`f.opened_at AS "opened_at"`).
+		ColumnExpr(`f.fix_state AS "fix_state"`).
+		ColumnExpr(`f.fixed_at AS "fixed_at"`).
+		ColumnExpr(`f.due_at AS "due_at"`).
+		ColumnExpr(`f.stated_by AS "stated_by"`).
+		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
+		Where("f.vulnerability_id = ?", issue).
+		Where("f.closed_at IS NULL").
+		Where("f.urgency_exploited = ? OR f.exploited_learned_at > ?", false, known).
 		Scan(ctx, &rows); err != nil {
 		return false, fmt.Errorf("read what is learning this: %w", err)
 	}
@@ -594,6 +611,11 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		// A place a supplier answers on some routes is not work, and carries
 		// no deadline however the issue is rated.
 		if row.StatedBy != nil {
+			due = nil
+		}
+		// Nothing on a tag or a release past end of life carries a deadline,
+		// and an issue becoming exploited changes nothing about the release.
+		if row.OnTheClock == 0 {
 			due = nil
 		}
 		key := clock{off: due == nil}
@@ -647,11 +669,16 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 // Written per group rather than per finding: a deadline is a run's start plus
 // a fixed number of days, so every finding of one issue opened by one run,
 // rated the same way, in this product, lands on the same instant.
-func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) error {
-	// The moment "now" means to this recount, taken once so that every group it
-	// writes is reasoned at one moment rather than at as many moments as
-	// there are groups.
-	recountedAt := time.Now().UTC()
+//
+// A finding on a tag or on a release past end of life carries no deadline
+// whatever the rating says, so the recount writes none there.
+//
+// The moment is the caller's store clock, taken once so that every group it
+// writes is reasoned at one moment rather than at as many moments as there are
+// groups.
+func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
+	now time.Time) error {
+	recountedAt := now.UTC().Truncate(time.Microsecond)
 	windows, err := LoadWindows(ctx, tx)
 	if err != nil {
 		return err
@@ -660,6 +687,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 	if err != nil {
 		return err
 	}
+	clocked, clockedArgs := catalog.OnTheClock("st", "p", recountedAt)
 
 	// Grouped on when each finding opened, which the row carries. Grouped on
 	// the run and joined for the timestamp it is one join to read one column,
@@ -683,6 +711,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
@@ -703,6 +732,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
+		Where(clocked, clockedArgs...).
 		// A recorded flaw is clocked by recountOwn, below.
 		Where("f.kind <> ?", Entered).
 		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, f.opened_at, "+
@@ -712,6 +742,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		return fmt.Errorf("read what this issue is open against: %w", err)
 	}
 
+	onClock, onClockArgs := clockedIn(productID, recountedAt, true)
 	for _, group := range groups {
 		q := tx.NewUpdate().
 			Model((*Finding)(nil)).
@@ -723,7 +754,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			Where("kind <> ?", Entered).
 			// A place a supplier answers on some routes carries no deadline.
 			Where("stated_by IS NULL").
-			Where(inThisProduct, productID)
+			Where(onClock, onClockArgs...)
 		if group.LearnedAt != nil {
 			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)
 		} else {
@@ -750,6 +781,17 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("move this issue's deadline: %w", err)
 		}
+	}
+	offClock, offClockArgs := clockedIn(productID, recountedAt, false)
+	if _, err := tx.NewUpdate().
+		Model((*Finding)(nil)).
+		Set("due_at = NULL").
+		Where("vulnerability_id = ?", vulnerabilityID).
+		Where("closed_at IS NULL").
+		Where("due_at IS NOT NULL").
+		Where(offClock, offClockArgs...).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("take the deadline off what is not on the clock: %w", err)
 	}
 	_, err = recountOwn(ctx, tx, productID, []int64{vulnerabilityID}, recountedAt)
 	return err

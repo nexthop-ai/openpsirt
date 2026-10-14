@@ -276,7 +276,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		if err := rerank(ctx, v.db, r.ProductID, kept, r.Severity); err != nil {
 			return err
 		}
-		if err := redue(ctx, v.db, r.ProductID, kept); err != nil {
+		if err := redue(ctx, v.db, r.ProductID, kept, now); err != nil {
 			return err
 		}
 	}
@@ -339,7 +339,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		return fmt.Errorf("read where the kept issue was attacked: %w", err)
 	}
 	for _, product := range attacked {
-		if err := ExploitedHereChanged(ctx, v.db, product, kept, true); err != nil {
+		if err := ExploitedHereChanged(ctx, v.db, product, kept, true, now); err != nil {
 			return err
 		}
 	}
@@ -475,7 +475,7 @@ func (v *Vulnerabilities) settleRatingClaims(ctx context.Context, kept, gone, me
 		if len(here) > 1 {
 			// The rating in force follows the claim that stands, and with it
 			// where the product's findings sit and how long they have.
-			if err := liveRating(ctx, v.db, product, kept, ""); err != nil {
+			if err := liveRating(ctx, v.db, product, kept, "", now); err != nil {
 				return err
 			}
 		}

@@ -1094,3 +1094,63 @@ func TestWhatAgreeingWouldDoCostsNoMoreStatementsForMoreRatingsInAProduct(t *tes
 		}
 	})
 }
+
+// A rating that moves, or an issue becoming exploited, re-clocks the issue's
+// findings without putting a deadline on a tag or a release past end of life.
+// Nothing will land on either, so a deadline there is unmeetable, and the scan
+// left them off the clock for that reason.
+func TestReclockingLeavesATagAndARetiredReleaseOffTheClock(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		tag := f.anotherBuild(t, "24.06")
+		retired := f.anotherBranch(t, "release-23")
+		var stream int64
+		if err := f.db.DB.NewSelect().TableExpr(`"target"`).Column("stream_id").
+			Where("id = ?", retired).Scan(ctx, &stream); err != nil {
+			t.Fatal(err)
+		}
+		yesterday := time.Now().UTC().AddDate(0, 0, -1)
+		if err := catalog.NewStore(f.db.DB).SetStreamEndOfLife(ctx, stream, &yesterday); err != nil {
+			t.Fatal(err)
+		}
+		reported := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-RECLOCK", Severity: "high"},
+			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+		}
+		for _, target := range []int64{f.target, tag, retired} {
+			f.shippedTo(t, target, twoConsumers())
+			if _, err := f.store.Apply(ctx, target, f.runOn(t, target),
+				[]finding.Reported{reported}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		offTheClock := func(when string) {
+			t.Helper()
+			if due := f.deadlineIn(t, tag, "CVE-2026-RECLOCK"); !due.IsZero() {
+				t.Errorf("after %s, a tag carries a deadline, %s", when, due)
+			}
+			if due := f.deadlineIn(t, retired, "CVE-2026-RECLOCK"); !due.IsZero() {
+				t.Errorf("after %s, a release past end of life carries a deadline, %s", when, due)
+			}
+			if f.deadlineIn(t, f.target, "CVE-2026-RECLOCK").IsZero() {
+				t.Errorf("after %s, the branch carries no deadline", when)
+			}
+		}
+		offTheClock("the scans")
+
+		f.recorded(t, 1, "someone")
+		if _, err := f.store.Assess(ctx, f.holding(t, access.PublicTriage), f.productID,
+			f.issue(t, "CVE-2026-RECLOCK"), "critical", "Reachable in how we ship it."); err != nil {
+			t.Fatal(err)
+		}
+		offTheClock("a rating")
+
+		exploited := reported
+		exploited.Issue.Exploited = true
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{exploited}); err != nil {
+			t.Fatal(err)
+		}
+		offTheClock("learning it is exploited")
+	})
+}

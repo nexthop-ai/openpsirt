@@ -578,17 +578,37 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 						productID, bun.List(words))
 			}
 		}
+		// A band the product's line does not admit is written only where the
+		// product was attacked through the issue, which no line sets aside, so
+		// the pass never writes a deadline the line would take away.
+		floor, err := FloorFor(ctx, s.db, productID)
+		if err != nil {
+			return changed, err
+		}
+		admitted := func(word string, where func(*bun.UpdateQuery) *bun.UpdateQuery) func(*bun.UpdateQuery) *bun.UpdateQuery {
+			if floor.Admits(false, word) {
+				return where
+			}
+			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
+				return where(q).Where("urgency_exploited_here = ?", true)
+			}
+		}
 		bands := []band{
 			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
 				return q.Where("urgency_exploited = ?", true)
 			}},
-			{windows.Critical, rated("critical")},
-			{windows.High, rated("high")},
-			{windows.Low, rated("low")},
+			{windows.Critical, admitted("critical", rated("critical"))},
+			{windows.High, admitted("high", rated("high"))},
+			{windows.Low, admitted("low", rated("low"))},
 			// Everything else: medium, and anything nobody rated — folded the
 			// same way by Band, because unknown is not harmless.
-			{windows.Medium, rated("medium")},
+			{windows.Medium, admitted("medium", rated("medium"))},
 		}
+		// Only what is on the clock: a release that moves and is in support,
+		// with a fix to take. Written into every statement rather than
+		// cleared afterwards, so a rewrite stopped part way leaves no
+		// deadline on what carries none.
+		onClock, onClockArgs := clockedIn(productID, now, true)
 
 		for _, start := range clockStarts(now) {
 			// The distinct moments the clock starts at in this product, off
@@ -635,7 +655,10 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							// A place a supplier answers on some routes
 							// carries no deadline.
 							Where("stated_by IS NULL").
-							Where(inThisProduct, productID)
+							Where(onClock, onClockArgs...).
+							Where("fix_state <> ?", NoFix).
+							Where("NOT (fix_state = ? AND urgency_exploited = ? AND "+
+								"urgency_exploited_here = ?)", WontFix, false, false)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -648,7 +671,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 						// Cancellation is honored between slices rather than
 						// only at the end, so shutting down during a rewrite
 						// stops promptly and leaves the rest for the next scan
-						// or the next edit.
+						// or the next edit. Every row written so far carries
+						// the deadline the whole pass would give it.
 						if err := ctx.Err(); err != nil {
 							return changed, err
 						}
@@ -660,11 +684,10 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 
 	// And then take the deadline away from everything below the line.
 	//
-	// Done as a pass afterwards rather than folded into the bands above,
-	// because the two say different things and reading them together is
-	// how one quietly becomes a condition of the other: the bands say how
-	// long something has, and this says that some things are not on a
-	// clock at all .
+	// The bands above write no deadline any of these four passes removes.
+	// The passes sweep what was written before a release went out of support,
+	// a line moved, or upstream answered, and each reports what it took off
+	// under its own rule.
 	cleared, err := s.clearBelowFloor(ctx)
 	if err != nil {
 		return changed, err
@@ -709,6 +732,23 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		return changed + cleared + retired + fixed, err
 	}
 	return changed + cleared + retired + fixed + nothing, nil
+}
+
+// clockedIn is the condition on a finding's build under which it is in this
+// product and, as asked, on the clock or off it at a moment (catalog.OnTheClock).
+//
+// Written as a condition on the target rather than as a join, because the
+// statements that need it are updates and no engine here spells a joined update
+// the same way.
+func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
+	clocked, args := catalog.OnTheClock("st", "p", at)
+	if !on {
+		clocked = "NOT " + clocked
+	}
+	return `target_id IN (SELECT tg.id FROM "target" AS "tg"
+		JOIN "stream" AS "st" ON st.id = tg.stream_id
+		JOIN "product" AS "p" ON p.id = st.product_id
+		WHERE st.product_id = ? AND ` + clocked + `)`, append([]any{productID}, args...)
 }
 
 // clearNothingToTake removes the deadline from open findings that carry no

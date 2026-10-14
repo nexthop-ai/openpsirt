@@ -12,6 +12,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -79,11 +80,16 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		Exploited     bool       `bun:"exploited"`
 		ExploitedHere bool       `bun:"exploited_here"`
 		LearnedAt     *time.Time `bun:"learned_at"`
+		// OnTheClock is whether the release carries deadlines at all: a tag
+		// and a release past end of life do not.
+		OnTheClock int `bun:"on_the_clock"`
 	}
+	clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(`f.id AS "id"`).
@@ -94,6 +100,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
+		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
 		Where("f.kind = ?", Entered).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID)
@@ -115,7 +122,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		}
 		at := ownDeadline(own, row.Severity, row.RatedAt, row.FixState,
 			row.Exploited, row.ExploitedHere, now, row.LearnedAt, row.FixedAt, floor)
-		if at == nil {
+		if at == nil || row.OnTheClock == 0 {
 			none = append(none, row.ID)
 			continue
 		}
