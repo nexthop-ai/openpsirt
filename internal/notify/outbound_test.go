@@ -462,7 +462,7 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		}, nil); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("configuring a destination as a non-administrator answered %v", err)
 		}
-		if err := store.RetireDestination(ctx, asks(t, db, other), "chat",
+		if _, err := store.RetireDestination(ctx, asks(t, db, other), "chat",
 			notify.Everything); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("retiring a destination as a non-administrator answered %v", err)
 		}

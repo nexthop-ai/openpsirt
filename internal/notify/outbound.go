@@ -949,34 +949,56 @@ func deref(s *string) string {
 	return *s
 }
 
-// RetireDestination takes one out of use, keeping what went there.
+// RetireDestination takes one out of use, keeping what went there. It answers
+// the row retired, so the caller names it as it is stored.
 func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
-	name, kind string) error {
+	name, kind string) (*Outbound, error) {
 
 	if err := administering(subject, "configure where things go"); err != nil {
-		return err
+		return nil, err
 	}
-	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
-		Set("retired_at = ?", time.Now().UTC().Truncate(time.Microsecond)).
-		Where("name = ?", DestinationKey(name)).
-		Where("kind = ?", DestinationKind(kind)).
-		Where("retired_at IS NULL").Exec(ctx)
+	var retired *Outbound
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		retired = nil
+		row := new(Outbound)
+		err := tx.NewSelect().Model(row).
+			Where("name = ?", DestinationKey(name)).
+			Where("kind = ?", DestinationKind(kind)).
+			Where("retired_at IS NULL").
+			Limit(1).Scan(ctx)
+		// A destination believed retired that was not goes on receiving every
+		// notification it takes, including about findings nobody has
+		// announced.
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("no destination is taking %q under that name: %w",
+				kind, access.ErrNothingMatched)
+		}
+		if err != nil {
+			return fmt.Errorf("retire that destination: %w", err)
+		}
+		at := s.now().UTC().Truncate(time.Microsecond)
+		res, err := tx.NewUpdate().Model((*Outbound)(nil)).
+			Set("retired_at = ?", at).
+			Where("id = ?", row.ID).
+			Where("retired_at IS NULL").Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("retire that destination: %w", err)
+		}
+		n, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("retire that destination: %w", err)
+		}
+		if n == 0 {
+			return fmt.Errorf("no destination is taking %q under that name: %w",
+				kind, access.ErrNothingMatched)
+		}
+		retired = row
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("retire that destination: %w", err)
+		return nil, err
 	}
-	// A destination believed retired that was not goes on receiving every
-	// notification it takes, including about findings nobody has announced.
-	// Answered as success, the only thing that would say otherwise is reading
-	// the list back.
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("retire that destination: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("no destination is taking %q under that name: %w",
-			kind, access.ErrNothingMatched)
-	}
-	return nil
+	return retired, nil
 }
 
 // withoutTheAddress is why a delivery failed, with the destination taken out.

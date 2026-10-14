@@ -99,7 +99,12 @@ func registerKeys(api huma.API, a core.Administering) {
 		Body KeyBody
 	}) (*core.DeclaredOutput[KeyBody], error) {
 		var name, secret string
+		var resolved KeyBody
 		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			// The names the request resolved to, not the ones it typed: one
+			// product spelled two ways in the trail is two products to
+			// anybody searching it.
+			resolved = KeyBody{}
 			store, names, err := mintable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -110,6 +115,7 @@ func registerKeys(api huma.API, a core.Administering) {
 				return core.Undeclared(a.Logger, err, "that product could not be looked up")
 			}
 			scope := access.Scope{ProductID: product.ID}
+			resolved.Product = product.Name
 
 			// Each lookup names the field whose read failed, so a fault
 			// reading the branch is not reported as a fault reading the
@@ -122,6 +128,7 @@ func registerKeys(api huma.API, a core.Administering) {
 					return core.Undeclared(a.Logger, err, "that branch or tag could not be looked up")
 				}
 				scope.StreamID = &stream.ID
+				resolved.Stream = stream.Name
 			}
 			if in.Body.Variant != "" {
 				variant, err := names.VariantByName(ctx, product.ID, in.Body.Variant)
@@ -129,6 +136,7 @@ func registerKeys(api huma.API, a core.Administering) {
 					return core.Undeclared(a.Logger, err, "that variant could not be looked up")
 				}
 				scope.VariantID = &variant.ID
+				resolved.Variant = variant.Name
 			}
 
 			key, minted, err := store.NewKey(ctx, in.Body.Name, scope)
@@ -146,7 +154,7 @@ func registerKeys(api huma.API, a core.Administering) {
 			// hands back what it holds is what storing a digest exists to
 			// avoid.
 			if err := core.Noted(ctx, tx, trail.Credential, key.Name,
-				nil, trail.Said(keyScope(in.Body), true)); err != nil {
+				nil, trail.Said(keyScope(resolved), true)); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}
 			return nil
@@ -154,8 +162,8 @@ func registerKeys(api huma.API, a core.Administering) {
 			return nil, err
 		}
 		return core.Answer(true, KeyBody{
-			Name: name, Product: in.Body.Product, Stream: in.Body.Stream,
-			Variant: in.Body.Variant, Secret: secret,
+			Name: name, Product: resolved.Product, Stream: resolved.Stream,
+			Variant: resolved.Variant, Secret: secret,
 		}), nil
 	})
 

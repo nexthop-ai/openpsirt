@@ -234,15 +234,16 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			// Mapped before the trail row, which would otherwise record a
 			// retirement that did not happen — and the destination goes on
 			// receiving everything it takes.
-			switch err := notify.NewStore(tx).
-				RetireDestination(ctx, by, input.Name, input.Kind); {
+			row, err := notify.NewStore(tx).RetireDestination(ctx, by, input.Name, input.Kind)
+			switch {
 			case errors.Is(err, access.ErrNothingMatched):
 				return huma.Error404NotFound("no destination is recorded under that name and kind")
 			case err != nil:
 				return core.WentWrong(a.Logger, "that could not be retired", err)
 			}
-			// The name and the kind as they are matched, which is how the addition's row names them.
-			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+notify.DestinationKey(input.Name)+" · "+notify.DestinationKind(input.Kind),
+			// Named as adding it was, from the row: the name and the kind are
+			// matched without regard to capitals, and the trail spells them one way.
+			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+row.Name+" · "+row.Kind,
 				trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}

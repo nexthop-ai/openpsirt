@@ -53,7 +53,7 @@ func TestADestinationNameIsMatchedWhateverItsCapitals(t *testing.T) {
 		if err := add("ops-pager"); err == nil {
 			t.Error("a second destination was added under the same name in other capitals")
 		}
-		if err := store.RetireDestination(ctx, admin, "OPS-PAGER", notify.Everything); err != nil {
+		if _, err := store.RetireDestination(ctx, admin, "OPS-PAGER", notify.Everything); err != nil {
 			t.Fatalf("retiring in other capitals: %v", err)
 		}
 		if got := listed(); len(got) != 0 {

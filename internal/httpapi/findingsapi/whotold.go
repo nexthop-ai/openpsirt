@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -188,7 +187,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			// issue. The issue it was recorded against is named too, since
 			// that is where the right to record it was held.
 			if err := core.Noted(ctx, tx, trail.Alias, named[issue],
-				nil, trail.Said(input.Alias, true)); err != nil {
+				nil, trail.Said(finding.Normalize(input.Alias), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
 			return nil
@@ -243,7 +242,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			// Every removal is a row, for the reason recording one is: it
 			// changes what a later scan of any product means.
 			if err := core.Noted(ctx, tx, trail.Alias, named[issue],
-				trail.Said(strings.ToUpper(strings.TrimSpace(input.Alias)), true), nil); err != nil {
+				trail.Said(finding.Normalize(input.Alias), true), nil); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
 			return nil

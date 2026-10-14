@@ -331,7 +331,9 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		id: "withdraw-advisory-source", what: "a supplier no longer read",
-		method: http.MethodDelete, path: "/v1/products/mine/advisory-sources/ExampleLinux",
+		// Withdrawn in other capitals, which the match ignores; the row names
+		// the supplier as it was added.
+		method: http.MethodDelete, path: "/v1/products/mine/advisory-sources/exampleLINUX",
 		kind: "setting", about: "advisory source · mine · ExampleLinux",
 	},
 	{
@@ -1134,6 +1136,92 @@ func TestTheChangeListAndItsFileStateTheSameMoment(t *testing.T) {
 		}
 		if !strings.HasSuffix(trail.Items[0].At, "Z") {
 			t.Errorf("the list states %s, which is not UTC", trail.Items[0].At)
+		}
+	})
+}
+
+// A trail row and an answer name what a typed name resolved to, so one product,
+// alias or key scope is spelled one way however a request spelled it.
+func TestATrailRowNamesWhatATypedNameResolvedTo(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		issue := r.Embargoed(t)
+		newest := func(t *testing.T, kind string) (was, became string) {
+			t.Helper()
+			var trail httpapitest.Changed
+			httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind="+kind+"&limit=1", &trail)
+			if len(trail.Items) == 0 {
+				t.Fatalf("nothing of kind %s was recorded", kind)
+			}
+			return trail.Items[0].Was, trail.Items[0].Became
+		}
+
+		at := "/v1/products/mine/issues/" + url.PathEscape(issue) + "/aliases/ghsa-2c4j-5f6m-7q8r"
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut, at, ""); got.Code >= 300 {
+			t.Fatalf("recording the name answered %d: %s", got.Code, got.Body.String())
+		}
+		if _, became := newest(t, "alias"); became != "GHSA-2C4J-5F6M-7Q8R" {
+			t.Errorf("recording a name typed in lower case records %q, the name as stored is GHSA-2C4J-5F6M-7Q8R", became)
+		}
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete, at, ""); got.Code >= 300 {
+			t.Fatalf("removing the name answered %d: %s", got.Code, got.Body.String())
+		}
+		if was, _ := newest(t, "alias"); was != "GHSA-2C4J-5F6M-7Q8R" {
+			t.Errorf("removing a name typed in lower case records %q, the name as stored is GHSA-2C4J-5F6M-7Q8R", was)
+		}
+
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+			`{"name":"spelled","product":"MINE","stream":"Master"}`)
+		if got.Code >= 300 {
+			t.Fatalf("creating a key answered %d: %s", got.Code, got.Body.String())
+		}
+		var created struct {
+			Item struct {
+				Product string `json:"product"`
+				Stream  string `json:"stream"`
+			} `json:"item"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &created); err != nil {
+			t.Fatal(err)
+		}
+		if key := created.Item; key.Product != "mine" || key.Stream != "master" {
+			t.Errorf("the key answers %+v, want the names declared: mine · master", created.Item)
+		}
+		if _, became := newest(t, "credential"); became != "mine · master" {
+			t.Errorf("the key's scope is recorded as %q, want the names declared: mine · master", became)
+		}
+
+		got = httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/tokens",
+			`{"name":"spelled","product":"MINE","lifetime":"24h"}`)
+		if got.Code >= 300 {
+			t.Fatalf("minting a token answered %d: %s", got.Code, got.Body.String())
+		}
+		var token struct {
+			Product string `json:"product"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &token); err != nil {
+			t.Fatal(err)
+		}
+		if token.Product != "mine" {
+			t.Errorf("the token answers %q, want the name declared: mine", token.Product)
+		}
+		if _, became := newest(t, "credential"); became != "mine" {
+			t.Errorf("the token's reach is recorded as %q, want the name declared: mine", became)
+		}
+
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/outbound",
+			`{"name":"spelled","kind":"brought-in","url":"https://hooks.example.test/t/abc",`+
+				`"secret":"sixteen-characters-at-least"}`); got.Code >= 300 {
+			t.Fatalf("adding a destination answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/outbound/spelled/Brought-In", ""); got.Code >= 300 {
+			t.Fatalf("retiring a destination answered %d: %s", got.Code, got.Body.String())
+		}
+		var trail httpapitest.Changed
+		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=setting&limit=1", &trail)
+		if len(trail.Items) == 0 || trail.Items[0].About != "outbound · spelled · brought-in" {
+			t.Errorf("retiring a destination in other capitals recorded %+v, want it named as added", trail.Items)
 		}
 	})
 }

@@ -93,6 +93,7 @@ func registerTokens(api huma.API, in core.Deps) {
 		}
 
 		var productID *int64
+		productName := ""
 		if input.Body.Product != "" {
 			// Resolved through what this person may see, so naming a product
 			// they cannot read answers as one that was never declared rather
@@ -102,6 +103,7 @@ func registerTokens(api huma.API, in core.Deps) {
 				return nil, err
 			}
 			productID = &product.ID
+			productName = product.Name
 		}
 
 		lifetime := time.Duration(0)
@@ -164,7 +166,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			// there to ask. Named by owner and token, because a name is unique
 			// among its owner's tokens in force.
 			if err := core.Noted(ctx, tx, trail.Credential, subject.Identity+" · "+token.Name,
-				nil, trail.Said(narrowedTokenSays(input.Body.Product, holds), true)); err != nil {
+				nil, trail.Said(narrowedTokenSays(productName, holds), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
 			return nil
@@ -172,7 +174,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		return &struct{ Body TokenBody }{Body: TokenBody{
-			Name: token.Name, Product: input.Body.Product, Secret: secret,
+			Name: token.Name, Product: productName, Secret: secret,
 			Holds: input.Body.Holds, ExpiresAt: core.Stamp(token.ExpiresAt),
 		}}, nil
 	})

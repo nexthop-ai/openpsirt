@@ -193,7 +193,7 @@ func registerVexImport(api huma.API, in core.Deps) {
 		}
 
 		return &struct{ Body StatementsTakenBody }{Body: StatementsTakenBody{
-			Publisher: strings.ToLower(publisher), Recorded: recorded, Superseded: superseded,
+			Publisher: publisher, Recorded: recorded, Superseded: superseded,
 			Digest: digest,
 		}}, nil
 	})
