@@ -19,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/uptrace/bun"
 	"modernc.org/sqlite"
+
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // Attempts is how many times a transaction is tried before its failure is
@@ -310,6 +312,16 @@ func Handle(db bun.IDB) (*bun.DB, bool) {
 		return handle, true
 	}
 	return nil, false
+}
+
+// Publishable reports whether an error's text may be handed to whoever caused
+// it: a sentence somebody wrote for a person to read, carrying nothing an engine
+// or a driver put in it.
+//
+// This is the one test for it. Spelled per site, a site that forgets it hands a
+// caller the statement text and the address a connection dialed.
+func Publishable(err error) bool {
+	return refusal.In(err) && !FromEngine(err)
 }
 
 // FromEngine reports whether an error came from the database rather than from

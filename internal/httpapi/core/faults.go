@@ -11,7 +11,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // WentWrong reports a fault to the caller without describing it to them.
@@ -91,7 +90,7 @@ func Asked(logger *slog.Logger, err error) error {
 	if errors.As(err, &faults) {
 		return RefusedText(faults)
 	}
-	if refusal.In(err) {
+	if database.Publishable(err) {
 		return huma.Error422UnprocessableEntity(err.Error())
 	}
 	return WentWrong(logger, "that could not be recorded", err)

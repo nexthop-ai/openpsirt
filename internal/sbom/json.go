@@ -6,10 +6,15 @@ package sbom
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
+
+// mostQuoted is how much of a document's own token a refusal quotes.
+const mostQuoted = 64
 
 // errTooLarge is returned when a document runs past the size it is allowed.
 var errTooLarge = refusal.New("document is larger than the configured limit")
@@ -158,7 +163,9 @@ func (b *bounded) open(want json.Delim) error {
 		return err
 	}
 	if tok != want {
-		return refusal.Errorf("want %v, got %v", want, tok)
+		// The token is the document's own, and a string token is as long as
+		// the document lets it be.
+		return refusal.Errorf("want %v, got %s", want, bound.Head(fmt.Sprint(tok), mostQuoted))
 	}
 	return b.enter()
 }

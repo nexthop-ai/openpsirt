@@ -167,7 +167,16 @@ file ending inside a value in its own words, because the error it would
 otherwise return is the one a driver returns for a connection cut short, and a
 truncated upload is the sender's to fix. A failed upload's receipt carries the
 refusal's sentence where its cause is a refusal, and a fixed sentence
-otherwise, including where the job reading it died before it could say why.
+otherwise, including where the job reading it died before it could say why. A
+failed scan run's receipt carries the scanner's own words, which are what tell
+a producer why, and a fixed sentence where the failure came from the database or
+its driver.
+
+Whether an error's text may be published is one test, used wherever the
+question is asked: a refusal that carries nothing an engine or a driver put in
+it. The harness every route package runs over its mappers reads the whole body
+a fault answers, its list of errors included, and fails a fault that carries any
+detail of its cause.
 
 A 404 is never built from an error's own text. It asserts that a name reaches
 nothing, and the body then publishes whatever the error carried — for a store

@@ -12,6 +12,7 @@
 package refusaltest
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -64,7 +65,11 @@ const SaidText = "is not a recognized reason"
 
 // Faults fails each answer that is not a server error, or that publishes any
 // of the withheld strings.
-func Faults(t *testing.T, mapped map[string]error, withheld ...string) {
+//
+// The whole body is read, the way a caller receives it, rather than its
+// detail alone: a fault's text carried in the list of errors beside the detail
+// is published just the same.
+func Faults(t testing.TB, mapped map[string]error, withheld ...string) {
 	t.Helper()
 	for name, answer := range mapped {
 		var status huma.StatusError
@@ -72,20 +77,30 @@ func Faults(t *testing.T, mapped map[string]error, withheld ...string) {
 			t.Errorf("%s answered %v, want a 500", name, answer)
 			continue
 		}
+		body, err := json.Marshal(status)
+		if err != nil {
+			t.Errorf("%s answered a body that cannot be written: %v", name, err)
+			continue
+		}
 		for _, text := range withheld {
-			if strings.Contains(answer.Error(), text) {
-				t.Errorf("%s published %q: %v", name, text, answer)
+			if strings.Contains(string(body), text) {
+				t.Errorf("%s published %q: %s", name, text, body)
 			}
+		}
+		var model *huma.ErrorModel
+		if errors.As(answer, &model) && len(model.Errors) > 0 {
+			t.Errorf("%s answered a fault carrying details of it: %s", name, body)
 		}
 	}
 }
 
 // Publishes fails each answer that is not a refusal carrying the store's
 // sentence in its own words.
-func Publishes(t *testing.T, answers map[string]error) {
+func Publishes(t testing.TB, answers map[string]error) {
 	t.Helper()
 	if len(answers) == 0 {
 		t.Fatal("no mapper was asked, so this checked nothing")
+		return
 	}
 	for name, answer := range answers {
 		var status huma.StatusError

@@ -413,7 +413,7 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 	reason := ""
 	switch {
 	case cause == nil:
-	case refusal.In(cause) && !database.FromEngine(cause):
+	case database.Publishable(cause):
 		reason = cause.Error()
 	default:
 		reason = "the scan could not be applied"

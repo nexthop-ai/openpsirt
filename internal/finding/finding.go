@@ -587,6 +587,10 @@ func (s *Store) LastRecordsVersion(ctx context.Context, targetID int64) (string,
 	return runs[0].RecordsVersion, nil
 }
 
+// UnstatedFailure is what a run's failure reads as where its cause is not one
+// to publish.
+const UnstatedFailure = "the scan could not be completed"
+
 // Finish records that a run ended, what produced it, and why it went wrong if
 // it did.
 //
@@ -594,12 +598,22 @@ func (s *Store) LastRecordsVersion(ctx context.Context, targetID int64) (string,
 // scanner's answer, not our question: what it says it is and what data it
 // matched against are known once it has run. A finding that appeared or
 // vanished because either moved is unexplainable without them.
+//
+// The failure is served on the receipt to the key that sent the scan. A
+// scanner's own words are kept, because they are what tells a producer why. A
+// failure the database or its driver raised is recorded as UnstatedFailure:
+// its text carries the statement and the address a connection dialed, and the
+// cause is in the log the job's settling writes.
 func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersion,
 	caution string, cause error) error {
 
 	done := s.now().Truncate(time.Microsecond)
 	failure := ""
-	if cause != nil {
+	switch {
+	case cause == nil:
+	case database.FromEngine(cause):
+		failure = UnstatedFailure
+	default:
 		failure = cause.Error()
 	}
 	_, err := s.db.NewUpdate().Model((*Run)(nil)).

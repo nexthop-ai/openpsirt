@@ -4,7 +4,9 @@
 package finding_test
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -513,6 +515,42 @@ func TestARunThatWarnsWhileSucceedingKeepsWhatItSaid(t *testing.T) {
 		}
 		if kept.Failure != "" {
 			t.Errorf("a run that warned reads as failed: %q", kept.Failure)
+		}
+	})
+}
+
+// A run's failure is served on the receipt to the key that sent the scan. The
+// scanner's own words are what tell a producer why; a failure the database or
+// its driver raised carries the address a connection dialed, and is kept as
+// fixed words.
+func TestARunsFailureKeepsTheScannersWordsAndHidesTheDatabases(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		lost := fmt.Errorf("apply what the scanner found: %w", &net.OpError{
+			Op: "dial", Net: "tcp", Addr: &net.TCPAddr{IP: net.IPv4(10, 0, 4, 7), Port: 5432},
+			Err: errors.New("connection refused"),
+		})
+		for _, c := range []struct {
+			cause error
+			want  string
+		}{
+			{errors.New("grype exited 1: the vulnerability database is out of date"),
+				"grype exited 1: the vulnerability database is out of date"},
+			{lost, finding.UnstatedFailure},
+		} {
+			run := f.run(t)
+			if err := f.store.Finish(t.Context(), run, "0.118.0", "2026-09-04", "",
+				c.cause); err != nil {
+				t.Fatal(err)
+			}
+			var kept finding.Run
+			if err := f.db.DB.NewSelect().Model(&kept).Where("id = ?", run).
+				Scan(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if kept.Failure != c.want {
+				t.Errorf("a run that failed with %v reads %q, want %q", c.cause, kept.Failure,
+					c.want)
+			}
 		}
 	})
 }

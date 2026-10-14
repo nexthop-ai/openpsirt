@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -203,7 +202,7 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 	// standing here, a claim covering nothing, a threshold crossed. Those are
 	// the caller's to fix, and the message is the answer. Anything else is a
 	// fault, and its text is withheld.
-	if refusal.In(err) && !database.FromEngine(err) {
+	if database.Publishable(err) {
 		return huma.Error422UnprocessableEntity(err.Error())
 	}
 	return WentWrong(logger, "that could not be recorded", err)
