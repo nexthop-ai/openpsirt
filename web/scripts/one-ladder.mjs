@@ -13,14 +13,13 @@
 // is not a list — it is a mapping, and every arm is visible — and neither is a
 // type. What this looks for is an array literal, which is the shape a ladder
 // takes and the shape that silently loses a rung.
-import { readFile, readdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { sourceFiles, SRC } from "./parsed.mjs";
 
-const here = import.meta.dirname;
-const src = path.join(here, "..", "src");
-// Where the ladder is allowed to be written down.
-const home = path.join(src, "ui", "severities.ts");
+// Where the ladder is allowed to be written down, relative to src/.
+const HOME = path.join("ui", "severities.ts");
 
 const RUNGS = new Set([
   "critical",
@@ -32,16 +31,6 @@ const RUNGS = new Set([
   "negligible",
   "none",
 ]);
-
-async function sources(dir) {
-  const found = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) found.push(...(await sources(full)));
-    else if (/\.(ts|tsx)$/.test(entry.name) && entry.name !== "schema.d.ts") found.push(full);
-  }
-  return found;
-}
 
 // Every array literal of string literals in a file, as the words it holds.
 // Read with a regular expression rather than parsed: a literal list of quoted
@@ -179,6 +168,20 @@ export function laddersIn(text) {
     .filter((found) => !lines.has(found.at) && lines.add(found.at));
 }
 
+// laddersOutside is every copy of the ladder across the files, given as
+// { path relative to src/: text }, except in the one file allowed to hold it.
+// Each copy is { file, at, words }; `looked` is how many files were read.
+export function laddersOutside(files) {
+  const found = [];
+  let looked = 0;
+  for (const [file, text] of Object.entries(files)) {
+    if (path.normalize(file) === HOME) continue;
+    looked++;
+    for (const { words, at } of laddersIn(text)) found.push({ file, at, words });
+  }
+  return { found, looked };
+}
+
 // What to say where the walk read no file, or nothing where it read some. A
 // tree moved out from under the walk holds no copy of the ladder for the
 // reason that nothing was looked at.
@@ -192,26 +195,29 @@ export function checkedNothing(looked) {
 // test would walk the tree, and a tree with a copy of the ladder in it would
 // call process.exit and take the test runner down with it. What is exported
 // above is the detection; this is the program.
+//
+// Tests are read too: a test holding its own copy of the ladder pins a list
+// that can drift from the one the screens draw.
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  let bad = 0;
-  let looked = 0;
-  for (const file of await sources(src)) {
-    if (path.resolve(file) === path.resolve(home)) continue;
-    const text = await readFile(file, "utf8");
-    looked++;
-    for (const { words, at } of laddersIn(text)) {
-      bad++;
-      console.error(
-        `${path.relative(src, file)}:${at}: [${words.join(", ")}] is the severity ladder written ` +
-          `out again — import it from ui/severities.ts, and add the word there if it is missing`,
-      );
-    }
+  const files = Object.fromEntries(
+    sourceFiles({ ext: [".ts", ".tsx"], tests: true }).map((file) => [
+      path.relative(SRC, file),
+      readFileSync(file, "utf8"),
+    ]),
+  );
+  const { found, looked } = laddersOutside(files);
+  for (const { file, at, words } of found) {
+    console.error(
+      `${file}:${at}: [${words.join(", ")}] is the severity ladder written ` +
+        `out again — import it from ui/severities.ts, and add the word there if it is missing`,
+    );
   }
   const nothing = checkedNothing(looked);
   if (nothing) {
     console.error(nothing);
     process.exit(1);
   }
+  const bad = found.length;
   if (bad > 0) {
     console.error(
       `\n${bad} ${bad === 1 ? "copy" : "copies"} of the ladder outside ui/severities.ts`,

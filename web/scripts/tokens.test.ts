@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { tokensIn, withoutComments } from "./tokens.mjs";
+import { tokenFindings, tokensIn, withoutComments } from "./tokens.mjs";
 
 // A `var(--thing)` naming a token that does not exist is an error nowhere: CSS
 // drops the declaration, the element keeps whatever it inherited, and the
@@ -69,5 +69,49 @@ describe("a comment is prose, not a reference", () => {
   it("changes nothing where there is no comment", () => {
     const source = `:root { --sev-high: #d9700a; }`;
     expect(withoutComments(source)).toBe(source);
+  });
+});
+
+describe("where a reference is reported", () => {
+  it("names the line in the file after a block comment of several lines", () => {
+    const { named } = tokensIn(`/* one\n   two\n   three */\n.x { color: var(--a); }`, "x.css") as {
+      named: Map<string, string[]>;
+    };
+    expect(named.get("--a")).toEqual(["x.css:4"]);
+  });
+});
+
+describe("the two directions across files", () => {
+  const find = (files: Record<string, string>) =>
+    tokenFindings(files) as {
+      missing: Map<string, string[]>;
+      orphaned: [string, string][];
+      defined: number;
+      named: number;
+    };
+
+  it("reports a token named in one file and defined in none", () => {
+    const got = find({
+      "a.css": `:root { --a: 1px; }`,
+      "b.css": `.x { width: var(--a); gap: var(--gone); }`,
+    });
+    expect([...got.missing]).toEqual([["--gone", ["b.css:1"]]]);
+    expect(got.orphaned).toEqual([]);
+  });
+
+  it("reports a token defined in one file and named in none", () => {
+    const got = find({
+      "a.css": `:root { --a: 1px; --dead: 2px; }`,
+      "b.css": `.x { width: var(--a); }`,
+    });
+    expect([...got.missing]).toEqual([]);
+    expect(got.orphaned).toEqual([["--dead", "a.css:1"]]);
+  });
+
+  it("reports nothing where every token is defined and named", () => {
+    const got = find({ "a.css": `:root { --a: 1px; }`, "b.css": `.x { width: var(--a, 2px); }` });
+    expect([...got.missing]).toEqual([]);
+    expect(got.orphaned).toEqual([]);
+    expect(got).toMatchObject({ defined: 1, named: 1 });
   });
 });
