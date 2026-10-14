@@ -572,7 +572,7 @@ people direct messages.
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
 | `OPENPSIRT_SLACK_TOKEN` | `chat.slack.token` | A Slack app's bot token, beginning `xoxb-` | unset |
-| `OPENPSIRT_ZULIP_SITE` | `chat.zulip.site` | The Zulip server's https address, e.g. `https://chat.example.com` | unset |
+| `OPENPSIRT_ZULIP_SITE` | `chat.zulip.site` | The Zulip server's https address, e.g. `https://chat.example.com`. Refused at startup if it carries a path, a query, a fragment or credentials | unset |
 | `OPENPSIRT_ZULIP_EMAIL` | `chat.zulip.email` | The bot's address, as Zulip shows it | unset |
 | `OPENPSIRT_ZULIP_KEY` | `chat.zulip.key` | The bot's API key | unset |
 
@@ -675,7 +675,7 @@ web server serves them, at the address you give below.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
-| `OPENPSIRT_DIRECTORY_URL` | `directory.url` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address, or carries a query, a fragment or credentials. A value that is only whitespace is unset | unset |
+| `OPENPSIRT_DIRECTORY_URL` | `directory.url` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address, or carries a query (an empty one included), a fragment or credentials. A value that is only whitespace is unset | unset |
 | `OPENPSIRT_DIRECTORY_BUCKET` | `directory.bucket` | The bucket the files are written to. Empty means no object store | unset |
 | `OPENPSIRT_DIRECTORY_ENDPOINT` | `directory.endpoint` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_DIRECTORY_REGION` | `directory.region` | The region, where the store wants one | unset |

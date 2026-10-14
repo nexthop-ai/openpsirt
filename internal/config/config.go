@@ -9,13 +9,13 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
@@ -521,11 +522,17 @@ func load(given map[string]string) (Config, error) {
 			"OPENPSIRT_ZULIP_SITE, OPENPSIRT_ZULIP_EMAIL and OPENPSIRT_ZULIP_KEY: set all " +
 				"three or none — a bot is its server, its address and its key together")
 	}
+	// The key goes with every request, so over https alone. A path, query or
+	// fragment lands in front of every API path the adapter appends.
 	if site := strings.TrimSpace(c.ZulipSite); site != "" {
-		parsed, err := url.Parse(site)
-		if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-			return Config{}, fmt.Errorf("OPENPSIRT_ZULIP_SITE: want the server's https " +
-				"address, such as https://chat.example.com: the bot's key is sent with every request")
+		parsed, err := plainAddress("OPENPSIRT_ZULIP_SITE", site, "https")
+		if err == nil && strings.Trim(parsed.Path, "/") != "" {
+			err = fmt.Errorf("OPENPSIRT_ZULIP_SITE: names the server, not a path below it: %q",
+				redact.URL(site))
+		}
+		if err != nil {
+			return Config{}, fmt.Errorf("%w — want the server's https address, such as "+
+				"https://chat.example.com: the bot's key is sent with every request", err)
 		}
 	}
 
@@ -573,20 +580,14 @@ func load(given map[string]string) (Config, error) {
 	// one made of spaces.
 	c.DirectoryURL = strings.TrimSpace(c.DirectoryURL)
 	if where := c.DirectoryURL; where != "" {
-		at, err := url.Parse(where)
-		if err != nil {
-			// The parser's error repeats the value, password and all.
-			return Config{}, errors.New("OPENPSIRT_DIRECTORY_URL: not an address at all")
-		}
 		// An address and nothing else. A name is joined to the end of this, so
 		// anything the address carries after its path lands in the middle of
-		// the result: a query becomes part of the filename in every document's
-		// own address, and a password in the address is published in every one
-		// of them and kept in the bytes that went out.
-		if at.Scheme != "https" || at.Host == "" || at.User != nil ||
-			at.RawQuery != "" || at.Fragment != "" {
-			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: want an https address "+
-				"with no query, fragment or credentials, got %q", masked(where))
+		// the result: a query, even an empty one, becomes part of the filename
+		// in every document's own address, and a password in the address is
+		// published in every one of them and kept in the bytes that went out.
+		at, err := plainAddress("OPENPSIRT_DIRECTORY_URL", where, "https")
+		if err != nil {
+			return Config{}, err
 		}
 		// One trailing slash, so that a name joined to it is a file inside the
 		// directory rather than a sibling of it. Every trailing slash, because
@@ -645,41 +646,42 @@ func absoluteBase(base string) error {
 	if base == "" {
 		return nil
 	}
-	parsed, err := url.Parse(base)
-	// Every refusal is logged, and shows the value with anything that may be a
-	// credential masked. Before a scheme is checked a password can sit
-	// anywhere: `admin:hunter2@psirt.example.com` parses with the scheme
-	// `admin` and no user information.
-	shown := masked(base)
+	parsed, err := plainAddress("OPENPSIRT_BASE_URL", base, "http", "https")
 	switch {
 	case err != nil:
-		return errors.New("OPENPSIRT_BASE_URL: not an address at all")
-	case parsed.Scheme != "http" && parsed.Scheme != "https":
-		return fmt.Errorf(
-			"OPENPSIRT_BASE_URL: want an absolute address such as "+
-				"https://psirt.example.com, got %q", shown)
-	case parsed.Host == "":
-		return fmt.Errorf("OPENPSIRT_BASE_URL: names no host: %q", shown)
-	case parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.ForceQuery:
-		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address alone, with no query, "+
-			"fragment or credentials: %q", shown)
+		return err
 	case strings.Trim(parsed.Path, "/") != "":
 		// A path below the address would make every link this deployment
 		// writes point somewhere it does not answer.
 		return fmt.Errorf("OPENPSIRT_BASE_URL: names the address, not a path below it: %q",
-			shown)
+			redact.URL(base))
 	}
 	return nil
 }
 
-// masked is an address as a refusal may show it. Everything up to the last
-// "@" is replaced, because whatever precedes it may be a password whether or
-// not the parser read it as user information.
-func masked(address string) string {
-	if at := strings.LastIndex(address, "@"); at >= 0 {
-		return "xxxxx@" + address[at+1:]
+// plainAddress reads an address that stands alone: a scheme from schemes, a
+// host, and no credentials, query or fragment, an empty query included.
+//
+// Every refusal is logged, so each shows the value through redact.URL. Before
+// a scheme is checked a password can sit anywhere: `admin:hunter2@host`
+// parses with the scheme `admin` and no user information.
+func plainAddress(name, raw string, schemes ...string) (*url.URL, error) {
+	parsed, err := url.Parse(raw)
+	shown := redact.URL(raw)
+	switch {
+	case err != nil:
+		// The parser's error repeats the value, password and all.
+		return nil, fmt.Errorf("%s: not an address at all", name)
+	case !slices.Contains(schemes, parsed.Scheme):
+		return nil, fmt.Errorf("%s: want an absolute %s address, got %q",
+			name, strings.Join(schemes, " or "), shown)
+	case parsed.Host == "":
+		return nil, fmt.Errorf("%s: names no host: %q", name, shown)
+	case parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "":
+		return nil, fmt.Errorf("%s: names the address alone, with no query, "+
+			"fragment or credentials: %q", name, shown)
 	}
-	return address
+	return parsed, nil
 }
 
 // reader reads typed settings and keeps the first value it could not read.

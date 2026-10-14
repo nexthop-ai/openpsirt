@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
 // A slot is leased through a lock on the server, so these run against the
@@ -149,7 +150,9 @@ func TestTheNextBinaryTakesAFreedSlotWithoutMigrating(t *testing.T) {
 			t.Errorf("the slot given back was %d and the next lease took %d", first.slot, second.slot)
 		}
 		if again != own {
-			t.Errorf("the next lessee was handed %s, want the freed slot's %s", again, own)
+			// Shown redacted: each is a server URL, password included.
+			t.Errorf("the next lessee was handed %s, want the freed slot's %s",
+				redact.URL(again), redact.URL(own))
 		}
 		if got := serverBuilds.Load() - before; got != 1 {
 			t.Errorf("two lessees in turn migrated %d databases, want 1: the second "+

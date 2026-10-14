@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
 // Engine is a supported database.
@@ -126,7 +128,7 @@ func ParseURL(raw string) (Target, error) {
 	if err != nil {
 		return Target{}, err
 	}
-	return Target{Engine: engine, DSN: dsn, Redacted: redact(u), secrets: secretsOf(u)}, nil
+	return Target{Engine: engine, DSN: dsn, Redacted: redact.Parsed(u), secrets: secretsOf(u)}, nil
 }
 
 func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
@@ -437,47 +439,6 @@ func hostRune(r rune) bool {
 		strings.ContainsRune(".-:[]", r)
 }
 
-// secretParams are query parameters that carry a credential. Drivers accept
-// passwords this way as well as in the userinfo, and a redaction that only
-// handles userinfo puts the password in the first log line of every start.
-var secretParams = []string{"password", "sslpassword", "sslkey"}
-
-// redact is the URL with every credential replaced, safe to log.
-//
-// The query is read pair by pair rather than through the parser. The parser
-// drops a pair it cannot decode, so a password parameter with a malformed
-// escape is neither found nor replaced, and is printed as it was written.
-func redact(u *url.URL) string {
-	clone := *u
-	if u.User != nil {
-		if _, set := u.User.Password(); set {
-			clone.User = url.UserPassword(u.User.Username(), "xxxxx")
-		}
-	}
-	pairs := strings.Split(clone.RawQuery, "&")
-	for i, pair := range pairs {
-		if key, _, _ := strings.Cut(pair, "="); secretParam(key) {
-			pairs[i] = key + "=xxxxx"
-		}
-	}
-	clone.RawQuery = strings.Join(pairs, "&")
-	clone.Fragment, clone.RawFragment = "", ""
-	return clone.String()
-}
-
-// secretParam reports whether a query key, as written, names a credential.
-func secretParam(key string) bool {
-	if decoded, err := url.QueryUnescape(key); err == nil {
-		key = decoded
-	}
-	for _, name := range secretParams {
-		if strings.EqualFold(key, name) {
-			return true
-		}
-	}
-	return false
-}
-
 // secretsOf is every spelling of every credential in a URL: as written and as
 // decoded, because a driver quoting it may use either.
 func secretsOf(u *url.URL) []string {
@@ -497,7 +458,7 @@ func secretsOf(u *url.URL) []string {
 	}
 	for _, pair := range strings.Split(u.RawQuery, "&") {
 		key, value, _ := strings.Cut(pair, "=")
-		if !secretParam(key) {
+		if !redact.Secret(key) {
 			continue
 		}
 		add(value)

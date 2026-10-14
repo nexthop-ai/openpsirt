@@ -19,6 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
 // Bucket keeps bytes in an object store reached over the S3 API, which is what
@@ -110,7 +112,9 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	if endpoint != "" {
 		parsed, err := url.Parse(endpoint)
 		if err != nil {
-			return nil, fmt.Errorf("object store endpoint: %w", err)
+			// Not wrapped: the parser's error quotes the address, and a
+			// malformed escape in a password is the commonest reason it fails.
+			return nil, errors.New("object store endpoint: not an address at all")
 		}
 		// A name and password in the address are taken out of it and handed
 		// over as credentials, which is also what makes the signing
@@ -135,10 +139,10 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// redirect is the part that leaves us. So plain HTTP is refused unless
 		// it reaches no further than this machine, or an operator has said
 		// that this network is one they accept it on (REQ-70).
-		// The string shown and the string used are one, rather
-		// than two that can drift: the password has already been taken out
-		// of the one the client gets.
-		shown = endpoint
+		// The string shown is the string used, with anything else that may
+		// carry a credential taken out: the password has already gone from
+		// the one the client gets.
+		shown = redact.Parsed(parsed)
 		plain = parsed.Scheme != "https"
 		inTheClear = plain && !loopback(parsed.Hostname())
 		if inTheClear && !settings.AllowHTTP {

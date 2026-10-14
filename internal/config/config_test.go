@@ -84,6 +84,9 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"DIRECTORY_URL", "https://u:p@psirt.example.test/csaf"},
 		{"DIRECTORY_URL", "https://psirt.example.test/csaf?x=1"},
 		{"DIRECTORY_URL", "https://psirt.example.test/csaf#f"},
+		// An empty query is a query: written back out, the "?" lands between
+		// the directory and every name joined to it.
+		{"DIRECTORY_URL", "https://psirt.example.test/csaf?"},
 		// Swallowed, a list that cannot be read empties the exclusions, and
 		// every internal host becomes somewhere a report can send a fetch.
 		{"OUTBOUND_EXCLUDED", "10.0.0.0/33"},
@@ -360,8 +363,11 @@ func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
 // since a refusal is logged. That holds on every arm, including a value the
 // parser reads as a scheme and an opaque rest, and one it cannot parse at all.
 func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
-	for _, key := range []string{"BASE_URL", "DIRECTORY_URL"} {
+	for _, key := range []string{"BASE_URL", "DIRECTORY_URL", "ZULIP_SITE"} {
 		for _, value := range []string{
+			"https://psirt.example.test/?token=hunter2",
+			"https://psirt.example.test/#hunter2",
+			"https://user:hunter2%zz@psirt.example.test/",
 			"https://user:hunter2@psirt.example.test/",
 			"admin:hunter2@psirt.example.test",
 			"ftp://user:hunter2@psirt.example.test/",
@@ -372,9 +378,16 @@ func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 		} {
 			t.Run(key+" "+value, func(t *testing.T) {
 				t.Setenv(envPrefix+key, value)
+				if key == "ZULIP_SITE" {
+					t.Setenv(envPrefix+"ZULIP_EMAIL", "bot@chat.example.test")
+					t.Setenv(envPrefix+"ZULIP_KEY", "k")
+				}
 				_, err := Load()
 				if err == nil {
 					t.Fatal("an address carrying credentials was accepted")
+				}
+				if !strings.Contains(err.Error(), envPrefix+key) {
+					t.Errorf("refused for something else: %v", err)
 				}
 				if strings.Contains(err.Error(), "hunter2") {
 					t.Errorf("the refusal repeats the password: %v", err)
@@ -434,7 +447,11 @@ func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
 	t.Setenv("OPENPSIRT_ZULIP_EMAIL", "bot@chat.example.test")
 	t.Setenv("OPENPSIRT_ZULIP_KEY", "k")
 	for _, site := range []string{"http://chat.example.test", "chat.example.test",
-		"https://user:pass@chat.example.test"} {
+		"https://user:pass@chat.example.test",
+		// Every API path is appended to the site, so anything after the host
+		// lands in front of each one.
+		"https://chat.example.test/?x", "https://chat.example.test/?",
+		"https://chat.example.test/#f", "https://chat.example.test/zulip"} {
 		t.Setenv("OPENPSIRT_ZULIP_SITE", site)
 		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "OPENPSIRT_ZULIP_SITE") {
 			t.Errorf("a Zulip server at %q answered %v, want it refused by name", site, err)

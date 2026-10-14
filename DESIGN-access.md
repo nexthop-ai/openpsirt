@@ -1158,7 +1158,9 @@ reintroduce it.
 | The host is named only where one `@`, with no `=` or `&` before it, or none at all, says where it begins, and only when it is shaped like a host | With a second `@`, or one after a query parameter's name, what follows the `@` may be the password |
 | The upgrade rehearsal reads the URL from the environment and hands it to a container through the environment | An argument is readable by every local user and is written to the rehearsal's log |
 | A URL the parser refuses is judged by the database package before any other parser reads it | Every other parser quotes the text it could not read |
-| A refused deployment address or directory address shows nothing up to its last `@`, and one the parser cannot read is not shown | Before the scheme is checked a password can sit anywhere: `admin:hunter2@psirt.example.com` parses with the scheme `admin` and no user information |
+| Every configured address is shown through one redaction rule: the database server, the object store endpoint, the published directory, the deployment address and the chat server | Two private rules with different reach are how one of them forgets the query string |
+| Redaction replaces the password, the value of every query key that carries a credential, and the fragment | A database driver reads a password from the query, and a presigned object store address carries its signature and session token there |
+| A refused address with no `//` after its scheme shows nothing up to its last `@`, and one the parser cannot read is not shown | Before the scheme is checked a password can sit anywhere: `admin:hunter2@psirt.example.com` parses with the scheme `admin` and no user information |
 
 The rule is written down rather than left as a habit because the failure is
 invisible: nothing breaks, no test fails, and the leak lives in a system nobody

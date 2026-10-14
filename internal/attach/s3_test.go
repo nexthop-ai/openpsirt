@@ -267,3 +267,32 @@ func TestABodyOfTheWrongLengthNeverReachesItsDeclaredLength(t *testing.T) {
 		}
 	}
 }
+
+// An endpoint the store refuses, or reports, shows no credential: not one the
+// parser could not read, and not one carried in the query.
+func TestAnEndpointIsShownWithoutItsCredentials(t *testing.T) {
+	_, err := NewBucket(context.Background(), BucketConfig{
+		Endpoint: "https://user:hunter2%zz@s3.example.test", Bucket: "advisories",
+		Region: "us-east-1", Names: directoryNames,
+	})
+	if err == nil || strings.Contains(err.Error(), "hunter2") {
+		t.Errorf("a malformed endpoint answered %v, want a refusal without the password", err)
+	}
+	_, err = NewBucket(context.Background(), BucketConfig{
+		Endpoint: "http://s3.example.test/?X-Amz-Signature=hunter2", Bucket: "advisories",
+		Region: "us-east-1", Names: directoryNames,
+	})
+	if err == nil || strings.Contains(err.Error(), "hunter2") {
+		t.Errorf("a plaintext endpoint answered %v, want a refusal without the signature", err)
+	}
+	bucket, err := NewBucket(context.Background(), BucketConfig{
+		Endpoint: "https://name:hunter2@s3.example.test/?token=hunter2", Bucket: "advisories",
+		Region: "us-east-1", Names: directoryNames,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(bucket.Endpoint(), "hunter2") {
+		t.Errorf("the endpoint is reported as %q", bucket.Endpoint())
+	}
+}
