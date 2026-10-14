@@ -175,8 +175,13 @@ func (t Target) Covers(d graph.Described) bool {
 	}
 	if strings.HasPrefix(base, "pkg:generic/") {
 		// The same question, asked of a claim that spells the source tree as
-		// an identifier rather than as a bare name.
-		return coversNamed(strings.TrimPrefix(base, "pkg:generic/"), version, d)
+		// an identifier rather than as a bare name: the package name is the
+		// last segment, and a namespace is compared where the component's
+		// own generic identifier carries one.
+		if !GenericNamespaceAgrees(base, d.Purl) {
+			return false
+		}
+		return coversNamed(nameOf(base), version, d)
 	}
 	componentBase, componentVersion := graph.PackageOf(d.Purl)
 	if componentBase != base {
@@ -220,6 +225,26 @@ func (s Suppression) Covers(d graph.Described) bool {
 		}
 	}
 	return false
+}
+
+// GenericNamespaceAgrees reports whether a generic package identifier a claim
+// names and a component's identifier agree on the namespace.
+//
+// Only a component that is itself a generic identifier carrying a namespace
+// has one to compare: a distribution's namespace names the distribution, not
+// the source tree a generic claim speaks about, and a component with no
+// namespace says nothing either way. A claim with no namespace agrees with
+// every component, which is the breadth an un-namespaced generic claim has.
+func GenericNamespaceAgrees(claimed, component string) bool {
+	named := graph.PartsOfPurl(claimed).Namespace
+	if named == "" {
+		return true
+	}
+	held := graph.PartsOfPurl(component)
+	if held.Type != "generic" || held.Namespace == "" {
+		return true
+	}
+	return strings.EqualFold(named, held.Namespace)
 }
 
 // equalName compares names the way an identifier does, which is without regard

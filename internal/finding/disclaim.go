@@ -459,6 +459,8 @@ func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
 		// A generic identifier names a product by what the inventory calls
 		// it in its own identifier, which the name it gives may not repeat:
 		// pkg:generic/sonic-utilities beside "SONiC utilities".
+	case base != "" && !sbom.GenericNamespaceAgrees(base, c.Purl):
+		return false
 	case product.Name == "" || !strings.EqualFold(product.Name, c.Name):
 		return false
 	}

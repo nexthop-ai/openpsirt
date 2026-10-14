@@ -603,6 +603,7 @@ its own name or in a header saying what it fixes.
 | A subcomponent is read only as a package identifier | Anything else names a component and no version, which would cover every version of that name and every fork of it. A product whose subcomponents are all of that kind is a claim about nothing |
 | A claim against a source tree matches a component of that name, or a fork of one | The build knows which packages came out of a tree and this deployment does not |
 | A source tree is named either way it can be named | As a bare name where the document carried no package identifier, and as a package identifier of the generic type where it carried one. The two are the same claim and are matched the same |
+| A generic identifier names its package by the last segment | A namespace before it is compared only where the component is itself a generic identifier carrying one. A distribution's namespace names the distribution rather than the source tree, and a component with no namespace says nothing either way |
 | A source tree named with a version is matched on it, against the component's own version and against what it was built from | A stated version is a version the build stated. Read as covering every version, a claim about one release suppresses a live finding on another |
 | A claim is matched at every place its component sits, within the product it names | The fan-out is ours either way. The next table holds what the product changes |
 
