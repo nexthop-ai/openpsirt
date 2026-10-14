@@ -792,7 +792,7 @@ by two toolchains with the gate green.
 |---|---|
 | The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own. The tag is grouped alone, so an image bump held red never holds the standard library's fixes with it |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities against the toolchain both artifacts are built with, and the image update carries the fix |
-| A Go release can write export data the pinned linter cannot read, and the linter then fails on every package | The tools' weekly update brings the linter release that reads it. That pull request lands first, and the toolchain's goes green after it. Go 1.27.2 wrote format 5, which golangci-lint v2.13.1 refused and v2.14.0 reads |
+| A Go release can write export data the pinned linter cannot read, and the linter then fails on every package | The tools' weekly update brings the linter release that reads it. That pull request lands first, and the toolchain's goes green after it. Go 1.27.2 writes format 5, and golangci-lint v2.14.0 is the first release that reads it |
 
 ## Tool pins
 
@@ -805,7 +805,7 @@ under `tools/`, and run with `go tool` against that module.
 | One module per tool | Moving one tool never moves a library another is built against |
 | A build-constrained source file imports the tool's command | The requirement is then direct. A module declaring a tool and importing nothing marks it indirect, and the updates move direct requirements |
 | A tool's directory is named for the command its module declares, and `pins-check` refuses one that is not | The targets call a tool by its directory |
-| The image builds the inventory generator from the same module the makefile runs | One pin, where a build argument and a makefile variable were two |
+| The image builds the inventory generator from the same module the makefile runs | One pin, read by both |
 
 | Tool | Run by |
 |---|---|
@@ -1159,7 +1159,7 @@ long precisely so the checklist holds only what a machine cannot decide.
 | Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
 | The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
 | Dependabot moves the pins, weekly, as one pull request per group: actions, images, the `golang` image alone, the database layer's Go modules, the other Go modules, the Go tools, the interface packages and the documentation closure | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
-| The database layer's modules are a group of their own: the query builder, the drivers and the migration runner | A release there can change an interface every store is written against, and the work it needs holds nothing else back. bun v1.3.0 changed the type of every limit, offset and count |
+| The database layer's modules are a group of their own: the query builder, the drivers and the migration runner | A release there can change an interface every store is written against, and the work it needs holds nothing else back. bun v1.3.0 makes every limit, offset and count an int64 |
 | The interface group carries minor and patch releases, and a major release arrives as a pull request of its own | A major release is the kind that needs work, and one that does holds nothing else back |
 | TypeScript's major releases are not offered | The linter's TypeScript support and the API client generator each declare the compiler releases they accept, and neither accepts 7, so npm refuses the install. It lifts when both do |
 | An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
