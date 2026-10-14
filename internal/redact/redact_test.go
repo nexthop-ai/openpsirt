@@ -23,6 +23,7 @@ func TestNoCredentialSurvivesRedaction(t *testing.T) {
 		{"https://psirt.example.com/#access_token=frag", "frag", "psirt.example.com"},
 		{"admin:hunter2@psirt.example.com", "hunter2", "psirt.example.com"},
 		{"psirt.example.com:hunter2@x", "hunter2", "@x"},
+		{"https://ghp_abc123@cdn.example.com/csaf", "ghp_abc123", "cdn.example.com/csaf"},
 	} {
 		got := redact.URL(each.raw)
 		if strings.Contains(got, each.secret) {

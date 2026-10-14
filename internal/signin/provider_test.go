@@ -305,6 +305,7 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 	}{
 		{"an unreadable issuer", whole(func(c *OIDCConfig) { c.Issuer = "://" }), "is not a URL naming a host"},
 		{"an issuer over plain http", whole(func(c *OIDCConfig) { c.Issuer = "http://issuer.example" }), "is not https"},
+		{"an issuer over plain http with a password", whole(func(c *OIDCConfig) { c.Issuer = "http://u:hunter2@issuer.example" }), "is not https"},
 		{"no client identifier", whole(func(c *OIDCConfig) { c.ClientID = "" }), "client identifier and secret"},
 		{"no client secret", whole(func(c *OIDCConfig) { c.ClientSecret = "" }), "client identifier and secret"},
 		{"no username claim", whole(func(c *OIDCConfig) { c.UsernameClaim = "  " }), "OIDC_USERNAME_CLAIM"},
@@ -319,6 +320,9 @@ func TestWhatAProviderMustSupplyBeforeItIsUsable(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), c.says) {
 			t.Errorf("a provider configured with %s was refused for another reason: %v", c.what, err)
+		}
+		if strings.Contains(err.Error(), "hunter2") {
+			t.Errorf("the refusal of a provider configured with %s repeats the password: %v", c.what, err)
 		}
 	}
 }

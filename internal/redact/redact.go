@@ -64,11 +64,15 @@ func Parsed(u *url.URL) string {
 // quotes it, and a malformed escape in a password is the commonest reason it
 // fails. Text with no "//" after its scheme shows nothing up to its last "@",
 // because `admin:hunter2@psirt.example.com` parses with the scheme `admin` and
-// no user information.
+// no user information. A user name with no password is hidden as well: a
+// configured address carries no user, so whatever stands there may be a token.
 func URL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return hidden
+	}
+	if u.User != nil {
+		u.User = url.User(hidden)
 	}
 	if u.Scheme == "" || u.Opaque != "" || u.Host == "" {
 		// A scheme the parser did not separate from a host leaves the

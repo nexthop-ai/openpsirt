@@ -20,6 +20,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/redact"
 )
 
 // OIDC signs somebody in through an OpenID Connect provider.
@@ -86,10 +87,10 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 	written := strings.TrimSpace(cfg.Issuer)
 	issuer, err := url.Parse(written)
 	if err != nil || issuer.Hostname() == "" {
-		return nil, fmt.Errorf("the issuer %q is not a URL naming a host", cfg.Issuer)
+		return nil, fmt.Errorf("the issuer %q is not a URL naming a host", redact.URL(written))
 	}
 	if issuer.Scheme != "https" {
-		return nil, fmt.Errorf("the issuer %q is not https, and an identity provider reached over plain http can be answered by anybody on the path", cfg.Issuer)
+		return nil, fmt.Errorf("the issuer %q is not https, and an identity provider reached over plain http can be answered by anybody on the path", redact.URL(written))
 	}
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return nil, fmt.Errorf("the %q provider needs a client identifier and secret", cfg.Name)

@@ -365,6 +365,7 @@ func TestARefusedAddressDoesNotRepeatItsPassword(t *testing.T) {
 			"https://user:hunter2@psirt.example.test/below",
 			"https://user:hunter2@psirt.example.test:bad/",
 			"http://user:hunter2@psirt.example.test/",
+			"https://hunter2@psirt.example.test/",
 		} {
 			t.Run(key+" "+value, func(t *testing.T) {
 				t.Setenv(envPrefix+key, value)
