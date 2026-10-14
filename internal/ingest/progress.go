@@ -289,8 +289,8 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 // claims says which upload each run's numbers belong to: the newest one it
 // covered, decided over the whole history rather than over one page of it.
 //
-// Two columns for every scan filed here, which the target index answers
-// directly. Arrival stands in for the moment a document was parsed — they are
+// Two columns for every scan filed here and read, which the target index
+// answers directly, and the state of the job that read each. Arrival stands in for the moment a document was parsed — they are
 // seconds apart, and what is being decided is only which of two uploads a run
 // came after, so the distinction cannot change the answer without the two
 // having arrived either side of the run finishing, in which case arrival is
@@ -298,13 +298,15 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 func (s *Store) claims(ctx context.Context, targetID int64,
 	runs []finding.Run) (map[int64]int64, error) {
 
-	var filed []struct {
-		ID         int64     `bun:"id"`
-		ReceivedAt time.Time `bun:"received_at"`
-	}
+	var filed []filing
+	// Only an upload that was read can have been covered by a run. One that
+	// failed carries no run, and one still being read is not yet what the
+	// build holds, so attributed to either, a run's counts appear on no
+	// receipt.
 	q := s.db.NewSelect().TableExpr(`"scan" AS "sc"`).
 		Column("sc.id", "sc.received_at").
-		Where("sc.target_id = ?", targetID)
+		Where("sc.target_id = ?", targetID).
+		Where("sc.status = ?", Accepted)
 	// Newest first by when it arrived, which is what "the newest upload this
 	// run covered" asks about. By arrival rather than by identifier because
 	// two uploads recorded at the same moment take their identifiers in
@@ -314,6 +316,17 @@ func (s *Store) claims(ctx context.Context, targetID int64,
 	if err := q.Order("sc.received_at DESC", "sc.id DESC").Scan(ctx, &filed); err != nil {
 		return nil, fmt.Errorf("read what has been filed here: %w", err)
 	}
+	done, err := s.readDone(ctx, filed)
+	if err != nil {
+		return nil, err
+	}
+	kept := filed[:0]
+	for _, sc := range filed {
+		if done[sc.ID] {
+			kept = append(kept, sc)
+		}
+	}
+	filed = kept
 
 	// The runs newest first by when they finished, which is the order the
 	// uploads are already in. Sorted here rather than by the engine: the
@@ -349,4 +362,47 @@ func (s *Store) claims(ctx context.Context, targetID int64,
 		claimed[run.ID] = filed[at].ID
 	}
 	return claimed, nil
+}
+
+// filing is one upload filed against a build, as attribution reads it.
+type filing struct {
+	ID         int64     `bun:"id"`
+	ReceivedAt time.Time `bun:"received_at"`
+}
+
+// readDone is which of these scans the reader has finished reading: the
+// latest job to read each is done. A scan can be read more than once, so the
+// latest job is the one that says where it has got to.
+func (s *Store) readDone(ctx context.Context, filed []filing) (map[int64]bool, error) {
+	ids := make([]int64, 0, len(filed))
+	for _, sc := range filed {
+		ids = append(ids, sc.ID)
+	}
+	latest := make(map[string]queue.State, len(ids))
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		references := make([]string, 0, len(batch))
+		for _, id := range batch {
+			references = append(references, strconv.FormatInt(id, 10))
+		}
+		var jobs []queue.Job
+		if err := s.db.NewSelect().Model(&jobs).
+			Column("reference", "state").
+			Where("kind = ?", queue.Parse).
+			Where("reference IN (?)", bun.List(references)).
+			Order("id ASC").Scan(ctx); err != nil {
+			return err
+		}
+		for _, j := range jobs {
+			latest[j.Reference] = j.State
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read which uploads have been read: %w", err)
+	}
+	done := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		done[id] = latest[strconv.FormatInt(id, 10)] == queue.Done
+	}
+	return done, nil
 }

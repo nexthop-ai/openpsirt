@@ -853,7 +853,10 @@ waiting on it, permanently.
 What each run changed is counted when asked for rather than stored, from the
 runs the findings already point at, as issues at components rather than places.
 The count is attributed to the newest upload that run covered and omitted from
-the rest, because one fact repeated down three rows reads as three changes.
+the rest, because one fact repeated down three rows reads as three changes. Only
+an upload that was read counts as covered, by arrival order: one that failed or
+is still being read carries no run, and the count attributed to it would appear
+on no receipt.
 
 Which run produced a finding is recorded on it (REQ-13): the one that opened it
 and the one that closed it, with the scanner and vulnerability-database versions

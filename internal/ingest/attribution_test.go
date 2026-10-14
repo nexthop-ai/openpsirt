@@ -473,3 +473,50 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 
 	})
 }
+
+// A run is attributed to the newest upload it covered that was read. One that
+// failed, or is still being read, carries no run, so a run attributed to it
+// would show its counts on no receipt.
+func TestARunIsNotAttributedToAnUploadThatFailedOrIsUnread(t *testing.T) {
+	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
+		ctx := t.Context()
+		target := quietTarget(t, s, ours)
+		now := time.Now().UTC()
+
+		file(t, s, target, "read", now.Add(-4*time.Hour))
+		file(t, s, target, "failed", now.Add(-3*time.Hour))
+		file(t, s, target, "reading", now.Add(-150*time.Minute))
+		finishRun(t, s, target, now.Add(-2*time.Hour), "")
+
+		var failed, reading int64
+		for hash, id := range map[string]*int64{"failed": &failed, "reading": &reading} {
+			if err := s.DB().NewSelect().Model((*ingest.Scan)(nil)).Column("id").
+				Where("content_hash = ?", hash).Scan(ctx, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.MarkFailed(ctx, failed, errors.New("unreadable")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DB().NewUpdate().TableExpr(`"job"`).Set("state = ?", queue.Pending).
+			Where("reference = ?", strconv.FormatInt(reading, 10)).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		receipts, _, err := s.Receipts(ctx, reader, target, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range receipts {
+			if r.Scan.ContentHash == "read" {
+				if r.RunID == nil {
+					t.Errorf("the upload that was read carries no run (%q)", r.State)
+				}
+				continue
+			}
+			if r.RunID != nil {
+				t.Errorf("the %s upload carries the run", r.Scan.ContentHash)
+			}
+		}
+	})
+}
