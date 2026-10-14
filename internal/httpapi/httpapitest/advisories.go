@@ -196,7 +196,8 @@ func (r *Reach) ScannedAtTwoPlaces(t *testing.T) {
 }
 
 // ScannedInTwoImages is ScannedAtTwoPlaces with two container images pulling
-// the library in, each stamped with a build: the shape of a SONiC image.
+// the library in, each stamped with a build: the shape of a SONiC image. It
+// also reports CVE-2026-9998 in docker-swss itself.
 func (r *Reach) ScannedInTwoImages(t *testing.T) {
 	t.Helper()
 	r.scannedUnder(t,
@@ -253,12 +254,19 @@ func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 	}
 	// One report, two places: the places come from the graph, and the library
 	// hangs off both consumers.
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
-		{
-			Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
-			Component: library, FixState: finding.NoFix,
-		},
-	}); err != nil {
+	reported := []finding.Reported{{
+		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+		Component: library, FixState: finding.NoFix,
+	}}
+	// An issue in the first consumer itself, reported against it as the
+	// scanner is given it: an image as it is stored.
+	if first.IsImage() {
+		reported = append(reported, finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-9998", Severity: "high"},
+			Component: first.AsImage(), FixState: finding.NoFix,
+		})
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
 		t.Fatal(err)
 	}
 }

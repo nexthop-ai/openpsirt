@@ -230,6 +230,65 @@ func TestADismissalBeneathAnImageNamesTheImageAsTheBuildStampedIt(t *testing.T) 
 	})
 }
 
+func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing.T) {
+	// The issue is in the image itself, so the statement's component is the
+	// image, and a reader matches it at the stamp the build shipped.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedInTwoImages(t)
+		var places struct {
+			Places []struct {
+				Place string `json:"place"`
+			} `json:"places"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9998/components/docker-swss", &places)
+		if len(places.Places) != 1 {
+			t.Fatalf("the image's own issue sits at %d places, want one", len(places.Places))
+		}
+		one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9998/places/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+		if one.Code != http.StatusCreated {
+			t.Fatalf("deciding the image's issue answered %d: %s", one.Code, one.Body.String())
+		}
+		var made struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
+			t.Fatal(err)
+		}
+		r.Agreed(t, made.ClaimID)
+
+		var doc struct {
+			Statements []struct {
+				Vulnerability struct {
+					Name string `json:"name"`
+				} `json:"vulnerability"`
+				Products []struct {
+					Subcomponents []struct {
+						ID string `json:"@id"`
+					} `json:"subcomponents"`
+				} `json:"products"`
+			} `json:"statements"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+		stated := 0
+		for _, each := range doc.Statements {
+			if each.Vulnerability.Name != "CVE-2026-9998" {
+				continue
+			}
+			stated++
+			if len(each.Products) != 1 || len(each.Products[0].Subcomponents) != 1 ||
+				each.Products[0].Subcomponents[0].ID != "pkg:oci/docker-swss@master.7-abc?arch=amd64" {
+				t.Errorf("the image's own issue is stated about %+v, want the image at its stamp", each.Products)
+			}
+		}
+		if stated != 1 {
+			t.Errorf("%d statements about the image's own issue, want one", stated)
+		}
+	})
+}
+
 // dismissedAtOnePlace agrees a dismissal of CVE-2026-9999 at the first of its
 // places, and checks the build's document states it once, about libnl inside
 // one of the consumers given.
