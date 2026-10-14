@@ -38,13 +38,19 @@ updates:
   # version the image builds the interface with is written in the Dockerfile
   # and in ci.yml, and the check compares them — so the pull request needs
   # ci.yml moved with it. Red there means half an update, not a broken bot.
+  #
+  # The golang tag is a group of its own, so a node bump held red by that
+  # check never holds the toolchain's standard-library fixes with it.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
     groups:
+      toolchain:
+        patterns: ["golang"]
       images:
         patterns: ["*"]
+        exclude-patterns: ["golang"]
 
   # The Go modules. A module that needs a newer Go than the image raises
   # go.mod's go line past it, and `pins-check` fails that pull request until

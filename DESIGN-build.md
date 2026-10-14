@@ -783,7 +783,7 @@ by two toolchains with the gate green.
 
 | What that costs | What answers it |
 |---|---|
-| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own |
+| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own. The tag is grouped alone, because a `node` bump fails `pins-check` until `ci.yml` moves with it |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities against the toolchain both artifacts are built with, and the image update carries the fix |
 
 ## Hash pinning per ecosystem
@@ -1128,7 +1128,7 @@ long precisely so the checklist holds only what a machine cannot decide.
 |---|---|
 | Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
 | The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
-| Dependabot moves the pins, weekly, as one pull request per ecosystem: actions, images, Go modules, interface packages and the documentation closure | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| Dependabot moves the pins, weekly, as one pull request per ecosystem: actions, images, Go modules, interface packages and the documentation closure. The `golang` image is the one exception, a pull request of its own | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
 | An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
 
 ## Repository settings
