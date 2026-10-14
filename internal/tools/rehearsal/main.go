@@ -25,15 +25,16 @@
 //  3. The counts again: a table the release held keeps its count, and a
 //     table the upgrade adds starts empty, except where an upgrade merges
 //     rows or fills a table from rows the release held.
-//  4. The server started on it, the open findings of every build against
-//     what the release showed, and every GET its API document lists asked
-//     once, none of which may answer 5xx.
+//  4. The server started on it with the configuration the release's demo
+//     started its own with, the open findings of every build against what
+//     the release showed, and every GET its API document lists asked once,
+//     none of which may answer 5xx.
 //
-// Everything it made is removed at the end, pass or fail, unless -keep.
+// Everything it made is removed at the end, pass, fail or interrupt, unless
+// -keep.
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -45,11 +46,13 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -73,16 +76,17 @@ const (
 
 type run struct {
 	from, engine string
-	adminURL     string // the engine's own URL, for creating the database
-	work         string // this run's directory
-	tag          string // the release's worktree
-	demo         string // what the release's demo writes: its data, its fixtures
-	grype        string // the scanner's database, shared between runs
-	image        string // this tree's image
-	hostURL      string // the rehearsal database, as this process reaches it
-	appURL       string // the same database, as a container reaches it
-	attached     string // the engine's container, joined to the rehearsal's network
-	base         string // where the proxy answers, as the administrator
+	adminURL     string   // the engine's own URL, for creating the database
+	work         string   // this run's directory
+	tag          string   // the release's worktree
+	demo         string   // what the release's demo writes: its data, its fixtures
+	grype        string   // the scanner's database, shared between runs
+	image        string   // this tree's image
+	hostURL      string   // the rehearsal database, as this process reaches it
+	appURL       string   // the same database, as a container reaches it
+	attached     string   // the engine's container, joined to the rehearsal's network
+	env          []string // what the release's demo started its server with, beyond its image
+	base         string   // where the proxy answers, as the administrator
 	log          *os.File
 }
 
@@ -126,13 +130,16 @@ func main() {
 	}
 	r.base = fmt.Sprintf("http://127.0.0.1:%d", port)
 
-	ctx := context.Background()
-	started := time.Now()
+	// An interrupt cancels the run and still removes what it made: the
+	// cleanup takes a context the interrupt does not cancel.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	began := time.Now()
 	faults, err := r.rehearse(ctx)
 	if !keep {
-		r.clean(ctx)
+		r.clean(context.WithoutCancel(ctx))
 	}
-	elapsed := time.Since(started).Round(time.Second)
+	elapsed := time.Since(began).Round(time.Second)
 	switch {
 	case err != nil:
 		fmt.Printf("%s on %s: stopped after %s: %v\n", r.from, r.engine, elapsed, err)
@@ -223,6 +230,9 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	}
 	before, err := r.settle(ctx, overrides, env)
 	if err != nil {
+		return nil, err
+	}
+	if r.env, err = r.startedWith(ctx, release); err != nil {
 		return nil, err
 	}
 	r.saveLogs(ctx, r.from)
@@ -325,10 +335,14 @@ func (r *run) database(ctx context.Context) error {
 	own.Path = "/" + dbName
 	r.hostURL = own.String()
 	inside := own
-	inside.Host, r.attached = reachEngine(ctx, u)
+	if inside.Host, r.attached, err = reachEngine(ctx, u, runDocker); err != nil {
+		return fmt.Errorf("reaching the engine from a container: %w", err)
+	}
 	r.appURL = inside.String()
 	if r.attached != "" {
 		r.note("reached as %s, on the rehearsal's network", inside.Host)
+	} else {
+		r.note("reached as %s", inside.Host)
 	}
 
 	db, err := database.Open(ctx, target)
@@ -381,14 +395,9 @@ func (r *run) overrides(ctx context.Context, wrapper, image string) ([]string, e
 	if err := c.Run(); err != nil {
 		return nil, fmt.Errorf("read %s's cast: %w", r.from, err)
 	}
-	var cast []string
-	for _, entry := range strings.Fields(out.String()) {
-		p, rest, ok := strings.Cut(entry, ":")
-		n, err := strconv.Atoi(p)
-		if !ok || err != nil {
-			return nil, fmt.Errorf("%s's cast entry %q has no port", r.from, entry)
-		}
-		cast = append(cast, fmt.Sprintf("%d:%s", n-8080+port, rest))
+	cast, err := shiftCast(out.String(), port)
+	if err != nil {
+		return nil, fmt.Errorf("%s's %w", r.from, err)
 	}
 	return []string{
 		"DOCKER=" + wrapper,
@@ -403,10 +412,6 @@ func (r *run) overrides(ctx context.Context, wrapper, image string) ([]string, e
 	}, nil
 }
 
-// statusLine is a build in the release's own status report, with the state
-// of its last scan and what is open.
-var statusLine = regexp.MustCompile(`^\s+(\S+)/streams/(\S+)/variants/(\S+)\s+scan (.*?) · open (\d+) findings`)
-
 // settle waits for every scan the release queued to finish, asking the
 // release's own status target, and answers what it reports open per build.
 func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, error) {
@@ -419,29 +424,7 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 			return nil, fmt.Errorf("%s's status: %w", r.from, err)
 		}
 		_, _ = fmt.Fprint(r.log, out.String())
-		totals := Totals{}
-		busy := false
-		var failed []string
-		scanner := bufio.NewScanner(&out)
-		for scanner.Scan() {
-			m := statusLine.FindStringSubmatch(scanner.Text())
-			if m == nil {
-				continue
-			}
-			build := m[1] + "/" + m[2] + "/" + m[3]
-			// A scan reads its inventory, then scans it. Only the last two
-			// states are an end; anything else, including a build nothing
-			// has reached yet, is still on its way.
-			switch m[4] {
-			case "scanned":
-			case "failed":
-				failed = append(failed, build)
-			default:
-				busy = true
-			}
-			n, _ := strconv.ParseInt(m[5], 10, 64)
-			totals[build] = n
-		}
+		totals, busy, failed, unread := parseStatus(out.String())
 		if len(failed) > 0 {
 			return nil, fmt.Errorf("%s failed to scan %s, so what it seeds is not what a deployment holds",
 				r.from, strings.Join(failed, ", "))
@@ -451,9 +434,15 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 			return totals, nil
 		}
 		if time.Now().After(deadline) {
+			if len(unread) > 0 {
+				return nil, fmt.Errorf("%s's status never gave a count for:\n  %s",
+					r.from, strings.Join(unread, "\n  "))
+			}
 			return nil, fmt.Errorf("the scans did not finish:\n%s", out.String())
 		}
-		time.Sleep(15 * time.Second)
+		if err := pause(ctx, 15*time.Second); err != nil {
+			return nil, err
+		}
 	}
 }
 
@@ -530,22 +519,51 @@ func (r *run) container(extra ...string) []string {
 		// withDatabase sets: an argument is readable by every local user and
 		// is written to the log.
 		"-e", "OPENPSIRT_DATABASE_URL",
-		"-e", "OPENPSIRT_ADDR=0.0.0.0:8080",
-		"-e", "OPENPSIRT_PLAIN_HTTP=1",
-		"-e", "OPENPSIRT_BOOTSTRAP_ADMINS=" + admin,
-		"-e", "OPENPSIRT_TRUSTED_HEADER=X-User",
-		"-e", "OPENPSIRT_TRUSTED_SOURCES=" + subnet,
-		"-e", "OPENPSIRT_ATTACHMENT_DIR=/data/attachments",
-		"-e", "OPENPSIRT_PUBLISHER_NAME=OpenPSIRT Demo",
-		"-e", "OPENPSIRT_PUBLISHER_NAMESPACE=https://demo.openpsirt.invalid",
-		"-e", "OPENPSIRT_ADVISORY_PREFIX=DEMO",
+	}
+	// The release's demo configuration, named the same way, since nothing
+	// says which of its values is a secret.
+	for _, entry := range r.env {
+		name, _, _ := strings.Cut(entry, "=")
+		args = append(args, "-e", name)
 	}
 	return append(args, extra...)
 }
 
-// withDatabase is the environment a container run takes its database from.
+// withDatabase is the environment a container run takes its database and the
+// release's demo configuration from.
 func (r *run) withDatabase() []string {
-	return []string{"OPENPSIRT_DATABASE_URL=" + r.appURL}
+	return append([]string{"OPENPSIRT_DATABASE_URL=" + r.appURL}, r.env...)
+}
+
+// startedWith reads the environment the release's server container was
+// started with beyond its image's own.
+func (r *run) startedWith(ctx context.Context, image string) ([]string, error) {
+	read := func(kind, name string) ([]string, error) {
+		var out, stderr bytes.Buffer
+		c := exec.CommandContext(ctx, "docker", kind, "inspect", "--format", "{{json .Config.Env}}", name) //nolint:gosec // G204: a name this tool chose
+		c.Stdout, c.Stderr = &out, &stderr
+		if err := c.Run(); err != nil {
+			return nil, fmt.Errorf("docker %s inspect %s: %w: %s", kind, name, err, strings.TrimSpace(stderr.String()))
+		}
+		var env []string
+		if err := json.Unmarshal(out.Bytes(), &env); err != nil {
+			return nil, fmt.Errorf("docker %s inspect %s: %w", kind, name, err)
+		}
+		return env, nil
+	}
+	container, err := read("container", app)
+	if err != nil {
+		return nil, err
+	}
+	own, err := read("image", image)
+	if err != nil {
+		return nil, err
+	}
+	env := started(container, own)
+	if len(env) == 0 {
+		return nil, fmt.Errorf("%s's server was started with no configuration of its own, so there is none to serve this tree with", r.from)
+	}
+	return env, nil
 }
 
 func (r *run) migrate(ctx context.Context, action string) error {
@@ -586,7 +604,9 @@ func (r *run) serve(ctx context.Context) error {
 		if status, _, err := r.get(ctx, "/readyz"); err == nil && status == http.StatusOK {
 			return nil
 		}
-		time.Sleep(2 * time.Second)
+		if err := pause(ctx, 2*time.Second); err != nil {
+			return err
+		}
 	}
 	return errors.New("this tree's server never answered ready")
 }
@@ -631,16 +651,12 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, err
 	}
-	var product, stream, variant string
-	for build := range builds {
-		parts := strings.SplitN(build, "/", 3)
-		if product == "" || parts[0] < product {
-			product, stream, variant = parts[0], parts[1], parts[2]
-		}
+	product, stream, variant, ok := firstBuild(builds)
+	if !ok {
+		return nil, errors.New("the release reported no build, so the sweep has no names to ask with")
 	}
 	names := map[string]string{"product": product, "stream": stream, "variant": variant,
 		"team": "platform", "identity": admin, "format": "csv"}
-	param := regexp.MustCompile(`\{(\w+)\}`)
 	paths := make([]string, 0, len(doc.Paths))
 	for path, ops := range doc.Paths {
 		if _, ok := ops["get"]; ok {
@@ -651,15 +667,8 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 	var faults []string
 	asked, skipped, answered := 0, 0, 0
 	for _, path := range paths {
-		missing := false
-		filled := param.ReplaceAllStringFunc(path, func(p string) string {
-			v, ok := names[strings.Trim(p, "{}")]
-			if !ok {
-				missing = true
-			}
-			return url.PathEscape(v)
-		})
-		if missing {
+		filled, complete := fillPath(path, names)
+		if !complete {
 			skipped++
 			continue
 		}

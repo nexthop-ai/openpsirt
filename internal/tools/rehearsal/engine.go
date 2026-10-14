@@ -4,12 +4,29 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"os/exec"
 	"strings"
 )
+
+// docker runs one docker command and answers what it printed. A failure
+// carries what docker said on standard error.
+type docker func(ctx context.Context, args ...string) (string, error)
+
+func runDocker(ctx context.Context, args ...string) (string, error) {
+	var stderr bytes.Buffer
+	c := exec.CommandContext(ctx, "docker", args...) //nolint:gosec // G204: arguments this tool built itself
+	c.Stderr = &stderr
+	out, err := c.Output()
+	if err != nil {
+		return "", fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	return string(out), nil
+}
 
 // reachEngine is where a container on the rehearsal's network reaches the
 // engine, and the container it attached to get there, or empty.
@@ -21,40 +38,53 @@ import (
 // Desktop, rootless Docker and Podman alike, where an address on the host
 // differs or is not reachable from a container at all.
 //
-// A URL naming another host, or a port no container here publishes, is reached
-// through host.docker.internal: a server listening on a real interface answers
-// there on every setup that maps the name.
-func reachEngine(ctx context.Context, u *url.URL) (host, attached string) {
+// A URL naming another host, or a loopback port no container publishes, is
+// reached through host.docker.internal: a server listening on a real interface
+// answers there on every setup that maps the name. Any docker command failing
+// on the way to a container that does publish the port is an error, with what
+// docker said, because the fallback cannot reach a port published on loopback
+// alone and would fail minutes later with nothing to say why.
+func reachEngine(ctx context.Context, u *url.URL, run docker) (host, attached string, err error) {
 	fallback := "host.docker.internal:" + u.Port()
-	if !loopback(u.Hostname()) || u.Port() == "" {
-		return fallback, ""
+	if !loopback(u.Hostname()) {
+		return fallback, "", nil
 	}
-	out, err := exec.CommandContext(ctx, "docker", "ps", "--filter", "publish="+u.Port(), //nolint:gosec // G204: a port from the engine URL this tool was given
-		"--format", "{{.Names}}").Output()
+	if u.Port() == "" {
+		return "", "", fmt.Errorf("the engine URL names %s and no port, so no container publishing it can be found", u.Hostname())
+	}
+	out, err := run(ctx, "ps", "--filter", "publish="+u.Port(), "--format", "{{.Names}}")
 	if err != nil {
-		return fallback, ""
+		return "", "", err
 	}
-	names := strings.Fields(string(out))
-	if len(names) != 1 {
-		return fallback, ""
+	names := strings.Fields(out)
+	switch len(names) {
+	case 0:
+		return fallback, "", nil
+	case 1:
+	default:
+		return "", "", fmt.Errorf("%d containers publish port %s (%s), so which is the engine is unknown",
+			len(names), u.Port(), strings.Join(names, ", "))
 	}
-	ports, err := exec.CommandContext(ctx, "docker", "port", names[0]).Output() //nolint:gosec // G204: a container name docker just listed
+	ports, err := run(ctx, "port", names[0])
 	if err != nil {
-		return fallback, ""
+		return "", "", err
 	}
-	inside := publishedAs(string(ports), u.Port())
+	inside := publishedAs(ports, u.Port())
 	if inside == "" {
-		return fallback, ""
+		return "", "", fmt.Errorf("%s does not say which of its ports is published on %s", names[0], u.Port())
 	}
 	// The network is the release demo's, made here first so the engine can
 	// join it before the release's container starts. Every release's demo
 	// leaves a network that already exists alone.
-	_ = exec.CommandContext(ctx, "docker", "network", "create", "--subnet", subnet, network).Run()
-	if err := exec.CommandContext(ctx, "docker", "network", "connect", network, names[0]).Run(); err != nil && //nolint:gosec // G204: a container name docker just listed
-		!connected(ctx, names[0]) {
-		return fallback, ""
+	if _, err := run(ctx, "network", "create", "--subnet", subnet, network); err != nil {
+		if _, exists := run(ctx, "network", "inspect", network); exists != nil {
+			return "", "", err
+		}
 	}
-	return net.JoinHostPort(names[0], inside), names[0]
+	if _, err := run(ctx, "network", "connect", network, names[0]); err != nil && !connected(ctx, run, names[0]) {
+		return "", "", err
+	}
+	return net.JoinHostPort(names[0], inside), names[0], nil
 }
 
 // loopback reports whether a host names this machine's loopback.
@@ -84,8 +114,7 @@ func publishedAs(ports, hostPort string) string {
 
 // connected reports whether a container is on the rehearsal's network already,
 // which is what a second connect answers as an error.
-func connected(ctx context.Context, name string) bool {
-	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", //nolint:gosec // G204: a container name docker just listed
-		"{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}", name).Output()
-	return err == nil && strings.Contains(" "+string(out), " "+network+" ")
+func connected(ctx context.Context, run docker, name string) bool {
+	out, err := run(ctx, "inspect", "--format", "{{range $n, $_ := .NetworkSettings.Networks}}{{$n}} {{end}}", name)
+	return err == nil && strings.Contains(" "+out, " "+network+" ")
 }
