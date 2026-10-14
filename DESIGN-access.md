@@ -82,7 +82,9 @@ Two things lean on "an administrator sees everything", and each is answered
 its own way: the background passes that report on the tool ask as **the
 deployment itself**, a subject nothing resolves a credential to and which holds
 no role; and the demo's administrator grants itself roles as part of
-seeding.
+seeding. The deployment reads every product and triages, approves and decides
+in none: a narrowing by a reading rule lets every row through for it, and one
+by a rule about acting lets none.
 
 | Rule | Reason |
 |---|---|

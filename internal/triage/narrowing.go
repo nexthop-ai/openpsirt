@@ -195,7 +195,10 @@ func onlyDecidable(query *bun.SelectQuery, subject access.Subject) *bun.SelectQu
 	}
 	products, all := subject.Products()
 	if all {
-		return query
+		if unnarrowedMay(subject, mayDecide) {
+			return query
+		}
+		return query.Where("1 = 0")
 	}
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return mayDecide(subject, id, v)
@@ -275,7 +278,10 @@ func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	}
 	products, all := subject.Products()
 	if all {
-		return query
+		if unnarrowedMay(subject, allowed) {
+			return query
+		}
+		return query.Where("1 = 0")
 	}
 
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
@@ -288,6 +294,15 @@ func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	return query.Where(where, args...)
 }
 
+// unnarrowedMay reports whether the deployment's own subject passes a rule. It
+// reads everything and holds no role, so a reading rule lets every row through
+// and a rule about triaging or agreeing lets none.
+func unnarrowedMay(subject access.Subject,
+	allowed func(access.Subject, int64, access.Visibility) bool) bool {
+
+	return allowed(subject, 0, access.Public) && allowed(subject, 0, access.Private)
+}
+
 // notApprovableWhere is the condition a decision row meets where the subject
 // may not agree to it — the complement of approvableBy, for asking whether a
 // claim has any row outside what the reader may act on.
@@ -297,7 +312,10 @@ func notApprovableWhere(subject access.Subject, column string) (string, []any) {
 	}
 	products, all := subject.Products()
 	if all {
-		return "1 = 0", nil
+		if unnarrowedMay(subject, mayApprove) {
+			return "1 = 0", nil
+		}
+		return "1 = 1", nil
 	}
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return mayApprove(subject, id, v)
@@ -317,7 +335,10 @@ func notDecidableWhere(subject access.Subject, column string) (string, []any) {
 	}
 	products, all := subject.Products()
 	if all {
-		return "1 = 0", nil
+		if unnarrowedMay(subject, mayDecide) {
+			return "1 = 0", nil
+		}
+		return "1 = 1", nil
 	}
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return mayDecide(subject, id, v)
