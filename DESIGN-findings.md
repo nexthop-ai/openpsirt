@@ -676,7 +676,9 @@ answers change, and both how many undisclosed flaws exist and when the last was
 recorded fall out of the names alone. Six digits, so every identifier reads the
 same length. A collision is answered by drawing again inside the same
 transaction, which also stops two people recording at the same moment being
-handed the same one.
+handed the same one. A name collides where any issue answers to it, filed under
+it or holding it as an alias, compared folded: an issue re-filed under a CVE
+keeps its minted name as an alias, and that name resolves to it.
 
 The width is not what makes it safe to probe. That is the routes answering a name
 somebody holds and a name nobody holds identically (REQ-43).
