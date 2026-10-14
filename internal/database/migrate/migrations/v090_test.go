@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -272,26 +273,48 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 	})
 }
 
-// On MySQL and MariaDB a migration's data definition commits as it runs, so a
-// start stopped after the image version table was made and before the merge
-// committed leaves the table and nothing else. The next start steps over the
-// table and merges as though it had not stopped.
-func TestTheV090UpgradeStoppedAfterItsTableMergesOnTheNextStart(t *testing.T) {
+// On MySQL and MariaDB a migration's data definition commits as it runs. An
+// upgrade whose merge stops part way leaves the image version table and
+// nothing else: no version recorded, and every stamp still a component of its
+// own. The next start steps over the table and merges whole.
+//
+// A trigger refusing to remove a component stops the merge at its last step,
+// after every other row has been written.
+func TestTheV090UpgradeStoppedPartWayMergesWholeOnTheNextStart(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		switch db.Server.Engine {
 		case database.MySQL, database.MariaDB:
 		default:
-			t.Skip("data definition is transactional here, so an upgrade cannot stop part way")
+			t.Skip("data definition is transactional here, so the whole upgrade is undone with it")
 		}
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v080)
 		w := seedV080Images(t, ctx, db)
-		for _, stmt := range migrations.StatementsV090(db.Server.Engine)["image_version"] {
+		exec := func(stmt string) {
+			t.Helper()
 			if _, err := db.ExecContext(ctx, stmt); err != nil {
-				t.Fatalf("make what a stopped upgrade left: %v\n%s", err, stmt)
+				t.Fatalf("%v\n%s", err, stmt)
 			}
 		}
+		exec(`CREATE TRIGGER "stop_v090" BEFORE DELETE ON "component" FOR EACH ROW
+			SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'stopped part way'`)
+		if err := migrate.UpTo(ctx, db, quiet(), v090); err == nil {
+			t.Fatal("the upgrade went through a trigger refusing every removal")
+		}
+		var versions, stamps int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "image_version"`).Scan(ctx, &versions); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "component" WHERE "name" = 'docker-swss' AND "version" <> ''`).
+			Scan(ctx, &stamps); err != nil {
+			t.Fatal(err)
+		}
+		if versions != 0 || stamps != 2 {
+			t.Errorf("stopped part way, %d image versions and %d stamps of docker-swss remain; "+
+				"want none written and both stamps as they were", versions, stamps)
+		}
+		exec(`DROP TRIGGER "stop_v090"`)
 		dbtest.MigrateTo(t, db, v090)
 		imagesAreMergedV090(t, ctx, db, w)
 		leaveAtLatest(t, ctx, db)
