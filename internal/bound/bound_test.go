@@ -99,3 +99,28 @@ func TestABadByteEarlyOnDoesNotSwallowWhatFollowsIt(t *testing.T) {
 		t.Fatalf("the split character was not cut: %q", got)
 	}
 }
+
+func TestACutInsideAFourByteCharacterLeavesValidText(t *testing.T) {
+	// A four-byte character leaves three of its bytes behind a cut, which
+	// is the furthest the trim goes back.
+	text := strings.Repeat("😀", 10)
+	for most := 1; most <= len(text); most++ {
+		head := Head(text, most)
+		if !utf8.ValidString(head) || len(head) != most/4*4 {
+			t.Fatalf("Head(%d) = %q", most, head)
+		}
+		tail := Tail(text, most)
+		if !utf8.ValidString(tail) || len(tail) != most/4*4 {
+			t.Fatalf("Tail(%d) = %q", most, tail)
+		}
+	}
+}
+
+func TestACharacterBoundOfNoneKeepsNothing(t *testing.T) {
+	if got := HeadRunes("abc", 0); got != "" {
+		t.Fatalf("HeadRunes = %q", got)
+	}
+	if got := HeadRunes("abc", -1); got != "" {
+		t.Fatalf("HeadRunes = %q", got)
+	}
+}
