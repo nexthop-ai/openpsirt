@@ -248,6 +248,7 @@ million edges between them.
 | Rule | Reason |
 |---|---|
 | The depth bound is why the document is walked rather than decoded | Decoding has no depth limit anyone can set, so a file nested far enough to exhaust the process would be discovered by running out of memory. Nesting is bounded everywhere, including inside the parts nothing reads |
+| A document of exactly the size bound is read | The reader asks for one byte past the bound before refusing, so the end of the file is told apart from more of it |
 | An oversized document is refused as oversized | Truncating it and letting the reader fail reports a malformed file, which sends whoever sees the message looking at their build instead of at the limit. This holds for a third party's VEX document as well, which was read to the limit and handed on: over-sized became malformed, and the digest recorded was over the part that fitted |
 | The component bound is charged where a component is read, not where one is recorded | Charged at the recording, the header pass — which records nothing — counted none of them, so a document putting its components inside the root component's own nested array was walked in full during a read that happens inside the upload request, with only the size bound saying how many there could be. The same document read whole was refused. A bound that holds on one of two paths through the same parser is a bound somebody routes around |
 | The header pass holds nothing it walked past | Charging the walk is what stops a document nobody could have meant; holding nothing is what keeps the pass cheap for the documents that are fine, and this pass runs inside the upload request, so what it holds is held per concurrent upload. It was charging and holding: the count was the fix and the retention was not |
@@ -506,6 +507,7 @@ stable build to build, so a change says the producer changed.
 | Two components sharing one identifier | Every edge naming it is ambiguous |
 | A build time nothing can read | The build time orders scans against each other |
 | Past any of the bounds | A broken or hostile file has to fail rather than exhaust the process |
+| Anything but whitespace after the top-level value, in an inventory, a suppression document or an advisory | Two documents written one after the other read as the first, and an inventory missing what the second held reads as a product that shrank |
 
 Reading is all or nothing. A partial inventory is indistinguishable from a
 product that shrank, and acting on one closes findings that are still somebody's

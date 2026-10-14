@@ -39,6 +39,9 @@ func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	if err := v.read(); err != nil {
 		return nil, refusal.Errorf("reading suppressions: %w", err)
 	}
+	if err := b.end(); err != nil {
+		return nil, refusal.Errorf("reading suppressions: %w", err)
+	}
 	// A document that fired both vocabularies is not either of them. Read as
 	// one, the other's statements would be dropped without a word while the
 	// upload reports success. The inventory side refuses the same and says

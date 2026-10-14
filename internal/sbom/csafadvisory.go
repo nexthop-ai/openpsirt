@@ -65,6 +65,9 @@ func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 			return b.skip()
 		}
 	})
+	if err == nil {
+		err = b.end()
+	}
 	if err != nil {
 		return Advisory{}, refusal.Errorf("reading an advisory: %w", err)
 	}
