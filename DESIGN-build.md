@@ -853,7 +853,8 @@ it (REQ-75).
 |---|---|
 | The base is where this branch left the branch it targets | `AUDIT_BASE` names that branch, `origin/main` unless set. CI fetches the whole history so the common commit is there to find |
 | An advisory is present when the base was already affected by it, and introduced otherwise | A bump that fixes one advisory and leaves another introduces nothing, so the automated security update for it stays green |
-| A Go finding is present when the version the base's `go.mod` requires, or its declared toolchain for the standard library, falls in the advisory's affected ranges | `go.mod` names every module a build uses, and each advisory govulncheck reports carries its ranges |
+| A Go finding is present when the version the base's `go.mod` requires falls in the advisory's affected ranges | `go.mod` names every module a build uses, and each advisory govulncheck reports carries its ranges |
+| A standard-library finding is present when the Go release the base's Dockerfile builds with falls in the advisory's affected ranges | That tag is the toolchain every workflow installs. `go.mod`'s `go` line is a floor below it and stands in only where the base's Dockerfile names no release |
 | An npm advisory is present when npm's audit of the base's lockfile names the same advisory against the same package | npm's range syntax is npm's to read. A package moved to another place in the tree, or bumped to a version still affected, was affected before |
 | Anything the base does not hold is introduced | A new dependency arrives with whatever is known against it |
 | A Go finding gates when a called function reaches it | The same line govulncheck draws on its own |

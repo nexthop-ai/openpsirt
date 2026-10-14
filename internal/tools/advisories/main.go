@@ -7,8 +7,10 @@
 // It reads a scanner's machine output: govulncheck's JSON stream for Go
 // modules, npm's audit report for what the interface installs. An advisory is
 // present when the base was already affected by it: the version the base's
-// go.mod requires falls in the advisory's affected ranges, or npm's audit of
-// the base's lockfile reports the same advisory against the same package.
+// go.mod requires, or for the standard library the Go release the base's
+// Dockerfile builds with, falls in the advisory's affected ranges, or npm's
+// audit of the base's lockfile reports the same advisory against the same
+// package.
 // Everything else is introduced — including an advisory the base was not
 // affected by at all, and one against a dependency the base does not have. A
 // bump that fixes one advisory and not another therefore introduces nothing,
@@ -35,6 +37,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -87,12 +90,26 @@ func split(found []advisory, affectedBefore func(advisory) bool) (introduced, pr
 }
 
 // stdlib is the name govulncheck gives the standard library, whose version is
-// the toolchain the module declares.
+// the Go release the image builds with.
 const stdlib = "stdlib"
 
+// golangTag reads the Go release from the Dockerfile's build stage, the one pin
+// every workflow installs the toolchain from.
+var golangTag = regexp.MustCompile(`(?m)^FROM golang:([0-9.]+)-`)
+
+// imageGo is the Go release a Dockerfile builds with, with the leading v, or
+// empty where it names none.
+func imageGo(dockerfile []byte) string {
+	if m := golangTag.FindSubmatch(dockerfile); m != nil {
+		return "v" + string(m[1])
+	}
+	return ""
+}
+
 // goVersions reads the versions a go.mod requires, and the toolchain it
-// declares as the standard library's. Versions are written as semver reads
-// them, with the leading v.
+// declares as the standard library's. The declared toolchain is a floor, so
+// it stands for the standard library only where no image names a release.
+// Versions are written as semver reads them, with the leading v.
 func goVersions(data []byte) (map[string]string, error) {
 	file, err := modfile.Parse("go.mod", data, nil)
 	if err != nil {
@@ -434,8 +451,9 @@ func report(kind, ref string, introduced, present []advisory) (string, bool) {
 // errFailed is a change failing, which the report has already explained.
 var errFailed = errors.New("introduced advisories")
 
-// checkGo scans the working tree and asks the base's go.mod about each
-// finding.
+// checkGo scans the working tree and asks the base about each finding: its
+// go.mod for modules, and its Dockerfile's Go release for the standard
+// library.
 func checkGo(root string, command []string, commit string) ([]advisory, func(advisory) bool, error) {
 	out, err := scan("go", root, command)
 	if err != nil {
@@ -454,6 +472,13 @@ func checkGo(root string, command []string, commit string) ([]advisory, func(adv
 		if held, err = goVersions(was); err != nil {
 			return nil, nil, err
 		}
+	}
+	dockerfile, err := at(root, commit, "Dockerfile")
+	if err != nil {
+		return nil, nil, err
+	}
+	if image := imageGo(dockerfile); image != "" {
+		held[stdlib] = image
 	}
 	return found.found, goAffectedBefore(found, held), nil
 }

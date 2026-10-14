@@ -143,3 +143,35 @@ func TestTheNpmHalfRefusesAnEmptyLockfile(t *testing.T) {
 		t.Errorf("a lockfile of no packages read as a scan: %v", err)
 	}
 }
+
+// stdlibStream is govulncheck's output for a standard-library advisory fixed
+// in Go 1.27.4.
+const stdlibStream = `{"config":{"scanner_name":"govulncheck"}}
+{"SBOM":{"modules":[{"path":"stdlib","version":"v1.27.3"}]}}
+{"osv":{"id":"GO-STD","affected":[{"package":{"name":"stdlib"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"},{"fixed":"1.27.4"}]}]}]}}
+{"finding":{"osv":"GO-STD","trace":[{"module":"stdlib","version":"v1.27.3","function":"F"}]}}
+`
+
+func TestTheStandardLibraryIsTheReleaseTheBaseImageBuildsWith(t *testing.T) {
+	const mod = "module x\n\ngo 1.27.1\n"
+	for _, c := range []struct {
+		what, dockerfile string
+		introduced       bool
+	}{
+		{"a base image already fixed, which the change moves back", "FROM golang:1.27.4-alpine AS build\n", true},
+		{"a base image already affected", "FROM golang:1.27.3-alpine AS build\n", false},
+		{"a base naming no image, read from the go line", "", false},
+	} {
+		files := map[string]string{"go.mod": mod}
+		if c.dockerfile != "" {
+			files["Dockerfile"] = c.dockerfile
+		}
+		dir := repository(t, files)
+		write(t, dir, map[string]string{"stream.json": stdlibStream})
+		var out strings.Builder
+		err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+		if got := errors.Is(err, errFailed); got != c.introduced {
+			t.Errorf("%s: failed %v, want %v: %v\n%s", c.what, got, c.introduced, err, out.String())
+		}
+	}
+}
