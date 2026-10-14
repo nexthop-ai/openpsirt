@@ -40,10 +40,44 @@ var onTable = regexp.MustCompile(`(?i)\bON\s+([A-Za-z_][A-Za-z0-9_]*)`)
 // notATable is what follows ON in a clause that names no table.
 var notATable = map[string]bool{"DELETE": true, "UPDATE": true, "CONFLICT": true}
 
+// readable is the two kinds of statement the patterns above read: a table and
+// an index.
+var readable = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:TABLE|(?:UNIQUE\s+)?INDEX)\s`)
+
+// expression opens a condition, whose names the patterns above cannot tell
+// from the words around them.
+var expression = regexp.MustCompile(`(?i)\bCHECK\s*\(`)
+
+// unreadable says why a statement is one the patterns above cannot read, or
+// nothing where they can.
+//
+// The patterns find a name after a keyword that always precedes one, or where a
+// column belongs in a declaration's outermost parentheses. A view or a trigger
+// names tables after words that also precede other things, a condition names
+// columns between operators, and a partial index puts one after the column
+// list. Each is refused rather than reported clean, so the first migration to
+// write one extends the sweep before it lands.
+func unreadable(statement string) string {
+	switch {
+	case !readable.MatchString(statement):
+		return "a kind of statement this does not read"
+	case expression.MatchString(statement):
+		return "a condition, whose names this does not read"
+	}
+	if shut := strings.LastIndex(statement, ")"); shut >= 0 && strings.TrimSpace(statement[shut+1:]) != "" {
+		return "a clause after the column list, which this does not read"
+	}
+	return ""
+}
+
 // bareIn is every identifier a statement writes bare, as the words that say
-// where: the keyword before it, or the column it declares.
+// where: the keyword before it, or the column it declares. A statement the
+// sweep cannot read is reported as that.
 func bareIn(statement string) []string {
 	bare := withoutComments(statement)
+	if why := unreadable(bare); why != "" {
+		return []string{why}
+	}
 	var found []string
 	for _, m := range bareAfter.FindAllStringSubmatch(bare, -1) {
 		found = append(found, strings.ToUpper(m[1])+" "+m[2])
@@ -73,7 +107,15 @@ func TestABareNameIsFoundWhereverTheSchemaWritesOne(t *testing.T) {
 		{`CREATE INDEX "finding_idx" ON "finding" (a)`, true},
 		{`CREATE TABLE "finding" ("a" INTEGER REFERENCES product ("id") ON DELETE CASCADE)`, true},
 		{`CREATE INDEX "finding_idx" ON "finding" ("a")`, false},
+		{`CREATE UNIQUE INDEX "finding_idx" ON "finding" ("a", "b")`, false},
 		{`CREATE TABLE "finding" ("a" INTEGER REFERENCES "product" ("id") ON DELETE CASCADE ON UPDATE CASCADE)`, false},
+		// Kinds the patterns cannot read, refused whether or not a name in
+		// them is bare.
+		{`CREATE TABLE "finding" ("a" TEXT, CHECK ("a" = 'x' OR state IS NULL))`, true},
+		{`CREATE TABLE "finding" ("a" TEXT, CHECK ("a" = 'x'))`, true},
+		{`CREATE INDEX "finding_idx" ON "finding" ("a") WHERE closed_at IS NULL`, true},
+		{`CREATE VIEW "open" AS SELECT "a" FROM finding`, true},
+		{`CREATE TRIGGER "t" AFTER INSERT ON "finding" BEGIN UPDATE product SET "a" = 1; END`, true},
 	} {
 		if got := len(bareIn(c.statement)) > 0; got != c.bare {
 			t.Errorf("%s: reported bare = %v (%v), want %v", c.statement, got, bareIn(c.statement), c.bare)

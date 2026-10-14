@@ -4,6 +4,7 @@
 package migrations_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -16,15 +17,27 @@ import (
 // v070 is the migration v0.7.0 carries v0.6.0's schema across with.
 const v070 = 41
 
-// A v0.6.0 database is upgraded. Its findings gain the record lines and the
-// statement answering them, its runs the snapshot, and its statements the
-// product their component ships inside, holding none.
+// A v0.6.0 database holding a finding, a run, a statement and a claim is
+// upgraded. Each row is carried across, its finding gaining the record lines
+// and the statement answering it, its run the snapshot, and its statement and
+// claim the product their component ships inside, each holding none.
 func TestAV060DatabaseUpgradesToV070(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v060)
+		seedV060(t, db)
 		dbtest.MigrateTo(t, db, v070)
+
+		for _, table := range []string{"finding", "scan_run", "vex_statement", "suppression"} {
+			var rows int
+			if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "`+table+`"`).Scan(ctx, &rows); err != nil {
+				t.Fatal(err)
+			}
+			if rows != 1 {
+				t.Errorf("%s holds %d rows after the upgrade, want the one written before it", table, rows)
+			}
+		}
 
 		var findings, runs int
 		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "finding" WHERE "unaffected_by" IS NOT NULL`).
@@ -148,4 +161,50 @@ func TestASupplierIsReadAgainAfterTheUpgrade(t *testing.T) {
 			t.Errorf("%d suppliers kept how far they had read", held)
 		}
 	})
+}
+
+// seedV060 writes one finding, run, statement and claim at v0.6.0's schema,
+// with every column it requires and nothing else.
+func seedV060(t *testing.T, db *database.DB) {
+	t.Helper()
+	ctx := t.Context()
+	w, err := world.Declare(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	hash := func(c byte) string { return strings.Repeat(string(c), 64) }
+	idOf := func(table, column, value string) int64 {
+		var id int64
+		if err := db.DB.NewRaw(`SELECT "id" FROM "`+table+`" WHERE "`+column+`" = ?`, value).
+			Scan(ctx, &id); err != nil {
+			t.Fatalf("read back the %s just written: %v", table, err)
+		}
+		return id
+	}
+	write := func(what, statement string, args ...any) {
+		if _, err := db.DB.NewRaw(statement, args...).Exec(ctx); err != nil {
+			t.Fatalf("write a %s at v0.6.0: %v", what, err)
+		}
+	}
+	write("vulnerability", `INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited",
+		"first_seen_at", "issue_id") VALUES ('CVE-2026-0001', 'cve-2026-0001', ?, ?, 1)`, false, now)
+	write("component", `INSERT INTO "component" ("identity", "name", "version", "fold_key", "first_seen_at")
+		VALUES (?, 'zlib', '1.3', ?, ?)`, hash('a'), hash('b'), now)
+	write("scan", `INSERT INTO "scan" ("target_id", "content_hash", "built_at", "received_at",
+		"parser_version", "status") VALUES (?, ?, ?, ?, '1', 'done')`, w.Target.ID, hash('c'), now, now)
+	write("scan run", `INSERT INTO "scan_run" ("target_id", "scanner", "ran_here", "started_at")
+		VALUES (?, 'grype', ?, ?)`, w.Target.ID, true, now)
+	write("claim", `INSERT INTO "suppression" ("target_id", "identity", "vulnerability", "status",
+		"origin", "opened_scan_id") VALUES (?, ?, 'CVE-2026-0001', 'not_affected', 'vex', ?)`,
+		w.Target.ID, hash('d'), idOf("scan", "content_hash", hash('c')))
+	write("statement", `INSERT INTO "vex_statement" ("product_id", "publisher", "source", "document_id",
+		"vulnerability", "component", "about", "status", "document", "digest", "uploaded_by", "uploaded_at")
+		VALUES (?, 'acme', 'upload', 'doc-1', 'CVE-2026-0001', 'pkg:generic/zlib@1.3', 'pkg:generic/zlib@1.3',
+		'not_affected', '{}', ?, ?, ?)`, w.Product.ID, hash('e'), w.Person.ID, now)
+	write("finding", `INSERT INTO "finding" ("target_id", "kind", "visibility", "vulnerability_id",
+		"component_id", "place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
+		"urgency_shipped", "last_changed_at", "opened_at") VALUES (?, 'scanned', 'internal', ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+		w.Target.ID, idOf("vulnerability", "identifier_folded", "cve-2026-0001"),
+		idOf("component", "identity", hash('a')), hash('f'), false, false, true, now, now)
 }

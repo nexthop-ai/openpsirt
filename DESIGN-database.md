@@ -104,7 +104,7 @@ Engine-specific code is confined to these places:
 | Reading a table's layout beside a measurement | PostgreSQL keeps a table's pages and each column's correlation in catalogs of its own. MySQL and MariaDB report a table's size through the information schema, in bytes of a page size each server sets |
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and the servers keep their own. § SQLite settings has the measurement |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
-| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
+| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops a uniqueness rule as a constraint where MySQL and MariaDB drop the index of that name, MySQL and MariaDB name the table an index is dropped from, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
@@ -233,6 +233,16 @@ again. `pg_class` is readable by any role. MySQL and MariaDB offer no
 unfiltered catalog, so on those two the two cases stay indistinguishable —
 bounded by what runs next, which is the version query or a migration, both of
 which fail with the engine's own permission message rather than silently.
+
+On PostgreSQL the name is resolved through the session's search path, the way
+the migration library's own unqualified reference to the table resolves.
+A runtime role with a schema of its own has the default search path put that
+schema first, and the migrations' table sits in `public` further along. A probe
+matching the current schema alone answers version zero there for a database the
+library reads as migrated, and a database ahead of the binary passes the
+refusal above. Resolving a name needs the
+right to use its schema and nothing on the table, so the answer still tells an
+absent table from an unreadable one.
 
 Migrations are written in Go rather than SQL files, because they branch on the
 engine. A timestamp column has no portable spelling: PostgreSQL has no
@@ -606,7 +616,11 @@ A migration that changes a table's shape on SQLite turns foreign keys off on a
 connection and then opens its transaction. On a wider pool the transaction can
 land on a connection where they are still on, and the connection they were
 turned off on goes back into the pool that way. So the pool is narrowed to one
-connection for the migration and put back as it was afterwards.
+connection for the migration and put back as it was afterwards. A pool of one
+still closes a connection past its lifetime as it comes back, so a release's
+upgrade holds one connection for the setting, the transaction and the restore.
+Every reference is checked before that transaction commits, and a row pointing
+at nothing refuses the upgrade.
 
 Assuming one process instead is enforced by one chart template, while the
 binary accepts a SQLite URL with a warning. Four processes against one file
@@ -629,6 +643,14 @@ than assumed, because both engines report "you did not hold this" as a value.
 The wait is bounded on both engines. An unbounded wait means an instance wedged
 mid-migration blocks every replacement silently, and the startup probe kills each
 in turn.
+
+Any account that can connect may take the lock. A named lock on MySQL and
+MariaDB needs no privilege and is shared by every database on the server, and a
+PostgreSQL advisory lock has no permissions. A refusal after the wait names the
+session holding it: the connection number on MySQL and MariaDB, and on
+PostgreSQL the server process with its user and application where the role may
+see them. An operator told only that another instance holds it looks for a
+replica that may not exist.
 
 | Rule | |
 |---|---|
@@ -711,6 +733,13 @@ reserved yet passes — and MySQL 8.0 reserved `rank`, `groups`, `lead` and
 property than the rule it is meant to enforce. A quoted name does not match the
 pattern at all, so every hit is by construction an unquoted one and the fix is
 one pair of quotes.
+
+The schema sweep reads a table's and an index's declaration: a name after a
+keyword that always precedes one, and a name where a column belongs in the
+outermost parentheses. A statement of any other kind, a condition, and a clause
+after an index's column list are refused as unreadable rather than reported
+clean, so the first migration to write a view, a trigger, a check or a partial
+index extends the sweep with it.
 
 The list of reserved words stays, for the other half. A name a migration
 declares is not invented — every engine accepted it when the migration ran —
@@ -1142,6 +1171,13 @@ operator ends up with. It runs on SQLite alone — the one place in this suite
 where that is deliberate rather than a compromise, since the engines do not
 disagree about which columns an index is on, and reading index metadata is
 spelled four different ways.
+
+| Pair | Reported |
+|---|---|
+| A narrower index leading a wider one | Yes |
+| A narrower unique index leading a wider one that is not unique | No: dropping it loses the rule it enforces |
+| Either index partial | No: it holds only the rows a condition admits |
+| A column that is an expression | Read as a column no other index's column equals |
 
 The indexes on the finding, decision and notification tables that serve the hottest reads:
 

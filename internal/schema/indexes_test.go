@@ -5,6 +5,8 @@ package schema_test
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -50,18 +52,15 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 				read++
 			}
 			seen += len(indexes)
-			for name, columns := range indexes {
-				for other, wider := range indexes {
-					if name == other {
-						continue
-					}
-					if !leads(columns, wider) {
+			for name, narrow := range indexes {
+				for other, wide := range indexes {
+					if name == other || !redundant(narrow, wide) {
 						continue
 					}
 					t.Errorf("%s.%s is (%s), which %s (%s) already answers — "+
 						"the wider one serves every lookup the narrower one does",
-						table, name, strings.Join(columns, ", "),
-						other, strings.Join(wider, ", "))
+						table, name, strings.Join(narrow.columns, ", "),
+						other, strings.Join(wide.columns, ", "))
 				}
 			}
 		}
@@ -77,56 +76,134 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 	})
 }
 
-// indexesOn is every index on one table, by name, with its columns in order.
+// index is one index's columns in order, whether it refuses a duplicate, and
+// whether it covers only the rows a condition admits.
+type index struct {
+	columns []string
+	unique  bool
+	partial bool
+}
+
+// redundant reports whether a wider index answers every lookup a narrower one
+// does and leaves nothing it enforces unenforced.
+//
+// A narrower index that refuses duplicates enforces something a wider one that
+// does not cannot, so dropping it loses a rule rather than a cost. A partial
+// index holds only some rows, so neither of a pair answers for the other.
+func redundant(narrow, wide index) bool {
+	if narrow.partial || wide.partial {
+		return false
+	}
+	if narrow.unique && !wide.unique {
+		return false
+	}
+	return leads(narrow.columns, wide.columns)
+}
+
+// indexesOn is every index on one table, by name.
 //
 // Constraints included: a unique constraint is an index, and the redundancy
 // this looks for is usually a hand-written index repeating the front of one.
-func indexesOn(t *testing.T, ctx context.Context, db *database.DB, table string) map[string][]string {
+func indexesOn(t *testing.T, ctx context.Context, db *database.DB, table string) map[string]index {
 	t.Helper()
-	rows, err := db.QueryContext(ctx, `SELECT name FROM pragma_index_list(?)`, table)
+	rows, err := db.QueryContext(ctx, `SELECT "name", "unique", "partial" FROM pragma_index_list(?)`, table)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = rows.Close() }()
-	var names []string
+	listed := map[string]index{}
 	for rows.Next() {
 		var name string
-		if err := rows.Scan(&name); err != nil {
+		var unique, partial bool
+		if err := rows.Scan(&name, &unique, &partial); err != nil {
 			t.Fatal(err)
 		}
-		names = append(names, name)
+		listed[name] = index{unique: unique, partial: partial}
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
 
-	indexes := make(map[string][]string, len(names))
-	for _, name := range names {
+	for name, held := range listed {
 		columns, err := columnsOf(ctx, db, name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		indexes[name] = columns
+		held.columns = columns
+		listed[name] = held
 	}
-	return indexes
+	return listed
 }
 
+// columnsOf is an index's columns in order. A column that is an expression
+// has no name, and is written as one no other index's column can equal.
 func columnsOf(ctx context.Context, db *database.DB, index string) ([]string, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT name FROM pragma_index_info(?) ORDER BY seqno`, index)
+		`SELECT "seqno", "name" FROM pragma_index_info(?) ORDER BY "seqno"`, index)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	var columns []string
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var seqno int
+		var name sql.NullString
+		if err := rows.Scan(&seqno, &name); err != nil {
 			return nil, err
 		}
-		columns = append(columns, name)
+		if !name.Valid {
+			name.String = fmt.Sprintf("<expression %d of %s>", seqno, index)
+		}
+		columns = append(columns, name.String)
 	}
 	return columns, rows.Err()
+}
+
+// A narrower index is reported only where a wider one answers its lookups and
+// enforces what it enforces.
+func TestAnIndexIsRedundantOnlyWhereNothingItEnforcesIsLost(t *testing.T) {
+	ab := []string{"a", "b"}
+	for _, c := range []struct {
+		what         string
+		narrow, wide index
+		redundant    bool
+	}{
+		{"a plain prefix", index{columns: ab[:1]}, index{columns: ab}, true},
+		{"a unique prefix of a unique index", index{columns: ab[:1], unique: true}, index{columns: ab, unique: true}, true},
+		{"a unique prefix of a plain index", index{columns: ab[:1], unique: true}, index{columns: ab}, false},
+		{"a plain index repeating a unique one", index{columns: ab}, index{columns: ab, unique: true}, true},
+		{"a partial prefix", index{columns: ab[:1], partial: true}, index{columns: ab}, false},
+		{"a prefix of a partial index", index{columns: ab[:1]}, index{columns: ab, partial: true}, false},
+		{"another leading column", index{columns: []string{"b"}}, index{columns: ab}, false},
+	} {
+		if got := redundant(c.narrow, c.wide); got != c.redundant {
+			t.Errorf("%s: reported redundant %v, want %v", c.what, got, c.redundant)
+		}
+	}
+}
+
+// An index on an expression is read, and its expression matches no column.
+func TestAnIndexOnAnExpressionIsRead(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		for _, stmt := range []string{
+			`CREATE TABLE "probe" ("name" TEXT, "kind" TEXT)`,
+			`CREATE INDEX "probe_lower_idx" ON "probe" (LOWER("name"), "kind")`,
+			`CREATE INDEX "probe_name_idx" ON "probe" ("name")`,
+		} {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatal(err)
+			}
+		}
+		indexes := indexesOn(t, ctx, db, "probe")
+		lower := indexes["probe_lower_idx"]
+		if len(lower.columns) != 2 || lower.columns[1] != "kind" {
+			t.Fatalf("the expression index reads as %v", lower.columns)
+		}
+		if redundant(indexes["probe_name_idx"], lower) {
+			t.Error("a column was answered by an expression over it")
+		}
+	})
 }
 
 // leads reports whether one column list is answered by another: the same

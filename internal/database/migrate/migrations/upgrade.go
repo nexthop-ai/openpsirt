@@ -32,30 +32,41 @@ import (
 // SQLite changes a table's shape by building a replacement and dropping the
 // original, which is refused while foreign keys are enforced and a table
 // points at it. The setting is ignored inside a transaction, so it is made
-// before one begins, on the one connection SQLite is held to, and every
-// reference is checked before the transaction commits.
+// before one begins, and every reference is checked before the transaction
+// commits. The setting belongs to a connection, so the setting, the
+// transaction and the restore all run on one connection held for the whole
+// of it. A pool of one is not enough: the pool closes a connection past its
+// lifetime as it comes back, and the transaction then opens on a fresh one
+// with foreign keys enforced.
 func inV020(ctx context.Context, sqldb *sql.DB, run func(context.Context, bun.Tx) error) (err error) {
 	engine := migrate.EngineFrom(ctx)
 	db, err := database.Query(sqldb, engine)
 	if err != nil {
 		return err
 	}
-	if engine == database.SQLite {
-		if _, err := sqldb.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
-			return fmt.Errorf("suspend foreign keys: %w", err)
-		}
-		defer func() {
-			if _, restore := sqldb.ExecContext(context.WithoutCancel(ctx), `PRAGMA foreign_keys = ON`); restore != nil && err == nil {
-				err = fmt.Errorf("restore foreign keys: %w", restore)
-			}
-		}()
-	}
-	return db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	body := func(ctx context.Context, tx bun.Tx) error {
 		if err := run(ctx, tx); err != nil {
 			return err
 		}
 		return foreignKeysHold(ctx, engine, tx)
-	})
+	}
+	if engine != database.SQLite {
+		return db.RunInTx(ctx, nil, body)
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("hold a connection for the upgrade: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return fmt.Errorf("suspend foreign keys: %w", err)
+	}
+	defer func() {
+		if _, restore := conn.ExecContext(context.WithoutCancel(ctx), `PRAGMA foreign_keys = ON`); restore != nil && err == nil {
+			err = fmt.Errorf("restore foreign keys: %w", restore)
+		}
+	}()
+	return conn.RunInTx(ctx, nil, body)
 }
 
 // foreignKeysHold checks every reference SQLite did not enforce while the
@@ -114,17 +125,13 @@ type change struct {
 	// add is the columns it gains, declared as the release declares
 	// them.
 	add []added
-	// relax is the columns that stop refusing a null.
-	relax []string
 	// drop is the columns the release no longer declares. Whatever a column
 	// held is moved before the change, which removes it.
 	drop []string
 	// then runs once every column is in place and before any constraint is.
 	then func() error
-	// constraints and indexes are named as the release names them. An
-	// index of that name the table already has is replaced.
+	// constraints is named as the release names them.
 	constraints []string
-	indexes     []string
 }
 
 // addsOnly is a change SQLite can make where the table stands: columns that
@@ -135,8 +142,7 @@ func (c change) addsOnly() bool {
 			return false
 		}
 	}
-	return len(c.relax) == 0 && len(c.drop) == 0 && len(c.constraints) == 0 && len(c.indexes) == 0 &&
-		c.then == nil
+	return len(c.drop) == 0 && len(c.constraints) == 0 && c.then == nil
 }
 
 // added is one column, and the value existing rows take in it. No fill is a
@@ -190,18 +196,6 @@ func (u *upgrader) change(statements []string, c change) error {
 			`ALTER TABLE "`+c.table+`" ADD COLUMN `+def+` DEFAULT `+fill,
 			`ALTER TABLE "`+c.table+`" ALTER COLUMN "`+a.column+`" DROP DEFAULT`)
 	}
-	for _, column := range c.relax {
-		def, err := items.column(column)
-		if err != nil {
-			return err
-		}
-		switch u.engine {
-		case database.Postgres:
-			stmts = append(stmts, `ALTER TABLE "`+c.table+`" ALTER COLUMN "`+column+`" DROP NOT NULL`)
-		default:
-			stmts = append(stmts, `ALTER TABLE "`+c.table+`" MODIFY COLUMN `+def)
-		}
-	}
 	for _, column := range c.drop {
 		stmts = append(stmts, `ALTER TABLE "`+c.table+`" DROP COLUMN "`+column+`"`)
 	}
@@ -221,20 +215,6 @@ func (u *upgrader) change(statements []string, c change) error {
 			return err
 		}
 		stmts = append(stmts, `ALTER TABLE "`+c.table+`" ADD `+def)
-	}
-	for _, name := range c.indexes {
-		stmt, err := indexNamed(indexes, name)
-		if err != nil {
-			return err
-		}
-		if replaced, err := u.hasIndex(c.table, name); err != nil {
-			return err
-		} else if replaced {
-			if err := dropIndex(u.ctx, u.raw, c.table, name); err != nil {
-				return err
-			}
-		}
-		stmts = append(stmts, stmt)
 	}
 	return u.run(stmts)
 }

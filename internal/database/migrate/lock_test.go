@@ -87,10 +87,19 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 			}
 
 			// The whole point: while one holds it, another must not get it.
+			// And the refusal names the session in the way, because any
+			// account that can connect may take the lock and an operator
+			// told "another instance" looks for a replica.
 			if release2, err := acquire(ctx, second); err == nil {
 				_ = release2(ctx)
 				_ = release(ctx)
 				t.Fatal("a second instance took the migration lock while it was held")
+			} else if want := map[database.Engine]string{
+				database.Postgres: "by server process ",
+				database.MySQL:    "by connection ",
+				database.MariaDB:  "by connection ",
+			}[name]; !strings.Contains(err.Error(), want) {
+				t.Errorf("the refusal does not name the holder: %v", err)
 			}
 
 			if err := release(ctx); err != nil {
@@ -149,37 +158,52 @@ func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 	}
 }
 
+// The catalog probe answers absent for a table that is not there, present for
+// one that is, and a failure for a database it cannot reach, on every engine.
+// Absent is what a fresh database is, and a failure read as absent is a
+// populated database told to migrate.
 func TestAnUnreadableVersionIsNotAnEmptyDatabase(t *testing.T) {
-	// "The table is not there", "this credential may not read it" and "the
-	// database is unreachable" arrived as one error and read as the first, so
-	// a fully populated database whose credentials omitted that one table
-	// reported version 0 — and the reasonable thing to do about "nothing is
-	// applied" is to migrate it.
-	//
-	// The catalog is asked now, which answers only the question being asked.
-	engines.SkipUnless(t, database.Postgres)
-	address := os.Getenv(postgresURLEnv)
-	if address == "" {
-		t.Skipf("%s is not set", postgresURLEnv)
-	}
-	db := open(t, address)
-	ctx := context.Background()
+	for name, env := range map[database.Engine]string{
+		database.Postgres: postgresURLEnv,
+		database.MySQL:    mysqlURLEnv,
+		database.MariaDB:  mariadbURLEnv,
+		database.SQLite:   "",
+	} {
+		t.Run(string(name), func(t *testing.T) {
+			engines.SkipUnless(t, name)
+			address := "sqlite://" + t.TempDir() + "/probe.db"
+			if env != "" {
+				if address = os.Getenv(env); address == "" {
+					t.Skipf("%s is not set", env)
+				}
+			}
+			db := open(t, address)
+			ctx := context.Background()
 
-	// A database with no bookkeeping table reads as "not migrated", which is
-	// the answer that has to keep working — it is what a fresh database is.
-	there, err := versionTableExists(ctx, db)
-	if err != nil {
-		t.Fatalf("probing a reachable database reported a failure: %v", err)
-	}
-	t.Logf("the version table is there: %v", there)
+			probe := fmt.Sprintf("probe_present_%d", time.Now().UnixNano())
+			t.Cleanup(func() { _, _ = db.ExecContext(context.WithoutCancel(ctx), `DROP TABLE IF EXISTS "`+probe+`"`) })
+			there, err := tableExists(ctx, db, probe)
+			if err != nil {
+				t.Fatalf("probing a reachable database reported a failure: %v", err)
+			}
+			if there {
+				t.Error("a table nobody made was reported present")
+			}
+			if _, err := db.ExecContext(ctx, `CREATE TABLE "`+probe+`" ("id" INTEGER)`); err != nil {
+				t.Fatal(err)
+			}
+			if there, err := tableExists(ctx, db, probe); err != nil || !there {
+				t.Errorf("a table just made was reported present %v, failing %v", there, err)
+			}
 
-	// And one that cannot be reached at all reports that, rather than zero.
-	closed := open(t, address)
-	if err := closed.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
-	if _, err := versionTableExists(ctx, closed); err == nil {
-		t.Error("a database that could not be read reported that the version table is simply absent")
+			closed := open(t, address)
+			if err := closed.Close(); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+			if _, err := tableExists(ctx, closed, probe); err == nil {
+				t.Error("a database that could not be read reported that the table is simply absent")
+			}
+		})
 	}
 }
 
@@ -213,6 +237,7 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 		clean := context.WithoutCancel(ctx)
 		for _, stmt := range []string{
 			`DROP TABLE IF EXISTS "` + probe + `"`,
+			`DROP SCHEMA IF EXISTS "` + role + `" CASCADE`,
 			`REVOKE ALL ON SCHEMA "public" FROM "` + role + `"`,
 			`REVOKE ALL ON DATABASE ` + quoted + ` FROM "` + role + `"`,
 			`DROP ROLE IF EXISTS "` + role + `"`,
@@ -225,6 +250,11 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 		`CREATE ROLE "` + role + `" LOGIN PASSWORD 'probe'`,
 		`GRANT CONNECT ON DATABASE ` + quoted + ` TO "` + role + `"`,
 		`GRANT USAGE ON SCHEMA "public" TO "` + role + `"`,
+		// A schema of the role's own, which the default search path puts
+		// ahead of public, so its current schema is not the one the table
+		// is in. The migration library's unqualified reference still
+		// resolves to public, and so does the probe.
+		`CREATE SCHEMA "` + role + `" AUTHORIZATION "` + role + `"`,
 	} {
 		if _, err := owner.ExecContext(ctx, stmt); err != nil {
 			t.Skipf("this server will not let the test arrange a restricted role (%v)", err)
@@ -255,16 +285,23 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
+	var current string
+	if err := restricted.QueryRowContext(ctx, `SELECT CURRENT_SCHEMA()`).Scan(&current); err != nil {
+		t.Fatal(err)
+	}
+	if current != role {
+		t.Errorf("the role's current schema is %q, so the arrangement under test is not the one made", current)
+	}
 	var seen int
 	if err := restricted.QueryRowContext(ctx, query, probe).Scan(&seen); err != nil {
-		t.Fatalf("a credential that may not read a table could not see it in the catalog either: %v", err)
+		t.Fatalf("a credential that may not read a table, with a schema of its own, could not see it in the catalog: %v", err)
 	}
 
 	// And the information schema is what that would have looked like.
 	var filtered int
 	if err := restricted.QueryRowContext(ctx,
 		`SELECT 1 FROM "information_schema"."tables"
-		 WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ?`, probe).Scan(&filtered); err == nil {
+		 WHERE "table_schema" = 'public' AND "table_name" = ?`, probe).Scan(&filtered); err == nil {
 		t.Error("the information schema is not privilege-filtered here, so the reason for pg_class no longer holds")
 	}
 	t.Logf("unreadable by this role (%v), present in pg_class, absent from the information schema", readErr)
@@ -512,4 +549,92 @@ func TestSQLiteMigratesOnOneConnectionAndGetsItsPoolBack(t *testing.T) {
 	if idle := db.Stats().Idle; idle != held {
 		t.Errorf("%d of %d returned connections stayed open after migrating, want all of them", idle, held)
 	}
+}
+
+// A release reports whether the session still held the lock. One that did
+// not lost it part way, and another instance may have migrated alongside.
+func TestAReleaseReadsWhetherTheLockWasHeld(t *testing.T) {
+	one, zero := 1, 0
+	for _, c := range []struct {
+		what     string
+		released *int
+		held     bool
+	}{
+		{"held", &one, true},
+		{"held by another session", &zero, false},
+		{"held by nobody", nil, false},
+	} {
+		if err := heldWhenReleased(c.released); (err == nil) != c.held {
+			t.Errorf("%s: answered %v", c.what, err)
+		}
+	}
+}
+
+// A migration whose lock is lost part way fails, rather than reporting
+// success. The holder's session ends during the work — a server or an
+// intermediary killing an idle session, or a failover — and the server hands
+// the lock to whoever waits.
+func TestALockLostPartWayFailsTheMigration(t *testing.T) {
+	for name, env := range map[database.Engine]string{
+		database.Postgres: postgresURLEnv,
+		database.MySQL:    mysqlURLEnv,
+		database.MariaDB:  mariadbURLEnv,
+	} {
+		t.Run(string(name), func(t *testing.T) {
+			engines.SkipUnless(t, name)
+			address := os.Getenv(env)
+			if address == "" {
+				t.Skipf("%s is not set", env)
+			}
+			db := open(t, address)
+			killer := open(t, address)
+			ctx := t.Context()
+			quiet := slog.New(slog.DiscardHandler)
+
+			err := withLock(ctx, db, quiet, func(ctx context.Context) error {
+				return endHolder(ctx, killer)
+			})
+			if err == nil || !strings.Contains(err.Error(), "may have migrated at the same time") {
+				t.Errorf("a migration that lost its lock part way answered %v", err)
+			}
+		})
+	}
+}
+
+// endHolder ends the session holding the migration lock of the database a
+// handle is connected to, and only that session.
+func endHolder(ctx context.Context, killer *database.DB) error {
+	switch killer.Server.Engine {
+	case database.Postgres:
+		var pid int64
+		if err := killer.QueryRowContext(ctx, `SELECT "pid" FROM "pg_catalog"."pg_locks"
+			WHERE "locktype" = 'advisory' AND "granted" AND "pid" <> pg_backend_pid()
+			AND "database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
+			AND CAST("classid" AS BIGINT) = ? AND CAST("objid" AS BIGINT) = ? AND "objsubid" = 1`,
+			int64(lockID>>32), int64(lockID&0xffffffff)).Scan(&pid); err != nil {
+			return fmt.Errorf("find the holder: %w", err)
+		}
+		var ended bool
+		if err := killer.QueryRowContext(ctx, `SELECT pg_terminate_backend(?)`, pid).Scan(&ended); err != nil || !ended {
+			return fmt.Errorf("end the holder: %v %w", ended, err)
+		}
+	default:
+		conn, err := killer.DB.DB.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = conn.Close() }()
+		name, err := namedLock(ctx, conn)
+		if err != nil {
+			return err
+		}
+		var id sql.NullInt64
+		if err := conn.QueryRowContext(ctx, `SELECT IS_USED_LOCK(?)`, name).Scan(&id); err != nil || !id.Valid {
+			return fmt.Errorf("find the holder: %w", err)
+		}
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("KILL %d", id.Int64)); err != nil {
+			return fmt.Errorf("end the holder: %w", err)
+		}
+	}
+	return nil
 }

@@ -158,25 +158,23 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			return nil, fmt.Errorf("bound the migration lock wait: %w", err)
 		}
 		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", lockID); err != nil {
+			holder := holderOf(ctx, conn, db.Server.Engine, "")
 			closeConn()
-			return nil, fmt.Errorf("take migration lock: %w", err)
+			return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
 		}
 		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
 			stop()
 			defer closeConn()
-			// pg_advisory_unlock returns false when this session did not hold
+			// pg_advisory_unlock answers false when this session did not hold
 			// the lock. Executing it without reading the result would report
 			// success while leaking the lock.
-			var released bool
+			var released *int
 			if err := conn.QueryRowContext(ctx,
-				"SELECT pg_advisory_unlock($1)", lockID).Scan(&released); err != nil {
+				"SELECT CAST(pg_advisory_unlock($1) AS INTEGER)", lockID).Scan(&released); err != nil {
 				return fmt.Errorf("release migration lock: %w", err)
 			}
-			if !released {
-				return fmt.Errorf("migration lock was not held by this session when released")
-			}
-			return nil
+			return heldWhenReleased(released)
 		}, nil
 
 	case database.MySQL, database.MariaDB:
@@ -195,29 +193,85 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			return nil, fmt.Errorf("take migration lock: %w", err)
 		}
 		if granted == nil || *granted != 1 {
+			holder := holderOf(ctx, conn, db.Server.Engine, name)
 			closeConn()
-			return nil, fmt.Errorf("another instance holds the migration lock")
+			return nil, fmt.Errorf("the migration lock %q is held%s", name, holder)
 		}
 		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
 			stop()
 			defer closeConn()
-			// RELEASE_LOCK returns 0 when held by another session and NULL
+			// RELEASE_LOCK answers 0 when held by another session and NULL
 			// when no such lock exists. Neither is an error to the driver.
 			var released *int
 			if err := conn.QueryRowContext(ctx,
 				"SELECT RELEASE_LOCK(?)", name).Scan(&released); err != nil {
 				return fmt.Errorf("release migration lock: %w", err)
 			}
-			if released == nil || *released != 1 {
-				return fmt.Errorf("migration lock was not held by this session when released")
-			}
-			return nil
+			return heldWhenReleased(released)
 		}, nil
 	}
 
 	closeConn()
 	return nil, fmt.Errorf("no migration lock for %s", db.Server.Engine)
+}
+
+// heldWhenReleased reads what a release answered: one where this session held
+// the lock, and zero or nothing where it did not.
+//
+// A lock this session no longer holds is one it lost part way, and the server
+// may have handed it to another instance in between.
+func heldWhenReleased(released *int) error {
+	if released == nil || *released != 1 {
+		return fmt.Errorf("migration lock was not held by this session when released")
+	}
+	return nil
+}
+
+// holderOf names the session holding the migration lock, for a refusal to
+// wait any longer, or says nothing where the server will not tell.
+//
+// Any account that can connect may take the lock: a named lock on MySQL and
+// MariaDB needs no privilege and is shared by every database on the server,
+// and an advisory lock on PostgreSQL has no permissions at all. A refusal that
+// blames another instance sends an operator looking for a replica that may not
+// exist, so it names the connection instead.
+//
+// A role without the right to see other sessions sees no user or application
+// on PostgreSQL. The answer is then the process identifier alone.
+func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name string) string {
+	asking, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	defer cancel()
+	switch engine {
+	case database.Postgres:
+		var pid int64
+		var user, application sql.NullString
+		err := conn.QueryRowContext(asking, `SELECT "a"."pid", "a"."usename", "a"."application_name"
+			FROM "pg_catalog"."pg_locks" AS "l"
+			JOIN "pg_catalog"."pg_stat_activity" AS "a" ON "a"."pid" = "l"."pid"
+			WHERE "l"."locktype" = 'advisory' AND "l"."granted"
+			AND "l"."database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
+			AND CAST("l"."classid" AS BIGINT) = $1 AND CAST("l"."objid" AS BIGINT) = $2 AND "l"."objsubid" = 1`,
+			int64(lockID>>32), int64(lockID&0xffffffff)).Scan(&pid, &user, &application)
+		if err != nil {
+			return ""
+		}
+		held := fmt.Sprintf(" by server process %d", pid)
+		if user.String != "" {
+			held += fmt.Sprintf(", user %q", user.String)
+		}
+		if application.String != "" {
+			held += fmt.Sprintf(", application %q", application.String)
+		}
+		return held
+	case database.MySQL, database.MariaDB:
+		var id sql.NullInt64
+		if err := conn.QueryRowContext(asking, "SELECT IS_USED_LOCK(?)", name).Scan(&id); err != nil || !id.Valid {
+			return ""
+		}
+		return fmt.Sprintf(" by connection %d", id.Int64)
+	}
+	return ""
 }
 
 // versionTableExists reports whether the migration bookkeeping table is there.
@@ -250,12 +304,18 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // both of which fail with the engine's own permission message rather than
 // silently.
 func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
+	return tableExists(ctx, db, versionTable)
+}
+
+// tableExists reports whether the catalog holds a table of a given name, by
+// the name an unqualified reference to it resolves.
+func tableExists(ctx context.Context, db *database.DB, name string) (bool, error) {
 	query, err := catalogQuery(db.Server.Engine)
 	if err != nil {
 		return false, err
 	}
 	var probe int
-	switch err := db.QueryRowContext(ctx, query, versionTable).Scan(&probe); {
+	switch err := db.QueryRowContext(ctx, query, name).Scan(&probe); {
 	case database.IsNoRows(err):
 		return false, nil
 	case err != nil:
@@ -269,12 +329,18 @@ func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
 // A catalog is engine-specific by nature: three of the four have an
 // information schema, SQLite has a table of its own, and PostgreSQL is asked
 // somewhere else again for the reason above.
+//
+// On PostgreSQL the name is resolved through the session's whole search path,
+// the way the migration library's own unqualified reference resolves it. A
+// runtime role with a schema of its own has that schema as its current one,
+// and the table the migrations made sits in a schema further along the path.
+// Resolving a name needs only the right to use the schema it is found in, so
+// the answer is still not filtered by privilege on the table.
 func catalogQuery(engine database.Engine) (string, error) {
 	switch engine {
 	case database.Postgres:
-		return `SELECT 1 FROM "pg_catalog"."pg_class" AS "c"
-			JOIN "pg_catalog"."pg_namespace" AS "n" ON "n"."oid" = "c"."relnamespace"
-			WHERE "n"."nspname" = CURRENT_SCHEMA() AND "c"."relname" = ? AND "c"."relkind" = 'r'`, nil
+		return `SELECT 1 FROM "pg_catalog"."pg_class"
+			WHERE "oid" = to_regclass(CAST(? AS TEXT)) AND "relkind" = 'r'`, nil
 	case database.MySQL, database.MariaDB:
 		return `SELECT 1 FROM "information_schema"."TABLES"
 			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ?`, nil

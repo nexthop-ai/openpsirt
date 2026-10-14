@@ -26,6 +26,10 @@ import (
 // go stale. The file is left behind deliberately — removing it would race with
 // the next process opening it, and an empty file beside the database costs
 // nothing.
+// flock is the system call that takes the lock, a variable so a test can make it
+// fail the way a broken file system does.
+var flock = syscall.Flock
+
 func lockFile(ctx context.Context, path string, wait time.Duration) (unlock, error) {
 	file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -34,7 +38,7 @@ func lockFile(ctx context.Context, path string, wait time.Duration) (unlock, err
 
 	deadline := time.Now().Add(wait)
 	for {
-		err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		err := flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {
 			return func(context.Context) error {
 				// Closing the descriptor releases the lock; doing both says so.
