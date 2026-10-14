@@ -46,8 +46,9 @@ var hosts = []string{
 // releaseTag is how the List tags a release: the day and the hour.
 var releaseTag = regexp.MustCompile(`^cve_([0-9]{4}-[0-9]{2}-[0-9]{2})_[0-9]{4}Z$`)
 
-// largestArchive bounds the download: 622 MB on 2026-10-07.
-const largestArchive = 8 << 30
+// largestArchive bounds the download: 622 MB on 2026-10-07. A variable so a
+// test can lower it.
+var largestArchive int64 = 8 << 30
 
 // Fetcher keeps the snapshot in a directory current with the CVE List.
 type Fetcher struct {
@@ -247,7 +248,7 @@ func (f *Fetcher) download(ctx context.Context, address string) (string, error) 
 		err = closed
 	}
 	if err == nil && written > largestArchive {
-		err = fmt.Errorf("the CVE List archive is larger than %d bytes", int64(largestArchive))
+		err = tooLarge(fmt.Sprintf("the CVE List archive is larger than %d bytes", largestArchive))
 	}
 	if err != nil {
 		_ = os.Remove(target.Name())

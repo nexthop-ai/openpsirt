@@ -19,17 +19,22 @@ import (
 )
 
 // Bounds on reading the CVE List's archive. The archive is fetched from
-// outside, so what it holds is bounded before it is read.
-const (
+// outside, so what it holds is bounded before it is read. What it keeps is
+// bounded by what a snapshot holds, so a fetch fails before it replaces a
+// snapshot with one no scan could read.
+//
+// Variables so a test can lower them.
+var (
 	// mostMembers is far above the 402,541 records the List held on
-	// 2026-10-07.
+	// 2026-10-07. Counted from the archive's directory before the archive is
+	// opened, because opening it holds an entry in memory for every member.
 	mostMembers = 4_000_000
 	// largestRecord bounds one record's JSON. The largest on 2026-10-07 is a
 	// few hundred kilobytes.
-	largestRecord = 16 << 20
+	largestRecord uint64 = 16 << 20
 	// largestInner bounds the archive inside the published one, which is
 	// written to disk before it is read: 688 MB on 2026-10-07.
-	largestInner = 8 << 30
+	largestInner int64 = 8 << 30
 )
 
 // FromArchive reads the CVE List's published archive and keeps what can narrow
@@ -44,6 +49,9 @@ const (
 // The moment returned is the newest any record read was updated, withdrawn
 // and rejected ones included, which is what the snapshot describes.
 func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
+	if err := countMembers(archive); err != nil {
+		return nil, time.Time{}, fmt.Errorf("open the CVE List archive: %w", err)
+	}
 	outer, err := zip.OpenReader(archive)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("open the CVE List archive: %w", err)
@@ -59,6 +67,9 @@ func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
 			return nil, time.Time{}, err
 		}
 		defer func() { _ = os.Remove(inner) }()
+		if err := countMembers(inner); err != nil {
+			return nil, time.Time{}, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
+		}
 		held, err := zip.OpenReader(inner)
 		if err != nil {
 			return nil, time.Time{}, fmt.Errorf("open the archive inside the CVE List archive: %w", err)
@@ -71,8 +82,8 @@ func FromArchive(archive, scratch string) ([]Record, time.Time, error) {
 
 // unpack writes an archive member to scratch and names the file.
 func unpack(member *zip.File, scratch string) (string, error) {
-	if member.UncompressedSize64 > largestInner {
-		return "", fmt.Errorf("the archive inside the CVE List archive is larger than %d bytes", int64(largestInner))
+	if member.UncompressedSize64 > uint64(largestInner) { //nolint:gosec // G115: a positive bound
+		return "", tooLarge(fmt.Sprintf("the archive inside the CVE List archive is larger than %d bytes", largestInner))
 	}
 	source, err := member.Open()
 	if err != nil {
@@ -88,7 +99,7 @@ func unpack(member *zip.File, scratch string) (string, error) {
 		err = closed
 	}
 	if err == nil && written > largestInner {
-		err = fmt.Errorf("the archive inside the CVE List archive is larger than %d bytes", int64(largestInner))
+		err = tooLarge(fmt.Sprintf("the archive inside the CVE List archive is larger than %d bytes", largestInner))
 	}
 	if err != nil {
 		_ = os.Remove(target.Name())
@@ -130,9 +141,10 @@ type container struct {
 // that can narrow a match, in identifier order.
 func records(members []*zip.File) ([]Record, time.Time, error) {
 	if len(members) > mostMembers {
-		return nil, time.Time{}, fmt.Errorf("the CVE List archive holds more than %d files", mostMembers)
+		return nil, time.Time{}, tooLarge(fmt.Sprintf("the CVE List archive holds more than %d files", mostMembers))
 	}
 	var kept []Record
+	var count sized
 	var taken time.Time
 	read := 0
 	for _, member := range members {
@@ -152,6 +164,15 @@ func records(members []*zip.File) ([]Record, time.Time, error) {
 			taken = updated
 		}
 		if keep {
+			// Counted as the snapshot will write it, so what is kept in
+			// memory is bounded by what a snapshot holds.
+			line, err := json.Marshal(&record)
+			if err != nil {
+				return nil, time.Time{}, fmt.Errorf("read %s from the CVE List archive: %w", name, err)
+			}
+			if err := count.add(record.ID, len(line)+1); err != nil {
+				return nil, time.Time{}, err
+			}
 			kept = append(kept, record)
 		}
 	}
@@ -165,7 +186,7 @@ func records(members []*zip.File) ([]Record, time.Time, error) {
 // readRecord reads one record, and says whether it is one to keep.
 func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 	if member.UncompressedSize64 > largestRecord {
-		return Record{}, time.Time{}, false, fmt.Errorf("larger than %d bytes", largestRecord)
+		return Record{}, time.Time{}, false, tooLarge(fmt.Sprintf("larger than %d bytes", largestRecord))
 	}
 	opened, err := member.Open()
 	if err != nil {
@@ -173,7 +194,8 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 	}
 	defer opened.Close()
 	var doc published
-	if err := json.NewDecoder(io.LimitReader(opened, largestRecord)).Decode(&doc); err != nil {
+	//nolint:gosec // G115: a positive bound far below the largest int64
+	if err := json.NewDecoder(io.LimitReader(opened, int64(largestRecord))).Decode(&doc); err != nil {
 		return Record{}, time.Time{}, false, err
 	}
 	if !strings.EqualFold(doc.Metadata.State, "PUBLISHED") {
