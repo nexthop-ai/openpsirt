@@ -51,6 +51,9 @@ type publisher struct {
 	inward map[string]bool
 	// asking runs as each path is asked for, before it is answered.
 	asking func(path string)
+	// feeds is further public listings the description names beside the
+	// first, each answered by failing or by nothing.
+	feeds []string
 }
 
 func serving(t *testing.T) *publisher {
@@ -82,8 +85,11 @@ func serving(t *testing.T) *publisher {
 		}
 		switch r.URL.Path {
 		case "/.well-known/csaf/provider-metadata.json":
-			_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
-				p.server.URL+"/feed.json")
+			feeds := fmt.Sprintf(`{"tlp_label":"WHITE","url":%q}`, p.server.URL+"/feed.json")
+			for _, path := range p.feeds {
+				feeds += fmt.Sprintf(`,{"tlp_label":"WHITE","url":%q}`, p.server.URL+path)
+			}
+			_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[%s]}}]}`, feeds)
 		case "/feed.json":
 			entries := make([]string, 0, len(p.documents))
 			for path, stamp := range p.stamped {

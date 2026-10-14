@@ -129,6 +129,15 @@ type Taken struct {
 	// not match theirs.
 	Checked    int
 	Mismatched int
+	// Barred is how many documents and listings the publisher refused to
+	// hand over at all, answering that the request was not authorized or was
+	// forbidden, and BarredBy what the last of them answered. They are
+	// stepped over like any other refused document, and the supplier is
+	// recorded as failing: a publisher's bot filter or a lapsed arrangement
+	// answers this way, and read as an ordinary refusal it loses advisories
+	// while the supplier reads as healthy.
+	Barred   int
+	BarredBy string
 	// Filled says the pass stopped at its bound rather than because there was
 	// nothing left, which is what leaves the supplier due for the next wake.
 	Filled bool
@@ -189,7 +198,13 @@ func NewFetcher(db bun.IDB, limits sbom.Limits, excluded outward.Excluded) *Fetc
 //
 // Read the other way round, one permanently unreadable document stops a
 // supplier for ever.
-type unreadable struct{ err error }
+//
+// barred marks a refusal saying the request was not authorized or was
+// forbidden. It is stepped over, and the supplier is recorded as failing.
+type unreadable struct {
+	err    error
+	barred bool
+}
 
 func (u unreadable) Error() string { return u.err.Error() }
 func (u unreadable) Unwrap() error { return u.err }
@@ -224,7 +239,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 	}
 
 	at2, mark := source.From(f.History)
-	due, filled, err := f.due(ctx, client, listed, at2, mark)
+	due, filled, err := f.due(ctx, client, listed, at2, mark, &took)
 	if err != nil {
 		return took, err
 	}
@@ -259,6 +274,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			return took, nil
 		}
 		recorded, checked, err := f.document(ctx, client, by, source, one, ships, sums)
+		var refused unreadable
 		switch {
 		case errors.Is(err, errWithdrawn):
 			// The supplier was withdrawn while this pass was running. Nothing
@@ -274,7 +290,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
-		case errors.As(err, &unreadable{}), steppedOver(err):
+		case errors.As(err, &refused), steppedOver(err):
 			// About this document rather than about the publisher, so the pass
 			// steps over it. Held instead, one withdrawn advisory still listed
 			// would stop everything issued after it, for ever. An address the
@@ -282,6 +298,9 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			// excluded, a port other than https — is turned away on every
 			// pass, so it is about the document too.
 			took.Refused++
+			if refused.barred {
+				took.bar(one.address, err)
+			}
 		case ctx.Err() != nil:
 			return took, nil
 		case err != nil:
@@ -397,12 +416,14 @@ func (f *Fetcher) kept(ctx context.Context) (bool, error) {
 // pass that stopped at its bound would leave the mark past everything it had
 // not read.
 //
-// A listing that cannot be read is stepped over rather than failing the
-// supplier. A publisher serves one per label and only the public ones are read,
-// but a label being unreadable today is not a reason to read none of the
-// others.
+// A listing refused the same way on every pass is stepped over rather than
+// failing the supplier: a publisher serves one per label, and a label refused
+// today is not a reason to read none of the others. A listing that could not be
+// reached holds the mark. The mark is shared by every listing, so moved on the
+// strength of the others it passes everything the unreached one listed before
+// it, and those entries are never read.
 func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing,
-	from time.Time, mark string) ([]entry, bool, error) {
+	from time.Time, mark string, took *Taken) ([]entry, bool, error) {
 
 	var due []entry
 	var refused error
@@ -425,9 +446,17 @@ func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing
 			return nil, true, nil
 		}
 		entries, err := f.entries(ctx, client, one)
-		if err != nil {
+		var stepped unreadable
+		switch {
+		case err == nil:
+		case errors.As(err, &stepped), steppedOver(err):
+			if stepped.barred {
+				took.bar(one.address, err)
+			}
 			refused = err
 			continue
+		default:
+			return nil, false, fmt.Errorf("read what that publisher lists: %w", err)
 		}
 		read++
 		for _, listedAt := range entries {
@@ -595,7 +624,7 @@ func (f *Fetcher) fromChanges(ctx context.Context, client *http.Client,
 		case errors.Is(err, io.EOF):
 			return out, nil
 		case err != nil:
-			return nil, fmt.Errorf("read that publisher's list of changes: %w", err)
+			return nil, unreadable{err: fmt.Errorf("read that publisher's list of changes: %w", err)}
 		case len(row) < 2:
 			continue
 		}
@@ -664,10 +693,10 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 		if errors.Is(err, sbom.ErrWrongProfile) {
 			return 0, false, err
 		}
-		return 0, false, unreadable{err}
+		return 0, false, unreadable{err: err}
 	}
 	if err := shaped(advisory); err != nil {
-		return 0, false, unreadable{err}
+		return 0, false, unreadable{err: err}
 	}
 	checked, err := f.matches(ctx, client, one, body, sums)
 	if err != nil {
@@ -819,8 +848,8 @@ func algorithmOf(address string) int {
 // is ordinary; a missing file is answered 404 by some and 403 by others. A
 // file past the size of a digest file is not one either, and nor is an
 // address the guarded client turns away itself — a redirect, or a host an
-// administrator excluded. A publisher that cannot be reached holds the mark, the way it
-// does for the document.
+// administrator excluded. A publisher that cannot be reached, or that asks to be
+// asked later, holds the mark, the way it does for the document.
 func (f *Fetcher) compare(ctx context.Context, client *http.Client, address string,
 	kind int, body []byte) (bool, error) {
 
@@ -853,7 +882,7 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 // errMismatched says a document did not match the digest its publisher serves
 // beside it. Stepped over like any unreadable document, and counted apart so a
 // publisher whose digests keep disagreeing is said to be one.
-var errMismatched = unreadable{refusal.New(
+var errMismatched = unreadable{err: refusal.New(
 	"that document does not match the digest its publisher serves beside it")}
 
 // stated is the digest a digest file holds, and whether it holds one.
@@ -982,13 +1011,20 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
-		// A refusal that names this one address is about the document. A
-		// publisher's listing still naming a withdrawn advisory is the
-		// ordinary case, and a server having a bad day answers 5xx, which is
-		// about reaching them.
 		answered := refusal.Errorf("that publisher answered %s", res.Status)
-		if res.StatusCode >= 400 && res.StatusCode < 500 {
-			return nil, unreadable{answered}
+		switch {
+		case later(res.StatusCode), res.StatusCode >= 500:
+			// About reaching the publisher: asked again, the same address
+			// answers. A rate limit and a server having a bad day both hold
+			// the mark.
+			return nil, answered
+		case res.StatusCode == http.StatusUnauthorized, res.StatusCode == http.StatusForbidden:
+			return nil, unreadable{err: answered, barred: true}
+		case res.StatusCode >= 400:
+			// A refusal that names this one address is about the document. A
+			// publisher's listing still naming a withdrawn advisory is the
+			// ordinary case.
+			return nil, unreadable{err: answered}
 		}
 		return nil, answered
 	}
@@ -997,7 +1033,7 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 		return nil, err
 	}
 	if int64(len(body)) > most {
-		return nil, unreadable{refusal.Errorf(
+		return nil, unreadable{err: refusal.Errorf(
 			"that document is larger than the %d bytes this reads", most)}
 	}
 	return body, nil
@@ -1009,7 +1045,27 @@ func (f *Fetcher) json(ctx context.Context, client *http.Client, address string,
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(body, into)
+	if err := json.Unmarshal(body, into); err != nil {
+		// Malformed the same way on every pass, so about the document rather
+		// than about reaching the publisher.
+		return unreadable{err: err}
+	}
+	return nil
+}
+
+// later is whether a status asks the caller to come back rather than refusing
+// the address: a request that took too long, one sent too early, and a rate
+// limit. A publisher's content delivery network answers these for a whole
+// pass, and stepped over, every document in it would be lost.
+func later(status int) bool {
+	return status == http.StatusRequestTimeout || status == http.StatusTooEarly ||
+		status == http.StatusTooManyRequests
+}
+
+// bar counts one document or listing the publisher refused to hand over.
+func (t *Taken) bar(address string, err error) {
+	t.Barred++
+	t.BarredBy = fmt.Sprintf("%s: %v", address, err)
 }
 
 // The two JSON files a publisher serves to say what they offer and where. The

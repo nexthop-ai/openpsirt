@@ -438,19 +438,31 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 // moments are left alone so the supplier stays due: the bound is per wake and
 // the interval is a day, so a publisher issuing more in a day than one pass
 // takes would otherwise fall further behind every day.
-func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark string) error {
-	if at.IsZero() {
+//
+// A pass that read on while stepping over something it should not have had to
+// names it in failed, and the last read that worked stays where it was.
+func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark string,
+	failed error) error {
+
+	update := s.db.NewUpdate().Model((*Source)(nil)).Where("id = ?", id)
+	switch {
+	case failed != nil:
+		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason))
+	case at.IsZero():
 		return nil
+	default:
+		update = update.Set("reached_at = ?", s.now().UTC().Truncate(time.Microsecond)).
+			Set("failed = ?", "")
 	}
-	moment := at.UTC().Truncate(time.Microsecond)
-	_, err := s.db.NewUpdate().Model((*Source)(nil)).
-		Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
-			moment, moment, mark, mark).
-		Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
-			moment, moment, mark, moment).
-		Set("reached_at = ?", s.now().UTC().Truncate(time.Microsecond)).
-		Set("failed = ?", "").
-		Where("id = ?", id).Exec(ctx)
+	if !at.IsZero() {
+		moment := at.UTC().Truncate(time.Microsecond)
+		update = update.
+			Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
+				moment, moment, mark, mark).
+			Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
+				moment, moment, mark, moment)
+	}
+	_, err := update.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record how far that supplier was read: %w", err)
 	}

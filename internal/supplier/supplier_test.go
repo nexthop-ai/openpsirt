@@ -327,7 +327,7 @@ func TestALaterMomentMovesTheDigestWithIt(t *testing.T) {
 				return store.Reached(ctx, id, at, mark, nil)
 			}},
 			{"caught up", func(id int64, at time.Time, mark string) error {
-				return store.CaughtUp(ctx, id, at, mark)
+				return store.CaughtUp(ctx, id, at, mark, nil)
 			}},
 		} {
 			row, err := store.Add(ctx, f.admin, f.product, "SUSE "+c.what, described)

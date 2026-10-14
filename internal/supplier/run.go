@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -202,12 +203,25 @@ func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 	// shutdown waits for one small write and no more.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), progressWrite)
 	defer cancel()
+	// What the publisher refused to hand over is stepped over, so the mark
+	// moves past it, and recorded as what stopped the attempt: a publisher
+	// refusing documents reads as healthy otherwise, while what it refused is
+	// never read.
+	var barred error
+	if took.Barred > 0 {
+		barred = refusal.Errorf("that publisher refused %d of what it lists, the last %s",
+			took.Barred, took.BarredBy)
+	}
 	if cut || (took.Filled && err == nil) {
-		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark); marked != nil {
+		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark,
+			barred); marked != nil {
 			p.logger.Error("recording how far a supplier was read",
 				"supplier", source.Display, "error", marked)
 		}
-		return took, nil
+		return took, barred
+	}
+	if err == nil {
+		err = barred
 	}
 	if marked := store.Reached(ctx, source.ID, took.CaughtUpTo, took.Mark, err); marked != nil {
 		p.logger.Error("recording what came back from a supplier",
