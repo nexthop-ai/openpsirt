@@ -1053,3 +1053,26 @@ func (s *Store) ProductNames(ctx context.Context, ids []int64) (map[int64]string
 	}
 	return names, nil
 }
+
+// ReadsBuild refuses a subject who may not read what one build sent or what
+// was filed against it, by the rule access.Subject.ReadsBuild states. A build
+// nobody declared is ErrNotFound.
+func ReadsBuild(ctx context.Context, db bun.IDB, subject access.Subject, targetID int64) error {
+	var build struct {
+		ProductID int64 `bun:"product_id"`
+		StreamID  int64 `bun:"stream_id"`
+		VariantID int64 `bun:"variant_id"`
+	}
+	if err := db.NewSelect().
+		TableExpr(`"target" AS "tg"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id", "tg"."stream_id", "tg"."variant_id"`).
+		Where(`"tg"."id" = ?`, targetID).
+		Scan(ctx, &build); err != nil {
+		return missingOr(err, fmt.Sprintf("build %d", targetID), fmt.Sprintf("look up which build %d is", targetID))
+	}
+	if !subject.ReadsBuild(build.ProductID, build.StreamID, build.VariantID) {
+		return access.Denied(fmt.Sprintf("read what a build of product %d sent", build.ProductID))
+	}
+	return nil
+}

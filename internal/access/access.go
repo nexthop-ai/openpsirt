@@ -781,6 +781,19 @@ func (s Subject) MaySend(productID, streamID, variantID int64) bool {
 	return true
 }
 
+// ReadsBuild reports whether this subject may read what one build sent and
+// what was filed against it.
+//
+// A person reads it for a product they may know exists. A key reads it for a
+// build it may upload to, whichever key sent each upload: a key that is
+// rotated, or two keys on one build, re-send what the other already sent.
+func (s Subject) ReadsBuild(productID, streamID, variantID int64) bool {
+	if s.Kind == Pipeline {
+		return s.MaySend(productID, streamID, variantID)
+	}
+	return s.Sees(productID)
+}
+
 // sessionKey carries the browser session a request arrived on, where it
 // arrived on one. It is separate from the subject because most requests have
 // no session — a pipeline's key and a proxy's header both resolve to a subject

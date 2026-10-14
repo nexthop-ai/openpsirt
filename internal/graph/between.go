@@ -11,7 +11,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -24,35 +23,9 @@ var ErrNoInventory = refusal.New("no inventory has been read for that build")
 // shipsTo refuses a subject who may not read what a build shipped.
 //
 // What a build sent rather than what is open against it, so the visibility a
-// finding carries narrows no part of it. A person reads it for a product they
-// may know exists. A key reads it for a build it may upload to, the rule its
-// receipts are read under: a key pinned to one release or variant reads no
-// other build of the product.
+// finding carries narrows no part of it: the rule catalog.ReadsBuild holds.
 func (s *Store) shipsTo(ctx context.Context, subject access.Subject, targetID int64) error {
-	var build struct {
-		ProductID int64 `bun:"product_id"`
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
-	}
-	if err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id, tg.stream_id, tg.variant_id").
-		Where("tg.id = ?", targetID).
-		Scan(ctx, &build); err != nil {
-		if database.IsNoRows(err) {
-			return fmt.Errorf("build %d: %w", targetID, catalog.ErrNotFound)
-		}
-		return fmt.Errorf("look up which build %d is: %w", targetID, err)
-	}
-	reaches := subject.Sees(build.ProductID)
-	if subject.Kind == access.Pipeline {
-		reaches = subject.MaySend(build.ProductID, build.StreamID, build.VariantID)
-	}
-	if !reaches {
-		return access.Denied(fmt.Sprintf("read what product %d contains", build.ProductID))
-	}
-	return nil
+	return catalog.ReadsBuild(ctx, s.db, subject, targetID)
 }
 
 // Between is every name two builds' inventories differ on, as each stands now.

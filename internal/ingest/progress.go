@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -96,34 +97,10 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	return held, nil
 }
 
-// mayRead refuses a subject who may not read what was filed against a build.
-//
-// A person reads the receipts of a product they read. A key reads every
-// receipt of a build it may upload to, whichever key sent each one: a key that
-// is rotated, or two keys on one build, re-send what the other already sent,
-// and the answer to the second is the first one's scan.
+// mayRead refuses a subject who may not read what was filed against a build:
+// the rule catalog.ReadsBuild holds.
 func (s *Store) mayRead(ctx context.Context, subject access.Subject, targetID int64) error {
-	var build struct {
-		ProductID int64 `bun:"product_id"`
-		StreamID  int64 `bun:"stream_id"`
-		VariantID int64 `bun:"variant_id"`
-	}
-	if err := s.db.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id, tg.stream_id, tg.variant_id").
-		Where("tg.id = ?", targetID).
-		Scan(ctx, &build); err != nil {
-		return fmt.Errorf("look up which build %d is: %w", targetID, err)
-	}
-	reads := subject.Sees(build.ProductID)
-	if subject.Kind == access.Pipeline {
-		reads = subject.MaySend(build.ProductID, build.StreamID, build.VariantID)
-	}
-	if !reads {
-		return access.Denied(fmt.Sprintf("read what was filed against product %d", build.ProductID))
-	}
-	return nil
+	return catalog.ReadsBuild(ctx, s.db, subject, targetID)
 }
 
 // Receipts reports what became of the scans filed against a target, newest
