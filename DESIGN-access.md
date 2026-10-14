@@ -466,7 +466,11 @@ Turning a rule on is a bulk write. One rule naming a source package sweeps
 thousands of existing unowned issues across every place each sits at, so the
 bound is counted on rows written rather than on the request. The sweep is queued
 work in bounded batches, and a batch that fills its bound queues itself again
-rather than looping in the worker.
+rather than looping in the worker. The next batch is queued before the batch's
+own job is settled, and a failure to queue it fails the job, which is then tried
+again: settled first, a failure to queue stops the sweep with the job recorded as
+having succeeded. A batch run twice places only what nobody holds. The batch
+size is read before a job is claimed, so a failure to read it holds nothing.
 
 A batch is full when it has read a batch's worth, not when it has written one.
 The page is bounded on rows read and the write re-checks the holder at the

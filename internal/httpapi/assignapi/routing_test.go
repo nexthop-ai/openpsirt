@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func TestARuleRoutesWorkNobodyHoldsAndTakesNothingFromAnybody(t *testing.T) {
@@ -292,6 +293,50 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 		if left != 0 {
 			t.Errorf("%d findings the rule matches are still unrouted after the "+
 				"sweep ran to the end", left)
+		}
+	})
+}
+
+// A full batch whose continuation cannot be queued is not a sweep that
+// finished. Settled as done, the rest of the product stays unrouted until
+// somebody saves another rule, and nothing says so.
+func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedSiblings(t)
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"curlers","members":["triager"]}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+		if made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
+			"/v1/products/mine/routing-rules",
+			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`,
+		); made.Code != http.StatusCreated {
+			t.Fatalf("adding a rule answered %d: %s", made.Code, made.Body.String())
+		}
+
+		work := queue.New(r.DB, queue.DefaultOptions())
+		// The rule's own sweep is waiting, and another beside it. With room
+		// for one waiting routing job, claiming the first leaves the second
+		// filling the queue, so the rest of the first cannot be queued.
+		if _, err := work.Add(ctx, queue.Route, "another product"); err != nil {
+			t.Fatal(err)
+		}
+		if err := setting.NewStore(r.DB.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+			t.Fatal(err)
+		}
+		sweeper := finding.NewSweeperOfSize(r.DB, work,
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test", 1)
+		if _, err := sweeper.Once(ctx); err == nil {
+			t.Fatal("a full batch whose continuation could not be queued reported success")
+		}
+		done, err := r.DB.DB.NewSelect().Table("job").
+			Where("kind = ?", queue.Route).Where("state = ?", queue.Done).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done != 0 {
+			t.Error("the sweep was settled as done with the rest of the product unrouted")
 		}
 	})
 }

@@ -90,6 +90,20 @@ func (s *Sweeper) Run(ctx context.Context, interval time.Duration) {
 // Once claims one sweep and runs a batch of it, reporting how many findings it
 // placed.
 func (s *Sweeper) Once(ctx context.Context) (int, error) {
+	// Read as the pass begins rather than when the sweeper was built, so a
+	// number an administrator changes takes effect on the next pass rather
+	// than on the next restart. Read before anything is claimed, so a failure
+	// here leaves no job held until its claim goes stale.
+	batch := s.batch
+	if batch <= 0 {
+		var err error
+		batch, err = setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
+			setting.DefaultRoutingBatch)
+		if err != nil {
+			return 0, err
+		}
+	}
+
 	job, err := s.queue.Claim(ctx, s.name, queue.Route)
 	if err != nil || job == nil {
 		return 0, err
@@ -109,18 +123,6 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
-	// Read as the pass begins rather than when the sweeper was built, so a
-	// number an administrator changes takes effect on the next pass rather
-	// than on the next restart.
-	batch := s.batch
-	if batch <= 0 {
-		batch, err = setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
-			setting.DefaultRoutingBatch)
-		if err != nil {
-			return 0, err
-		}
-	}
-
 	working, release := s.queue.Holding(ctx, job.ID, s.name, s.logger)
 	placed, filled, outgrown, err := NewStore(s.db.DB).ApplyRules(working, productID, batch)
 	// A rule that has outgrown the bound is named rather than left to be
@@ -133,11 +135,6 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	}
 	taken := release()
 
-	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)
-	if ending.HandedOver || ending.Err != nil {
-		return placed, ending.Err
-	}
-
 	// A full batch means there is more of the estate to walk. Queued again
 	// rather than looped here, so the worker is free between batches and an
 	// operator can see that the work is still going.
@@ -146,16 +143,26 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// one assignment made by a person inside the window leaves a row of the
 	// batch already held, and reading that as the end stopped the sweep with
 	// the rest of the estate unrouted and the job reported successful.
-	if filled {
+	//
+	// Queued before this job is settled, and a failure to queue is this job's
+	// failure: settled as done first, a failure to queue the rest stops the
+	// sweep with the rest of the estate unrouted and the job reported
+	// successful. Failed, the job is tried again, and a batch run twice places
+	// only what nobody holds.
+	if filled && err == nil {
 		// Its own context that outlives a cancellation, for the same reason
 		// settling has one: a shutdown must not be what loses the rest of the
 		// estate.
-		settled, done := queue.Settling(ctx)
-		defer done()
-		if _, err := s.queue.Add(settled, queue.Route, job.Reference); err != nil {
-			s.logger.Warn("could not queue the rest of a routing sweep",
-				"product", productID, "error", err)
+		queuing, done := queue.Settling(ctx)
+		if _, queued := s.queue.Add(queuing, queue.Route, job.Reference); queued != nil {
+			err = fmt.Errorf("queue the rest of routing product %d: %w", productID, queued)
 		}
+		done()
+	}
+
+	ending := s.queue.Settle(ctx, job, s.name, "product", s.logger, err, taken, nil)
+	if ending.HandedOver || ending.Err != nil {
+		return placed, ending.Err
 	}
 	return placed, nil
 }
