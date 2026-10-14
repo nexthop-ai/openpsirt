@@ -389,7 +389,8 @@ After, the root has ten and every module sits under the binary it came from.
 
 | Composer rule | Reason |
 |---|---|
-| A component is identified by its package identifier with the producer's qualifiers cut | A module two binaries both link gets a different reference in each catalog. One component with two parents is the truth; two components is a count saying the image ships it twice, and a decision to be made twice |
+| A component is identified by its package identifier without the per-scan package identity, its other qualifiers in a fixed order | A module two binaries both link gets a different reference and a different per-scan qualifier in each catalog. One component with two parents is the truth; two components is a count saying the image ships it twice, and a decision to be made twice. The other qualifiers name which package it is — an architecture, a classifier — so two of them stay two |
+| An input is named once, and every placement names an input | One file read twice is every component twice. A placement naming a file that was not read places nothing, and is refused rather than ignored |
 | Everything else a producer recorded is carried through untouched | Licenses, hashes, and the properties stating where something was found. Composing rewrites references and adds one edge |
 | A part can be placed inside a component another part describes | The interface's packages are inside the server binary, and a finding against one should say so. Placed inside a component no input describes, composing is refused |
 | The root can be one part's own root | The binary's inventory stays rooted at the application its module reader named, with the interface beside the modules, rather than at a container the composer made up |

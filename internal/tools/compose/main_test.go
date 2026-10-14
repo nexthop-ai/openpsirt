@@ -474,3 +474,60 @@ func TestAPlacementNamedByPathReachesThatPart(t *testing.T) {
 		t.Errorf("the server holds %v, and the interface it embeds is not among them", got)
 	}
 }
+
+// A placement naming a file that is not an input is refused even where another
+// input is listed twice, and an input listed twice is refused on its own.
+func TestAPlacementIsCheckedByNameAndAnInputListedTwiceIsRefused(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for name, body := range map[string]string{"server.json": theServer, "web.json": theInterface} {
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	opts := options{name: "x", within: map[string]string{"web.json": server, "typo.json": server}}
+	err := run(opts, "out.json", []string{"server.json", "web.json"})
+	if err == nil || !strings.Contains(err.Error(), "-within typo.json is not one of the inputs") {
+		t.Errorf("a placement naming no input answered %v", err)
+	}
+	opts = options{name: "x", within: map[string]string{"web.json": server}}
+	err = run(opts, "out.json", []string{"server.json", "web.json", "web.json"})
+	if err == nil || !strings.Contains(err.Error(), "listed as an input more than once") {
+		t.Errorf("an input listed twice answered %v", err)
+	}
+}
+
+// Only the per-scan package identity is dropped from a package identifier.
+// The other qualifiers say which package it is.
+func TestOnlyThePerScanQualifierIsLeftOutOfAnIdentity(t *testing.T) {
+	for _, c := range []struct{ a, b string }{
+		{"pkg:golang/x/y@1?package-id=aaa", "pkg:golang/x/y@1?package-id=bbb"},
+		{"pkg:apk/alpine/musl@1?arch=x86_64&distro=alpine-3&package-id=a",
+			"pkg:apk/alpine/musl@1?distro=alpine-3&arch=x86_64"},
+	} {
+		if identity(component{Purl: c.a}) != identity(component{Purl: c.b}) {
+			t.Errorf("%s and %s are one package and read as two", c.a, c.b)
+		}
+	}
+	for _, c := range []struct{ a, b string }{
+		{"pkg:deb/debian/libc6@2.36-9?arch=amd64", "pkg:deb/debian/libc6@2.36-9?arch=i386"},
+		{"pkg:maven/g/a@1?classifier=sources", "pkg:maven/g/a@1?type=jar"},
+	} {
+		if identity(component{Purl: c.a}) == identity(component{Purl: c.b}) {
+			t.Errorf("%s and %s are two packages and read as one", c.a, c.b)
+		}
+	}
+	if got := identity(component{Purl: "pkg:golang/x/y@1?package-id=aaa"}); got != "pkg:golang/x/y@1" {
+		t.Errorf("an identifier whose only qualifier is per-scan read as %q", got)
+	}
+}
+
+// A field two producers did not both write as an array is still carried from
+// the second where the first does not have it.
+func TestAUnionedFieldTheFirstLacksIsCarriedFromTheSecond(t *testing.T) {
+	into := component{other: map[string]json.RawMessage{}}
+	from := component{other: map[string]json.RawMessage{"licenses": json.RawMessage(`"MIT"`)}}
+	merge(&into, from)
+	if got := string(into.other["licenses"]); got != `"MIT"` {
+		t.Errorf("licenses read %q, want what the second producer wrote", got)
+	}
+}

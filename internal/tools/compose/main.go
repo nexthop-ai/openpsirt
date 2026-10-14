@@ -26,8 +26,10 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -120,7 +122,7 @@ func merge(into *component, from component) {
 	if into.other == nil {
 		into.other = map[string]json.RawMessage{}
 	}
-	for _, key := range []string{"licenses", "hashes", "externalReferences"} {
+	for _, key := range unioned {
 		if joined, ok := unionArrays(into.other[key], from.other[key]); ok {
 			into.other[key] = joined
 		}
@@ -128,16 +130,21 @@ func merge(into *component, from component) {
 	if joined, ok := mergeProperties(into.other["properties"], from.other["properties"]); ok {
 		into.other["properties"] = joined
 	}
+	// Whatever the first copy lacks is taken from the second, including a
+	// unioned field neither side held as an array, which is carried as the
+	// second producer wrote it.
 	for key, value := range from.other {
-		switch key {
-		case "licenses", "hashes", "properties":
-		default:
-			if _, held := into.other[key]; !held {
-				into.other[key] = value
-			}
+		if key == "properties" {
+			continue
+		}
+		if _, held := into.other[key]; !held {
+			into.other[key] = value
 		}
 	}
 }
+
+// unioned is the fields merged by value across two catalogs of one component.
+var unioned = []string{"licenses", "hashes", "externalReferences"}
 
 // unionArrays joins two JSON arrays, keeping each distinct element once and in
 // the order it first appeared. It reports false where neither side is an
@@ -242,15 +249,38 @@ func canonical(raw json.RawMessage) []byte {
 // them.
 func identity(c component) string {
 	if c.Purl != "" {
-		// Everything after the first "?" is the producer's qualifiers, and
-		// syft puts a per-scan package identity there. Two catalogs of one
-		// module differ only in that, so it is cut.
-		if i := strings.IndexByte(c.Purl, '?'); i > 0 {
-			return c.Purl[:i]
-		}
-		return c.Purl
+		return withoutScanIdentity(c.Purl)
 	}
 	return c.Name + "@" + c.Version
+}
+
+// withoutScanIdentity is a package identifier without the per-scan package
+// identity syft writes among its qualifiers, with the qualifiers left in a
+// fixed order. Two catalogs of one module differ only in that qualifier. The
+// others say which package it is — two architectures of one Debian package,
+// or a Maven artifact and its sources — so they stay.
+func withoutScanIdentity(purl string) string {
+	base, qualifiers, ok := strings.Cut(purl, "?")
+	if !ok {
+		return purl
+	}
+	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
+	var kept []string
+	for _, pair := range strings.Split(qualifiers, "&") {
+		if key, _, _ := strings.Cut(pair, "="); pair == "" || strings.EqualFold(key, "package-id") {
+			continue
+		}
+		kept = append(kept, pair)
+	}
+	sort.Strings(kept)
+	out := base
+	if len(kept) > 0 {
+		out += "?" + strings.Join(kept, "&")
+	}
+	if hasSubpath {
+		out += "#" + subpath
+	}
+	return out
 }
 
 // part is one input and where its top-level components hang: under the
@@ -302,8 +332,15 @@ func run(opts options, out string, inputs []string) error {
 	parts := make([]part, 0, len(inputs))
 	root := component{Ref: "root", Type: "container", Name: opts.name, Version: opts.version}
 	rooted := opts.rootFrom == ""
-	placedWithin := 0
+	placed := map[string]bool{}
+	listed := map[string]bool{}
 	for _, path := range inputs {
+		// One file read twice is every component twice, and it counts once
+		// toward any placement naming it.
+		if listed[path] {
+			return fmt.Errorf("%s is listed as an input more than once", path)
+		}
+		listed[path] = true
 		// Read below the working directory and nowhere else. A path that
 		// directory cannot address is refused in words, rather than an
 		// absolute one being read as if it were relative to here.
@@ -329,7 +366,7 @@ func run(opts options, out string, inputs []string) error {
 		}
 		within, inside := opts.within[path]
 		if inside {
-			placedWithin++
+			placed[path] = true
 		}
 		parts = append(parts, part{doc: doc, within: within})
 	}
@@ -338,8 +375,10 @@ func run(opts options, out string, inputs []string) error {
 	if !rooted {
 		return fmt.Errorf("-root %s is not one of the inputs", opts.rootFrom)
 	}
-	if placedWithin != len(opts.within) {
-		return fmt.Errorf("-within names an input that is not one of the inputs")
+	for _, input := range slices.Sorted(maps.Keys(opts.within)) {
+		if !placed[input] {
+			return fmt.Errorf("-within %s is not one of the inputs", input)
+		}
 	}
 
 	composed, err := compose(root, parts)
