@@ -3595,7 +3595,7 @@ export interface paths {
          *
          *     No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
          *
-         *     `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and link schemes outside http, https and mailto are refused naming the line they are on.
+         *     `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and a link using anything but http, https, mailto, attachment or issue are refused naming the line they are on.
          *
          *     `received` is the day it arrived, which is what an embargo would be counted from. A date that cannot be read is treated as one nobody gave.
          *
@@ -5564,7 +5564,7 @@ export interface paths {
          * Keep a filter under a name
          * @description Keeps the findings list's current narrowing so it can be opened again. Saving under a name you already use replaces it: the act is deciding what that name means, and refusing would make somebody delete before they could correct.
          *
-         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, `differs`, `variants`, `opened_by_run` and `view`. Every other parameter is kept as sent.
+         *     The branch, the variant, anything naming one build or one run, and the grouping are left out of what is kept: `stream`, `variant`, `beneath`, `beneath_version`, `beneath_ecosystem`, `beneath_namespace`, `differs`, `variants`, `opened_by_run`, `view`. Every other parameter is kept as sent.
          *
          *     Refused with 422 where adding the name would take you past the per-person limit.
          *

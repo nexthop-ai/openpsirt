@@ -57,8 +57,9 @@ export function useKept(when = true) {
 // the variants of one branch, the run that opened it, and the grouping. A saved
 // filter keeps none of them, so one filter applies within whatever scope and
 // grouping is on screen, and picking one keeps them. The server drops the same
-// words from what it keeps.
-const SCOPE = [
+// words from what it keeps, and a web test holds this list to the one it
+// reads, in testdata/scope-words.json.
+export const SCOPE = [
   "stream",
   "variant",
   "beneath",

@@ -16,6 +16,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -97,16 +98,35 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// scopeWords is every word of the findings list's address that says where the
+// scope is every word of the findings list's address that says where the
 // list is or how it is grouped rather than what it is narrowed by: the branch,
 // the variant, a subtree of one build, what differs between the builds of a
 // selection, what is spread over the variants of one branch, the run that
 // opened it, and the grouping. The product is in the list's path and never in
 // its query.
-var scopeWords = map[string]bool{
-	"stream": true, "variant": true,
-	"beneath": true, "beneath_version": true, "beneath_ecosystem": true, "beneath_namespace": true,
-	"differs": true, "variants": true, "opened_by_run": true, "view": true,
+//
+// The interface drops the same words before it compares an address with a
+// kept query, so testdata/scope-words.json holds them too, and a Go test and a
+// web test each compare their own copy with it.
+var scope = [...]string{
+	"stream", "variant",
+	"beneath", "beneath_version", "beneath_ecosystem", "beneath_namespace",
+	"differs", "variants", "opened_by_run", "view",
+}
+
+// ScopeWords is the words of the list's address a kept filter leaves out, in
+// the order the list's address is described in.
+// A copy, so no caller can change what is left out.
+func ScopeWords() []string { return slices.Clone(scope[:]) }
+
+// scopeWord reports whether a word of the list's address is one of its scope.
+func scopeWord(key string) bool {
+	for _, each := range scope {
+		if key == each {
+			return true
+		}
+	}
+	return false
 }
 
 // unscoped is a query without its scope. Every other parameter is kept exactly
@@ -119,7 +139,7 @@ func unscoped(query string) string {
 	var out []string
 	for _, pair := range strings.Split(query, "&") {
 		rawKey, _, _ := strings.Cut(pair, "=")
-		if key, err := url.QueryUnescape(rawKey); err == nil && scopeWords[key] {
+		if key, err := url.QueryUnescape(rawKey); err == nil && scopeWord(key) {
 			continue
 		}
 		out = append(out, pair)

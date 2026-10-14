@@ -4,12 +4,22 @@
 package adminapi_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"flag"
+	"os"
 	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
+
+// published is the web tests' copy of what a session answer says about each
+// outcome, which a test standing in for the server serves.
+const published = "../../../web/src/test/outcomes.json"
+
+var update = flag.Bool("update", false, "rewrite "+published+" from the session answer")
 
 func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing.T) {
 	// A screen asking for dismissals, or requiring a justification, reads
@@ -42,6 +52,28 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 				got.Dismisses != slices.Contains(triage.OutcomesDismissing(), want) {
 				t.Errorf("%s is published as %+v, which is not the rule the server applies", want, got)
 			}
+		}
+
+		// The web tests serve their copy in place of this answer, so it is
+		// held to the answer rather than to somebody's reading of the rules.
+		answer, err := json.MarshalIndent(who.Outcomes, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		answer = append(answer, '\n')
+		if *update {
+			if err := os.WriteFile(published, answer, 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		kept, err := os.ReadFile(published)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(kept, answer) {
+			t.Errorf("%s is not what the session answer publishes; rewrite it with "+
+				"go test ./internal/httpapi/adminapi -run %s -update",
+				published, t.Name())
 		}
 	})
 }

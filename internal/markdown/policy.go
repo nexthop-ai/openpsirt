@@ -14,8 +14,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-// allowedScheme reports whether a link may use this scheme. These are the only
-// ones.
+// linkSchemes is the schemes a link may use. These are the only ones.
 //
 // `javascript:` in a link is the oldest attack there is, and a `data:` address
 // lets a link become a page we appear to have served. Everything else is
@@ -28,14 +27,42 @@ import (
 // Not a map anybody can widen. An exported map is a value every importer
 // shares and any of them may write to at init, so one line in an unrelated
 // package could add a scheme to the link policy for the whole process, with
-// nothing in this file changed and no test here failing. Asked as a function
-// over a closed list instead, which is a policy rather than a variable.
+// nothing in this file changed and no test here failing. An unexported array
+// asked through a function is a policy rather than a variable.
+//
+// testdata/link-schemes.json holds the same lists, and a Go test and a web
+// test each compare their own copy with it, because the interface's renderer
+// links what this accepts.
+var linkSchemes = [...]string{"http", "https", "mailto", Attachment, Issue}
+
+// addressSchemes is the schemes a link leaving the deployment may name: a
+// document's address, and a rendered link once attachment and issue references
+// are rewritten into paths.
+var addressSchemes = [...]string{"http", "https", "mailto"}
+
+// allowedScheme reports whether a link may use this scheme.
 func allowedScheme(scheme string) bool {
-	switch scheme {
-	case "http", "https", "mailto", Attachment, Issue:
-		return true
+	for _, each := range linkSchemes {
+		if scheme == each {
+			return true
+		}
 	}
 	return false
+}
+
+// SchemesSaid is the schemes a link may use, as the words a refusal and an
+// operation's description carry.
+func SchemesSaid() string { return either(linkSchemes[:]) }
+
+// either joins a list as a sentence offering any one of it.
+func either(words []string) string {
+	switch len(words) {
+	case 0:
+		return ""
+	case 1:
+		return words[0]
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " or " + words[len(words)-1]
 }
 
 // Attachment is the scheme a file held here is referred to by.
@@ -144,9 +171,8 @@ func destinationFault(line int, destination string) (Fault, bool) {
 		}
 		return Fault{
 			Line: line, Offending: destination,
-			Reason: fmt.Sprintf(
-				"a link may use http, https, mailto, attachment or issue, and this uses %q",
-				target.scheme),
+			Reason: fmt.Sprintf("a link may use %s, and this uses %q",
+				SchemesSaid(), target.scheme),
 		}, true
 	}
 	switch target.scheme {

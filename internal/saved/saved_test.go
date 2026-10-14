@@ -5,6 +5,10 @@ package saved_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/url"
+	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -328,15 +332,24 @@ func TestTwoSavesOfOneNewNameAtOnceBothKeepIt(t *testing.T) {
 // and every other parameter is kept as it was sent, since the list recognizes
 // an open filter by its query byte for byte.
 func TestAKeptFilterHoldsNoScope(t *testing.T) {
+	// Every scope word, so a word the list stops dropping fails here rather
+	// than in the interface, which matches a kept query byte for byte.
+	words := saved.ScopeWords()
+	if len(words) == 0 {
+		t.Fatal("no scope words, so this checked nothing")
+	}
+	var asked []string
+	for _, word := range words {
+		asked = append(asked, url.QueryEscape(word)+"=x")
+	}
+	asked = append(asked, "exploited=1", "hide=a%7Eb", "q=open+ssl")
 	each(t, func(t *testing.T, f *fixture) {
 		person, err := f.rights.Ensure(t.Context(), "someone@example.com", "Someone", nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel",
-			"?stream=main&exploited=1&variant=x86&beneath=zlib&beneath_version=1.2"+
-				"&differs=1&variants=only&opened_by_run=4&view=components&hide=a%7Eb&q=open+ssl",
-			saved.Filter{}, 0)
+			"?"+strings.Join(asked, "&"), saved.Filter{}, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -351,4 +364,23 @@ func TestAKeptFilterHoldsNoScope(t *testing.T) {
 			t.Errorf("read back %+v, want the one kept as %q", mine, kept.Query)
 		}
 	})
+}
+
+func TestTheScopeWordsAreTheOnesTheInterfaceDrops(t *testing.T) {
+	source, err := os.ReadFile("../../testdata/scope-words.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Words []string `json:"words"`
+	}
+	if err := json.Unmarshal(source, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Words) == 0 {
+		t.Fatal("the shared file names no scope words, so this checked nothing")
+	}
+	if got := saved.ScopeWords(); !slices.Equal(got, doc.Words) {
+		t.Errorf("the server drops %v and testdata/scope-words.json says %v", got, doc.Words)
+	}
 }

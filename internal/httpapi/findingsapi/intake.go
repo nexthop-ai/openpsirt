@@ -51,8 +51,9 @@ func registerIntake(api huma.API, in core.Deps) {
 			"`summary` is required and everything else is optional: a claim arriving " +
 			"anonymously is an ordinary claim, and a report with nothing in it records only " +
 			"that a mail arrived. The summary is stored as markdown and goes through the " +
-			"same submission policy a justification does, so raw HTML and link schemes " +
-			"outside http, https and mailto are refused naming the line they are on.\n\n" +
+			"same submission policy a justification does, so raw HTML and a link using " +
+			"anything but " + markdown.SchemesSaid() + " are refused naming the line " +
+			"they are on.\n\n" +
 			"`received` is the day it arrived, which is what an embargo would be counted " +
 			"from. A date that cannot be read is treated as one nobody gave.\n\n" +
 			"`found_here` marks a flaw somebody here found. Recorded as a flaw, it carries " +

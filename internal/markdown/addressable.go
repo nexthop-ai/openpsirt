@@ -62,15 +62,16 @@ func Autolinkable(address string) error {
 				"them and the rest of the line would become content",
 		}
 	}
-	switch target, _ := schemeOf(address); target.scheme {
-	case "http", "https", "mailto":
-	default:
-		return Fault{
-			Offending: address,
-			Reason:    "an address written into a document names http, https or mailto",
+	target, _ := schemeOf(address)
+	for _, each := range addressSchemes {
+		if target.scheme == each {
+			return Addressable(address)
 		}
 	}
-	return Addressable(address)
+	return Fault{
+		Offending: address,
+		Reason:    "an address written into a document names " + either(addressSchemes[:]),
+	}
 }
 
 // endsAutolink reports whether a character ends an address inside angle

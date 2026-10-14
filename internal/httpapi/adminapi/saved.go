@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -104,9 +105,8 @@ func registerSaved(api huma.API, in core.Deps) {
 			"Saving under a name you already use replaces it: the act is deciding what that " +
 			"name means, and refusing would make somebody delete before they could correct.\n\n" +
 			"The branch, the variant, anything naming one build or one run, and the grouping are " +
-			"left out of what is kept: `stream`, `variant`, `beneath` and its three qualifiers, " +
-			"`differs`, `variants`, `opened_by_run` and `view`. Every other parameter is kept " +
-			"as sent.\n\n" +
+			"left out of what is kept: `" + strings.Join(saved.ScopeWords(), "`, `") + "`. " +
+			"Every other parameter is kept as sent.\n\n" +
 			"Refused with 422 where adding the name would take you past the per-person limit.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, "Yours alone."), func(ctx context.Context, input *struct {

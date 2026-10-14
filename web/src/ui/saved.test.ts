@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { here, ruleIn, type Kept } from "./Saved";
+import scope from "../../../testdata/scope-words.json";
+import { here, ruleIn, SCOPE, type Kept } from "./Saved";
 
 // The saved filter a list is narrowed by.
 //
@@ -67,5 +68,21 @@ describe("the filter a list is narrowed by", () => {
 
   it("is none of them on a list nobody kept", () => {
     expect(ruleIn(kept, new URLSearchParams("component=openssl"))).toBeUndefined();
+  });
+});
+
+// The server drops the same words before it stores a filter, and its own test
+// compares its list with the same file, so a word dropped on one side and kept
+// on the other fails on the side that was not changed.
+describe("the scope a kept filter leaves out", () => {
+  it("is the server's", () => {
+    expect(scope.words.length).toBeGreaterThan(0);
+    expect(SCOPE).toEqual(scope.words);
+  });
+
+  it("is dropped from the address a kept query is compared with", () => {
+    const params = new URLSearchParams(scope.words.map((word) => [word, "x"]));
+    params.append("exploited", "1");
+    expect(here(params)).toBe("exploited=1");
   });
 });

@@ -1,0 +1,14 @@
+{
+  "note": [
+    "The link schemes, read by both halves: the server's submission check and the",
+    "interface's renderer. Each half compares its own list with this file, so a",
+    "scheme accepted at submission and dropped on screen fails a test on the side",
+    "that was not changed.",
+    "",
+    "'link' is what a link in submitted text may use. 'address' is what a link",
+    "leaving the deployment may name: a document's address, and a rendered link",
+    "once attachment and issue references are rewritten into paths."
+  ],
+  "link": ["http", "https", "mailto", "attachment", "issue"],
+  "address": ["http", "https", "mailto"]
+}

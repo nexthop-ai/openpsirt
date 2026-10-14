@@ -63,6 +63,15 @@ somebody else's, and each renderer has its own tests over the same corpus.
 `attachment:` for a file held here and `issue:` for one vulnerability. Every
 other scheme is dropped.
 
+One file in the repository's test data holds both lists: what a link in
+submitted text may use, and what a link leaving the deployment may name once
+the two of this deployment's own are rewritten into paths. The submission
+check and the interface's renderer each keep their own copy, and a test on
+each side compares it with the file, so a scheme accepted at submission and
+dropped on screen fails on the side that was not changed. The refusal
+sentence and the operation description that name the schemes are built from
+the submission check's list.
+
 | Refused | Reason |
 |---|---|
 | `javascript:` | Script execution from a link |

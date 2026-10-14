@@ -1,6 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { LINK_SCHEMES } from "./schemes";
+
 // A URL a third party supplied, judged before it becomes somewhere to click.
 //
 // A scanner's advisory references and the records an enrichment feed carries
@@ -11,10 +13,13 @@
 // in this codebase, and neither of which the rule about third-party text
 // anywhere says is enough.
 //
-// The same two schemes the text policy permits for a link, asked the same way:
-// an address that is not one of them is not linked, and the text is shown as
-// it stands so nothing disappears from the page.
-const LINKABLE = /^https?:\/\//i;
+// The schemes the text policy permits for a link that name a page, which is
+// all of them but mailto. An address that is not one of them is not linked,
+// and the text is shown as it stands so nothing disappears from the page.
+const LINKABLE = new RegExp(
+  `^(?:${LINK_SCHEMES.filter((scheme) => scheme !== "mailto").join("|")}):\\/\\/`,
+  "i",
+);
 
 export function linkable(url: string | undefined | null): string | null {
   const written = String(url ?? "").trim();

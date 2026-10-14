@@ -1,0 +1,21 @@
+{
+  "note": [
+    "The words of the findings list's address that say where the list is or how",
+    "it is grouped rather than what it is narrowed by. A kept filter leaves them",
+    "out, on the server when it is stored and in the interface when an address is",
+    "compared with a kept query. Each half compares its own list with this file,",
+    "so a word dropped on one side and kept on the other fails a test."
+  ],
+  "words": [
+    "stream",
+    "variant",
+    "beneath",
+    "beneath_version",
+    "beneath_ecosystem",
+    "beneath_namespace",
+    "differs",
+    "variants",
+    "opened_by_run",
+    "view"
+  ]
+}

@@ -123,6 +123,8 @@ var Held = []Entry{
 	{"internal/sbom/testdata/switch-image-mellanox.cdx.json.xz", Ours, ""},
 	{"internal/scanner/testdata/grype-output.json", Ours, ""},
 	{"internal/scanner/testdata/grype-known-exploited.json", Ours, ""},
+	{"testdata/link-schemes.json", Ours, ""},
+	{"testdata/scope-words.json", Ours, ""},
 	{"testdata/xss-corpus.json", Ours, ""},
 	// An SPDX document written inline as a test's input, whose data license
 	// is the one the format requires every document to state.
