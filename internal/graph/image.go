@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -197,6 +198,73 @@ func StatedImages(ctx context.Context, db bun.IDB, targetID int64) (map[int64]Im
 	out := make(map[int64]ImageVersion, len(rows))
 	for _, row := range rows {
 		out[row.ComponentID] = ImageVersion{Version: row.Version, Purl: row.Purl}
+	}
+	return out, nil
+}
+
+// Stated is one version a build stated for an image, and the builds it was
+// stated across: from the build time of the scan that first stated it until
+// the build time of the scan that stated something else, absent while it is
+// still what the build states.
+type Stated struct {
+	Version string
+	Purl    string
+	From    time.Time
+	Until   *time.Time
+}
+
+// TargetComponent is one component in one build.
+type TargetComponent struct {
+	TargetID, ComponentID int64
+}
+
+// StatedVersions is every version these builds stated for these images,
+// newest first, by build and component. A component no build holds by name has
+// none.
+func StatedVersions(ctx context.Context, db bun.IDB, targets, components []int64) (
+	map[TargetComponent][]Stated, error) {
+
+	out := map[TargetComponent][]Stated{}
+	if len(targets) == 0 || len(components) == 0 {
+		return out, nil
+	}
+	type statedRow struct {
+		TargetID    int64      `bun:"target_id"`
+		ComponentID int64      `bun:"component_id"`
+		Version     string     `bun:"version"`
+		Purl        string     `bun:"purl"`
+		From        time.Time  `bun:"from_at"`
+		Until       *time.Time `bun:"until_at"`
+	}
+	var rows []statedRow
+	err := database.IDsInBatches(ctx, components, func(ctx context.Context, batch []int64) error {
+		var some []statedRow
+		if err := db.NewSelect().
+			TableExpr(`"image_version" AS "iv"`).
+			Join(`JOIN "graph_node" AS "n" ON n.id = iv.node_id`).
+			Join(`JOIN "scan" AS "so" ON so.id = iv.opened_scan_id`).
+			Join(`LEFT JOIN "scan" AS "sc" ON sc.id = iv.closed_scan_id`).
+			ColumnExpr(`n.target_id AS "target_id"`).
+			ColumnExpr(`n.component_id AS "component_id"`).
+			ColumnExpr(`iv.version AS "version"`).
+			ColumnExpr(`COALESCE(iv.purl, '') AS "purl"`).
+			ColumnExpr(`so.built_at AS "from_at"`).
+			ColumnExpr(`sc.built_at AS "until_at"`).
+			Where("n.target_id IN (?)", bun.List(targets)).
+			Where("n.component_id IN (?)", bun.List(batch)).
+			OrderExpr("iv.opened_scan_id DESC, iv.id DESC").
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		rows = append(rows, some...)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read the versions builds stated for their images: %w", err)
+	}
+	for _, row := range rows {
+		key := TargetComponent{row.TargetID, row.ComponentID}
+		out[key] = append(out[key], Stated{Version: row.Version, Purl: row.Purl, From: row.From, Until: row.Until})
 	}
 	return out, nil
 }

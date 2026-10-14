@@ -90,6 +90,18 @@ type FoldPackageBody struct {
 	FirstSeen  time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
 	Issues     int        `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
 	Consumers  int        `json:"consumers" doc:"The number of things pulling this binary in here"`
+	// StatedVersions is what a container image was stamped with, build by
+	// build. An image is identified by its name, so its version is not
+	// part of what it is.
+	StatedVersions []StatedVersionBody `json:"stated_versions,omitempty" doc:"Every version this build stated for a container image, newest first. A container image is identified by its name, and the version a build stamps it with is recorded here rather than in Version. Absent for everything else"`
+}
+
+// StatedVersionBody is one version a build stated for a container image.
+type StatedVersionBody struct {
+	Version string     `json:"version" doc:"The version as the build stated it, empty where it stated none"`
+	Purl    string     `json:"purl,omitempty" doc:"The package identifier as the build stated it, version and qualifiers included"`
+	From    time.Time  `json:"from" doc:"The build time of the first scan that stated it"`
+	Until   *time.Time `json:"until,omitempty" doc:"The build time of the scan that stated something else. Absent while it is what the build states"`
 }
 
 // registerComponent answers a component across the builds that carry it.
@@ -159,6 +171,11 @@ func registerComponent(api huma.API, in core.Deps) {
 			ecosystem := ""
 			for _, one := range build.Packages {
 				page, called := finding.PackagePage(one.Purl)
+				var stated []StatedVersionBody
+				for _, each := range one.Stated {
+					stated = append(stated, StatedVersionBody{Version: each.Version, Purl: each.Purl,
+						From: each.From, Until: each.Until})
+				}
 				if ecosystem == "" {
 					ecosystem = graph.EcosystemOf(one.Purl)
 				}
@@ -170,6 +187,7 @@ func registerComponent(api huma.API, in core.Deps) {
 					Supplier: one.Supplier, License: one.License,
 					Newest: one.Newest, NewestAt: one.NewestAt, FirstSeen: one.FirstSeen,
 					Issues: one.Issues, Consumers: one.Consumers,
+					StatedVersions: stated,
 				})
 			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{

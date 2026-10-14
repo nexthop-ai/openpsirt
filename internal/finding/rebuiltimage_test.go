@@ -135,3 +135,41 @@ func TestAPackageMovingInsideARebuiltImageSupersedesItsFinding(t *testing.T) {
 		}
 	})
 }
+
+func TestTheComponentPageListsTheVersionsEachBuildStampedAnImageWith(t *testing.T) {
+	// The image is one component however often it is rebuilt, so the page
+	// for it lists what each build stamped it with, newest first, and a
+	// package inside it lists none.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, inImage(swssImage("master.1-aaa"), libnl))
+		f.shipped(t, inImage(swssImage("master.2-bbb"), libnl))
+		reader := f.holding(t, access.PublicTriage)
+		builds, err := f.store.AcrossBuilds(ctx, reader, f.wholeProduct(), "docker-swss")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 || len(builds[0].Packages) != 1 {
+			t.Fatalf("the image answers %+v, want one build and one package", builds)
+		}
+		image := builds[0].Packages[0]
+		if image.Version != "" {
+			t.Errorf("the image answers at version %q, want none of its own", image.Version)
+		}
+		stated := image.Stated
+		if len(stated) != 2 || stated[0].Version != "master.2-bbb" || stated[0].Until != nil ||
+			stated[1].Version != "master.1-aaa" || stated[1].Until == nil ||
+			!stated[1].Until.Equal(stated[0].From) ||
+			stated[0].Purl != "pkg:oci/docker-swss@master.2-bbb?arch=amd64" {
+			t.Errorf("the image's versions read %+v, want the second build's open and first", stated)
+		}
+
+		inside, err := f.store.AcrossBuilds(ctx, reader, f.wholeProduct(), libnl.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(inside) != 1 || len(inside[0].Packages) != 1 || inside[0].Packages[0].Stated != nil {
+			t.Errorf("a package inside the image answers %+v, want no stated versions", inside)
+		}
+	})
+}

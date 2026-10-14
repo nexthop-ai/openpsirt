@@ -90,6 +90,10 @@ type FoldPackage struct {
 	// package alone, and Consumers how many things pull it in.
 	Issues    int
 	Consumers int
+	// Stated is every version this build stated for the package, newest
+	// first, where it is a container image held by its name. A package
+	// carries its version in its identity, and has none.
+	Stated []graph.Stated
 }
 
 // foldIn is one fold in one build.
@@ -153,6 +157,10 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if err != nil {
 		return nil, err
 	}
+	stated, err := graph.StatedVersions(ctx, s.db, targets, held.ids())
+	if err != nil {
+		return nil, err
+	}
 
 	var order []foldIn
 	rows := map[foldIn]*PerBuild{}
@@ -185,6 +193,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			Supplier: one.Supplier, License: one.License,
 			Newest: one.Newest, NewestAt: one.NewestAt, FirstSeen: one.FirstSeen,
 			Issues: open.onEach[binaryIn{one.TargetID, one.ComponentID}], Consumers: one.Consumers,
+			Stated: stated[graph.TargetComponent{TargetID: one.TargetID, ComponentID: one.ComponentID}],
 		})
 	}
 

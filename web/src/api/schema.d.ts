@@ -8542,6 +8542,8 @@ export interface components {
             project_url?: string;
             /** @description The package identifier this build ships it under */
             purl?: string;
+            /** @description Every version this build stated for a container image, newest first. A container image is identified by its name, and the version a build stamps it with is recorded here rather than in Version. Absent for everything else */
+            stated_versions?: components["schemas"]["StatedVersionBody"][] | null;
             /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
             summary?: string;
             /** @description The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
@@ -12180,6 +12182,22 @@ export interface components {
             publisher: string;
             /** @description What the supplier wrote alongside it */
             statement?: string;
+        };
+        StatedVersionBody: {
+            /**
+             * Format: date-time
+             * @description The build time of the first scan that stated it
+             */
+            from: string;
+            /** @description The package identifier as the build stated it, version and qualifiers included */
+            purl?: string;
+            /**
+             * Format: date-time
+             * @description The build time of the scan that stated something else. Absent while it is what the build states
+             */
+            until?: string;
+            /** @description The version as the build stated it, empty where it stated none */
+            version: string;
         };
         Statement: {
             action_statement?: string;

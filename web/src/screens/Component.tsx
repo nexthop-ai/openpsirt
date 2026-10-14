@@ -328,6 +328,16 @@ export function Component() {
               </dd>
               <dt>First seen</dt>
               <dd className="hint">{pkg.first_seen ? on(pkg.first_seen) : "—"}</dd>
+              {(pkg.stated_versions ?? []).length > 0 && (
+                <>
+                  <dt title="A container image is tracked by its name. Each build's version of it is listed here">
+                    Image versions
+                  </dt>
+                  <dd>
+                    <ImageVersions stated={pkg.stated_versions ?? []} />
+                  </dd>
+                </>
+              )}
               <dt>Upgrade scheduled</dt>
               <dd>
                 {here.upgrade_to ? (
@@ -350,6 +360,37 @@ export function Component() {
 
       <History product={product} pkg={pkg} here={here} />
     </>
+  );
+}
+
+// The versions a build stamped a container image with, newest first. The image
+// is one component however often it is rebuilt, so its version is a fact about
+// each build rather than part of what it is. The first few are shown and the
+// rest counted, because a nightly build stamps a new one every night.
+function ImageVersions({ stated }: { stated: Body<"StatedVersionBody">[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? stated : stated.slice(0, SHOWN);
+  return (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      {shown.map((each) => (
+        <li key={`${each.from}-${each.version}`}>
+          <span className="id" title={each.purl || undefined}>
+            {each.version || "no version"}
+          </span>{" "}
+          <span className="hint">
+            {on(each.from)}
+            {each.until ? ` to ${on(each.until)}` : " to now"}
+          </span>
+        </li>
+      ))}
+      {stated.length > shown.length && (
+        <li>
+          <button type="button" className="linkish" onClick={() => setAll(true)}>
+            {stated.length - shown.length} earlier
+          </button>
+        </li>
+      )}
+    </ul>
   );
 }
 
