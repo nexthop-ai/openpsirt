@@ -641,6 +641,34 @@ func TestAFlawRatedUnderBothGenerationsStatesTheOneTheDocumentCarries(t *testing
 	})
 }
 
+// A vector carrying metrics outside the base set is published as the base
+// vector inside it, because a CSAF validator checks the vector against the
+// specification's grammar and those metrics are accepted here unchecked.
+func TestAPublishedScoreStatesOnlyTheBaseVector(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
+			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			Summary: "The management socket answers before anyone authenticated.",
+			Vector:  "CVSS:3.1/E:Q/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/FOO:BAR",
+		})
+		if err != nil {
+			t.Fatalf("recording a flaw: %v", err)
+		}
+		doc, err := f.document(t, "sonic", identifier)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		scores := doc.Vulnerabilities[0].Scores
+		if len(scores) != 1 || scores[0].CVSSv3 == nil {
+			t.Fatalf("the document states %d scores, want one", len(scores))
+		}
+		const base = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+		if got := scores[0].CVSSv3; got.VectorString != base || got.BaseScore != 9.8 {
+			t.Errorf("the document states %+v, want the base vector %s at 9.8", got, base)
+		}
+	})
+}
+
 func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 	// The score, the credit, the places to go and what to do about it are all
 	// held, and the document carried none of them: a reader got which
