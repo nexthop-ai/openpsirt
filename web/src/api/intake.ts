@@ -20,7 +20,9 @@ export type Rulable = Ruling["disposition"];
 // The rows one request carries, named so the pager and the request agree.
 export const PAGE = 50;
 
-// Everything an act on a report or a ruling can move.
+// Everything an act on a report or a ruling can move. A duplicate ruling moves
+// an issue's disclosure date, and withdrawing one moves it back, so every read
+// carrying that date is among them.
 export function useAfterReport() {
   const queries = useQueryClient();
   return () => {
@@ -29,6 +31,12 @@ export function useAfterReport() {
     void queries.invalidateQueries({ queryKey: ["rulings"] });
     void queries.invalidateQueries({ queryKey: ["duplicates"] });
     void queries.invalidateQueries({ queryKey: ["report"] });
+    void queries.invalidateQueries({ queryKey: ["duplicate-disclosure"] });
+    void queries.invalidateQueries({ queryKey: ["finding"] });
+    void queries.invalidateQueries({ queryKey: ["findings"] });
+    void queries.invalidateQueries({ queryKey: ["issue"] });
+    void queries.invalidateQueries({ queryKey: ["disclosing"] });
+    void queries.invalidateQueries({ queryKey: ["home"] });
   };
 }
 

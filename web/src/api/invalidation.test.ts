@@ -68,9 +68,21 @@ describe("what an act invalidates", () => {
     );
   });
 
-  it("a change to a report reaches the reports, the rulings and the duplicates", () => {
+  it("a change to a report reaches the reports, the rulings, the duplicates and every disclosure date", () => {
     expect(after(useAfterReport)).toEqual(
-      ["duplicates", "recorded-report", "report", "reports", "rulings"].sort(),
+      [
+        "disclosing",
+        "duplicate-disclosure",
+        "duplicates",
+        "finding",
+        "findings",
+        "home",
+        "issue",
+        "recorded-report",
+        "report",
+        "reports",
+        "rulings",
+      ].sort(),
     );
   });
 });

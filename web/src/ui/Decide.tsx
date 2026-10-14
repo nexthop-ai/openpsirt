@@ -360,16 +360,19 @@ export function Decide({
   // A promise with no date is what leaving the finding alone already says, so
   // the date is what makes it a claim at all.
   const needsLanding = outcome === "patch-needed";
-  // Ctrl or ⌘ with Enter, anywhere in the form. Only when it is ready, so the
-  // shortcut cannot submit something the button would refuse.
+  // Ctrl or ⌘ with Enter, from inside the form. Only when it is ready, so the
+  // shortcut cannot submit something the button would refuse. Not from outside
+  // it: a comment box on the same screen takes the same keys for its own.
   //
   // Through refs rather than by re-binding on every keystroke: the listener is
   // one, and what it reads is whatever the form says at the moment it fires.
   const readyRef = useRef(false);
   const startRef = useRef(() => {});
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function pressed(event: KeyboardEvent) {
       if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) return;
       if (!readyRef.current) return;
       event.preventDefault();
       startRef.current();
@@ -827,7 +830,7 @@ export function Decide({
           {/* The pane is named for both questions, so the box somebody types
               a judgment into carries its own name. */}
           <h4 className="deciding-head">Decision</h4>
-          <div className="writing">
+          <div className="writing" ref={rootRef}>
             {form}
             {aside}
           </div>

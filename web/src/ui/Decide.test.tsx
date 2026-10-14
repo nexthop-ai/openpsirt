@@ -122,3 +122,76 @@ describe("proposing a deferral past the threshold", () => {
     );
   });
 });
+
+describe("the decision form's Ctrl+Enter", () => {
+  async function ready() {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            deferral_days: 30,
+            outcomes: PUBLISHED,
+          },
+        };
+      }
+      if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };
+      return { data: { items: [], total: 0 } };
+    });
+    const sent = accept(() => ({
+      data: { claim_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: false },
+    }));
+    mount.render(
+      screen(
+        <>
+          <Decide
+            at={at}
+            places={[{ place: "p1", component: "openssl" }]}
+            onDone={() => undefined}
+          />
+          <textarea aria-label="A comment elsewhere" />
+        </>,
+      ),
+    );
+    await settle();
+    const host = mount.host();
+    const deferred = Array.from(host.querySelectorAll<HTMLButtonElement>("button.outcome")).find(
+      (each) => each.textContent === "Deferred",
+    );
+    act(() => deferred?.click());
+    const date = host.querySelector<HTMLInputElement>('input[type="date"]');
+    act(() => {
+      if (date) type(date, daysOut(10));
+    });
+    const reasoning = host.querySelector<HTMLTextAreaElement>(".writing textarea");
+    act(() => {
+      if (reasoning) type(reasoning, "Waiting on the vendor's next image.");
+    });
+    return { sent, host, reasoning };
+  }
+
+  function press(on: Element | null) {
+    act(() => {
+      on?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }),
+      );
+    });
+  }
+
+  it("submits from inside the form", async () => {
+    const { sent, reasoning } = await ready();
+    press(reasoning);
+    await settle();
+    expect(sent()).toHaveLength(1);
+  });
+
+  it("does not submit from a box outside it", async () => {
+    const { sent, host } = await ready();
+    press(host.querySelector('textarea[aria-label="A comment elsewhere"]'));
+    await settle();
+    expect(sent()).toHaveLength(0);
+  });
+});

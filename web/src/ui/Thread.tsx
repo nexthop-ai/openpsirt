@@ -52,7 +52,7 @@ export function Thread({
   adding,
   onAdd,
   edit,
-  history,
+  useHistory,
 }: {
   items: Said[];
   // A piece written by whoever is reading. The identity alone: a
@@ -75,7 +75,8 @@ export function Thread({
   adding: { isPending: boolean; error: unknown };
   onAdd: (body: string, done: () => void) => void;
   edit: (piece: Said, done: () => void) => ReactNode;
-  history: (id: number) => UseQueryResult<{ items?: Version[] | null }>;
+  // A hook, named as one so the rules of hooks are checked where it is called.
+  useHistory: (id: number) => UseQueryResult<{ items?: Version[] | null }>;
 }) {
   const [text, setText] = useState("");
   const [showing, setShowing] = useState<number | null>(null);
@@ -117,7 +118,7 @@ export function Thread({
                         than always on screen: the current text is what a
                         reader is reading, and the history is what somebody
                         checking the record goes looking for. */}
-                    {showing === each.id && <Earlier history={history(each.id ?? 0)} />}
+                    {showing === each.id && <Earlier id={each.id ?? 0} useHistory={useHistory} />}
                     {mine(each.written_by ?? "") && (
                       <button
                         type="button"
@@ -187,9 +188,17 @@ type Version = { version?: number; body?: string; replaced_at?: string };
 // A thread goes public at disclosure with the rest of the record, so one whose
 // earlier text is unrecoverable is one somebody can read and nobody can check.
 // Read only when asked for: the current text is what a reader is reading, and
-// this is what somebody checking goes looking for — which is why the query
-// arrives already built rather than being made here.
-function Earlier({ history }: { history: UseQueryResult<{ items?: Version[] | null }> }) {
+// this is what somebody checking goes looking for. The hook is called here, in
+// a component mounted when the mark is pressed, so the thread's own hooks are
+// the same on every render.
+function Earlier({
+  id,
+  useHistory,
+}: {
+  id: number;
+  useHistory: (id: number) => UseQueryResult<{ items?: Version[] | null }>;
+}) {
+  const history = useHistory(id);
   const rows = history.data?.items ?? [];
   if (history.isPending) return <Loading />;
   if (history.isError) {

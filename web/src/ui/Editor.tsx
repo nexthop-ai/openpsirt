@@ -146,13 +146,16 @@ export function Editor({
   // Restore whatever was left behind, once per draft, and only over an empty
   // field — a draft must never overwrite something the caller supplied.
   //
-  // Once per *draft*, not once per mount. The key changes under a mounted
-  // editor whenever what it is about changes, and a one-shot flag meant the
-  // second draft was never restored at all.
+  // Once per draft rather than once per mount, because the key changes under a
+  // mounted editor whenever what it is about changes. A key first seen with
+  // text in the field is settled then: the effect below has already kept that
+  // text as the draft, so restoring it when the field is next emptied would put
+  // back what somebody just deleted.
   const restored = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (restored.current === draftKey || !draftKey || value !== "") return;
+    if (restored.current === draftKey || !draftKey) return;
     restored.current = draftKey;
+    if (value !== "") return;
     const kept = restore(draftKey);
     if (kept) onChange(kept);
   }, [draftKey, value, onChange]);
@@ -188,6 +191,12 @@ export function Editor({
     });
   }
 
+  // The text as last drawn, for a write that lands after an await.
+  const latest = useRef(value);
+  useEffect(() => {
+    latest.current = value;
+  });
+
   // Puts one file against the issue and writes the reference where the cursor
   // is. An image goes in as one, and everything else as a link: what decides
   // that is the type the server chose from the bytes, not the file's name.
@@ -207,9 +216,12 @@ export function Editor({
       const written = stored.inline
         ? `![${stored.filename}](${stored.reference})`
         : `[${stored.filename}](${stored.reference})`;
+      // Written into the text as it is now. The field stays editable while
+      // the upload runs, so the value this call began with has gone stale.
       const field = box.current;
-      const at = field ? field.selectionStart : value.length;
-      onChange(value.slice(0, at) + written + value.slice(at));
+      const live = field ? field.value : latest.current;
+      const at = field ? field.selectionStart : live.length;
+      onChange(live.slice(0, at) + written + live.slice(at));
       queueMicrotask(() => field?.focus());
     } catch (error) {
       // Said here rather than thrown away. The two refusals somebody can act

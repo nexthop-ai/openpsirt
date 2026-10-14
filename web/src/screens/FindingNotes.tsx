@@ -92,7 +92,7 @@ export function Notes({
             onDone={done}
           />
         )}
-        history={useNoteHistory}
+        useHistory={useNoteHistory}
       />
     </div>
   );

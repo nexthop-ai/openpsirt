@@ -118,8 +118,10 @@ export function Review({
         onCancel();
         return;
       }
+      // A focused control keeps its own keys: Enter on Back or Close is that
+      // button, not a confirmation.
       const tag = (document.activeElement?.tagName ?? "").toUpperCase();
-      if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
+      if (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(tag)) return;
       if (event.key === "Enter") {
         event.preventDefault();
         if (step === 0) go("next");

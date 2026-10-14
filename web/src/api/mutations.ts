@@ -44,7 +44,12 @@ export function useEditComment() {
           body: { body },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["comments"] }),
+    // Its earlier wording too, which an open "edited" panel is showing and
+    // which now holds the text just replaced.
+    onSuccess: (_, { id }) => {
+      void queries.invalidateQueries({ queryKey: ["comments"] });
+      void queries.invalidateQueries({ queryKey: ["comment", id, "history"] });
+    },
   });
 }
 
@@ -107,6 +112,9 @@ export function useEditNote() {
           body: { body },
         }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["notes"] }),
+    onSuccess: (_, { id }) => {
+      void queries.invalidateQueries({ queryKey: ["notes"] });
+      void queries.invalidateQueries({ queryKey: ["note", id, "history"] });
+    },
   });
 }

@@ -561,7 +561,7 @@ export function Comments({
             onDone={done}
           />
         )}
-        history={useCommentHistory}
+        useHistory={useCommentHistory}
       />
     </div>
   );

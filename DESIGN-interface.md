@@ -929,6 +929,7 @@ collects the answer it suggested.
 | Ctrl+Enter asks what the button asks | Nothing is sent while a submission is in flight or the review sheet is open, so a second press does not post the decision twice |
 | It names the next missing answer, beside the button | A disabled button says something is missing and never what, and Ctrl+Enter does nothing until the same answer is given. One rule decides both the sentence and the refusal |
 | Ctrl+Enter submits, and the form says so | A shortcut nobody knows about is a shortcut nobody has, and the person it is for is making a hundred of these a day |
+| Ctrl+Enter submits only from inside the form | A comment thread can sit on the same screen, and the keys pressed in its box are that box's |
 | The last pair is offered, never applied | Retyping the outcome and the justification is the cost the review measured, but a judgment prefilled with the last one made is a record that can say what nobody meant. So it is a button that says what it will fill in, and the fill is somebody's own click. Per session, because a default that survives a night is a default nobody chose |
 | A justification is shown with a label and a one-line meaning, never as its bare token (REQ-60) | An accuracy defect rather than a cosmetic one: the token somebody picks out of a list of five snake_case strings at the end of a long day is what ships to a customer, machine-readable, as our claim about their exposure. The stored token stays reachable, on the title, because it is what an approver is checking |
 | One list, and one way of rendering it | The vocabulary carries its own labels, the two forms that offer a choice read from it, and the six places that display a stored one go through a single renderer. Two screens had already started to diverge. A test asserts that every value the type allows is in the list and carries a label that is not its own token |
@@ -1476,6 +1477,8 @@ eventually disagrees with what gets published.
 | A control is drawn with something the bundle carries | A mark whose character one of the bundled fonts has is that character; the rest are icons from the set the rail uses. An emoji is neither — no emoji font ships here, so a link and a paperclip drawn as one are an empty box on any machine that has none installed. That is the same failure as fetching a font at run time, and it is invisible to whoever picks the glyph, because their own machine has the font |
 | Preview is the published rendering, not a second one that resembles it | |
 | Preview returns warnings as well as rendered output (REQ-67) | Anything that would be refused says so before somebody presses submit. A refusal at submit, on a long justification, sends somebody hunting for the line by eye |
+| An attached file's reference goes into the text as it is when the upload lands | The field stays editable while the file uploads, so what was typed meanwhile is kept and the reference lands at the cursor |
+| An edited piece's earlier wording is read by the panel that shows it, and refreshed by the edit | The panel is mounted when "edited" is pressed, so the thread asks for the same reads on every render. An edit refreshes the history it just added to |
 
 ### Drafts
 
@@ -1487,7 +1490,7 @@ the part of a decision that matters most.
 
 | Rule | |
 |---|---|
-| Restoring is deliberately narrow | Only into an empty field, and only once per draft. Once per *editor* meant the second draft an open editor was asked for was never restored, because the key changes under it when what it is about changes |
+| Restoring is deliberately narrow | Only into an empty field, and only once per draft. Once per *editor* meant the second draft an open editor was asked for was never restored, because the key changes under it when what it is about changes. A draft key first seen with text in the field is settled then, so clearing prefilled text leaves it cleared |
 | **What is on screen is stored under the key it was typed under** | The key and the text move in separate renders, so the first write after the key moves carries the previous text — which put one thing's reasoning into another's draft |
 | Storage a browser refuses is not a failure | The draft is a convenience; the text in front of somebody is the real thing, so every read and write of it tolerates being turned down |
 | Signing out clears every draft the browser holds | Every writer's, not only the one signing out: a draft left by an earlier session is the one nobody would think to clear, and drafts hold triage text with private findings among it. Cleared *before* the request that ends the session: a sign-out that could not reach the server is the case where clearing matters most |
@@ -1550,6 +1553,7 @@ A control somebody can see and cannot reach is a control that is not there.
 | Where a control has no border of its own, the ring goes on the box around it | The two search boxes draw their own frame and the input inside has none, so the ring taken off the input had nowhere to go |
 | Nothing a person operates is hidden with `display: none` | It leaves the tab order. A drop zone's file input is out of sight and still focusable, and the zone draws the focus ring, because a label is not focusable and nothing else reaches the input |
 | Text on a severity color reads the token that flips with the look | Every severity token in the dark look is a light tint, so white on one of them is 2.54:1. One rule hardcoded white over the critical token at nine and a half pixels |
+| A focused control keeps Enter | On the review sheet, Enter confirms only where no button, link or field has focus. Enter on Back or Close is that button |
 | One ratio for one meaning | A disabled chip and a disabled button said the same thing at two strengths, and the weaker composited to about 2.2:1 against white |
 
 ## A read that failed
