@@ -161,6 +161,38 @@ func TestAClaimAgainstASourceTreeIsAsGoodAsItsName(t *testing.T) {
 	}
 }
 
+// A generic identifier with a namespace names the package by its last segment,
+// as the purl specification's own example spells one. The namespace is
+// compared where the component is a generic identifier carrying one.
+func TestANamespacedSourceTreeClaimCoversThePackageItNames(t *testing.T) {
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-2"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:generic/openssl/openssl@1.0.2"}]}`))
+	for _, each := range []struct {
+		why    string
+		held   graph.Described
+		covers bool
+	}{
+		{"a distribution's package of that name, whose namespace names the distribution",
+			graph.Described{Purl: "pkg:deb/debian/openssl@1.0.2", Name: "openssl", Version: "1.0.2"}, true},
+		{"a generic component in the same namespace",
+			graph.Described{Purl: "pkg:generic/OpenSSL/openssl@1.0.2", Name: "openssl", Version: "1.0.2"}, true},
+		{"a generic component with no namespace",
+			graph.Described{Purl: "pkg:generic/openssl@1.0.2", Name: "openssl", Version: "1.0.2"}, true},
+		{"a component with no identifier at all",
+			graph.Described{Name: "openssl", Version: "1.0.2"}, true},
+		{"a generic component in another namespace",
+			graph.Described{Purl: "pkg:generic/fork/openssl@1.0.2", Name: "openssl", Version: "1.0.2"}, false},
+		{"another version",
+			graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14", Name: "openssl", Version: "3.0.14"}, false},
+		{"a name that merely starts the same",
+			graph.Described{Purl: "pkg:deb/debian/openssl-dev@1.0.2", Name: "openssl-dev", Version: "1.0.2"}, false},
+	} {
+		if got[0].Covers(each.held) != each.covers {
+			t.Errorf("%s: covered %v, wanted %v", each.why, !each.covers, each.covers)
+		}
+	}
+}
+
 func TestAClaimMatchesThePackageHoweverEitherSideSpellsIt(t *testing.T) {
 	// Identity decodes escapes and lowercases the type, because one real image
 	// carries the same package spelled both ways. A claim compared as written
