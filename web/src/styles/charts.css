@@ -104,18 +104,6 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.ringkey .d {
-  font-variant-numeric: tabular-nums;
-  font-size: 10px;
-  width: 30px;
-  text-align: right;
-}
-.ringkey .d.up {
-  color: var(--sev-exploited);
-}
-.ringkey .d.down {
-  color: var(--ok);
-}
 
 /* Recharts marks its surface focusable; the browser's ring reads as a box
    drawn on purpose. Ours is shown instead, and only from a keyboard. */

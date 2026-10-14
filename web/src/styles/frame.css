@@ -105,6 +105,17 @@ button {
   display: block;
 }
 
+/* A small uppercase heading over a group: the rail's groups, the picker's
+   columns and the look menu's sections. */
+.rail .group,
+.picker h5,
+.lookmenu h5 {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+}
+
 /* A heading that folds what is under it. It stays a heading to look at: the
    caret is the only thing marking it as a control, because a rail of three
    buttons styled as buttons reads as three more places to go. */
@@ -117,12 +128,8 @@ button {
   background: none;
   text-align: left;
   cursor: pointer;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
   color: var(--side-faint);
   padding: 14px 10px 6px;
-  font-weight: 600;
 }
 .rail .group .what {
   overflow: hidden;
@@ -387,11 +394,7 @@ button {
 }
 .picker h5 {
   margin: 0 0 6px;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
   color: var(--faint);
-  font-weight: 600;
 }
 .opt {
   display: flex;
@@ -536,11 +539,7 @@ button {
 }
 .lookmenu h5 {
   margin: 4px 8px 6px;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
   color: var(--faint);
-  font-weight: 600;
 }
 .lookmenu .opt .swatch {
   width: 14px;
@@ -636,10 +635,13 @@ button {
 
 /* A label over a block, in the words a person would use for it. Sentence
    case: a page of uppercase labels shouts every heading equally, and the
-   label is the quietest thing in its block rather than the loudest. The same
-   shape is given to every label of this kind below, in the file that owns
-   the block. */
-.eyebrow {
+   label is the quietest thing in its block rather than the loudest. Every
+   label of this kind is named here, so the shape has one definition. */
+.eyebrow,
+.evblock h4,
+.score .l,
+.ourview .l,
+.dgrid .l {
   font-size: 12px;
   color: var(--muted);
   font-weight: 500;

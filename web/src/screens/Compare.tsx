@@ -253,7 +253,7 @@ type Changed = Body<"ChangedBody">;
 
 // Marks read as sentences rather than as field values, because a reader of a
 // release note is being told what happened rather than shown a column.
-const WENT: Record<string, string> = {
+const WENT: Record<NonNullable<Changed["because"]>, string> = {
   upgraded: "Upgraded",
   revised: "Revised",
   patched: "Patched",
@@ -262,6 +262,8 @@ const WENT: Record<string, string> = {
   unexplained: "Unexplained",
   unaffected: "Not affected",
   disclaimed: "Not affected, per supplier",
+  invalid: "Taken back",
+  fixed: "Fixed",
 };
 
 function Columns({
@@ -369,7 +371,7 @@ function Column({
               </span>
               <span className="why">
                 {row.because && (
-                  <span className={`mark ${row.because}`}>
+                  <span className={row.because === "patched" ? "mark patched" : "mark"}>
                     {own(WENT, row.because) ?? row.because}
                   </span>
                 )}

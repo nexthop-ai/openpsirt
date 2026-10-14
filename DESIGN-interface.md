@@ -183,6 +183,8 @@ what every other application on the same screen calls them.
 | Every state is ink or the raised tone | Picked, pressed, checked, selected, the page you are on, the component a path leads to, a setting that is set. The accent stays with links, focus rings, hover on what opens, and the row or option the keys are on. A web test fails on a style rule for a state that uses the accent |
 | Severity is a dot and a word | Colored by the band, with no fill behind them. A tinted pill on every row of a fifty-row list is fifty patches of color competing with the column that is read first |
 | A count beside a tab is a number | Quieter than the word it counts and the same shape whether the tab is selected or not |
+| A warning or an all-clear tint is a token | Each of the two colors has three: a panel on the surface, a wash over whatever is behind, and the line around either. Two screens' warnings are then one shade, and a different strength is a raw mix that says why beside it |
+| A shape many rules share is one rule | The sentence-case label, the small uppercase heading over a group, a chip's tint arms and the editor column's reserved height are each written once with every selector that takes them, so a change lands everywhere it is drawn |
 
 | Rule | |
 |---|---|

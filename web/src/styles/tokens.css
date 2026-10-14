@@ -190,6 +190,15 @@
 :root,
 :root[data-look="dark"] {
   --sev-exploited-bg: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
+
+  /* A warning or an all-clear as a panel on the surface, as a wash on
+     whatever is behind it, and as the line around either. */
+  --warn-bg: color-mix(in oklab, var(--sev-high) 8%, var(--surface));
+  --warn-wash: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  --warn-line: color-mix(in oklab, var(--sev-high) 40%, transparent);
+  --ok-bg: color-mix(in oklab, var(--ok) 8%, var(--surface));
+  --ok-wash: color-mix(in oklab, var(--ok) 10%, transparent);
+  --ok-line: color-mix(in oklab, var(--ok) 45%, transparent);
 }
 
 /* ---------- base element rules ---------- */

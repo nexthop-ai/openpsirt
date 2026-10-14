@@ -215,8 +215,8 @@ a.kpi:hover {
 /* ---------- alerts / callouts ---------- */
 
 .alert {
-  border: 1px solid color-mix(in oklab, var(--sev-high) 35%, transparent);
-  background: color-mix(in oklab, var(--sev-high) 8%, var(--surface));
+  border: 1px solid var(--warn-line);
+  background: var(--warn-bg);
   padding: 10px 12px 10px 14px;
   border-radius: var(--radius);
   font-size: var(--step--1);
@@ -491,8 +491,8 @@ a.kpi:hover {
 /* The same card where the act is refused rather than offered — no version
    fixes any of this, so the work is a judgment. */
 .card.stuck {
-  border-color: color-mix(in oklab, var(--sev-high) 40%, transparent);
-  background: color-mix(in oklab, var(--sev-high) 7%, transparent);
+  border-color: var(--warn-line);
+  background: var(--warn-wash);
 }
 
 /* The versions a build could move to, with what each closes beside it. A list
@@ -548,7 +548,6 @@ a.kpi:hover {
 
 /* A pair of figures inside a panel rather than across a screen. */
 .kpis.tight {
-  gap: var(--gap-wide);
   margin-bottom: var(--gap-wide);
 }
 
@@ -689,27 +688,31 @@ tr.row.on > td {
   display: none;
 }
 
+/* A chip takes its tint from one hook, so an arm names a color and nothing
+   else. */
 .vchip {
+  --c: var(--muted);
   font-size: 10.5px;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   padding: 0 7px;
-  color: var(--muted);
+  color: var(--c);
   white-space: nowrap;
 }
+.vchip.differs,
+.vchip.nothing,
+.vchip.bad,
+.vchip.ok {
+  border-color: var(--c);
+  background: color-mix(in oklab, var(--c) 10%, transparent);
+}
 .vchip.differs {
-  border-color: var(--sev-high);
-  color: var(--sev-high);
-  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  --c: var(--sev-high);
 }
 /* A chip marking what a row is missing rather than what it holds. It reads as
-   a warning and stays a chip: the block-level notice it used to borrow set a
-   display, a margin and three sides of padding, so it stood a row of pills on
-   end and stretched every chip beside it to its height. */
+   a warning and stays a chip, the height of the chips beside it. */
 .vchip.nothing {
-  border-color: var(--sev-high);
-  color: var(--sev-high);
-  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  --c: var(--sev-high);
   font-weight: 600;
 }
 /* A chip somebody picks with, and the one picked. It stays a chip: a button
@@ -725,15 +728,11 @@ button.vchip {
 /* A chip tinted by what it says rather than by where it sits: a count of
    criticals and a deadline are read at a glance or not at all. */
 .vchip.bad {
-  border-color: var(--sev-critical);
-  color: var(--sev-critical);
-  background: color-mix(in oklab, var(--sev-critical) 10%, transparent);
+  --c: var(--sev-critical);
   font-weight: 600;
 }
 .vchip.ok {
-  border-color: var(--ok);
-  color: var(--ok);
-  background: color-mix(in oklab, var(--ok) 10%, transparent);
+  --c: var(--ok);
 }
 .vchip.on {
   border-color: var(--ink);
@@ -883,7 +882,6 @@ button.vchip {
 /* Nothing picked yet reads as a question rather than as a row of labels. */
 .seg:not(:has([aria-pressed="true"])) {
   border-style: dashed;
-  border-color: var(--line-strong);
 }
 .seg button {
   display: inline-flex;
@@ -1072,8 +1070,6 @@ button.vchip {
 .advanced .field.row span {
   font-size: var(--step--1);
   color: var(--ink);
-  text-transform: none;
-  letter-spacing: 0;
   font-weight: 500;
 }
 .searchbox {
@@ -1166,12 +1162,6 @@ button.vchip {
   background-image:
     linear-gradient(to left, var(--shade), transparent 28px),
     linear-gradient(to right, var(--shade), transparent 28px);
-}
-/* A box that scrolls takes a tab stop, so the arrow keys move it; the ring
-   says it has one. */
-.tablewrap[data-wider]:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 table {
   border-collapse: collapse;
@@ -1668,26 +1658,6 @@ textarea:disabled {
 .rendered p:last-child {
   margin-bottom: 0;
 }
-.rendered code {
-  background: var(--raised);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.92em;
-}
-.rendered pre {
-  background: var(--raised);
-  padding: 9px 11px;
-  border-radius: var(--radius);
-  overflow-x: auto;
-  margin: 0 0 9px;
-}
-.rendered pre code {
-  background: none;
-  padding: 0;
-}
-.rendered a {
-  color: var(--accent);
-}
 
 .tabs2 {
   display: flex;
@@ -1769,8 +1739,6 @@ textarea:disabled {
   font-size: var(--step--1);
   font-weight: 600;
   color: var(--ink);
-  text-transform: none;
-  letter-spacing: 0;
 }
 .filterset select,
 .filterset input:not([type="checkbox"]) {
@@ -1893,10 +1861,6 @@ textarea:disabled {
   color: var(--faint);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-.viewtab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 /* A filter as one button carrying its own name and value. Each wraps as a
@@ -2257,13 +2221,11 @@ select.triageline {
   stroke-linejoin: round;
 }
 
-/* A drop zone is a label, and not the small-caps kind. */
+/* A drop zone is a label, set in the drop zone's own size and weight rather
+   than a field label's. Its color is left to the drop zone's states. */
 .field > label.dropzone {
-  text-transform: none;
-  letter-spacing: 0;
   font-size: var(--step--1);
   font-weight: 400;
-  color: var(--muted);
 }
 
 /* The finding an approver is judging, above the argument about it. */
@@ -2438,8 +2400,6 @@ select.triageline {
   align-items: center;
   gap: var(--gap-tight);
   font: inherit;
-  text-transform: none;
-  letter-spacing: 0;
   color: var(--ink);
   cursor: pointer;
 }
@@ -2478,7 +2438,7 @@ select.triageline {
 }
 .mark button:hover:not(:disabled) {
   color: var(--sev-high);
-  background: color-mix(in oklab, var(--sev-high) 10%, transparent);
+  background: var(--warn-wash);
 }
 .mark.add {
   border-style: dashed;
