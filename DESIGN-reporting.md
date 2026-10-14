@@ -519,6 +519,7 @@ assembled differently every time.
 | Every address in it goes through the rule an address stored beside a claim goes through, and names `http`, `https` or `mailto` | It is a document somebody forwards, and a scheme a reader's machine acts on is not something to hand them. Inside angle brackets anything but an absolute address opens markup, and a space, an ASCII control character or a bracket ends the address and makes the rest of the line markdown, so an address carrying one is left out |
 | Everything else in it that did not pass the submission policy is escaped where it is written | The identifier, description, severity and aliases come from feeds, the component, version and fixed-in version from scan files, and product and person names are not markdown. A reasoning passed the policy when it was typed and is written as it was |
 | It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of judgments, and what this is for is being read |
+| Over a page, it says how many judgments stand and how many are recorded | The list carries withdrawn and lapsed judgments too, and only a judgment in force stands |
 
 ## The exception report
 
