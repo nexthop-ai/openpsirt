@@ -262,7 +262,7 @@ ingress controller.
 | Rendered whenever a trusted header is named, unless turned off | Off, any pod can send the header to the Service and be signed in as anybody, the bootstrap administrators included |
 | Admits the ingress controller by namespace and pod labels, both configurable, and any further peers named | The defaults are ingress-nginx's own labels. A controller on the host network needs an address block, and a metrics scraper a namespace of its own |
 | The controller's defaults apply only where neither label map is set, and are applied in the template | Helm merges a map an operator sets into a default map, so defaults held in the values would keep ingress-nginx's labels beside another controller's and admit nobody |
-| A controller named by its pods alone is looked for in every namespace | A pod selector alone selects pods in the policy's own namespace, which is never where the controller runs |
+| A controller named by its pods alone is refused at render | A pod selector alone selects pods in the policy's own namespace, which is never where the controller runs, and pod labels matched in every namespace are labels anybody who may create a pod can set. That pod could assert the sign-in header. The policy renders only where trusted-header sign-in is on, so the refusal applies there alone |
 | The controller's admission can be turned off, leaving the further peers alone | A controller on the host network is named by address, and its labels would admit nothing |
 | Anything reaching the Service directly is refused unless named as a further peer | A pipeline uploading with a key from inside the cluster is one |
 | Refused at render where it would admit nobody | See § Render-time refusals |

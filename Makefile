@@ -1454,6 +1454,7 @@ else
 	  "a group role with an empty product|names an empty product|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={public-read} --set auth.groupRoles[0].products={}" \
 	  "administration held on a product|takes no products|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.github.org=o --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin} --set auth.groupRoles[0].products={router-os}" \
 	  "group roles and nothing reporting groups|set a source of groups for auth.groupRoles|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.baseURL=https://p.example.com --set auth.github.clientID=gh --set auth.github.clientSecret=shh --set auth.groupRoles[0].group=g --set auth.groupRoles[0].roles={admin}" \
+	  "a controller named by its pods alone|set networkPolicy.ingressController.namespaceLabels|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.podLabels.app=router" \
 	  "a trusted header fenced from everybody|set networkPolicy.ingressController or networkPolicy.from|--set database.existingSecret=s --set auth.bootstrapAdmins={admin} --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} --set networkPolicy.ingressController.enabled=false"; do \
 	  refusals=$$((refusals + 1)); \
 	  what="$${missing%%|*}"; rest="$${missing#*|}"; \
@@ -1475,11 +1476,12 @@ else
 	@set -e; out=$$(helm template t deploy/helm/openpsirt -s templates/networkpolicy.yaml \
 	  --set database.existingSecret=s --set auth.bootstrapAdmins={admin} \
 	  --set auth.trustedHeader.name=X-User --set auth.trustedHeader.sources={10.0.0.0/8} \
-	  --set networkPolicy.ingressController.podLabels.app=router); \
+	  --set networkPolicy.ingressController.podLabels.app=router \
+	  --set networkPolicy.ingressController.namespaceLabels.team=edge); \
 	case "$$out" in *ingress-nginx*) echo "a controller's own labels were merged with ingress-nginx's:"; echo "$$out"; exit 1;; esac; \
 	case "$$out" in *"app: router"*) ;; *) echo "a controller's own labels were not rendered:"; echo "$$out"; exit 1;; esac; \
-	case "$$out" in *"namespaceSelector: {}"*) ;; *) echo "a controller named by its pods alone was looked for in this namespace only:"; echo "$$out"; exit 1;; esac
-	@echo "the network policy admits a controller by its own labels alone, in any namespace"
+	case "$$out" in *"team: edge"*) ;; *) echo "a controller's own namespace labels were not rendered:"; echo "$$out"; exit 1;; esac
+	@echo "the network policy admits a controller by its own labels alone"
 	@# A group or product name holding a character the variable separates on
 	@# is carried encoded, so the process reads the name it was given.
 	@out=$$(helm template t deploy/helm/openpsirt -s templates/deployment.yaml \

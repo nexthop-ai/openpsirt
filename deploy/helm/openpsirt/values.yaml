@@ -192,8 +192,9 @@ networkPolicy:
   # they are ingress-nginx's: a namespace named ingress-nginx and pods labelled
   # app.kubernetes.io/name=ingress-nginx. Anything set in either replaces both
   # defaults whole, so a label map given here is never merged with
-  # ingress-nginx's. Pod labels with no namespace labels match those pods in
-  # any namespace. Turn enabled off to admit by `from` alone.
+  # ingress-nginx's. Pod labels with no namespace labels are refused at render:
+  # anybody who may create a pod in any namespace can give it those labels.
+  # Turn enabled off to admit by `from` alone.
   ingressController:
     enabled: true
     namespaceLabels: {}

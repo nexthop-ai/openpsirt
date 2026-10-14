@@ -30,13 +30,12 @@ spec:
   ingress:
     - from:
         {{- if or $namespaces $pods }}
-        {{- /* A podSelector alone selects pods in this namespace only, so a controller named by its pods alone is looked for in every namespace. */}}
-        - {{- if $namespaces }}
-          namespaceSelector:
+        {{- /* A podSelector alone selects pods in this namespace only, and pod labels in every namespace are labels anybody who may create a pod can set. So the controller's namespace is required. */}}
+        {{- if not $namespaces }}
+        {{- fail "set networkPolicy.ingressController.namespaceLabels, for example kubernetes.io/metadata.name: <the controller's namespace>: pod labels alone match a pod anybody can create in any namespace, and that pod could assert the sign-in header" }}
+        {{- end }}
+        - namespaceSelector:
             matchLabels: {{- toYaml $namespaces | nindent 14 }}
-          {{- else }}
-          namespaceSelector: {}
-          {{- end }}
           {{- with $pods }}
           podSelector:
             matchLabels: {{- toYaml . | nindent 14 }}

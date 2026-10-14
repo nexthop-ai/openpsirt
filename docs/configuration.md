@@ -310,7 +310,7 @@ set.
 | `networkPolicy.enabled` | Whether the policy is rendered for a trusted-header install. Turn it off only where something else keeps other pods from reaching this one | `true` |
 | `networkPolicy.ingressController.enabled` | Whether the ingress controller is admitted by its labels. Off, the policy admits `networkPolicy.from` alone | `true` |
 | `networkPolicy.ingressController.namespaceLabels` | The labels of the ingress controller's namespace. Set here or in `podLabels`, it replaces both of ingress-nginx's defaults | ingress-nginx's, where neither is set |
-| `networkPolicy.ingressController.podLabels` | The labels of its pods, replacing the defaults the same way | ingress-nginx's, where neither is set |
+| `networkPolicy.ingressController.podLabels` | The labels of its pods, replacing the defaults the same way. Refused at render without `namespaceLabels`, because a pod with these labels can be created in any namespace | ingress-nginx's, where neither is set |
 | `networkPolicy.from` | Further peers, in the NetworkPolicy's own form: an `ipBlock` for a controller on the host network, or a namespace a metrics scraper runs in | none |
 
 A policy is enforced only where the cluster's network plugin supports
