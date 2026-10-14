@@ -131,12 +131,13 @@ func dropIndexStatement(ctx context.Context, table, name string) string {
 	return stmt
 }
 
-// creates recognizes the two kinds of object these migrations make, and the
+// creates recognizes the three kinds of object these migrations make, and the
 // name each statement gives it. Every identifier in the schema is quoted, so
 // the quotes are what is matched rather than a bare word.
 var (
 	createsTable = regexp.MustCompile(`(?is)^\s*CREATE\s+TABLE\s+"([^"]+)"`)
 	createsIndex = regexp.MustCompile(`(?is)^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+"([^"]+)"\s+ON\s+"([^"]+)"`)
+	addsColumn   = regexp.MustCompile(`(?is)^\s*ALTER\s+TABLE\s+"([^"]+)"\s+ADD\s+COLUMN\s+"([^"]+)"`)
 )
 
 // alreadyMade reports whether the object a statement creates is already there.
@@ -154,6 +155,12 @@ func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 			`SELECT 1 FROM "information_schema"."STATISTICS"
 			 WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "INDEX_NAME" = ?`,
 			m[2], m[1])
+	}
+	if m := addsColumn.FindStringSubmatch(stmt); m != nil {
+		return exists(ctx, tx,
+			`SELECT 1 FROM "information_schema"."COLUMNS"
+			 WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`,
+			m[1], m[2])
 	}
 	return false, nil
 }

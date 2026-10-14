@@ -191,13 +191,19 @@ func TestResumingStepsOverOnlyTheObjectAStatementNames(t *testing.T) {
 		{"an index", `CREATE INDEX "widget_idx" ON "widget" ("id")`, true},
 		{"a unique index", `CREATE UNIQUE INDEX "widget_idx" ON "widget" ("id")`, true},
 		{"a table declared over several lines", "CREATE TABLE \"widget\" (\n\t\"id\" BIGINT\n)", true},
+		{"a column", `ALTER TABLE "widget" ADD COLUMN "size" BIGINT NULL`, true},
 		{"anything else", `INSERT INTO "widget" ("id") VALUES (1)`, false},
 		{"a drop", `DROP TABLE "widget"`, false},
+		{"a column's default dropped", `ALTER TABLE "widget" ALTER COLUMN "size" DROP DEFAULT`, false},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			table := createsTable.FindStringSubmatch(c.statement)
 			index := createsIndex.FindStringSubmatch(c.statement)
-			if named := table != nil || index != nil; named != c.named {
+			column := addsColumn.FindStringSubmatch(c.statement)
+			if column != nil && (column[1] != "widget" || column[2] != "size") {
+				t.Errorf("the column reads as %q of %q", column[2], column[1])
+			}
+			if named := table != nil || index != nil || column != nil; named != c.named {
 				t.Errorf("%q reads as named=%v, want %v", c.statement, named, c.named)
 			}
 			if index != nil && index[2] != "widget" {

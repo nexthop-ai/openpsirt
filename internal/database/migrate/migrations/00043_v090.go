@@ -34,7 +34,7 @@ func upV090(ctx context.Context, sqldb *sql.DB) error {
 	case database.MySQL, database.MariaDB:
 		for _, step := range []func(context.Context, bun.Tx) error{
 			createImageVersionV090, foldDestinationsV090, mergeImagesV090,
-			shapeWordsV090, moveWordsV090, dropWordsV090,
+			shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 		} {
 			if err := inV020(ctx, sqldb, step); err != nil {
 				return err
@@ -70,10 +70,12 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //   - A claim's reasoning is stored once and pointed at, a build's claim is
 //     keyed on its reasoning, and a reference to an issue is keyed on its
 //     address as given.
+//   - A patch repository records when its last visit ended. No visit v0.8.0
+//     recorded has an end.
 func upgradeV090(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		createImageVersionV090, foldDestinationsV090, mergeImagesV090,
-		shapeWordsV090, moveWordsV090, dropWordsV090,
+		shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

@@ -30,6 +30,7 @@ type repositoryRow struct {
 	FetchedAt   *time.Time `bun:"fetched_at"`
 	ReachedAt   *time.Time `bun:"reached_at"`
 	Failed      *string    `bun:"failed"`
+	EndedAt     *time.Time `bun:"ended_at"`
 	HeldBytes   *int64     `bun:"held_bytes"`
 	CreatedAt   time.Time  `bun:"created_at,notnull"`
 }
