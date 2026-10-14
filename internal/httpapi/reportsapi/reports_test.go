@@ -184,6 +184,42 @@ func TestARowDecidedTwoWaysStatesNeither(t *testing.T) {
 	})
 }
 
+// A place standing on a claim that needed nobody counts as agreed, so its
+// outcome is read with the others. Read only from approved claims, the row said
+// agreed and stated the other place's outcome and reason over both.
+func TestARowAgreedPartlyByAClaimNeedingNobodyStatesNeitherOutcome(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		places := r.TwoPlacesOf(t, "CVE-2026-9999")
+		r.AgreedAt(t, places[0], httpapitest.Dismissal)
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/places/"+places[1]+"/decision",
+			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())
+		}
+
+		var out struct {
+			Still []struct {
+				Vulnerability string `json:"vulnerability"`
+				State         string `json:"state"`
+			} `json:"still_present"`
+		}
+		httpapitest.Read(t, r, "private-triage",
+			"/v1/products/mine/comparison?from=master&from_variant=broadcom"+
+				"&to=master&to_variant=broadcom&include_undisclosed=true", &out)
+		for _, row := range out.Still {
+			if row.Vulnerability == "CVE-2026-9999" && row.State != "agreed" {
+				t.Fatalf("a row whose every place stands reads as %s, so this proves nothing", row.State)
+			}
+		}
+		if outcome, why := r.StandsOn(t, "CVE-2026-9999"); outcome != "" || why != "" {
+			t.Errorf("a row argued away at one place and affected at another states "+
+				"%q with reason %q", outcome, why)
+		}
+	})
+}
+
 func TestTheComparisonFileSaysWhatTheScreenSays(t *testing.T) {
 	// An export answering less than the screen it was taken from is a file
 	// that quietly answers something else. The sign-off column is the whole
