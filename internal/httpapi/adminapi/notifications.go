@@ -16,16 +16,16 @@ import (
 
 // NotificationBody is one thing somebody was told.
 type NotificationBody struct {
-	ID   int64  `json:"id" doc:"The name for this when acknowledging it"`
-	Kind string `json:"kind" doc:"The kind, as a word: assigned, sent-back, build-quiet"`
+	ID   int64                 `json:"id" doc:"The name for this when acknowledging it"`
+	Kind core.NotificationKind `json:"kind" doc:"What it is about"`
 	// Lifetime says whether acknowledging is the way this goes away. A
 	// condition clears itself when what it is about stops being true, so
 	// acknowledging one hides it rather than resolving anything.
-	Lifetime string `json:"lifetime" enum:"event,condition" doc:"An event happened once and is acknowledged; a condition holds until what it is about changes"`
-	About    string `json:"about,omitempty" doc:"A condition's subject. Absent for an event"`
-	Body     string `json:"body" doc:"The message. It describes the moment it was written rather than the world now"`
-	Link     string `json:"link,omitempty" doc:"The destination, where there is somewhere to go"`
-	At       string `json:"at" doc:"The moment it was recorded"`
+	Lifetime core.Lifetime `json:"lifetime" doc:"An event happened once and is acknowledged; a condition holds until what it is about changes"`
+	About    string        `json:"about,omitempty" doc:"A condition's subject. Absent for an event"`
+	Body     string        `json:"body" doc:"The message. It describes the moment it was written rather than the world now"`
+	Link     string        `json:"link,omitempty" doc:"The destination, where there is somewhere to go"`
+	At       string        `json:"at" doc:"The moment it was recorded"`
 }
 
 type notificationsOutput struct {
@@ -74,7 +74,7 @@ func registerNotifications(api huma.API, in core.Deps) {
 		out.Body.Total = total
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, NotificationBody{
-				ID: row.ID, Kind: string(row.Kind), Lifetime: string(row.Lifetime),
+				ID: row.ID, Kind: core.NotificationKind(row.Kind), Lifetime: core.Lifetime(row.Lifetime),
 				About: row.About, Body: row.Body, Link: row.Link,
 				At: core.Stamp(row.CreatedAt),
 			})

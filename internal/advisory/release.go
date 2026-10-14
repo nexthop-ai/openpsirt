@@ -23,6 +23,9 @@ const (
 	Fixed            = "fixed"
 )
 
+// ReleaseStatuses is every status a document can state about a release.
+func ReleaseStatuses() []string { return []string{KnownAffected, KnownNotAffected, Fixed} }
+
 // The outcomes a covering decision states, as the triage vocabulary spells
 // them.
 const (

@@ -20,11 +20,11 @@ import (
 
 // ReceiptBody is the record of one upload.
 type ReceiptBody struct {
-	ScanID     int64  `json:"scan_id" doc:"The scan this upload became"`
-	Serial     string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states, or the time the upload arrived where it states none"`
-	ReceivedAt string `json:"received_at" doc:"The moment it arrived here"`
-	State      string `json:"state" enum:"reading,scanning,scanned,failed" doc:"The state it has reached"`
+	ScanID     int64         `json:"scan_id" doc:"The scan this upload became"`
+	Serial     string        `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
+	BuiltAt    string        `json:"built_at,omitempty" doc:"The build time the producer states, or the time the upload arrived where it states none"`
+	ReceivedAt string        `json:"received_at" doc:"The moment it arrived here"`
+	State      core.Progress `json:"state" doc:"The state it has reached"`
 	// Failure is the producer's own text back at them — what could not be read
 	// and where. It is not a fault in this deployment, so it is reported
 	// rather than logged away.
@@ -103,10 +103,10 @@ type SentBody struct {
 	// whether or not they are still here, because it is also what a caller
 	// names to be told the contents were let go rather than guessing from a
 	// 404.
-	DocumentID int64  `json:"document_id" doc:"The name that reads this document back"`
-	Kind       string `json:"kind" enum:"inventory,suppressions" doc:"The kind of document"`
-	SizeBytes  int64  `json:"size_bytes" doc:"Its size"`
-	Hash       string `json:"hash" doc:"SHA-256 of the bytes as they arrived"`
+	DocumentID int64             `json:"document_id" doc:"The name that reads this document back"`
+	Kind       core.DocumentKind `json:"kind" doc:"The kind of document"`
+	SizeBytes  int64             `json:"size_bytes" doc:"Its size"`
+	Hash       string            `json:"hash" doc:"SHA-256 of the bytes as they arrived"`
 	// Held says the contents are still here. A tagged release keeps them,
 	// because re-scanning it years from now needs what it contained; a branch
 	// build's are let go, because the next night supersedes them.
@@ -249,7 +249,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 				Serial:     r.Scan.Serial,
 				BuiltAt:    core.Stamp(r.Scan.BuiltAt),
 				ReceivedAt: core.Stamp(r.Scan.ReceivedAt),
-				State:      string(r.State),
+				State:      core.Progress(r.State),
 				Failure:    r.Failure,
 				Caution:    r.Caution,
 			}
@@ -288,7 +288,7 @@ func registerReceipts(api huma.API, in core.Deps) {
 			for _, doc := range sent[r.Scan.ID] {
 				body.Sent = append(body.Sent, SentBody{
 					DocumentID: doc.ID,
-					Kind:       string(doc.Kind), SizeBytes: doc.SizeBytes,
+					Kind:       core.DocumentKind(doc.Kind), SizeBytes: doc.SizeBytes,
 					Hash: doc.ContentHash, Held: doc.DiscardedAt == nil,
 				})
 			}

@@ -39,15 +39,15 @@ type FindingBody struct {
 	// scanner rated it" means the published rating on the evidence and the
 	// in-force one here, which is the disagreement this list exists not to
 	// have.
-	Severity  string `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
-	Component string `json:"component" doc:"The component that carries it"`
-	Version   string `json:"version" doc:"The version that ships"`
-	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
-	Source    string `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
-	Namespace string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
-	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Upstream's answer about it"`
-	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it, where one exists"`
+	Severity  string        `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
+	Component string        `json:"component" doc:"The component that carries it"`
+	Version   string        `json:"version" doc:"The version that ships"`
+	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
+	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
+	Ecosystem string        `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
+	Namespace string        `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
+	FixState  core.FixState `json:"fix_state,omitempty" doc:"Upstream's answer about it"`
+	FixedIn   string        `json:"fixed_in,omitempty" doc:"The version that resolves it, where one exists"`
 	// Matched is the route the scanner reached this by, the thing to ask about
 	// a distribution's packages. "advisory" is the people who package it
 	// saying so, and what they say about a fix is about the version actually
@@ -55,7 +55,7 @@ type FindingBody struct {
 	// upstream version range, which cannot see a backported patch: a
 	// distribution that has already fixed this looks the same as one that has
 	// not. Empty where the scanner said nothing.
-	Matched string `json:"matched,omitempty" enum:"advisory,identifier" doc:"The scanner's route to this"`
+	Matched core.MatchRoute `json:"matched,omitempty" doc:"The scanner's route to this"`
 	// Places counts the consumers that pull this component in here, and
 	// Answered how many of those the build has already argued about. Both
 	// ends of the way down, with the middle collapsed. Those two are what
@@ -110,7 +110,7 @@ type FindingBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
-	NoDeadline string `json:"no_deadline,omitempty" enum:"not-rated,below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	// Exploited is the reason a row sits at the top. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
@@ -265,8 +265,8 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Component: group.Component, Version: group.Version, Upstream: group.Upstream,
 		Source:    group.Source,
 		Ecosystem: group.Ecosystem, Namespace: group.Namespace,
-		FixState: string(group.FixState), FixedIn: group.FixedIn,
-		Matched: string(group.Matched),
+		FixState: core.FixState(group.FixState), FixedIn: group.FixedIn,
+		Matched: core.MatchRoute(group.Matched),
 		Owner:   group.Owner, Parent: group.Parent,
 		Middle: group.Middle, Chains: group.Chains,
 		Builds: group.Builds, Stream: group.Stream, Variant: group.Variant,
@@ -280,7 +280,7 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 		Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
 		Score:        float64(group.ScoreCenti) / 100,
 		ScoreVersion: group.ScoreVersion,
-		NoDeadline:   string(group.NoDeadline),
+		NoDeadline:   core.NoDeadline(group.NoDeadline),
 		Undisclosed:  group.Undisclosed,
 	}
 	if group.DiscloseAt != nil {
@@ -386,8 +386,8 @@ func registerComponentFindings(api huma.API, in core.Deps) {
 
 // ReferenceBody is somewhere an issue is written up, or fixed.
 type ReferenceBody struct {
-	URL  string `json:"url"`
-	Kind string `json:"kind" enum:"patch,advisory,report,other" doc:"The kind of reference. A patch is the change itself"`
+	URL  string             `json:"url"`
+	Kind core.ReferenceKind `json:"kind" doc:"The kind of reference. A patch is the change itself"`
 	// Branches is filled from a copy of the repository a patch link names,
 	// where this deployment keeps one (REQ-78). A fix is backported as a
 	// separate commit to each maintained branch, and this says which link is
@@ -531,18 +531,18 @@ type EvidenceBody struct {
 	// record at all.
 	Links []LinkBody `json:"links,omitempty"`
 
-	Component string `json:"component"`
-	Version   string `json:"version"`
-	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
-	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed"`
-	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it"`
+	Component string        `json:"component"`
+	Version   string        `json:"version"`
+	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
+	FixState  core.FixState `json:"fix_state,omitempty"`
+	FixedIn   string        `json:"fixed_in,omitempty" doc:"The version that resolves it"`
 	// Matched is the route this place was reached by and MatchedFrom the data
 	// that supplied it. The source sits here rather than on the issue because
 	// one issue reached through two ecosystems has two answers and the issue
 	// holds one, which is how a package from one distribution links to
 	// another's tracker.
-	Matched     string `json:"matched,omitempty" enum:"advisory,identifier"`
-	MatchedFrom string `json:"matched_from,omitempty" doc:"The source of this match"`
+	Matched     core.MatchRoute `json:"matched,omitempty"`
+	MatchedFrom string          `json:"matched_from,omitempty" doc:"The source of this match"`
 	// The evidence for the judgment `matched` asks for, rather than a second
 	// way of making it. Recorded as the scanner wrote them and never parsed:
 	// deciding whether a version falls inside a range needs an ordering per
@@ -571,7 +571,7 @@ type EvidenceBody struct {
 	// The same words the list body declares, and the words the store emits.
 	// A consumer validating against the published document rejects a body
 	// carrying a word the enum omits, and a TypeScript one cannot narrow on it.
-	NoDeadline string             `json:"no_deadline,omitempty" enum:"not-rated,below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *core.MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,
@@ -774,8 +774,8 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		LikelihoodOn: core.DayOf(e.LikelihoodOn),
 		Weaknesses:   core.Weaknesses(e.Weaknesses), Description: e.Description, Advisory: e.Advisory,
 		Component: e.Component, Version: e.Version, Upstream: e.Upstream,
-		FixState: string(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
-		Matched: string(e.Matched), MatchedFrom: e.MatchedFrom,
+		FixState: core.FixState(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
+		Matched: core.MatchRoute(e.Matched), MatchedFrom: e.MatchedFrom,
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
 		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, RoutedBy: e.RoutedBy,
@@ -797,7 +797,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		left := int(math.Floor(time.Until(*e.DueAt).Hours() / 24))
 		body.DaysLeft = &left
 	} else {
-		body.NoDeadline = string(e.NoDeadline)
+		body.NoDeadline = core.NoDeadline(e.NoDeadline)
 	}
 	if e.FoundBy != nil {
 		body.FoundBy = &core.MeasuredBody{
@@ -820,7 +820,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 	}
 	for _, reference := range e.References {
 		body.References = append(body.References, ReferenceBody{
-			URL: reference.URL, Kind: string(reference.Kind),
+			URL: reference.URL, Kind: core.ReferenceKind(reference.Kind),
 		})
 	}
 	for _, link := range e.Links {
@@ -883,7 +883,7 @@ func putOff(ctx context.Context, in core.Deps, subject access.Subject, productID
 func labelPatches(ctx context.Context, db bun.IDB, references []ReferenceBody) error {
 	var links []string
 	for _, reference := range references {
-		if reference.Kind == string(finding.Patch) {
+		if reference.Kind == core.ReferenceKind(finding.Patch) {
 			links = append(links, reference.URL)
 		}
 	}
@@ -896,7 +896,7 @@ func labelPatches(ctx context.Context, db bun.IDB, references []ReferenceBody) e
 	}
 	for i, reference := range references {
 		label, ok := labels[reference.URL]
-		if !ok || reference.Kind != string(finding.Patch) {
+		if !ok || reference.Kind != core.ReferenceKind(finding.Patch) {
 			continue
 		}
 		references[i].Branches = label.Branches

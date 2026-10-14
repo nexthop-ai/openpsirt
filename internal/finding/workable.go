@@ -26,6 +26,9 @@ const (
 	PastEndOfLife = "past-eol"
 )
 
+// Supports is the two states of support a release can be in.
+func Supports() []string { return []string{InSupport, PastEndOfLife} }
+
 // Workable narrows a list to the releases work can actually land in.
 //
 // Two questions kept apart because they are two: a tag can be in support and

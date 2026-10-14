@@ -35,17 +35,21 @@ type refEdge struct{ parent, child, kind string }
 // A word neither format defines is not recorded. A producer inventing one has
 // said something no reader of this can interpret, and a column of arbitrary
 // strings is a filter nobody can offer.
-var declaredScopes = map[string]bool{
-	// A CycloneDX component scope.
-	"required": true,
-	"optional": true,
-	"excluded": true,
-	// An SPDX lifecycle scope, which SPDX 2 spells as a relationship type.
-	"build":       true,
-	"design":      true,
-	"development": true,
-	"other":       true,
-	"runtime":     true,
+var declaredScopes = func() map[string]bool {
+	held := map[string]bool{}
+	for _, word := range Scopes() {
+		held[word] = true
+	}
+	return held
+}()
+
+// Scopes is every scope word recorded, CycloneDX's component scopes first and
+// then SPDX's lifecycle scopes, which SPDX 2 spells as relationship types.
+func Scopes() []string {
+	return []string{
+		"required", "optional", "excluded",
+		"build", "design", "development", "other", "runtime",
+	}
 }
 
 // scopeWord keeps what a producer declared where the format defines it, and

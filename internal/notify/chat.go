@@ -24,6 +24,9 @@ const (
 	Zulip = "zulip"
 )
 
+// Platforms is every way a destination is reached.
+func Platforms() []string { return []string{Webhook, Slack, Zulip} }
+
 // Chat is a chat platform this deployment holds a credential for.
 //
 // It carries a note and decides nothing about what the note says: that is

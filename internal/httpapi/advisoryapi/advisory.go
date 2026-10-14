@@ -159,7 +159,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, AdvisoryListedBody{
 				Advisory: one.Identifier, Title: one.Title,
 				Issues: one.Issues, Products: one.Products, Issuances: one.Issuances,
-				Status: one.Status(), Agreed: one.Agreed,
+				Status: core.AdvisoryStatus(one.Status()), Agreed: one.Agreed,
 				MintedAt: one.MintedAt.UTC().Format(time.RFC3339),
 			})
 		}
@@ -202,7 +202,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			return nil, advisoryRefused(in, err, "the advisory could not be compared")
 		}
 		body := bodyFor(row, held)
-		body.Status, body.Agreed = where.Status, len(where.Agreed)
+		body.Status, body.Agreed = core.AdvisoryStatus(where.Status), len(where.Agreed)
 		body.Changed = changed
 		body.AgreedBy = make([]AgreerBody, 0, len(where.Agreed))
 		for i, one := range where.Agreed {
@@ -580,12 +580,12 @@ type AdvisoryBody struct {
 	// Status and Agreed are left out where the advisory was just started or
 	// just retitled, which answers with what the act did rather than with
 	// where the advisory stands.
-	Status   string        `json:"status,omitempty" enum:"draft,final,interim" doc:"Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either"`
-	Agreed   int           `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
-	AgreedBy []AgreerBody  `json:"agreed_by,omitempty" doc:"Who agrees to what it says now, oldest first"`
-	Changed  *bool         `json:"changed,omitempty" doc:"Whether the document generated now says something different from the last one that went out"`
-	MintedAt string        `json:"minted_at"`
-	Covers   []CoveredBody `json:"covers"`
+	Status   core.AdvisoryStatus `json:"status,omitempty" doc:"Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either"`
+	Agreed   int                 `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
+	AgreedBy []AgreerBody        `json:"agreed_by,omitempty" doc:"Who agrees to what it says now, oldest first"`
+	Changed  *bool               `json:"changed,omitempty" doc:"Whether the document generated now says something different from the last one that went out"`
+	MintedAt string              `json:"minted_at"`
+	Covers   []CoveredBody       `json:"covers"`
 }
 
 // NameableBody is one flaw an advisory may name in a product.
@@ -609,14 +609,14 @@ type AgreementBody struct {
 
 // AdvisoryListedBody is one advisory as a list of them reads it.
 type AdvisoryListedBody struct {
-	Advisory  string `json:"advisory"`
-	Title     string `json:"title,omitempty"`
-	Issues    int    `json:"issues" doc:"How many issues it covers"`
-	Products  int    `json:"products" doc:"How many products those sit in"`
-	Issuances int    `json:"issuances" doc:"How many times it has gone out"`
-	Status    string `json:"status" enum:"draft,final,interim" doc:"Where the document is in its life"`
-	Agreed    int    `json:"agreed" doc:"How many people agree to what it says now"`
-	MintedAt  string `json:"minted_at"`
+	Advisory  string              `json:"advisory"`
+	Title     string              `json:"title,omitempty"`
+	Issues    int                 `json:"issues" doc:"How many issues it covers"`
+	Products  int                 `json:"products" doc:"How many products those sit in"`
+	Issuances int                 `json:"issuances" doc:"How many times it has gone out"`
+	Status    core.AdvisoryStatus `json:"status" doc:"Where the document is in its life"`
+	Agreed    int                 `json:"agreed" doc:"How many people agree to what it says now"`
+	MintedAt  string              `json:"minted_at"`
 }
 
 // CoveredBody is one issue an advisory covers, in one product.

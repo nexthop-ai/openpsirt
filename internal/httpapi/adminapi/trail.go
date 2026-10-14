@@ -50,12 +50,12 @@ func onDay(at *time.Time) *string {
 
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
-	At    string `json:"at"`
-	Actor string `json:"actor" enum:"person,configuration,merge,upgrade" doc:"What made the change: a person in the application, the deployment's startup configuration, which names administrators, maps groups to roles and sets where roles come from to match, a scan merging two issues its report named together, or an upgrade, which withdraws a key or a token whose name another holds"`
-	By    string `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where no person made it"`
+	At    string          `json:"at"`
+	Actor core.TrailActor `json:"actor" doc:"What made the change: a person in the application, the deployment's startup configuration, which names administrators, maps groups to roles and sets where roles come from to match, a scan merging two issues its report named together, or an upgrade, which withdraws a key or a token whose name another holds"`
+	By    string          `json:"by,omitempty" doc:"The person who made the change, by sign-in identity. Absent where no person made it"`
 	// ByName is the label beside the identity rather than in its place.
-	ByName string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"The kind of thing that changed"`
+	ByName string         `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Kind   core.TrailKind `json:"kind" doc:"The kind of thing that changed"`
 	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
@@ -88,7 +88,7 @@ func registerTrail(api huma.API, in core.Deps) {
 			"it holds.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, input *struct {
-		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"Keep only changes of one kind"`
+		Kind core.TrailKind `query:"kind" doc:"Keep only changes of one kind"`
 		core.Period
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
@@ -151,9 +151,9 @@ func registerTrail(api huma.API, in core.Deps) {
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{
-				At: core.Stamp(change.At), Actor: string(change.Actor),
+				At: core.Stamp(change.At), Actor: core.TrailActor(change.Actor),
 				By: people.Identity(change.Person()), ByName: people.Label(change.Person()),
-				Kind: string(change.Kind), About: change.Name,
+				Kind: core.TrailKind(change.Kind), About: change.Name,
 				Unset: change.Was == nil, Cleared: change.Became == nil,
 			}
 			if change.Was != nil {

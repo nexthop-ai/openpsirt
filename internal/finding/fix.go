@@ -180,6 +180,11 @@ const (
 	UpgradeLapsed UpgradeState = "lapsed"
 )
 
+// UpgradeStates is every state a promised upgrade can be in.
+func UpgradeStates() []UpgradeState {
+	return []UpgradeState{UpgradePlanned, UpgradeLanded, UpgradeLapsed}
+}
+
 // Planned is one bump a build is waiting on, and how far it has landed.
 type Planned struct {
 	// The commitment's key: the build's fold, exactly as the fix-bundle list

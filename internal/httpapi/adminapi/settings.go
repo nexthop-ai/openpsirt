@@ -28,13 +28,13 @@ import (
 
 // SettingBody is one thing a deployment has decided for everybody in it.
 type SettingBody struct {
-	Name    string `json:"name"`
-	Value   string `json:"value"`
-	Default bool   `json:"default,omitempty" doc:"Nobody has set this; the shipped value is in use"`
-	Title   string `json:"title" doc:"The setting's name as a screen shows it"`
-	Section string `json:"section" enum:"deadlines,own,triage,disclosure,scanning,signin,limits,outbound" doc:"Which part of the settings it belongs to"`
-	Summary string `json:"summary" doc:"What it decides, in one line"`
-	Detail  string `json:"detail,omitempty" doc:"What a reader may want beyond the summary"`
+	Name    string              `json:"name"`
+	Value   string              `json:"value"`
+	Default bool                `json:"default,omitempty" doc:"Nobody has set this; the shipped value is in use"`
+	Title   string              `json:"title" doc:"The setting's name as a screen shows it"`
+	Section core.SettingSection `json:"section" doc:"Which part of the settings it belongs to"`
+	Summary string              `json:"summary" doc:"What it decides, in one line"`
+	Detail  string              `json:"detail,omitempty" doc:"What a reader may want beyond the summary"`
 	// Kind is the type of the value, so a client offers the control the value
 	// takes rather than a text field somebody types a refused value into.
 	//
@@ -42,38 +42,11 @@ type SettingBody struct {
 	// on setting names, beside the server's own, are five copies of one fact,
 	// and a setting added to any of them is a control that offers the wrong
 	// thing or none.
-	Kind string `json:"kind" enum:"duration,count,size,percent,word,switch" doc:"The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off"`
+	Kind core.SettingKind `json:"kind" doc:"The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off"`
 	// Words is the values a word setting may take, in the order to offer them.
 	// Empty for every other kind.
 	Words []string `json:"words,omitempty" doc:"For a word setting, the values it takes, in the order to offer them"`
 }
-
-// settingKind is the type of a setting's value.
-//
-// Named because the four are checked differently, and a value checked as the
-// wrong kind is stored and then silently ignored. Carried on the row rather
-// than answered by four functions that each know about some of the names: a
-// name missing from all four falls through to "a length of time", and a name
-// missing from the shipped switch falls through to the empty string.
-type settingKind string
-
-const (
-	aDuration settingKind = "duration"
-	aCount    settingKind = "count"
-	// aSize is a count of bytes. Checked exactly as a count is — the write
-	// path cannot tell them apart and does not need to — and named separately
-	// because a screen must: 26214400 is twenty-five megabytes and nobody
-	// reads it as that, so the mistake available in a raw byte field is a
-	// factor of a thousand.
-	aSize settingKind = "size"
-	// aPercent is a share of something the deployment holds rather than a
-	// count of things. Checked as one to a hundred: a share above the whole
-	// is a threshold nothing can reach, which is a setting somebody changed
-	// and got nothing from.
-	aPercent settingKind = "percent"
-	aWord    settingKind = "word"
-	aSwitch  settingKind = "switch"
-)
 
 // windows is the shipped deadline policy, read from the package that applies
 // it rather than respelled here as string literals: a shipped number written
@@ -113,14 +86,14 @@ var settable = []struct {
 	// section is which part of the settings a screen files this under.
 	// Served with the rest of the row, so a setting added here lands in a
 	// section rather than in a list somebody forgot to extend.
-	section string
+	section setting.Section
 	// summary is what the setting decides, in one line, and detail is what a
 	// reader may want beyond it. Empty where the summary is the whole of it.
 	summary string
 	detail  string
 	// kind is the type of this setting's value, which decides how it is
 	// checked at the write and how the screen offers it.
-	kind settingKind
+	kind setting.Kind
 	// words is the values this setting may take, in the order to offer them,
 	// and the list the write path checks against. Nil for every kind but a
 	// word or a switch.
@@ -142,182 +115,182 @@ var settable = []struct {
 	// so they are rewritten away from the request.
 	movesDeadlines bool
 }{
-	{setting.DueExploited, "Known exploited", "deadlines",
+	{setting.DueExploited, "Known exploited", setting.Deadlines,
 		"How long a known-exploited finding may stay open",
 		"Its own window, and the shortest. Severity is how bad a flaw is; being exploited is a fact about the world.",
-		aDuration, nil, func(core.Deps) string { return windows.Exploited.String() }, true},
-	{setting.DueCritical, "Critical", "deadlines",
+		setting.Duration, nil, func(core.Deps) string { return windows.Exploited.String() }, true},
+	{setting.DueCritical, "Critical", setting.Deadlines,
 		"How long a critical finding may stay open",
 		"",
-		aDuration, nil, func(core.Deps) string { return windows.Critical.String() }, true},
-	{setting.DueHigh, "High", "deadlines",
+		setting.Duration, nil, func(core.Deps) string { return windows.Critical.String() }, true},
+	{setting.DueHigh, "High", setting.Deadlines,
 		"How long a high finding may stay open",
 		"",
-		aDuration, nil, func(core.Deps) string { return windows.High.String() }, true},
-	{setting.DueMedium, "Medium", "deadlines",
+		setting.Duration, nil, func(core.Deps) string { return windows.High.String() }, true},
+	{setting.DueMedium, "Medium", setting.Deadlines,
 		"How long a medium finding may stay open",
 		"",
-		aDuration, nil, func(core.Deps) string { return windows.Medium.String() }, true},
-	{setting.DueLow, "Low", "deadlines",
+		setting.Duration, nil, func(core.Deps) string { return windows.Medium.String() }, true},
+	{setting.DueLow, "Low", setting.Deadlines,
 		"How long a low finding may stay open",
 		"",
-		aDuration, nil, func(core.Deps) string { return windows.Low.String() }, true},
-	{setting.OwnDueExploited, "Known exploited", "own",
+		setting.Duration, nil, func(core.Deps) string { return windows.Low.String() }, true},
+	{setting.OwnDueExploited, "Known exploited", setting.Own,
 		"How long a known-exploited flaw in our own product may stay open",
 		"Counted from when the flaw was first rated.",
-		aDuration, nil, func(core.Deps) string { return ownWindows.Exploited.String() }, true},
-	{setting.OwnDueCritical, "Critical", "own",
+		setting.Duration, nil, func(core.Deps) string { return ownWindows.Exploited.String() }, true},
+	{setting.OwnDueCritical, "Critical", setting.Own,
 		"How long a critical flaw in our own product may stay open",
 		"Counted from when the flaw was first rated.",
-		aDuration, nil, func(core.Deps) string { return ownWindows.Critical.String() }, true},
-	{setting.OwnDueHigh, "High", "own",
+		setting.Duration, nil, func(core.Deps) string { return ownWindows.Critical.String() }, true},
+	{setting.OwnDueHigh, "High", setting.Own,
 		"How long a high flaw in our own product may stay open",
 		"Counted from when the flaw was first rated.",
-		aDuration, nil, func(core.Deps) string { return ownWindows.High.String() }, true},
-	{setting.OwnDueMedium, "Medium", "own",
+		setting.Duration, nil, func(core.Deps) string { return ownWindows.High.String() }, true},
+	{setting.OwnDueMedium, "Medium", setting.Own,
 		"How long a medium flaw in our own product may stay open",
 		"Counted from when the flaw was first rated.",
-		aDuration, nil, func(core.Deps) string { return ownWindows.Medium.String() }, true},
-	{setting.OwnDueLow, "Low", "own",
+		setting.Duration, nil, func(core.Deps) string { return ownWindows.Medium.String() }, true},
+	{setting.OwnDueLow, "Low", setting.Own,
 		"How long a low flaw in our own product may stay open",
 		"Counted from when the flaw was first rated.",
-		aDuration, nil, func(core.Deps) string { return ownWindows.Low.String() }, true},
-	{setting.DeferralThreshold, "Second approver above", "triage",
+		setting.Duration, nil, func(core.Deps) string { return ownWindows.Low.String() }, true},
+	{setting.DeferralThreshold, "Second approver above", setting.Triage,
 		"How long something may be put off before a second person must agree",
 		"Measured against everything the finding has already been put off for, not against the postponement being asked for.",
-		aDuration, nil, func(core.Deps) string { return triage.DefaultDeferralThreshold.String() }, false},
-	{setting.SessionLifetime, "Session lifetime", "signin",
+		setting.Duration, nil, func(core.Deps) string { return triage.DefaultDeferralThreshold.String() }, false},
+	{setting.SessionLifetime, "Session lifetime", setting.Signin,
 		"How long a sign-in lasts",
 		"",
-		aDuration, nil, sessionLifetime, false},
-	{setting.MaxTokenLifetime, "Personal token lifetime", "signin",
+		setting.Duration, nil, sessionLifetime, false},
+	{setting.MaxTokenLifetime, "Personal token lifetime", setting.Signin,
 		"The longest a personal token may be valid for",
 		"",
-		aDuration, nil, func(core.Deps) string { return access.MaxTokenLifetime.String() }, false},
-	{setting.ClaimWindow, "Authorization redemption window", "signin",
+		setting.Duration, nil, func(core.Deps) string { return access.MaxTokenLifetime.String() }, false},
+	{setting.ClaimWindow, "Authorization redemption window", setting.Signin,
 		"How long an authorization for somebody who has never signed in stays redeemable",
 		"It is the one window where a name, not an identifier, decides who gets a set of roles, so it ends.",
-		aDuration, nil, func(core.Deps) string { return access.DefaultClaimWindow.String() }, false},
-	{setting.TogetherCap, "Bulk action limit", "triage",
+		setting.Duration, nil, func(core.Deps) string { return access.DefaultClaimWindow.String() }, false},
+	{setting.TogetherCap, "Bulk action limit", setting.Triage,
 		"Reports per ruling, places per single-issue answer, and rows a screen acts on at once",
 		"",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(triage.DefaultTogetherCap) }, false},
-	{setting.ReviewIssues, "Issues per reviewed bulk answer", "triage",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(triage.DefaultTogetherCap) }, false},
+	{setting.ReviewIssues, "Issues per reviewed bulk answer", setting.Triage,
 		"Issues one answer may cover where a second person must agree",
 		"Counted in issues because issues are what the approver reads.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultReviewIssues) }, false},
-	{setting.AgreedIssues, "Issues per re-confirmation", "triage",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultReviewIssues) }, false},
+	{setting.AgreedIssues, "Issues per re-confirmation", setting.Triage,
 		"Issues one re-confirmation may cover where nobody must agree again",
 		"",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAgreedIssues) }, false},
-	{setting.WriteCeiling, "Findings per bulk answer", "triage",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAgreedIssues) }, false},
+	{setting.WriteCeiling, "Findings per bulk answer", setting.Triage,
 		"How many findings one answer about many issues, or one flaw recorded here, may write",
 		"",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultWriteCeiling) }, false},
-	{setting.TriageFloor, "Minimum severity", "triage",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultWriteCeiling) }, false},
+	{setting.TriageFloor, "Minimum severity", setting.Triage,
 		"The severity below which findings stay out of the working list",
 		"Below it, findings are still recorded and counted. A product may state its own.",
-		aWord, theFloor, func(core.Deps) string { return theFloor[0] }, true},
-	{setting.QuietAfter, "Quiet build threshold", "scanning",
+		setting.Word, theFloor, func(core.Deps) string { return theFloor[0] }, true},
+	{setting.QuietAfter, "Quiet build threshold", setting.Scanning,
 		"How long a build may go without a scan before it is reported as quiet",
 		"Measured from the last arrival, or from when the build was declared if nothing has arrived.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultQuietAfter.String() }, false},
-	{setting.VulnerabilityDataStaleAfter, "Stale vulnerability data", "scanning",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultQuietAfter.String() }, false},
+	{setting.VulnerabilityDataStaleAfter, "Stale vulnerability data", setting.Scanning,
 		"How long the vulnerability data may go unchanged before you are told",
 		"A scan against data that has not moved answers the same way it did last month, with nothing saying so.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
-	{setting.DeltaShare, "Inventory change share", "scanning",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
+	{setting.DeltaShare, "Inventory change share", setting.Scanning,
 		"The share of a build's inventory one upload may move before readers are told",
 		"Both this and the inventory change floor have to be passed, so three names moving in a small inventory is not reported every time.",
-		aPercent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaShare) }, false},
-	{setting.PairShare, "Approval pair share", "triage",
+		setting.Percent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaShare) }, false},
+	{setting.PairShare, "Approval pair share", setting.Triage,
 		"The share of a product's agreements one pair may reach before administrators are told",
 		"Only asked where the product has at least as many approvers as the setting below, and over at least ten claims agreed in ninety days. A product may state its own.",
-		aPercent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultPairShare) }, false},
-	{setting.PairApprovers, "Approvers for pair alerts", "triage",
+		setting.Percent, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultPairShare) }, false},
+	{setting.PairApprovers, "Approvers for pair alerts", setting.Triage,
 		"The fewest approvers a product needs before pair shares are checked",
 		"Below it, one pair doing everything is what a small team looks like. A product may state its own.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultPairApprovers) }, false},
-	{setting.DeltaFloor, "Inventory change floor", "scanning",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultPairApprovers) }, false},
+	{setting.DeltaFloor, "Inventory change floor", setting.Scanning,
 		"The fewest component names an upload must move to be reported",
 		"",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
-	{setting.ScanEvery, "Rescan interval", "scanning",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
+	{setting.ScanEvery, "Rescan interval", setting.Scanning,
 		"How often everything tracked is scanned against the day's vulnerability data",
 		"A release that is never rebuilt gets a different answer every month, so this is what finds an advisory published after it shipped. It is also how often each supplier is read again, so shortening it sends more requests to third parties.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultScanEvery.String() }, false},
-	{setting.SupplierSilentAfter, "Silent supplier threshold", "scanning",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultScanEvery.String() }, false},
+	{setting.SupplierSilentAfter, "Silent supplier threshold", setting.Scanning,
 		"How long a supplier may go unread before administrators are told",
 		"Never shorter in effect than two scan intervals, since a supplier is read once each.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultSupplierSilentAfter.String() }, false},
-	{setting.SupplierHistory, "Supplier history", "scanning",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultSupplierSilentAfter.String() }, false},
+	{setting.SupplierHistory, "Supplier history", setting.Scanning,
 		"How many days back a newly configured supplier is read from",
 		"A distribution lists every advisory it has ever issued, so this bounds how much is asked for. A year of the largest takes a couple of weeks to read.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSupplierHistory) }, false},
-	{setting.UpstreamCurrency, "Upstream version checks", "outbound",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSupplierHistory) }, false},
+	{setting.UpstreamCurrency, "Upstream version checks", setting.Outbound,
 		"Ask public package indexes for each component's newest version",
 		"One request per component, carrying its name and nothing else. Names this deployment calls its own are held back. Without it, what a scan reports is unaffected.",
-		aSwitch, theSwitch, func(core.Deps) string { return setting.Off }, false},
-	{setting.AttachmentMaxSize, "Maximum attachment size", "limits",
+		setting.Switch, theSwitch, func(core.Deps) string { return setting.Off }, false},
+	{setting.AttachmentMaxSize, "Maximum attachment size", setting.Limits,
 		"The largest single file this deployment accepts",
 		"",
-		aSize, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
-	{setting.AttachmentQuota, "Total attachment storage", "limits",
+		setting.Size, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
+	{setting.AttachmentQuota, "Total attachment storage", setting.Limits,
 		"How much this deployment holds in attachments in total",
 		"",
-		aSize, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
-	{setting.QueueBacklog, "Queued work limit", "limits",
+		setting.Size, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentQuota) }, false},
+	{setting.QueueBacklog, "Queued work limit", setting.Limits,
 		"How much background work of one kind may wait before more is refused",
 		"Counted per kind, so a producer that has filled its own queue does not refuse everybody else's work.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
-	{setting.UploadsAtOnce, "Simultaneous uploads", "limits",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultQueueBacklog) }, false},
+	{setting.UploadsAtOnce, "Simultaneous uploads", setting.Limits,
 		"How many uploads one server reads at the same time",
 		"Each is written to scratch space as it arrives, so that space has to hold this many of the largest uploads. Past it, a sender is told to try again shortly.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultUploadsAtOnce) }, false},
-	{setting.RoutingBatch, "Findings placed per pass", "limits",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultUploadsAtOnce) }, false},
+	{setting.RoutingBatch, "Findings placed per pass", setting.Limits,
 		"How many findings one pass of the routing sweep places, at most",
 		"On a large estate a pass can be too big to hold a connection through, or too small to drain the backlog.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
-	{setting.SavedPerPerson, "Saved filters per person", "limits",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultRoutingBatch) }, false},
+	{setting.SavedPerPerson, "Saved filters per person", setting.Limits,
 		"How many saved filters one person may keep",
 		"The panel that lists them reads every one on every open.",
-		aCount, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSavedPerPerson) }, false},
-	{setting.AttachmentShare, "Attachment storage per person", "limits",
+		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultSavedPerPerson) }, false},
+	{setting.AttachmentShare, "Attachment storage per person", setting.Limits,
 		"How much of the attachment total any one person may hold",
 		"Without it, one person can fill the store and block everybody else's next upload.",
-		aSize, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
-	{setting.AbsentAfter, "Inactive account threshold", "signin",
+		setting.Size, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentShare) }, false},
+	{setting.AbsentAfter, "Inactive account threshold", setting.Signin,
 		"How long somebody may go without signing in before their held work is raised",
 		"It only asks: long leave and having left look the same from here.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultAbsentAfter.String() }, false},
-	{setting.WaitingAfter, "Awaiting approval", "triage",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultAbsentAfter.String() }, false},
+	{setting.WaitingAfter, "Awaiting approval", setting.Triage,
 		"How long a claim may wait on a second person before approvers are told",
 		"",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultWaitingAfter.String() }, false},
-	{setting.SentBackAfter, "Returned, untouched", "triage",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultWaitingAfter.String() }, false},
+	{setting.SentBackAfter, "Returned, untouched", setting.Triage,
 		"How long a returned claim may sit before its proposer is told again",
 		"Shorter than awaiting approval: the question was asked of the person already holding it.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultSentBackAfter.String() }, false},
-	{setting.DeferralLead, "Deferral expiry warning", "triage",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultSentBackAfter.String() }, false},
+	{setting.DeferralLead, "Deferral expiry warning", setting.Triage,
 		"How long before a deferral ends its proposer is told",
 		"The end date itself puts the finding back in the queue, which is the last moment to act, not the first.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultDeferralLead.String() }, false},
-	{setting.QueuedAfter, "Unclaimed in a team queue", "triage",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultDeferralLead.String() }, false},
+	{setting.QueuedAfter, "Unclaimed in a team queue", setting.Triage,
 		"How long work may sit in a team's queue with nobody taking it",
 		"",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultQueuedAfter.String() }, false},
-	{setting.DiscloseAfter, "Default embargo period", "disclosure",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultQueuedAfter.String() }, false},
+	{setting.DiscloseAfter, "Default embargo period", setting.Disclosure,
 		"How long an undisclosed finding stays that way before its date",
 		"What the deployment's coordinated-disclosure policy says. An embargo somebody outside can hold us to is one they were told the length of.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultDiscloseAfter.String() }, false},
-	{setting.MovementThreshold, "Embargo movement threshold", "disclosure",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultDiscloseAfter.String() }, false},
+	{setting.MovementThreshold, "Embargo movement threshold", setting.Disclosure,
 		"How far an embargo's end may move in total before a second person must agree",
 		"Measured against every move already made, and a date brought forward counts the same as one pushed back.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultMovementThreshold.String() }, false},
-	{setting.DisclosureLead, "Embargo expiry warning", "disclosure",
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultMovementThreshold.String() }, false},
+	{setting.DisclosureLead, "Embargo expiry warning", setting.Disclosure,
 		"How long before an embargo's date the people who could move it are told",
 		"An extension nobody can agree to in time is an approval in name only.",
-		aDuration, nil, func(core.Deps) string { return setting.DefaultDisclosureLead.String() }, false},
+		setting.Duration, nil, func(core.Deps) string { return setting.DefaultDisclosureLead.String() }, false},
 }
 
 // theSwitch is the two values an on-or-off setting may take.
@@ -364,9 +337,9 @@ func registerSettings(api huma.API, in core.Deps) {
 				value = each.shipped(in)
 			}
 			out.Body.Items = append(out.Body.Items, SettingBody{
-				Name: each.name, Value: value, Default: !set, Title: each.title, Section: each.section,
+				Name: each.name, Value: value, Default: !set, Title: each.title, Section: core.SettingSection(each.section),
 				Summary: each.summary, Detail: each.detail,
-				Kind: string(each.kind), Words: each.words,
+				Kind: core.SettingKind(each.kind), Words: each.words,
 			})
 		}
 		return out, nil
@@ -401,7 +374,7 @@ func registerSettings(api huma.API, in core.Deps) {
 		// negative as unset, so those would do the same while looking set.
 		value := input.Body.Value
 		switch settable[row].kind {
-		case aSwitch, aWord:
+		case setting.Switch, setting.Word:
 			// Against the row's own list, which is the one the response
 			// offers. Two tables keyed on the name is how an offered word and
 			// an accepted word come to differ. A word is typed, so it is
@@ -413,21 +386,21 @@ func registerSettings(api huma.API, in core.Deps) {
 					fmt.Sprintf("%q is not one this setting takes — write one of %s",
 						input.Body.Value, strings.Join(settable[row].words, ", ")))
 			}
-		case aCount, aSize:
+		case setting.Count, setting.Size:
 			n, err := strconv.Atoi(input.Body.Value)
 			if err != nil || n <= 0 {
 				return nil, huma.Error422UnprocessableEntity(
 					fmt.Sprintf("%q is not a count — write a whole number above zero",
 						input.Body.Value))
 			}
-		case aPercent:
+		case setting.Percent:
 			n, err := strconv.Atoi(input.Body.Value)
 			if err != nil || n <= 0 || n > 100 {
 				return nil, huma.Error422UnprocessableEntity(
 					fmt.Sprintf("%q is not a share — write a whole number of percent "+
 						"between 1 and 100", input.Body.Value))
 			}
-		case aDuration:
+		case setting.Duration:
 			d, err := time.ParseDuration(input.Body.Value)
 			if err != nil {
 				return nil, huma.Error422UnprocessableEntity(

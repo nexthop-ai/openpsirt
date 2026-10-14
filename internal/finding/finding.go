@@ -50,6 +50,12 @@ const (
 	FixMixed FixState = "mixed"
 )
 
+// FixStates is every word for what upstream has done, in the order the API
+// offers them.
+func FixStates() []FixState {
+	return []FixState{FixedUpstream, NoFix, WontFix, FixUnknown, FixMixed}
+}
+
 // agreedFixState is what a group's places say upstream did, or FixMixed where
 // they do not agree.
 //

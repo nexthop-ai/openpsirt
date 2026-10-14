@@ -677,6 +677,11 @@ const (
 	NotRated NoDeadline = "not-rated"
 )
 
+// NoDeadlines is every reason a finding carries no deadline, narrowest first.
+func NoDeadlines() []NoDeadline {
+	return []NoDeadline{NotRated, BelowTheLine, NothingToTake, OutOfSupport}
+}
+
 // groupKey names one group of the list.
 type groupKey struct {
 	vulnerabilityID int64

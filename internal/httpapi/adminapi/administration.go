@@ -61,7 +61,7 @@ func personBody(person *access.Account, doors []access.Identity, estate []access
 		Identity: person.Identity, DisplayName: person.DisplayName,
 		Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
-		Email: person.Email, EmailSource: string(person.EmailSource),
+		Email: person.Email, EmailSource: core.EmailSource(person.EmailSource),
 	}
 	for _, door := range doors {
 		body.SignsInBy = append(body.SignsInBy, SignInBody{
@@ -71,14 +71,14 @@ func personBody(person *access.Account, doors []access.Identity, estate []access
 	for _, grant := range estate {
 		body.Holds = append(body.Holds, HeldBody{
 			Everywhere: true, Role: core.Role(grant.Role),
-			Effective: grant.Active, Source: string(grant.Source),
+			Effective: grant.Active, Source: core.GrantSource(grant.Source),
 		})
 	}
 	for _, grant := range held {
 		body.Holds = append(body.Holds, HeldBody{
 			Product: named[grant.ProductID].Address, Role: core.Role(grant.Role),
 			ProductDisplayName: named[grant.ProductID].Display,
-			Effective:          grant.Active, Source: string(grant.Source),
+			Effective:          grant.Active, Source: core.GrantSource(grant.Source),
 		})
 	}
 	body.SeesNothing = seesNothing(body.Holds)
@@ -111,8 +111,8 @@ type PersonBody struct {
 	//
 	// The source is worth reporting: an address a provider supplied is one a
 	// later sign-in may change, and one recorded here is not.
-	Email       string `json:"email,omitempty" doc:"The address they are reached at outside the application"`
-	EmailSource string `json:"email_source,omitempty" enum:"provider,recorded" doc:"The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten"`
+	Email       string           `json:"email,omitempty" doc:"The address they are reached at outside the application"`
+	EmailSource core.EmailSource `json:"email_source,omitempty" doc:"The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten"`
 	// Holds is the grants in force, listed as product and role.
 	Holds []HeldBody `json:"holds,omitempty"`
 	// SeesNothing says every role they hold is a capability, so they reach
@@ -230,7 +230,7 @@ type HeldBody struct {
 	// Source is the origin: assigned by an administrator, or derived from a
 	// group. The origin of a grant is the first thing an access review asks
 	// for.
-	Source string `json:"source,omitempty" enum:"assigned,derived" doc:"Whether an administrator assigned this or a group derived it"`
+	Source core.GrantSource `json:"source,omitempty" doc:"Whether an administrator assigned this or a group derived it"`
 }
 
 // KeyBody is a pipeline credential, without its secret.

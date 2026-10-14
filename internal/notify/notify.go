@@ -48,6 +48,9 @@ const (
 	Condition Lifetime = "condition"
 )
 
+// Lifetimes is both lifetimes a notification can have.
+func Lifetimes() []Lifetime { return []Lifetime{Event, Condition} }
+
 // Kind is what happened, as a word the interface knows how to draw. Spelled
 // here so a producer and a screen cannot disagree about it.
 type Kind string

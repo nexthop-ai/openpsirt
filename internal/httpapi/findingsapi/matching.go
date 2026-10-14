@@ -17,19 +17,19 @@ import (
 
 // UnmatchedBody is one component the scanner has no way to match.
 type UnmatchedBody struct {
-	Name      string `json:"name"`
-	Version   string `json:"version"`
-	Purl      string `json:"purl,omitempty" doc:"The package identifier the scanner is given, where there is one"`
-	CPE       string `json:"cpe,omitempty" doc:"The platform enumeration the scanner is given, where there is one"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package this is, as its identifier spells it"`
-	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Reason    string `json:"reason" enum:"no-identifier,unpublished-kind,no-version,no-distribution,generic-without-cpe" doc:"Why the scanner cannot match it. no-identifier: no package identifier, and a CPE alone matches nothing. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE"`
+	Name      string           `json:"name"`
+	Version   string           `json:"version"`
+	Purl      string           `json:"purl,omitempty" doc:"The package identifier the scanner is given, where there is one"`
+	CPE       string           `json:"cpe,omitempty" doc:"The platform enumeration the scanner is given, where there is one"`
+	Ecosystem string           `json:"ecosystem,omitempty" doc:"The kind of package this is, as its identifier spells it"`
+	Namespace string           `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Reason    core.Unmatchable `json:"reason" doc:"Why the scanner cannot match it. no-identifier: no package identifier, and a CPE alone matches nothing. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE"`
 }
 
 // ReasonCountBody is how many of a build's components one reason covers.
 type ReasonCountBody struct {
-	Reason string `json:"reason" enum:"no-identifier,unpublished-kind,no-version,no-distribution,generic-without-cpe" doc:"Why the scanner cannot match them"`
-	Count  int    `json:"count" doc:"The number of the build's components it covers"`
+	Reason core.Unmatchable `json:"reason" doc:"Why the scanner cannot match them"`
+	Count  int              `json:"count" doc:"The number of the build's components it covers"`
 }
 
 // MatchCoverageBody is what a build holds that the scanner cannot match.
@@ -91,12 +91,12 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 			"meeting several reasons is listed under the first in the order `reasons` gives.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Reason  string `query:"reason" enum:"no-identifier,unpublished-kind,no-version,no-distribution,generic-without-cpe" doc:"One reason alone"`
-		Limit   int    `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
-		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product string           `path:"product"`
+		Stream  string           `path:"stream"`
+		Variant string           `path:"variant"`
+		Reason  core.Unmatchable `query:"reason" doc:"One reason alone"`
+		Limit   int              `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset  int              `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*matchCoverageOutput, error) {
 		listed, held, err := unmatchedIn(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -110,9 +110,9 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 		}
 		for _, reason := range graph.Reasons {
 			out.Body.Reasons = append(out.Body.Reasons,
-				ReasonCountBody{Reason: string(reason), Count: counts[reason]})
+				ReasonCountBody{Reason: core.Unmatchable(reason), Count: counts[reason]})
 		}
-		narrowed := onlyReason(listed, input.Reason)
+		narrowed := onlyReason(listed, string(input.Reason))
 		out.Body.Total = len(narrowed)
 		out.Body.Items = []UnmatchedBody{}
 		// The window is worked out without adding the two: an offset near the
@@ -123,7 +123,7 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, UnmatchedBody{
 				Name: one.Name, Version: one.Version, Purl: one.Purl, CPE: one.CPE,
 				Ecosystem: graph.EcosystemOf(one.Purl), Namespace: graph.NamespaceOf(one.Purl),
-				Reason: string(one.Reason),
+				Reason: core.Unmatchable(one.Reason),
 			})
 		}
 		return out, nil
@@ -141,11 +141,11 @@ func registerMatchCoverageExport(api huma.API, in core.Deps) {
 			"with the reason for each.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Format  string `path:"format" enum:"csv,json"`
-		Reason  string `query:"reason" enum:"no-identifier,unpublished-kind,no-version,no-distribution,generic-without-cpe" doc:"One reason alone"`
+		Product string           `path:"product"`
+		Stream  string           `path:"stream"`
+		Variant string           `path:"variant"`
+		Format  string           `path:"format" enum:"csv,json"`
+		Reason  core.Unmatchable `query:"reason" doc:"One reason alone"`
 	}) (*huma.StreamResponse, error) {
 		// Worked out whole before the response starts, so a build out of reach
 		// is refused with a status rather than a file cut short. It is bounded
@@ -154,12 +154,12 @@ func registerMatchCoverageExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		narrowed := onlyReason(listed, input.Reason)
+		narrowed := onlyReason(listed, string(input.Reason))
 		out := core.Exporting{
 			What: "components a scanner cannot match",
 			About: []core.Stated{
 				{Label: "build", Value: input.Product + " " + input.Stream + " (" + input.Variant + ")"},
-				{Label: "reason", Value: input.Reason},
+				{Label: "reason", Value: string(input.Reason)},
 			},
 			Header: []string{"reason", "name", "version", "purl", "cpe"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {

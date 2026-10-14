@@ -53,13 +53,13 @@ type DueBody struct {
 
 // NoticeSaid is what a caller supplies to record a notice.
 type NoticeSaid struct {
-	Recipient string   `json:"recipient" minLength:"1" maxLength:"200" doc:"Who was told: a regulator, a customer, a response team"`
-	ToldAt    string   `json:"told_at" format:"date-time" doc:"When they were told. Not before the attack became known, and not in the future"`
-	Said      string   `json:"said" minLength:"1" maxLength:"65536" doc:"What they were told"`
-	Window    int64    `json:"window,omitempty" doc:"The window in force this notice answers. Left off, it answers none"`
-	Reference string   `json:"reference,omitempty" maxLength:"191" doc:"What the recipient called the notice, such as a case number. Left off, none"`
-	Places    []string `json:"places,omitempty" maxItems:"250" doc:"The places the notice named, in order. Each is up to 191 characters and not blank; one named twice, in any capitals, is kept once"`
-	Malicious string   `json:"suspected_malicious,omitempty" enum:"yes,no,unknown" doc:"What the notice said about whether the attack was malicious. Left off, it said nothing"`
+	Recipient string      `json:"recipient" minLength:"1" maxLength:"200" doc:"Who was told: a regulator, a customer, a response team"`
+	ToldAt    string      `json:"told_at" format:"date-time" doc:"When they were told. Not before the attack became known, and not in the future"`
+	Said      string      `json:"said" minLength:"1" maxLength:"65536" doc:"What they were told"`
+	Window    int64       `json:"window,omitempty" doc:"The window in force this notice answers. Left off, it answers none"`
+	Reference string      `json:"reference,omitempty" maxLength:"191" doc:"What the recipient called the notice, such as a case number. Left off, none"`
+	Places    []string    `json:"places,omitempty" maxItems:"250" doc:"The places the notice named, in order. Each is up to 191 characters and not blank; one named twice, in any capitals, is kept once"`
+	Malicious core.Malice `json:"suspected_malicious,omitempty" doc:"What the notice said about whether the attack was malicious. Left off, it said nothing"`
 }
 
 // ObligationBody is one incident on the shelf.
@@ -319,7 +319,7 @@ func registerObligations(api huma.API, in core.Deps) {
 		told, err := store.RecordTold(ctx, subject, input.ID, window,
 			input.Body.Recipient, toldAt, input.Body.Said, obligation.Details{
 				Reference: input.Body.Reference, Places: input.Body.Places,
-				Malicious: input.Body.Malicious,
+				Malicious: string(input.Body.Malicious),
 			})
 		if err != nil {
 			switch {

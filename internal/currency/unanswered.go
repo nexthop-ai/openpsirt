@@ -37,6 +37,9 @@ const (
 	WhyUnreadable Why = "unreadable"
 )
 
+// Whys is every reason a component has no upstream answer.
+func Whys() []Why { return []Why{WhyOurs, WhyUnknown, WhyUnreadable} }
+
 // Unanswered is one component with no upstream answer, and why.
 type Unanswered struct {
 	Purl      string

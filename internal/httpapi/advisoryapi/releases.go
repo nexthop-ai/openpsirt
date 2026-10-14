@@ -16,15 +16,15 @@ import (
 // AdvisoryReleaseBody is one release of one issue an advisory covers, and what the
 // document states about it.
 type AdvisoryReleaseBody struct {
-	Product       string `json:"product"`
-	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Vulnerability string `json:"vulnerability"`
-	Stream        string `json:"stream"`
-	Variant       string `json:"variant"`
-	Status        string `json:"status" enum:"known_affected,known_not_affected,fixed" doc:"What the document states about the release"`
+	Product       string             `json:"product"`
+	ProductName   string             `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	Vulnerability string             `json:"vulnerability"`
+	Stream        string             `json:"stream"`
+	Variant       string             `json:"variant"`
+	Status        core.ReleaseStatus `json:"status" doc:"What the document states about the release"`
 	// Decided is where the decisions put it, which differs from the status
 	// only where the release is marked affected.
-	Decided string               `json:"decided" enum:"known_affected,known_not_affected,fixed" doc:"Where the release's decisions put it, before any mark"`
+	Decided core.ReleaseStatus   `json:"decided" doc:"Where the release's decisions put it, before any mark"`
 	Marked  bool                 `json:"marked" doc:"Whether the release is marked affected whatever its decisions say"`
 	Changed bool                 `json:"changed" doc:"Whether the status differs from what an agreement standing on what the advisory says now saw. The agreement stands"`
 	Covered *ReleaseCoveringBody `json:"covered,omitempty" doc:"The decision every open place of the issue in the release stands under. Absent where no one outcome covers them all"`
@@ -86,7 +86,7 @@ func registerReleases(api huma.API, in core.Deps) {
 			body := AdvisoryReleaseBody{
 				Product: one.Covered.Product, ProductName: one.Covered.ProductName,
 				Vulnerability: one.Covered.Issue, Stream: one.Stream, Variant: one.Variant,
-				Status: one.Status, Decided: one.Decided(),
+				Status: core.ReleaseStatus(one.Status), Decided: core.ReleaseStatus(one.Decided()),
 				Marked: one.Overridden, Changed: one.Changed,
 				Elsewhere: one.MadeElsewhere(),
 			}

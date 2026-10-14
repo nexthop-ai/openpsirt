@@ -34,6 +34,9 @@ const (
 	GroupBound Mode = "group-bound"
 )
 
+// Modes is both ways roles can be assigned.
+func Modes() []Mode { return []Mode{Direct, GroupBound} }
+
 // AsMode reads a stored value, treating anything unrecognized as direct.
 //
 // Direct is the safe reading: it is the mode in which nothing is derived from
@@ -56,6 +59,9 @@ const (
 	// sign-in.
 	Derived Source = "derived"
 )
+
+// Sources is both places a grant can come from.
+func Sources() []Source { return []Source{Assigned, Derived} }
 
 // Binding is a provider group bound to a role on one product.
 //

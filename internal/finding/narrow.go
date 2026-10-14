@@ -180,8 +180,8 @@ type Filter struct {
 	// stands now, so a dismissal withdrawn last year does not answer for its
 	// place.
 	Outcomes []string
-	// Assigned keeps groups by who is dealing with them: "me", "somebody"
-	// or "nobody". A findings list that cannot say "mine" makes somebody
+	// Assigned keeps groups by who is dealing with them, in the words
+	// Assignees lists. A findings list that cannot say "mine" makes somebody
 	// go to a second screen to find the work they already know is theirs.
 	// Several, because "mine and whatever nobody has picked up" is one
 	// question about a morning.
@@ -948,6 +948,19 @@ func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	return q
 }
 
+// Who is dealing with a group, as a findings list asks it.
+const (
+	// HeldByMe is mine or a team I am on, at every place.
+	HeldByMe = "me"
+	// HeldBySomebody is held at every place, by anybody.
+	HeldBySomebody = "somebody"
+	// HeldByNobody is held at no place.
+	HeldByNobody = "nobody"
+)
+
+// Assignees is every word a findings list asks who is dealing with a group in.
+func Assignees() []string { return []string{HeldByMe, HeldBySomebody, HeldByNobody} }
+
 // heldBy keeps only the groups whose places are held by who was asked about.
 //
 // One condition holding an OR rather than several applied in turn: "mine or
@@ -966,11 +979,11 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	args := make([]any, 0, 2)
 	for _, who := range asked {
 		switch who {
-		case "nobody":
+		case HeldByNobody:
 			says = append(says, g.held()+" < 1")
-		case "somebody":
+		case HeldBySomebody:
 			says = append(says, g.held()+" >= "+g.places())
-		case "me":
+		case HeldByMe:
 			// Mine or my team's, everywhere the phrase appears. A subject
 			// holding no party names nobody, so the phrase contributes
 			// nothing — which the guard below turns into an answer of nothing

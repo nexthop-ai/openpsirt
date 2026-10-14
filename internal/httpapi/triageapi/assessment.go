@@ -30,12 +30,12 @@ type AssessmentBody struct {
 	// The name an address takes, never the spelling shown on screen — the
 	// same field on both operations has to mean the same thing, and this is
 	// the one a client feeds back to the filter beside it.
-	Product     string      `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
-	ProductName string      `json:"product_name,omitempty" doc:"That product's spelling on screen"`
-	Severity    core.Rating `json:"severity" doc:"This product's own rating"`
-	Published   string      `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
-	Reasoning   string      `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
-	State       string      `json:"state,omitempty" enum:"proposed,live,withdrawn"`
+	Product     string               `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
+	ProductName string               `json:"product_name,omitempty" doc:"That product's spelling on screen"`
+	Severity    core.Rating          `json:"severity" doc:"This product's own rating"`
+	Published   string               `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
+	Reasoning   string               `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
+	State       core.AssessmentState `json:"state,omitempty"`
 	// WithdrawnBecause is set only where no person withdrew the rating.
 	WithdrawnBecause string `json:"withdrawn_because,omitempty" doc:"Why the rating was withdrawn, where a merge of two issues withdrew it rather than a person"`
 	NeedsApproval    bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
@@ -217,8 +217,8 @@ func registerAssessment(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Narrowed to issues you may read a finding of in the product the rating "+
 		"belongs to. A rating is about one product, and an issue this deployment minted for a "+
 		"flaw nobody has announced is not public knowledge."), func(ctx context.Context, input *struct {
-		Product string `query:"product" doc:"Limit to one product, by name"`
-		State   string `query:"state" enum:"proposed,live,withdrawn" doc:"Limit to one state"`
+		Product string               `query:"product" doc:"Limit to one product, by name"`
+		State   core.AssessmentState `query:"state" doc:"Limit to one state"`
 		core.Paging
 	}) (*core.ListOutput[AssessmentBody], error) {
 		subject, err := core.Reading(ctx)
@@ -237,7 +237,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 			within = product.ID
 		}
 		store := finding.NewStore(in.DB.DB)
-		claims, named, total, err := store.Assessments(ctx, subject, within, input.State,
+		claims, named, total, err := store.Assessments(ctx, subject, within, string(input.State),
 			input.Limit, input.Offset)
 		if err != nil {
 			if errors.Is(err, access.ErrDenied) {
@@ -290,7 +290,7 @@ func assessmentBody(a finding.Assessment, identifier string, asking int64) Asses
 	body := AssessmentBody{
 		ID: a.ID, Vulnerability: identifier, Severity: core.Rating(a.Severity),
 		Published: a.Published, Reasoning: a.Reasoning,
-		State: a.State, NeedsApproval: a.NeedsApproval,
+		State: core.AssessmentState(a.State), NeedsApproval: a.NeedsApproval,
 		Mine: a.ProposedBy == asking,
 	}
 	if a.WithdrawnBecause != nil {

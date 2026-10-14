@@ -44,6 +44,9 @@ const (
 	Refused Progress = "failed"
 )
 
+// Progresses is every state an upload can reach, in the order it reaches them.
+func Progresses() []Progress { return []Progress{Reading, Scanning, Scanned, Refused} }
+
 // Receipt is what became of one upload.
 type Receipt struct {
 	Scan    Scan

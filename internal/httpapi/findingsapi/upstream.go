@@ -17,10 +17,10 @@ import (
 // UnansweredBody is one component with no upstream answer, and why there is
 // none.
 type UnansweredBody struct {
-	Purl      string `json:"purl" doc:"The package identifier, which is the name that would be sent"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
-	Why       string `json:"why" enum:"ours,unknown,unreadable" doc:"'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"`
-	Checked   string `json:"checked" doc:"The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked"`
+	Purl      string          `json:"purl" doc:"The package identifier, which is the name that would be sent"`
+	Ecosystem string          `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
+	Why       core.Unanswered `json:"why" doc:"'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"`
+	Checked   string          `json:"checked" doc:"The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked"`
 }
 
 // UnansweredOutput is a page of what has no upstream answer.
@@ -106,7 +106,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		out.Body.Items = make([]UnansweredBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, UnansweredBody{
-				Purl: row.Purl, Ecosystem: row.Ecosystem, Why: string(row.Why),
+				Purl: row.Purl, Ecosystem: row.Ecosystem, Why: core.Unanswered(row.Why),
 				Checked: row.Checked.UTC().Format(time.RFC3339),
 			})
 		}

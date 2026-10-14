@@ -74,6 +74,11 @@ const (
 	AssessmentWithdrawn = "withdrawn"
 )
 
+// AssessmentStates is every state an assessment passes through, in order.
+func AssessmentStates() []string {
+	return []string{AssessmentProposed, AssessmentLive, AssessmentWithdrawn}
+}
+
 // ErrAlreadyAssessed is returned where a claim already stands about an issue
 // in this product. Another product's claim is not in the way of one.
 var ErrAlreadyAssessed = refusal.New("this issue is already assessed in this product")

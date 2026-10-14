@@ -6994,7 +6994,36 @@ components:
           format: int64
           type: integer
         kind:
-          description: "The kind, as a word: assigned, sent-back, build-quiet"
+          description: What it is about
+          enum:
+            - assigned
+            - mentioned
+            - sent-back
+            - build-quiet
+            - holding-absent
+            - critical-on-release
+            - disclosure-due
+            - disclosure-near
+            - statement-revised
+            - claim-waiting
+            - sent-back-waiting
+            - deferral-ending
+            - queue-untaken
+            - approval-undone
+            - approval-withdrawn
+            - claim-lapsed
+            - merge-superseded
+            - brought-in
+            - disclosed
+            - unanswered-report
+            - vulnerability-data-stale
+            - risk-unagreed
+            - pairs-concentrated
+            - supplier-silent
+            - inventory-moved
+            - obligation-open
+            - obligation-near
+            - obligation-passed
           type: string
         lifetime:
           description: An event happened once and is acknowledged; a condition holds until what it is about changes
@@ -8899,7 +8928,6 @@ components:
             - patch
             - advisory
             - report
-            - other
           type: string
         lookup:
           description: "'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit"

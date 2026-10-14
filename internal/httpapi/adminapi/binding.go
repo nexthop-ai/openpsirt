@@ -21,7 +21,7 @@ import (
 
 // ModeBody is where this deployment's roles come from.
 type ModeBody struct {
-	Mode string `json:"mode" enum:"direct,group-bound" doc:"Whether an administrator assigns roles or provider groups derive them"`
+	Mode core.Mode `json:"mode" doc:"Whether an administrator assigns roles or provider groups derive them"`
 }
 
 // BindingBody is a provider group bound to a role.
@@ -57,7 +57,7 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read where roles come from", err)
 		}
-		return &struct{ Body ModeBody }{Body: ModeBody{Mode: string(access.AsMode(stored))}}, nil
+		return &struct{ Body ModeBody }{Body: ModeBody{Mode: core.Mode(access.AsMode(stored))}}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{

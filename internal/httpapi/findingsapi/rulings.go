@@ -26,7 +26,7 @@ type RulingBody struct {
 	Reasoning       string                  `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
 	DuplicateOf     string                  `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
 	Reports         []string                `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
-	State           string                  `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
+	State           core.RulingState        `json:"state" doc:"Waiting for a second person, what its reports currently are, or taken back"`
 	ProposedBy      string                  `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
 	ProposedByName  string                  `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt      string                  `json:"proposed_at"`
@@ -401,7 +401,7 @@ func rulingBodies(ctx context.Context, in core.Deps, subject access.Subject,
 		body := RulingBody{
 			ID: row.ID, Product: row.Product,
 			Disposition: core.DispositionRulable(row.Disposition), Reasoning: row.Reasoning,
-			Reports: row.References, State: rulingState(row),
+			Reports: row.References, State: core.RulingState(row.State()),
 			ProposedBy: who.Identity(row.ProposedBy), ProposedByName: who.Label(row.ProposedBy),
 			ProposedAt: row.ProposedAt.UTC().Format(time.RFC3339),
 			Yours:      row.ProposedBy == subject.ID,
@@ -427,17 +427,6 @@ func rulingBodies(ctx context.Context, in core.Deps, subject access.Subject,
 		out = append(out, body)
 	}
 	return out, nil
-}
-
-// rulingState names where a ruling stands.
-func rulingState(row finding.ReportRuling) string {
-	switch {
-	case row.WithdrawnAt != nil:
-		return "withdrawn"
-	case row.SettledAt != nil:
-		return "in-force"
-	}
-	return "waiting"
 }
 
 // refusedRuling turns what the store answers about a ruling into what the

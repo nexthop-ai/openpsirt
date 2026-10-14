@@ -31,6 +31,9 @@ const (
 	SuppressionsKind Kind = "suppressions"
 )
 
+// Kinds is every kind of document a build sends.
+func Kinds() []Kind { return []Kind{InventoryKind, SuppressionsKind} }
+
 // chunkSize is how much of a document one row holds.
 //
 // Two engines cap how large a single statement may be, the cap is server

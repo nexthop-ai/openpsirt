@@ -34,6 +34,9 @@ const (
 	Refused State = "excluded"
 )
 
+// States is every state a repository can stand in.
+func States() []State { return []State{Waiting, Working, Failed, Done, Refused} }
+
 // Step is what a visit under way is doing.
 type Step string
 
@@ -44,6 +47,9 @@ const (
 	// LookingUp is a visit asking the copy about the commits due.
 	LookingUp Step = "looking-up"
 )
+
+// Steps is every step a visit under way can be at, in order.
+func Steps() []Step { return []Step{Fetching, LookingUp} }
 
 // RepositoryProgress is how far one repository's commits have been looked up.
 type RepositoryProgress struct {

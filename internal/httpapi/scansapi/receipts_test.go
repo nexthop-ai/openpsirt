@@ -40,7 +40,7 @@ func TestASenderReadsBackWhatBecameOfWhatItSent(t *testing.T) {
 		if out.Body.Total != 1 || len(out.Body.Items) != 1 {
 			t.Fatalf("got %d receipts (total %d), want 1", len(out.Body.Items), out.Body.Total)
 		}
-		if got := out.Body.Items[0].State; got != string(ingest.Reading) {
+		if got := out.Body.Items[0].State; string(got) != string(ingest.Reading) {
 			t.Errorf("before the work ran the state is %q, want %q", got, ingest.Reading)
 		}
 
@@ -52,7 +52,7 @@ func TestASenderReadsBackWhatBecameOfWhatItSent(t *testing.T) {
 			t.Fatalf("reading: %v", err)
 		}
 		_, out = httpapitest.Receipts(t, f, f.Key, f.Path)
-		if got := out.Body.Items[0].State; got != string(ingest.Scanning) {
+		if got := out.Body.Items[0].State; string(got) != string(ingest.Scanning) {
 			t.Errorf("after reading the state is %q, want %q", got, ingest.Scanning)
 		}
 		if out.Body.Items[0].Failure != "" {
@@ -88,7 +88,7 @@ func TestAnUnreadableUploadSaysSoToWhoeverSentIt(t *testing.T) {
 		if len(out.Body.Items) != 1 {
 			t.Fatalf("got %d receipts, want 1", len(out.Body.Items))
 		}
-		if got := out.Body.Items[0].State; got != string(ingest.Refused) {
+		if got := out.Body.Items[0].State; string(got) != string(ingest.Refused) {
 			t.Fatalf("state is %q, want %q", got, ingest.Refused)
 		}
 		if out.Body.Items[0].Failure == "" {

@@ -11,20 +11,16 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
 func TestTheReasonsTheSchemaOffersAreTheReasonsAComponentIsGiven(t *testing.T) {
 	// A reason the classifier gives and the schema does not name is refused as
-	// a filter and fails the response's own validation.
-	want := make([]string, 0, len(graph.Reasons))
-	for _, reason := range graph.Reasons {
-		want = append(want, string(reason))
-	}
-	if len(want) == 0 {
-		t.Fatal("no reasons were found, so this checked nothing")
-	}
+	// a filter and fails the response's own validation. The vocabulary type
+	// builds its enum from the classifier's own list.
+	want := reflect.TypeFor[core.Unmatchable]()
 	for _, of := range []reflect.Type{
 		reflect.TypeFor[findingsapi.UnmatchedBody](), reflect.TypeFor[findingsapi.ReasonCountBody](),
 	} {
@@ -32,8 +28,18 @@ func TestTheReasonsTheSchemaOffersAreTheReasonsAComponentIsGiven(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s has no reason", of)
 		}
-		if got := strings.Split(field.Tag.Get("enum"), ","); !reflect.DeepEqual(got, want) {
-			t.Errorf("%s names %v, want %v", of, got, want)
+		if field.Type != want {
+			t.Errorf("%s types its reason as %s, want %s", of, field.Type, want)
+		}
+	}
+	offered := core.Unmatchable("").Schema(nil).Enum
+	if len(offered) != len(graph.Reasons) {
+		t.Errorf("the schema offers %v, want every one of %v", offered, graph.Reasons)
+	}
+	for i, reason := range graph.Reasons {
+		if i < len(offered) && offered[i] != string(reason) {
+			t.Errorf("the schema offers %v, want %v", offered, graph.Reasons)
+			break
 		}
 	}
 }
@@ -62,7 +68,7 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 		}
 		counts := map[string]int{}
 		for _, reason := range all.Reasons {
-			counts[reason.Reason] = reason.Count
+			counts[string(reason.Reason)] = reason.Count
 		}
 		if len(all.Reasons) != len(graph.Reasons) || counts["no-identifier"] != 2 ||
 			counts["no-distribution"] != 1 {

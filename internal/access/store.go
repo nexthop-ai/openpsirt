@@ -114,6 +114,9 @@ const (
 	ATeam PartyKind = "team"
 )
 
+// PartyKinds is both sorts of party.
+func PartyKinds() []PartyKind { return []PartyKind{APerson, ATeam} }
+
 // Grant is one role held against one product.
 type Grant struct {
 	bun.BaseModel `bun:"table:role_grant,alias:rg"`
@@ -422,6 +425,10 @@ const (
 	// A provider may never write over one of these.
 	Recorded EmailSource = "recorded"
 )
+
+// EmailSources is every source that has decided an address. NobodySaid is the
+// absence of one, and is not offered.
+func EmailSources() []EmailSource { return []EmailSource{FromProvider, Recorded} }
 
 // SetEmail records where to reach somebody outside the application.
 //

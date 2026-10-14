@@ -10036,8 +10036,11 @@ export interface components {
              * @description The name for this when acknowledging it
              */
             id: number;
-            /** @description The kind, as a word: assigned, sent-back, build-quiet */
-            kind: string;
+            /**
+             * @description What it is about
+             * @enum {string}
+             */
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11195,7 +11198,7 @@ export interface components {
              * @description The kind of reference. A patch is the change itself
              * @enum {string}
              */
-            kind: "patch" | "advisory" | "report" | "other";
+            kind: "patch" | "advisory" | "report";
             /**
              * @description 'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit
              * @enum {string}

@@ -489,13 +489,24 @@ func (s *Store) agreed(ctx context.Context, row *Advisory) ([]Approval, error) {
 func statusOf(issued, agreed bool) string {
 	switch {
 	case agreed:
-		return "final"
+		return StatusFinal
 	case issued:
-		return "interim"
+		return StatusInterim
 	default:
-		return "draft"
+		return StatusDraft
 	}
 }
+
+// StatusDraft, StatusFinal and StatusInterim are where a document is in its
+// life, in the standard's words.
+const (
+	StatusDraft   = "draft"
+	StatusFinal   = "final"
+	StatusInterim = "interim"
+)
+
+// Statuses is every status a document can carry.
+func Statuses() []string { return []string{StatusDraft, StatusFinal, StatusInterim} }
 
 // mayWrite reports whether this subject may change what an advisory says.
 //

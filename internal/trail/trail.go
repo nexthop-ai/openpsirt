@@ -116,7 +116,14 @@ const (
 	// ByMerge is a change a scan made by merging two issues its report named
 	// together, which names no person.
 	ByMerge Actor = "merge"
+	// ByUpgrade is a change an upgrade made, which names no person. Nothing
+	// in the application writes it; it is here so a row carrying it is read
+	// and offered.
+	ByUpgrade Actor = "upgrade"
 )
+
+// Actors is every actor a change can have.
+func Actors() []Actor { return []Actor{ByPerson, ByConfiguration, ByMerge, ByUpgrade} }
 
 // Change is one administrative act.
 type Change struct {

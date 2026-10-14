@@ -547,8 +547,8 @@ func registerChangeExport(api huma.API, in core.Deps) {
 			"everything this deployment holds.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentRecords, ""), func(ctx context.Context, input *struct {
-		Format string `path:"format" enum:"csv,json"`
-		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here,merge" doc:"Keep only changes of one kind"`
+		Format string         `path:"format" enum:"csv,json"`
+		Kind   core.TrailKind `query:"kind" doc:"Keep only changes of one kind"`
 		core.Period
 	}) (*huma.StreamResponse, error) {
 		subject, err := core.Requester(ctx)
@@ -566,7 +566,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "what has been changed administratively",
 			About: []core.Stated{
-				{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}, {Label: "kind", Value: input.Kind},
+				{Label: "from", Value: asDay(since)}, {Label: "to", Value: asDay(until)}, {Label: "kind", Value: string(input.Kind)},
 			},
 			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {

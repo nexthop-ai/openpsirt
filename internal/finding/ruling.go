@@ -93,6 +93,35 @@ func (r *ReportRuling) Waiting() bool { return r.SettledAt == nil && r.Withdrawn
 // InForce reports whether it is what its reports currently are.
 func (r *ReportRuling) InForce() bool { return r.SettledAt != nil && r.WithdrawnAt == nil }
 
+// RulingState is where a ruling stands.
+type RulingState string
+
+const (
+	// RulingWaiting is waiting for a second person.
+	RulingWaiting RulingState = "waiting"
+	// RulingInForce is what its reports currently are.
+	RulingInForce RulingState = "in-force"
+	// RulingWithdrawn is taken back, whether or not it was ever in force.
+	RulingWithdrawn RulingState = "withdrawn"
+)
+
+// RulingStates is every state a ruling can stand in.
+func RulingStates() []RulingState {
+	return []RulingState{RulingWaiting, RulingInForce, RulingWithdrawn}
+}
+
+// State is where it stands. A withdrawal outranks a settlement, because a
+// ruling settled and then taken back is no longer what its reports are.
+func (r *ReportRuling) State() RulingState {
+	switch {
+	case r.WithdrawnAt != nil:
+		return RulingWithdrawn
+	case r.SettledAt != nil:
+		return RulingInForce
+	}
+	return RulingWaiting
+}
+
 // reportRuled is the permanent record of which reports one ruling covered.
 type reportRuled struct {
 	bun.BaseModel `bun:"table:report_ruled,alias:rd"`

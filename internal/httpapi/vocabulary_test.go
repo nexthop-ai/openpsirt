@@ -11,11 +11,23 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/obligation"
+	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 // words is a vocabulary as plain strings.
@@ -25,101 +37,6 @@ func words[T ~string](all []T) []string {
 		out = append(out, string(each))
 	}
 	return out
-}
-
-// TestEveryVocabularyTheDocumentOffersIsOneTheDomainStates holds the shape,
-// not a second copy of the lists.
-//
-// The vocabulary was retyped as a literal in struct tags at eight sites with
-// four memberships, so an outcome added to `internal/triage` was accepted by
-// the store and refused by every route — and a subset was a shorter literal
-// rather than a rule, so nothing said what it left out or why. Each enum is
-// built from the domain now, and what this asks is that a route offering our
-// words offers one of the lists the domain names.
-//
-// Scoped by the words rather than by the field name: "outcome" also names what
-// became of an upload, which is a different vocabulary and not this one's to
-// police.
-func TestEveryVocabularyTheDocumentOffersIsOneTheDomainStates(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		named := [][]string{
-			words(triage.Outcomes()),
-			words(triage.OutcomesOneAtATime()),
-			words(triage.OutcomesInBulk()),
-			words(triage.OutcomesThatHideRisk()),
-			finding.OutcomesOffered(),
-		}
-		reasons := words(triage.Justifications())
-		// Every word of it, not any of them. Other vocabularies share a word
-		// with this one — a fix state is also "wont-fix", and a publisher's
-		// status is also "affected" — and those are not this one's to police.
-		ours := func(offered []string) bool {
-			return len(offered) > 0 && !slices.ContainsFunc(offered, func(word string) bool {
-				return !slices.Contains(named[0], word) && !slices.Contains(reasons, word)
-			})
-		}
-
-		// Read out of the document the server builds rather than out of the
-		// source, so a field added anywhere is examined without this being
-		// edited.
-		document, err := json.Marshal(r.API.OpenAPI())
-		if err != nil {
-			t.Fatal(err)
-		}
-		var walked map[string]any
-		if err := json.Unmarshal(document, &walked); err != nil {
-			t.Fatal(err)
-		}
-
-		checked := 0
-		var visit func(at string, node any)
-		visit = func(at string, node any) {
-			switch held := node.(type) {
-			case map[string]any:
-				listed, carries := held["enum"].([]any)
-				if carries {
-					offered := make([]string, 0, len(listed))
-					for _, one := range listed {
-						word, ok := one.(string)
-						if !ok {
-							t.Fatalf("%s offers something that is not a word: %v", at, one)
-						}
-						offered = append(offered, word)
-					}
-					if ours(offered) {
-						checked++
-						switch {
-						case slices.Equal(offered, reasons):
-						case slices.ContainsFunc(named, func(one []string) bool {
-							return slices.Equal(one, offered)
-						}):
-						default:
-							t.Errorf("%s offers %v, which is none of the lists internal/triage "+
-								"states — a subset is a named rule there, not a shorter "+
-								"literal here", at, offered)
-						}
-					}
-				}
-				for key, value := range held {
-					visit(at+"."+key, value)
-				}
-			case []any:
-				for _, value := range held {
-					visit(at, value)
-				}
-			}
-		}
-		visit("", walked)
-		if checked == 0 {
-			t.Fatal("the document offers no outcome and no justification, so this checked nothing")
-		}
-		// More than one, or a change that closed one field and opened the
-		// rest would pass.
-		if checked < len(triage.Outcomes()) {
-			t.Errorf("only %d fields were examined, which is fewer than the routes that carry one",
-				checked)
-		}
-	})
 }
 
 // A field beside one of our outcomes carries our reasons.
@@ -208,81 +125,129 @@ func keeping[T ~string](all []T, keeps func(T) bool) []string {
 	return words(slices.DeleteFunc(all, func(one T) bool { return !keeps(one) }))
 }
 
-// TestEveryEnumOfADomainVocabularyIsOneTheDomainNames holds the rest of the
-// closed vocabularies to the lists their packages state: roles, embargo acts,
-// dispositions, what became of a claim, decision states, claim kinds,
-// standings and the severity words.
+// TestEveryEnumInTheDocumentIsAListSomethingStates holds every closed
+// vocabulary the document offers to a list a package states.
 //
-// An enum made only of one vocabulary's words is that vocabulary offered, and
-// it has to be one of the lists the owning package names, in its order. A
-// retyped literal fails here whether it is the whole list, a shorter one or
-// the same words reordered. An enum reaching outside every vocabulary is some
-// other list, and not this one's to police.
-func TestEveryEnumOfADomainVocabularyIsOneTheDomainNames(t *testing.T) {
-	vocabularies := []struct {
-		name  string
-		named [][]string
-	}{
-		{"roles", [][]string{
-			words(access.Roles()),
-			append(words(access.Roles()), words(access.OverTheDeployment())...),
-		}},
-		{"embargo acts", [][]string{words(finding.Acts())}},
-		{"release line kinds", [][]string{words(catalog.Kinds())}},
-		{"dispositions", [][]string{
-			words(finding.Dispositions()),
-			keeping(finding.Dispositions(), finding.Disposition.Rulable),
-			keeping(finding.Dispositions(), finding.Disposition.NeedsSecondPerson),
-		}},
-		{"words for what became of a claim", [][]string{words(triage.WhatHappenedAll())}},
-		{"decision states", [][]string{
-			words(triage.States()),
-			keeping(triage.States(), triage.State.Live),
-			keeping(triage.States(), triage.State.Ended),
-		}},
-		{"claim kinds", [][]string{words(triage.ClaimKinds())}},
-		{"standings", [][]string{
-			words(finding.ClaimStandings()),
-			keeping(finding.ClaimStandings(), finding.ClaimStanding.Unsettled),
-		}},
-		{"severity words", [][]string{
-			finding.Bands(), finding.LeastFirst(), finding.Recordable(),
-			finding.TriageFloors(), append(finding.TriageFloors(), ""), cvss.Bands(),
-		}},
+// An enum is a domain vocabulary offered, so it has to be one of the lists
+// the owning package names, in its order: a retyped literal fails here whether
+// it is the whole list, a shorter one or the same words reordered. The few
+// enums no domain package owns are a format's or a route's own words, and are
+// listed below by name, so a new enum is either built from its package or
+// added there on purpose.
+//
+// Both directions: an entry no enum offers is a list this test carries for
+// nothing, which is how a hand-kept table goes stale.
+func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
+	stated := map[string][]string{
+		"outcomes":                       words(triage.Outcomes()),
+		"outcomes one at a time":         words(triage.OutcomesOneAtATime()),
+		"outcomes in bulk":               words(triage.OutcomesInBulk()),
+		"outcomes that hide risk":        words(triage.OutcomesThatHideRisk()),
+		"outcomes a statement offers":    finding.OutcomesOffered(),
+		"justifications":                 words(triage.Justifications()),
+		"roles":                          words(access.Roles()),
+		"roles and rights":               append(words(access.Roles()), words(access.OverTheDeployment())...),
+		"embargo acts":                   words(finding.Acts()),
+		"release line kinds":             words(catalog.Kinds()),
+		"dispositions":                   words(finding.Dispositions()),
+		"dispositions a ruling carries":  keeping(finding.Dispositions(), finding.Disposition.Rulable),
+		"dispositions that wait":         keeping(finding.Dispositions(), finding.Disposition.NeedsSecondPerson),
+		"what became of a claim":         words(triage.WhatHappenedAll()),
+		"decision states":                words(triage.States()),
+		"live decision states":           keeping(triage.States(), triage.State.Live),
+		"ended decision states":          keeping(triage.States(), triage.State.Ended),
+		"decision states or several":     append(words(triage.States()), triage.SeveralStates),
+		"queue reasons":                  words(triage.QueueReasons()),
+		"claim kinds":                    words(triage.ClaimKinds()),
+		"standings":                      words(finding.ClaimStandings()),
+		"unsettled standings":            keeping(finding.ClaimStandings(), finding.ClaimStanding.Unsettled),
+		"bands":                          finding.Bands(),
+		"ratings":                        finding.LeastFirst(),
+		"recordable severities":          finding.Recordable(),
+		"triage lines":                   finding.TriageFloors(),
+		"triage lines or clear":          append(finding.TriageFloors(), ""),
+		"score bands":                    cvss.Bands(),
+		"statement sources":              finding.Sources(),
+		"publisher statuses":             finding.VexStatuses(),
+		"build sayings":                  finding.BuildSayings(),
+		"origins":                        words(finding.Origins()),
+		"fix states":                     words(finding.FixStates()),
+		"unmatchable reasons":            words(graph.Reasons),
+		"reasons for no deadline":        words(finding.NoDeadlines()),
+		"declared scopes":                sbom.Scopes(),
+		"planned":                        {string(finding.PlannedOnly), string(finding.NotPlanned), core.PlannedEither},
+		"support":                        finding.Supports(),
+		"assignees":                      finding.Assignees(),
+		"upgrade states":                 words(finding.UpgradeStates()),
+		"match routes":                   words(finding.MatchRoutes()),
+		"reference kinds":                words(finding.ReferenceKinds()),
+		"assessment states":              finding.AssessmentStates(),
+		"ruling states":                  words(finding.RulingStates()),
+		"platforms":                      notify.Platforms(),
+		"notification kinds":             words(notify.Kinds()),
+		"notification lifetimes":         words(notify.Lifetimes()),
+		"upload progress":                words(ingest.Progresses()),
+		"document kinds":                 words(ingest.Kinds()),
+		"access modes":                   words(access.Modes()),
+		"grant sources":                  words(access.Sources()),
+		"email sources":                  words(access.EmailSources()),
+		"party kinds":                    words(access.PartyKinds()),
+		"repository states":              words(patchbranch.States()),
+		"visit steps":                    words(patchbranch.Steps()),
+		"reasons for no upstream answer": words(currency.Whys()),
+		"trail kinds":                    words(trail.Kinds()),
+		"trail actors":                   words(trail.Actors()),
+		"malice":                         obligation.Malice,
+		"advisory statuses":              advisory.Statuses(),
+		"release statuses":               advisory.ReleaseStatuses(),
+		"setting kinds":                  words(setting.Kinds()),
+		"setting sections":               words(setting.Sections()),
+		"finding sorts":                  words(finding.SortKeys()),
+		"bundle sorts":                   words(finding.BundleSortKeys()),
+		"closures":                       words(finding.Closures()),
+		"exchange document kinds":        words(vex.Kinds()),
+	}
+	// What no domain package owns: a file format's words, or a route's own
+	// answer that nothing beneath it names.
+	owned := map[string][]string{
+		"export formats":       {"csv", "json"},
+		"visibilities":         {"public", "private"},
+		"inventory changes":    {"added", "removed", "changed"},
+		"spread over variants": {"only", "every"},
+		"register sides":       {"open", "closed"},
+		"CVE record statuses":  {"affected", "unaffected"},
+		"commit lookups":       {"found", "absent"},
+		"upload answers":       {"queued", "already_held"},
+		"subject kinds":        {"person", "key"},
 	}
 
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		checked := 0
-		for at, offered := range enumsIn(t, r) {
-			var of []string
-			named := false
-			for _, each := range vocabularies {
-				all := []string{}
-				for _, list := range each.named {
-					all = append(all, list...)
+		offered := enumsIn(t, r)
+		if len(offered) == 0 {
+			t.Fatal("the document offers no enum, so this checked nothing")
+		}
+		used := map[string]bool{}
+		for at, list := range offered {
+			named := ""
+			for _, table := range []map[string][]string{stated, owned} {
+				for name, each := range table {
+					if slices.Equal(each, list) {
+						named = name
+						used[name] = true
+					}
 				}
-				if len(offered) < 2 || slices.ContainsFunc(offered, func(word string) bool {
-					return !slices.Contains(all, word)
-				}) {
-					continue
-				}
-				of = append(of, each.name)
-				named = named || slices.ContainsFunc(each.named, func(list []string) bool {
-					return slices.Equal(list, offered)
-				})
 			}
-			if len(of) == 0 {
-				continue
-			}
-			checked++
-			if !named {
-				t.Errorf("%s offers %v, which is made of the %s and is none of the lists the "+
-					"owning package names — a subset is a named rule there, not a shorter "+
-					"literal here", at, offered, strings.Join(of, " or the "))
+			if named == "" {
+				t.Errorf("%s offers %v, which is none of the lists a package states — build it "+
+					"from the package that owns the words, or name it as a format's own", at, list)
 			}
 		}
-		if checked == 0 {
-			t.Fatal("the document offers none of these vocabularies, so this checked nothing")
+		for _, table := range []map[string][]string{stated, owned} {
+			for name := range table {
+				if !used[name] {
+					t.Errorf("no enum in the document offers the %s, so the entry checks nothing", name)
+				}
+			}
 		}
 	})
 }

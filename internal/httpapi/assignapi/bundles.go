@@ -268,9 +268,9 @@ type PlannedBody struct {
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
-	By     string `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
-	HeldBy string `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
-	State  string `json:"state" enum:"planned,landed,lapsed" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
+	By     string            `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
+	HeldBy string            `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
+	State  core.UpgradeState `json:"state" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
 	// ClaimID is the claim that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
 	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
@@ -379,7 +379,7 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 						row.Upstream, row.From, row.To,
 						strings.Join(row.Components, " "),
 						strconv.Itoa(row.Issues), strconv.Itoa(row.Places),
-						row.DeclaredAt, row.By, row.HeldBy, row.State, claim,
+						row.DeclaredAt, row.By, row.HeldBy, string(row.State), claim,
 					})
 				}
 				return written, nil
@@ -401,7 +401,7 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 			Components: one.Components,
 			Issues:     one.Issues, Places: one.Places,
 			DeclaredAt: one.DeclaredAt.Format(time.DateOnly),
-			HeldBy:     one.HeldBy, State: string(one.State),
+			HeldBy:     one.HeldBy, State: core.UpgradeState(one.State),
 			ClaimID: one.ClaimID,
 		}
 		if row.Components == nil {
