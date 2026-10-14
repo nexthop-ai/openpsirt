@@ -199,6 +199,12 @@ A document whose contents were released answers 410, not 404. On screen, one
 still held is a link and one released is not: a link answering 410 is a control
 that looks like it works.
 
+A document is read back one part at a time rather than in one snapshot, so one
+released while it is read runs out of parts before its size. The stream then
+ends in an error rather than cleanly: the background reader fails the read
+instead of parsing part of a document as all of it, and a download already
+answered 200 ends short of the length it declared and is logged.
+
 ## Scan application
 
 A worker claims the scan, reads its documents, and applies what they describe.

@@ -96,7 +96,7 @@ func registerRetained(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that document could not be read", err)
 		}
 
-		body := documents.Open(ctx, doc.ID)
+		body := documents.Open(ctx, doc)
 		return &huma.StreamResponse{Body: func(hc huma.Context) {
 			// The bytes as they arrived, and named as such. Not parsed and not
 			// re-serialized: the hash on the receipt is over what was
@@ -108,9 +108,13 @@ func registerRetained(api huma.API, in core.Deps) {
 			hc.SetHeader("Content-Length", strconv.FormatInt(doc.SizeBytes, 10))
 			hc.SetHeader("Cache-Control", "private, no-store")
 			hc.SetStatus(http.StatusOK)
-			if _, err := io.Copy(hc.BodyWriter(), body); err != nil {
+			// The status and length are out before the first byte, so a
+			// document let go while it is sent cannot be answered 410 any
+			// more. It ends short of the length it declared, which a client
+			// reads as a failed transfer, and it is logged.
+			if sent, err := io.Copy(hc.BodyWriter(), body); err != nil {
 				in.Log().ErrorContext(ctx, "sending a retained document stopped part way",
-					"error", err, "document", doc.ID)
+					"error", err, "document", doc.ID, "sent", sent, "size", doc.SizeBytes)
 			}
 		}}, nil
 	})

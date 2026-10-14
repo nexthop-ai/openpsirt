@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -52,7 +53,7 @@ func TestADocumentComesBackExactlyAsItArrived(t *testing.T) {
 			t.Errorf("content hash is %q", doc.ContentHash)
 		}
 
-		got, err := io.ReadAll(docs.Open(ctx, doc.ID))
+		got, err := io.ReadAll(docs.Open(ctx, doc))
 		if err != nil {
 			t.Fatalf("read back: %v", err)
 		}
@@ -79,7 +80,7 @@ func TestAnEmptyDocumentIsStillADocument(t *testing.T) {
 		if doc.SizeBytes != 0 {
 			t.Errorf("an empty document stored %d bytes", doc.SizeBytes)
 		}
-		got, err := io.ReadAll(docs.Open(ctx, doc.ID))
+		got, err := io.ReadAll(docs.Open(ctx, doc))
 		if err != nil || len(got) != 0 {
 			t.Errorf("read back %d bytes, %v", len(got), err)
 		}
@@ -151,7 +152,7 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 		if err != nil || len(held) != 0 {
 			t.Errorf("held %d documents after discarding, %v", len(held), err)
 		}
-		if got, _ := io.ReadAll(docs.Open(ctx, doc.ID)); len(got) != 0 {
+		if got, _ := io.ReadAll(docs.Open(ctx, doc)); len(got) != 0 {
 			t.Errorf("%d bytes of content survived the discard", len(got))
 		}
 
@@ -177,6 +178,35 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 		// and a re-run of it must agree.
 		if err := docs.Discard(ctx, rec.ID); err != nil {
 			t.Errorf("discarding twice: %v", err)
+		}
+	})
+}
+
+// A document let go while it is read runs out of parts before its size. The
+// stream ends in an error rather than cleanly, so a reader does not take the
+// bytes it got for the whole document.
+func TestADocumentLetGoWhileItIsReadEndsShortWithAnError(t *testing.T) {
+	each(t, func(t *testing.T, s *ingest.Store, targetID int64) {
+		ctx := t.Context()
+		rec, _, err := s.Record(ctx, arriving(targetID, "hash-1", time.Now().UTC().Add(-time.Hour)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		docs := ingest.NewDocuments(s.DB())
+		doc, err := docs.Write(ctx, rec.ID, ingest.InventoryKind, 0, bytes.NewReader(aDocument(1_200_000)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		reading := docs.Open(ctx, doc)
+		first := make([]byte, 1024)
+		if _, err := io.ReadFull(reading, first); err != nil {
+			t.Fatal(err)
+		}
+		if err := docs.Discard(ctx, rec.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.ReadAll(reading); !errors.Is(err, io.ErrUnexpectedEOF) {
+			t.Errorf("reading on past a discard ended with %v, want an unexpected end", err)
 		}
 	})
 }

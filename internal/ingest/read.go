@@ -252,7 +252,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		return &Result{ScanID: scanID, Superseded: true}, nil
 	}
 
-	doc, err := sbom.Read(documents.Open(ctx, inventory.ID), r.limits)
+	doc, err := sbom.Read(documents.Open(ctx, inventory), r.limits)
 	if err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
 	}
@@ -289,7 +289,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		}
 		within := limits
 		within.MaxStatements = left
-		read, err := sbom.ReadSuppressions(documents.Open(ctx, held.ID), within)
+		read, err := sbom.ReadSuppressions(documents.Open(ctx, &held), within)
 		if err != nil {
 			return nil, fmt.Errorf("scan %d: %w", scanID, err)
 		}
