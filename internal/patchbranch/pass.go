@@ -44,6 +44,19 @@ const LookAgainAfter = 7 * 24 * time.Hour
 // for the second.
 const RetryAfter = 24 * time.Hour
 
+// HostShare is how long the visits to one host's repositories may hold the
+// pass within RetryAfter before that host's repositories are planned after
+// every other host's.
+//
+// The links a pass follows come from the scanner's vulnerability data, whose
+// references anybody publishing an advisory writes, and a repository that
+// answers slowly holds the one pass for as long as a fetch is allowed. Counted
+// per host because a host is what a link's author chooses, and no host is
+// exempt by name: a host with many linked repositories over its share is
+// visited as often as the pass has nothing else due. One fetch's worth of
+// visit time a day.
+const HostShare = fetchBudget
+
 // Pass fetches the repositories patch links point into and records which
 // branches each linked commit is on.
 type Pass struct {
@@ -227,6 +240,10 @@ type candidate struct {
 	// stale is the most urgent of those looked up before.
 	stale urgency
 	held  bool
+	// spent is how long visits to the repository's host held the pass within
+	// RetryAfter, and over says that is HostShare or more.
+	spent time.Duration
+	over  bool
 }
 
 // choose picks the repository to visit: the first in the order plan puts
@@ -257,7 +274,9 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 // due in it costs little once it is there. After that, the repository holding
 // the most urgent commit never looked up, then the most urgent one due again. A
 // repository an administrator excluded is never planned, and one that failed
-// is left for a day.
+// is left for a day. A repository whose host has had its share of the pass is
+// planned after every repository whose host has not, and among those, the host
+// that has had the least goes first.
 //
 // held says whether a repository's copy is on the disk that counts. The pass
 // asks its own disk; the progress report, answered by any replica, reads the
@@ -278,6 +297,7 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the commits due a look: %w", err)
 	}
+	spent := hostTime(repositories, now)
 	byID := map[int64]*candidate{}
 	for _, repository := range repositories {
 		// Asked of the host in the address, which is stored whole, rather
@@ -349,8 +369,35 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 			out = append(out, one)
 		}
 	}
+	for _, one := range out {
+		one.spent = spent[Commit{Repository: one.repository.URL}.Host()]
+		one.over = one.spent >= HostShare
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].before(out[j]) })
 	return out, nil
+}
+
+// hostTime is how long visits to each host's repositories held the pass within
+// RetryAfter, keyed on the host in the address.
+//
+// A repository records its last visit and no other, so a repository visited
+// twice within the window counts once. The links that claim the pass are many
+// repositories each visited once, which is what this counts.
+func hostTime(repositories []repositoryRow, now time.Time) map[string]time.Duration {
+	since := now.Add(-RetryAfter)
+	out := map[string]time.Duration{}
+	for _, repository := range repositories {
+		began, ended := repository.FetchedAt, repository.EndedAt
+		if began == nil || ended == nil || ended.Before(*began) || !ended.After(since) {
+			continue
+		}
+		from := *began
+		if from.Before(since) {
+			from = since
+		}
+		out[Commit{Repository: repository.URL}.Host()] += ended.Sub(from)
+	}
+	return out
 }
 
 // notYetRecorded is the linked commits with no row, in a repository not on an
@@ -398,6 +445,12 @@ func waitingOut(repository repositoryRow, now time.Time) bool {
 
 // before orders two candidates as plan describes.
 func (c *candidate) before(other *candidate) bool {
+	if c.over != other.over {
+		return other.over
+	}
+	if c.over && c.spent != other.spent {
+		return c.spent < other.spent
+	}
 	here, there := c.held && c.never > 0, other.held && other.never > 0
 	if here != there {
 		return here
@@ -594,11 +647,14 @@ func (p *Pass) finish(ctx context.Context, before repositoryRow, dir string, fai
 	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where("id = ?", before.ID)
 	switch {
 	case errors.Is(failed, errStopped):
-		update = update.Set("fetched_at = ?", utc(before.FetchedAt)).Set("failed = ?", before.Failed)
+		update = update.Set("fetched_at = ?", utc(before.FetchedAt)).Set("failed = ?", before.Failed).
+			Set("ended_at = ?", utc(before.EndedAt))
 	case failed != nil:
-		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason))
+		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason)).
+			Set("ended_at = ?", p.Now().UTC())
 	default:
-		update = update.Set("failed = NULL").Set("reached_at = ?", p.Now().UTC())
+		now := p.Now().UTC()
+		update = update.Set("failed = NULL").Set("reached_at = ?", now).Set("ended_at = ?", now)
 	}
 	if dir != "" {
 		update = update.Set("held_bytes = ?", size(dir))

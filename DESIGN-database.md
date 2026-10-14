@@ -460,6 +460,7 @@ once, keys a build's claim on it, and keys a reference on its address as given.
 | Findings and tags are pointed at the kept component | Both the component a finding is against and what pulls it in. A tag the merged image carried twice for one issue in one product keeps the first added |
 | The findings are read and moved once for every image | Read for the places decisions are keyed on before anything moves, and moved after every image is merged, a batch of components at a time. The finding table is the largest there is and nothing indexes it by component alone, so a pass per image is a scan of it per image |
 | The other components are removed | Nothing points at them any more |
+| A patch repository records when its last visit ended | No visit v0.8.0 recorded has an end, so each counts as having held the pass for no time until it is visited again (`DESIGN-findings.md` § Host share) |
 
 The rules an identity, a fold key and a live key are worked out by are copied
 into the migration rather than called, so a later change to the application
@@ -1196,14 +1197,15 @@ A cut is made on a character boundary, never at a byte offset.
 | Rule | Reason |
 |---|---|
 | A value shortened to fit a width is cut between characters | A byte offset lands inside a multi-byte character about two times in three, and what is left is not valid UTF-8 |
-| The write is refused by three engines of four | PostgreSQL refuses invalid UTF-8 outright, MySQL and MariaDB refuse it in strict mode, and SQLite stores it — which is the engine the quick loop runs |
+| The query builder writes text as valid UTF-8 | It writes every value into the statement text, character by character: an invalid byte becomes U+FFFD and a NUL is dropped. A cut inside a character is stored with a replacement character where its last character was |
+| Text another program wrote is stored however it is encoded | A scanner's standard error and git's account of what a remote said carry whatever bytes they carry. Each engine refuses an invalid byte or a NUL handed to it as a parameter — PostgreSQL always, MySQL and MariaDB in strict mode — and none is handed one, because the builder sends none |
 | The two directions are separate operations | Keeping the head leaves the partial character at the end and keeping the tail leaves it at the front, so one of them trims backward and the other forward |
 | Both live in one place | Every site wrote its own slice, and the ones that were correct were written by people who had already been bitten. The cut is one fact, so it is written once and called |
 
-What it costs where it is missing is the failure that reports nothing: the
-value being shortened is usually a message saying why something else failed, so
-the refused write is the one recording a failure, and the operator is left with
-neither.
+A test on each of the four engines ends a scan run with a failure, a caution
+and versions carrying invalid bytes and a NUL, and records a patch repository's
+failure quoting a remote error in invalid bytes: each is stored, valid, with
+the text around the bytes kept, and the repository waits its day.
 
 A lookup key is cut in characters, which is how its column is declared; a
 value bounded for a byte budget is cut in bytes. Both cut on a character
