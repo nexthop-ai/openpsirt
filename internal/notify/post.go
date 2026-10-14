@@ -112,6 +112,10 @@ func NewPost(db *bun.DB, channel Channel, baseURL string, logger *slog.Logger,
 
 // Run sweeps until the context ends.
 func (p *Post) Run(ctx context.Context, interval time.Duration) {
+	// Both leases are handed back once the last cycle has ended, so the next
+	// replica carries on without waiting them out.
+	defer p.leases.Handback(ctx, DigestLease, p.replica, p.logger)
+	defer p.leases.Handback(ctx, PostLease, p.replica, p.logger)
 	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
 		if sent, err := p.Digests(ctx); err != nil {
 			p.logger.Error("sending digests", "error", err)

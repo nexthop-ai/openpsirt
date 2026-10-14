@@ -143,6 +143,9 @@ func NewSignal(db *bun.DB, baseURL string, logger *slog.Logger, replica string) 
 
 // Run sweeps until the context ends.
 func (s *Signal) Run(ctx context.Context, interval time.Duration) {
+	// Handed back once the last cycle has ended, so the next replica carries
+	// on without waiting out the lease.
+	defer s.leases.Handback(ctx, SignalLease, s.replica, s.logger)
 	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
 		if sent, failed, err := s.Once(ctx); err != nil {
 			s.logger.Error("carrying notifications to their destinations", "error", err)

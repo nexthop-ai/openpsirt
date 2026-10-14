@@ -310,12 +310,6 @@ func (q *Queue) backlogLimit(ctx context.Context, db bun.IDB) (int, error) {
 // every engine. The engine-specific row locking in claim_locking.go is about
 // throughput, not correctness.
 func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
-	now := q.now().Truncate(time.Microsecond)
-
-	// A job whose claim has gone stale is available again: the worker holding
-	// it has died, and waiting for it forever would strand the work.
-	staleBefore := now.Add(-q.opts.ClaimTimeout)
-
 	var job *Job
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		// Every attempt starts from nothing. InTransaction re-runs this
@@ -324,6 +318,13 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 		// pointer set — so an attempt that finds nothing claimable returns no
 		// error and Claim hands back a claim the database does not have.
 		job = nil
+		// The moment is read on each attempt, because a retry runs after a
+		// pause and a job that became runnable during it is claimable.
+		now := q.now().Truncate(time.Microsecond)
+		// A job whose claim has gone stale is available again: the worker
+		// holding it has died, and waiting for it forever would strand the
+		// work.
+		staleBefore := now.Add(-q.opts.ClaimTimeout)
 		id, err := claimableID(ctx, tx, q.db.Server.Engine, q.locking, kind, now, staleBefore)
 		if err != nil || id == 0 {
 			return err
@@ -389,14 +390,14 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 // is the same failure; the difference is only that nobody was left alive to
 // report it.
 func (q *Queue) Bury(ctx context.Context) (int, error) {
-	now := q.now().Truncate(time.Microsecond)
-	stale := now.Add(-q.opts.ClaimTimeout)
-
 	var buried int
 	err := database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		// Every attempt starts from nothing: a count from an attempt that was
-		// rolled back describes a queue that no longer exists.
+		// rolled back describes a queue that no longer exists, and a moment
+		// from before it describes a clock that has moved on.
 		buried = 0
+		now := q.now().Truncate(time.Microsecond)
+		stale := now.Add(-q.opts.ClaimTimeout)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
 			Set("state = ?", Dead).
 			Set("last_error = ?", ErrWorkerGone.Error()).

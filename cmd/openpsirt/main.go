@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -584,14 +585,20 @@ const scheduleInterval = 5 * time.Minute
 // first run over a few hours and is invisible thereafter.
 const askInterval = time.Minute
 
-// workerName identifies this process in a claim, so a job held by something
-// that has since died can be told apart from one being worked on.
+// workerName identifies this process in a claim and as a lease's holder, so a
+// job held by something that has since died can be told apart from one being
+// worked on.
+//
+// The host and the process are what an operator reads, and neither tells two
+// processes apart: in a container the process is the first one, and replicas
+// sharing the host's network share its name. Random characters do, so two
+// replicas never both hold one job or one lease.
 func workerName() string {
 	host, err := os.Hostname()
 	if err != nil || host == "" {
 		host = "unknown"
 	}
-	return fmt.Sprintf("%s/%d", host, os.Getpid())
+	return fmt.Sprintf("%s/%d/%s", host, os.Getpid(), rand.Text()[:16])
 }
 
 // closeQuietly closes the database at shutdown. A failure here changes nothing

@@ -315,6 +315,11 @@ func TestAPassThatLosesTheLeaseStopsAndLeavesTheSupplierDue(t *testing.T) {
 			if path == "/2026/EL-140.json" {
 				t.Error("a document was fetched after the lease was lost")
 			}
+			// Asked before each listing too: a publisher serving many slowly
+			// outlasts the lease before the first document.
+			if path == "/feed.json" {
+				t.Error("a listing was fetched after the lease was lost")
+			}
 		}
 	})
 }

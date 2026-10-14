@@ -70,6 +70,9 @@ func (u *Undertaker) Run(ctx context.Context, interval time.Duration) {
 	if u == nil {
 		return
 	}
+	// Handed back once the last pass has ended, so the next replica buries
+	// without waiting out the lease.
+	defer u.leases.Handback(ctx, BurialLease, u.replica, u.logger)
 	background.Every(ctx, interval, betweenBurials, func(ctx context.Context) {
 		// Logged and carried on, like every other background pass here: a
 		// pass that cannot run is not a reason to stop serving, and what it

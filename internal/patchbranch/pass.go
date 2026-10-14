@@ -164,11 +164,7 @@ func (p *Pass) cycle(ctx context.Context) int {
 			// Shutting down mid-visit. The lease is handed back so the
 			// replica that starts next carries on at once rather than
 			// waiting for it to lapse.
-			releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			defer cancel()
-			if err := p.leases.Release(releasing, Lease, p.replica); err != nil {
-				p.logger.Warn("handing back the lease on looking up patch branches", "error", err)
-			}
+			p.leases.Handback(ctx, Lease, p.replica, p.logger)
 			return visits
 		}
 		if err != nil {

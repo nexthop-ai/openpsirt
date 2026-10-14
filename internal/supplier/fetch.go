@@ -45,9 +45,8 @@ const MostPerPass = 20
 // MostFeeds bounds how many listings one publisher may point at.
 //
 // Nothing in the format bounds it, and a description within the size bound can
-// name tens of thousands of addresses — which is a pass
-// running for hours, holding every entry it has read, and outliving the lease
-// that says it is the one reading (REQ-69). A publisher serves one listing per
+// name tens of thousands of addresses — which is a pass running for hours and
+// holding every entry it has read (REQ-69). A publisher serves one listing per
 // label they publish under, so this is far above any real directory.
 const MostFeeds = 16
 
@@ -154,11 +153,12 @@ type Fetcher struct {
 	// Now is the clock a publisher's own stamps are judged against, so a test
 	// can hand one a date in the future without waiting for the future.
 	Now func() time.Time
-	// Keep is asked before each document whether this replica still holds
-	// the work, renewing its claim. A document is a request for itself and up
-	// to two for its digests, each with a timeout, so a supplier's pass is
-	// longer than a lease sized for the interval. Nil where nothing else
-	// could be reading, which is a fetcher a test drives directly.
+	// Keep is asked before each listing and each document whether this
+	// replica still holds the work, renewing its claim. A document is a
+	// request for itself and up to two for its digests, and a listing a
+	// request of its own, each with a timeout, so a supplier's pass is longer
+	// than a lease sized for the interval. Nil where nothing else could be
+	// reading, which is a fetcher a test drives directly.
 	Keep func(ctx context.Context) (bool, error)
 	// History is how far before its configuration a supplier is first read
 	// from. The pass sets it from the deployment's setting on every wake; a
@@ -249,16 +249,14 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		if err := f.wait(ctx); err != nil {
 			return took, nil
 		}
-		if f.Keep != nil {
-			switch mine, err := f.Keep(ctx); {
-			case err != nil:
-				return took, fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)
-			case !mine:
-				// Another replica has the work. Left due, so whichever of
-				// them reads next starts from the mark this one reached.
-				took.Filled = true
-				return took, nil
-			}
+		switch mine, err := f.kept(ctx); {
+		case err != nil:
+			return took, err
+		case !mine:
+			// Another replica has the work. Left due, so whichever of
+			// them reads next starts from the mark this one reached.
+			took.Filled = true
+			return took, nil
 		}
 		recorded, checked, err := f.document(ctx, client, by, source, one, ships, sums)
 		switch {
@@ -379,6 +377,19 @@ type entry struct {
 	sums []string
 }
 
+// kept asks whether this replica still holds the work, renewing the lease
+// where it does. A fetcher with nothing to ask holds it.
+func (f *Fetcher) kept(ctx context.Context) (bool, error) {
+	if f.Keep == nil {
+		return true, nil
+	}
+	mine, err := f.Keep(ctx)
+	if err != nil {
+		return false, fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)
+	}
+	return mine, nil
+}
+
 // due is the entries the publisher listed past the mark, oldest first and
 // bounded, and whether the bound is what stopped it.
 //
@@ -401,6 +412,17 @@ func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing
 	for _, one := range listed {
 		if err := f.wait(ctx); err != nil {
 			return nil, false, err
+		}
+		// Asked before each listing as before each document: a listing is
+		// fetched within the same bound a document is, and a publisher
+		// serving many of them slowly outlasts the lease before the first
+		// document is reached.
+		switch mine, err := f.kept(ctx); {
+		case err != nil:
+			return nil, false, err
+		case !mine:
+			// Left due, with the mark where the last pass left it.
+			return nil, true, nil
 		}
 		entries, err := f.entries(ctx, client, one)
 		if err != nil {

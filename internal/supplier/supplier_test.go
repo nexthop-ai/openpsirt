@@ -305,6 +305,53 @@ func TestTheMarkMovesForwardOnly(t *testing.T) {
 	})
 }
 
+// A later moment carries its own digest with it, whichever of the two digests
+// is the greater. Two of the four engines read an assignment already made when
+// they evaluate the next, and a digest left behind beside a new moment skips
+// every entry between the two for ever.
+func TestALaterMomentMovesTheDigestWithIt(t *testing.T) {
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+		high, low := supplier.Mark("a"), supplier.Mark("b")
+		if high < low {
+			high, low = low, high
+		}
+		earlier := time.Now().UTC().Truncate(time.Microsecond).Add(-time.Hour)
+		later := earlier.Add(time.Hour)
+		for _, c := range []struct {
+			what   string
+			record func(id int64, at time.Time, mark string) error
+		}{
+			{"reached", func(id int64, at time.Time, mark string) error {
+				return store.Reached(ctx, id, at, mark, nil)
+			}},
+			{"caught up", func(id int64, at time.Time, mark string) error {
+				return store.CaughtUp(ctx, id, at, mark)
+			}},
+		} {
+			row, err := store.Add(ctx, f.admin, f.product, "SUSE "+c.what, described)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := c.record(row.ID, earlier, high); err != nil {
+				t.Fatal(err)
+			}
+			if err := c.record(row.ID, later, low); err != nil {
+				t.Fatal(err)
+			}
+			var held supplier.Source
+			if err := f.db.DB.NewSelect().Model(&held).Where("id = ?", row.ID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if held.CaughtUpTo == nil || !held.CaughtUpTo.UTC().Equal(later) || held.CaughtUpMark != low {
+				t.Errorf("%s: the mark reads %v and %q, want %v and the later moment's digest %q",
+					c.what, held.CaughtUpTo, held.CaughtUpMark, later, low)
+			}
+		}
+	})
+}
+
 func TestWhyASupplierCouldNotBeReadIsRecorded(t *testing.T) {
 	// "This publisher has been unreachable for a week" is only visible as a
 	// moment that has stopped moving. Nothing else reports it.

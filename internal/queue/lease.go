@@ -5,7 +5,9 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -59,26 +61,22 @@ func NewLeases(db *bun.DB) *Leases {
 // while the work runs, which is why `until` has to cover a cycle of the work
 // rather than an instant of it.
 func (l *Leases) Take(ctx context.Context, name, holder string, until time.Duration) (bool, error) {
-	now := l.now().Truncate(time.Microsecond)
-	// The row is made on first use rather than seeded by the migration: what
-	// work exists is decided in code, and a migration listing the names would
-	// be a second place to change whenever a pass is added or retired.
-	// Outside the transaction below, and deliberately. A second replica's
-	// insert is refused by the primary key, which is the answer rather than an
-	// error — but on PostgreSQL a statement that fails inside a transaction
-	// aborts the whole of it, so the refusal that is the ordinary case would
-	// take the update with it. Nothing here depends on the two being atomic:
-	// the row's existence is not what decides, the update is.
-	made := &Lease{Name: name}
-	if _, err := l.db.NewInsert().Model(made).Exec(ctx); err != nil && !database.IsDuplicate(err) {
-		return false, fmt.Errorf("record the lease on %s: %w", name, err)
-	}
-
 	var mine bool
 	err := database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
 		// Every attempt starts from nothing: an attempt that was rolled back
-		// took no lease, whatever it decided.
+		// took no lease, whatever it decided, and a retry runs after a pause
+		// the moment has to include.
 		mine = false
+		now := l.now().Truncate(time.Microsecond)
+		// The row is made on first use rather than seeded by the migration:
+		// what work exists is decided in code, and a migration listing the
+		// names would be a second place to change whenever a pass is added or
+		// retired. Written so that a row another replica made first is left
+		// alone rather than refused, because on PostgreSQL a refused
+		// statement aborts the transaction it is in.
+		if err := database.InBatchesKeeping(ctx, tx, []Lease{{Name: name}}); err != nil {
+			return fmt.Errorf("record the lease on %s: %w", name, err)
+		}
 		taken, err := l.takeIn(ctx, tx, name, holder, now, until)
 		if err != nil {
 			return err
@@ -123,20 +121,25 @@ func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
 // somebody just changed has to be applied, so a replica that loses the race
 // waits and applies it after — which is also what makes the last rewrite the
 // one holding the newest policy.
+//
+// A take that fails is a turn missed, and asked again at the next poll: one
+// connection reset would otherwise drop work that has to happen. What it
+// failed with is returned beside the context's own error when ctx ends.
 func (l *Leases) Await(ctx context.Context, name, holder string, until, poll time.Duration) error {
+	var last error
 	for {
 		held, err := l.Take(ctx, name, holder, until)
-		if err != nil {
-			return err
-		}
-		if held {
+		if err == nil && held {
 			return nil
+		}
+		if err != nil {
+			last = err
 		}
 		timer := time.NewTimer(poll)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return ctx.Err()
+			return errors.Join(ctx.Err(), last)
 		case <-timer.C:
 		}
 	}
@@ -164,4 +167,25 @@ func (l *Leases) Release(ctx context.Context, name, holder string) error {
 		}
 		return nil
 	})
+}
+
+// handbackWait bounds handing a lease back on the way out. It is one write
+// against a server that was answering a moment ago.
+const handbackWait = 10 * time.Second
+
+// Handback releases a lease on shutdown, for a pass whose context has ended.
+//
+// The release runs on a context of its own, because the pass's has already
+// ended by the time it is called, and is bounded so a database that has gone
+// away does not hold the process up. A failure is logged and not returned: the
+// lease lapses on its own, and a shutdown has nobody to return it to.
+func (l *Leases) Handback(ctx context.Context, name, holder string, logger *slog.Logger) {
+	if l == nil {
+		return
+	}
+	releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), handbackWait)
+	defer cancel()
+	if err := l.Release(releasing, name, holder); err != nil && logger != nil {
+		logger.WarnContext(releasing, "handing back a lease on the way out", "lease", name, "error", err)
+	}
 }

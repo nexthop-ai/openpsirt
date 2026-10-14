@@ -85,6 +85,9 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, limits sbom.Limits
 // decides that a publisher should no longer be read should not have to redeploy
 // to stop it.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
+	// Handed back once the last cycle has ended, so the next replica reads
+	// without waiting out the lease.
+	defer p.leases.Handback(ctx, FetchLease, p.replica, p.logger)
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		p.interval = interval
 		took, err := p.Once(ctx)

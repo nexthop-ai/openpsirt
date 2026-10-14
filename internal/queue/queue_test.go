@@ -4,8 +4,10 @@
 package queue_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -214,9 +216,13 @@ func TestWorkWhoseJobWasTakenOverSettlesAsHandedOver(t *testing.T) {
 			t.Fatalf("the stale claim was not taken over: %v", err)
 		}
 		recovered := false
-		ending := q.Settle(ctx, first, "slow", "upload", nil,
+		logged, logger := records()
+		ending := q.Settle(ctx, first, "slow", "upload", logger,
 			context.Canceled, queue.ErrNoLongerHeld,
 			func(context.Context) error { recovered = true; return nil })
+		// A claim that went stale under running work means the renewals
+		// were not landing, which an operator is told at Warn.
+		said(t, logged, slog.LevelWarn, "took its job over", first.ID)
 		if !ending.HandedOver || ending.Err != nil {
 			t.Errorf("a takeover settled as %+v, want handed over with nothing to report", ending)
 		}
@@ -248,8 +254,12 @@ func TestWorkStoppedAtTheCeilingSettlesAsAFailure(t *testing.T) {
 		}
 		stopped := errors.New("stopped at the ceiling")
 		recovered := false
-		ending := q.Settle(ctx, job, "worker", "upload", nil, stopped, queue.ErrHeldTooLong,
+		logged, logger := records()
+		ending := q.Settle(ctx, job, "worker", "upload", logger, stopped, queue.ErrHeldTooLong,
 			func(context.Context) error { recovered = true; return nil })
+		// The one event here an operator has to see, so at Error and never as
+		// a takeover.
+		said(t, logged, slog.LevelError, "reached the ceiling", job.ID)
 		if ending.HandedOver || !errors.Is(ending.Err, stopped) {
 			t.Errorf("a claim at its ceiling settled as %+v, want the work's failure", ending)
 		}
@@ -914,6 +924,13 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 		case <-time.After(10 * time.Second):
 			t.Error("the pass did not return when the context ended")
 		}
+
+		// And the lease is handed back on the way out, so the replica that
+		// starts next buries at once rather than waiting it out.
+		if mine, err := queue.NewLeases(db.DB).Take(t.Context(), queue.BurialLease, "the-next-replica",
+			time.Minute); err != nil || !mine {
+			t.Errorf("the burial lease was not free after the pass stopped: %v %v", mine, err)
+		}
 	})
 }
 
@@ -1084,4 +1101,35 @@ func claimed(t *testing.T, q *queue.Queue, kind, ref, worker string) *queue.Job 
 		t.Fatalf("claimed %q, want the job just added, %q", job.Reference, ref)
 	}
 	return job
+}
+
+// records is a logger whose records are kept, and the buffer it keeps them in.
+func records() (*bytes.Buffer, *slog.Logger) {
+	var logged bytes.Buffer
+	return &logged, slog.New(slog.NewJSONHandler(&logged, &slog.HandlerOptions{Level: slog.LevelDebug}))
+}
+
+// said fails unless exactly one record at level mentions what and names job.
+func said(t *testing.T, logged *bytes.Buffer, level slog.Level, what string, job int64) {
+	t.Helper()
+	found := 0
+	for line := range strings.SplitSeq(strings.TrimSpace(logged.String()), "\n") {
+		var record struct {
+			Level string `json:"level"`
+			Msg   string `json:"msg"`
+			Job   int64  `json:"job"`
+		}
+		if line == "" {
+			continue
+		}
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			t.Fatalf("a record that is not JSON: %q", line)
+		}
+		if record.Level == level.String() && strings.Contains(record.Msg, what) && record.Job == job {
+			found++
+		}
+	}
+	if found != 1 {
+		t.Errorf("%d records at %s say %q about job %d, want one; logged:\n%s", found, level, what, job, logged)
+	}
 }

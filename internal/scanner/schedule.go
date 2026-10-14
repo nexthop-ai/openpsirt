@@ -68,13 +68,7 @@ const betweenSchedules = 5 * time.Minute
 // different holder, and a lease left to lapse stops re-scans until it does.
 func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
 	s.interval = interval
-	defer func() {
-		releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-		defer cancel()
-		if err := s.leases.Release(releasing, ScheduleLease, s.replica); err != nil {
-			s.logger.Warn("handing back the lease on scanning again", "error", err)
-		}
-	}()
+	defer s.leases.Handback(ctx, ScheduleLease, s.replica, s.logger)
 	background.Every(ctx, interval, betweenSchedules, func(ctx context.Context) {
 		if asked, err := s.Once(ctx); err != nil {
 			// Logged and carried on, like every other background pass here. A

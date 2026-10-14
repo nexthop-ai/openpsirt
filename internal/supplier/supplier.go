@@ -420,10 +420,10 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 		// the address, which is hexadecimal and so orders the same on every
 		// engine.
 		update = update.
-			Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
-				moment, moment, mark, moment).
 			Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
-				moment, moment, mark, mark)
+				moment, moment, mark, mark).
+			Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
+				moment, moment, mark, moment)
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return fmt.Errorf("record what came back from that supplier: %w", err)
@@ -444,10 +444,10 @@ func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark strin
 	}
 	moment := at.UTC().Truncate(time.Microsecond)
 	_, err := s.db.NewUpdate().Model((*Source)(nil)).
-		Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
-			moment, moment, mark, moment).
 		Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
 			moment, moment, mark, mark).
+		Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
+			moment, moment, mark, moment).
 		Set("reached_at = ?", s.now().UTC().Truncate(time.Microsecond)).
 		Set("failed = ?", "").
 		Where("id = ?", id).Exec(ctx)
@@ -462,6 +462,12 @@ func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark strin
 // Written once because the two assignments above have to ask exactly the same
 // question: one of them moving without the other leaves a mark that is half of
 // one pass and half of another, which orders against neither.
+//
+// The digest is assigned before the moment, and the order keeps the pair
+// whole. MySQL and MariaDB evaluate an update's assignments left to right and
+// read the value already written, so the test asked second sees the new
+// moment: asked for the digest, it moves the moment alone; asked for the
+// moment, it answers as the first did or writes the moment over itself.
 //
 // It binds three values, in this order: the moment twice, then the digest. A
 // caller passing them in another order is not caught by SQLite, which compares

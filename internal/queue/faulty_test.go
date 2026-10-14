@@ -6,6 +6,7 @@ package queue_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -183,5 +184,92 @@ func TestQueueingWorkSurvivesACommitThatLosesARace(t *testing.T) {
 	}
 	if queued != 1 {
 		t.Errorf("%d rows were queued, want exactly one", queued)
+	}
+}
+
+// A job that becomes claimable while a claim waits to go again is claimed on
+// the retry. The moment is read on each attempt: one read before the first
+// describes a clock that has since moved, and the stale claim the retry could
+// take over is still fresh to it.
+func TestAClaimTakenAgainReadsTheMomentAgain(t *testing.T) {
+	ctx := t.Context()
+	opts := queue.DefaultOptions()
+	now := time.Now().UTC()
+	handle, owner := dbtest.Racing(t, func() { now = now.Add(2 * time.Minute) })
+	q := queue.New(handle, opts)
+	queue.SetClock(q, func() time.Time { return now })
+	if _, err := q.Add(ctx, "ingest", "held-by-one-that-died"); err != nil {
+		t.Fatal(err)
+	}
+	if job, err := q.Claim(ctx, "dead", "ingest"); err != nil || job == nil {
+		t.Fatalf("first claim: %v", err)
+	}
+	// A minute short of stale when the claim begins, and past it once the
+	// lost commit has been waited out.
+	now = now.Add(opts.ClaimTimeout - time.Minute)
+
+	owner.Arm(1)
+	job, err := q.Claim(ctx, "worker", "ingest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner.Unspent() != 0 {
+		t.Fatal("no commit was lost, so nothing was taken again")
+	}
+	if job == nil {
+		t.Error("a claim gone stale while the claim waited to go again was left with the worker that died")
+	}
+}
+
+// A lease taken again after a lost commit runs from the moment of the attempt
+// that commits, and its row is made inside the transaction that is retried: a
+// row that went away while the commit was lost is made again.
+func TestALeaseTakenAgainIsMadeAndTimedByTheAttemptThatCommits(t *testing.T) {
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Second)
+	var handle *database.DB
+	var owner *dbtest.Race
+	handle, owner = dbtest.Racing(t, func() {
+		now = now.Add(time.Hour)
+		if _, err := handle.ExecContext(context.WithoutCancel(ctx), `DELETE FROM "lease"`); err != nil {
+			t.Errorf("take the lease's row away between attempts: %v", err)
+		}
+	})
+	leases := queue.NewLeases(handle.DB)
+	queue.SetLeaseClock(leases, func() time.Time { return now })
+
+	owner.Arm(1)
+	mine, err := leases.Take(ctx, "sweeping", "me", time.Minute)
+	if err != nil || !mine {
+		t.Fatalf("a take that lost one commit answered %v %v", mine, err)
+	}
+	if owner.Unspent() != 0 {
+		t.Fatal("no commit was lost, so nothing was taken again")
+	}
+	var until time.Time
+	if err := handle.QueryRowContext(ctx, `SELECT "held_until" FROM "lease" WHERE "name" = 'sweeping'`).
+		Scan(&until); err != nil {
+		t.Fatal(err)
+	}
+	if want := now.Add(time.Minute); !until.Equal(want) {
+		t.Errorf("the lease is held until %s, want %s from the attempt that committed", until, want)
+	}
+}
+
+// A take that fails while a lease is awaited is a turn missed, not the end of
+// the wait: work that has to happen is not dropped for one failure.
+func TestWaitingForALeaseOutlastsATakeThatFails(t *testing.T) {
+	ctx, stop := context.WithTimeout(t.Context(), 30*time.Second)
+	defer stop()
+	handle, owner := dbtest.Racing(t, nil)
+	leases := queue.NewLeases(handle.DB)
+	// Every attempt of the first take loses, so it fails outright, and the
+	// second take loses once and commits.
+	owner.Arm(database.Attempts + 1)
+	if err := leases.Await(ctx, "rewriting", "me", time.Minute, 5*time.Millisecond); err != nil {
+		t.Errorf("a wait whose first take failed gave up: %v", err)
+	}
+	if owner.Unspent() != 0 {
+		t.Errorf("%d commits never happened, so no take failed", owner.Unspent())
 	}
 }

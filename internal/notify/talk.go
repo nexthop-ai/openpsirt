@@ -89,6 +89,9 @@ func NewTalk(db *bun.DB, chats []Chat, baseURL string, logger *slog.Logger,
 
 // Run sweeps until the context ends.
 func (t *Talk) Run(ctx context.Context, interval time.Duration) {
+	// Handed back once the last cycle has ended, so the next replica carries
+	// on without waiting out the lease.
+	defer t.leases.Handback(ctx, ChatLease, t.replica, t.logger)
 	background.Every(ctx, interval, betweenPosts, t.cycle)
 }
 

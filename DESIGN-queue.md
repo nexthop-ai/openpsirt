@@ -142,13 +142,15 @@ update.
 |---|---|
 | Expiry | A lease lapses rather than only being handed back |
 | Retention | The holder keeps it by asking for it again each cycle |
-| Release | Handed back on a clean shutdown |
+| Release | Handed back on a clean shutdown, by every pass that takes one, once its last cycle has ended. The release runs on a bounded context of its own, because the pass's has ended |
+| Holder | The worker's name: the host and the process an operator reads, and random characters that tell apart two processes sharing both. Replicas on the host's network share its name, and in a container every process is the first |
+| First use | The lease's row is made inside the transaction that takes it, written so that a row another replica made first is left alone. A cluster refuses that write at commit like any other, and the take goes again |
 | Duration | Outlasts a cycle of the work, sized from how often the pass runs rather than how often its subject recurs, so a replica that stops without handing it back holds the work for a few passes. Not renewed mid-pass |
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
 | May be skipped | Does nothing this cycle, asks again next | Asking public indexes what upstream released; deciding which builds are due a scan; setting aside work whose worker never came back |
-| Must happen | Waits for its turn, then applies | Rewriting deadlines after a policy change |
+| Must happen | Waits for its turn, then applies. A take that fails is a turn missed and is asked again at the next poll; the wait ends only with its context | Rewriting deadlines after a policy change |
 
 Work that waits reads what it decides from **after** its turn comes. Anything
 the work decides from is fetched inside the thing that serializes it.
@@ -223,6 +225,7 @@ own.
 | Finishing is the write where it costs most | Reported up rather than retried, a job that finished is recorded by its caller as failed and handed out again. The work runs twice, which on an ingest looks like real change |
 | A finish whose commit was refused asks the row rather than assuming | A second attempt covers both "somebody else holds it now" and "the commit succeeded and the answer never arrived". Work that is finished is finished, and reporting a lost claim for it would record a failure against a job that succeeded |
 | A lease take that is refused would read as losing a race | A replica told it lost a race it never ran stops sweeping, with nothing logged, on every replica at once |
+| The moment a write compares against is read inside each attempt | A retry runs after a pause. A claim judging staleness by the moment before the first attempt misses a job that went stale during it, and a lease taken again runs short by the pause |
 
 ## Limits
 
