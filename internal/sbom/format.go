@@ -114,6 +114,9 @@ func (c *reader) read() error {
 	// One format states its build time inside the contents, pointing at it
 	// rather than carrying it, so it cannot be settled where it is read — and
 	// nor can a fault in it be reported where the other two report theirs.
+	if err := c.spdx3Document(); err != nil {
+		return refusal.Errorf("reading scan file: %w", err)
+	}
 	c.spdx3Settle()
 	if c.settleErr != nil {
 		return refusal.Errorf("reading scan file: %w", c.settleErr)
