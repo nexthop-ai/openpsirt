@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
@@ -181,7 +182,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 			t.Fatalf("raised %d absences, want the one person away and holding work: %v", len(said), said)
 		}
 		// The sentence the decision asks for: who, how long, and how much.
-		for _, want := range []string{"Ana Away", "days", "1 item"} {
+		for _, want := range []string{"Ana Away", "4 weeks", "1 item"} {
 			if !contains(said[0], want) {
 				t.Errorf("the alert does not say %q: %q", want, said[0])
 			}
@@ -214,4 +215,53 @@ func contains(haystack, needle string) bool {
 		}
 		return false
 	})()
+}
+
+// An absence under a day is said as the smallest true thing, never as "0 days".
+func TestAnAbsenceShorterThanADayIsSaidPlainly(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if err := setting.NewStore(db.DB).Set(ctx, setting.AbsentAfter, "12h"); err != nil {
+			t.Fatal(err)
+		}
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		away, err := rights.Ensure(ctx, "away@example.com", "Ana Away", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Table("person").
+			Set("last_seen_at = ?", time.Now().UTC().Add(-13*time.Hour)).
+			Where("id = ?", away.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		assignOne(t, w, away.PartyID)
+
+		if _, _, err := notify.NewWatch(db.DB, hush).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		items, _, err := notify.NewStore(db.DB).Waiting(ctx,
+			access.NewPerson(admin.ID, admin.Identity, true, nil, 0), 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var said []string
+		for _, item := range items {
+			if item.Kind == notify.HoldingAbsent {
+				said = append(said, item.Body)
+			}
+		}
+		if len(said) != 1 {
+			t.Fatalf("raised %d absences, want the one: %v", len(said), said)
+		}
+		if contains(said[0], "0 days") || !contains(said[0], "for a day") {
+			t.Errorf("an absence of thirteen hours reads %q, want it said as a day", said[0])
+		}
+	})
 }

@@ -554,12 +554,12 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 			items = "item"
 		}
 		days := int(time.Since(row.CreatedAt).Hours() / 24)
-		body := fmt.Sprintf("%s was added %d days ago, has never signed in, and has %d %s "+
-			"assigned.", who, days, row.Holding, items)
+		body := fmt.Sprintf("%s was added %s ago, has never signed in, and has %d %s "+
+			"assigned.", who, plainly(days), row.Holding, items)
 		if row.LastSeenAt != nil {
 			days = int(time.Since(*row.LastSeenAt).Hours() / 24)
-			body = fmt.Sprintf("%s has not signed in for %d days and has %d %s assigned.",
-				who, days, row.Holding, items)
+			body = fmt.Sprintf("%s has not signed in for %s and has %d %s assigned.",
+				who, plainly(days), row.Holding, items)
 		}
 		holding = append(holding, Holds{
 			// Keyed on the person rather than on the sentence, so the number

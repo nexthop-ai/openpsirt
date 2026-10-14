@@ -663,6 +663,7 @@ date.
 | A deferral that was **taken back** counts for the part that ran | A withdrawal shortens the time a finding spent hidden and does not erase it. Erased, the threshold was defeated by withdrawing and deferring again — each span under the line, the running total back to zero every time, and a place hidden indefinitely with nobody ever agreeing to it. Withdrawing needs nobody, so the whole loop is one person's |
 | One taken back **before it held** counts for nothing | Correcting a mistake is not avoiding the work, and counting it would make the two read alike |
 | A deferral asking for a date **already past** counts for nothing | It asks for nothing, and it is refused at submission besides. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
+| The threshold is a whole number of days, refused otherwise | A deferral is dated in days and the decision form is told the threshold in days. A threshold already stored under a day is published to the form as one day, rounded up, so the form never reads it as no threshold |
 
 Whether a claim needs a second person is worked out where it is written. As a
 field on the proposal, answered before the transaction opens and taken on
