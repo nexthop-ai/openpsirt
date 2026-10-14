@@ -346,7 +346,7 @@ a commit or a content digest.
 
 | Producer shape | Read as an image |
 |---|---|
-| A package identifier of type `oci` | Yes. SONiC, Trivy, Syft, apko |
+| A package identifier of type `oci` | Yes. SONiC, Trivy, apko |
 | A package identifier of type `docker` | Yes. The type names an image the way `oci` does |
 | A package identifier of any other type | No, whatever the format calls the component. The identifier is what identity is derived from |
 | No identifier, and a CycloneDX component of type `container` | Yes |
