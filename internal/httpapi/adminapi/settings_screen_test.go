@@ -62,8 +62,21 @@ func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	}
 
 	// Nor does it name one. The title and the section are served, so a key
-	// appearing here is a lookup coming back.
-	if at := regexp.MustCompile(`"(remediation|triage|scanning|disclosure|attachment|session|token|signin|people|upstream|patch|queue|routing|saved)\.[a-z.-]+"`).FindString(body); at != "" {
+	// appearing here is a lookup coming back. The prefixes are the ones the
+	// settings offered carry, so a setting under a new prefix is looked for
+	// too.
+	var prefixes []string
+	for _, each := range settable {
+		prefix, _, _ := strings.Cut(each.name, ".")
+		if quoted := regexp.QuoteMeta(prefix); !slices.Contains(prefixes, quoted) {
+			prefixes = append(prefixes, quoted)
+		}
+	}
+	if len(prefixes) == 0 {
+		t.Fatal("no settings are offered, so this looked for no names")
+	}
+	named := regexp.MustCompile(`"(` + strings.Join(prefixes, "|") + `)\.[a-z.-]+"`)
+	if at := named.FindString(body); at != "" {
 		t.Errorf("the settings screen names the setting %s, which the server describes", at)
 	}
 
