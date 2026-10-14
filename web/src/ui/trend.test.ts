@@ -64,4 +64,17 @@ describe("what the trend panels say", () => {
     expect(settled(points)).toHaveLength(5);
     expect(paceReading(points)).toContain("of 5 weeks");
   });
+
+  it("says a backlog that ends where it began is unchanged", () => {
+    const points = [
+      { open: 40, opened: 40, resolved: 0, by_severity: { critical: 4 } },
+      { open: 45, opened: 5, resolved: 0, by_severity: { critical: 4 } },
+      { open: 42, opened: 0, resolved: 3, by_severity: { critical: 4 } },
+      { open: 40, opened: 0, resolved: 2, by_severity: { critical: 4 } },
+    ];
+    const said = paceReading(points);
+    expect(said).toContain("Backlog flat");
+    expect(said).toContain("open unchanged at 40");
+    expect(said).not.toContain("up 0");
+  });
 });

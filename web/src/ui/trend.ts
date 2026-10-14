@@ -50,9 +50,11 @@ export function paceReading(points: Step[]): string {
   const last = range[range.length - 1]?.open ?? 0;
   const moved = last - first;
   const direction = moved > 0 ? "growing" : moved < 0 ? "shrinking" : "flat";
-  return `Backlog ${direction} · open ${moved >= 0 ? "up" : "down"} ${Math.abs(
-    moved,
-  ).toLocaleString()} · new exceeded resolved in ${outran} of ${range.length} weeks`;
+  const open =
+    moved === 0
+      ? `open unchanged at ${last.toLocaleString()}`
+      : `open ${moved > 0 ? "up" : "down"} ${Math.abs(moved).toLocaleString()}`;
+  return `Backlog ${direction} · ${open} · new exceeded resolved in ${outran} of ${range.length} weeks`;
 }
 
 // The critical share's direction, over the same history.

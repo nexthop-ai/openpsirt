@@ -184,7 +184,7 @@ var settable = []struct {
 		aDuration, nil, func(core.Deps) string { return ownWindows.Low.String() }, true},
 	{setting.DeferralThreshold, "Second approver above", "triage",
 		"How long something may be put off before a second person must agree",
-		"Measured against everything the finding has already been put off for, not against the postponement being asked for.",
+		"Measured against everything the finding has already been put off for, not against the postponement being asked for. A whole number of days.",
 		aDuration, nil, func(core.Deps) string { return triage.DefaultDeferralThreshold.String() }, false},
 	{setting.SessionLifetime, "Session lifetime", "signin",
 		"How long a sign-in lasts",
@@ -440,6 +440,14 @@ func registerSettings(api huma.API, in core.Deps) {
 			// the reason the markdown policy is enforced before storage:
 			// somebody who asks for a year should be told the limit now
 			// rather than discover it when nobody can sign in.
+			// A deferral is dated in days, and a screen taking a date is told
+			// the threshold in days: a threshold between two whole days is
+			// one no date can be measured against.
+			if input.Name == setting.DeferralThreshold && (d < 24*time.Hour || d%(24*time.Hour) != 0) {
+				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+					"%q is not a whole number of days — a deferral is dated in days, "+
+						"so write it as 720h for thirty days", input.Body.Value))
+			}
 			if input.Name == setting.SessionLifetime && d > access.MaxSessionLifetime {
 				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 					"a sign-in may last at most %s. Group membership is read at "+

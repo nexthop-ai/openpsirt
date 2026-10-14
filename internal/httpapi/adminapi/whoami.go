@@ -6,6 +6,7 @@ package adminapi
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"slices"
 	"sort"
@@ -134,7 +135,8 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
 		}
-		body.DeferralDays = int(threshold.Hours() / 24)
+		// Rounded up, so a stored threshold under a day still publishes one.
+		body.DeferralDays = int(math.Ceil(threshold.Hours() / 24))
 		if in.DB != nil {
 			cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,
 				triage.DefaultTogetherCap)
