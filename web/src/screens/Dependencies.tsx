@@ -6,6 +6,7 @@ import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { STEP, keyOf, partsOf, stepsOf, type At, type Node } from "./treeshape";
+import { aroundKey, fetchAround } from "../api/around";
 import { buildFindingsAt, componentAt, matchCoverageAt } from "../app/routes";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -57,32 +58,6 @@ const CHILDREN = 400;
 // A count past this is emphasized, so the branch worth descending is visible
 // without reading every number on the way down.
 const HOT = 500;
-
-const aroundKey = (at: At, component: string, version = "", ecosystem = "", namespace = "") =>
-  ["tree-around", at, component, version, ecosystem, namespace] as const;
-
-// A name is not always enough: a build ships some libraries at several
-// versions, and a finding arriving here says which one it meant — and a few
-// it ships at one version as two components, which only the kind of package
-// or its namespace tells apart.
-const fetchAround =
-  (at: At, component: string, version = "", ecosystem = "", namespace = "") =>
-  async () =>
-    unwrap(
-      await api.GET(
-        "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
-        {
-          params: {
-            path: { ...at, component },
-            query: {
-              ...(version ? { version } : {}),
-              ...(ecosystem ? { ecosystem } : {}),
-              ...(namespace ? { namespace } : {}),
-            },
-          },
-        },
-      ),
-    );
 
 // The rows under one node, in whichever of the three states the read is in:
 // nothing yet, refused, or the rows themselves. Two of them are not the same

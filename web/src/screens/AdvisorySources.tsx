@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { useProducts } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Dropzone } from "../ui/Dropzone";
@@ -112,10 +113,7 @@ export function AdvisorySources() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
 
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  const products = useProducts();
   const sources = useSources(product);
 
   const add = useMutation({

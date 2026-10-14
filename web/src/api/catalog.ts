@@ -8,12 +8,10 @@ import { unwrap } from "./queries";
 // The catalog cascade: products, then a product's branches and tags, then what
 // it is built as.
 //
-// One definition, because two are one cache. The scope picker and the upload
-// panel each held their own copy of these three reads, including the query
-// keys — so the two already shared cache entries while being enabled under
-// different conditions, and neither said so. A fourth level, a bound on the
-// product list, or an invalidation after a product is declared would have
-// landed in one of them.
+// One definition of each read, because two definitions of one read are one
+// cache entry under two sets of conditions, and an invalidation written
+// against one key misses a read written under another. Every screen asking
+// for these names asks through here.
 
 export type Product = Body<"ProductBody">;
 type Stream = Body<"StreamBody">;
@@ -37,29 +35,53 @@ export function useCatalog(
   streams: UseQueryResult<{ items: Stream[] | null }>;
   variants: UseQueryResult<{ items: Variant[] | null }>;
 } {
-  const products = useQuery({
-    queryKey: ["products"],
-    enabled: open,
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    enabled: open && !!product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product],
-    enabled: open && !!product,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
+  const products = useProducts(open);
+  const streams = useStreams(product, open);
+  const variants = useProductVariants(product, open);
   return { products, streams, variants };
 }
 
+// The products, by name.
+export function useProducts(enabled = true): UseQueryResult<{ items: Product[] | null }> {
+  return useQuery({
+    queryKey: ["products"],
+    enabled,
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+  });
+}
+
+// One product's branches and tags, by name. Nothing is asked until a product
+// is named.
+export function useStreams(
+  product: string,
+  enabled = true,
+): UseQueryResult<{ items: Stream[] | null }> {
+  return useQuery({
+    queryKey: ["streams", product],
+    enabled: enabled && !!product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
+  });
+}
+
+// What one product is built as, by name. Nothing is asked until a product is
+// named.
+export function useProductVariants(
+  product: string,
+  enabled = true,
+): UseQueryResult<{ items: Variant[] | null }> {
+  return useQuery({
+    queryKey: ["variants", product],
+    enabled: enabled && !!product,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
+  });
+}
+
 // The variants one release was built as, which is a different question from
-// what the product is built as — and a different route. Only the scope picker
-// asks it, once a branch or tag is chosen.
+// what the product is built as — and a different route. Asked once a branch or
+// tag is chosen. Keyed under the product's variants, so declaring or renaming
+// one reaches this read too.
 //
 // Nothing here holds a previous key's rows on screen. Three of these four
 // are keyed on something the picker changes, so keeping the last answer would

@@ -9,7 +9,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Suggest } from "../ui/Suggest";
-import { useCatalog } from "../api/catalog";
+import { useCatalog, useProducts } from "../api/catalog";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
@@ -62,10 +62,7 @@ export function Access({ who: me }: { who: Who }) {
         }),
       ),
   });
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  const products = useProducts();
   const mode = useQuery({
     queryKey: ["role-mode"],
     queryFn: async () => unwrap(await api.GET("/v1/roles/mode", {})),

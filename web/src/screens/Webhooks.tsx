@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { useDestinations, useRetireDestination } from "../api/outbound";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
@@ -48,13 +49,6 @@ function NoWebhooks() {
   );
 }
 
-function useDestinations() {
-  return useQuery({
-    queryKey: ["outbound"],
-    queryFn: async () => unwrap(await api.GET("/v1/outbound", {})),
-  });
-}
-
 // A kind's own word. A destination taking everything says so in a word
 // rather than in the wildcard the address is stored with.
 function kindOf(kind?: string) {
@@ -96,11 +90,7 @@ export function Webhooks() {
       void queries.invalidateQueries({ queryKey: ["outbound"] });
     },
   });
-  const retire = useMutation({
-    mutationFn: async (where: { name: string; kind: string }) =>
-      unwrap(await api.DELETE("/v1/outbound/{name}/{kind}", { params: { path: where } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["outbound"] }),
-  });
+  const retire = useRetireDestination();
 
   // A chat channel is configured on its own tab.
   const rows = (sent.data?.items ?? []).filter((row) => row.platform === "webhook");

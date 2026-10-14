@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { useDestinations, useRetireDestination } from "../api/outbound";
 import { own } from "../ui/own";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
@@ -48,10 +49,7 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
   const [scope, setScope] = useState<Scope>("deployment");
   const [owner, setOwner] = useState("");
 
-  const listed = useQuery({
-    queryKey: ["outbound"],
-    queryFn: async () => unwrap(await api.GET("/v1/outbound", {})),
-  });
+  const listed = useDestinations();
   const add = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -78,11 +76,7 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
       void queries.invalidateQueries({ queryKey: ["outbound"] });
     },
   });
-  const retire = useMutation({
-    mutationFn: async (where: { name: string; kind: string }) =>
-      unwrap(await api.DELETE("/v1/outbound/{name}/{kind}", { params: { path: where } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["outbound"] }),
-  });
+  const retire = useRetireDestination();
 
   // With no platform configured the channels still stored are listed, so
   // they can be retired rather than posting again when a token returns.

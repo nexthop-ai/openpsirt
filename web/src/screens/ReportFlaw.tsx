@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { uploadReportFile, useAfterReport, useRecordReport, useReport } from "../api/intake";
 import { api } from "../api/client";
+import { useProductVariants, useProducts, useStreams } from "../api/catalog";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
 import { mayOf, useWho } from "../app/session";
@@ -148,25 +149,12 @@ export function ReportFlaw() {
   // undisclosed is the default, which is the quiet dangerous mistake again.
   useReseed(product, () => setChose(null));
 
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
-  const lines = useQuery({
-    queryKey: ["streams", product],
-    enabled: product !== "",
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
+  const products = useProducts();
+  const lines = useStreams(product);
   // The variants the product is built as, rather than one line's own. A variant
   // belongs to the product, so with several lines chosen this is the set to
   // pick from — a per-line list would be an arbitrary one of them.
-  const builtAs = useQuery({
-    queryKey: ["variants", product],
-    enabled: product !== "",
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
+  const builtAs = useProductVariants(product);
 
   // The components the build holds, to offer back as they type. A name typed
   // from memory is a name the server refuses, and a build holds thousands of

@@ -9,7 +9,7 @@
 // question, which is why they are one file: what does the record say, and how
 // did it come to say that.
 
-import { useAfterClaim } from "../api/claims";
+import { useAfterClaim, useClaimApprovals, useClaimRevisions } from "../api/claims";
 import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
 import { at, on } from "../ui/when";
@@ -126,11 +126,7 @@ export function Standing({
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
   const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
   const queries = useQueryClient();
-  const approvals = useQuery({
-    queryKey: ["decision", id, "approvals"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/approvals", { params: { path: { id } } })),
-  });
+  const approvals = useClaimApprovals(id);
   const live = (approvals.data?.items ?? []).filter((a) => !a.withdrawn_at);
   const last = live[live.length - 1];
   const stripe = waiting
@@ -314,16 +310,8 @@ export function Activity({
   places?: number;
   previous: Previous[];
 }) {
-  const approvals = useQuery({
-    queryKey: ["claim", claimId, "approvals"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/approvals", { params: { path: { id: claimId } } })),
-  });
-  const revisions = useQuery({
-    queryKey: ["claim", claimId, "revisions"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/revisions", { params: { path: { id: claimId } } })),
-  });
+  const approvals = useClaimApprovals(claimId);
+  const revisions = useClaimRevisions(claimId);
   const comments = useQuery({
     queryKey: ["comments", claimId],
     queryFn: async () =>
@@ -422,16 +410,8 @@ export function Activity({
 // Every revision is kept. An approval names the revision it was given for,
 // and revising withdraws it.
 export function Revisions({ claimId }: { claimId: number }) {
-  const revisions = useQuery({
-    queryKey: ["claim", claimId, "revisions"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/revisions", { params: { path: { id: claimId } } })),
-  });
-  const approvals = useQuery({
-    queryKey: ["claim", claimId, "approvals"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/approvals", { params: { path: { id: claimId } } })),
-  });
+  const revisions = useClaimRevisions(claimId);
+  const approvals = useClaimApprovals(claimId);
   const items = revisions.data?.items ?? [];
   if (revisions.isError && !notYours(revisions.error)) {
     return (

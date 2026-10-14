@@ -203,3 +203,21 @@ export function useSplitClaim() {
     onSuccess: done,
   });
 }
+
+// Who agreed to one claim, and its revisions: read under one key each by
+// every block that draws them, so an act on the claim refreshes all of them.
+export function useClaimApprovals(id: number) {
+  return useQuery({
+    queryKey: ["claim", id, "approvals"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/claims/{id}/approvals", { params: { path: { id } } })),
+  });
+}
+
+export function useClaimRevisions(id: number) {
+  return useQuery({
+    queryKey: ["claim", id, "revisions"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/claims/{id}/revisions", { params: { path: { id } } })),
+  });
+}

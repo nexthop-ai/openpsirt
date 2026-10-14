@@ -140,6 +140,7 @@ the result differs from what is committed — the generated types say a list may
 | Rule | |
 |---|---|
 | A table of words over a word the server sends is keyed on the generated union | A word the server adds is then a compile error in the table until it has words, rather than the bare token on screen. A lint refuses a string-keyed table written as a literal in the screens, and a table over an open set — a package kind, a keyboard key, this interface's own names — says why beside it |
+| A read is declared once and asked through its hook | One read declared at two sites is one cache entry under two sets of conditions, and an invalidation written against one key misses a read declared under another. The catalog's products, branches and variants, one release's variants, where an issue sits, a claim's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so that what changes them reaches every screen showing them |
 
 The session is a cookie the browser holds and nothing in the application ever
 sees. The application holds the cross-site-request token, deliberately readable

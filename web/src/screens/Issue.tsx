@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { decidedAs } from "../ui/decided";
-import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../api/client";
-import { Refused, unwrap } from "../api/queries";
+import { useIssue } from "../api/issue";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited } from "../ui/Severity";
@@ -35,24 +33,13 @@ export function Issue() {
   // under, and matching a display name as well made ownership turn on a label
   // anybody can be given.
   const mine = (writtenBy: string) => !!who.data && writtenBy === who.data.identity;
-  const found = useQuery({
-    queryKey: ["issue", vulnerability],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/issues/{vulnerability}", {
-          params: { path: { vulnerability }, query: { limit: 200 } },
-        }),
-      ),
-    retry: false,
-  });
+  const found = useIssue(vulnerability);
 
   if (found.isPending) return <Loading />;
   if (found.isError) {
-    // A 404 is the answer to the question this screen asks — nothing you can
-    // read carries the issue. Anything else is a read that did not happen,
-    // and saying "nothing carries this" about it is a wrong answer with the
-    // confidence of a right one.
-    const nothing = found.error instanceof Refused && found.error.status === 404;
+    // Nothing you can read carrying the issue is an empty answer rather than a
+    // refusal, and it is drawn below; an error here is a read that did not
+    // happen.
     return (
       <>
         <div className="screen-head">
@@ -60,14 +47,7 @@ export function Issue() {
             <span className="id">{vulnerability}</span>
           </h2>
         </div>
-        {nothing ? (
-          <Empty
-            title="Nothing you can see carries this."
-            detail="Nothing you can read holds it."
-          />
-        ) : (
-          <Failed error={found.error} what="This issue could not be read." />
-        )}
+        <Failed error={found.error} what="This issue could not be read." />
       </>
     );
   }

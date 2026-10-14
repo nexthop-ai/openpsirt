@@ -3,8 +3,9 @@
 
 import { Link } from "react-router-dom";
 import { remember } from "../app/scope";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useReleaseVariants, useStreams } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -31,20 +32,8 @@ import {
 // No overdue section. A tag never changes, so nothing on it has a deadline
 // to miss.
 export function Release({ product, stream }: { product: string; stream: string }) {
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const built = useQuery({
-    queryKey: ["release-variants", product, stream],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants", {
-          params: { path: { product, stream } },
-        }),
-      ),
-  });
+  const streams = useStreams(product);
+  const built = useReleaseVariants(true, product, stream);
 
   const rows = streams.data?.items ?? [];
   const here = rows.find((row) => row.name === stream);

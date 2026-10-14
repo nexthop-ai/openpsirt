@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useProducts } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -34,10 +35,7 @@ export function AutoAssignment() {
 
   const [said, setSaid] = useState<string | null>(null);
 
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  const products = useProducts();
   const teams = useQuery({
     queryKey: ["teams"],
     queryFn: async () => unwrap(await api.GET("/v1/teams", {})),

@@ -7,6 +7,7 @@ import { Loading } from "../ui/Loading";
 import { at, on } from "../ui/when";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
+import { useProducts } from "../api/catalog";
 import { usePaging } from "./list";
 import { notYours, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
@@ -128,10 +129,7 @@ export function TheRecord() {
     window.scrollTo({ top: 0 });
   }
 
-  const declared = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  const declared = useProducts();
   const record = useQuery({
     queryKey: ["audit", products, outcomes, states, sent.from, sent.to, alone, inForce, offset],
     queryFn: async () =>

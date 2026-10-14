@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useIssue } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -25,16 +26,6 @@ import { Required } from "../ui/Required";
 //
 // Folded until asked, like the advisory: it reads two lists to draw itself,
 // and most visits to a finding are not somebody correcting its filing.
-
-// The most builds this may set at once, which is the bound the route declares.
-//
-// The editor needs all of them or none — every build absent from what it sends
-// is closed as never affected — so this is compared against the whole-answer
-// count rather than used as a page size. Stated in both places on purpose: the
-// route is what actually holds the line, because a caller that is not this
-// screen is bound by it too, and this is what stops the screen offering an act
-// the route would refuse.
-const MOST = 200;
 
 export function AffectedBuilds({
   product,
@@ -61,17 +52,7 @@ export function AffectedBuilds({
   });
   // The builds holding it now. The same request the issue screen makes, under
   // the same key, so opening this after reading that page asks nothing.
-  const holds = useQuery({
-    enabled: open,
-    queryKey: ["issue", vulnerability],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/issues/{vulnerability}", {
-          params: { path: { vulnerability }, query: { limit: MOST } },
-        }),
-      ),
-    retry: false,
-  });
+  const holds = useIssue(vulnerability, open);
 
   // A page in hand that is the whole answer.
   //

@@ -1,10 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { useProductVariants, useStreams } from "../api/catalog";
 import { Failed } from "./Failed";
 
 // A build is a stream and a variant together, never one of them: the same
@@ -73,16 +71,8 @@ export function useBuildPair(product: string) {
   const to = params.get("to") ?? "";
   const toVariant = params.get("to_variant") ?? "";
 
-  const streams = useQuery({
-    queryKey: ["streams", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
-  });
-  const variants = useQuery({
-    queryKey: ["variants", product],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
-  });
+  const streams = useStreams(product);
+  const variants = useProductVariants(product);
 
   function set(key: string, value: string) {
     const next = new URLSearchParams(params);

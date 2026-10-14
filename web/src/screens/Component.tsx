@@ -9,6 +9,7 @@ import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { unwrap, whichOf } from "../api/queries";
 import { claimAt, componentAt, decideAt, dependenciesAt } from "../app/routes";
+import { aroundKey, fetchAround } from "../api/around";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
@@ -452,34 +453,8 @@ function Sits({
   const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
   const component = pkg.name;
   const around = useQuery({
-    queryKey: [
-      "around",
-      product,
-      component,
-      here.stream,
-      here.variant,
-      pkg.version,
-      here.ecosystem,
-      pkg.namespace,
-    ],
-    queryFn: async () =>
-      unwrap(
-        await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
-          {
-            params: {
-              path: { ...scope, component },
-              // All three, because a name and a version do not always pick one
-              // component: a build can hold one package under two namespaces.
-              query: {
-                ...(pkg.version ? { version: pkg.version } : {}),
-                ...(here.ecosystem ? { ecosystem: here.ecosystem } : {}),
-                ...(pkg.namespace ? { namespace: pkg.namespace } : {}),
-              },
-            },
-          },
-        ),
-      ),
+    queryKey: aroundKey(scope, component, pkg.version, here.ecosystem, pkg.namespace),
+    queryFn: fetchAround(scope, component, pkg.version, here.ecosystem, pkg.namespace),
     retry: false,
   });
 

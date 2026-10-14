@@ -7,6 +7,7 @@ import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useProducts } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { Empty } from "../ui/Empty";
@@ -285,10 +286,7 @@ function Tokens() {
   // The products this person may narrow a token to. Only what they can already
   // read is listed, because narrowing intersects: a token pinned to something
   // its owner cannot reach is a token that reaches nothing.
-  const products = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
-  });
+  const products = useProducts();
   const mint = useMutation({
     mutationFn: async () =>
       unwrap(
