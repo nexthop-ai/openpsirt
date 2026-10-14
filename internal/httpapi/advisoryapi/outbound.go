@@ -244,8 +244,8 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			case err != nil:
 				return core.WentWrong(a.Logger, "that could not be retired", err)
 			}
-			// The key the name is matched under, as the addition's row names it.
-			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+notify.DestinationKey(input.Name)+" · "+input.Kind,
+			// The name and the kind as they are matched, which is how the addition's row names them.
+			if err := core.Noted(ctx, tx, trail.Setting, "outbound · "+notify.DestinationKey(input.Name)+" · "+notify.DestinationKind(input.Kind),
 				trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}

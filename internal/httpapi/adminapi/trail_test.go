@@ -308,6 +308,20 @@ var administrativeActs = []trailedAct{
 		path: "/v1/outbound/ops/*", kind: "setting", about: "outbound · ops · *",
 	},
 	{
+		id: "add-outbound", what: "a destination typed in capitals", method: http.MethodPost,
+		path: "/v1/outbound",
+		body: `{"name":"Pager","kind":"Assigned","url":"https://hooks.example.test/t/abc",` +
+			`"secret":"sixteen-characters-at-least"}`,
+		kind: "setting", about: "outbound · pager · assigned",
+	},
+	{
+		// Retired in other capitals, and recorded under the same folded name
+		// and kind, so a search for the destination finds both rows.
+		id: "retire-outbound", what: "a destination retired in other capitals",
+		method: http.MethodDelete, path: "/v1/outbound/PAGER/ASSIGNED", kind: "setting",
+		about: "outbound · pager · assigned",
+	},
+	{
 		id: "add-advisory-source", what: "a supplier to read advisories from",
 		method: http.MethodPost, path: "/v1/products/mine/advisory-sources",
 		body: `{"name":"ExampleLinux",` +

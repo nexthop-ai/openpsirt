@@ -529,14 +529,14 @@ func about(row Notification) string {
 	return "notification-" + strconv.FormatInt(row.ID, 10)
 }
 
-// foldedKind is how a destination's kind is stored, so that a match is an
+// DestinationKind is how a destination's kind is stored, so that a match is an
 // equality test rather than something an engine is asked to fold.
 //
 // Normalized on the way in, which is the rule every other typed name here
 // follows: the four engines fold differently outside ASCII, so asking one to
 // compare loosely makes what a destination receives depend on which engine is
 // running.
-func foldedKind(kind string) string {
+func DestinationKind(kind string) string {
 	return strings.ToLower(strings.TrimSpace(kind))
 }
 
@@ -737,7 +737,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		// on the way out, so the write that adds a destination and the read
 		// that retires it agree on what it is called.
 		Name: DestinationKey(d.Name), DisplayName: strings.TrimSpace(d.Name),
-		Kind:     foldedKind(d.Kind),
+		Kind:     DestinationKind(d.Kind),
 		Platform: strings.ToLower(strings.TrimSpace(d.Platform)),
 		URL:      strings.TrimSpace(d.URL), Secret: d.Secret,
 		ProductID: d.ProductID, TeamID: d.TeamID,
@@ -883,7 +883,7 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", time.Now().UTC().Truncate(time.Microsecond)).
 		Where("name = ?", DestinationKey(name)).
-		Where("kind = ?", foldedKind(kind)).
+		Where("kind = ?", DestinationKind(kind)).
 		Where("retired_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("retire that destination: %w", err)
