@@ -76,12 +76,41 @@ func (s *Store) MayBeToldOfIn(ctx context.Context, subject access.Subject,
 func (s *Store) ToldOfIn(ctx context.Context, subject access.Subject,
 	productID int64, issues []int64) (map[int64]bool, error) {
 
+	return toldOfWithin(ctx, s.db, subject, productID, issues)
+}
+
+// MayBeToldOfWithin is MayBeToldOfIn against a handle the caller chooses, so
+// that a transaction asks it from inside itself.
+//
+// A retry re-runs its closure against a database that has moved, so an
+// authorization answered outside describes a world that is gone.
+//
+// The list form asked of a list of one, so a single route and a list route
+// cannot come to answer one name differently.
+func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID, vulnerabilityID int64) (bool, error) {
+
+	told, err := toldOfWithin(ctx, db, subject, productID, []int64{vulnerabilityID})
+	if err != nil {
+		return false, err
+	}
+	return told[vulnerabilityID], nil
+}
+
+// toldOfWithin is the one statement of the rule, for one issue or many.
+func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID int64, issues []int64) (map[int64]bool, error) {
+
 	told := map[int64]bool{}
 	if subject.Kind != access.Person || len(issues) == 0 {
 		return told, nil
 	}
-	// A case grant is asked first and alone, for the reason the single form
-	// gives: a collaborator does not see the product at any visibility.
+	// One issue in one product is a grant of its own, and it is asked before
+	// the product-wide question: a collaborator does not see the product at
+	// any visibility, which is the whole of what the grant is for. The only
+	// question left for one is whether the issue is there at all, and
+	// answering "no such finding" for one that is not keeps a case grant from
+	// confirming an issue exists in a product it does not.
 	var onCase, rest []int64
 	for _, id := range issues {
 		if subject.OnCase(productID, id) {
@@ -91,12 +120,11 @@ func (s *Store) ToldOfIn(ctx context.Context, subject access.Subject,
 		}
 	}
 	products, all := subject.Products()
-	seen := subject.Sees(productID)
 	read := func(ids []int64, narrowed bool) error {
 		return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			// Each issue asked is read as the issue it stands for, which
 			// holds the findings where a merge absorbed it.
-			q := s.db.NewSelect().
+			q := db.NewSelect().
 				TableExpr(`"vulnerability" AS "tv"`).
 				Join(`JOIN "finding" AS "f" ON f.vulnerability_id = tv.issue_id`).
 				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
@@ -120,68 +148,10 @@ func (s *Store) ToldOfIn(ctx context.Context, subject access.Subject,
 	if err := read(onCase, false); err != nil {
 		return nil, err
 	}
-	if seen {
+	if subject.Sees(productID) {
 		if err := read(rest, true); err != nil {
 			return nil, err
 		}
 	}
 	return told, nil
-}
-
-// MayBeToldOfWithin is MayBeToldOfIn against a handle the caller chooses, so
-// that a transaction asks it from inside itself.
-//
-// A retry re-runs its closure against a database that has moved, so an
-// authorization answered outside describes a world that is gone.
-func MayBeToldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID, vulnerabilityID int64) (bool, error) {
-
-	if subject.Kind != access.Person {
-		return false, nil
-	}
-	// One issue in one product is a grant of its own, and it is asked
-	// before the product-wide question: a collaborator does not see the
-	// product at any visibility, which is the whole of what the grant is
-	// for.
-	if subject.OnCase(productID, vulnerabilityID) {
-		return sitsIn(ctx, db, productID, vulnerabilityID)
-	}
-	if !subject.Sees(productID) {
-		return false, nil
-	}
-	products, all := subject.Products()
-	held, err := onlyReadable(db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where("st.product_id = ?", productID),
-		subject, products, all).Count(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read where this issue sits here: %w", err)
-	}
-	return held > 0, nil
-}
-
-// sitsIn says this issue is open somewhere in this product, without asking who
-// is looking.
-//
-// The narrowing a collaborator's grant replaces, not one it skips: the pair
-// they were brought in on is the whole of what they may reach, so the only
-// question left is whether the issue is there at all — and answering "no such
-// finding" for one that is not keeps a case grant from confirming an issue
-// exists in a product it does not.
-func sitsIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
-	here, err := db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("f.id").
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where("st.product_id = ?", productID).
-		Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read where this issue sits here: %w", err)
-	}
-	return here, nil
 }

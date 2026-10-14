@@ -72,5 +72,37 @@ func TestManyIssuesAreToldOfAsEachOneWouldBe(t *testing.T) {
 				t.Errorf("%s asked alone: %v, want %v", name, single, want)
 			}
 		}
+
+		// A collaborator on the undisclosed one, and a name that merged into
+		// the disclosed one: the two shapes the product-wide reader above
+		// never reaches.
+		collaborator := reader.OnCases(map[int64][]int64{f.productID: {ids["CVE-2026-2"]}})
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
+			Set("issue_id = ?", ids["CVE-2026-1"]).
+			Where("id = ?", ids["CVE-2026-3"]).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct {
+			who  string
+			as   access.Subject
+			name string
+			want bool
+		}{
+			{"a collaborator", collaborator, "CVE-2026-2", true},
+			{"a reader", reader, "CVE-2026-3", true},
+		} {
+			told, err := f.store.ToldOfIn(ctx, c.as, f.productID, []int64{ids[c.name]})
+			if err != nil {
+				t.Fatal(err)
+			}
+			single, err := f.store.MayBeToldOfIn(ctx, c.as, f.productID, ids[c.name])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if told[ids[c.name]] != c.want || single != c.want {
+				t.Errorf("%s told of %s: %v in a list and %v alone, want %v",
+					c.who, c.name, told[ids[c.name]], single, c.want)
+			}
+		}
 	})
 }
