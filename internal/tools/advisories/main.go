@@ -12,8 +12,9 @@
 // Everything else is introduced — including an advisory the base was not
 // affected by at all, and one against a dependency the base does not have. A
 // bump that fixes one advisory and not another therefore introduces nothing,
-// and an advisory already present reaches a fix through the repository's
-// dependency alerts.
+// and an advisory already present blocks neither main nor a release. It
+// reaches a fix through Dependabot's update of the module, the package, or the
+// image whose golang tag is the toolchain.
 //
 // The base is where this branch left the reference named by AUDIT_BASE,
 // origin/main unless set. On main itself that is the commit being checked, so
