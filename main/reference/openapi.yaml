@@ -4199,6 +4199,13 @@ components:
         purl:
           description: The package identifier this build ships it under
           type: string
+        stated_versions:
+          description: Every version this build stated for a container image, newest first. A container image is identified by its name, and the version a build stamps it with is recorded here rather than in Version. Absent for everything else
+          items:
+            $ref: "#/components/schemas/StatedVersionBody"
+          type:
+            - array
+            - "null"
         summary:
           description: One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package
           type: string
@@ -10624,6 +10631,27 @@ components:
         - publisher
         - product
         - document
+      type: object
+    StatedVersionBody:
+      additionalProperties: false
+      properties:
+        from:
+          description: The build time of the first scan that stated it
+          format: date-time
+          type: string
+        purl:
+          description: The package identifier as the build stated it, version and qualifiers included
+          type: string
+        until:
+          description: The build time of the scan that stated something else. Absent while it is what the build states
+          format: date-time
+          type: string
+        version:
+          description: The version as the build stated it, empty where it stated none
+          type: string
+      required:
+        - version
+        - from
       type: object
     Statement:
       additionalProperties: false

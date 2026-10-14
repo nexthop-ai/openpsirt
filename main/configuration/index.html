@@ -975,6 +975,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v080" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.8.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1639,6 +1650,17 @@
     <span class="md-ellipsis">
       
         From v0.6.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v080" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.8.0
       
     </span>
   </a>
@@ -3828,6 +3850,37 @@ v0.5.0's schema in one step and carries none of the upgrades before it.</p>
 <tr>
 <td>A VEX document uploaded on its own whose statements name the build's root is the build's own claim</td>
 <td>Upload such a document again. A statement recorded by v0.6.0 kept no product, so it stays evidence until it is read again</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v080">From v0.8.0<a class="headerlink" href="#from-v080" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands</td>
+<td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held. The chart's startup probe allows ten minutes, and a probe that stops the upgrade undoes it, so the next pod starts it again. With more than about three weeks of nightly history, raise <code>startupProbe.failureThreshold</code> for the upgrade, or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
+</tr>
+<tr>
+<td>A live judgment beneath an image is keyed on the image with no version</td>
+<td>Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed</td>
+</tr>
+<tr>
+<td>Findings a rebuild closed before the upgrade stay closed</td>
+<td>Nothing. They are history, listed in the register with the reason they closed</td>
+</tr>
+<tr>
+<td>A name some build held at two versions at once is not merged in any build, and a build holding two images of one name at once keeps them apart by version, as before</td>
+<td>Nothing. A build that holds such a name once moves it to the name on its next upload, once: the image's node closes and opens, the findings beneath it close and open again, and judgments beneath it lapse and are asked again</td>
+</tr>
+<tr>
+<td>An image the inventory states with no package identifier is not found by the upgrade</td>
+<td>Nothing. The next upload of each build stores it by name, which closes the old node and opens the new one once, as a version moving would</td>
 </tr>
 </tbody>
 </table>
