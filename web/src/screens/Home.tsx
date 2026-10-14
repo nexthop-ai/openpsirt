@@ -14,7 +14,8 @@ import { Severity } from "../ui/Severity";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Reading } from "../ui/Reading";
-import { Pace, Mix, Ring, Releases } from "../ui/Charts";
+import { Pace, Mix, Ring, Releases, TREND_WEEKS, trendSaid } from "../ui/Charts";
+import { SOON_DAYS } from "./FindingsFilters";
 import { paceReading, mixReading } from "../ui/trend";
 import { claimOf, useQueueCount } from "../api/claims";
 import type { Who } from "../app/session";
@@ -39,11 +40,6 @@ const OVERDUE_LIMIT = 200;
 // count to ask for — a page is read and what is on it counted, and the tile
 // says so where the page was cut.
 const BACK_LIMIT = 200;
-
-// The distance ahead "soon" looks. A fortnight is the window the deadline list
-// itself defaults to, and it is about as far out as somebody can act on: a
-// quarter ahead is a plan rather than a week's work.
-const SOON_DAYS = 14;
 
 // The findings list, narrowed to what a deadline tile counts: undecided, and
 // running out inside the window. Built here so the figure and the screen it
@@ -80,7 +76,7 @@ export function Home({ who }: { who: Who }) {
   const trend = useQuery({
     queryKey: ["home", "trend", scope],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12, ...scope } } })),
+      unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS, ...scope } } })),
   });
   const points = trend.data?.items ?? [];
   // The other axis. Asked for whenever a product is picked, and drawn instead
@@ -121,7 +117,7 @@ export function Home({ who }: { who: Who }) {
               {byRelease ? "Open issues in each release" : "Trend: open, new and resolved issues"}
             </h3>
             <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              {byRelease ? "release over release" : "12 weeks"} · {counting}
+              {byRelease ? "release over release" : trendSaid} · {counting}
             </span>
           </header>
           {trend.isError ? (
@@ -454,7 +450,8 @@ function Figures({
   const allOpen = useQuery({
     queryKey: ["home", "trend", "all"],
     enabled: widely,
-    queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12 } } })),
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/trend", { params: { query: { weeks: TREND_WEEKS } } })),
   });
   const rulings = useApprovable(at.product || undefined);
   const allRulings = useApprovable();

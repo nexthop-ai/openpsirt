@@ -18,6 +18,11 @@ import {
 import type { Body } from "../api/client";
 import { BANDS as LADDER, COLORS } from "./severities";
 
+// The window a trend chart draws when the reader has not chosen one, as a
+// number for the request and as the words its heading carries.
+export const TREND_WEEKS = 12;
+export const trendSaid = `${TREND_WEEKS} weeks`;
+
 // The three shapes the reporting decisions name, drawn small. They sit inside
 // panels rather than on a page of their own, so they carry no title and no
 // legend — the panel says what they are, and a reading underneath says what

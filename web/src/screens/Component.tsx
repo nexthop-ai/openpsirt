@@ -16,7 +16,7 @@ import { Outward } from "../ui/Outward";
 import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
-import { Pace } from "../ui/Charts";
+import { Pace, TREND_WEEKS, trendSaid } from "../ui/Charts";
 import { ranked, rankedLabel, rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
 import { ExploitedHere, Severity } from "../ui/Severity";
@@ -1094,7 +1094,7 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
   );
 }
 
-// Twelve weeks of what opened and closed at this package and under it.
+// The trend window of what opened and closed at this package and under it.
 function History({ product, pkg, here }: { product: string; pkg: Package; here: Build }) {
   const component = pkg.name;
   const trend = useQuery({
@@ -1122,7 +1122,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
               ...(pkg.version ? { beneath_version: pkg.version } : {}),
               ...(here.ecosystem ? { beneath_ecosystem: here.ecosystem } : {}),
               ...(pkg.namespace ? { beneath_namespace: pkg.namespace } : {}),
-              weeks: 12,
+              weeks: TREND_WEEKS,
             },
           },
         }),
@@ -1135,7 +1135,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>Twelve weeks</h3>
+        <h3>{trendSaid}</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
           {here.stream} · {here.variant}
         </span>
@@ -1145,7 +1145,7 @@ function History({ product, pkg, here }: { product: string; pkg: Package; here: 
       ) : trend.isPending ? (
         <Loading />
       ) : !moved ? (
-        <p className="hint">Nothing opened or closed in twelve weeks.</p>
+        <p className="hint">Nothing opened or closed in {trendSaid}.</p>
       ) : (
         <Pace points={points} />
       )}

@@ -144,14 +144,19 @@ const BUILD_SAYS = [
   ["under_investigation", "Under investigation"],
 ] as const;
 
+// The distance ahead "soon" looks. A fortnight is the window the deadline list
+// itself defaults to, and it is about as far out as somebody can act on: a
+// quarter ahead is a plan rather than a week's work. The front page's "due
+// soon" tile navigates with it.
+export const SOON_DAYS = 14;
+
 export const DEADLINES = [
   ["", "Any"],
   ["overdue", "Overdue"],
   ["7", "Due within 7 days"],
-  // A fortnight, because that is what the front page's "due soon" tile
-  // navigates with. Every value an address can carry is offered, so a filter
-  // in force is one the reader can see and turn off.
-  ["14", "Due within 14 days"],
+  // Every value an address can carry is offered, so a filter in force is one
+  // the reader can see and turn off.
+  [String(SOON_DAYS), `Due within ${SOON_DAYS} days`],
   ["30", "Due within 30 days"],
   ["90", "Due within 90 days"],
 ] as const;

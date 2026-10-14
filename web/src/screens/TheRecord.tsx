@@ -429,7 +429,7 @@ function Administered() {
   // The rows shown, rather than an offset: the newest first is the
   // order, and asking for the next page of a list that only grows at the top
   // is how a row is seen twice or not at all.
-  const [showing, setShowing] = useState(50);
+  const [showing, setShowing] = useState(CHANGES_FIRST);
   // Past what the route answers in one request, the file is how the rest is
   // read; asking for more would be refused and take the section with it.
   const longest = CHANGES_MOST;
@@ -467,7 +467,7 @@ function Administered() {
   }
   // Empty under a kind somebody picked is an answer, and the picker stays so
   // it can be put back.
-  if (rows.length === 0 && showing === 50 && !kind) return null;
+  if (rows.length === 0 && showing === CHANGES_FIRST && !kind) return null;
 
   return (
     <div style={{ marginTop: 24 }} id="changes">
@@ -500,7 +500,7 @@ function Administered() {
             const next = new URLSearchParams(params);
             if (event.target.value) next.set("change", event.target.value);
             else next.delete("change");
-            setShowing(50);
+            setShowing(CHANGES_FIRST);
             setParams(next, { replace: true });
           }}
           aria-label="Kind of change"
@@ -609,6 +609,10 @@ export function periodSent(params: URLSearchParams): { from: string; to: string 
     to: endExclusive(calendarDay(params.get("to") ?? "")),
   };
 }
+
+// The change-history rows shown before the reader asks for more. An empty
+// section is hidden only at this length, so the three readers share it.
+const CHANGES_FIRST = 50;
 
 // The most change-history rows one request is answered with. The route
 // refuses a larger page.
