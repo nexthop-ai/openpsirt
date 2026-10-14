@@ -16,6 +16,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Test databases](#test-databases)
 - [Commit durability](#commit-durability)
 - [Pinned pairs](#pinned-pairs)
+- [Tool pins](#tool-pins)
 - [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
 - [Known vulnerabilities](#known-vulnerabilities)
@@ -79,6 +80,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
+| `tools/` | One module per Go tool the gate and the image run, each requiring that tool at one version. See § Tool pins |
 | `Makefile` | The build, every gate, and what they clean up |
 | `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
 
@@ -173,6 +175,7 @@ query runs both.
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
+| a tool's module under `tools/`, its source included | the whole gate, because the tool it pins is one the gate runs |
 | anything else, or nothing | the whole gate |
 
 | Rule | |
@@ -217,7 +220,7 @@ rather than for tidiness.
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
-| Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` | When the key is new |
+| Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` and each tool's under `tools/` | When the key is new |
 | Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
 | Linter results | The linter's analysis of each package, by the content it read | The run, restored by prefix | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
@@ -761,10 +764,10 @@ separates a harness that stopped asking from a server nobody may configure.
 ## Pinned pairs
 
 A version written in two files is a version somebody moves in one of them: the Go
-toolchain the container builds with against the one the module accepts, the Node
-the image uses against the one every workflow runs, the SBOM generator in the
-image against the one the SBOM target invokes, and the Python the documentation
-closure was resolved on against the one the workflows build it with.
+toolchain the container builds with against the one the module and each tool's
+module accept, and the Python the documentation closure was resolved on against
+the one the workflows build it with. The Go and Node releases the workflows
+install are read from the image rather than written twice.
 
 A check of its own rather than part of the engine check: that answers what the
 tests run against, this answers what the release is built from. An image
@@ -781,17 +784,42 @@ by two toolchains with the gate green.
 | Every workflow installs the release `make go-version` reads from that tag | The tarball, the image and the tests are built by one toolchain |
 | `go.mod`'s `go` line is held at or below the image's release, compared as versions | It is the oldest release the module accepts. Held equal, an image bump would fail until somebody edited `go.mod` by hand on the same pull request |
 | A `go` line above the image's release fails | A module needing a newer Go lands after the image moves, never before |
+| Each tool's module under `tools/` is held to the same `go` line rule | The image and the workflows build the tools with the image's release |
+| The image's `node` tag is the one pin of the interface's Node, and every workflow installs the release `make node-version` reads from it | The pull request moving the tag moves the interface's toolchain everywhere |
+| A workflow naming a Node release itself fails | A second copy of the number is the one a bump leaves behind |
 
 | What that costs | What answers it |
 |---|---|
-| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own. The tag is grouped alone, because a `node` bump fails `pins-check` until `ci.yml` moves with it |
+| The image no longer picks up a Go release by itself | Dependabot watches the images. Its pull request moving the `golang` tag moves the toolchain everywhere and passes `pins-check` on its own. The tag is grouped alone, so an image bump held red never holds the standard library's fixes with it |
 | A pinned toolchain goes stale between bumps | `govulncheck` reports standard-library vulnerabilities against the toolchain both artifacts are built with, and the image update carries the fix |
+| A Go release can write export data the pinned linter cannot read, and the linter then fails on every package | The tools' weekly update brings the linter release that reads it. That pull request lands first, and the toolchain's goes green after it. Go 1.27.2 wrote format 5, which golangci-lint v2.13.1 refused and v2.14.0 reads |
+
+## Tool pins
+
+Every Go tool the gate or the image runs is required by a module of its own
+under `tools/`, and run with `go tool` against that module.
+
+| Rule | Why |
+|---|---|
+| A tool's version is a requirement in its module's `go.mod`, and its `go.sum` holds the checksum of everything it is built from | A requirement is what the dependency updates read. A version in the makefile is one nothing moves |
+| One module per tool | Moving one tool never moves a library another is built against |
+| A build-constrained source file imports the tool's command | The requirement is then direct. A module declaring a tool and importing nothing marks it indirect, and the updates move direct requirements |
+| A tool's directory is named for the command its module declares, and `pins-check` refuses one that is not | The targets call a tool by its directory |
+| The image builds the inventory generator from the same module the makefile runs | One pin, where a build argument and a makefile variable were two |
+
+| Tool | Run by |
+|---|---|
+| golangci-lint | `make lint`, `make fmt` |
+| govulncheck | `make govulncheck` |
+| go-licenses | `make licenses` |
+| gitleaks | `make secrets` |
+| cyclonedx-gomod | `make sbom`, and the image's inventory of its binary |
 
 ## Hash pinning per ecosystem
 
 | Ecosystem | What names the bytes |
 |---|---|
-| Go | `go.sum`, through the checksum database |
+| Go | `go.sum`, and each tool's under `tools/`, through the checksum database |
 | Node | `package-lock.json`, by integrity |
 | Python, for the documentation | `docs/requirements.txt`, a lock with a hash for every package in the closure, installed with `--require-hashes` |
 | The scanner and the cataloger | A version and a per-architecture hash in the image |
@@ -1130,7 +1158,10 @@ long precisely so the checklist holds only what a machine cannot decide.
 |---|---|
 | Every action is pinned to the commit of a release, with the version in a comment beside it | A tag moves. An action that moves is code running with this repository's token on a day nobody chose, and `v4` is a tag |
 | The repository requires it | `sha_pinning_required` refuses a workflow referencing an action by tag, so the rule is enforced rather than remembered by whoever writes the next workflow |
-| Dependabot moves the pins, weekly, as one pull request per ecosystem: actions, images, Go modules, interface packages and the documentation closure. The `golang` image is the one exception, a pull request of its own | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| Dependabot moves the pins, weekly, as one pull request per group: actions, images, the `golang` image alone, the database layer's Go modules, the other Go modules, the Go tools, the interface packages and the documentation closure | A pin nobody moves is a version that stops receiving fixes with nothing saying so. Grouped, because these move together and separately they are noise nobody reads by the fourth one |
+| The database layer's modules are a group of their own: the query builder, the drivers and the migration runner | A release there can change an interface every store is written against, and the work it needs holds nothing else back. bun v1.3.0 changed the type of every limit, offset and count |
+| The interface group carries minor and patch releases, and a major release arrives as a pull request of its own | A major release is the kind that needs work, and one that does holds nothing else back |
+| TypeScript's major releases are not offered | The linter's TypeScript support and the API client generator each declare the compiler releases they accept, and neither accepts 7, so npm refuses the install. It lifts when both do |
 | An update arrives through the queue like anything else | The commit being pinned is visible in the diff, and the gate runs against it |
 
 ## Repository settings

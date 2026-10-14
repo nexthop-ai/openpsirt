@@ -53,6 +53,13 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 			// tier would take it — and that tier does not run `reserved`.
 			"a gate program", "internal/tools/walk/walk.go", []tier{everything},
 		},
+		{
+			// Holds no SQL and registers no operation either, and moving the
+			// version it requires changes what the linter and the scanners do.
+			"a tool's pin", write("tools/golangci-lint/tools.go", "//go:build tools\n\npackage tools\n\n"+
+				"import _ \"github.com/golangci/golangci-lint/v2/cmd/golangci-lint\"\n"),
+			[]tier{everything},
+		},
 		{"the database package", "internal/database/connect.go", []tier{engines}},
 		{"the test harness", "internal/dbtest/dbtest.go", []tier{engines}},
 		{"the schema package", "internal/schema/indexes_test.go", []tier{engines}},

@@ -125,11 +125,12 @@ jobs:
           # on, the entry holding both is downloaded and extracted over the top
           # of the two below, and grows to hold the merged copy.
           cache: false
-      # The modules, keyed on what decides their content.
+      # The modules, keyed on what decides their content: the module's own and
+      # each tool's under tools/, which the same directory holds.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/go/pkg/mod
-          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum', 'tools/*/go.sum') }}
           restore-keys: go-mod-${{ runner.os }}-
       # The build cache, kept current.
       #
@@ -159,11 +160,17 @@ jobs:
           path: ~/.cache/golangci-lint
           key: golangci-lint-${{ runner.os }}-${{ github.run_id }}
           restore-keys: golangci-lint-${{ runner.os }}-
+      - name: Read the Node release the image builds the interface with
+        id: node
+        run: |
+          version=$(make -s --no-print-directory node-version)
+          [ -n "$version" ] || { echo "::error::the Dockerfile names no node release"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
           # The version the image builds the interface with. "make check" runs
           # the interface checks, so the toolchain for them belongs here.
-          node-version: 26
+          node-version: ${{ steps.node.outputs.version }}
           cache: npm
           cache-dependency-path: web/package-lock.json
 

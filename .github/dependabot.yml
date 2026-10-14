@@ -33,14 +33,16 @@ updates:
   # it names, so this pull request moves the toolchain everything is built and
   # tested with, standard-library fixes included, and passes `pins-check` on
   # its own: go.mod's go line is held at or below the image's, not equal to it.
+  # The node tag is the one pin of the interface's Node in the same way.
   #
-  # **A bump to the node image will fail `pins-check`, and should.** The
-  # version the image builds the interface with is written in the Dockerfile
-  # and in ci.yml, and the check compares them — so the pull request needs
-  # ci.yml moved with it. Red there means half an update, not a broken bot.
+  # A Go release can outrun a tool built against the previous one: the linter
+  # reads the compiler's export data, and a release writing a newer format
+  # fails it on every package. The tools' own pull request below brings the
+  # release that reads it, and lands first. Red there means the tools move
+  # first.
   #
-  # The golang tag is a group of its own, so a node bump held red by that
-  # check never holds the toolchain's standard-library fixes with it.
+  # The golang tag is a group of its own, so an image bump held red never holds
+  # the toolchain's standard-library fixes with it.
   - package-ecosystem: docker
     directory: /
     schedule:
@@ -55,15 +57,47 @@ updates:
   # The Go modules. A module that needs a newer Go than the image raises
   # go.mod's go line past it, and `pins-check` fails that pull request until
   # the image's own has landed. Red there means the toolchain moves first.
+  #
+  # The database layer is a group of its own: the query builder, the drivers
+  # and the migration runner. A release there can change an interface every
+  # store is written against, and the work it needs should hold nothing else
+  # back. A module goes to the first group whose pattern it matches.
   - package-ecosystem: gomod
     directory: /
     schedule:
       interval: weekly
     groups:
+      database:
+        patterns:
+          - "github.com/uptrace/bun*"
+          - "github.com/jackc/*"
+          - "github.com/go-sql-driver/*"
+          - "github.com/pressly/goose/*"
+          - "modernc.org/*"
       go:
         patterns: ["*"]
 
+  # The Go tools the gate runs, one module each under tools/. The makefile and
+  # the image run each at the version its module requires, so this pull
+  # request moves the tool everywhere it runs.
+  - package-ecosystem: gomod
+    directories: ["/tools/*"]
+    schedule:
+      interval: weekly
+    groups:
+      tools:
+        patterns: ["*"]
+
   # The interface's packages, moved in the lockfile the build installs from.
+  #
+  # The group carries minor and patch releases. A major release arrives as a
+  # pull request of its own, because it is the kind that needs work, and one
+  # that does should hold nothing else back.
+  #
+  # TypeScript's major releases are not offered. The linter's TypeScript
+  # support and the API client generator each declare the compiler releases
+  # they accept as a peer, and neither accepts 7, so npm refuses the install.
+  # This lifts when both accept it.
   - package-ecosystem: npm
     directory: /web
     schedule:
@@ -71,6 +105,10 @@ updates:
     groups:
       web:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # The documentation build's Python closure. The lock is generated from
   # requirements.in with a hash for every package, and the update regenerates

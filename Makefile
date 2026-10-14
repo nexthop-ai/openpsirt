@@ -119,18 +119,19 @@ CHART_DIR       := deploy/helm/openpsirt
 # that publishes builds one per architecture it pushes.
 DIST_IMAGE_ARCH ?= $(shell $(GO) env GOARCH)
 
-# Every tool is pinned. "latest" resolves at run time, so CI would not be
-# reproducible against last week's run and a compromised upstream release would
-# execute here on the day it shipped.
-GOLANGCI_VERSION    ?= v2.13.1
-GOVULNCHECK_VERSION ?= v1.7.0
-GOLICENSES_VERSION  ?= v1.6.0
-# The module path is not the repository path: the project moved to the
-# gitleaks organization and the module still declares zricethezav, so asking
-# for the other one fails with a version-constraint conflict rather than a
-# not-found.
-GITLEAKS_VERSION    ?= v8.30.1
-CDXGOMOD_VERSION    ?= v1.12.0
+# Every Go tool is pinned, each by a module of its own under tools/: the
+# directory is named for the command, its go.mod requires the tool at one
+# version, and its go.sum holds the checksum of everything the tool is built
+# from. "latest" resolves at run time, so CI would not be reproducible against
+# last week's run and a compromised upstream release would execute here on the
+# day it shipped. A module rather than a version in this file, because a
+# requirement in a go.mod is what the dependency updates read, and a version
+# here is one nothing moves. One module per tool, so that moving one tool never
+# moves a library another is built against.
+#
+# The gitleaks module path is not its repository path: the project moved to the
+# gitleaks organization and the module still declares zricethezav.
+tool = $(GO) tool -modfile=$(CURDIR)/tools/$(1)/go.mod $(1)
 
 # Permissive only, for anything that ships. Build tooling is unrestricted.
 ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MIT,MPL-2.0
@@ -321,8 +322,8 @@ lint:
 # without a word, so a setting spelled at the wrong level reads as configured
 # and does nothing — which is how the "measure"-tagged file went on being
 # unlinted under a comment saying it was not.
-	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) config verify
-	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run
+	$(call tool,golangci-lint) config verify
+	$(call tool,golangci-lint) run
 
 # The files a build constraint keeps off Linux, type-checked. Every runner and
 # every other target builds for Linux, so a file marked !linux is compiled by
@@ -333,7 +334,7 @@ vet-other-os:
 	GOOS=darwin $(GO) vet $(PACKAGES)
 
 fmt:
-	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) fmt
+	$(call tool,golangci-lint) fmt
 
 # Known vulnerabilities in Go modules and the toolchain. A change fails for one
 # the branch it targets was not already affected by; one it was is reported and
@@ -341,7 +342,7 @@ fmt:
 # set. DESIGN-build.md § Known vulnerabilities has the rules.
 govulncheck:
 	$(GO) run ./internal/tools/advisories go -- \
-	  $(GO) run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -format json $(PACKAGES)
+	  $(call tool,govulncheck) -format json $(PACKAGES)
 
 # Both halves of what ships, against one allowlist.
 #
@@ -351,7 +352,7 @@ govulncheck:
 # private repository. The allowlist is this variable, passed to both, because
 # a policy written in two files is a policy that differs in one of them.
 licenses:
-	$(GO) run github.com/google/go-licenses@$(GOLICENSES_VERSION) check $(PACKAGES) \
+	$(call tool,go-licenses) check $(PACKAGES) \
 		--allowed_licenses=$(ALLOWED_LICENSES) \
 		$(foreach m,$(LICENSE_EXCEPTIONS),--ignore=$(m))
 	@command -v $(NPM) >/dev/null 2>&1 \
@@ -393,7 +394,7 @@ sbom-shape:
 # carries, which is why the image's invocation has to be told one.
 sbom:
 	@mkdir -p bin
-	$(GO) run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@$(CDXGOMOD_VERSION) \
+	$(call tool,cyclonedx-gomod) \
 		app -main cmd/openpsirt -json -packages -output bin/openpsirt.cdx.json .
 	@echo "wrote bin/openpsirt.cdx.json"
 
@@ -513,7 +514,7 @@ dist-inventories: dist-version
 	@# recorded was that it had.
 	$(DOCKER) build -t $(DIST_IMAGE):$(DIST_VERSION) \
 	  --build-arg VERSION=$(DIST_VERSION) --build-arg COMMIT=$(COMMIT) \
-	  --build-arg DATE=$(DATE) --build-arg CDXGOMOD_VERSION=$(CDXGOMOD_VERSION) .
+	  --build-arg DATE=$(DATE) .
 	@$(DOCKER) run --rm --entrypoint cat $(DIST_IMAGE):$(DIST_VERSION) \
 	  /usr/share/openpsirt/openpsirt.cdx.json > $(DIST_DIR)/openpsirt_$(DIST_VERSION).cdx.json
 	@$(DOCKER) run --rm --entrypoint cat $(DIST_IMAGE):$(DIST_VERSION) \
@@ -741,7 +742,7 @@ secrets:
 	git ls-files -z --cached --others --exclude-standard \
 	  | while IFS= read -r -d '' file; do if [ -f "$$file" ]; then printf '%s\0' "$$file"; fi; done \
 	  | tar --null -T - -cf - | tar -C "$$into" -xf - && \
-	cd "$$into" && $(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
+	cd "$$into" && $(call tool,gitleaks) dir . \
 		--no-banner --redact --config .gitleaks.toml
 
 # Known vulnerabilities in what the interface installs.
@@ -1154,14 +1155,20 @@ docs-site:
 go-version:
 	@sed -n 's/^FROM golang:\([0-9.]*\)-.*/\1/p' Dockerfile
 
+# The Node release the image builds the interface with, read the same way and
+# for the same reason: the workflows install what this prints, so the image's
+# node tag is the one pin of it, and the pull request moving the tag moves the
+# interface's toolchain everywhere.
+.PHONY: node-version
+node-version:
+	@sed -n 's/^FROM node:\([0-9.]*\)-.*/\1/p' Dockerfile
+
 # The other pinned pairs, checked the same way and for the same reason.
 #
-# A version written in two files is one somebody moves in one of them. The
-# database images had a check and these did not, so the toolchain the container
-# builds with could drift from the one the module declares, the Node the image
-# uses from the one CI runs, and the SBOM generator in the image from the one
-# the SBOM target invokes — each silently, and each producing an artifact built
-# with something other than what was tested.
+# A version written in two files is one somebody moves in one of them, so the
+# toolchain the container builds with could drift from the one a module
+# declares, or a workflow could install a Node of its own — each silently, and
+# each producing an artifact built with something other than what was tested.
 #
 # Named rather than folded into engines-check, because that one is about what
 # the tests run against and this is about what the release is built from.
@@ -1173,7 +1180,14 @@ go-version:
 #
 # go.mod's go line is the oldest Go release the module accepts, and is held at
 # or below the image's: the image moves first, through its own pull request,
-# and a dependency raising the go line past it fails here until it has.
+# and a dependency raising the go line past it fails here until it has. Each
+# tool's module under tools/ is held to the same line, because the image and
+# the workflows build the tools with that toolchain too. A tool's directory is
+# named for the command its module declares, because that name is what the
+# targets call it by.
+#
+# A workflow reads Node from the image, as it reads Go, and never names a
+# release itself.
 #
 # The tidy run rewrites the tree, so what it found there is put back on every
 # exit path — including an interrupt, which used to leave the tree as tidy had
@@ -1199,15 +1213,30 @@ pins-check:
 	  [ "$$(printf '%s\n%s\n' "$$declared" "$$image" | sort -V | head -n 1)" = "$$declared" ] || { \
 	  echo "go.mod declares Go $$declared and the image builds with $$image, which is older."; \
 	  echo "Move the image's golang tag first: it is the one pin of the toolchain."; fail=1; }; \
-	here=$$(awk -F'= ' '/^CDXGOMOD_VERSION/{print $$2}' Makefile | tr -d ' \t'); \
-	there=$$(awk -F= '/^ARG CDXGOMOD_VERSION/{print $$2}' Dockerfile); \
-	[ "$$here" = "$$there" ] || { \
-	  echo "the SBOM generator is $$here here and $$there in the image."; fail=1; }; \
-	node=$$(awk -F'[:-]' '/^FROM node:/{print $$2}' Dockerfile); \
+	tools=0; \
+	for mod in tools/*/go.mod; do \
+	  [ -f "$$mod" ] || continue; \
+	  tools=$$((tools + 1)); \
+	  dir=$$(basename "$$(dirname "$$mod")"); \
+	  wants=$$(awk '/^go /{print $$2}' "$$mod"); \
+	  [ -z "$$wants" ] || [ -z "$$image" ] || \
+	    [ "$$(printf '%s\n%s\n' "$$wants" "$$image" | sort -V | head -n 1)" = "$$wants" ] || { \
+	    echo "$$mod declares Go $$wants and the image builds with $$image, which is older."; \
+	    echo "Move the image's golang tag first: it is the one pin of the toolchain."; fail=1; }; \
+	  named=$$(awk '/^tool /{print $$2}' "$$mod" | sed -E 's#/v[0-9]+$$##; s#.*/##'); \
+	  [ "$$named" = "$$dir" ] || { \
+	    echo "$$mod declares the tool \"$$named\" and sits in tools/$$dir, so the targets"; \
+	    echo "calling it by its directory reach nothing. One tool per module, named for it."; \
+	    fail=1; }; \
+	done; \
+	[ "$$tools" -gt 0 ] || { echo "tools/ holds no module, so no tool's pin was compared."; fail=1; }; \
+	[ -n "$$($(MAKE) -s --no-print-directory node-version)" ] || { \
+	  echo "the Dockerfile names no node release, so the workflows have nothing to read."; fail=1; }; \
 	for flow in .github/workflows/*.yml; do \
 	  for said in $$(awk -F': ' '/node-version:/{print $$2}' "$$flow" | tr -d ' '); do \
-	    [ "$$said" = "$$node" ] || { \
-	      echo "the image builds the interface with Node $$node and $$flow uses $$said."; \
+	    [ "$$said" = '$${{steps.node.outputs.version}}' ] || { \
+	      echo "$$flow names Node $$said itself. Read it from the image with"; \
+	      echo "make node-version, as the Go release is read, so the image's tag is the one pin."; \
 	      fail=1; }; \
 	  done; \
 	done; \

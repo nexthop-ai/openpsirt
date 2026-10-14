@@ -80,11 +80,18 @@ jobs:
       - name: Confirm the release's migrations are frozen
         run: make release-check VERSION="$GITHUB_REF_NAME"
       # "make dist" builds the interface before it builds the binaries, because
-      # the binary embeds it. The version is the one the image builds with, and
-      # "make pins-check" is what holds every copy of that number together.
+      # the binary embeds it. The version is the one the image builds with,
+      # read from the Dockerfile, and "make pins-check" refuses a workflow
+      # naming one of its own.
+      - name: Read the Node release the image builds the interface with
+        id: node
+        run: |
+          version=$(make -s --no-print-directory node-version)
+          [ -n "$version" ] || { echo "::error::the Dockerfile names no node release"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: 26
+          node-version: ${{ steps.node.outputs.version }}
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310  # v5.0.1

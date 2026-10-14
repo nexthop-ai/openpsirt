@@ -261,13 +261,14 @@ func classify(file string) []tier {
 		// costs little.
 		return []tier{everything}
 	}
-	// The gate programs themselves, and the reader they share. A change here
+	// The gate programs themselves, the reader they share, and the modules
+	// pinning the tools the gate runs. A change here
 	// can stop any check looking at part of the tree, and no narrower tier
 	// covers that: the walk holds no SQL and registers no operation, so it
 	// would otherwise land in the code tier, which does not run `reserved`.
 	// Widening the skip set would then make the quoting gate read less while
 	// this reported green.
-	if strings.HasPrefix(file, "internal/tools/") {
+	if strings.HasPrefix(file, "internal/tools/") || strings.HasPrefix(file, "tools/") {
 		return []tier{everything}
 	}
 	for _, dir := range storage {

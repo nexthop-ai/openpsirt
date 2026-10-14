@@ -72,14 +72,15 @@ FROM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3
 WORKDIR /src
 
 # Dependencies first, so a source-only change does not re-download them. The
-# bill-of-materials tool's are fetched here for the same reason: what "go run"
+# bill-of-materials tool's are fetched here for the same reason: what "go tool"
 # downloads lands in the layer of the step that runs it, and a step after the
-# source is copied is run again for every commit.
+# source is copied is run again for every commit. The tool is pinned by its
+# own module under tools/, which is what the dependency updates move.
 COPY go.mod go.sum ./
 RUN go mod download
-ARG CDXGOMOD_VERSION=v1.12.0
+COPY tools/cyclonedx-gomod/ ./tools/cyclonedx-gomod/
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} version
+    go tool -modfile=tools/cyclonedx-gomod/go.mod cyclonedx-gomod version
 
 COPY . .
 
@@ -129,7 +130,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -o /out/compose ./internal/tools/compose
 RUN --mount=type=cache,target=/root/.cache/go-build \
     mkdir -p /out/parts \
- && go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} \
+ && go tool -modfile=tools/cyclonedx-gomod/go.mod cyclonedx-gomod \
       bin -json -version "${VERSION}" -output /out/parts/modules.cdx.json /out/openpsirt
 
 # Run.
