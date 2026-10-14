@@ -344,11 +344,9 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 //
 // Three of the four signals the order is worked out from are properties of
 // the issue, and the order is stored per finding — rewritten only for the
-// build the scan was about. So a nightly branch scan learning that something
-// is being exploited left the shipped tag carrying a number from before:
-// below the triage line, answering no exploited filter, on no exploited
-// clock, at the bottom of the list, until somebody rescanned the tag, which
-// for a tag is never.
+// build the scan was about. A tag nobody rescans has to answer the exploited
+// filter and sit at the top of the list as the branch does. It carries no
+// deadline, because nothing will ever land on a tag.
 func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -398,8 +396,22 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 			if !finding.Exploiting(row.Urgency) {
 				t.Errorf("its urgency is %d, which does not read as exploited", row.Urgency)
 			}
+			if row.DueAt != nil {
+				t.Errorf("a release built once carries a deadline, %s", row.DueAt)
+			}
+		}
+		var onTheBranch []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&onTheBranch).
+			Where("target_id = ?", f.target).Where("closed_at IS NULL").
+			Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(onTheBranch) == 0 {
+			t.Fatal("the branch holds none of it")
+		}
+		for _, row := range onTheBranch {
 			if row.DueAt == nil {
-				t.Error("it has no deadline at all")
+				t.Error("the branch learned it is exploited and carries no deadline")
 			}
 		}
 	})

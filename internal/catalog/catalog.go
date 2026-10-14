@@ -491,24 +491,44 @@ func (s *Store) StreamsEndingBy(ctx context.Context, by time.Time) ([]int64, err
 // answering to its own date where it states one and to its product's
 // otherwise.
 func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
-	day := at.UTC().Truncate(24 * time.Hour)
-	var past []int64
+	past, args := pastEndOfLife("s", "p", at)
+	var ids []int64
 	err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
 		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
 		ColumnExpr("s.id").
-		// The release's own date where it has one, the product's otherwise —
-		// the same precedence a single read applies, written as a condition
-		// rather than fetched and compared, so a deployment with thousands of
-		// releases is one statement.
-		Where(`(s.eol_on IS NOT NULL AND s.eol_on <= ?)
-			OR (s.eol_on IS NULL AND p.eol_on IS NOT NULL AND p.eol_on <= ?)`, day, day).
+		Where(past, args...).
 		OrderExpr("s.id").
-		Scan(ctx, &past)
+		Scan(ctx, &ids)
 	if err != nil {
 		return nil, fmt.Errorf("read which releases are out of support: %w", err)
 	}
-	return past, nil
+	return ids, nil
+}
+
+// pastEndOfLife is the condition, as SQL, under which a release has gone out
+// of support by a date, over a stream and its product under the aliases given.
+//
+// The release's own date where it has one, the product's otherwise — the same
+// precedence a single read applies, written as a condition rather than fetched
+// and compared, so a deployment with thousands of releases is one statement.
+func pastEndOfLife(stream, product string, at time.Time) (string, []any) {
+	day := at.UTC().Truncate(24 * time.Hour)
+	return `((` + stream + `.eol_on IS NOT NULL AND ` + stream + `.eol_on <= ?)
+			OR (` + stream + `.eol_on IS NULL AND ` + product + `.eol_on IS NOT NULL AND ` +
+		product + `.eol_on <= ?))`, []any{day, day}
+}
+
+// OnTheClock is the condition, as SQL, under which a release carries
+// deadlines at a moment: it moves, and it has not gone out of support. The
+// stream and its product are joined by the caller under the aliases given.
+//
+// The condition a scan applies to the build it writes, as one expression, so
+// that a recount reaching findings across many releases leaves the same ones
+// off the clock that the scan did.
+func OnTheClock(stream, product string, at time.Time) (string, []any) {
+	past, args := pastEndOfLife(stream, product, at)
+	return `(` + stream + `.kind = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
 }
 
 // Retired is a release that has gone out of support, with what it belongs to

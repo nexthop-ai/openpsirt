@@ -305,7 +305,7 @@ func (v *Vulnerabilities) absorb(ctx context.Context, kept int64, gone Vulnerabi
 		return err
 	}
 	for _, product := range products {
-		if err := redue(ctx, v.db, product, kept); err != nil {
+		if err := redue(ctx, v.db, product, kept, now); err != nil {
 			return err
 		}
 	}
