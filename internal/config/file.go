@@ -47,9 +47,18 @@ func LoadFile(path string, environ []string) (Config, error) {
 			strings.Join(ours, ", "), path)
 	}
 
+	// A pipe is refused by path before it is opened, because opening one
+	// with no writer waits for a writer.
+	named, err := os.Stat(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("configuration file: %w", err)
+	}
+	if !named.Mode().IsRegular() {
+		return Config{}, fmt.Errorf("configuration file %s: not a regular file", path)
+	}
 	// Opened once, and every check made on what was opened. Checked by path
 	// and then read by path, a file swapped between the two is read without
-	// having been checked.
+	// having been checked, so what was opened must be what was checked by path.
 	file, err := os.Open(path) //nolint:gosec // G304: the path an operator named on the command line
 	if err != nil {
 		return Config{}, fmt.Errorf("configuration file: %w", err)
@@ -59,8 +68,8 @@ func LoadFile(path string, environ []string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("configuration file: %w", err)
 	}
-	if !info.Mode().IsRegular() {
-		return Config{}, fmt.Errorf("configuration file %s: not a regular file", path)
+	if !os.SameFile(named, info) {
+		return Config{}, fmt.Errorf("configuration file %s: replaced while it was being opened", path)
 	}
 	if open := info.Mode().Perm() & 0o077; open != 0 {
 		return Config{}, fmt.Errorf("configuration file %s: mode %04o lets somebody other than its "+
@@ -69,10 +78,10 @@ func LoadFile(path string, environ []string) (Config, error) {
 	}
 	// Owned by this process's user or by root. Another user's file, however
 	// strict its mode, is one they can rewrite.
-	if owner, known := ownerOf(info); known && !ownedAcceptably(owner, os.Geteuid()) {
+	if owner, known := ownerOf(info); known && !ownedAcceptably(owner, geteuid()) {
 		return Config{}, fmt.Errorf("configuration file %s: owned by user %d, and this process "+
 			"runs as %d: another user can change what it holds, and it holds secrets", path,
-			owner, os.Geteuid())
+			owner, geteuid())
 	}
 	raw, err := io.ReadAll(file)
 	if err != nil {
@@ -85,6 +94,10 @@ func LoadFile(path string, environ []string) (Config, error) {
 	c, err := load(given)
 	return c, InFile(err)
 }
+
+// geteuid is the user this process runs as. A test reads a file as another
+// user through it.
+var geteuid = os.Geteuid
 
 // ownedAcceptably reports whether a file owned by owner may configure a
 // process running as me: its own user's, or root's, as a mounted secret is.
