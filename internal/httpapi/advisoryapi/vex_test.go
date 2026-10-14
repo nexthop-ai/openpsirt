@@ -5,16 +5,15 @@ package advisoryapi_test
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
-	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
@@ -471,36 +470,35 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 func TestABuildStandingOnMoreDismissalsThanOneDocumentCarriesIsAnsweredAsTooLarge(t *testing.T) {
 	// Refused rather than truncated, because a document that stopped at a
 	// ceiling would say "nothing is claimed about this" by omission about
-	// everything past it. But the refusal has to reach the person asking:
-	// returned bare it fell through to "the document could not be generated"
-	// with a 500, which reads as the tool being broken rather than as
-	// something to narrow, and the sentence naming the build and the limit
-	// went only to the log.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	// everything past it. The refusal reaches the person asking, as something
+	// to narrow naming the build, and recording that the document went out
+	// generates it too, so it refuses the same way.
+	//
+	// The ceiling is brought down to the fixture rather than the fixture
+	// built up to twenty thousand, which is how the routing reach is tested
+	// and for the same reason.
+	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
+	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		// Two dismissals agreed to, so a ceiling of one is past rather than
-		// reached: landing on the limit exactly is not a refusal.
+		// reached.
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			claim, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
 			r.Agreed(t, claim)
 		}
-
-		// The ceiling is brought down to the fixture rather than the fixture
-		// built up to twenty thousand, which is how the routing reach is
-		// tested and for the same reason. On the store rather than on the
-		// package variable, because the engines run in parallel.
-		who, err := r.Rights.Resolve(t.Context(), "triager")
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = vex.NewStoreCarrying(r.DB.DB, 1).For(t.Context(), who,
-			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
-			"mine", "master", "broadcom", false, vex.Ours)
-		if !errors.Is(err, vex.ErrTooLarge) {
-			t.Fatalf("a build past the ceiling answered %v, wanted a refusal naming itself", err)
-		}
-		if !strings.Contains(err.Error(), "mine") || !strings.Contains(err.Error(), "master") {
-			t.Errorf("the refusal does not say which build: %s", err)
+		for _, method := range []string{http.MethodGet, http.MethodPost} {
+			at := httpapitest.ABuild
+			if method == http.MethodPost {
+				at += "/issuance"
+			}
+			got := httpapitest.AsPerson(t, r, "triager", method, at, "")
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("%s %s on a build past the ceiling answered %d: %s",
+					method, at, got.Code, got.Body.String())
+			}
+			if !strings.Contains(got.Body.String(), "mine") || !strings.Contains(got.Body.String(), "master") {
+				t.Errorf("the refusal does not say which build: %s", got.Body.String())
+			}
 		}
 	})
 }
@@ -672,24 +670,26 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 }
 
 func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
-	// The issuance list maps this answer to no comparison rather than a
-	// failed read: what went out is still what went out.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	// The issuance list answers no comparison rather than a failed read: what
+	// went out is still what went out.
+	carryingOne := func(d *core.Deps) { d.VexCeiling = 1 }
+	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, carryingOne, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		httpapitest.RecordedIssuance(t, r, "triager")
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
 			claim, _ := r.Claimed(t, "triager", issue, "linux-image", httpapitest.Dismissal)
 			r.Agreed(t, claim)
 		}
-		who, err := r.Rights.Resolve(t.Context(), "triager")
-		if err != nil {
-			t.Fatal(err)
+		var listed struct {
+			Changed *bool             `json:"changed"`
+			Items   []json.RawMessage `json:"items"`
 		}
-		_, err = vex.NewStoreCarrying(r.DB.DB, 1).Changed(t.Context(), who,
-			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
-			"mine", "master", "broadcom", vex.Ours)
-		if !errors.Is(err, vex.ErrTooLarge) {
-			t.Fatalf("comparing a build past the ceiling answered %v", err)
+		httpapitest.Read(t, r, "triager", httpapitest.ABuild+"/issuance", &listed)
+		if len(listed.Items) != 1 {
+			t.Fatalf("the list holds %d issuances, want the one that went out", len(listed.Items))
+		}
+		if listed.Changed != nil {
+			t.Errorf("a build past the ceiling was compared: changed is %v", *listed.Changed)
 		}
 	})
 }

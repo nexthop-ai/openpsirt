@@ -71,6 +71,10 @@ func (c *counting) Read(p []byte) (int, error) {
 // Read one byte past the limit, so a document over it is refused as too large
 // rather than cut off and reported as malformed — and so the digest recorded
 // is over what arrived rather than over the part that fitted.
+//
+// The parser reads to the end of the file: whitespace after the document is
+// read and anything else is refused. So a document it takes has passed
+// through the digest whole.
 func uploaded(in core.Deps, file huma.FormFile, read func(io.Reader) error) (string, error) {
 	most := in.Limits.OrDefault().MaxBytes
 	digest := sha256.New()
@@ -84,23 +88,6 @@ func uploaded(in core.Deps, file huma.FormFile, read func(io.Reader) error) (str
 	}
 	if err != nil {
 		return "", core.Asked(in.Logger, err)
-	}
-	// Whatever the parser left, read past the digest exactly once. The digest
-	// is the whole document by definition, and a reader that answered early
-	// would otherwise record a hash of the part it read.
-	//
-	// Drained into nothing, because the reader above already tees into the
-	// digest: copying into it here hashes every drained byte a second time, so
-	// a document with anything after the closing brace — a trailing newline is
-	// enough — records a digest that is not the document's, and the digest is
-	// what says whether a publisher has revised what an approval was granted
-	// against.
-	if _, err := io.Copy(io.Discard, counted); err != nil {
-		return "", huma.Error400BadRequest("that document could not be read")
-	}
-	if counted.n > most {
-		return "", huma.Error413RequestEntityTooLarge(fmt.Sprintf(
-			"that document is larger than the %d bytes this deployment reads", most))
 	}
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }

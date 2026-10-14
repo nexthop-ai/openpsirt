@@ -210,13 +210,16 @@ func TwoReach(t *testing.T, fn func(t *testing.T, r *Reach)) {
 
 func ReachOn(t *testing.T, on withCast, fn func(t *testing.T, r *Reach)) {
 	t.Helper()
-	ReachAs(t, on, publisher.Named{
-		Name: "Example Networks", Namespace: "https://example.test",
-		// The prefix a minted advisory identifier opens with. A deployment
-		// that has not been told cannot start one, which is a case of its own
-		// and has its own test.
-		Prefix: "EXNET",
-	}, fn)
+	ReachAs(t, on, examplePublisher, fn)
+}
+
+// examplePublisher is who the seeded deployment publishes as.
+var examplePublisher = publisher.Named{
+	Name: "Example Networks", Namespace: "https://example.test",
+	// The prefix a minted advisory identifier opens with. A deployment that
+	// has not been told cannot start one, which is a case of its own and has
+	// its own test.
+	Prefix: "EXNET",
 }
 
 // cast is what the seeded world hands a test: the secrets of the two API
@@ -476,6 +479,20 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 // differently — the one that has not been told who it publishes as.
 func ReachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T, r *Reach)) {
 	t.Helper()
+	reach(t, on, as, func(*core.Deps) {}, fn)
+}
+
+// ReachAdjusted is ReachOn for a test that needs a bound brought down to
+// what a fixture can reach: adjust changes the deployment's dependencies
+// before the handler is built.
+func ReachAdjusted(t *testing.T, on withCast, adjust func(*core.Deps), fn func(t *testing.T, r *Reach)) {
+	t.Helper()
+	reach(t, on, examplePublisher, adjust, fn)
+}
+
+func reach(t *testing.T, on withCast, as publisher.Named, adjust func(*core.Deps),
+	fn func(t *testing.T, r *Reach)) {
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB, made cast) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		rights := access.NewStore(db.DB)
@@ -489,7 +506,7 @@ func ReachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		handler, api := httpapi.New(quiet, nil, core.Deps{
+		deps := core.Deps{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: TestHeader, From: sources}),
 			// The identity this deployment publishes as, which an advisory
@@ -504,7 +521,9 @@ func ReachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T
 			// A chat platform, so a chat channel and a person's own chat
 			// settings answer rather than saying the deployment offers none.
 			Chats: []string{notify.Slack},
-		})
+		}
+		adjust(&deps)
+		handler, api := httpapi.New(quiet, nil, deps)
 		fn(t, &Reach{Handler: handler, Key: made.key, Revoked: made.revoked,
 			Rights: rights, DB: db, API: api})
 	})

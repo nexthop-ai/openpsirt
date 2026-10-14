@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
@@ -326,11 +330,9 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		// The padding sits outside the top-level object, so the parser
-		// stops at the closing brace and the drain past it actually runs.
-		// Inside the object it is a field the parser skips on its way to the
-		// end, which leaves the drain reading nothing and the test passing
-		// whatever the drain does.
+		// The padding sits outside the top-level object, which the parser
+		// reads to the end of the file on its way to refusing anything but
+		// whitespace there.
 		padding := strings.Repeat("\n", 64*1024)
 		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
 			"author":"Example Distribution","timestamp":"2026-09-01T00:00:00Z","version":1,
@@ -411,6 +413,38 @@ func TestADocumentCutOffPartwayIsRefusedAsMalformed(t *testing.T) {
 		}
 		if !strings.Contains(got.Body.String(), "partway through a value") {
 			t.Errorf("the refusal does not say the document ends partway: %s", got.Body.String())
+		}
+	})
+}
+
+func TestADocumentPastTheByteLimitIsRefusedAsTooLarge(t *testing.T) {
+	const most = 4096
+	small := func(d *core.Deps) { d.Limits = sbom.Limits{MaxBytes: most} }
+	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Two, small, func(t *testing.T, r *httpapitest.Reach) {
+		document := httpapitest.Said("not_affected", "vulnerable_code_not_present", "Not built.")
+		if len(document) >= most {
+			t.Fatalf("the document is %d bytes, which leaves no room under the limit", len(document))
+		}
+		tooLarge := func(got *httptest.ResponseRecorder) bool {
+			return got.Code == http.StatusRequestEntityTooLarge &&
+				strings.Contains(got.Body.String(), "4096 bytes")
+		}
+
+		// Whitespace after the document is read, and counts.
+		var last *httptest.ResponseRecorder
+		boundtest.Edges(t, most, func(n int) error {
+			last = r.Vexed(t, "admin", "debian", document+strings.Repeat("\n", n-len(document)))
+			if last.Code != http.StatusCreated {
+				return errors.New(last.Body.String())
+			}
+			return nil
+		}, func(error) bool { return tooLarge(last) })
+
+		// And a field inside the document running past the limit is refused
+		// for its size rather than read as a document cut off partway.
+		padded := strings.Replace(document, "Not built.", strings.Repeat("a", 6<<10), 1)
+		if got := r.Vexed(t, "admin", "debian", padded); !tooLarge(got) {
+			t.Errorf("a document with a 6 KiB field answered %d: %s", got.Code, got.Body.String())
 		}
 	})
 }
