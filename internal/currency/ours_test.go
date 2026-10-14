@@ -178,7 +178,7 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 // of it would hold back every package on a shared forge while reporting that
 // it was protecting one organization, which is the failure that would make an
 // operator turn the feature off rather than tune it.
-func TestTheOwnerIsTheSegmentBesideTheName(t *testing.T) {
+func TestTheOwnerIsTheAccountAPackageIsPublishedUnder(t *testing.T) {
 	for _, each := range []struct {
 		name string
 		purl string
@@ -186,6 +186,16 @@ func TestTheOwnerIsTheSegmentBesideTheName(t *testing.T) {
 	}{
 		{"a module path, whose forge host is shared by everybody",
 			"pkg:golang/github.com/nexthop-ai/openpsirt@v1.2.3", "nexthop-ai"},
+		{"a module at a major version past the first, whose path ends in that version",
+			"pkg:golang/github.com/acme/agent/v3@v3.1.0", "acme"},
+		{"a module inside a forge group, which nests",
+			"pkg:golang/gitlab.com/acme/team/project@v1.0.0", "acme"},
+		{"one module of a repository holding several",
+			"pkg:golang/github.com/acme/repo/sdk@v1.0.0", "acme"},
+		{"a module at a major version inside a repository holding several",
+			"pkg:golang/github.com/acme/repo/sdk/v2@v2.0.0", "acme"},
+		{"a vanity module path with no account",
+			"pkg:golang/example.com/agent@v1.0.0", "example.com"},
 		{"a scope",
 			"pkg:npm/%40nexthop/agent@1.0.0", "nexthop"},
 		{"a group, which is one segment however many dots it carries",

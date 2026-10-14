@@ -6,6 +6,7 @@ package currency
 import (
 	"context"
 	"net/url"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -183,17 +184,34 @@ func segments(name string) []string {
 // a product called "core" would hold back every package whose name starts that
 // way, and a default that wrong is one an operator turns the whole feature off
 // to escape.
+//
+// A Go module path is the exception, because what follows its account is not
+// one name. A major version past the first ends the path in "/v2", a
+// repository holding several modules adds a segment per module, and a forge
+// group nests: in each the account is the segment after the host.
 func Owner(purl string) string {
-	_, name, ok := Asked(purl)
+	ecosystem, name, ok := Asked(purl)
 	if !ok {
 		return ""
 	}
 	parts := segments(name)
+	if ecosystem == "golang" {
+		if n := len(parts); n > 2 && majorSuffix.MatchString(parts[n-1]) {
+			parts = parts[:n-1]
+		}
+		if len(parts) >= 3 && strings.Contains(parts[0], ".") {
+			return parts[1]
+		}
+	}
 	if len(parts) < 2 {
 		return ""
 	}
 	return parts[len(parts)-2]
 }
+
+// majorSuffix is the last segment of a Go module path at a major version past
+// the first.
+var majorSuffix = regexp.MustCompile(`^v[0-9]+$`)
 
 // generic are labels that name a kind of registration rather than an
 // organization.

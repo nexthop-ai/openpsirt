@@ -937,12 +937,12 @@ func TestOnlyWhatABuildStillCarriesIsAskedAbout(t *testing.T) {
 func TestWhatWasScannedIsHeldBack(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		r, asked := seed(t, w.DB, []component{
-			{purl: "pkg:golang/github.com/example-corp/product@v2.0.0"},
+			{purl: "pkg:golang/github.com/example-corp/product/v2@v2.0.0"},
 			{purl: "pkg:golang/github.com/example-corp/internal-lib@v1.0.0"},
 			{purl: "pkg:cargo/serde@1.0.0"},
 		}, map[string]currency.Latest{"serde": {Version: "1.0.230"}}, nil)
-		carried(t, w, "pkg:golang/github.com/example-corp/product@v2.0.0",
-			"pkg:golang/github.com/example-corp/product@v2.0.0",
+		carried(t, w, "pkg:golang/github.com/example-corp/product/v2@v2.0.0",
+			"pkg:golang/github.com/example-corp/product/v2@v2.0.0",
 			"pkg:golang/github.com/example-corp/internal-lib@v1.0.0")
 
 		if _, err := r.Once(t.Context()); err != nil {
