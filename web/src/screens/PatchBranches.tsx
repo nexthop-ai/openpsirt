@@ -213,7 +213,7 @@ function Done({ rows }: { rows: Repository[] }) {
                 <td className="hint">
                   {row.looked.toLocaleString()}
                   {row.looked > row.found &&
-                    ` · ${(row.looked - row.found).toLocaleString()} not in repository`}
+                    ` · ${(row.looked - row.found).toLocaleString()} not found`}
                 </td>
                 <td className="hint">
                   {row.held_bytes ? humaneBytes(String(row.held_bytes)) : "—"}

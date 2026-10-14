@@ -201,7 +201,14 @@ function OnBranches({
   of: { branches?: string[] | null; branch_count?: number; lookup?: string };
 }) {
   if (of.lookup === "absent") {
-    return <span className="hint branches">not in repository</span>;
+    return (
+      <span
+        className="hint branches"
+        title="No commit in the repository matches this hash, or it is an abbreviation more than one object shares."
+      >
+        not found
+      </span>
+    );
   }
   const branches = of.branches ?? [];
   if (of.lookup !== "found") return null;

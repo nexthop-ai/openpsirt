@@ -26,7 +26,7 @@ type PatchRepositoryBody struct {
 	Worst       string               `json:"worst,omitempty" doc:"The severity of the most urgent issue linking to a commit due, where the issue is rated"`
 	Commits     int                  `json:"commits" doc:"How many commits patch links name in this repository"`
 	Looked      int                  `json:"looked" doc:"How many of those have been looked up"`
-	Found       int                  `json:"found" doc:"How many of those the repository holds"`
+	Found       int                  `json:"found" doc:"How many of those the repository's copy resolves to one commit"`
 	FetchedAt   string               `json:"fetched_at,omitempty" doc:"When a visit last began"`
 	ReachedAt   string               `json:"reached_at,omitempty" doc:"When a visit last finished"`
 	RetryAt     string               `json:"retry_at,omitempty" doc:"When a failed repository is next visited"`
@@ -41,7 +41,7 @@ type PatchBranchesOutput struct {
 		Links        int                   `json:"links" doc:"How many patch links reports carry"`
 		Commits      int                   `json:"commits" doc:"How many distinct commits in a recognized repository those links name"`
 		Looked       int                   `json:"looked" doc:"How many of those commits have been looked up"`
-		Found        int                   `json:"found" doc:"How many of those the repository holds"`
+		Found        int                   `json:"found" doc:"How many of those the repository's copy resolves to one commit"`
 		HeldBytes    int64                 `json:"held_bytes" doc:"What every repository copy on disk took when its last visit finished, together, in bytes"`
 		Repositories []PatchRepositoryBody `json:"repositories" doc:"The repositories those commits are in, in working order: the visit under way, then those with commits due in the order they are visited, then failed, excluded and done"`
 		Total        int                   `json:"total" doc:"How many repositories there are in all"`
