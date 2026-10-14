@@ -110,7 +110,7 @@ func each(extra []string, visit func(path string) error) error {
 			}
 			return nil
 		}
-		return visit(strings.TrimPrefix(path, "./"))
+		return visit(path)
 	})
 }
 

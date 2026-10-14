@@ -185,6 +185,9 @@ func TestTheDefaultSkipSetIsNotSharedBetweenCallers(t *testing.T) {
 
 func TestAPathCarriesNoLeadingDotSlash(t *testing.T) {
 	// Every gate prints these, and somebody pastes one back into an editor.
+	// filepath.WalkDir from "." joins each child to the root with
+	// filepath.Join, which cleans the prefix away, so this pins the standard
+	// library's behavior that the walk relies on rather than code of its own.
 	tree(t, map[string]string{"internal/a.go": "package a"})
 	if _, err := Sources(".go", func(path string, _ []byte) error {
 		if filepath.ToSlash(path) != "internal/a.go" {
