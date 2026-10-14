@@ -258,7 +258,7 @@ func TestAnIssueSaysWhereItIsAFlawRecordedHere(t *testing.T) {
 			t.Fatal(err)
 		}
 		for issue, want := range map[int64]bool{scanned: false, f.issueID(t, identifier): true} {
-			rows, _, err := f.store.Everywhere(ctx, who, issue, 50)
+			rows, _, _, err := f.store.Everywhere(ctx, who, issue, 50)
 			if err != nil {
 				t.Fatal(err)
 			}

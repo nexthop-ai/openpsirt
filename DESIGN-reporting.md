@@ -531,6 +531,7 @@ assembled differently every time.
 | Everything else in it that did not pass the submission policy is escaped where it is written | The identifier, description, severity and aliases come from feeds, the component, version and fixed-in version from scan files, and product and person names are not markdown. A reasoning passed the policy when it was typed and is written as it was |
 | It is bounded, and says when the list is a page of a longer one | An issue at a widely vendored component carries hundreds of judgments, and what this is for is being read |
 | Over a page, it says how many judgments stand and how many are recorded | The list carries withdrawn and lapsed judgments too, and only a judgment in force stands |
+| The issue screen's count of products is taken with its total, before the limit, over what the reader may see | A figure taken off a capped page answers a different question from the one it looks like |
 
 ## The exception report
 

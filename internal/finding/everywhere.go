@@ -60,20 +60,22 @@ type Sighting struct {
 // because it is one piece of work.
 //
 // Capped, with the total said. A kernel flaw across a dozen products and forty
-// builds is a real answer and an unbounded one is a page nobody can read.
+// builds is a real answer and an unbounded one is a page nobody can read. The
+// number of products is counted with the total rather than off the page, so a
+// page cut short still says how many products carry the issue.
 func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
-	vulnerabilityID int64, limit int) ([]Sighting, int, error) {
+	vulnerabilityID int64, limit int) ([]Sighting, int, int, error) {
 
 	limit = database.AWholeBuild.Of(limit)
 	// Not merely empty: "here is nothing" and "you cannot ask" are
 	// different statements, and this is the second. A person holding
 	// nothing is the first, and is answered below.
 	if subject.Kind != access.Person {
-		return nil, 0, access.Denied("read findings across products")
+		return nil, 0, 0, access.Denied("read findings across products")
 	}
-	products, all := subject.Products()
-	if !all && len(products) == 0 {
-		return nil, 0, nil
+	readable, all := subject.Products()
+	if !all && len(readable) == 0 {
+		return nil, 0, 0, nil
 	}
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -86,7 +88,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.vulnerability_id = ?", vulnerabilityID).
 			Where("f.closed_at IS NULL")
-		return onlyReadable(q, subject, products, all)
+		return onlyReadable(q, subject, readable, all)
 	}
 
 	total, err := s.db.NewSelect().
@@ -94,7 +96,14 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			ColumnExpr("DISTINCT st.product_id, tg.id, f.component_id")).
 		Count(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("count where this issue sits: %w", err)
+		return nil, 0, 0, fmt.Errorf("count where this issue sits: %w", err)
+	}
+	products, err := s.db.NewSelect().
+		TableExpr(`(?) AS "carrying"`, narrow(s.db.NewSelect()).
+			ColumnExpr("DISTINCT st.product_id")).
+		Count(ctx)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("count the products carrying this issue: %w", err)
 	}
 
 	var rows []struct {
@@ -147,7 +156,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, 0, fmt.Errorf("read where this issue sits: %w", err)
+		return nil, 0, 0, fmt.Errorf("read where this issue sits: %w", err)
 	}
 
 	out := make([]Sighting, 0, len(rows))
@@ -179,5 +188,5 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		}
 		return a.Component < b.Component
 	})
-	return out, total, nil
+	return out, total, products, nil
 }
