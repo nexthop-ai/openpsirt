@@ -211,68 +211,87 @@ func TestADismissalAtOnePlaceIsStatedAboutThatPlaceAndNeverTheBuild(t *testing.T
 	// the component in as the product, it says what was agreed and no more.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedAtTwoPlaces(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
-
-		// The issue sits at more than one place in this component.
-		var places struct {
-			Places []struct {
-				Place string `json:"place"`
-			} `json:"places"`
-		}
-		httpapitest.Read(t, r, "triager", httpapitest.FindingAt("CVE-2026-9999"), &places)
-		if len(places.Places) < 2 {
-			t.Fatalf("the fixture holds this issue at %d places, so there is nothing "+
-				"to prove", len(places.Places))
-		}
-
-		// Agreed at one place only.
-		one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
-		if one.Code != http.StatusCreated {
-			t.Fatalf("deciding one place answered %d: %s", one.Code, one.Body.String())
-		}
-		var made struct {
-			ClaimID int64 `json:"claim_id"`
-		}
-		if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
-			t.Fatal(err)
-		}
-		r.Agreed(t, made.ClaimID)
-
-		var doc struct {
-			Statements []struct {
-				Vulnerability struct {
-					Name string `json:"name"`
-				} `json:"vulnerability"`
-				Products []struct {
-					ID            string `json:"@id"`
-					Subcomponents []struct {
-						ID string `json:"@id"`
-					} `json:"subcomponents"`
-				} `json:"products"`
-			} `json:"statements"`
-		}
-		httpapitest.Read(t, r, "triager", at, &doc)
-		consumers := map[string]bool{
+		dismissedAtOnePlace(t, r, map[string]bool{
 			"pkg:deb/debian/libswsscommon@1.0.0": true, "pkg:deb/debian/libteam5@1.31": true,
-		}
-		stated := 0
-		for _, each := range doc.Statements {
-			if each.Vulnerability.Name != "CVE-2026-9999" {
-				continue
-			}
-			stated++
-			if !consumers[each.Products[0].ID] ||
-				each.Products[0].Subcomponents[0].ID != "pkg:deb/debian/libnl-3-200@3.7.0" {
-				t.Errorf("a component dismissed at one place of several is stated about %s, "+
-					"want the libnl one consumer pulls in", each.Products[0].ID)
-			}
-		}
-		if stated != 1 {
-			t.Errorf("%d statements about the issue, want the one place agreed", stated)
-		}
+		})
 	})
+}
+
+func TestADismissalBeneathAnImageNamesTheImageAsTheBuildStampedIt(t *testing.T) {
+	// An image is stored by its name, with no version, and a statement
+	// naming a product with no version names nothing a reader can match. The
+	// product is the image as this build stamped it.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedInTwoImages(t)
+		dismissedAtOnePlace(t, r, map[string]bool{
+			"pkg:oci/docker-swss@master.7-abc?arch=amd64":  true,
+			"pkg:oci/docker-teamd@master.7-abc?arch=amd64": true,
+		})
+	})
+}
+
+// dismissedAtOnePlace agrees a dismissal of CVE-2026-9999 at the first of its
+// places, and checks the build's document states it once, about libnl inside
+// one of the consumers given.
+func dismissedAtOnePlace(t *testing.T, r *httpapitest.Reach, consumers map[string]bool) {
+	t.Helper()
+	const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+	// The issue sits at more than one place in this component.
+	var places struct {
+		Places []struct {
+			Place string `json:"place"`
+		} `json:"places"`
+	}
+	httpapitest.Read(t, r, "triager", httpapitest.FindingAt("CVE-2026-9999"), &places)
+	if len(places.Places) < 2 {
+		t.Fatalf("the fixture holds this issue at %d places, so there is nothing "+
+			"to prove", len(places.Places))
+	}
+
+	// Agreed at one place only.
+	one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+		"/v1/products/mine/streams/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/places/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+	if one.Code != http.StatusCreated {
+		t.Fatalf("deciding one place answered %d: %s", one.Code, one.Body.String())
+	}
+	var made struct {
+		ClaimID int64 `json:"claim_id"`
+	}
+	if err := json.Unmarshal(one.Body.Bytes(), &made); err != nil {
+		t.Fatal(err)
+	}
+	r.Agreed(t, made.ClaimID)
+
+	var doc struct {
+		Statements []struct {
+			Vulnerability struct {
+				Name string `json:"name"`
+			} `json:"vulnerability"`
+			Products []struct {
+				ID            string `json:"@id"`
+				Subcomponents []struct {
+					ID string `json:"@id"`
+				} `json:"subcomponents"`
+			} `json:"products"`
+		} `json:"statements"`
+	}
+	httpapitest.Read(t, r, "triager", at, &doc)
+	stated := 0
+	for _, each := range doc.Statements {
+		if each.Vulnerability.Name != "CVE-2026-9999" {
+			continue
+		}
+		stated++
+		if !consumers[each.Products[0].ID] ||
+			each.Products[0].Subcomponents[0].ID != "pkg:deb/debian/libnl-3-200@3.7.0" {
+			t.Errorf("a component dismissed at one place of several is stated about %s, "+
+				"want the libnl one consumer pulls in", each.Products[0].ID)
+		}
+	}
+	if stated != 1 {
+		t.Errorf("%d statements about the issue, want the one place agreed", stated)
+	}
 }
 
 func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T) {

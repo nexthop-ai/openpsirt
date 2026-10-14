@@ -362,6 +362,7 @@ a commit or a content digest.
 | A build stating the name once again moves it to the name | Once, the way a version moving would: the version-identified node closes and the image's node opens |
 | Every other component keeps its version in its identity | An upgrade inside an image still closes the old node and supersedes its findings |
 | The scanner is given an image as stored | Its name and its identifier with no version. A report is matched back to a component by identity, and no vulnerability data is published against an image's build stamp: the scanner was measured matching nothing for the `oci` type (`DESIGN-reporting.md` § Match coverage) |
+| A VEX statement names an image as the build stamped it | The product a statement names inside the build, and a component a statement is about, is read with the build's open image version. A product named with no version is one a reader cannot match |
 | A claim or a statement naming an image at a version is placed against the version the build states | The component row carries no version to compare it with, so the version the build states now is read from its image versions |
 
 #### Image versions

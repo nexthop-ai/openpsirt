@@ -180,26 +180,33 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 //
 // The build's open node for a component holds the identifier this build
 // stated; the component row is shared by every product shipping the package.
-// A build holds one open node per component, so the joins add no row.
+// A container image is stored with no version, and the identifier this build
+// stamped it with is its open image version: a product named with no version
+// is one a reader cannot match. A build holds one open node per component and
+// a node one open image version, so the joins add no row.
 func statedPlaceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
 			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL`).
+		Join(`LEFT JOIN "image_version" AS "giv" ON giv.node_id = gn.id
+			AND giv.closed_scan_id IS NULL`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`LEFT JOIN "graph_node" AS "cn" ON cn.target_id = f.target_id
 			AND cn.component_id = f.consumer_id AND cn.closed_scan_id IS NULL`).
+		Join(`LEFT JOIN "image_version" AS "civ" ON civ.node_id = cn.id
+			AND civ.closed_scan_id IS NULL`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		ColumnExpr(`f.id AS "finding_id"`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
 		ColumnExpr(`COALESCE(f.consumer_id, 0) AS "consumer_id"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`COALESCE(cn.purl, uc.purl, '') AS "consumer_purl"`)
+		ColumnExpr(`COALESCE(civ.purl, cn.purl, uc.purl, '') AS "consumer_purl"`)
 }
 
 // statedPlace is one place as statedPlaceColumns reads it.
@@ -245,8 +252,8 @@ func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 		ColumnExpr(`COUNT(DISTINCT cl.outcome) AS "outcomes"`).
 		Where("f.target_id = ?", targetID).
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr(`f.id, v.id, v.identifier, c.id, c.name, gn.purl, c.purl, f.consumer_id,
-			uc.name, cn.purl, uc.purl`).
+		GroupExpr(`f.id, v.id, v.identifier, c.id, c.name, giv.purl, gn.purl, c.purl, f.consumer_id,
+			uc.name, civ.purl, cn.purl, uc.purl`).
 		Having("COUNT(cl.id) > 0")
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the places decisions cover: %w", err)

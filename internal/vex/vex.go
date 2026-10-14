@@ -294,8 +294,12 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 // shipping the package and holds the qualifiers the first of them stated, and a
 // customer's scanner matches the build's own. A build holds one open node per
 // component, so the join adds no row.
+//
+// A container image is stored with no version, and the identifier this build
+// stamped it with is its node's open image version, joined beside it.
 const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
-			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL`
+			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL
+		LEFT JOIN "image_version" AS "giv" ON giv.node_id = gn.id AND giv.closed_scan_id IS NULL`
 
 // document assembles what stands about one build, at the visibilities asked
 // for.
@@ -331,7 +335,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
 		Where("f.target_id = ?", target.ID).
 		Where("f.visibility IN (?)", bun.List(visible)).
 		// The issue's key is grouped alongside its name so the aliases can be
@@ -346,7 +350,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// grouping on those emitted the same claim twice — or, where the
 		// outcomes differed, two statements contradicting each other about one
 		// component.
-		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
+		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
 		Limit(s.carrying() + 1)
@@ -601,7 +605,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
 		// The row the date is read from. A time read through an aggregate
 		// comes back as text on one engine and a time on another.
 		ColumnExpr(`MIN(f.id) AS "first"`).
@@ -621,7 +625,7 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
 				AND o.closed_at IS NULL AND oc.name = c.name
 				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
-		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
+		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
 		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -740,7 +744,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(gn.purl, c.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
 		// The row the statement and the date are read from: the lowest, so
 		// every engine names the same one.
 		ColumnExpr(`MIN(f.id) AS "first"`).
@@ -759,7 +763,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
 				AND o.closed_at IS NULL AND oc.name = c.name
 				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
-		GroupExpr("v.id, v.identifier, c.name, gn.purl, c.purl").
+		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
 		// One supplier's statement and no other. Two suppliers answering
 		// places of one component each spoke for their own product, and the
 		// format names the component once: credited to either, the document

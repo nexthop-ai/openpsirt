@@ -190,6 +190,25 @@ func (r *Reach) Suppliers(t *testing.T, path string) []supplierRow {
 // document with no place granularity turns on.
 func (r *Reach) ScannedAtTwoPlaces(t *testing.T) {
 	t.Helper()
+	r.scannedUnder(t,
+		graph.Described{Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0"},
+		graph.Described{Purl: "pkg:deb/debian/libteam5@1.31", Name: "libteam5", Version: "1.31"})
+}
+
+// ScannedInTwoImages is ScannedAtTwoPlaces with two container images pulling
+// the library in, each stamped with a build: the shape of a SONiC image.
+func (r *Reach) ScannedInTwoImages(t *testing.T) {
+	t.Helper()
+	r.scannedUnder(t,
+		graph.Described{Purl: "pkg:oci/docker-swss@master.7-abc?arch=amd64", Name: "docker-swss",
+			Version: "master.7-abc", Container: true},
+		graph.Described{Purl: "pkg:oci/docker-teamd@master.7-abc?arch=amd64", Name: "docker-teamd",
+			Version: "master.7-abc", Container: true})
+}
+
+// scannedUnder is one issue in libnl, pulled in by the two components given.
+func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
+	t.Helper()
 	ctx := t.Context()
 
 	names := catalog.NewStore(r.DB.DB)
@@ -210,12 +229,6 @@ func (r *Reach) ScannedAtTwoPlaces(t *testing.T) {
 	}
 
 	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	first := graph.Described{
-		Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0",
-	}
-	second := graph.Described{
-		Purl: "pkg:deb/debian/libteam5@1.31", Name: "libteam5", Version: "1.31",
-	}
 	library := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 	}
