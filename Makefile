@@ -321,6 +321,14 @@ lint:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) config verify
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) run
 
+# The files a build constraint keeps off Linux, type-checked. Every runner and
+# every other target builds for Linux, so a file marked !linux is compiled by
+# nothing else here, and a signature it shares with its Linux twin can change
+# under it with every check green. Vet type-checks without linking.
+.PHONY: vet-other-os
+vet-other-os:
+	GOOS=darwin $(GO) vet $(PACKAGES)
+
 fmt:
 	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION) fmt
 
@@ -626,7 +634,7 @@ openapi:
 
 # Everything CI runs, reachable from one command, except the container and the
 # chart: those need docker and helm, and check-packaging holds them.
-check: build lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build lint vet-other-os unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"

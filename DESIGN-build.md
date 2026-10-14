@@ -116,6 +116,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
+| `make vet-other-os` | Type-checks the build for macOS, which compiles the files a build constraint keeps off Linux |
 | `make govulncheck` | Known vulnerabilities in Go modules and the toolchain, failing only what the change introduced |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs, failing only what the change introduced |
@@ -168,7 +169,7 @@ query runs both.
 | `web/**` alone | `web-check`, `spdx`, `secrets` |
 | the interface's manifest or lockfile | `licenses` as well as the interface's tier |
 | the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
-| Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
+| Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: any file of the package that registers the operations, and any declaring a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
