@@ -499,3 +499,36 @@ func TestSomebodyWhoWroteAnyOfAClaimsReasoningMayNotAgreeToIt(t *testing.T) {
 		}
 	})
 }
+
+func TestADecisionUndisclosedSinceIsNotReaffirmedBySomebodyWhoMayNotArgueIt(t *testing.T) {
+	// Authorized against the row as it stands: a decision whose place is
+	// undisclosed now is not re-made by somebody triaging disclosed work,
+	// one row or the whole claim.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := f.judged(t, f.at(), finding.SeverityScore("high"))
+		if err := agreeTo(ctx, f.store, f.reviewer, agreed.ClaimID, ""); err != nil {
+			t.Fatal(err)
+		}
+		f.lapsed(t, agreed.ID)
+		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
+			Set("visibility = ?", access.Private).Where("id = ?", agreed.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		moved := f.at()
+		moved.ComponentUpstream = "1.2.4"
+		if _, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+			PreviousID: agreed.ID, Place: moved,
+			Reasoning: "Checked again at the new version.", By: f.proposer,
+		}); !errors.Is(err, triage.ErrNotTheirs) {
+			t.Errorf("one row undisclosed since was re-affirmed: %v", err)
+		}
+		if _, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
+			PreviousClaimID: agreed.ClaimID,
+			Reasoning:       "Checked again at the new version.", By: f.proposer,
+			Bounds: triage.DefaultBounds(),
+		}); !errors.Is(err, triage.ErrNotTheirs) {
+			t.Errorf("a claim with a row undisclosed since was re-affirmed: %v", err)
+		}
+	})
+}

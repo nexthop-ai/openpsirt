@@ -378,3 +378,31 @@ func TestWhatANoteSaidBeforeIsReadOnlyByWhoMayReadTheNote(t *testing.T) {
 		}
 	})
 }
+
+func TestANoteIsWrittenAndChangedOnlyByWhoTriagesTheIssueHere(t *testing.T) {
+	// Writing is arguing, so a reader of the product is refused in words —
+	// they may read the issue — and a reader of another product is told the
+	// note is not there.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.sits(t, access.Public)
+		if _, err := f.store.NoteOn(ctx, f.onlooker, f.product, f.issue,
+			"We ship it."); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a reader of the product wrote a note: %v", err)
+		}
+		note, err := f.store.NoteOn(ctx, f.triager, f.product, f.issue, "We ship it.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.RewordNote(ctx, f.onlooker, note.ID, "We do not."); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a reader of the product changed a note: %v", err)
+		}
+		elsewhere := f.alongside(t, "other")
+		stranger := access.NewPerson(f.proposer, "stranger", false,
+			map[int64][]access.Role{elsewhere: {access.PublicTriage}}, 0)
+		if _, err := f.store.NoteOn(ctx, stranger, f.product, f.issue,
+			"We ship it."); !errors.Is(err, triage.ErrNoSuchNote) {
+			t.Errorf("a triager of another product wrote a note here: %v", err)
+		}
+	})
+}
