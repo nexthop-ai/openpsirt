@@ -3,6 +3,13 @@
 
 package database
 
+import (
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+)
+
 // EncryptionAsAsked is the refusal a deployment's stated transport produces,
 // for the test.
 //
@@ -21,4 +28,20 @@ func EncryptionAsAsked(server Server, target Target) error {
 // pass for the wrong reason.
 func MandatoryTransport(target Target, getenv func(string) string) (string, error) {
 	return mandatoryTransport(target, getenv)
+}
+
+// ValidateTimeout is how long a liveness check waits, for the test.
+const ValidateTimeout = validateTimeout
+
+// Unanswering is a PostgreSQL handle on an address that accepts a connection
+// and never says anything, for the test.
+//
+// Built here because opening one through Open waits on the same silence before
+// it returns, so a test of the bound on a check would be a test of Open's.
+func Unanswering(address string) (*DB, error) {
+	config, err := pgx.ParseConfig("postgres://u:p@" + address + "/db?sslmode=disable")
+	if err != nil {
+		return nil, err
+	}
+	return &DB{DB: bun.NewDB(stdlib.OpenDB(*config), pgdialect.New())}, nil
 }

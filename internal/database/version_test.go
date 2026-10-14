@@ -66,7 +66,10 @@ func TestVersionComparison(t *testing.T) {
 
 func TestEveryEngineHasAFloor(t *testing.T) {
 	// A missing floor would silently accept any version of that engine.
-	for _, e := range []Engine{Postgres, MySQL, MariaDB, SQLite} {
+	if len(Engines()) == 0 {
+		t.Fatal("no engines were listed, so this checked nothing")
+	}
+	for _, e := range Engines() {
 		if _, ok := minimum[e]; !ok {
 			t.Errorf("%s has no minimum version", e)
 		}

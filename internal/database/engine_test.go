@@ -62,7 +62,8 @@ func TestMySQLDSNIsRewrittenForItsDriver(t *testing.T) {
 	}
 	want := "user:secret@tcp(db.example:3306)/openpsirt?parseTime=true&loc=UTC&" +
 		"clientFoundRows=true&tls=preferred&sql_mode=" +
-		url.QueryEscape("CONCAT(@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES')") +
+		url.QueryEscape("TRIM(BOTH ',' FROM REPLACE(REPLACE(CONCAT(',',@@sql_mode,',ANSI_QUOTES,STRICT_TRANS_TABLES,'),"+
+			"',NO_BACKSLASH_ESCAPES,',','),',NO_BACKSLASH_ESCAPES,',','))") +
 		"&cte_max_recursion_depth=1000000"
 	if got.DSN != want {
 		t.Errorf("DSN\n got %q\nwant %q", got.DSN, want)
@@ -315,13 +316,13 @@ func TestADriverErrorQuotingTheCredentialIsScrubbed(t *testing.T) {
 }
 
 func TestOnlySQLiteIsNonProduction(t *testing.T) {
-	for _, e := range []Engine{Postgres, MySQL, MariaDB} {
-		if !e.IsProduction() {
-			t.Errorf("%s should be a production engine", e)
-		}
+	if len(Engines()) == 0 {
+		t.Fatal("no engines were listed, so this checked nothing")
 	}
-	if SQLite.IsProduction() {
-		t.Error("SQLite must never count as a production engine")
+	for _, e := range Engines() {
+		if e.IsProduction() != (e != SQLite) {
+			t.Errorf("%s answers %v to whether it is a production engine", e, e.IsProduction())
+		}
 	}
 }
 
@@ -374,7 +375,7 @@ func TestAnOperatorsOwnSQLModeSurvives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
 	}
-	if !contains(got.DSN, url.QueryEscape("CONCAT('ANSI',")) {
+	if !contains(got.DSN, url.QueryEscape("CONCAT(',','ANSI',")) {
 		t.Errorf("DSN %q quotes the operator's quoted mode a second time", got.DSN)
 	}
 }

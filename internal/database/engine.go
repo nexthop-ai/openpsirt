@@ -317,8 +317,16 @@ func recursion(engine Engine, u *url.URL) string {
 // value arriving in one pair of single quotes has them taken off first: quoted
 // again, it asks the server for a mode whose name begins with a quote, which it
 // refuses. No mode's name begins and ends with a quote.
+//
+// NO_BACKSLASH_ESCAPES is taken out of whatever the base holds. The driver
+// writes values into statement text itself and escapes a backslash as two;
+// under that mode the server reads both as written, so every backslash is
+// stored doubled, and doubled again on each edit. The list is wrapped in
+// commas so the name is matched whole, taken out twice so a name written twice
+// in a row goes, and the commas are trimmed afterwards.
 func mode(u *url.URL) string {
-	const ours = ",ANSI_QUOTES,STRICT_TRANS_TABLES"
+	const ours = ",ANSI_QUOTES,STRICT_TRANS_TABLES,"
+	const dropped = "',NO_BACKSLASH_ESCAPES,'"
 	base := "@@sql_mode"
 	held := u.Query().Get("sql_mode")
 	if len(held) >= 2 && held[0] == '\'' && held[len(held)-1] == '\'' {
@@ -327,7 +335,11 @@ func mode(u *url.URL) string {
 	if held != "" {
 		base = "'" + strings.ReplaceAll(held, "'", "''") + "'"
 	}
-	return "CONCAT(" + base + ",'" + ours + "')"
+	listed := "CONCAT(','," + base + ",'" + ours + "')"
+	for range 2 {
+		listed = "REPLACE(" + listed + "," + dropped + ",',')"
+	}
+	return "TRIM(BOTH ',' FROM " + listed + ")"
 }
 
 // transport is the tls setting to add to a MySQL or MariaDB DSN, or nothing

@@ -93,6 +93,7 @@ Engine-specific code is confined to these places:
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped, and PostgreSQL refuses to write it into a timestamp column. The cast target differs: PostgreSQL takes a zoned timestamp, MySQL and MariaDB a six-digit datetime, and SQLite stores text and takes none |
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Leasing the harness's slots | A test binary holds a lock the server keeps for its connection, and the two families spell it differently: a named lock on MySQL and MariaDB, an advisory lock on PostgreSQL, whose key is a number |
+| Numbering the rows of one insert on MySQL | MySQL reports only the first identifier a statement assigns, and the other three hand every identifier back. The rest are counted from the first in the server's step between identifiers, read from the session the insert ran on. The branch asks which statements the dialect can write rather than which engine it is |
 | Writing a batch whose identifiers nobody reads | PostgreSQL takes one array a column and unpacks it into rows. The other three have no array type and take a list of rows. § Bulk inserts has the measurement |
 | Counting the statements a server holds prepared | A test of connection setup asks it. PostgreSQL lists them in a catalog of its own, and MySQL and MariaDB count them in session status, kept in two different schemas |
 | Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
@@ -679,6 +680,14 @@ that way for older applications. Naming it makes the mode a property of this
 application rather than of the server it was pointed at, and the set is
 deduplicated, so naming one a server already holds changes nothing.
 
+One name is taken out of the mode whoever set it: `NO_BACKSLASH_ESCAPES`. The
+driver writes values into the statement text and escapes a backslash as two,
+and under that name the server reads both as written. A markdown escape, a
+quoted string inside a VEX document and a Windows path in an inventory would
+each be stored with every backslash doubled, and doubled again on every edit.
+Taking the name out keeps the rest of an operator's mode, and a server that
+sets it still starts.
+
 The gate reads three places. `AS <word>` is the syntax for inventing a name,
 and matching that alone leaves a table renamed in a migration, which names no
 alias, and a table alias declared in a model's own struct tag both invisible.
@@ -1074,6 +1083,7 @@ style naming the month first.
 | Rule | |
 |---|---|
 | Rows are written 500 to a statement | Two of the four engines cap a statement's size in server configuration, and the lowest default in circulation is sixteen megabytes |
+| A writer that needs identifiers gets the ones the database stored | MySQL reports the first and the step between them. A cluster sets the step to its number of nodes, so counting up by one names a neighbor's row (REQ-71) |
 | A writer that needs no identifier reads none back | Reading them back returns a row for every row written, carrying the identifier and each column left to its default |
 | On PostgreSQL, such a batch is one array a column | The server parses a list of rows a value at a time and an array whole, and unpacks the arrays into rows |
 | A row type with a column that names its own default keeps the list of rows | A column with a default, or one storing a zero value as null, is left to its default one row at a time, which an array cannot say |
@@ -1094,7 +1104,10 @@ checks are the rest of the cost. MySQL and MariaDB check a foreign key inside
 the storage engine.
 
 A test writes the same rows through both kinds of statement, every column kind
-and text that looks like syntax among them, and compares what is stored.
+and text that looks like syntax among them, and compares what is stored. A
+second compares each identifier a keyed insert hands back with the one stored,
+across batches, and on MySQL and MariaDB in a session numbering rows in steps
+of three.
 
 ## SQLite settings
 

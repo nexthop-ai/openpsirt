@@ -178,3 +178,59 @@ func describe(r issueRow) string {
 		text(r.Severity), text(r.Description), r.Exploited, number(r.Likelihood), number(r.Score),
 		r.FirstSeenAt.UTC().Format(time.RFC3339Nano), r.IssueID)
 }
+
+// Every row a keyed insert writes carries the identifier the database stored
+// for it, across batches, including on a server that numbers rows in steps
+// greater than one. A cluster of MySQL or MariaDB nodes sets the step to the
+// number of nodes, and a row given its neighbor's identifier is one whose
+// children are written against somebody else's row.
+func TestAKeyedInsertCarriesTheIdentifiersTheDatabaseStored(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = conn.Close() }()
+		steps := []int{1}
+		if db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB {
+			steps = append(steps, 3)
+		}
+		for _, step := range steps {
+			if len(steps) > 1 {
+				if _, err := conn.ExecContext(ctx,
+					fmt.Sprintf("SET SESSION auto_increment_increment = %d", step)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			prefix := fmt.Sprintf("step%d", step)
+			rows := make([]issueRow, 2*database.BatchSize+1)
+			for i := range rows {
+				id := fmt.Sprintf("%s-%04d", prefix, i)
+				rows[i] = issueRow{Identifier: id, Folded: id, FirstSeenAt: time.Now().UTC(), IssueID: int64(i)}
+			}
+			if err := database.InBatches(ctx, conn, rows); err != nil {
+				t.Fatal(err)
+			}
+			var stored []issueRow
+			if err := conn.NewSelect().Model(&stored).Where("identifier LIKE ?", prefix+"-%").
+				Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			held := make(map[string]int64, len(stored))
+			for _, row := range stored {
+				held[row.Identifier] = row.ID
+			}
+			wrong := 0
+			for _, row := range rows {
+				if held[row.Identifier] != row.ID {
+					wrong++
+				}
+			}
+			if len(stored) != len(rows) || wrong > 0 {
+				t.Errorf("in steps of %d: %d rows stored of %d, and %d carry an identifier the database did not give them",
+					step, len(stored), len(rows), wrong)
+			}
+		}
+	})
+}

@@ -494,7 +494,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
 			rows = append(rows, row)
 		}
-		if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
+		if err := database.InBatches(ctx, tx, rows); err != nil {
 			return fmt.Errorf("record the finding: %w", err)
 		}
 		// The reporter, in the same transaction as the flaw itself. A

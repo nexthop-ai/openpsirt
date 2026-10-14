@@ -6,6 +6,8 @@ package database_test
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"sync"
@@ -259,7 +261,52 @@ func TestValidateAnswersQuickly(t *testing.T) {
 	})
 }
 
-func TestValidateFailsQuicklyAgainstSomethingUnreachable(t *testing.T) {
+// A liveness check gives up on its own bound against a server that accepts a
+// connection and never answers. Without one, a readiness probe waits on a
+// half-open connection until the operating system gives up on it.
+func TestValidateGivesUpOnAServerThatNeverAnswers(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	go func() {
+		var held []net.Conn
+		defer func() {
+			for _, conn := range held {
+				_ = conn.Close()
+			}
+		}()
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			held = append(held, conn)
+		}
+	}()
+	db, err := database.Unanswering(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+
+	// The caller's own deadline is well past the bound, so a check that
+	// waits on it rather than on its own fails here instead of hanging.
+	ctx, cancel := context.WithTimeout(t.Context(), 4*database.ValidateTimeout)
+	defer cancel()
+	start := time.Now()
+	err = db.Validate(ctx)
+	elapsed := time.Since(start)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("the check answered %v, want its deadline passing", err)
+	}
+	if elapsed > database.ValidateTimeout+time.Second {
+		t.Errorf("the check gave up after %v, past its own bound of %v", elapsed, database.ValidateTimeout)
+	}
+}
+
+func TestOpenFailsQuicklyAgainstSomethingUnreachable(t *testing.T) {
 	// A dead address, so the check has to give up on its own deadline rather
 	// than waiting for the operating system to.
 	target, err := database.ParseURL("postgres://u:p@127.0.0.1:1/db?sslmode=disable&connect_timeout=1")

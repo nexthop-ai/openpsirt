@@ -5,6 +5,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
+	"github.com/uptrace/bun/dialect/feature"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/schema"
 )
@@ -159,6 +161,11 @@ func asArrays[T any](ctx context.Context, db bun.IDB, table *schema.Table,
 }
 
 func inBatches[T any](ctx context.Context, db bun.IDB, rows []T, keyed bool) error {
+	// Where the statement hands the identifiers back, they are read from it.
+	// Where it does not, the insert counts up from the first.
+	features := db.Dialect().Features()
+	numbered := keyed && !features.Has(feature.InsertReturning) && !features.Has(feature.Output)
+	step := int64(0)
 	for start := 0; start < len(rows); start += BatchSize {
 		end := min(start+BatchSize, len(rows))
 		batch := rows[start:end]
@@ -166,8 +173,68 @@ func inBatches[T any](ctx context.Context, db bun.IDB, rows []T, keyed bool) err
 		if !keyed {
 			insert = insert.Returning("")
 		}
-		if _, err := insert.Exec(ctx); err != nil {
+		res, err := insert.Exec(ctx)
+		if err != nil {
 			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
+		}
+		if !numbered || len(batch) < 2 {
+			continue
+		}
+		if step == 0 {
+			if step, err = increment(ctx, db); err != nil {
+				return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
+			}
+		}
+		if err := renumber(db, batch, res, step); err != nil {
+			return fmt.Errorf("insert rows %d to %d: %w", start, end, err)
+		}
+	}
+	return nil
+}
+
+// increment is the step between the identifiers one MySQL statement assigns.
+//
+// The other three engines hand the identifiers back, and this one reports
+// only the first. A server numbering one row in every n leaves n-1 values between
+// two rows of one statement: a cluster sets the step to the number of nodes,
+// so that two nodes never assign the same value. Read from the session the
+// insert ran on, because a session may set its own.
+func increment(ctx context.Context, db bun.IDB) (int64, error) {
+	var step int64
+	if err := db.QueryRowContext(ctx, `SELECT @@SESSION.auto_increment_increment`).Scan(&step); err != nil {
+		return 0, fmt.Errorf("read the step between assigned identifiers: %w", err)
+	}
+	if step < 1 {
+		return 0, fmt.Errorf("the server numbers rows in steps of %d", step)
+	}
+	return step, nil
+}
+
+// renumber sets each row's identifier from the first one a MySQL statement
+// assigned and the step between them.
+//
+// The insert has already written an identifier into each row, counting up by
+// one from the first. That is right only where the step is one.
+func renumber[T any](db bun.IDB, batch []T, res sql.Result, step int64) error {
+	if step == 1 {
+		return nil
+	}
+	table := db.Dialect().Tables().Get(reflect.TypeFor[T]())
+	if table == nil || len(table.PKs) != 1 || !table.PKs[0].AutoIncrement {
+		return nil
+	}
+	first, err := res.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("read the first assigned identifier: %w", err)
+	}
+	if first == 0 {
+		return nil
+	}
+	pk := table.PKs[0]
+	for i := range batch {
+		row := reflect.Indirect(reflect.ValueOf(&batch[i]).Elem())
+		if err := pk.ScanValue(row, first+int64(i)*step); err != nil {
+			return fmt.Errorf("set an assigned identifier: %w", err)
 		}
 	}
 	return nil
