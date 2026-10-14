@@ -4,9 +4,11 @@
 package main
 
 import (
+	"net"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -113,8 +115,6 @@ func keysOf(running map[string]bool) []string {
 //
 // `openpsirt migrat` — a typo in a job meant to apply migrations and nothing
 // else — fell through to serving, against whatever schema was there.
-// runMigrate already refuses an action it does not know, which is the contrast
-// that made this an omission rather than a choice.
 func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 	quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -149,5 +149,68 @@ func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 		if !c.refused && (err == nil || !strings.Contains(err.Error(), "no database configured")) {
 			t.Errorf("%v: stopped with %v, want it stopped at the database", c.args, err)
 		}
+	}
+}
+
+// An unknown migrate action is named before anything is contacted, so a typo
+// is not reported as a missing or unreachable database.
+func TestAnUnknownMigrateActionIsRefusedBeforeConnecting(t *testing.T) {
+	quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = quiet.Close() }()
+	t.Setenv("OPENPSIRT_DATABASE_URL", "")
+	err = run([]string{"migrate", "statsu"}, quiet, quiet)
+	if err == nil || !strings.Contains(err.Error(), "unknown migrate action") {
+		t.Errorf("answered %v, want the action refused by name", err)
+	}
+}
+
+// Connecting to migrate is bounded by the startup timeout. A server that
+// accepts the connection and never answers otherwise holds the command for
+// ever, with nothing logged.
+func TestMigratingGivesUpOnADatabaseThatNeverAnswers(t *testing.T) {
+	quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = quiet.Close() }()
+	silent, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held := make(chan net.Conn, 16)
+	defer func() {
+		_ = silent.Close()
+		for {
+			select {
+			case conn := <-held:
+				_ = conn.Close()
+			default:
+				return
+			}
+		}
+	}()
+	go func() {
+		for {
+			conn, err := silent.Accept()
+			if err != nil {
+				return
+			}
+			held <- conn
+		}
+	}()
+	t.Setenv("OPENPSIRT_DATABASE_URL", "postgres://u:p@"+silent.Addr().String()+"/x?sslmode=disable")
+	t.Setenv("OPENPSIRT_STARTUP_TIMEOUT", "500ms")
+	done := make(chan error, 1)
+	go func() { done <- run([]string{"migrate", "up"}, quiet, quiet) }()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "gave up connecting to the database") {
+			t.Errorf("answered %v, want it to give up connecting", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("still connecting after 30s")
 	}
 }

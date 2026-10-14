@@ -91,8 +91,8 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// A subcommand this does not know is refused rather than ignored.
 	// Ignored, `openpsirt migrat` would start the server — a typo in a job
 	// meant to apply migrations and nothing else, answering requests against
-	// whatever schema is there. runMigrate already refuses an
-	// action it does not know, which is the contrast.
+	// whatever schema is there. runMigrate refuses an action it does not
+	// know in the same way.
 	//
 	// Each subcommand takes --config after its name as well as before it, so
 	// `openpsirt migrate up --config f` names the file where it is written.
@@ -722,17 +722,29 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 	if action == "" {
 		action = "up"
 	}
+	// Refused before anything is contacted, so a typo is named as one rather
+	// than as whatever the connection said.
+	if action != "up" && action != "status" {
+		return fmt.Errorf("unknown migrate action %q: want up or status", action)
+	}
 
-	db, err := openDatabase(ctx, cfg, logger)
+	// Connecting is bounded the way a server's start is, and migrating is
+	// not: a schema change on a large table legitimately takes longer than a
+	// start, and an endpoint that accepts the connection and never answers
+	// does not.
+	logger.Info("connecting to the database", "timeout", cfg.StartupTimeout)
+	connecting, connected := context.WithTimeout(ctx, cfg.StartupTimeout)
+	db, err := openDatabase(connecting, cfg, logger)
+	connected()
 	if err != nil {
-		return err
+		return startupFailed(err, "connecting to the database", cfg)
 	}
 	defer closeQuietly(db, logger)
 
 	switch action {
 	case "up":
 		return schema.Up(ctx, db, logger)
-	case "status":
+	default:
 		applied, err := schema.Version(ctx, db)
 		if err != nil {
 			return err
@@ -756,7 +768,6 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 			db.Server.Engine, db.Server.Version, applied, wanted, state)
 		return err
 	}
-	return fmt.Errorf("unknown migrate action %q: want up or status", action)
 }
 
 func newLogger(cfg config.Config, w *os.File) *slog.Logger {

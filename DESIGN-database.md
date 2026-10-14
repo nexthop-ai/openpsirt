@@ -186,7 +186,10 @@ cleartext by a deployment that asked for it.
 Embedded in the binary and applied at startup by default, so a deployment is one
 artifact and an upgrade is deploying it. Automatic application can be disabled,
 and `openpsirt migrate up|status` runs them separately for an operator who
-would rather use different credentials at a time they choose.
+would rather use different credentials at a time they choose. It refuses an
+action it does not know before contacting anything, and connects within the
+startup timeout a server's start is held to; the migration itself is unbounded,
+because a schema change on a large table takes longer than a start.
 
 With automatic application off, the schema is compared before anything is
 served. The binary and the schema move independently, and uncompared, a build
