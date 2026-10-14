@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -284,5 +285,62 @@ func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testi
 			"/v1/report-rulings?product=theirs"); code != http.StatusNotFound {
 			t.Errorf("naming a product the reader cannot see answered %d", code)
 		}
+	})
+}
+
+func TestARulingIsNarrowedToItsProductAndRefusedWhereItCannotStand(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		claimed := r.Claim(t, "Generated text about a function this does not have.")
+		const list = "/v1/products/mine/report-rulings"
+		rule := func(body string) *httptest.ResponseRecorder {
+			return httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, list, body)
+		}
+		got := rule(fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Slop."}`, claimed))
+		if got.Code != http.StatusCreated {
+			t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
+		}
+		var proposed rulingRead
+		if err := json.Unmarshal(got.Body.Bytes(), &proposed); err != nil {
+			t.Fatal(err)
+		}
+
+		// Narrowed to the product named: its own is counted, and a product
+		// the reader may not see is refused rather than answered empty.
+		var mine struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/report-rulings?product=mine", &mine)
+		if mine.Total != 1 {
+			t.Errorf("narrowed to its product the list holds %d", mine.Total)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/report-rulings?product=theirs", ""), http.StatusNotFound)
+
+		for _, c := range []struct {
+			what, body string
+			want       int
+		}{
+			{"ruling a report already waiting on one",
+				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Again."}`, claimed),
+				http.StatusConflict},
+			{"a ruling with no reasoning",
+				fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"  "}`, claimed),
+				http.StatusUnprocessableEntity},
+			{"a report nobody filed",
+				`{"reports":["MINE-R-1999-0001"],"disposition":"rejected","reasoning":"Slop."}`,
+				http.StatusNotFound},
+		} {
+			if got := rule(c.body); got.Code != c.want {
+				t.Errorf("%s answered %d, want %d: %s", c.what, got.Code, c.want, got.Body.String())
+			}
+		}
+
+		at := fmt.Sprintf("%s/%d", list, proposed.ID)
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at+"/withdrawal", ""); got.Code != http.StatusOK {
+			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body.String())
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+			at+"/approval", ""), http.StatusConflict)
 	})
 }

@@ -5,9 +5,12 @@ package triageapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -124,6 +127,53 @@ func TestAnIssueNotInThisProductCannotBeRatedThroughIt(t *testing.T) {
 			if got.Code != http.StatusNotFound {
 				t.Errorf("rating %s in a product that does not carry it answered %d, want the "+
 					"words an unused name gets: %s", name, got.Code, got.Body.String())
+			}
+		}
+	})
+}
+
+func TestAnAssessmentSomebodyMayNotReachAnswersAsOneNobodyMade(t *testing.T) {
+	// Agreeing to and withdrawing a rating name it by number, so a rating in a
+	// product the caller holds nothing on answers in the words a number
+	// nobody used gets. Told apart, the pair walks the numbers.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/issues/CVE-2026-9999/assessment",
+			`{"severity":"low","reasoning":"Not reachable in how we build it."}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording a rating answered %d: %s", made.Code, made.Body.String())
+		}
+		var claim struct {
+			ID int64 `json:"id"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &claim); err != nil {
+			t.Fatal(err)
+		}
+		// Triaging another product, so the route admits them and the rating's
+		// own product is what refuses them.
+		elsewhere, err := r.Rights.ByIdentity(t.Context(), "outsider")
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(t.Context(), "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(t.Context(), elsewhere.ID, theirs.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range []struct{ method, path, never string }{
+			{http.MethodPost, "/v1/assessments/%d/agreement", "/v1/assessments/999999/agreement"},
+			{http.MethodDelete, "/v1/assessments/%d", "/v1/assessments/999999"},
+		} {
+			there := httpapitest.AsPerson(t, r, "outsider", c.method,
+				fmt.Sprintf(c.path, claim.ID), "")
+			nobody := httpapitest.AsPerson(t, r, "outsider", c.method, c.never, "")
+			httpapitest.RefusedWith(t, there, http.StatusNotFound)
+			if there.Body.String() != nobody.Body.String() {
+				t.Errorf("%s answers a rating elsewhere %s and a number nobody used %s",
+					c.method, there.Body.String(), nobody.Body.String())
 			}
 		}
 	})
