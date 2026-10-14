@@ -101,7 +101,7 @@ func (r requires) said() string {
 	case r.Scope == DeploymentRecords:
 		what = "administrator, or the audit permission over this deployment's own records"
 	case r.Scope == OwnSubject:
-		what = "your own credential"
+		what = "your own sign-in, as a person and not a pipeline key"
 	case r.Scope == AnyPerson:
 		what = "any signed-in person, and not a pipeline key"
 	case r.Scope == NoCredential:
@@ -109,12 +109,27 @@ func (r requires) said() string {
 	default:
 		what = "any recognized credential"
 	}
+	// The scope is said after the roles too, because the middleware enforces
+	// it whatever roles are held: a pipeline key holding every role listed is
+	// still refused an operation only a person may ask.
 	switch r.Scope {
 	case PerProduct:
 		what += " on the product"
 	case DeploymentWide:
 		if len(r.AnyOf) > 0 {
 			what += ", deployment-wide"
+		}
+	case DeploymentRecords:
+		if len(r.AnyOf) > 0 {
+			what += ", or the audit permission over this deployment's own records"
+		}
+	case AnyPerson:
+		if len(r.AnyOf) > 0 {
+			what += ", held by a signed-in person and not a pipeline key"
+		}
+	case OwnSubject:
+		if len(r.AnyOf) > 0 {
+			what += ", held by yourself as a signed-in person and not a pipeline key"
 		}
 	}
 	if r.Narrowed && len(r.AnyOf) > 0 {

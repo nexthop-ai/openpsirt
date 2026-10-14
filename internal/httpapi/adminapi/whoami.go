@@ -74,7 +74,7 @@ type WhoBody struct {
 	Name     string    `json:"name" doc:"The display name, where one is recorded"`
 	Admin    bool      `json:"admin" doc:"Administers this deployment"`
 	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
-	Kind     string    `json:"kind" enum:"person,key" doc:"A person who signed in, or a credential"`
+	Kind     string    `json:"kind" enum:"person" doc:"Always a person. A pipeline key is refused this route"`
 	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
 	// Digest is the daily summary they asked for. Answered here because a
 	// screen offering the switches has to know their state, and because a
@@ -155,11 +155,11 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			}
 			body.DiscloseAfter = embargo.String()
 		}
-		// The digest they asked for, where they are a person and this process
-		// has somewhere to read it from. A credential asks for nothing and is
-		// sent nothing, and neither is a person with no account row of their
-		// own, which is somebody a trusted proxy asserted.
-		if in.DB != nil && subject.Kind == access.Person {
+		// The digest they asked for, where this process has somewhere to read
+		// it from. A person with no account row of their own, which is
+		// somebody a trusted proxy asserted, asks for nothing and is sent
+		// nothing.
+		if in.DB != nil {
 			me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity)
 			switch {
 			case err == nil:
@@ -187,13 +187,11 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 
 		// The display name, where one is recorded. Falls back to the identity
 		// rather than to nothing, so a header never renders blank.
-		if subject.Kind == access.Person {
-			named, err := access.NewStore(in.DB.DB).Names(ctx, []int64{subject.ID})
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "who you are could not be read", err)
-			}
-			body.Name = named[subject.ID]
+		named, err := access.NewStore(in.DB.DB).Names(ctx, []int64{subject.ID})
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "who you are could not be read", err)
 		}
+		body.Name = named[subject.ID]
 		if body.Name == "" {
 			body.Name = subject.Identity
 		}
