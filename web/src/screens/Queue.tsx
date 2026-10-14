@@ -73,7 +73,7 @@ export function Queue() {
       ),
     onSuccess: () => {
       setJustDone("");
-      void queries.invalidateQueries({ queryKey: ["queue"] });
+      afterClaim();
     },
   });
 

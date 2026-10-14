@@ -50,8 +50,29 @@ func TestTheFileOfYourClaimsHoldsWhatTheMineTabLists(t *testing.T) {
 		if waiting := file("triager", "/v1/review-queue.csv?mine=true"); len(waiting) != 1 {
 			t.Errorf("the queue's own file still holds the approved claim: %v", waiting)
 		}
+		for _, column := range []string{"stream", "variant"} {
+			if at := httpapitest.IndexOf(mine[0], column); at < 0 || mine[1][at] == "" {
+				t.Errorf("the claim's row names no %s, which the tab shows: %v", column, mine)
+			}
+		}
 		if theirs := file("reviewer", "/v1/my-claims.csv"); len(theirs) != 1 {
 			t.Errorf("somebody who proposed nothing exported %v", theirs)
+		}
+
+		// A proposer who has lost the product keeps the file and loses the
+		// claim's row: what they proposed there is no longer theirs to read.
+		// They keep a role on the other product, so they are still somebody
+		// signed in.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"triager","holds":[{"product":"theirs","role":"public-read"}]}`); got.Code >= 300 {
+			t.Fatalf("granting the triager the other product answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/triager/roles/mine/public-triage", ""); got.Code >= 300 {
+			t.Fatalf("withdrawing the triager's role answered %d: %s", got.Code, got.Body.String())
+		}
+		if lost := file("triager", "/v1/my-claims.csv"); len(lost) != 1 {
+			t.Errorf("a proposer who lost the product still exports its claim: %v", lost)
 		}
 	})
 }

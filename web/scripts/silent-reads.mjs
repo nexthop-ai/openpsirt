@@ -12,11 +12,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// A query's data defaulted to an empty list: `name.data ?? []` or
-// `name.data?.items ?? []`, the name being whatever stands before `.data`. A
+// A query's data defaulted to an empty list: `name.data ?? []`, or one field
+// of it, `name.data?.items ?? []`, the name being whatever stands before
+// `.data`. A
 // call standing there, `useThing().data ?? []`, has no name anything else in
 // the file can consult, so it is reported unless allowed.
-const DEFAULTED = /([\w$.]*?)(\))?\.data(?:\?\.items)?\s*\?\?\s*\[\]/g;
+const DEFAULTED = /([\w$.]*?)(\))?\.data(?:\?\.[\w$]+)?\s*\?\?\s*\[\]/g;
 
 const escaped = (name) => name.replace(/[.$]/g, (c) => `\\${c}`);
 

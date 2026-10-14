@@ -16,7 +16,7 @@ import { Unread } from "../ui/Reading";
 import { called, ROLES, type Role } from "../ui/roles";
 import { GrantGrid } from "./GrantGrid";
 import { Wide } from "../ui/Wide";
-import { on } from "../ui/when";
+import { at, on } from "../ui/when";
 import type { Who } from "../app/session";
 import { personAt } from "../app/routes";
 
@@ -319,7 +319,7 @@ export function Access({ who: me }: { who: Who }) {
                       {person.deactivated_at && (
                         <>
                           {" "}
-                          <span className="state" title={person.deactivated_at}>
+                          <span className="state" title={at(person.deactivated_at)}>
                             left {on(person.deactivated_at)}
                           </span>
                         </>

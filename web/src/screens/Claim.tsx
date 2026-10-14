@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Elsewhere } from "../ui/Elsewhere";
-import { useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
+import { useAfterClaim, useApproveClaim, useRejectClaim, useSplitClaim } from "../api/claims";
 import { Comments, Revisions } from "./FindingClaim";
 import { Happened } from "./QueueMine";
 import { Editor } from "../ui/Editor";
@@ -108,7 +108,7 @@ export function Claim({ who }: { who: Who }) {
 
       <Argument claim={it} id={id} onChanged={again} />
       <Reasoning claim={it} about={about} onChanged={again} />
-      <Reaffirm claim={it} id={id} mine={mine} onDone={again} />
+      <Reaffirm claim={it} id={id} mine={mine} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
       <Revisions claimId={id} />
@@ -314,17 +314,10 @@ function Ended({ claimId, part }: { claimId: number; part: Body<"EndedReachBody"
 // The claimant's, and nobody else's. An approver doing this would become the
 // proposer of the new claim while their own earlier agreement is carried onto
 // it, which is one person on both sides of the control.
-function Reaffirm({
-  claim,
-  id,
-  mine,
-  onDone,
-}: {
-  claim: Claimed;
-  id: number;
-  mine: boolean;
-  onDone: () => void;
-}) {
+function Reaffirm({ claim, id, mine }: { claim: Claimed; id: number; mine: boolean }) {
+  // The claim's own blocks are among what every act on a claim invalidates,
+  // with the lists the re-made claim joins.
+  const after = useAfterClaim();
   const [reasoning, setReasoning] = useState("");
   const [waiting, setWaiting] = useState<boolean | null>(null);
   // The claim the act re-made, which is where the decision now stands.
@@ -341,7 +334,7 @@ function Reaffirm({
       setWaiting(!!made?.waiting);
       setRemade(made?.claim_id ?? 0);
       setReasoning("");
-      onDone();
+      after();
     },
   });
 

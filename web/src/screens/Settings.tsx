@@ -37,7 +37,12 @@ export function Settings({ who }: { who: Who }) {
   const set = useMutation({
     mutationFn: async ({ name, value }: { name: string; value: string }) =>
       unwrap(await api.PUT("/v1/settings/{name}", { params: { path: { name } }, body: { value } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["settings"] }),
+    // And the identity read, which carries the settings a form beside it
+    // quotes, such as the embargo length.
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ["settings"] });
+      void queries.invalidateQueries({ queryKey: ["whoami"] });
+    },
   });
 
   if (settings.isPending) return <Loading />;

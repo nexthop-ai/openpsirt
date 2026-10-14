@@ -541,6 +541,7 @@ export function Comments({
         consequence="Does not affect the approval"
         placeholder="A question, a note, something worth knowing later."
         draftKey={`comment:${claimId}`}
+        // silent-read: a write's answer, whose failure the thread draws from `adding`.
         notNotified={comment.data?.not_notified ?? []}
         // Said, as the note thread says it: an empty thread with a live
         // composer above it reads as a claim nobody has objected to.

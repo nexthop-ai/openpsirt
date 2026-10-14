@@ -8,7 +8,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Wide } from "../ui/Wide";
-import { since } from "../ui/when";
+import { at, since } from "../ui/when";
 import { PatchBranches } from "./PatchBranches";
 import { WebhookDelivery } from "./Webhooks";
 
@@ -351,7 +351,7 @@ function TheQueue() {
                         what the row says. */}
                     <td className="id">{job.reference}</td>
                     <td>{job.attempts}</td>
-                    <td className="hint" title={job.stopped_at}>
+                    <td className="hint" title={at(job.stopped_at)}>
                       {since(job.stopped_at)}
                     </td>
                     <td className="hint">

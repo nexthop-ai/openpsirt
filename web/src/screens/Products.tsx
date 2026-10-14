@@ -13,6 +13,7 @@ import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Failed } from "../ui/Failed";
+import { Unread } from "../ui/Reading";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { productAt, streamsAt } from "../app/routes";
@@ -160,6 +161,10 @@ export function Products({ who }: { who: Who }) {
         {who.admin && <AddButton label="Add product" onClick={() => setAdding(true)} />}
       </div>
 
+      <Unread
+        of={scanning}
+        what="How long a build may go unscanned could not be read, so nothing is flagged."
+      />
       {setEndOfLife.isError && (
         <Failed error={setEndOfLife.error} what="That support date could not be set." />
       )}

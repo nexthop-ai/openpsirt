@@ -4,6 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mounted, screen, serve, settle } from "../../test/mount";
 import { Effort } from "./Effort";
+import { Overview } from "./Overview";
 import { Scrutiny } from "./Scrutiny";
 import { Sheet } from "./Sheet";
 import { windowStart } from "./Window";
@@ -67,5 +68,21 @@ describe("the approval quality figure", () => {
     };
     expect(asked.params.query.from).toBe(windowStart(30));
     expect(asked.params.query.days).toBeUndefined();
+  });
+});
+
+describe("the program overview's figures", () => {
+  it("count from the day their links open the record from", async () => {
+    const reads = serve(() => ({ data: { items: [] } }));
+    mount.render(screen(<Overview />, "/reports/program-overview?days=30"));
+    await settle();
+    const calls = reads.mock.calls as unknown as [string, unknown][];
+    for (const path of ["/v1/remediation", "/v1/measures"]) {
+      const asked = calls.find(([called]) => called === path)?.[1] as {
+        params: { query: Record<string, unknown> };
+      };
+      expect(asked.params.query.from).toBe(windowStart(30));
+      expect(asked.params.query.days).toBeUndefined();
+    }
   });
 });

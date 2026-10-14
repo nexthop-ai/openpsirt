@@ -689,7 +689,7 @@ holds the files that are reachable nowhere else.
 | A section counted by product alone says so | The triage times, the repeated deferrals and the dismissals are read for a product and never for a branch or a variant, so the heading's scope is not theirs. Each names the product, every branch and variant, or every product where none is picked |
 | A sheet counted by product alone says so in its header | Effort, advisories issued and approval quality are read for a product and never for a branch or a variant. Their header, on screen and printed, names the product, every branch and variant, in place of the picker's scope |
 | Every narrowing the sheet's controls apply is in the printed header | The controls do not print. Effort names its team, the register its states and closure reasons, and the support sheet how far ahead it warns |
-| A rolling window is asked for as the date it began | The record a figure links to reads a date from midnight, and a window counted from this minute held rows the figure did not count. Approval quality asks from the same date its links carry |
+| A rolling window is asked for as the date it began | The record a figure links to reads a date from midnight, and a window counted from this minute holds rows the figure does not count. The program overview and approval quality ask from the same date their links carry |
 | A link out of a report carries the period and the product the figure was computed with | The record reads its narrowing from the address rather than from the picker, so an entry that dropped the selection opened every product the reader can see from a page scoped to one — a different population under the same name, which is worse than no link |
 | No PDF is generated | Printing is the browser's, and the stylesheet is the record's. Rendering on the server needs a browser engine in the image to do what the reader's browser already does |
 | A printed record is drawn in the light look | Paper is white whatever the screen was, and the dark look's text on a white page is pale gray on white. The dark look applies to the screen alone |
@@ -814,7 +814,7 @@ engine.
 
 Any list that can be read can be exported, as CSV or JSON. What exports: the
 findings list, the cross-product findings list, the record of judgments, the
-review queue, the by-component view, what is running out of time, scan coverage,
+review queue, what became of the reader's own claims, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, a comparison of two
 builds' inventories, the fix bundles, the upgrades one build is waiting on,
 what keeps being put off, the backlog over time, what has been changed

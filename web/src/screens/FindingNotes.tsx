@@ -73,6 +73,7 @@ export function Notes({
         consequence="Records no judgment"
         placeholder="Something whoever decides this should know. No judgment recorded."
         draftKey={`note:${product}:${vulnerability}`}
+        // silent-read: a write's answer, whose failure the thread draws from `adding`.
         notNotified={note.data?.not_notified ?? []}
         unread={
           unread ? (

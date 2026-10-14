@@ -90,8 +90,10 @@ export function Overview() {
   // The window every figure on this sheet covers, and the one the lists it
   // links to have to be narrowed by. One value, because a heading saying one
   // stretch over a list showing another is the failure this sheet is easiest to
-  // ship.
-  const when = asked(period, days);
+  // ship. A rolling window is sent as the date its links open the record
+  // from: a count of days the server counts from this minute, and the record
+  // reads a date from midnight.
+  const when = stated(period) ? asked(period, days) : { from: windowStart(days) };
   // A period naming only its end still runs from the beginning, so there is
   // no date to narrow a list by — and a list narrowed by an empty one opens
   // over all time beside a figure that counts one window.

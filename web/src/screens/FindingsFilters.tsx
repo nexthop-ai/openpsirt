@@ -7,6 +7,8 @@ import type { Outcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
+import { Unread } from "../ui/Reading";
+import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
 import { useState } from "react";
 import { BENEATH_PARTS } from "./list";
@@ -518,6 +520,7 @@ export function Filters({
   setMany,
   tags,
   kinds,
+  kindsRead,
   oneBuild,
   spanning,
   variantNamed,
@@ -532,6 +535,9 @@ export function Filters({
   tags: string[];
   // The package kinds the server reports present in the scope on screen.
   kinds: readonly KindPresent[];
+  // The read the kinds come from. The picker offers nothing else, so a
+  // failure is said beside it.
+  kindsRead: Readable;
   oneBuild: boolean;
   spanning: boolean;
   // Whether the selection names a variant, which is what "only this
@@ -706,6 +712,7 @@ export function Filters({
           options={kindsOffered(kinds, all("ecosystem"))}
           onChange={(chosen) => setMany("ecosystem", chosen)}
         />
+        <Unread of={kindsRead} what="The package types could not be read." />
         <Choices
           label="Producer said"
           hint="What the inventory called the dependency. Nothing here ranks or decides by it"

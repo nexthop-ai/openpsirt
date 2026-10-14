@@ -4,7 +4,8 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "./Settings";
-import { mounted, screen, serve, settle } from "../test/mount";
+import { api } from "../api/client";
+import { client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
 
@@ -27,7 +28,7 @@ function type(field: HTMLInputElement | null, value: string) {
   });
 }
 
-async function shown(setting: Record<string, unknown>) {
+async function shown(setting: Record<string, unknown>, queries = client()) {
   serve((path) =>
     path === "/v1/settings"
       ? {
@@ -45,7 +46,9 @@ async function shown(setting: Record<string, unknown>) {
         }
       : { data: { items: [] } },
   );
-  mount.render(screen(<Settings who={ADMIN} />, "/settings/disclosure", "/settings/:section"));
+  mount.render(
+    screen(<Settings who={ADMIN} />, "/settings/disclosure", "/settings/:section", queries),
+  );
   await settle();
 }
 
@@ -69,5 +72,22 @@ describe("a duration setting", () => {
     type(mount.host().querySelector<HTMLInputElement>('input[type="number"]'), "1.5");
     expect(saves()).toHaveLength(0);
     expect(mount.host().textContent).toContain("A whole number of one or more.");
+  });
+});
+
+describe("a saved setting", () => {
+  it("refreshes the identity read, which quotes the embargo length to every form", async () => {
+    const queries = client();
+    await shown({ kind: "duration", value: "2160h0m0s", default: true }, queries);
+    vi.spyOn(api, "PUT").mockResolvedValue({
+      data: {},
+      error: undefined,
+      response: new Response(null, { status: 200 }),
+    } as never);
+    const invalidated = watchInvalidations(queries);
+    type(mount.host().querySelector<HTMLInputElement>('input[type="number"]'), "30");
+    await act(async () => saves()[0]?.click());
+    await settle();
+    expect(invalidated()).toEqual(expect.arrayContaining(["settings", "whoami"]));
   });
 });

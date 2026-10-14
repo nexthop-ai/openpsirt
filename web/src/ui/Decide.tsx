@@ -441,7 +441,9 @@ export function Decide({
     const diff = new Map<string, Other>();
     const differing = new Set<string>();
     {
+      // silent-read: handed whole to Covering, which draws its failure.
       for (const m of reach.data?.automatic ?? []) auto.set(shown(m), true);
+      // silent-read: handed whole to Covering, which draws its failure.
       for (const m of reach.data?.differing ?? []) {
         // Its place, said as an aside. The subject of the question is the
         // version — a build at matching versions never reaches this list — so

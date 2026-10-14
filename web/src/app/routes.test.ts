@@ -90,6 +90,16 @@ describe("an address refiled under another name", () => {
     expect(out).toContain("github.com%2Fa%2Fb");
   });
 
+  it("escapes a component's name once, whatever characters it holds", () => {
+    for (const component of ["libstdc++6", "@scope/x", "50%/y"]) {
+      const before = { product: "sonic", stream: "main", variant: "x" };
+      const at = routes.findingAt(before, { vulnerability: "CVE-1", component });
+      expect(routes.refiled(at, "CVE-1", "CVE-2")).toBe(
+        routes.findingAt(before, { vulnerability: "CVE-2", component }),
+      );
+    }
+  });
+
   it("does not take one name for another it begins", () => {
     expect(routes.refiled(routes.issueAt("CVE-10"), "CVE-1", "CVE-2")).toBe(
       routes.issueAt("CVE-10"),

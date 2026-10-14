@@ -444,7 +444,7 @@ or team a row is about, are named the same way.
 | A label beside a person or a team is absent where it would repeat the name; a label beside a product, branch or tag, or variant falls back to the name | Absent beside a person reads as "the same". A build is named on every list alike |
 | Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
 | The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
-| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, and the review-queue file the product and the proposer, the way their lists do |
+| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, the review-queue file the product and the proposer, and the file of the reader's own claims the product, the branch or tag and the variant, the way their lists do |
 
 ## File organization
 

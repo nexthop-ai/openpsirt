@@ -13,6 +13,12 @@ describe("a read defaulted to an empty list", () => {
     });
   });
 
+  it("is reported for any one field of the data, not only its items", () => {
+    expect(silentReads("x.tsx", `const pairs = compared.data?.pairs ?? [];`).found).toEqual([
+      "x.tsx:1: compared",
+    ]);
+  });
+
   it("is reported where a call stands in place of a name", () => {
     expect(silentReads("x.tsx", `const offered = useSearch(typed).data ?? [];`).found).toEqual([
       "x.tsx:1: a call's data",

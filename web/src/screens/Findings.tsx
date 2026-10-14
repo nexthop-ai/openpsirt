@@ -702,8 +702,9 @@ export function Findings() {
           setMany={setMany}
           // silent-read: choices offered in the panel; an unread list offers fewer.
           tags={inUse.data?.items ?? []}
-          // silent-read: choices offered in the panel; an unread list offers fewer.
+          // silent-read: handed whole to the panel, which says a failure beside the picker.
           kinds={kindsHere.data?.items ?? []}
+          kindsRead={kindsHere}
           oneBuild={oneBuild}
           spanning={spanning}
           variantNamed={Boolean(variant)}

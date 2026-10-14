@@ -15,6 +15,7 @@ import { IssueNotes } from "./FindingNotes";
 import { useWho } from "../app/session";
 import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
+import { on } from "../ui/when";
 import { findingAt } from "../app/routes";
 
 // One issue, everywhere it sits.
@@ -115,8 +116,8 @@ export function Issue() {
       )}
       {(it?.merged ?? []).map((one) => (
         <p key={one.vulnerability} className="hint" style={{ marginBottom: 10 }}>
-          Merged from <span className="id">{one.vulnerability}</span> on{" "}
-          {one.merged_at.slice(0, 10)}, when a report named both
+          Merged from <span className="id">{one.vulnerability}</span> on {on(one.merged_at)}, when a
+          report named both
         </p>
       ))}
 

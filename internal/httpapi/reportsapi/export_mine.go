@@ -39,7 +39,8 @@ func registerMyClaimsExport(api huma.API, in core.Deps) {
 			What: "your claims",
 			Header: []string{
 				"claim", "proposed", "outcome", "became", "when", "by", "by name",
-				"issue", "product", "product name", "component",
+				"issue", "product", "product name", "stream", "stream name",
+				"variant", "variant name", "component",
 				"decisions", "issues", "places", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -74,16 +75,22 @@ func registerMyClaimsExport(api huma.API, in core.Deps) {
 					if row.By != 0 {
 						by, byName = who.Identity(row.By), who.Label(row.By)
 					}
-					product, productName, component := "", "", ""
+					// The build as well as the product, as the tab names it: two
+					// claims on one component in two builds are otherwise told
+					// apart by number alone.
+					var product, productName, stream, streamName, variant, variantName, component string
 					if where := named[i].Finding; where != nil {
 						product, productName = where.Product, where.ProductName
+						stream, streamName = where.Stream, where.StreamName
+						variant, variantName = where.Variant, where.VariantName
 						component = where.Component + " " + where.Version
 					}
 					rows = append(rows, []string{
 						strconv.FormatInt(row.Claim.ID, 10),
 						core.Stamp(row.Decision.ProposedAt),
 						string(row.Claim.Outcome), string(row.Happened), when, by, byName,
-						named[i].Place.Vulnerability, product, productName, component,
+						named[i].Place.Vulnerability, product, productName,
+						stream, streamName, variant, variantName, component,
 						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues), strconv.Itoa(row.Places),
 						row.Reasoning,
 					})

@@ -232,13 +232,28 @@ export function requeried(address: string, query: URLSearchParams): string {
 // is reached by a name that no longer files what it shows.
 //
 // Rebuilt from the route rather than substituted in the text, so a product,
-// branch or component whose name begins with the issue's is left alone.
+// branch or component whose name begins with the issue's is left alone. A
+// matched part arrives with only its escaped slashes decoded, so each is
+// decoded whole before it is escaped again, or "libstdc++6" comes back as
+// "libstdc%252B%252B6".
 export function refiled(pathname: string, from: string, to: string): string {
   for (const name of ["finding", "issue"] as const) {
     const hit = matchPath(ROUTES[name], pathname);
-    if (hit && hit.params.vulnerability === from) {
-      return fill(ROUTES[name], { ...hit.params, vulnerability: to });
+    if (!hit) continue;
+    const parts = Object.fromEntries(
+      Object.entries(hit.params).map(([key, value]) => [key, decoded(value ?? "")]),
+    );
+    if (parts.vulnerability === from) {
+      return fill(ROUTES[name], { ...parts, vulnerability: to });
     }
   }
   return pathname;
+}
+
+function decoded(part: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return part;
+  }
 }
