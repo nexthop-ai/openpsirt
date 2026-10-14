@@ -67,8 +67,11 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 			t.Fatal(err)
 		}
 		// The reader and two other people, numbered one below the reader and
-		// one above, so neither end of who holds a group answers alone.
-		below := &access.Party{Kind: access.APerson}
+		// one above, so neither end of who holds a group answers alone. Every
+		// identifier is given: MySQL and MariaDB keep a table's counter past
+		// the highest identifier it ever held, so one the engine assigns can
+		// land above the reader in a database an earlier run emptied.
+		below := &access.Party{ID: 1_000_000_000, Kind: access.APerson}
 		reader := &access.Party{ID: 2_000_000_000, Kind: access.APerson}
 		above := &access.Party{ID: 3_000_000_000, Kind: access.APerson}
 		for _, party := range []*access.Party{below, reader, above} {
