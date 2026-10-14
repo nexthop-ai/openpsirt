@@ -121,7 +121,6 @@ func (b *SlackBot) post(ctx context.Context, channel string, n Note) error {
 // ask makes one request with the token and reads Slack's answer.
 func (b *SlackBot) ask(request *http.Request) (*slackAnswer, error) {
 	request.Header.Set("Authorization", "Bearer "+b.token)
-	request.Header.Set("User-Agent", "OpenPSIRT")
 	response, err := b.client.Do(request)
 	if err != nil {
 		return nil, withoutTheRequest(err)

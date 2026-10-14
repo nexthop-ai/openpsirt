@@ -4,12 +4,14 @@
 // Package outward is the one HTTP client this process reaches the internet
 // with.
 //
-// Every fetch through here refuses redirects, refuses to connect inside this
-// network, and is bounded in time. A client whose hosts an administrator
-// configured or the application names is pinned to them; the open client, for
-// a host a document chooses, also refuses anywhere an administrator excluded
-// (REQ-69). Webhooks, mail and the object store go only where an administrator
-// configured them, do not reach out through here, and each governs its own
+// Every fetch through here refuses redirects, is reached over https, carries
+// one User-Agent, and is bounded in time. A client whose hosts an
+// administrator configured or the application names is pinned to them and
+// refuses to connect inside this network; the open client, for a host a
+// document chooses, also refuses anywhere an administrator excluded (REQ-69).
+// The configured client, for a webhook or chat server an administrator typed
+// in, reaches that address wherever it is, inside this network included. Mail
+// and the object store do not reach out through here, and each governs its own
 // address.
 //
 // One package, because a control remembered at each call site is missed at the
@@ -20,6 +22,8 @@
 package outward
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -37,6 +41,10 @@ import (
 // sign-in runs, and a provider that has stopped answering should fail it
 // rather than hold a request open until something further up gives up.
 const Timeout = 10 * time.Second
+
+// Agent is the User-Agent every request out of this process carries, so a
+// receiver sees one name and somewhere to read about it.
+const Agent = "openpsirt (+https://github.com/nexthop-ai/openpsirt)"
 
 // Guarded returns an HTTP client that will only talk to the hosts named, will
 // not follow a redirect, and will not connect to an address inside this
@@ -124,6 +132,38 @@ func open(within time.Duration, excluded Excluded, port string) *http.Client {
 	})
 }
 
+// Configured returns an HTTP client for an address an administrator typed in:
+// a webhook, or a chat server.
+//
+// The same refusals as Guarded apart from where the address may be: https
+// only, no redirect followed, and no user in the address. A private address is
+// reached, because this one did not arrive in a document from outside, and an
+// operator's chat server is quite reasonably on their own network.
+func Configured(within time.Duration) *http.Client {
+	return ConfiguredTrusting(within, nil)
+}
+
+// ConfiguredTrusting is Configured with the certificate authorities a server
+// is checked against named. Nil is the system's.
+func ConfiguredTrusting(within time.Duration, roots *x509.CertPool) *http.Client {
+	c := client(within, anywhere, func(to *url.URL) error {
+		if to.User != nil {
+			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, to.Hostname())
+		}
+		return nil
+	})
+	if roots != nil {
+		c.Transport.(*guard).inner.(*http.Transport).TLSClientConfig = &tls.Config{
+			RootCAs: roots, MinVersion: tls.VersionTLS12,
+		}
+	}
+	return c
+}
+
+// anywhere is the address check of a client whose address an administrator
+// configured: none.
+func anywhere(string) error { return nil }
+
 // client is the one shape every outbound client here takes: an address check
 // at the dial, a host check at the round trip, redirects refused, and a budget
 // for the whole call.
@@ -146,7 +186,7 @@ func client(within time.Duration, reachable func(string) error,
 	return &http.Client{
 		Timeout: within,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			return fmt.Errorf("%w a redirect to %s: a provider's endpoints are configured, not followed",
+			return fmt.Errorf("%w a redirect to %s: an address is configured, not followed",
 				ErrRefused, req.URL.Host)
 		},
 		Transport: &guard{
@@ -162,12 +202,19 @@ func client(within time.Duration, reachable func(string) error,
 // the address, so a caller can tell this from a provider that did not answer.
 var ErrRefused = refusal.New("refused")
 
-// ErrInside says an address a name resolved to lies inside this network. It
-// comes wrapped with ErrRefused. Unlike the other refusals it is about what a
-// name resolves to today, which a resolver answering differently tomorrow
-// changes, so a caller stepping over what the client refuses holds on to
-// this one.
+// ErrInside says an address a name resolved to lies inside this network, or in
+// a network an administrator excluded. It comes wrapped with ErrRefused.
+// Unlike the other refusals it is about what a name resolves to today, which a
+// resolver answering differently tomorrow changes, so a caller stepping over
+// what the client refuses holds on to this one.
 var ErrInside = refusal.New("a provider is not reached inside this network")
+
+// resolvedInto is a refusal of the address a name resolved to, in words of its
+// own, that is ErrInside to errors.Is.
+type resolvedInto string
+
+func (r resolvedInto) Error() string        { return string(r) }
+func (r resolvedInto) Is(target error) bool { return target == ErrInside }
 
 // guard refuses a request to a host the client does not permit.
 //
@@ -186,6 +233,10 @@ func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if err := g.permits(req.URL); err != nil {
 		return nil, err
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req = req.Clone(req.Context())
+		req.Header.Set("User-Agent", Agent)
 	}
 	return g.inner.RoundTrip(req)
 }
@@ -216,20 +267,12 @@ func Reachable(address string) error {
 // inside is whether an address is anywhere but the public internet, including
 // through an address that carries an IPv4 one inside it.
 func inside(ip net.IP) bool {
-	if v4 := translated(ip); v4 != nil {
+	if v4 := embedded(ip); v4 != nil {
 		ip = v4
 	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsUnspecified() || ip.IsMulticast() ||
-		sharedAddressSpace(ip) {
-		return true
-	}
-	// A 6to4 address routes to the IPv4 address in its second to fifth
-	// bytes, through a relay: 2002:a00:5:: reaches 10.0.0.5.
-	if sixToFour.Contains(ip) {
-		return inside(net.IP(ip[2:6]))
-	}
-	return false
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsUnspecified() || ip.IsMulticast() ||
+		sharedAddressSpace(ip)
 }
 
 // wellKnownNAT64 is the prefix a NAT64 gateway translates into IPv4 with the
@@ -238,17 +281,26 @@ func inside(ip net.IP) bool {
 // 64:ff9b::a00:5 reaches 10.0.0.5.
 var wellKnownNAT64 = mustNetwork("64:ff9b::/96")
 
-// translated is the IPv4 address a well-known NAT64 address reaches, or nil
-// for any other address.
-func translated(ip net.IP) net.IP {
-	if ip.To4() != nil || !wellKnownNAT64.Contains(ip) {
+// sixToFour is the 6to4 prefix, whose addresses route to the IPv4 address in
+// their second to fifth bytes, through a relay: 2002:a00:5:: reaches 10.0.0.5.
+var sixToFour = mustNetwork("2002::/16")
+
+// embedded is the IPv4 address an IPv6 address reaches, where it carries one:
+// a well-known NAT64 address or a 6to4 address. Nil for any other address.
+// Every check of an address asks this, so the built-in ranges and an
+// administrator's networks are judged the same way.
+func embedded(ip net.IP) net.IP {
+	if ip.To4() != nil {
 		return nil
 	}
-	return net.IPv4(ip[12], ip[13], ip[14], ip[15])
+	switch {
+	case wellKnownNAT64.Contains(ip):
+		return net.IPv4(ip[12], ip[13], ip[14], ip[15])
+	case sixToFour.Contains(ip):
+		return net.IPv4(ip[2], ip[3], ip[4], ip[5])
+	}
+	return nil
 }
-
-// sixToFour is the 6to4 prefix, whose addresses carry an IPv4 one.
-var sixToFour = mustNetwork("2002::/16")
 
 // sharedAddressSpace covers the ranges the standard library does not treat as
 // private but which are not the public internet either.

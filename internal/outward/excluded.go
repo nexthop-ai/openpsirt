@@ -82,10 +82,10 @@ func (e Excluded) Host(host string) bool {
 }
 
 // address reports whether an address is in a network an administrator
-// excluded. An address in the well-known NAT64 prefix is judged by the IPv4
-// address it translates to as well.
+// excluded. A well-known NAT64 or 6to4 address is judged by the IPv4 address
+// it reaches as well.
 func (e Excluded) address(ip net.IP) bool {
-	if v4 := translated(ip); v4 != nil && e.address(v4) {
+	if v4 := embedded(ip); v4 != nil && e.address(v4) {
 		return true
 	}
 	for _, network := range e.networks {
@@ -100,14 +100,16 @@ func (e Excluded) address(ip net.IP) bool {
 // administrator excluded.
 //
 // The administrator's networks are asked first, so a refusal names the
-// exclusion where a network of theirs also lies inside this one.
+// exclusion where a network of theirs also lies inside this one. Either
+// refusal is about what a name resolved to, so both are ErrInside.
 func (e Excluded) Reachable(address string) error {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		host = address
 	}
 	if ip := net.ParseIP(host); ip != nil && e.address(ip) {
-		return fmt.Errorf("%w a connection to %s: an administrator excluded it", ErrRefused, ip)
+		return fmt.Errorf("%w a connection to %s: %w", ErrRefused, ip,
+			resolvedInto("an administrator excluded it"))
 	}
 	return Reachable(address)
 }

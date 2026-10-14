@@ -654,10 +654,12 @@ unspecified, or in one of the blocks the standard library does not call private
 and the internet does not route: carrier-grade translation, "this network",
 benchmarking, protocol assignments, reserved, IPv6 site-local, IPv4-compatible
 IPv6, and the local-use NAT64 prefix. An address in the well-known NAT64
-prefix, and a 6to4 address, is judged by the IPv4 address inside it. Every
+prefix, and a 6to4 address, is judged by the IPv4 address inside it, against
+the built-in blocks and an administrator's excluded networks alike. Every
 refusal the client makes itself, at the dial as well as before it, is told apart
-from a host that did not answer, and an address inside this network is told
-apart again, because what a name resolves to can change.
+from a host that did not answer, and an address inside this network or in an
+excluded network is told apart again, because what a name resolves to can
+change.
 
 One client, in one place, for every fetch out of this process. Written per
 caller it is forgotten by one of them: a bare client with a timeout and nothing
@@ -674,6 +676,8 @@ it re-resolves the issuer's name each time.
 | Pinning the fetch is not enough | A document fetched from the right host can name endpoints on another one, turning every sign-in into a redirect of the issuer's choosing. The endpoints a provider publishes are checked against the issuer's own host when the adapter is built, and a provider that would misdirect people stops the process |
 | The address check runs after the name resolves and before the connection is made | Checked earlier it would see a name rather than an address and refuse everything; resolving separately and then connecting leaves a window in which the name resolves to something else the second time |
 | The return address is stated in configuration, not taken from the request | Otherwise it is whatever a caller claimed the host was. A deployment that configured a provider without stating its address does not start |
+| Every request out carries one User-Agent, set where every request passes | A receiver sees one name and somewhere to read about it, and a caller that forgets to set it sends the library's default |
+| An address an administrator configured, a webhook or a chat server, goes through the same client without the address check | https only, no user in the address, no redirect followed. It was typed by the operator rather than read from a document, and REQ-69 lets it reach wherever that is |
 | An answer read back from a provider is bounded | A profile is a few hundred bytes; a body that never ends is a sign-in that allocates until the process dies |
 
 ## Trusted-header sign-in

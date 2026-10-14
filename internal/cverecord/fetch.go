@@ -213,9 +213,6 @@ func (f *Fetcher) latest(ctx context.Context) (string, time.Time, error) {
 	return tag, day, nil
 }
 
-// agent is what the fetcher calls itself.
-const agent = "openpsirt (+https://github.com/nexthop-ai/openpsirt)"
-
 // download fetches an archive into the directory and names the file.
 //
 // The repository host answers a download with a redirect to the host that
@@ -269,7 +266,6 @@ func (f *Fetcher) get(ctx context.Context, address string) (*http.Response, erro
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", agent)
 	resp, err := f.Client.Do(req)
 	if resp != nil && isRedirect(resp.StatusCode) && errors.Is(err, outward.ErrRefused) {
 		return resp, nil

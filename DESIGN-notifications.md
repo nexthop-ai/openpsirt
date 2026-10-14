@@ -541,6 +541,7 @@ request-forgery primitive unless governed:
 | https only | The body is authenticated and not encrypted, and what it says is what somebody is being told about a vulnerability |
 | A redirect is refused, never followed | A redirect asks this deployment to send a signed request somewhere else. A receiver that moved should be reconfigured, which is visible |
 | A private address is allowed | The one place this differs from a sign-in provider's endpoints. A provider's address arrives in a discovery document from outside; this one was typed by the operator, whose chat server is reasonably on their own network |
+| The request goes through the process's one outbound client | Its configured form, which carries every control above and the User-Agent every request out carries. `DESIGN-access.md` § Outbound provider fetches. A second client built here is one a change to the shared refusals misses |
 
 | Rule | Reason |
 |---|---|

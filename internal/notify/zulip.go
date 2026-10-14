@@ -130,7 +130,6 @@ func (b *ZulipBot) send(ctx context.Context, form url.Values) error {
 // whether it worked or not.
 func (b *ZulipBot) ask(request *http.Request) (*zulipAnswer, int, error) {
 	request.SetBasicAuth(b.email, b.key)
-	request.Header.Set("User-Agent", "OpenPSIRT")
 	response, err := b.client.Do(request)
 	if err != nil {
 		return nil, 0, withoutTheRequest(err)

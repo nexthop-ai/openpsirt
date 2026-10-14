@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestAProviderClientTalksToItsOwnHostAndNowhereElse(t *testing.T) {
@@ -166,9 +167,7 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 		"0.1.2.3:443",            // this network, other than its unspecified address
 		"[64:ff9b::a00:5]:443",   // 10.0.0.5 through a NAT64 gateway
 		"[64:ff9b:1::a00:5]:443", // the same, through a local-use NAT64 prefix
-		"100.64.0.1:443",         // carrier-grade translation
 		"100.127.255.254:443",
-		"0.1.2.3:443", // "this network", beyond the unspecified address
 		"198.18.0.1:443",
 		"192.0.0.8:443",
 		"240.0.0.1:443",
@@ -176,6 +175,10 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 		"[::a00:5]:443",      // IPv4-compatible 10.0.0.5
 		"[2002:a00:5::]:443", // 10.0.0.5 through a 6to4 relay
 		"[2002:7f00:1::]:443",
+		// Multicast, which nothing this process fetches is reached on.
+		"224.0.0.1:443",
+		"[ff02::1]:443",
+		"[ff0e::1]:443",
 	} {
 		err := Reachable(address)
 		if err == nil {
@@ -208,18 +211,87 @@ func TestAProviderOnTheInternetIsReached(t *testing.T) {
 	}
 }
 
-func TestAnExcludedNetworkIsNotReachedThroughNAT64(t *testing.T) {
-	// The address a NAT64 gateway translates to is the one an administrator
-	// excluded, so it is refused however it is spelled.
+func TestAnExcludedNetworkIsNotReachedThroughAnAddressCarryingIt(t *testing.T) {
+	// The address a NAT64 gateway or a 6to4 relay reaches is the one an
+	// administrator excluded, so it is refused however it is spelled.
 	excluded, err := ParseExcluded("140.82.121.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := excluded.Reachable("[64:ff9b::8c52:7904]:443"); err == nil ||
-		!strings.Contains(err.Error(), "an administrator excluded it") {
-		t.Errorf("an excluded address was reached through NAT64: %v", err)
+	for _, address := range []string{"64:ff9b::8c52:7904", "2002:8c52:7904::"} {
+		if err := excluded.Reachable("[" + address + "]:443"); err == nil ||
+			!strings.Contains(err.Error(), "an administrator excluded it") {
+			t.Errorf("an excluded address was reached as %s: %v", address, err)
+		}
+		if !excluded.Host(address) {
+			t.Errorf("an excluded address named as %s was not recognized as excluded", address)
+		}
 	}
-	if !excluded.Host("64:ff9b::8c52:7904") {
-		t.Error("an excluded address named through NAT64 was not recognized as excluded")
+	if err := excluded.Reachable("[2002:8c52:7a04::]:443"); err != nil {
+		t.Errorf("a 6to4 address outside the excluded network was refused: %v", err)
+	}
+}
+
+// A name resolving into an excluded network is refused on what it resolves to
+// today, the way one resolving inside this network is, so a caller that steps
+// over a refusal holds on to both.
+func TestAnExcludedAnswerIsAboutWhatANameResolvedTo(t *testing.T) {
+	excluded, err := ParseExcluded("203.0.113.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = excluded.Reachable("203.0.113.5:443")
+	if !errors.Is(err, ErrRefused) || !errors.Is(err, ErrInside) {
+		t.Errorf("refused as %v, want ErrRefused and ErrInside", err)
+	}
+	if strings.Contains(err.Error(), "inside this network") {
+		t.Errorf("an excluded public network is described as inside this one: %v", err)
+	}
+}
+
+// Every request out carries one User-Agent, set where every request passes.
+func TestEveryRequestOutCarriesOneAgent(t *testing.T) {
+	var got string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("User-Agent")
+	}))
+	defer server.Close()
+	client := ConfiguredTrusting(time.Second, server.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs)
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if got != Agent {
+		t.Errorf("the request carried %q, want %q", got, Agent)
+	}
+}
+
+// A configured address is reached inside this network, and is still refused
+// over plain http, with a user in it, or through a redirect.
+func TestAConfiguredAddressIsReachedWhereverItIs(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/moved" {
+			http.Redirect(w, r, "/", http.StatusFound)
+		}
+	}))
+	defer server.Close()
+	client := ConfiguredTrusting(time.Second, server.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs)
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatalf("a configured address on loopback was refused: %v", err)
+	}
+	_ = resp.Body.Close()
+	at := strings.TrimPrefix(server.URL, "https://")
+	for _, address := range []string{"http://" + at, "https://user:pw@" + at, server.URL + "/moved"} {
+		resp, err := client.Get(address)
+		if err == nil {
+			_ = resp.Body.Close()
+			t.Errorf("%s was reached", address)
+			continue
+		}
+		if !errors.Is(err, ErrRefused) {
+			t.Errorf("%s was refused for another reason: %v", address, err)
+		}
 	}
 }

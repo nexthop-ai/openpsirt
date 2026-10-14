@@ -1036,9 +1036,10 @@ type content struct {
 }
 
 // steppedOver is whether the client refused an address in a way it repeats on
-// every pass. A name resolving inside this network is left out: a filtering
-// resolver or a split view answers that way until it is corrected, so it is
-// read as a publisher that could not be reached and holds the mark.
+// every pass. A name resolving inside this network or into an excluded one is
+// left out: a filtering resolver or a split view answers that way until it is
+// corrected, so it is read as a publisher that could not be reached and holds
+// the mark.
 func steppedOver(err error) bool {
 	return errors.Is(err, outward.ErrRefused) && !errors.Is(err, outward.ErrInside)
 }

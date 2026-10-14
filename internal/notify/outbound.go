@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -29,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -491,7 +491,6 @@ func (s *Signal) send(ctx context.Context, to Outbound, body []byte, now time.Ti
 		return fmt.Errorf("build the request: %w", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "OpenPSIRT")
 	request.Header.Set("X-OpenPSIRT-Timestamp", stamp)
 	request.Header.Set("X-OpenPSIRT-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 
@@ -564,36 +563,16 @@ func chatText(text, link string) string {
 // trimTo bounds what is stored of a failure.
 func trimTo(text string, most int) string { return bound.Head(text, most) }
 
-// outboundClient is how a request leaves here.
+// outboundClient is how a request leaves here: outward's client for an
+// address an administrator configured. https only, no user in the address, and
+// no redirect followed, since a receiver that genuinely moved should be
+// reconfigured, which is visible, rather than followed, which is not.
 //
-// Redirects are refused rather than followed. A destination is configured,
-// and "somewhere else" is exactly what a redirect asks us to send a signed
-// request to — a receiver that genuinely moved should be reconfigured, which
-// is visible, rather than followed, which is not.
-//
-// Https only. The body is signed and not encrypted, and what it carries is
-// what somebody is being told about a vulnerability. A deployment that wants
-// to send that in clear text is not a case worth supporting.
-//
-// A private address is allowed here, unlike a sign-in provider's. The
-// difference is where the address came from: a provider's endpoints arrive in
-// a discovery document from outside, and this one was typed by the operator —
-// whose chat server is quite reasonably on their own network.
-func outboundClient() *http.Client {
-	// No address guard, deliberately, and stated by its absence rather than
-	// by a hook that returns nil. A hook in exactly the position a reviewer
-	// looks for one reads as a control that is present, and the paragraph
-	// above is what says the permission is intended.
-	dialer := &net.Dialer{Timeout: signalTimeout}
-	return &http.Client{
-		Timeout: signalTimeout,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			return refusal.Errorf("refused a redirect to %s: a destination is configured, not followed",
-				req.URL.Host)
-		},
-		Transport: &outboundGuard{inner: &http.Transport{DialContext: dialer.DialContext}},
-	}
-}
+// A private address is reached, unlike a sign-in provider's. A provider's
+// endpoints arrive in a discovery document from outside, and this one was
+// typed by the operator, whose chat server is quite reasonably on their own
+// network.
+func outboundClient() *http.Client { return outward.Configured(signalTimeout) }
 
 // reachable says whether an address is one this may send to.
 //
@@ -614,17 +593,6 @@ func reachable(address string) error {
 			"encrypted, and what it carries is what somebody is being told about a vulnerability")
 	}
 	return nil
-}
-
-// outboundGuard refuses anything but https.
-type outboundGuard struct{ inner http.RoundTripper }
-
-func (g *outboundGuard) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Scheme != "https" {
-		return nil, refusal.Errorf("refused a request to %s: a destination is reached over https",
-			req.URL.Scheme+"://"+req.URL.Host)
-	}
-	return g.inner.RoundTrip(req)
 }
 
 // administering refuses anybody but an administrator signed in as a person.

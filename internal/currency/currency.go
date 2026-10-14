@@ -107,10 +107,9 @@ var ErrNotAnswering = fmt.Errorf("the index is not answering")
 
 // Client asks the public index for an ecosystem.
 type Client struct {
+	// HTTP is outward's guarded client, which also says who is asking:
+	// crates.io refuses a request that does not, and it is right to.
 	HTTP *http.Client
-	// Agent identifies us to the indexes. crates.io refuses a request that
-	// does not say who is asking, and it is right to.
-	Agent string
 	// The address of each index. Fields rather than constants so a test can
 	// point them at a local server: without this the only way to exercise any
 	// of this code is to call somebody else's service, whose answers change,
@@ -148,7 +147,6 @@ func New() *Client {
 			hostOf(DefaultPyPI), hostOf(DefaultCrates),
 			hostOf(DefaultMaven), hostOf(DefaultNuGet),
 		),
-		Agent:   "openpsirt (+https://github.com/nexthop-ai/openpsirt)",
 		GoProxy: DefaultGoProxy, NPM: DefaultNPM,
 		PyPI: DefaultPyPI, Crates: DefaultCrates,
 		Maven: DefaultMaven, NuGet: DefaultNuGet,
@@ -250,7 +248,6 @@ func (c *Client) fetch(ctx context.Context, at, accept string) ([]byte, http.Hea
 		// to.
 		return nil, nil, fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
 	}
-	req.Header.Set("User-Agent", c.Agent)
 	req.Header.Set("Accept", accept)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
