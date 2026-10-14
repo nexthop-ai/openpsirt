@@ -4,6 +4,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -101,30 +102,38 @@ func TestARangeIsWrittenAtTheWidthTheRequirementsUse(t *testing.T) {
 func TestTheRequirementsTableIsReadAsRows(t *testing.T) {
 	// The pattern that finds a requirement and what it says. A row shape it
 	// stops matching is a requirement this gate stops asking about, which
-	// looks exactly like a requirement a document names.
-	table := strings.Join([]string{
+	// looks exactly like a requirement a document names. A withdrawn decision
+	// is history rather than an obligation, and the marker is what tells them
+	// apart.
+	text := strings.Join([]string{
+		"## 3. Requirements",
 		"| REQ-01 | Apache 2.0 | Somebody else runs it |",
 		"| REQ-02 | **Withdrawn** — replaced by REQ-03 |",
 		"not a row at all",
 		"| SEC-10 | Keys are hashed at rest |",
+		"## 4. Out of scope",
+		"| REQ-99 | Out of scope |",
 	}, "\n")
+	want, width, err := requirementsIn(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(want, []string{"REQ-01", "SEC-10"}) {
+		t.Errorf("read %v, want the two in force and in the section", want)
+	}
+	if width["REQ"] != 2 || width["SEC"] != 2 {
+		t.Errorf("read widths %v", width)
+	}
+}
 
-	got := map[string]string{}
-	for _, match := range row.FindAllStringSubmatch(table, -1) {
-		got[match[1]] = match[2]
-	}
-	for _, want := range []string{"REQ-01", "REQ-02", "SEC-10"} {
-		if _, found := got[want]; !found {
-			t.Errorf("%s was not read as a row", want)
+func TestASectionHoldingNoRequirementChecksNothingAndIsRefused(t *testing.T) {
+	for _, text := range []string{
+		"## 3. Requirements\nprose only\n## 4. Out of scope\n",
+		"no sections at all",
+	} {
+		if _, _, err := requirementsIn(text); err == nil {
+			t.Errorf("%q was read as a list of requirements", text)
 		}
-	}
-	if len(got) != 3 {
-		t.Errorf("read %d rows from a table holding three", len(got))
-	}
-	// A withdrawn decision is history rather than an obligation, and the
-	// marker is what tells them apart.
-	if !strings.HasPrefix(strings.TrimSpace(strings.TrimLeft(got["REQ-02"], "*")), "Withdrawn") {
-		t.Errorf("a withdrawn row read as %q, which nothing would skip", got["REQ-02"])
 	}
 }
 

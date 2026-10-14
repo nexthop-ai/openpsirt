@@ -105,3 +105,17 @@ func TestWhatCountsAsAnExportedDeclaration(t *testing.T) {
 		}
 	}
 }
+
+func TestAnOrphanIsReportedAndReadingNothingIsRefused(t *testing.T) {
+	declared := []decl{{"Used", "a.go", 3}, {"Alone", "a.go", 1}, {"String", "a.go", 2}}
+	got, err := orphansOf(declared, map[string]int{"Used": 2, "Alone": 1, "String": 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].name != "Alone" {
+		t.Errorf("reported %v, want only the symbol nothing else names", got)
+	}
+	if _, err := orphansOf(nil, map[string]int{}); err == nil {
+		t.Error("a walk that declared nothing was read as a clean tree")
+	}
+}

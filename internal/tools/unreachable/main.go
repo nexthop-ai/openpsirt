@@ -81,19 +81,11 @@ func main() {
 		os.Exit(2)
 	}
 
-	var orphans []decl
-	for _, d := range declared {
-		if mentions[d.name] <= 1 && !satisfiesSomething(d.name) {
-			orphans = append(orphans, d)
-		}
+	orphans, err := orphansOf(declared, mentions)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
 	}
-
-	sort.Slice(orphans, func(i, j int) bool {
-		if orphans[i].file != orphans[j].file {
-			return orphans[i].file < orphans[j].file
-		}
-		return orphans[i].line < orphans[j].line
-	})
 	for _, o := range orphans {
 		fmt.Printf("%s:%d: %s is exported and nothing names it\n", o.file, o.line, o.name)
 	}
@@ -107,6 +99,28 @@ func main() {
 	// silence on a walk that reached nothing are the same output, and this is
 	// the gate AGENTS.md leans on.
 	fmt.Printf("every exported symbol is named by something (%d in %d files)\n", len(declared), read)
+}
+
+// orphansOf is every declaration nothing but itself names, in file and line
+// order. Reading no declaration at all is refused, since it would check
+// nothing and report the same as a tree with no orphan.
+func orphansOf(declared []decl, mentions map[string]int) ([]decl, error) {
+	if len(declared) == 0 {
+		return nil, fmt.Errorf("no exported declaration was read, so this checked nothing")
+	}
+	var orphans []decl
+	for _, d := range declared {
+		if mentions[d.name] <= 1 && !satisfiesSomething(d.name) {
+			orphans = append(orphans, d)
+		}
+	}
+	sort.Slice(orphans, func(i, j int) bool {
+		if orphans[i].file != orphans[j].file {
+			return orphans[i].file < orphans[j].file
+		}
+		return orphans[i].line < orphans[j].line
+	})
+	return orphans, nil
 }
 
 // exportedIn is every exported name one declaration makes.

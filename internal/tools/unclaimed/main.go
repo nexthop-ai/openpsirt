@@ -68,28 +68,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
 	}
-	text := string(decisions)
-	from, to := strings.Index(text, inForceFrom), strings.Index(text, inForceTo)
-	if from < 0 || to < 0 || to < from {
-		fmt.Fprintln(os.Stderr, "unclaimed: REQUIREMENTS.md has no section of requirements")
+	want, width, err := requirementsIn(string(decisions))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
-	}
-
-	// Every requirement, in the order the document lists them, minus any it
-	// records as withdrawn — a requirement that was taken back is history
-	// rather than an obligation, and asking a design document to describe it
-	// would be asking for a description of something that is not there.
-	var want []string
-	width := map[string]int{}
-	for _, match := range row.FindAllStringSubmatch(text[from:to], -1) {
-		id, body := match[1], match[2]
-		if strings.HasPrefix(strings.TrimSpace(strings.TrimLeft(body, "*")), "Withdrawn") {
-			continue
-		}
-		want = append(want, id)
-		if n := len(id) - 4; n > width[id[:3]] {
-			width[id[:3]] = n
-		}
 	}
 
 	named, err := namedByDesigns(width)
@@ -129,6 +111,35 @@ func main() {
 	fmt.Fprintln(os.Stderr, "it is met — or, where it is not built, says that. Neither is optional: the")
 	fmt.Fprintln(os.Stderr, "chain from code to design to requirement is what makes this auditable.")
 	os.Exit(1)
+}
+
+// requirementsIn is every requirement in force in the text of REQUIREMENTS.md,
+// in the order it lists them, with the widest number each area's identifiers
+// carry. A requirement recorded as withdrawn is left out: it is history rather
+// than an obligation, and asking a design document to describe it would be
+// asking for a description of something that is not there. A section holding
+// no requirement is refused, since reading nothing would check nothing.
+func requirementsIn(text string) ([]string, map[string]int, error) {
+	from, to := strings.Index(text, inForceFrom), strings.Index(text, inForceTo)
+	if from < 0 || to < 0 || to < from {
+		return nil, nil, fmt.Errorf("REQUIREMENTS.md has no section of requirements")
+	}
+	var want []string
+	width := map[string]int{}
+	for _, match := range row.FindAllStringSubmatch(text[from:to], -1) {
+		id, body := match[1], match[2]
+		if strings.HasPrefix(strings.TrimSpace(strings.TrimLeft(body, "*")), "Withdrawn") {
+			continue
+		}
+		want = append(want, id)
+		if n := len(id) - 4; n > width[id[:3]] {
+			width[id[:3]] = n
+		}
+	}
+	if len(want) == 0 {
+		return nil, nil, fmt.Errorf("the section of requirements holds no requirement in force, so this checked nothing")
+	}
+	return want, width, nil
 }
 
 // namedByDesigns collects every requirement identifier the design documents name.
