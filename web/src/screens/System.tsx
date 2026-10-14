@@ -252,7 +252,7 @@ function because(why?: string) {
     case "unreadable":
       return <span className="state open">identifier cannot be read</span>;
     default:
-      return <span className="hint">no index knows it</span>;
+      return <span className="hint">not known, or refused</span>;
   }
 }
 
