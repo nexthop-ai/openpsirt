@@ -123,6 +123,31 @@ func TestAScannerWithTooMuchToSayStillScanned(t *testing.T) {
 	}
 }
 
+func TestAChattyScannersLastWordsAreWhatIsKept(t *testing.T) {
+	// Kept whole within the ceiling, the complaint is cut to its end, which
+	// is where a program says what finally went wrong.
+	result, err := scanning(t, "complaint", scanner.Limits{MaxComplaint: 1 << 20})
+	if err != nil {
+		t.Fatalf("a chatty scanner: %v", err)
+	}
+	if !strings.HasSuffix(result.Caution, "the last thing it said") {
+		t.Errorf("the end of what it said was not kept: %q", tailOf(result.Caution))
+	}
+	if !strings.HasPrefix(result.Caution, "…") {
+		t.Error("a cut complaint does not say that it was cut")
+	}
+	if len(result.Caution) > 500+len("…") {
+		t.Errorf("what it said was kept at %d bytes", len(result.Caution))
+	}
+}
+
+func tailOf(s string) string {
+	if len(s) > 80 {
+		return s[len(s)-80:]
+	}
+	return s
+}
+
 func TestAScanOfNothingIsNotAFailure(t *testing.T) {
 	result, err := scanning(t, "empty", scanner.Limits{})
 	if err != nil {
