@@ -40,13 +40,15 @@ type tier int
 
 const (
 	// A document can break a link to a heading that was renamed, leave a
-	// decision in force that nothing names, fail a Go test that reads it, or
-	// carry a credential. Nothing else in the gate can fail for a prose edit.
+	// decision in force that nothing names, fail a Go test that reads it,
+	// carry a byte a text tool will not read, or carry a credential. Nothing
+	// else in the gate can fail for a prose edit.
 	documents tier = iota
 	// The interface, checked by its own toolchain.
 	web
-	// What the interface installs. A new package can carry a license the
-	// binary may not ship.
+	// What the interface installs and what its bundle imports. A new package
+	// can carry a license the binary may not ship, and an import from the
+	// source can ship a package installed only to build.
 	webPackages
 	// Go that reaches no SQL: the type checks, the analysis gates, the quick
 	// test loop.
@@ -70,13 +72,14 @@ const (
 // runs is what each tier runs, in the order a person wants to see a failure:
 // the fast and specific before the slow and broad.
 //
-// The secret scan is in every tier, because any file can carry a credential,
+// The secret scan is in every tier a change can reach alone, and every other
+// tier comes with one that runs it, because any file can carry a credential,
 // and a credential pushed is in the remote's history before CI reads it.
 var runs = map[tier][]string{
 	// The README and the documentation home share a block pins-check holds
 	// equal.
-	documents:   {"docs-check", "unclaimed", "pins-check", "secrets"},
-	web:         {"web-check", "spdx", "secrets"},
+	documents:   {"docs-check", "unclaimed", "pins-check", "readable", "secrets"},
+	web:         {"web-check", "spdx", "readable", "secrets"},
 	webPackages: {"licenses"},
 	code: {"build", "lint", "vet-other-os", "unreachable", "readable", "negatives", "confined", "granted",
 		"narrowed", "attached", "vendored", "spdx", "pins-check", "sbom-shape", "secrets", "test"},
@@ -208,6 +211,10 @@ const routeTable = "web/src/app/routes.json"
 // webManifests are the files that say what the interface installs.
 var webManifests = []string{"web/package.json", "web/package-lock.json"}
 
+// webSource is the interface's source, which the license check reads for the
+// packages the bundle imports.
+const webSource = "web/src/"
+
 // storage is where the queries, the schema and the harness the tests share
 // live. A change under any of these is portability work whatever it looks
 // like.
@@ -239,7 +246,7 @@ const apiPackage = "internal/httpapi/"
 // portability work, and choosing one of the two drops the other's checks.
 func classify(file string) []tier {
 	switch {
-	case slices.Contains(webManifests, file):
+	case slices.Contains(webManifests, file), strings.HasPrefix(file, webSource):
 		return []tier{web, webPackages}
 	case strings.HasPrefix(file, "web/"):
 		return []tier{web}

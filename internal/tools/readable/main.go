@@ -53,7 +53,7 @@ func text(path string) bool {
 		return true
 	}
 	switch name := filepath.Base(path); name {
-	case "Dockerfile", ".gitignore", ".dockerignore", ".prettierignore":
+	case "Dockerfile", ".gitignore", ".dockerignore", ".prettierignore", "LICENSE", "NOTICE":
 		return true
 	default:
 		// Makefile.demo is a makefile whose extension is not a language.

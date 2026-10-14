@@ -718,11 +718,12 @@ from.
 to consult it. Two things about it are worth knowing here.
 
 A change to documents alone is checked as documents: the document tests,
-`make unclaimed`, `make pins-check` and the secret scan, seconds rather than
-minutes. That covers what a document can actually break — a link pointing at a
-heading that has been renamed, a decision in force that no design document
-names, a Go test that reads the document, the block the README shares with the
-documentation home, and a credential pasted into prose. Nothing else in the
+`make unclaimed`, `make pins-check`, `make readable` and the secret scan,
+seconds rather than minutes. That covers what a document can actually break — a
+link pointing at a heading that has been renamed, a decision in force that no
+design document names, a Go test that reads the document, the block the README
+shares with the documentation home, a control byte that makes a text tool skip
+the file, and a credential pasted into prose. Nothing else in the
 gate can fail for a prose edit. `check-engines` proves four database
 engines ran, which a document cannot affect — it can only pass, and a check
 that can only pass is not evidence. Running it anyway is not caution; it is a

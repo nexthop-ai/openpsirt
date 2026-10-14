@@ -71,7 +71,9 @@ func TestWhichFilesAreReadAsText(t *testing.T) {
 		{"web/public/logo.png", false},
 		{"dist/openpsirt", false},
 		{"assets/font.woff2", false},
-		{"LICENSE", false},
+		{"LICENSE", true},
+		{"NOTICE", true},
+		{"LICENSES", false},
 	} {
 		if got := text(c.path); got != c.want {
 			t.Errorf("%s read as text = %v, want %v", c.path, got, c.want)

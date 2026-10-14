@@ -42,7 +42,8 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 		want []tier
 	}{
 		{"a design document", write("DESIGN-thing.md", "# Thing\n"), []tier{documents}},
-		{"anything under the interface", "web/src/screens/Home.tsx", []tier{web}},
+		{"the interface's source, which the license check reads", "web/src/screens/Home.tsx", []tier{web, webPackages}},
+		{"anything else under the interface", "web/scripts/check.mjs", []tier{web}},
 		{"the module files", "go.mod", []tier{modules}},
 		{"the interface's manifest", "web/package.json", []tier{web, webPackages}},
 		{"the interface's lockfile", "web/package-lock.json", []tier{web, webPackages}},
@@ -245,6 +246,20 @@ func TestEveryNarrowTierScansForSecrets(t *testing.T) {
 	}
 	if !slices.Contains(targets(map[tier]bool{web: true, webPackages: true}), "secrets") {
 		t.Error("the web packages tier reaches no secret scan")
+	}
+}
+
+func TestEveryFileReadableReadsTakesATierRunningIt(t *testing.T) {
+	// readable reads documents and the interface's source, so a control byte
+	// pasted into either fails CI unless the tier the file lands in runs it.
+	for _, file := range []string{"DESIGN-thing.md", "web/src/screens/Home.tsx", "web/scripts/check.mjs"} {
+		reached := map[tier]bool{}
+		for _, tr := range classify(file) {
+			reached[tr] = true
+		}
+		if !slices.Contains(targets(reached), "readable") {
+			t.Errorf("%s takes %v, which does not run readable", file, targets(reached))
+		}
 	}
 }
 

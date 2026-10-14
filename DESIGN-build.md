@@ -165,9 +165,9 @@ query runs both.
 
 | Touched | Adds |
 |---|---|
-| `*.md` alone | `docs-check`, `unclaimed`, `pins-check`, `secrets` |
-| `web/**` alone | `web-check`, `spdx`, `secrets` |
-| the interface's manifest or lockfile | `licenses` as well as the interface's tier |
+| `*.md` alone | `docs-check`, `unclaimed`, `pins-check`, `readable`, `secrets` |
+| `web/**` alone | `web-check`, `spdx`, `readable`, `secrets` |
+| the interface's manifest, lockfile or source | `licenses` as well as the interface's tier |
 | the interface's route table | the Go tier as well as the interface's, because a Go test holds the server's links to it |
 | Go reaching no SQL | `build`, `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
@@ -181,7 +181,7 @@ query runs both.
 | **A path nobody classified takes the whole gate** | The makefile, the container, the chart, an asset, a fixture. Being generous about a handful of paths costs less than a tier that quietly omits one |
 | **A Go file is classified by what the whole file holds** | Not by what the edited lines hold. A change anywhere in a file of queries can move what a query returns |
 | **A file takes every tier it lands in** | A route file holding a query is the API document's input and portability work at once |
-| **Every narrow tier scans for secrets** | Any file can carry a credential, and one pushed is in the remote's history before CI reads it |
+| **Every tier a change reaches alone scans for secrets** | Any file can carry a credential, and one pushed is in the remote's history before CI reads it. The other tiers come with one that runs it |
 | **Every target `check` runs is chosen by some narrow tier** | A test holds the join, so a target added to `check` and to no tier fails it |
 | **`docs-check` tests every package whose tests read a document** | A test holds the list to the tests that climb out of their package to a `.md` file |
 | **A clean tree takes the whole gate** | Nothing there to choose from, and a clean tree before a push is carrying work that is already committed |
