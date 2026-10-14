@@ -159,7 +159,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		reference, err := mintReference(ctx, tx, product, now.Year())
+		reference, err := mintReference(ctx, tx, s.drawer(), product, now.Year())
 		if err != nil {
 			return err
 		}
@@ -354,10 +354,11 @@ var ErrNoSuchIssueHere = refusal.New("no issue here goes by that name")
 // The number is drawn rather than counted, for the same reason: counted from
 // one it is a running total of how many claims this product has received and
 // when the last one arrived, which is a disclosure made by the name alone.
-func mintReference(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
-	return drawNamed(ctx, tx, product, year, naming{
+func mintReference(ctx context.Context, tx bun.IDB, draw drawing, product string,
+	year int) (string, error) {
+	return drawNamed(ctx, tx, draw, product, year, naming{
 		what: "reference", an: "a", pool: "reports of %s in %d", shape: "%s-R-%d-%d",
-		table: "flaw_report", column: "reference",
+		tables: []string{"flaw_report"}, column: "reference",
 	})
 }
 

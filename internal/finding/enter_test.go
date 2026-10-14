@@ -854,3 +854,66 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 		}
 	})
 }
+
+// A name minted for a flaw stays spoken for after the issue is re-filed under a
+// CVE, when the minted name survives only as an alias. Drawn again, it would be
+// resolved to the old issue and the new flaw interned into it.
+func TestAMintedNameKeptOnlyAsAnAliasIsNotDrawnAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		entering := finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		}
+		first, _, err := finding.NewStoreDrawing(f.db.DB, 481907).Enter(ctx, who, entering)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := first[0].VulnerabilityID
+		if err := finding.NewVulnerabilities(f.db.DB).
+			AlsoKnownAs(ctx, who, issue, "CVE-2026-48190"); err != nil {
+			t.Fatal(err)
+		}
+		var filed string
+		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability"`).Column("identifier").
+			Where("id = ?", issue).Scan(ctx, &filed); err != nil {
+			t.Fatal(err)
+		}
+		if filed != "CVE-2026-48190" {
+			t.Fatalf("the issue is filed under %s, want the CVE, so this proves nothing", filed)
+		}
+
+		entering.Summary = "A different flaw in the same component."
+		second, _, err := finding.NewStoreDrawing(f.db.DB, 481907, 123).Enter(ctx, who, entering)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if second[0].VulnerabilityID == issue {
+			t.Error("a second flaw was recorded into the first one's issue under its minted name")
+		}
+	})
+}
+
+// Eight names in a row already spoken for is not luck, and the draw stops and
+// says so rather than looping.
+func TestDrawingOnlyNamesSpokenForStopsAndSaysSo(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		entering := finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		}
+		if _, _, err := finding.NewStoreDrawing(f.db.DB, 7).Enter(ctx, who, entering); err != nil {
+			t.Fatal(err)
+		}
+		entering.Summary = "A different flaw in the same component."
+		_, _, err := finding.NewStoreDrawing(f.db.DB, 7).Enter(ctx, who, entering)
+		if err == nil || !strings.Contains(err.Error(), "nearly all taken") {
+			t.Errorf("drawing nothing but a name in use answered %v, want the draw refused", err)
+		}
+	})
+}

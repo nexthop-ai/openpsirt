@@ -6,6 +6,8 @@ package finding
 import (
 	"context"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 // FixedBecause is how a closure is said in a release note, for the test.
@@ -65,3 +67,20 @@ func (v *Vulnerabilities) InternAlone(ctx context.Context, reported []Named) (ma
 
 // Absorbed is how many issues the last interning merged into another.
 func (v *Vulnerabilities) Absorbed() int { return len(v.absorbed) }
+
+// NewStoreDrawing is a store drawing the identifiers it issues from these
+// numbers, in order, repeating the last.
+//
+// For the test alone: a collision is a one-in-nine-hundred-thousand draw, and
+// the redraw it answers cannot be reached by chance.
+func NewStoreDrawing(db bun.IDB, numbers ...int64) *Store {
+	s := NewStore(db)
+	s.draws = func(int64) (int64, error) {
+		next := numbers[0]
+		if len(numbers) > 1 {
+			numbers = numbers[1:]
+		}
+		return next, nil
+	}
+	return s
+}

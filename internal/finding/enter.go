@@ -395,7 +395,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		}
 		// Minted inside the transaction, so that a name drawn and found
 		// free is still free when the row carrying it is written.
-		identifier, err = mint(ctx, tx, product, now.Year())
+		identifier, err = mint(ctx, tx, s.drawer(), product, now.Year())
 		if err != nil {
 			return err
 		}
@@ -530,7 +530,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// the Inbox is the one list of where flaws came from and the same
 		// fields answer it for both.
 		told := in.Told
-		reference, err := mintReference(ctx, tx, product, now.Year())
+		reference, err := mintReference(ctx, tx, s.drawer(), product, now.Year())
 		if err != nil {
 			return err
 		}
@@ -664,45 +664,62 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 // Drawn from a source fit for the purpose, because guessing the next one is
 // the whole of what this prevents. What happens to a collision is
 // drawIdentifier's, below.
-func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
-	return drawNamed(ctx, tx, product, year, naming{
+//
+// A name is spoken for where any issue is known by it, under the name it is
+// filed by or as an alias: a minted name an issue was later re-filed under a
+// CVE by is still that issue's, and minting it again would intern a new flaw
+// into the old issue. Compared folded, the form an issue is resolved by.
+func mint(ctx context.Context, tx bun.IDB, draw drawing, product string, year int) (string, error) {
+	return drawNamed(ctx, tx, draw, product, year, naming{
 		what: "identifier", an: "an", pool: "%s in %d", shape: "%s-%d-%d",
-		table: "vulnerability", column: "identifier",
+		tables: []string{"vulnerability", "vulnerability_alias"}, column: "identifier_folded",
+		fold: FoldIdentifier,
 	})
 }
 
 // naming is one kind of name a product issues: what it is called, the pool
-// its numbers are drawn from, its shape, and the column that records the
-// names already issued. The table and column are written here in code and
-// never taken from a request.
+// its numbers are drawn from, its shape, and the tables and column that record
+// the names already issued, with the form a candidate is compared in. The
+// tables and column are written here in code and never taken from a request.
 type naming struct {
-	what, an      string
-	pool, shape   string
-	table, column string
+	what, an    string
+	pool, shape string
+	tables      []string
+	column      string
+	fold        func(string) string
 }
 
 // drawNamed issues a name of one kind for a product in a year: the product's
 // name in capitals, the year, and a drawn number, drawn again where the name
 // is spoken for.
-func drawNamed(ctx context.Context, tx bun.IDB, product string, year int, n naming) (string, error) {
+func drawNamed(ctx context.Context, tx bun.IDB, draw drawing, product string, year int,
+	n naming) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
 		return "", refusal.Errorf("a product with no name cannot issue %s %s", n.an, n.what)
 	}
-	return drawIdentifier(ctx, fmt.Sprintf(n.pool, prefix, year),
+	return drawIdentifier(ctx, draw, fmt.Sprintf(n.pool, prefix, year),
 		func(number int64) string {
 			return fmt.Sprintf(n.shape, prefix, year, number)
 		},
 		func(ctx context.Context, candidate string) (bool, error) {
-			taken, err := tx.NewSelect().
-				TableExpr("?", bun.Ident(n.table)).
-				Where("? = ?", bun.Ident(n.column), candidate).
-				Count(ctx)
-			if err != nil {
-				return false, fmt.Errorf(
-					"read whether that %s is spoken for: %w", n.what, err)
+			if n.fold != nil {
+				candidate = n.fold(candidate)
 			}
-			return taken > 0, nil
+			for _, table := range n.tables {
+				taken, err := tx.NewSelect().
+					TableExpr("?", bun.Ident(table)).
+					Where("? = ?", bun.Ident(n.column), candidate).
+					Exists(ctx)
+				if err != nil {
+					return false, fmt.Errorf(
+						"read whether that %s is spoken for: %w", n.what, err)
+				}
+				if taken {
+					return true, nil
+				}
+			}
+			return false, nil
 		})
 }
 
@@ -721,16 +738,16 @@ func drawNamed(ctx context.Context, tx bun.IDB, product string, year int, n nami
 // not block on an insert nobody has committed, so neither of them sees the
 // other here. Eight collisions in a row against a space this size is not luck,
 // and carrying on would be a loop nobody is watching.
-func drawIdentifier(ctx context.Context, issuer string, name func(number int64) string,
+func drawIdentifier(ctx context.Context, draw drawing, issuer string, name func(number int64) string,
 	taken func(ctx context.Context, candidate string) (bool, error)) (string, error) {
 
 	const lowest, span = 100000, 900000
 	for attempt := 0; attempt < 8; attempt++ {
-		drawn, err := rand.Int(rand.Reader, big.NewInt(span))
+		drawn, err := draw(span)
 		if err != nil {
 			return "", fmt.Errorf("draw an identifier: %w", err)
 		}
-		candidate := name(drawn.Int64() + lowest)
+		candidate := name(drawn + lowest)
 		held, err := taken(ctx, candidate)
 		if err != nil {
 			return "", err
@@ -742,6 +759,27 @@ func drawIdentifier(ctx context.Context, issuer string, name func(number int64) 
 	return "", refusal.Errorf(
 		"no identifier could be drawn for %s — the ones it issues are nearly all taken",
 		issuer)
+}
+
+// drawing is a source of numbers nobody can guess, below a bound.
+type drawing func(span int64) (int64, error)
+
+// unguessable draws from a source fit for the purpose.
+func unguessable(span int64) (int64, error) {
+	drawn, err := rand.Int(rand.Reader, big.NewInt(span))
+	if err != nil {
+		return 0, err
+	}
+	return drawn.Int64(), nil
+}
+
+// drawer is where this store draws the numbers it names things with: the
+// unguessable source, unless a test fixed the sequence.
+func (s *Store) drawer() drawing {
+	if s.draws != nil {
+		return s.draws
+	}
+	return unguessable
 }
 
 // productNameOf reads what a product is called, for the identifiers it issues.
