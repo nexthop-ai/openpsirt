@@ -429,7 +429,7 @@ it is the half that matching a claim needs.
 The binary packages one source package was built at one version are one thing to
 a person. curl, libcurl4t64 and libcurl3t64 are one bump; treating them as three
 is three acts that can disagree with each other. Every component carries a
-fold key, written as the scan is applied.
+fold key, written when the component is first stored.
 
 | Part of the key | Separates |
 |---|---|
@@ -475,27 +475,28 @@ The first statement of anything stands, and anything it did not state is taken
 from the next description that does. Nothing is overwritten: two producers
 disagreeing is not something a reader can settle.
 
-The same rule holds across reports. A stored component is filled in by a later
-report describing it, because the scanner takes what a build did not state from
-the stored row.
+A component row is shared by every product shipping the package, and the
+reports describing it come from senders trusted differently: a pipeline key is
+scoped to one product. So across reports the rule is scoped to one product.
 
-| Filled in where the stored row lacks it | Reason |
+| Rule | Reason |
 |---|---|
-| A package-identifier qualifier, key by key | Identity drops qualifiers, so one component arrives with and without them. `distro` selects a distribution's advisories and `upstream` its source package's: a kernel first stored as `pkg:deb/sonic/linux-image…?arch=amd64` matched nothing, and the same package stated with `distro=debian-13&upstream=linux` matches the Debian kernel's advisories |
+| The component row holds what the first report of it stated, and no later report writes its identifiers | A qualifier, a platform enumeration or a source package one product's report wrote onto the shared row reached another product's scanner. One product stating `distro=debian-13` for a package another ships for Debian 12 matched the second against the wrong release's advisories, where the missing qualifier was a gap it could see |
+| What a build states about matching a component is held on its node | The package identifier with its qualifiers, the platform enumeration, and the source package and the version it was built at |
+| What a build did not state is taken from what other builds of the same product stated, earliest first | One product's builds describe one package one way, and a qualifier a later build states for it is what the product means by it |
+| Nothing stated is overwritten | A qualifier is compared key by key without regard to capitals. Two builds disagreeing is not something a reader can settle, so the build's own statement stands |
+| The supplier and the license are filled in on the row where it has none | `DESIGN-findings.md` § Component suppliers. Neither reaches a scanner |
+
+The fold key is worked out once, when the component is first stored, and does
+not move. A later report stating a distribution or a source package is held on
+its build's node, so an upgrade commitment keyed on the fold keeps covering what
+it covered.
+
+| Filled in from a build of the same product where the build left it out | Reason |
+|---|---|
+| A package-identifier qualifier, key by key | Identity drops qualifiers, so one component arrives with and without them. `distro` selects a distribution's advisories and `upstream` its source package's: a kernel stored as `pkg:deb/sonic/linux-image…?arch=amd64` matched nothing, and the same package stated with `distro=debian-13&upstream=linux` matches the Debian kernel's advisories |
 | The platform enumeration | The second identifier a scanner matches on |
-| The source package and the version it was built at | What a finding is explained by and what expiry compares |
-| The supplier and the license | `DESIGN-findings.md` § Component suppliers |
-
-A qualifier already stored stays as written whatever a later report says about
-it, so a later report adds to what is stored and never changes it. The fold
-key is worked out again from the filled row, because it reads the distribution
-and the source package. Identity reads neither, and does not move.
-
-| When the fold key moves | Reason |
-|---|---|
-| Each build holding the component has its upgrade commitment carried to the new key | A commitment is keyed on the fold. Left on the old key it covers nothing open, which reads as landed |
-| A build already committed on the new key keeps that commitment | One commitment per fold per build, and it is the one somebody made for that fold |
-| The commitment on the old key is withdrawn only where nothing the build holds still folds to it | A fold splits when some of its binaries state a distribution and some do not, and each side is still work |
+| The source package and the version it was built at | What the scanner selects a source package's advisories with |
 
 The platform enumeration is kept and excluded from identity. A scanner given one
 matches things a package identifier alone misses — vendor firmware, operating
@@ -511,7 +512,7 @@ node.
 
 | Held on the node | Reason |
 |---|---|
-| The package identifier as the build stated it, qualifiers included, and the platform enumeration. A scanner is given these, with what the build did not state taken from the component, and a VEX statement names the component by the identifier | A distribution qualifier decides which advisories a scanner matches, and two products ship one package version built for two distribution releases |
+| The package identifier as the build stated it, qualifiers included, the platform enumeration, and the source package and its version. A scanner is given these, with what the build did not state taken from other builds of the same product, and a VEX statement names the component by the identifier | A distribution qualifier decides which advisories a scanner matches, and two products ship one package version built for two distribution releases |
 
 A build restating an identifier writes its node where it stands and opens and
 closes nothing: the component has not changed. Every other node an unchanged
@@ -687,8 +688,7 @@ root, against 0.018 s.
 | Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
 | A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
 | Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
-| A fold that splits is committed on both sides | A later report stating a distribution for some of a source package's binaries and not the rest splits its fold, and the commitment is carried to the new key and kept on the old. Revising the claim behind it through one component revises that side alone |
-| Carrying a commitment is not recorded as an act | Nobody made it. The carried commitment keeps who declared it and when |
+| A component's row, and its fold, are what the first report of it stated | A source package or a distribution a later report states reaches that product's scanner from the node, and not the fold, a finding's explanation, a decision's expiry or a claim's match, which read the row. A package first described without its source package folds on its own name in every product |
 | Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
 | A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
 | A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named. A decision is related to a finding by one spelling of the product, the issue and the place. The findings package's queries correlating a decision to a finding compose it, and a test fails a copy written out in that direction. Correlations written the other way round or between other aliases, the triage package's among them, are spelled in place and are outside that test. Each query adds its own condition on liveness, versions and state beside the correlation |

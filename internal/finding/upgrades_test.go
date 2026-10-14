@@ -719,11 +719,11 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 	}
 }
 
-func TestACommitmentFollowsAFoldALaterInventoryMoves(t *testing.T) {
+func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 	// A later inventory stating a distribution the stored component lacked
-	// moves its fold key. A commitment left on the old key covers nothing open,
-	// which reads as landed: the plan would say the bump shipped when nothing
-	// changed.
+	// is held on the build's node, and the shared component row and its fold
+	// key stay as first stored. The commitment on the fold still covers what
+	// is open, so the plan does not read as landed when nothing changed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -761,8 +761,8 @@ func TestACommitmentFollowsAFoldALaterInventoryMoves(t *testing.T) {
 		if len(planned) != 1 {
 			t.Fatalf("%d commitments, want the one made", len(planned))
 		}
-		if planned[0].Fold != stated.FoldKey() {
-			t.Error("the commitment stayed on the fold the component left")
+		if planned[0].Fold != libnl.FoldKey() {
+			t.Error("the commitment moved off the fold the component is stored on")
 		}
 		if planned[0].State != finding.UpgradePlanned || planned[0].Issues != 1 {
 			t.Errorf("the commitment reads %s with %d open, want planned with the one",

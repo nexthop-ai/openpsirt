@@ -113,6 +113,8 @@ func seedV080Images(t *testing.T, ctx context.Context, db *database.DB) v080Worl
 	w.layerB = stated("pkg:oci/layer@sha256:bbb", "layer", "sha256:bbb")
 	w.gap1 = stated("pkg:oci/docker-gap@master.1", "docker-gap", "master.1")
 	w.gap2 = stated("pkg:oci/docker-gap@master.3", "docker-gap", "master.3")
+	exec(`UPDATE "component" SET "upstream_name" = ?, "upstream_version" = ? WHERE "id" = ?`,
+		"libnl3", "3.7.0", w.libnl)
 
 	node := func(componentID int64, root bool, opened int64, closed any, purl any) int64 {
 		t.Helper()
@@ -234,6 +236,31 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 		w := seedV080Images(t, ctx, db)
 		dbtest.MigrateTo(t, db, v090)
 		imagesAreMergedV090(t, ctx, db, w)
+
+		t.Run("EachNodeHoldsTheSourcePackageItsComponentHeld", func(t *testing.T) {
+			var held []struct {
+				ComponentID     int64   `bun:"component_id"`
+				UpstreamName    *string `bun:"upstream_name"`
+				UpstreamVersion *string `bun:"upstream_version"`
+			}
+			if err := db.DB.NewRaw(`SELECT "component_id", "upstream_name", "upstream_version"
+				FROM "graph_node" WHERE "target_id" = ?`, w.target).Scan(ctx, &held); err != nil {
+				t.Fatal(err)
+			}
+			if len(held) == 0 {
+				t.Fatal("no nodes were read, so this checked nothing")
+			}
+			for _, n := range held {
+				libnl := n.ComponentID == w.libnl
+				switch {
+				case libnl && (n.UpstreamName == nil || *n.UpstreamName != "libnl3" ||
+					n.UpstreamVersion == nil || *n.UpstreamVersion != "3.7.0"):
+					t.Errorf("libnl's node holds %v %v, want libnl3 3.7.0", n.UpstreamName, n.UpstreamVersion)
+				case !libnl && (n.UpstreamName != nil || n.UpstreamVersion != nil):
+					t.Errorf("component %d's node was given a source package", n.ComponentID)
+				}
+			}
+		})
 
 		t.Run("TheNextRebuildMovesOnlyTheVersion", func(t *testing.T) {
 			rec, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{

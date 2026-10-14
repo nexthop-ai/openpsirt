@@ -420,9 +420,6 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		func(d Described) string { return d.License }); err != nil {
 		return nil, err
 	}
-	if err := c.fillIdentifiers(ctx, byIdentity, known); err != nil {
-		return nil, err
-	}
 	if len(missing) > 0 {
 		// Two writers describing the same component are agreeing. The
 		// read above is inside the caller's transaction, which satisfies the
@@ -436,7 +433,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		//
 		// A component row is content-addressed, so leaving somebody else's
 		// alone loses nothing its identity depends on. What this description
-		// states and theirs does not is filled in by the next report of it.
+		// states about matching it is held on the build's node.
 		if err := database.InBatchesKeeping(ctx, c.db, missing); err != nil {
 			return nil, fmt.Errorf("record %d new components: %w", len(missing), err)
 		}
@@ -826,145 +823,6 @@ func (c *Components) fillBlank(ctx context.Context, column, what string,
 		})
 		if err != nil {
 			return fmt.Errorf("record %s %d components: %w", what, len(ids), err)
-		}
-	}
-	return nil
-}
-
-// fillIdentifiers writes onto stored components what a later report says about
-// matching them and the stored row does not: package-identifier qualifiers, a
-// CPE, and the source package a component was built from.
-//
-// The scanner takes what a build did not state from the stored row, so a
-// component first interned without `distro` or `upstream` is otherwise never
-// matched against its distribution's advisories, however many later reports
-// state them. The merge is FillFrom's: nothing stated is overwritten,
-// so what is stored does not depend on which report came last.
-//
-// The fold key is worked out again from the filled row, because it is derived
-// from the distribution and the source package. Only rows that change are
-// written. Nothing about identity moves: identity drops qualifiers and never
-// reads the other two.
-func (c *Components) fillIdentifiers(ctx context.Context,
-	described map[string]Described, known map[string]int64) error {
-
-	ids := make([]int64, 0, len(known))
-	for identity, id := range known {
-		if _, have := described[identity]; have {
-			ids = append(ids, id)
-		}
-	}
-	var stored []Component
-	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var rows []Component
-		if err := c.db.NewSelect().Model(&rows).
-			Column("id", "identity", "purl", "cpe", "name", "version",
-				"upstream_name", "upstream_version", "fold_key").
-			Where("id IN (?)", bun.List(batch)).
-			Scan(ctx); err != nil {
-			return err
-		}
-		stored = append(stored, rows...)
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("read what %d components are identified by: %w", len(ids), err)
-	}
-
-	for _, row := range stored {
-		was := Described{
-			Purl: row.Purl, CPE: row.CPE, Name: row.Name, Version: row.Version,
-			UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-		}
-		filled := was
-		filled.FillFrom(described[row.Identity])
-		if filled.Purl == was.Purl && filled.CPE == was.CPE &&
-			filled.UpstreamName == was.UpstreamName &&
-			filled.UpstreamVersion == was.UpstreamVersion {
-			continue
-		}
-		update := c.db.NewUpdate().Model((*Component)(nil)).Where("id = ?", row.ID)
-		for _, column := range []struct{ name, value string }{
-			{"purl", filled.Purl},
-			{"cpe", filled.CPE},
-			{"upstream_name", filled.UpstreamName},
-			{"upstream_version", filled.UpstreamVersion},
-			{"upstream_folded", Folded(filled.UpstreamName)},
-			{"fold_key", filled.FoldKey()},
-		} {
-			update = update.Set("? = ?", bun.Ident(column.name), column.value)
-		}
-		if _, err := update.Exec(ctx); err != nil {
-			return fmt.Errorf("record what identifies %s %s: %w", row.Name, row.Version, err)
-		}
-		if moved := filled.FoldKey(); moved != row.FoldKey {
-			if err := c.carryCommitments(ctx, row.ID, row.FoldKey, moved); err != nil {
-				return fmt.Errorf("carry what was committed for %s %s: %w", row.Name, row.Version, err)
-			}
-		}
-	}
-	return nil
-}
-
-// commitment is the part of an upgrade commitment that moves with a fold. The
-// commitment itself is the finding package's, which reads this package rather
-// than the other way round.
-type commitment struct {
-	bun.BaseModel `bun:"table:upgrade,alias:ug"`
-
-	ID          int64      `bun:"id,pk,autoincrement"`
-	TargetID    int64      `bun:"target_id,notnull"`
-	FoldKey     string     `bun:"fold_key,notnull"`
-	FromVersion string     `bun:"from_version,notnull"`
-	ToVersion   string     `bun:"to_version,notnull"`
-	CommittedTo *time.Time `bun:"committed_to"`
-	ClaimID     *int64     `bun:"claim_id"`
-	DeclaredBy  int64      `bun:"declared_by,notnull"`
-	DeclaredAt  time.Time  `bun:"declared_at,notnull"`
-}
-
-// carryCommitments moves the upgrade commitments on a fold a component has
-// left onto the fold it has joined, in every build holding it.
-//
-// A commitment is keyed on the fold. Left on the old key it covers nothing
-// open, which is what landed means, so the build's plan would say the bump
-// shipped when nothing changed. A build already committed on the new fold
-// keeps that commitment. The old one is withdrawn only where nothing the build
-// holds still folds to it: a fold that splits, with some of its binaries
-// stating a distribution and some not, is committed on both sides.
-func (c *Components) carryCommitments(ctx context.Context, componentID int64, from, to string) error {
-	var committed []commitment
-	if err := c.db.NewSelect().Model(&committed).
-		Where("ug.fold_key = ?", from).
-		Where(`ug.target_id IN (SELECT n.target_id FROM "graph_node" AS "n"
-			WHERE n.component_id = ? AND n.closed_scan_id IS NULL AND n.is_root = ?)`,
-			componentID, false).
-		Scan(ctx); err != nil {
-		return fmt.Errorf("read the commitments on its fold: %w", err)
-	}
-	for _, one := range committed {
-		already, err := c.db.NewSelect().Model((*commitment)(nil)).
-			Where("ug.target_id = ?", one.TargetID).
-			Where("ug.fold_key = ?", to).
-			Exists(ctx)
-		if err != nil {
-			return fmt.Errorf("read what the build commits on the new fold: %w", err)
-		}
-		if !already {
-			carried := one
-			carried.ID, carried.FoldKey = 0, to
-			if _, err := c.db.NewInsert().Model(&carried).Exec(ctx); err != nil {
-				return fmt.Errorf("commit the build on the new fold: %w", err)
-			}
-		}
-		if _, err := c.db.NewDelete().Model((*commitment)(nil)).
-			Where("id = ?", one.ID).
-			Where(`NOT EXISTS (SELECT 1 FROM "graph_node" AS "n"
-				JOIN "component" AS "c" ON c.id = n.component_id
-				WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.is_root = ?
-				AND c.fold_key = ?)`, one.TargetID, false, from).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("withdraw the commitment on the fold it left: %w", err)
 		}
 	}
 	return nil

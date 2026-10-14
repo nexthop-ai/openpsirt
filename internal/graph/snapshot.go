@@ -40,6 +40,12 @@ type Node struct {
 	// given these.
 	Purl string `bun:"purl,nullzero"`
 	CPE  string `bun:"cpe,nullzero"`
+	// UpstreamName and UpstreamVersion are the source package this build
+	// stated the component was built from, and the version it was built at.
+	// The component row holds what the first report of it stated, which can
+	// be another product's.
+	UpstreamName    string `bun:"upstream_name,nullzero"`
+	UpstreamVersion string `bun:"upstream_version,nullzero"`
 }
 
 // Edge is one component depending on another.
@@ -192,7 +198,11 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			stored := asStored(d)
 			id := ids[stored.Identity()]
 			if _, already := wanted[id]; !already {
-				wanted[id] = stated{purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE)}
+				wanted[id] = stated{
+					purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
+					upstreamName:    strings.TrimSpace(stored.UpstreamName),
+					upstreamVersion: strings.TrimSpace(stored.UpstreamVersion),
+				}
 			}
 		}
 
@@ -244,39 +254,47 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 // next night. Re-scanning a year-old release against today's vulnerability
 // data works from this, which is why what is not stored can never be scanned.
 //
-// The identifiers are the ones this build stated, from its node. What the
-// build did not state is taken from the shared row, which later reports fill
-// in, and nothing the build stated is replaced by it: the row carries what
-// other products stated, and a scanner given another product's distribution
-// in place of this build's matches the wrong advisories.
+// The identifiers and the source package are the ones this build stated, from
+// its node. What the build did not state is taken from what other builds of
+// the same product stated for the component, earliest first, and nothing the
+// build stated is replaced by it. Never from another product: a pipeline key
+// scoped to one product would otherwise decide which advisories another
+// product's scanner matches. The component row is not read for them at all,
+// because it holds whichever report first described the component.
 func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Described, error) {
 	var rows []struct {
+		ComponentID     int64  `bun:"component_id"`
 		Name            string `bun:"name"`
 		Version         string `bun:"version"`
 		UpstreamName    string `bun:"upstream_name"`
 		UpstreamVersion string `bun:"upstream_version"`
 		Purl            string `bun:"purl"`
 		CPE             string `bun:"cpe"`
-		SharedPurl      string `bun:"shared_purl"`
-		SharedCPE       string `bun:"shared_cpe"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		ColumnExpr(`c.id AS "component_id"`).
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.upstream_name AS "upstream_name"`).
-		ColumnExpr(`c.upstream_version AS "upstream_version"`).
+		ColumnExpr(`n.upstream_name AS "upstream_name"`).
+		ColumnExpr(`n.upstream_version AS "upstream_version"`).
 		ColumnExpr(`n.purl AS "purl"`).
 		ColumnExpr(`n.cpe AS "cpe"`).
-		ColumnExpr(`c.purl AS "shared_purl"`).
-		ColumnExpr(`c.cpe AS "shared_cpe"`).
 		Where("n.target_id = ?", targetID).
 		Where("n.closed_scan_id IS NULL").
 		Where("n.is_root = ?", false).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a target contains: %w", err)
+	}
+	ids := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ComponentID)
+	}
+	others, err := s.statedInProduct(ctx, targetID, ids)
+	if err != nil {
+		return nil, err
 	}
 
 	described := make([]Described, 0, len(rows))
@@ -285,10 +303,72 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 			Purl: row.Purl, CPE: row.CPE, Name: row.Name, Version: row.Version,
 			UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
 		}
-		stated.FillFrom(Described{Purl: row.SharedPurl, CPE: row.SharedCPE})
+		for _, other := range others[row.ComponentID] {
+			stated.FillFrom(other)
+		}
 		described = append(described, stated)
 	}
 	return described, nil
+}
+
+// statedInProduct is what the other builds of a target's product stated for
+// each of these components, earliest statement first. Only nodes that state
+// something are read.
+func (s *Store) statedInProduct(ctx context.Context, targetID int64,
+	componentIDs []int64) (map[int64][]Described, error) {
+
+	out := make(map[int64][]Described, len(componentIDs))
+	if len(componentIDs) == 0 {
+		return out, nil
+	}
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	if err != nil {
+		return nil, err
+	}
+	err = database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
+		var rows []struct {
+			ComponentID     int64  `bun:"component_id"`
+			Purl            string `bun:"purl"`
+			CPE             string `bun:"cpe"`
+			UpstreamName    string `bun:"upstream_name"`
+			UpstreamVersion string `bun:"upstream_version"`
+		}
+		err := s.db.NewSelect().
+			TableExpr(`"graph_node" AS "n"`).
+			ColumnExpr(`n.component_id AS "component_id"`).
+			ColumnExpr(`n.purl AS "purl"`).
+			ColumnExpr(`n.cpe AS "cpe"`).
+			ColumnExpr(`n.upstream_name AS "upstream_name"`).
+			ColumnExpr(`n.upstream_version AS "upstream_version"`).
+			// By build first, which the node index leads with: a product
+			// has a handful of builds and the node table holds every
+			// product's history.
+			Where(`n.target_id IN (SELECT tg.id FROM "target" AS "tg"
+				JOIN "stream" AS "st" ON st.id = tg.stream_id
+				WHERE st.product_id = ? AND tg.id <> ?)`, productID, targetID).
+			Where("n.component_id IN (?)", bun.List(batch)).
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.Where("n.purl IS NOT NULL").
+					WhereOr("n.cpe IS NOT NULL").
+					WhereOr("n.upstream_name IS NOT NULL")
+			}).
+			OrderExpr("n.opened_scan_id, n.id").
+			Scan(ctx, &rows)
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			out[row.ComponentID] = append(out[row.ComponentID], Described{
+				Purl: row.Purl, CPE: row.CPE,
+				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read what the product's other builds state: %w", err)
+	}
+	return out, nil
 }
 
 // ErrAmbiguous says a name matched more than one component and no version was

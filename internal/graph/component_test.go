@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -373,53 +374,32 @@ func TestAQualifierOneDescriptionLacksIsTakenFromAnother(t *testing.T) {
 	}
 }
 
-func TestALaterReportFillsInWhatAScannerMatchesOn(t *testing.T) {
-	// The scanner takes what a build did not state from the stored row. A
-	// component first interned without the qualifiers that select its
-	// distribution's advisories is otherwise never matched, however many
-	// later reports state them.
+func TestALaterReportLeavesTheSharedRowAsFirstStored(t *testing.T) {
+	// A component row is shared by every product shipping the package. What a
+	// later report states about matching it belongs to that report's build,
+	// and written onto the shared row it would reach another product's
+	// scanner.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		components := graph.NewComponents(f.db.DB)
 		bare := graph.Described{
 			Purl: "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64",
 			Name: "linux-image", Version: "6.12.41-1",
-			UpstreamName: "private-sonic-linux-kernel",
 		}
 		if _, err := components.Intern(ctx, []graph.Described{bare}); err != nil {
 			t.Fatal(err)
 		}
-
 		stated := bare
 		stated.Purl = "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64&distro=debian-13&upstream=linux"
 		stated.CPE = "cpe:2.3:a:linux-image:linux-image:6.12.41-1:*:*:*:*:*:*:*"
-		stated.UpstreamName = "linux"
+		stated.UpstreamName = "Linux"
 		if _, err := components.Intern(ctx, []graph.Described{stated}); err != nil {
 			t.Fatal(err)
 		}
-		want := bare
-		want.Purl, want.CPE = stated.Purl, stated.CPE
 		got := identifiedBy(t, f, bare.Identity())
-		if got.Purl != want.Purl || got.CPE != want.CPE {
-			t.Errorf("after a report stating them, the row is identified by\n  %s\n  %s", got.Purl, got.CPE)
-		}
-		// The source package the row already named stands, and the fold key
-		// follows the distribution the row now states.
-		if got.UpstreamName != "private-sonic-linux-kernel" {
-			t.Errorf("the source package was overwritten with %q", got.UpstreamName)
-		}
-		if got.FoldKey != want.FoldKey() {
-			t.Error("the fold key was not worked out again from the filled row")
-		}
-
-		// Nothing overwrites a qualifier once stored.
-		other := bare
-		other.Purl = "pkg:deb/sonic/linux-image@6.12.41-1?arch=arm64&distro=debian-12"
-		if _, err := components.Intern(ctx, []graph.Described{other}); err != nil {
-			t.Fatal(err)
-		}
-		if got := identifiedBy(t, f, bare.Identity()); got.Purl != want.Purl {
-			t.Errorf("a later report overwrote the identifier with %s", got.Purl)
+		if got.Purl != bare.Purl || got.CPE != "" || got.UpstreamName != "" ||
+			got.UpstreamFolded != "" || got.FoldKey != bare.FoldKey() {
+			t.Errorf("a later report rewrote the shared row: %+v", got)
 		}
 	})
 }
@@ -465,31 +445,62 @@ func TestTheScannerIsHandedWhatALaterInventoryStated(t *testing.T) {
 	})
 }
 
-func TestALaterReportNamesTheSourcePackageAStoredRowLacks(t *testing.T) {
-	// A reader turns `upstream=linux` into the source package, so a kernel
-	// first stored without one is given it by the later report, and the fold
-	// key moves with it.
+func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
+	// A pipeline key is scoped to one product. What its scans state about a
+	// package reaches that product's builds and no other's: a distribution
+	// qualifier another product stated would match this product against the
+	// wrong release's advisories, where the missing one is a gap it can see.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		components := graph.NewComponents(f.db.DB)
-		bare := graph.Described{
-			Purl: "pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64",
-			Name: "linux-image", Version: "6.12.41-1",
+		other := f.world.DeclareProduct("edge", "Edge")
+		otherStream := f.world.DeclareStream(other, "main", catalog.Branch, nil)
+		otherVariant := f.world.DeclareVariant(other, "box", true)
+		theirs := f.world.TargetFor(otherStream, otherVariant).ID
+		sibling := f.world.TargetFor(f.world.Branch, f.world.Internal).ID
+
+		holding := func(d graph.Described) graph.Snapshot {
+			return graph.Snapshot{
+				Root:         root,
+				Components:   []graph.Described{d},
+				Dependencies: []graph.Dependency{{Parent: root, Child: d}},
+			}
 		}
-		if _, err := components.Intern(ctx, []graph.Described{bare}); err != nil {
+		bare := graph.Described{Purl: "pkg:deb/debian/openssl@3.0.11-1", Name: "openssl", Version: "3.0.11-1"}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), holding(bare)); err != nil {
 			t.Fatal(err)
 		}
 		stated := bare
-		stated.UpstreamName = "Linux"
-		if _, err := components.Intern(ctx, []graph.Described{stated}); err != nil {
+		stated.Purl = "pkg:deb/debian/openssl@3.0.11-1?distro=debian-13&upstream=openssl"
+		stated.UpstreamName, stated.UpstreamVersion = "openssl", "3.0.11"
+		if _, err := f.store.Apply(ctx, theirs, f.scanOf(t, theirs), holding(stated)); err != nil {
 			t.Fatal(err)
 		}
-		got := identifiedBy(t, f, bare.Identity())
-		if got.UpstreamName != "Linux" || got.UpstreamFolded != "linux" {
-			t.Errorf("the source package is stored as %q, folded %q", got.UpstreamName, got.UpstreamFolded)
+
+		held := func(target int64) graph.Described {
+			t.Helper()
+			listed, err := f.store.CurrentComponents(ctx, target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(listed) != 1 {
+				t.Fatalf("the build holds %+v, want openssl alone", listed)
+			}
+			return listed[0]
 		}
-		if got.FoldKey != stated.FoldKey() {
-			t.Error("the fold key did not follow the source package")
+		if got := held(f.targetID); got.Purl != bare.Purl || got.UpstreamName != "" {
+			t.Errorf("another product's scan changed what this build's scanner is given: %+v", got)
+		}
+		if got := held(theirs); got.Purl != stated.Purl || got.UpstreamVersion != "3.0.11" {
+			t.Errorf("the stating product's scanner is given %+v", got)
+		}
+
+		// Another build of the same product stating it fills in what this
+		// build did not.
+		if _, err := f.store.Apply(ctx, sibling, f.scanOf(t, sibling), holding(stated)); err != nil {
+			t.Fatal(err)
+		}
+		if got := held(f.targetID); got.Purl != stated.Purl || got.UpstreamName != "openssl" {
+			t.Errorf("a build of the same product stating it left this build's scanner given %+v", got)
 		}
 	})
 }

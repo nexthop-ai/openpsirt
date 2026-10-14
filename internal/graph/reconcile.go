@@ -46,7 +46,9 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			if node.IsRoot != says.isRoot {
 				reroot[node.ID] = says.isRoot
 			}
-			if node.Purl != says.purl || node.CPE != says.cpe {
+			if node.Purl != says.purl || node.CPE != says.cpe ||
+				node.UpstreamName != says.upstreamName ||
+				node.UpstreamVersion != says.upstreamVersion {
 				restated[node.ID] = says
 			}
 			continue
@@ -63,6 +65,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			TargetID: targetID, ComponentID: componentID,
 			IsRoot: says.isRoot, OpenedScanID: scanID,
 			Purl: says.purl, CPE: says.cpe,
+			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
 		})
 	}
 	// One statement per node. A build restates an identifier rarely, and
@@ -72,6 +75,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		if _, err := tx.NewUpdate().Model((*Node)(nil)).
 			Set("purl = ?", nullable(says.purl)).
 			Set("cpe = ?", nullable(says.cpe)).
+			Set("upstream_name = ?", nullable(says.upstreamName)).
+			Set("upstream_version = ?", nullable(says.upstreamVersion)).
 			Where("id = ?", id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
@@ -125,10 +130,12 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 }
 
 // stated is what a scan says about one component's place in a build: whether
-// it is the build's root, and the identifiers the build stated for it.
+// it is the build's root, and the identifiers and source package the build
+// stated for it.
 type stated struct {
-	isRoot    bool
-	purl, cpe string
+	isRoot                        bool
+	purl, cpe                     string
+	upstreamName, upstreamVersion string
 }
 
 // nullable is a stated identifier as the column holds it: absent where the
