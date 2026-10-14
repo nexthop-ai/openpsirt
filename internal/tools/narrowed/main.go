@@ -26,13 +26,15 @@
 // The names, and the address resolved from them. A build resolved this way
 // is almost never read directly: it is handed to the call that turns a release
 // and a variant into a build, and the finding query is keyed on what that
-// returned. So what a resolver hands back is followed as another name, and
-// what a route collects into a list of builds with it, whether bound by an
-// assignment or by `var`. Anything further — a resolution used inline without
-// being bound, a value carried through a struct field, or out of the function
-// and back — is not followed, because a gate that did would be an analysis
-// rather than a check. What it buys is that the next call site arrives announced rather than
-// discovered.
+// returned. So what a resolver hands back is followed as another name, and so
+// is whatever a route copies, collects or builds a value from with it, however
+// many hops away, whether bound by an assignment or by `var`. A use is the
+// name itself handed on as well as a field read off it, and the call that
+// decides is the innermost one around the use. Anything further — a
+// resolution used inline without being bound, or a value carried out of the
+// function and back — is not followed, because a gate that did would be an
+// analysis rather than a check. What it buys is that the next call site
+// arrives announced rather than discovered.
 package main
 
 import (
@@ -113,26 +115,7 @@ func main() {
 			if body == nil {
 				return true
 			}
-			// Only what this function holds directly. Anything inside a
-			// closure is checked when the walk reaches that closure.
-			inner := func(at token.Pos) bool {
-				for _, lit := range closures {
-					if lit.Body == body {
-						continue
-					}
-					if lit.Pos() < at && at < lit.End() &&
-						body.Pos() < lit.Pos() && lit.End() < body.End() {
-						return true
-					}
-				}
-				return false
-			}
-			resolved := resolvedIn(body)
-			for name, at := range resolved {
-				if inner(at) {
-					delete(resolved, name)
-				}
-			}
+			resolved := resolvedOutside(body, closures)
 			loose, held, followed := looseIn(body, resolved)
 			sites += held
 			derived += followed
@@ -170,6 +153,36 @@ func main() {
 	fmt.Printf("every build resolved for a case collaborator is read with a subject "+
 		"(%d resolutions and %d addresses resolved from them, in %d files)\n",
 		sites, derived, read)
+}
+
+// resolvedOutside is resolvedIn for what this function holds directly.
+// Anything inside a closure is checked when the walk reaches that closure. A
+// name bound more than once is kept while any of its bindings is this
+// function's own: a closure rebinding it does not take the outer resolution
+// away.
+func resolvedOutside(body *ast.BlockStmt, closures []*ast.FuncLit) map[string]token.Pos {
+	inner := func(at token.Pos) bool {
+		for _, lit := range closures {
+			if lit.Body == body {
+				continue
+			}
+			if lit.Pos() < at && at < lit.End() &&
+				body.Pos() < lit.Pos() && lit.End() < body.End() {
+				return true
+			}
+		}
+		return false
+	}
+	resolved := map[string]token.Pos{}
+	for name, positions := range resolvedIn(body) {
+		for _, at := range positions {
+			if !inner(at) {
+				resolved[name] = at
+				break
+			}
+		}
+	}
+	return resolved
 }
 
 // looseIn is every use of a resolved build in this function that nothing
@@ -225,14 +238,17 @@ func functionBody(node ast.Node) *ast.BlockStmt {
 // of two shapes, is a resolution like any other — and reading only the top
 // level made three of them invisible, two of which arrived in the change that
 // added this program.
-func resolvedIn(body *ast.BlockStmt) map[string]token.Pos {
-	found := map[string]token.Pos{}
+//
+// Every binding of a name, because a closure may bind the same name again and
+// the last binding read alone would decide the outer one away.
+func resolvedIn(body *ast.BlockStmt) map[string][]token.Pos {
+	found := map[string][]token.Pos{}
 	ast.Inspect(body, func(node ast.Node) bool {
 		name, call, at, ok := binding(node)
 		if !ok || !permissive[called(call)] {
 			return true
 		}
-		found[name] = at
+		found[name] = append(found[name], at)
 		return true
 	})
 	return found
@@ -264,37 +280,90 @@ func binding(node ast.Node) (name string, call *ast.CallExpr, at token.Pos, ok b
 	return first.Name, call, at, true
 }
 
-// derivedIn returns what a call that resolves the rest of an address was bound
-// to, given the names already resolved.
+// derivedIn returns every name bound from the names already resolved, followed
+// to a fixed point.
 //
 // The hop that consumed the check. Almost every site hands the resolved
 // names straight to one of the address resolvers and then reads through what
 // that returned, so the one use this program could see was the exempt one and
 // there was nothing left to check. The build a resolver hands back stands for
-// the same permissive resolution, so it is followed as another name.
+// the same permissive resolution, so it is followed as another name; so is a
+// value copied or collected from one, however many hops away.
+//
+// A call carrying the subject is where a resolved build is narrowed, so what
+// it returns is not followed. Nor is a call's error, which says whether it
+// answered rather than what it answered about.
 func derivedIn(body *ast.BlockStmt, from map[string]token.Pos) map[string]token.Pos {
+	known := map[string]token.Pos{}
+	for name, at := range from {
+		known[name] = at
+	}
 	found := map[string]token.Pos{}
-	ast.Inspect(body, func(node ast.Node) bool {
-		name, call, at, ok := binding(node)
-		if !ok {
+	for grew := true; grew; {
+		grew = false
+		ast.Inspect(body, func(node ast.Node) bool {
+			for _, bound := range bindings(node) {
+				if _, already := known[bound.name]; already || !mentions(bound.from, known) {
+					continue
+				}
+				if call, isCall := bound.from.(*ast.CallExpr); isCall && carriesSubject(call) {
+					continue
+				}
+				known[bound.name], found[bound.name] = bound.at, bound.at
+				grew = true
+			}
 			return true
-		}
-		if _, address := resolving[called(call)]; !address {
-			return true
-		}
-		if !mentions(call, from) {
-			return true
-		}
-		found[name] = at
-		return true
-	})
+		})
+	}
 	return found
 }
 
-// mentions reports whether a call reads one of these names.
-func mentions(call *ast.CallExpr, names map[string]token.Pos) bool {
+// bound is one name and the value it is bound from.
+type bound struct {
+	name string
+	from ast.Expr
+	at   token.Pos
+}
+
+// bindings is each name an assignment or a declaration binds, paired with the
+// value it is bound from: one for one where both sides list as many, and the
+// first name alone where one call answers several, since the rest are what a
+// call says about its own answer. Names bound to `_` are left out.
+func bindings(node ast.Node) []bound {
+	var lhs, rhs []ast.Expr
+	var at token.Pos
+	switch b := node.(type) {
+	case *ast.AssignStmt:
+		lhs, rhs, at = b.Lhs, b.Rhs, b.Pos()
+	case *ast.ValueSpec:
+		for _, n := range b.Names {
+			lhs = append(lhs, n)
+		}
+		rhs, at = b.Values, b.Pos()
+	default:
+		return nil
+	}
+	var out []bound
+	pair := func(left, right ast.Expr) {
+		if named, isName := left.(*ast.Ident); isName && named.Name != "_" {
+			out = append(out, bound{name: named.Name, from: right, at: at})
+		}
+	}
+	switch {
+	case len(lhs) == len(rhs):
+		for i := range lhs {
+			pair(lhs[i], rhs[i])
+		}
+	case len(rhs) == 1 && len(lhs) > 0:
+		pair(lhs[0], rhs[0])
+	}
+	return out
+}
+
+// mentions reports whether an expression reads one of these names.
+func mentions(expr ast.Node, names map[string]token.Pos) bool {
 	seen := false
-	ast.Inspect(call, func(node ast.Node) bool {
+	ast.Inspect(expr, func(node ast.Node) bool {
 		base, ok := node.(*ast.Ident)
 		if !ok {
 			return true
@@ -320,6 +389,11 @@ func called(call *ast.CallExpr) string {
 
 // unguarded finds every use of a resolved build that no call carrying the
 // subject covers.
+//
+// A use is the name read: a field of it, or the name itself handed on. The
+// call that decides is the innermost one around the use, because that is the
+// call the value reaches. A subject carried by a call further out is carried
+// to that call, not to whatever the inner one did with the build first.
 func unguarded(body *ast.BlockStmt, name string) []token.Pos {
 	var loose []token.Pos
 	// path is where the walk currently is. Every node is pushed on the way
@@ -336,36 +410,57 @@ func unguarded(body *ast.BlockStmt, name string) []token.Pos {
 		}
 		path = append(path, node)
 
-		selector, ok := node.(*ast.SelectorExpr)
-		if !ok {
+		used, ok := node.(*ast.Ident)
+		if !ok || used.Name != name || len(path) < 2 {
 			return true
 		}
-		base, ok := selector.X.(*ast.Ident)
-		if !ok || base.Name != name {
+		// The name as a selector's field, or as the key of a composite
+		// literal, is some other thing's name.
+		if selector, ok := path[len(path)-2].(*ast.SelectorExpr); ok && selector.Sel == used {
 			return true
 		}
-		inACall := false
-		for _, above := range path {
-			call, ok := above.(*ast.CallExpr)
+		if pair, ok := path[len(path)-2].(*ast.KeyValueExpr); ok && pair.Key == used {
+			return true
+		}
+		for i := len(path) - 2; i >= 0; i-- {
+			call, ok := path[i].(*ast.CallExpr)
 			if !ok {
 				continue
 			}
-			inACall = true
+			// A conversion hands the value on unchanged, so the call that
+			// decides is the one around it.
+			if converts(call) {
+				continue
+			}
 			if carriesSubject(call) {
 				return true
 			}
 			if _, address := resolving[called(call)]; address {
 				return true
 			}
-		}
-		// Returned rather than read: a resolver hands the names back, and its
-		// own callers are checked here too.
-		if inACall {
-			loose = append(loose, selector.Pos())
+			// Returned rather than read where no call holds it: a resolver
+			// hands the names back, and its own callers are checked here
+			// too.
+			loose = append(loose, used.Pos())
+			return true
 		}
 		return true
 	})
 	return loose
+}
+
+// converts reports whether a call is a conversion to a basic type, which hands
+// its argument on rather than reading it.
+func converts(call *ast.CallExpr) bool {
+	named, ok := call.Fun.(*ast.Ident)
+	if !ok || len(call.Args) != 1 {
+		return false
+	}
+	switch named.Name {
+	case "int", "int32", "int64", "uint", "uint32", "uint64", "string":
+		return true
+	}
+	return false
 }
 
 // refused reports whether the function opens by asking the subject about the
@@ -380,45 +475,70 @@ func unguarded(body *ast.BlockStmt, name string) []token.Pos {
 // went past it.
 func refusedIn(body *ast.BlockStmt, names map[string]token.Pos) bool {
 	for _, statement := range body.List {
-		branch, ok := statement.(*ast.IfStmt)
-		if !ok {
-			continue
-		}
-		// It has to turn somebody away. A question whose answer *widens* what
-		// follows — "may they also read what nobody has disclosed?" — is the
-		// same shape and the opposite act, and taking it for a refusal
-		// exempts the function that asks it.
-		if !leaves(branch) {
-			continue
-		}
-		asksSubject, namesBuild := false, false
-		ast.Inspect(branch.Cond, func(node ast.Node) bool {
-			if call, ok := node.(*ast.CallExpr); ok && carriesSubject(call) {
-				asksSubject = true
+		switch branch := statement.(type) {
+		case *ast.IfStmt:
+			// It has to turn somebody away. A question whose answer
+			// *widens* what follows — "may they also read what nobody has
+			// disclosed?" — is the same shape and the opposite act, and
+			// taking it for a refusal exempts the function that asks it.
+			if leaves(branch.Body) && refuses(branch.Cond, names) {
+				return true
 			}
-			if selector, ok := node.(*ast.SelectorExpr); ok {
-				if base, ok := selector.X.(*ast.Ident); ok {
-					if _, held := names[base.Name]; held {
-						namesBuild = true
+		case *ast.SwitchStmt:
+			// A switch with no tag is a chain of ifs, and a case refusing
+			// is a refusal for whoever reaches it.
+			if branch.Tag != nil {
+				continue
+			}
+			for _, clause := range branch.Body.List {
+				arm, ok := clause.(*ast.CaseClause)
+				if !ok || !leaves(&ast.BlockStmt{List: arm.Body}) {
+					continue
+				}
+				for _, cond := range arm.List {
+					if refuses(cond, names) {
+						return true
 					}
 				}
 			}
-			return true
-		})
-		if asksSubject && namesBuild {
-			return true
 		}
 	}
 	return false
 }
 
-// leaves reports whether a branch ends the function, which is what makes it a
-// refusal rather than a question whose answer changes what follows.
-func leaves(branch *ast.IfStmt) bool {
-	if len(branch.Body.List) == 0 {
+// refuses reports whether a condition is the refusal itself: the negation of a
+// question asked of the subject about one of these names. A positive question
+// that returns early answers those it admits and lets everybody else past.
+func refuses(cond ast.Expr, names map[string]token.Pos) bool {
+	negated, ok := cond.(*ast.UnaryExpr)
+	if !ok || negated.Op != token.NOT {
 		return false
 	}
-	switch branch.Body.List[len(branch.Body.List)-1].(type) {
+	asked, ok := negated.X.(*ast.CallExpr)
+	if !ok || !carriesSubject(asked) {
+		return false
+	}
+	namesBuild := false
+	ast.Inspect(asked, func(node ast.Node) bool {
+		if selector, ok := node.(*ast.SelectorExpr); ok {
+			if base, ok := selector.X.(*ast.Ident); ok {
+				if _, held := names[base.Name]; held {
+					namesBuild = true
+				}
+			}
+		}
+		return true
+	})
+	return namesBuild
+}
+
+// leaves reports whether a branch ends the function, which is what makes it a
+// refusal rather than a question whose answer changes what follows.
+func leaves(body *ast.BlockStmt) bool {
+	if len(body.List) == 0 {
+		return false
+	}
+	switch body.List[len(body.List)-1].(type) {
 	case *ast.ReturnStmt:
 		return true
 	}

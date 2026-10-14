@@ -14,8 +14,8 @@ import (
 // rather than through the program's exit code: a gate reached only by running
 // it over the tree has one bit of evidence for whatever it found.
 
-// bodyOf parses one function and hands back its body.
-func bodyOf(t *testing.T, source string) *ast.BlockStmt {
+// bodyOf parses one function and hands back its body and the closures in it.
+func bodyOf(t *testing.T, source string) (*ast.BlockStmt, []*ast.FuncLit) {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), "x.go", "package p\n"+source, 0)
 	if err != nil {
@@ -25,7 +25,14 @@ func bodyOf(t *testing.T, source string) *ast.BlockStmt {
 	if !ok {
 		t.Fatal("the source is not a function")
 	}
-	return fn.Body
+	var closures []*ast.FuncLit
+	ast.Inspect(fn, func(node ast.Node) bool {
+		if lit, ok := node.(*ast.FuncLit); ok {
+			closures = append(closures, lit)
+		}
+		return true
+	})
+	return fn.Body, closures
 }
 
 func TestABuildResolvedForACollaborator(t *testing.T) {
@@ -170,9 +177,90 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			}`,
 			false,
 		},
+		{
+			// A value copied from the resolution and handed on whole: not
+			// a field of the resolved name, and one hop further than the
+			// resolver's own answer.
+			"copied into a list and handed on by name",
+			`func f() {
+				at, err := names.LocateVisible(ctx, subject, p, s, v)
+				_ = err
+				ids = append(ids, at.ProductID)
+				store.Unnarrowed(ctx, ids)
+			}`,
+			true,
+		},
+		{
+			"copied twice and read",
+			`func f() {
+				named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				_ = err
+				product := named.ProductID
+				again := product
+				store.Unnarrowed(ctx, again)
+			}`,
+			true,
+		},
+		{
+			// A positive question that returns early answers those it
+			// admits and lets everybody else past.
+			"a positive question about the subject that returns early",
+			`func f() {
+				named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				_ = err
+				if subject.Reads(access.Private, named.ProductID) {
+					return store.All(ctx, subject, named.ProductID)
+				}
+				return store.Published(ctx, named.ProductID)
+			}`,
+			true,
+		},
+		{
+			// The subject reaches the outer call; the build reaches the inner
+			// one first.
+			"nested inside a call that carries the subject",
+			`func f() {
+				named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				_ = err
+				store.Narrow(ctx, subject, catalog.Unnarrowed(ctx, named.ProductID))
+			}`,
+			true,
+		},
+		{
+			"a refusal in a switch with no tag",
+			`func f() {
+				named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+				_ = err
+				switch {
+				case subject.Kind == access.Pipeline:
+					return
+				case !subject.TriagesIn(named.ProductID):
+					return
+				}
+				store.Unnarrowed(ctx, named.ProductID)
+			}`,
+			false,
+		},
+		{
+			// The loop collecting builds a request names into a value that
+			// carries the subject, the shape recording a flaw takes.
+			"collected into a list handed to a read with the subject",
+			`func f() {
+				var targets []int64
+				for _, build := range input.Body.Builds {
+					at, err := names.LocateVisible(ctx, subject, p, build.Stream, build.Variant)
+					_ = err
+					target, err := core.TargetRow(ctx, in, at.StreamID, at.VariantID)
+					_ = err
+					targets = append(targets, target.ID)
+				}
+				store.Enter(ctx, subject, finding.Entering{TargetIDs: targets})
+			}`,
+			false,
+		},
 	} {
-		body := bodyOf(t, c.source)
-		resolved := resolvedIn(body)
+		body, closures := bodyOf(t, c.source)
+		resolved := resolvedOutside(body, closures)
 		if len(resolved) != 1 {
 			t.Fatalf("%s: %d resolutions found, want the one in the source", c.what, len(resolved))
 		}
@@ -183,5 +271,28 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		if (len(loose) > 0) != c.reported {
 			t.Errorf("%s: reported=%v, want %v", c.what, len(loose) > 0, c.reported)
 		}
+	}
+}
+
+func TestAClosureRebindingANameLeavesTheOuterResolution(t *testing.T) {
+	// The outer resolution is read without a subject; a closure below binds
+	// the same name again. Keyed by name with the last binding winning, the
+	// closure's binding took the outer one away and the read went unreported.
+	body, closures := bodyOf(t, `func f() {
+		named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+		_ = err
+		store.Unnarrowed(ctx, named.ProductID)
+		h := func() {
+			named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
+			_, _ = named, err
+		}
+		_ = h
+	}`)
+	resolved := resolvedOutside(body, closures)
+	if len(resolved) != 1 {
+		t.Fatalf("%d outer resolutions found, want the one", len(resolved))
+	}
+	if loose, _, _ := looseIn(body, resolved); len(loose) == 0 {
+		t.Error("the outer read without a subject was not reported")
 	}
 }
