@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -83,7 +84,7 @@ func (n nugetGallery) Latest(ctx context.Context, name string) (Latest, error) {
 			// The page's address is what the document says it is, so it is
 			// held to the registration it came from: an answer naming a page
 			// anywhere else is not followed.
-			if !strings.HasPrefix(page.ID, base) {
+			if !withinRegistration(page.ID, base) {
 				return Latest{}, fmt.Errorf("%w: a page of %q is at %q", ErrUnaskable, name, page.ID)
 			}
 			var read nugetPage
@@ -157,4 +158,31 @@ func released(text string) time.Time {
 		return time.Time{}
 	}
 	return at
+}
+
+// withinRegistration is whether a page address names a document under the
+// registration base it was listed in.
+//
+// A prefix of the text is not enough: a dot segment after the prefix walks
+// out of the registration on a server that resolves it, and the request is
+// sent as written. So the address is parsed, its scheme and host are the
+// base's, its path carries no dot segment, decoded or not, and the path is
+// under the base's.
+func withinRegistration(id, base string) bool {
+	if !strings.HasPrefix(id, base) {
+		return false
+	}
+	page, err := url.Parse(id)
+	if err != nil {
+		return false
+	}
+	registration, err := url.Parse(base)
+	if err != nil {
+		return false
+	}
+	if page.Scheme != registration.Scheme || page.Host != registration.Host ||
+		page.Path != path.Clean(page.Path) {
+		return false
+	}
+	return strings.HasPrefix(page.Path, registration.Path)
 }

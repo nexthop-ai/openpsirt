@@ -313,7 +313,7 @@ name to a public index.
 | An unlisted NuGet version is passed over | Its owner withdrew it from what anybody choosing a version is offered, and nuget.org dates it to 1900 |
 | A paged NuGet registration is read from its newest page back, at most four pages | Pages run oldest to newest, so the answer is usually on the last. The bound is for a package whose newest pages hold only pre-releases, which would otherwise cost a request per page back to its first release |
 | Where the bound stops the walk with no release found, there is no answer | A release may sit on a page that was not read, so the newest pre-release is not offered. The package is recorded as asked with no version |
-| A page is read only from the registration it came from | Its address is what the answer says it is. An index naming a page anywhere else is not followed |
+| A page is read only from the registration it came from | Its address is what the answer says it is. An index naming a page anywhere else, or an address carrying a dot segment, is not followed |
 | A Maven name that would move the request is not asked | A group or an artifact that is empty, `.` or `..` names a different place in the repository rather than a package. Refused as unaskable, which records it |
 
 What comes back is classified, because the classes want opposite treatment.
