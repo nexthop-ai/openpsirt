@@ -139,8 +139,12 @@ export function Person() {
                 </thead>
                 <tbody>
                   {who.holds.map((held, at) => (
-                    <tr key={`${held.product} ${held.role} ${at}`}>
-                      <td className="id">{held.product}</td>
+                    <tr key={`${held.everywhere ? "*" : held.product} ${held.role} ${at}`}>
+                      {held.everywhere ? (
+                        <td>every product</td>
+                      ) : (
+                        <td className="id">{held.product}</td>
+                      )}
                       <td>{called(held.role)}</td>
                       <td>{held.effective ? "Yes" : <span className="hint">No</span>}</td>
                       <td className="hint">{held.source || "—"}</td>

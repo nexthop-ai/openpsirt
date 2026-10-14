@@ -142,14 +142,14 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read what they hold", err)
 		}
-		for _, grant := range held {
-			body.Holds = append(body.Holds, HeldBody{
-				Product: named[grant.ProductID].Address, Role: core.Role(grant.Role),
-				ProductDisplayName: named[grant.ProductID].Display,
-				Effective:          grant.Active, Source: string(grant.Source),
-			})
+		estate, err := store.EstateGrants(ctx, person.ID)
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot read what they hold", err)
 		}
-		body.SeesNothing = seesNothing(body.Holds)
+		// The roles as the people list states them, estate-wide grants first,
+		// so the two administration reads cannot disagree about one person.
+		listed := personBody(person, nil, estate, held, named)
+		body.Holds, body.SeesNothing = listed.Holds, listed.SeesNothing
 
 		changes, total, err := trail.NewStore(in.DB.DB).About(ctx, subject, trail.Role,
 			person.Identity, input.Limit, 0)
