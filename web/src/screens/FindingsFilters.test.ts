@@ -79,6 +79,13 @@ describe("removing a chip", () => {
     expect(chips(left)).toEqual([]);
   });
 
+  it("takes a subtree's qualifiers with its root", () => {
+    const left = removed("beneath=openssl&beneath_version=3.0.2&beneath_ecosystem=deb");
+    expect(left.has("beneath")).toBe(false);
+    expect(left.has("beneath_version")).toBe(false);
+    expect(left.has("beneath_ecosystem")).toBe(false);
+  });
+
   it("leaves what is not a filter in the address", () => {
     const left = removed("q=openssl&view=issues&offset=50");
     expect(left.has("q")).toBe(false);

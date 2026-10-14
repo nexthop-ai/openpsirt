@@ -225,7 +225,13 @@ export function Together() {
             // issues ticked under the old question were submitted under the
             // new one, with none of them on screen.
             setPicked(new Set());
-            setParams(typed ? { contains: typed } : {});
+            // Edited rather than replaced: the version, ecosystem and namespace
+            // in the address are what pick the component.
+            const next = new URLSearchParams(params);
+            if (typed) next.set("contains", typed);
+            else next.delete("contains");
+            next.delete("offset");
+            setParams(next);
           }}
         >
           <Icon name="search" />

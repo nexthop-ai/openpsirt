@@ -160,7 +160,8 @@ export function ByComponent({
     );
   }
 
-  const most = rows[0]?.issues ?? 0;
+  // The heaviest row on the page, whatever order the page is in.
+  const most = Math.max(0, ...rows.map((row) => row.issues ?? 0));
   const asked = (query as { sort?: string }).sort ?? "";
   const worstFirst = asked === "severity";
   // The order this list is in, which is not always its own default: the
@@ -284,7 +285,7 @@ export function ByComponent({
                     <span
                       aria-hidden
                       className="share"
-                      style={{ width: `${Math.max(share, 2)}%` }}
+                      style={{ width: `${Math.min(100, Math.max(share, 2))}%` }}
                     />
                   </td>
                   <td className="num">{(row.places ?? 0).toLocaleString()}</td>

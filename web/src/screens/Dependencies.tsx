@@ -703,7 +703,7 @@ function Branches({
           className="look"
           title={`Everything about ${name}`}
           aria-label={`Open ${name}`}
-          to={componentPage(at, name)}
+          to={componentPage(at, name, node.version)}
           onClick={(event) => event.stopPropagation()}
         >
           ⋯

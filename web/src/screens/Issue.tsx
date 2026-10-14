@@ -171,7 +171,7 @@ export function Issue() {
                 );
                 return (
                   <tr
-                    key={`${row.product} ${row.stream} ${row.variant} ${row.component}`}
+                    key={`${row.product} ${row.stream} ${row.variant} ${row.component} ${row.version}`}
                     className="row opens"
                     onClick={opener(to)}
                   >

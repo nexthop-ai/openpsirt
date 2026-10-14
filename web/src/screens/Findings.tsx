@@ -61,6 +61,7 @@ import {
   usePaging,
   widened,
   withEach,
+  withinBuild,
   withinVariant,
   withParam,
   withParams,
@@ -252,7 +253,10 @@ export function Findings() {
   // Built from the address rather than from the values read out of it, so that
   // the finding screen can build the same query from the same address and
   // there is one place a filter is translated.
-  const query = useMemo(() => withinVariant(listQuery(asked), Boolean(variant)), [asked, variant]);
+  const query = useMemo(
+    () => withinBuild(withinVariant(listQuery(asked), Boolean(variant)), oneBuild),
+    [asked, variant, oneBuild],
+  );
 
   // The same question as a file: every filter the list asked, and never the
   // paging, since a file is the whole of a narrowing rather than the page in

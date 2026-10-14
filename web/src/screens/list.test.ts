@@ -15,6 +15,8 @@ import {
   where,
   widened,
   windowFor,
+  withEach,
+  withinBuild,
   type Row,
 } from "./list";
 
@@ -358,5 +360,52 @@ describe("widening out of a scope", () => {
 
   it("asks for nothing where nothing was asked", () => {
     expect(widened("/findings", new URLSearchParams())).toBe("/findings");
+  });
+
+  it("drops a subtree, which is a walk over the build being widened out of", () => {
+    const asked = new URLSearchParams("beneath=curl&beneath_version=8&state=undecided");
+    const out = query(widened("/products/sonic/findings?stream=master", asked));
+    expect(out.get("beneath")).toBeNull();
+    expect(out.get("beneath_version")).toBeNull();
+    expect(out.get("state")).toBe("undecided");
+  });
+});
+
+describe("a subtree's root", () => {
+  it("drops what qualified the old root when it changes", () => {
+    const asked = new URLSearchParams(
+      "beneath=openssl&beneath_version=3.0.2&beneath_ecosystem=deb&beneath_namespace=debian",
+    );
+    const out = withEach(asked, { beneath: "zlib" });
+    expect(out.get("beneath")).toBe("zlib");
+    expect(out.get("beneath_version")).toBeNull();
+    expect(out.get("beneath_ecosystem")).toBeNull();
+    expect(out.get("beneath_namespace")).toBeNull();
+  });
+
+  it("keeps a qualifier the same change names", () => {
+    const out = withEach(new URLSearchParams(), { beneath: "zlib", beneath_version: "1.3" });
+    expect(out.get("beneath_version")).toBe("1.3");
+  });
+
+  it("is not asked of a selection that is not one build", () => {
+    const query = listQuery(new URLSearchParams("beneath=curl&beneath_version=8"));
+    expect(withinBuild(query, true)).toMatchObject({ beneath: "curl", beneath_version: "8" });
+    expect(withinBuild(query, false)).not.toHaveProperty("beneath");
+    expect(withinBuild(query, false)).not.toHaveProperty("beneath_version");
+  });
+});
+
+describe("a date filter the address carries", () => {
+  it("is sent only where it is a day the server takes", () => {
+    const query = listQuery(
+      new URLSearchParams(
+        "opened_after=yesterday&opened_before=2026-02-30&proposed_after=2026-3-1&closed_after=2026-01-01",
+      ),
+    );
+    expect(query).not.toHaveProperty("opened_after");
+    expect(query).not.toHaveProperty("opened_before");
+    expect(query).not.toHaveProperty("proposed_after");
+    expect(query).toMatchObject({ closed_after: "2026-01-01" });
   });
 });

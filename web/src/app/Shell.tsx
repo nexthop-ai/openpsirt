@@ -49,6 +49,9 @@ import { useClickAway } from "../ui/away";
 // total counted without them is a number that disagrees with the list it
 // opens. Built from the entry's own address for that reason.
 const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"));
+// The Findings entry's badge, for the same reason: the list it opens writes the
+// same narrowings, so the count is asked with them.
+const OPEN_QUERY = listQuery(asAsked(new URLSearchParams(), "issues"));
 
 // The frame the restyled mockup settled on: a rail down the side carrying the
 // brand and the entries grouped by what they span, a bar across the top
@@ -125,6 +128,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
           params: {
             path: { product: product ?? "" },
             query: {
+              ...OPEN_QUERY,
               limit: 1,
               ...(stream ? { stream } : {}),
               ...(variant ? { variant } : {}),

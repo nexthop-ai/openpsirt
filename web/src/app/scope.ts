@@ -9,6 +9,7 @@ import {
   ROUTES,
   allFindingsAt,
   buildFindingsAt,
+  inventoriesAt,
   productAt,
   productFindingsAt,
   sameProductScreenAt,
@@ -267,10 +268,16 @@ export function rescoped(pathname: string, to: Scoped): string | null {
     // selection has nowhere to land. The picker disables those levels while
     // somebody stands on one, so this is the belt rather than the braces.
     if (!to.product || !to.stream || !to.variant) return null;
+    const whole = { product: to.product, stream: to.stream, variant: to.variant };
+    // A run and an inventory are the old build's, and the new one has neither
+    // under that number, so a change lands on the new build's inventories.
+    if (matchPath(ROUTES.run, pathname) || matchPath(ROUTES.inventoryChanges, pathname)) {
+      return inventoriesAt(whole);
+    }
     // Cut from the address as it stands rather than read from the match,
     // whose splat has an escaped slash turned back into a separator.
     const rest = pathname.slice(build.pathnameBase.length).replace(/^\//, "");
-    return sameScreenAt({ product: to.product, stream: to.stream, variant: to.variant }, rest);
+    return sameScreenAt(whole, rest);
   }
   // The wider list carries the whole selection in its own address.
   if (matchPath(LIST, pathname)) return findingsPath(to);

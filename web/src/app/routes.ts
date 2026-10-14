@@ -1,6 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { matchPath } from "react-router-dom";
 import table from "./routes.json";
 
 // Every address this application answers, and every address into it the
@@ -229,6 +230,15 @@ export function requeried(address: string, query: URLSearchParams): string {
 
 // The same address with one issue's name in place of another, where a screen
 // is reached by a name that no longer files what it shows.
+//
+// Rebuilt from the route rather than substituted in the text, so a product,
+// branch or component whose name begins with the issue's is left alone.
 export function refiled(pathname: string, from: string, to: string): string {
-  return pathname.replace(`/${encodeURIComponent(from)}`, `/${encodeURIComponent(to)}`);
+  for (const name of ["finding", "issue"] as const) {
+    const hit = matchPath(ROUTES[name], pathname);
+    if (hit && hit.params.vulnerability === from) {
+      return fill(ROUTES[name], { ...hit.params, vulnerability: to });
+    }
+  }
+  return pathname;
 }

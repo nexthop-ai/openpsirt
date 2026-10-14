@@ -5,7 +5,15 @@ import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { findingsPageKey, fromAt, listQuery, where, windowFor, withinVariant } from "./list";
+import {
+  findingsPageKey,
+  fromAt,
+  listQuery,
+  where,
+  windowFor,
+  withinBuild,
+  withinVariant,
+} from "./list";
 import { findingAt } from "../app/routes";
 import type { components } from "../api/schema";
 
@@ -38,7 +46,11 @@ export function useFindingNeighbors(
   // is refused by the server — which would take the previous and next row with
   // it rather than the filter.
   const listed = useMemo(
-    () => withinVariant(listQuery(list), Boolean(list.get("variant"))),
+    () =>
+      withinBuild(
+        withinVariant(listQuery(list), Boolean(list.get("variant"))),
+        Boolean(list.get("stream") && list.get("variant")),
+      ),
     [list],
   );
   // By what the row is rather than by where it sat: a row may have moved or

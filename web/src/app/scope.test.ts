@@ -139,6 +139,13 @@ describe("changing scope stays on the screen", () => {
     ).toBe("/products/sonic/streams/202411/variants/mellanox/dependencies");
   });
 
+  it("lands a run or an inventory's changes on the new build's inventories", () => {
+    const to = { product: "sonic", stream: "master", variant: "mellanox" };
+    const there = "/products/sonic/streams/master/variants/mellanox/inventories";
+    expect(rescoped(`${BUILD}/runs/7`, to)).toBe(there);
+    expect(rescoped(`${BUILD}/inventories/9/changes`, to)).toBe(there);
+  });
+
   it("keeps a segment that carries an escaped slash as one segment", () => {
     const tail = "/findings/CVE-1/components/github.com%2Fsirupsen%2Flogrus";
     expect(

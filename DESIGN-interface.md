@@ -232,7 +232,9 @@ to upload, what is waiting on you, and who you are.
 A build-only entry declines rather than opening on a scope that means nothing.
 With a product, branch or variant unpicked, the tree and inventories entries are
 disabled and say why. Findings is not one of them: it takes whatever is
-selected, and the count beside it is of what the list it opens will show.
+selected, and the count beside it is of what the list it opens will show. It is
+asked with the narrowings the list writes into its own address when the address
+is silent, as the Unassigned entry's is.
 
 Other bar rules:
 
@@ -307,6 +309,8 @@ screen answering the question just asked of it.
 | A selection the server would refuse is never sent | A branch or variant with no product above it is dropped on the way out |
 | **The variant column does not empty while it narrows** | Picking a branch swaps what the column offers from the product's variants to that release's, which is a different question and a different read. The first stands in until the second arrives: it is a superset, and a column that goes blank in front of somebody halfway through choosing reads as the picker losing what it had |
 | **The picker asks for no counts** | What is open against a row is the expensive half of a catalog read — a list of two products answered in 0.39s against 1ms for a liveness probe, and the time went with the findings rather than the rows. This panel draws names. So the counts are a parameter the two screens whose subject they are pass, and everybody else gets the cheap answer |
+| Variants are unselectable on a build screen until a branch is picked | A build screen cannot be given half a scope, and a variant picked over no branch changed nothing and said nothing |
+| A run or an inventory's changes, rescoped, lands on the new build's inventories | Both are numbered within the old build, and the new one holds nothing under that number |
 | A screen saying what it needs picked opens this picker | One picker, in the bar. A report entry waiting on a product or a build opens it rather than drawing a second picker of its own, and brings the bar into view, since the bar does not follow the page down |
 
 ## Home
@@ -456,6 +460,9 @@ bound — is a narrowing only somebody editing the address can use.
 | The filters narrowing the list are above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. A control carrying a count and nothing else keeps that count as a hand-maintained list of variables, which falls behind the filters it counts |
 | **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it draws nothing of its own — and a list scoped to one product then sits under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagree by exactly what the other products hold. A chip per level, product first, because each is narrowing what the one before it chose |
 | Removing a selection chip widens by a level and carries the filters | Widening is a move rather than a parameter change, and dropping what somebody actually narrowed by on the way would be a second surprise on top of the one the chip ends. The branch and the variant are the new address's to put back, so they are not carried |
+| A subtree goes with the build it was walked in | "At or under" is a walk over one build's edges, and the server refuses it over a selection naming anything else. Widening out of the build drops it, and a list whose selection is not one build does not send it |
+| What qualifies a subtree's root goes with the root | The version, ecosystem and namespace the dependency tree writes beside the name pick that component. A new root, a cleared root and a removed chip each drop them, so the server is not asked for the new name at the old one's version |
+| A date the server does not take is left off the request | The server reads a day as YYYY-MM-DD and refuses the whole list over anything else. A malformed date in a link, or one that rolls over such as February 30, widens the list by that filter instead |
 | **A filter cleared drops its key; it does not write out its own default** | The three narrowings the list applies when the address is silent are applied only where the key is absent. Two controls wrote both of their values to mean "not narrowed", which made the address say something, suppressed the default and widened the list — and left no way to express from the panel what the rail's address says |
 | The count is read from the address | The one place that knows what every filter is called |
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
@@ -649,6 +656,7 @@ data, different subject.
 |---|---|
 | Each row carries the issues by severity and the worst among them | Ranking by count alone answers the view's own question backwards: a package with forty-four issues outranks one with three criticals |
 | The weight stays the order | Where the volume is is what the view is for. Making urgency the default would reproduce the by-issue list at worse resolution. "Which of these is worst" is the other question people read it for, so the column is sortable |
+| The share bar is scaled to the heaviest row on the page | The page may be ordered by anything the list offers, so its first row is not the heaviest, and a bar wider than its cell runs across the columns beside it |
 | The count beside a version says which count it is | Ranked, it is everything reaching that version would close; unranked, it is what that release fixed on its own. The two are the same shape and often the same number, so the word in front of it changes with the flag and the reason is on hover. Drawn as one number under one heading, the column changes question without saying so |
 
 The By fix view is gone. It listed one row per version pair with an action in

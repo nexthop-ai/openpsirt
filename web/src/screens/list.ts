@@ -144,12 +144,21 @@ export function widened(path: string, params: URLSearchParams): string {
   // standing, the chip says "only this variant" over a list narrowed by no
   // such thing, and the control offering it no longer has the value it holds.
   if (rest.get("variants") === "only") rest.delete("variants");
+  // A subtree is a walk over one build, and the server refuses it over a
+  // selection naming anything else, so it goes with the build.
+  rest.delete("beneath");
+  for (const part of BENEATH_PARTS) rest.delete(part);
   const cut = path.indexOf("?");
   const base = cut < 0 ? path : path.slice(0, cut);
   const own = cut < 0 ? "" : path.slice(cut + 1);
   for (const [key, value] of new URLSearchParams(own)) rest.append(key, value);
   return requeried(base, rest);
 }
+
+// What qualifies the component a subtree starts at. Each belongs to the name it
+// qualifies: kept after that name changes, it asks for the new name at the old
+// one's version.
+export const BENEATH_PARTS = ["beneath_version", "beneath_ecosystem", "beneath_namespace"];
 
 // withParam sets one value, or takes the key out where there is none.
 export function withParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
@@ -169,6 +178,11 @@ export function withEach(
   for (const [key, value] of Object.entries(changes)) {
     if (value) next.set(key, value);
     else next.delete(key);
+  }
+  // A changed subtree root drops what qualified the old one, unless this
+  // change names it too.
+  if ("beneath" in changes) {
+    for (const part of BENEATH_PARTS) if (!(part in changes)) next.delete(part);
   }
   return next;
 }
@@ -302,6 +316,16 @@ function num(raw: string | null, least: number, most: number): number | undefine
   return asked;
 }
 
+// A day the address carries, or nothing where it is not one the server takes.
+// The server reads YYYY-MM-DD and refuses the whole list over anything else,
+// and a date that rolls over, such as 2026-02-30, is not a day either.
+function day(raw: string | null): string | undefined {
+  if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return undefined;
+  const read = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(read.getTime()) || read.toISOString().slice(0, 10) !== raw) return undefined;
+  return raw;
+}
+
 // The components somebody has hidden from this page.
 //
 // Carried as the parameter repeated, like every other filter that takes a set,
@@ -371,6 +395,10 @@ export function listQuery(params: URLSearchParams) {
     .getAll("claim_state")
     .filter((word) => ["proposed", "approved", "withdrawn", "lapsed"].includes(word));
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
+  const openedAfter = day(params.get("opened_after"));
+  const openedBefore = day(params.get("opened_before"));
+  const proposedAfter = day(params.get("proposed_after"));
+  const closedAfter = day(params.get("closed_after"));
   return {
     limit: pageSize(params),
     offset: num(params.get("offset"), 0, Number.MAX_SAFE_INTEGER) ?? 0,
@@ -380,8 +408,8 @@ export function listQuery(params: URLSearchParams) {
     ...(exploited ? { exploited: true } : {}),
     ...(fixable ? { fixable: true } : {}),
     ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
-    ...(params.get("opened_after") ? { opened_after: params.get("opened_after") ?? "" } : {}),
-    ...(params.get("opened_before") ? { opened_before: params.get("opened_before") ?? "" } : {}),
+    ...(openedAfter ? { opened_after: openedAfter } : {}),
+    ...(openedBefore ? { opened_before: openedBefore } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
     ...(claim !== undefined ? { claim } : {}),
     ...(claim !== undefined && claimStates.length > 0
@@ -391,8 +419,8 @@ export function listQuery(params: URLSearchParams) {
           )[],
         }
       : {}),
-    ...(params.get("proposed_after") ? { proposed_after: params.get("proposed_after") ?? "" } : {}),
-    ...(params.get("closed_after") ? { closed_after: params.get("closed_after") ?? "" } : {}),
+    ...(proposedAfter ? { proposed_after: proposedAfter } : {}),
+    ...(closedAfter ? { closed_after: closedAfter } : {}),
     ...(params.get("q") ? { q: params.get("q") ?? "" } : {}),
     ...(ecosystems.length > 0 ? { ecosystem: ecosystems } : {}),
     ...(releases.length > 0 ? { on: releases } : {}),
@@ -476,6 +504,25 @@ export function withinVariant(query: ReturnType<typeof listQuery>, named: boolea
   if (named || query.across_variants !== "only") return query;
   const { across_variants, ...rest } = query;
   void across_variants;
+  return rest;
+}
+
+// A subtree is a walk over one build's edges, and the server refuses it over a
+// selection naming anything else. Dropped where the selection is not one
+// build, for the reason the variant's filter is dropped above.
+export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boolean) {
+  if (oneBuild) return query;
+  const { beneath, beneath_version, beneath_ecosystem, beneath_namespace, ...rest } =
+    query as ReturnType<typeof listQuery> & {
+      beneath?: string;
+      beneath_version?: string;
+      beneath_ecosystem?: string;
+      beneath_namespace?: string;
+    };
+  void beneath;
+  void beneath_version;
+  void beneath_ecosystem;
+  void beneath_namespace;
   return rest;
 }
 
