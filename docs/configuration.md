@@ -167,6 +167,8 @@ read.
 |---|---|
 | The URL asks for a transport that falls back to cleartext, or says nothing | Every connection is opened with one that does not: `sslmode=require` on PostgreSQL where the URL says `prefer`, `allow` or nothing, and `tls=skip-verify` on MySQL and MariaDB where it says `preferred` or nothing. Encrypted, with no certificate checked, which is what the default already gave where the server offered it |
 | A PostgreSQL URL says nothing and `PGSSLMODE` is set | The environment's mode is judged in the URL's place: `require`, `verify-ca` and `verify-full` are left to apply, `prefer` and `allow` become `require`, and `disable` is refused |
+| A PostgreSQL URL names a service | The service file's mode is judged too: the URL, the environment and the service file together must leave no attempt in cleartext, or the process refuses to start |
+| A PostgreSQL query pair cannot be read | Refused at startup. The driver drops it, so the mode it held is replaced by the driver's default |
 | The URL asks for cleartext | `sslmode=disable`, `tls=false` or `tls=0` in any case, or `allowFallbackToPlaintext` true: refused at startup, naming the setting |
 | The connection is encrypted | Nothing happens. The transport is logged as it always is |
 | The connection is in cleartext | Refused at startup, naming the setting |

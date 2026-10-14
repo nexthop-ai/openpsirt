@@ -4,8 +4,10 @@
 package database_test
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -264,6 +266,11 @@ func TestARequiredTransportIsImposedOnEveryConnection(t *testing.T) {
 		{"postgres://u:p@db/openpsirt", "prefer", true, "sslmode=require", ""},
 		{"postgres://u:p@db/openpsirt", "disable", true, "", ""},
 		{"postgres://u:p@db/openpsirt?sslmode=require", "disable", true, "sslmode=require", ""},
+		// The driver decodes a key, so an escaped one is the mode, and it
+		// drops a pair it cannot read, which leaves its own default.
+		{"postgres://u:p@db/openpsirt?ssl%6Dode=prefer", "", true, "sslmode=require", "ssl%6Dode"},
+		{"postgres://u:p@db/openpsirt?sslmode=verify-full;", "", true, "", ""},
+		{"postgres://u:p@db/openpsirt?sslmode=verify-full&sslmode=prefer", "", true, "sslmode=verify-full&sslmode=require", ""},
 		{"mysql://u:p@db/openpsirt", "", true, "tls=skip-verify", ""},
 		{"mysql://u:p@db/openpsirt?tls=preferred", "", true, "tls=skip-verify", ""},
 		{"mysql://u:p@db/openpsirt?tls=PREFERRED", "", true, "tls=skip-verify", "PREFERRED"},
@@ -330,6 +337,34 @@ func TestOpeningRefusesACleartextTransportWhenEncryptionIsRequired(t *testing.T)
 		if _, err := database.Open(t.Context(), target); err == nil ||
 			!strings.Contains(err.Error(), database.RequiredEncryption) {
 			t.Errorf("%s: opened, or refused for another reason: %v", raw, err)
+		}
+	}
+}
+
+// A service file's mode sits above the environment's and under the URL's, so a
+// URL that names none is judged as the driver reads it, service file included.
+func TestAServiceFileModeIsJudgedWhenEncryptionIsRequired(t *testing.T) {
+	services := filepath.Join(t.TempDir(), "pg_service.conf")
+	if err := os.WriteFile(services, []byte("[weak]\nsslmode=prefer\n[strong]\nsslmode=require\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PGSERVICEFILE", services)
+	t.Setenv("PGSSLMODE", "verify-full")
+	for _, c := range []struct {
+		service string
+		refused bool
+	}{{"weak", true}, {"strong", false}} {
+		target, err := database.ParseURL("postgres://u:p@127.0.0.1:1/x?service=" + c.service)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target.RequireEncryption = true
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		_, err = database.Open(ctx, target)
+		cancel()
+		named := err != nil && strings.Contains(err.Error(), database.RequiredEncryption)
+		if named != c.refused {
+			t.Errorf("service %s: refused for the transport = %v, want %v (%v)", c.service, named, c.refused, err)
 		}
 	}
 }

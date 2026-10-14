@@ -6,6 +6,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -22,6 +23,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" // MySQL and MariaDB
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib" // PostgreSQL
 	_ "modernc.org/sqlite"           // SQLite, pure Go so the binary stays static
 )
@@ -134,7 +136,12 @@ func Open(ctx context.Context, target Target) (*DB, error) {
 		return nil, err
 	}
 
-	sqldb, err := openPool(target.Engine, driver, dsn)
+	sqldb, err := openPool(target.Engine, driver, dsn, target.RequireEncryption)
+	if errors.Is(err, errMayGoInCleartext) {
+		return nil, fmt.Errorf("%s is set and %s, as the driver reads it with the environment "+
+			"and any service file, may go in cleartext: ask for encryption in the database URL",
+			RequiredEncryption, target.Redacted)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", target.Engine, scrub(err, target))
 	}
@@ -238,9 +245,27 @@ func mandatoryTransport(target Target, getenv func(string) string) (string, erro
 	if query != "" {
 		pairs = strings.Split(query, "&")
 	}
+	// The PostgreSQL driver reads the query through the URL parser, which
+	// decodes each key and drops a pair it cannot read. A dropped pair is a
+	// mode nobody can judge, so it is refused rather than left to the
+	// driver's default.
+	if target.Engine == Postgres {
+		if _, err := url.ParseQuery(query); err != nil {
+			return "", fmt.Errorf("%s is set and %s has a query pair the driver drops, "+
+				"so the transport it asks for cannot be judged: percent-encode it",
+				RequiredEncryption, target.Redacted)
+		}
+	}
 	named := false
 	for i, pair := range pairs {
 		key, value, _ := strings.Cut(pair, "=")
+		if target.Engine == Postgres {
+			// Compared as the driver reads it. The MySQL driver reads its
+			// keys as written, so those are compared as written.
+			if decoded, err := url.QueryUnescape(key); err == nil {
+				key = decoded
+			}
+		}
 		if key != name && (target.Engine == Postgres || key != "allowFallbackToPlaintext") {
 			continue
 		}
@@ -353,7 +378,12 @@ func Query(sqldb *sql.DB, e Engine) (*bun.DB, error) {
 // text. Describing first is what lets results come back in the server's
 // binary encoding, which carries neither the session's time zone nor its date
 // style; a statement run without a description reads every result as text.
-func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
+//
+// Where encryption is required, the driver's own reading of the connection
+// string is the last word on it. The driver merges the environment and a
+// service file under the URL, and a mode from either can leave a fallback to
+// cleartext that nothing in the URL shows.
+func openPool(e Engine, driver, dsn string, encrypted bool) (*sql.DB, error) {
 	if e != Postgres {
 		return sql.Open(driver, dsn)
 	}
@@ -361,8 +391,29 @@ func openPool(e Engine, driver, dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	if encrypted && !alwaysEncrypted(&config.Config) {
+		return nil, errMayGoInCleartext
+	}
 	config.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
 	return stdlib.OpenDB(*config), nil
+}
+
+// errMayGoInCleartext is a PostgreSQL configuration with an attempt the
+// driver makes without encryption.
+var errMayGoInCleartext = errors.New("a connection attempt without encryption")
+
+// alwaysEncrypted reports whether every attempt the driver makes, the first
+// and each fallback, is encrypted.
+func alwaysEncrypted(config *pgconn.Config) bool {
+	if config.TLSConfig == nil {
+		return false
+	}
+	for _, fallback := range config.Fallbacks {
+		if fallback.TLSConfig == nil {
+			return false
+		}
+	}
+	return true
 }
 
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {
