@@ -226,12 +226,16 @@ func TestBytesThatCouldNotBeReadAreTakenAgain(t *testing.T) {
 		if code != http.StatusAccepted {
 			t.Fatalf("the same bytes after a failure returned %d, want 202", code)
 		}
-		// The same row: one set of bytes at one build is one submission, and
-		// what changes is which attempt at it is the live one.
-		if again.ScanID != first.ScanID || again.Outcome != "queued" {
-			t.Errorf("the retake reported %+v, want scan %d queued", again, first.ScanID)
+		// A new scan in place of the failed one: one set of bytes at one
+		// build is one row, and scan identifiers follow the order scans are
+		// applied in.
+		if again.ScanID <= first.ScanID || again.Outcome != "queued" {
+			t.Errorf("the retake reported %+v, want a scan after %d queued", again, first.ScanID)
 		}
-		held, err := scans.ByID(t.Context(), first.ScanID)
+		if _, err := scans.ByID(t.Context(), first.ScanID); err == nil {
+			t.Errorf("the failed attempt %d is still held", first.ScanID)
+		}
+		held, err := scans.ByID(t.Context(), again.ScanID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -240,7 +244,7 @@ func TestBytesThatCouldNotBeReadAreTakenAgain(t *testing.T) {
 		}
 		// One inventory, not two. A second copy is one the reader would read
 		// and count twice.
-		docs, err := ingest.NewDocuments(f.DB.DB).List(t.Context(), first.ScanID)
+		docs, err := ingest.NewDocuments(f.DB.DB).List(t.Context(), again.ScanID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,18 +287,18 @@ func TestBytesThatCouldNotBeReadAreTakenAgainBesideAnAcceptedScan(t *testing.T) 
 		if code != http.StatusAccepted {
 			t.Fatalf("the same bytes after a failure returned %d, want 202", code)
 		}
-		if again.ScanID != second.ScanID {
-			t.Errorf("the retake reported scan %d, want the row those bytes already have (%d)",
+		if again.ScanID <= second.ScanID {
+			t.Errorf("the retake reported scan %d, want a new row in place of %d",
 				again.ScanID, second.ScanID)
 		}
-		held, err := scans.ByID(t.Context(), second.ScanID)
+		held, err := scans.ByID(t.Context(), again.ScanID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if held.Status != ingest.Accepted || held.Failure != "" {
 			t.Errorf("the scan reads as %q: %q", held.Status, held.Failure)
 		}
-		docs, err := ingest.NewDocuments(f.DB.DB).List(t.Context(), second.ScanID)
+		docs, err := ingest.NewDocuments(f.DB.DB).List(t.Context(), again.ScanID)
 		if err != nil {
 			t.Fatal(err)
 		}

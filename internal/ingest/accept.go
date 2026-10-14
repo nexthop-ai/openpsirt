@@ -291,11 +291,9 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		return existing, AlreadyHave, err
 
 	case Retake:
-		// The row stays: it is what says these bytes arrived at this build,
-		// and one row per set of bytes is what the uniqueness on the table
-		// means. What changes is that this attempt is the live one — the
-		// previous attempt's failure is no longer what happened to this
-		// submission.
+		// One row per set of bytes is what the uniqueness on the table means,
+		// and this attempt is the live one: the previous attempt's failure is
+		// no longer what happened to this submission.
 		taken, err := s.retake(ctx, a)
 		return taken, Retake, err
 
@@ -374,6 +372,19 @@ func (s *Store) Newest(ctx context.Context, targetID int64) (*Scan, error) {
 	return scan, nil
 }
 
+// passedBy reports whether a newer accepted scan stands ahead of scan, in
+// the order Newest reads: the later build time, and at one build time the
+// later arrival.
+func passedBy(scan, newest *Scan) bool {
+	if newest == nil || newest.ID == scan.ID {
+		return false
+	}
+	if newest.BuiltAt.Equal(scan.BuiltAt) {
+		return newest.ID > scan.ID
+	}
+	return newest.BuiltAt.After(scan.BuiltAt)
+}
+
 func (s *Store) byContent(ctx context.Context, targetID int64, hash string) (*Scan, error) {
 	scan := new(Scan)
 	err := s.db.NewSelect().Model(scan).
@@ -435,6 +446,19 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 // Everything about who sent it and what will read it is this attempt's: the
 // reader version that failed is not the one about to run, and the credential
 // that sends the retry need not be the one that sent the first try.
+//
+// The attempt gets a scan identifier of its own. The graph stamps what a scan
+// opens and closes with the scan's identifier and reads those identifiers as
+// time, so a scan has to be applied in the order its identifier says.
+// Revived under its old identifier, a failed scan applied after a later one
+// closes rows that later identifier opened. The failed row and what it
+// arrived with are removed and the attempt is written as a new row, which is
+// also what keeps one row per set of bytes.
+//
+// A failed scan the graph already names keeps its identifier: it was applied
+// before something after the write failed, and the rows it opened point at
+// it. The reader refuses to apply a scan older than the one the build last
+// applied, so that row cannot invert anything either.
 func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
 	scan, err := s.byContent(ctx, a.TargetID, a.ContentHash)
 	if err != nil {
@@ -443,17 +467,67 @@ func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
 	if scan == nil {
 		return nil, fmt.Errorf("retake scan: the submission is no longer held")
 	}
+	named, err := s.named(ctx, scan.ID)
+	if err != nil {
+		return nil, err
+	}
 	scan.Status = Accepted
 	scan.Failure = ""
 	scan.ReceivedAt = asStored(s.now())
 	scan.ParserVersion = a.ParserVersion
 	scan.Credential = a.Credential
-	if _, err := s.db.NewUpdate().Model(scan).
-		Column("status", "failure", "received_at", "parser_version", "credential").
-		WherePK().Exec(ctx); err != nil {
-		return nil, fmt.Errorf("retake scan %d: %w", scan.ID, err)
+	if named {
+		if _, err := s.db.NewUpdate().Model(scan).
+			Column("status", "failure", "received_at", "parser_version", "credential").
+			WherePK().Exec(ctx); err != nil {
+			return nil, fmt.Errorf("retake scan %d: %w", scan.ID, err)
+		}
+		return scan, nil
+	}
+	failed := scan.ID
+	if err := NewDocuments(s.db).Remove(ctx, failed); err != nil {
+		return nil, err
+	}
+	if _, err := s.db.NewDelete().Model((*Scan)(nil)).
+		Where("id = ?", failed).Exec(ctx); err != nil {
+		return nil, fmt.Errorf("retake scan %d: remove the failed attempt: %w", failed, err)
+	}
+	scan.ID = 0
+	if _, err := s.db.NewInsert().Model(scan).Exec(ctx); err != nil {
+		return nil, fmt.Errorf("retake scan %d: %w", failed, err)
 	}
 	return scan, nil
+}
+
+// named reports whether anything the graph or a build holds points at a scan.
+func (s *Store) named(ctx context.Context, scanID int64) (bool, error) {
+	var found []int64
+	for _, table := range []string{"graph_node", "graph_edge", "suppression", "image_version"} {
+		err := s.db.NewSelect().
+			TableExpr(`?`, bun.Ident(table)).
+			ColumnExpr("1").
+			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.Where("opened_scan_id = ?", scanID).WhereOr("closed_scan_id = ?", scanID)
+			}).
+			Limit(1).
+			Scan(ctx, &found)
+		if err != nil {
+			return false, fmt.Errorf("read whether %s names scan %d: %w", table, scanID, err)
+		}
+		if len(found) > 0 {
+			return true, nil
+		}
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"target"`).
+		ColumnExpr("1").
+		Where("last_scan_id = ?", scanID).
+		Limit(1).
+		Scan(ctx, &found)
+	if err != nil {
+		return false, fmt.Errorf("read whether a build names scan %d: %w", scanID, err)
+	}
+	return len(found) > 0, nil
 }
 
 // truncate bounds what is stored from a message that quotes a scan file.

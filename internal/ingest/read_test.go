@@ -5,6 +5,7 @@ package ingest_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"strconv"
@@ -842,4 +843,193 @@ func nodesNow(ctx context.Context, db bun.IDB, targetID int64) ([]graph.Node, er
 		Where("closed_scan_id IS NULL").
 		Scan(ctx)
 	return nodes, err
+}
+
+// A build re-sent at one build time with different judgments stands once it
+// is read, even where its first read failed: at one build time the later
+// arrival is the newer, in the reader's order as in Newest's.
+func TestAReArguedBuildWhoseFirstReadFailedIsAppliedOnTheRetry(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		at := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		first := f.accept(t, f.branch, at, anInventory)
+		if result, err := f.reader.Once(ctx); err != nil || result == nil || result.Superseded {
+			t.Fatalf("the first submission was not applied: %+v %v", result, err)
+		}
+		var hash string
+		if err := f.db.DB.NewSelect().Model((*ingest.Document)(nil)).Column("content_hash").
+			Where("scan_id = ?", first).Where("kind = ?", ingest.InventoryKind).
+			Scan(ctx, &hash); err != nil {
+			t.Fatal(err)
+		}
+
+		scans := ingest.NewStore(f.db.DB)
+		again, outcome, err := scans.Record(ctx, ingest.Arriving{
+			TargetID: f.branch, ContentHash: "re-argued", InventoryHash: hash,
+			BuiltAt: at, ParserVersion: "test",
+		})
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record the re-argued build: %v %v", outcome, err)
+		}
+		docs := ingest.NewDocuments(f.db.DB)
+		if _, err := docs.Write(ctx, again.ID, ingest.InventoryKind, 0,
+			strings.NewReader(anInventory)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := docs.Write(ctx, again.ID, ingest.SuppressionsKind, 0,
+			strings.NewReader(aSuppression)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.queue.Add(ctx, queue.Parse, strconv.FormatInt(again.ID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		// What a first attempt that failed leaves behind.
+		if err := scans.MarkFailed(ctx, again.ID, errors.New("the connection dropped")); err != nil {
+			t.Fatal(err)
+		}
+
+		result, err := f.reader.Once(ctx)
+		if err != nil || result == nil {
+			t.Fatalf("the retry read nothing: %+v %v", result, err)
+		}
+		if result.Superseded || result.ScanID != again.ID {
+			t.Fatalf("read %+v, want the re-argued build applied", result)
+		}
+		read, err := scans.ByID(ctx, again.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if read.Status != ingest.Accepted {
+			t.Errorf("the re-argued build is %q after its retry", read.Status)
+		}
+	})
+}
+
+// A failed submission sent again is a new scan, so scan identifiers keep the
+// order scans are applied in and no interval the graph records closes before
+// it opened.
+func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Second)
+		once := queue.DefaultOptions()
+		once.MaxAttempts = 1
+		q := queue.New(f.db, once)
+		reader := ingest.NewReader(f.db, q, sbom.Limits{},
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
+		scans := ingest.NewStore(f.db.DB)
+		docs := ingest.NewDocuments(f.db.DB)
+
+		// Tuesday's build arrives first and cannot be read.
+		tuesday := ingest.Arriving{
+			TargetID: f.branch, ContentHash: "tuesday", BuiltAt: now.Add(-time.Hour),
+			ParserVersion: "test",
+		}
+		failed, outcome, err := scans.Record(ctx, tuesday)
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record Tuesday: %v %v", outcome, err)
+		}
+		if _, err := docs.Write(ctx, failed.ID, ingest.InventoryKind, 0, strings.NewReader(
+			`{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"version": "1"}]}`)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Add(ctx, queue.Parse, strconv.FormatInt(failed.ID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := reader.Once(ctx); err == nil {
+			t.Fatal("the unreadable inventory was read")
+		}
+
+		// Monday's build arrives after it and is applied.
+		monday, outcome, err := scans.Record(ctx, ingest.Arriving{
+			TargetID: f.branch, ContentHash: "monday", BuiltAt: now.Add(-2 * time.Hour),
+			ParserVersion: "test",
+		})
+		if err != nil || outcome != ingest.Accept {
+			t.Fatalf("record Monday: %v %v", outcome, err)
+		}
+		if _, err := docs.Write(ctx, monday.ID, ingest.InventoryKind, 0,
+			strings.NewReader(aSmallerInventory)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Add(ctx, queue.Parse, strconv.FormatInt(monday.ID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		if result, err := reader.Once(ctx); err != nil || result == nil || result.Superseded {
+			t.Fatalf("Monday was not applied: %+v %v", result, err)
+		}
+
+		// Tuesday's bytes are sent again and read this time.
+		retaken, outcome, err := scans.Record(ctx, tuesday)
+		if err != nil || outcome != ingest.Retake {
+			t.Fatalf("send Tuesday again: %v %v", outcome, err)
+		}
+		if retaken.ID <= monday.ID {
+			t.Fatalf("Tuesday was taken again as scan %d, not newer than Monday's %d",
+				retaken.ID, monday.ID)
+		}
+		if _, err := scans.ByID(ctx, failed.ID); err == nil {
+			t.Errorf("the failed attempt %d is still held beside the retake", failed.ID)
+		}
+		if _, err := docs.Write(ctx, retaken.ID, ingest.InventoryKind, 0,
+			strings.NewReader(anInventory)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := q.Add(ctx, queue.Parse, strconv.FormatInt(retaken.ID, 10)); err != nil {
+			t.Fatal(err)
+		}
+		if result, err := reader.Once(ctx); err != nil || result == nil ||
+			result.Superseded || result.ScanID != retaken.ID {
+			t.Fatalf("Tuesday was not applied on the retake: %+v %v", result, err)
+		}
+
+		var inverted int
+		inverted, err = f.db.DB.NewSelect().Model((*graph.Node)(nil)).
+			Where("target_id = ?", f.branch).
+			Where("closed_scan_id IS NOT NULL").
+			Where("closed_scan_id < opened_scan_id").
+			Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if inverted != 0 {
+			t.Errorf("%d nodes closed before they opened", inverted)
+		}
+	})
+}
+
+// A scan older than the one the build last applied is set aside rather than
+// applied over it, whatever its build time says, because the graph reads scan
+// identifiers as time.
+func TestAScanOlderThanTheOneLastAppliedIsSetAside(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Second)
+		scans := ingest.NewStore(f.db.DB)
+		earlier := f.store(t, f.branch, now.Add(-time.Hour), anInventory)
+		if err := scans.MarkFailed(ctx, earlier, nil); err != nil {
+			t.Fatal(err)
+		}
+		f.accept(t, f.branch, now.Add(-2*time.Hour), aSmallerInventory)
+		if result, err := f.reader.Once(ctx); err != nil || result == nil || result.Superseded {
+			t.Fatalf("the later scan was not applied: %+v %v", result, err)
+		}
+
+		// The earlier scan stands again under its own identifier, as one the
+		// graph already named does when its bytes are sent again.
+		if _, err := f.db.DB.NewUpdate().Model((*ingest.Scan)(nil)).
+			Set("status = ?", ingest.Accepted).Where("id = ?", earlier).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.queue.Add(ctx, queue.Parse, strconv.FormatInt(earlier, 10)); err != nil {
+			t.Fatal(err)
+		}
+		result, err := f.reader.Once(ctx)
+		if err != nil || result == nil {
+			t.Fatalf("read nothing: %+v %v", result, err)
+		}
+		if !result.Superseded || result.ScanID != earlier {
+			t.Errorf("read %+v, want scan %d set aside", result, earlier)
+		}
+	})
 }

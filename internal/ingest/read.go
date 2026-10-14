@@ -213,6 +213,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 
 	scans := NewStore(r.db.DB)
 	scan, err := scans.ByID(ctx, scanID)
+	if errors.Is(err, ErrNoScan) {
+		// A failed attempt sent again is written as a new scan and the failed
+		// row removed, so a job still waiting to retry it has been overtaken.
+		return &Result{ScanID: scanID, Superseded: true}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +253,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if newest != nil && newest.ID != scanID && !scan.BuiltAt.After(newest.BuiltAt) {
+	if passedBy(scan, newest) {
 		return &Result{ScanID: scanID, Superseded: true}, nil
 	}
 
@@ -363,7 +368,18 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			if err != nil {
 				return err
 			}
-			if newest != nil && newest.ID != scanID && !scan.BuiltAt.After(newest.BuiltAt) {
+			if passedBy(scan, newest) {
+				overtaken = true
+				return nil
+			}
+			// The graph reads scan identifiers as time, so a scan older than
+			// the one the build last applied is not applied over it.
+			var last *int64
+			if err := tx.NewSelect().Table("target").Column("last_scan_id").
+				Where("id = ?", scan.TargetID).Scan(ctx, &last); err != nil {
+				return fmt.Errorf("read what the build last applied: %w", err)
+			}
+			if last != nil && *last > scanID {
 				overtaken = true
 				return nil
 			}
