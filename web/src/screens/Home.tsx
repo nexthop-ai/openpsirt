@@ -699,13 +699,14 @@ function greeting(): string {
 // Said in what the roles let somebody do rather than what they are called.
 function holdings(who: Who): string {
   if (who.admin) return "You administer this deployment";
-  const triage = who.reach.filter((each) => each.may_triage).map((each) => each.product);
-  const agree = who.reach.filter((each) => each.may_agree).map((each) => each.product);
+  const reach = who.reach ?? [];
+  const triage = reach.filter((each) => each.may_triage).map((each) => each.product);
+  const agree = reach.filter((each) => each.may_agree).map((each) => each.product);
   const parts: string[] = [];
   if (triage.length) parts.push(`triage on ${triage.join(", ")}`);
   if (agree.length) parts.push(`approval on ${agree.join(", ")}`);
   if (parts.length === 0) {
-    return `You can read ${who.reach.length} product${who.reach.length === 1 ? "" : "s"}`;
+    return `You can read ${reach.length} product${reach.length === 1 ? "" : "s"}`;
   }
   return `You hold ${parts.join(" and ")}`;
 }

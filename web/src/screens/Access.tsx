@@ -13,7 +13,7 @@ import { useCatalog } from "../api/catalog";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
-import { called, ROLES, type Role } from "../ui/roles";
+import { called, ROLES, roleOf, type Role } from "../ui/roles";
 import { GrantGrid } from "./GrantGrid";
 import { Wide } from "../ui/Wide";
 import { at, on } from "../ui/when";
@@ -46,7 +46,7 @@ export function Access({ who: me }: { who: Who }) {
   // access review asks, and reading it off a list of everybody is reading the
   // grid sideways — so the narrowing is a control rather than a scan.
   const [onProduct, setOnProduct] = useState("");
-  const [withRole, setWithRole] = useState("");
+  const [withRole, setWithRole] = useState<Role | "">("");
 
   const people = useQuery({
     queryKey: ["people", onProduct, withRole],
@@ -56,7 +56,7 @@ export function Access({ who: me }: { who: Who }) {
           params: {
             query: {
               ...(onProduct ? { product: onProduct } : {}),
-              ...(withRole ? { role: withRole as Role } : {}),
+              ...(withRole ? { role: withRole } : {}),
             },
           },
         }),
@@ -111,12 +111,12 @@ export function Access({ who: me }: { who: Who }) {
   });
 
   const grant = useMutation({
-    mutationFn: async (who: { identity: string; product: string; role: string }) =>
+    mutationFn: async (who: { identity: string; product: string; role: Role }) =>
       unwrap(
         await api.POST("/v1/people", {
           body: {
             identity: who.identity,
-            holds: [{ product: who.product, role: who.role as Role }],
+            holds: [{ product: who.product, role: who.role }],
           },
         }),
       ),
@@ -135,12 +135,12 @@ export function Access({ who: me }: { who: Who }) {
   // standing grant rather than a copy per product, so what it covers is
   // worked out when somebody asks rather than frozen when it was made.
   const grantEverywhere = useMutation({
-    mutationFn: async (who: { identity: string; role: string }) =>
+    mutationFn: async (who: { identity: string; role: Role }) =>
       unwrap(
         await api.POST("/v1/people", {
           body: {
             identity: who.identity,
-            holds: [{ role: who.role as Role, everywhere: true }],
+            holds: [{ role: who.role, everywhere: true }],
           },
         }),
       ),
@@ -227,7 +227,10 @@ export function Access({ who: me }: { who: Who }) {
         </label>
         <label>
           Holding{" "}
-          <select value={withRole} onChange={(event) => setWithRole(event.target.value)}>
+          <select
+            value={withRole}
+            onChange={(event) => setWithRole(roleOf(event.target.value) ?? "")}
+          >
             <option value="">any role</option>
             {ROLES.map((each) => (
               <option key={each.role} value={each.role}>

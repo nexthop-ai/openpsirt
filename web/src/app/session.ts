@@ -8,64 +8,12 @@ import { forgetAll, forgetSession } from "./drafts";
 import { sessionEnded } from "./ended";
 import { rememberForward, signedOutHere } from "../screens/SignIn";
 
-type Can = {
-  product: string;
-  name: string;
-  // Either visibility. Each is its own grant, so reading or triaging one
-  // says nothing about the other.
-  may_see: boolean;
-  reads_public: boolean;
-  reads_private: boolean;
-  may_triage: boolean;
-  triages_public: boolean;
-  // Giving work to somebody else, or taking what they hold. Taking work
-  // nobody owns and handing back your own are triage and need only may_triage.
-  may_assign: boolean;
-  // Triage of private findings, which recording an undisclosed one asks for.
-  may_hide: boolean;
-  may_agree: boolean;
-  // Agreeing to a claim at one visibility, which is how approving is asked.
-  agrees_public: boolean;
-  agrees_private: boolean;
-  // Agreeing to somebody else's ruling on vulnerability reports.
-  may_approve_rulings: boolean;
-};
+// The caller and their reach, in the server's own shape: a field the server
+// renames or makes nullable is a compile error at every reader.
+export type Who = Body<"WhoBody">;
 
-export type Who = {
-  identity: string;
-  name: string;
-  admin: boolean;
-  // Their reach over this deployment's own records, which grants no write to
-  // them. A separate answer from admin: one of them changes things.
-  audits?: boolean;
-  kind: "person" | "key";
-  reach: Can[];
-  // The digest they asked for, and whether anything can be sent: a screen
-  // offering the switches has to know their state, and a switch that changes
-  // nothing is worse than no switch.
-  digest?: boolean;
-  digest_unassigned?: boolean;
-  reachable?: boolean;
-  // The chat platforms this deployment offers and what they chose, where it
-  // offers any.
-  chat?: { platforms: string[]; direct: boolean; shared: boolean };
-  // The deployment's deferral threshold, in days. A screen taking a date
-  // needs it while the date is being chosen: which side of it a date falls on
-  // decides whether a second person has to agree, and reading that off the
-  // response is reading it after the fact.
-  deferral_days?: number;
-  // The rows one action may write here. A screen acting on a selection
-  // bounds it by this and says so, rather than turning one click into as many
-  // round trips as a filter matched — a page nobody can use and nothing can
-  // cancel.
-  bulk_cap?: number;
-  // The embargo a flaw reported from outside is given, as a duration such as
-  // 2160h0m0s. A screen recording one states the date it will get.
-  disclose_after?: string;
-  // Every triage outcome with what it claims, which is how a screen tells a
-  // dismissal from a deferral and knows which outcomes state a reason.
-  outcomes: Body<"WhoBody">["outcomes"];
-};
+// What somebody can do in one product.
+type Can = Body<"CanBody">;
 
 // The caller, and their reach. Asked once and shared, because every
 // screen needs it to decide what to draw and asking per screen would put a
@@ -88,7 +36,7 @@ export function useWho() {
     staleTime: 5 * 60_000,
     queryFn: async () => {
       try {
-        return unwrap(await api.GET("/v1/session/me", {})) as Who;
+        return unwrap(await api.GET("/v1/session/me", {}));
       } catch (error) {
         if (error instanceof Refused && error.status === 401) {
           const held = client.getQueryData<Who | null>(["whoami"]);
@@ -113,7 +61,7 @@ export function useWho() {
 // Every screen asks this one question through here.
 export function mayOf(who: Who | null | undefined, product: string): Can | undefined {
   const named = product.toLowerCase();
-  return who?.reach.find((each) => each.product.toLowerCase() === named);
+  return (who?.reach ?? []).find((each) => each.product.toLowerCase() === named);
 }
 
 // Signing out, as a sequence rather than as a click handler.

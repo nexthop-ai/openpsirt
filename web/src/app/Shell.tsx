@@ -66,7 +66,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, stream, variant } = useScope();
   const whole = !!(product && stream && variant);
   // Reading reports takes reading undisclosed work, which is what reads_private says.
-  const reportsAnywhere = who.reach.some((each) => each.reads_private);
+  const reportsAnywhere = (who.reach ?? []).some((each) => each.reads_private);
   const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
   const build = whole ? { product, stream, variant } : undefined;

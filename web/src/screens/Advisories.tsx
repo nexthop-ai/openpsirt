@@ -43,7 +43,7 @@ export function Advisories() {
   // Whoever may record a flaw in a product may write an advisory about one,
   // which is the server's own gate. Drawn to somebody holding no triage
   // anywhere, the control is one that always fails.
-  const mayStart = !!who.data?.reach.some((each) => each.may_triage);
+  const mayStart = !!who.data?.reach?.some((each) => each.may_triage);
 
   if (rows.isPending) return <Loading />;
   if (rows.isError) return <Failed error={rows.error} what="The advisories could not be read." />;

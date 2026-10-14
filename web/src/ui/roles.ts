@@ -1,53 +1,61 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { Body } from "../api/client";
+
+// Every role the server grants, from the published document.
+export type Role = Body<"GrantBody">["role"];
+
 // The roles, with what each allows — the same words the API reference uses.
 //
 // Words rather than bare tokens: `private-triage` and `private-read` differ by
 // one word in a select, and what they differ by is whether somebody can decide
 // about findings nobody has announced. The label says what it is; the meaning
 // says what granting it does.
-export const ROLES = [
-  {
-    role: "public-read",
+//
+// Keyed on the published roles, so a role the server adds is a compile error
+// here until it has words, and a column in the grant grid once it has. The
+// order written is the order offered.
+const WORDS: Record<Role, { label: string; means: string; grants: boolean }> = {
+  "public-read": {
     label: "Read, public",
     means: "Read findings about issues that are public",
     grants: true,
   },
-  {
-    role: "private-read",
+  "private-read": {
     label: "Read, private",
     means: "Read findings nobody has announced. Public ones need their own role",
     grants: true,
   },
-  {
-    role: "public-triage",
+  "public-triage": {
     label: "Triage, public",
     means: "Decide, revise, withdraw and comment on public findings; take work nobody owns",
     grants: true,
   },
-  {
-    role: "private-triage",
+  "private-triage": {
     label: "Triage, private",
     means:
       "The same for findings nobody has announced, including recording one. Public ones need their own role",
     grants: true,
   },
-  {
-    role: "approver",
+  approver: {
     label: "Approver",
     means: "Agree to somebody else's claim. Never their own",
     grants: false,
   },
-  {
-    role: "assigner",
+  assigner: {
     label: "Assigner",
     means: "Give work to somebody else, or take what they are holding",
     grants: false,
   },
-] as const;
+};
 
-export type Role = (typeof ROLES)[number]["role"];
+export const ROLES = (Object.keys(WORDS) as Role[]).map((role) => ({ role, ...WORDS[role] }));
+
+// The role a word names, or nothing where it names none.
+export function roleOf(word: string): Role | undefined {
+  return ROLES.find((each) => each.role === word)?.role;
+}
 
 // The name for one, wherever a stored role is read back. A role this does not
 // know is shown as it arrived: a deployment that grows one before the
