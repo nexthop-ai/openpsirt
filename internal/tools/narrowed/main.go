@@ -205,11 +205,24 @@ func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]t
 		}
 	}
 	loose := map[string][]token.Pos{}
-	if held == 0 || refusedIn(body, resolved) {
+	if held == 0 {
 		return loose, held, followed
 	}
-	for name := range resolved {
-		if uses := unguarded(body, name); len(uses) > 0 {
+	// A refusal covers what comes after it, so a use before it is still a
+	// read nothing narrowed. A use before the name was bound from the build
+	// is of some earlier value under the same name.
+	refusal := refusedAt(body, resolved)
+	for name, bound := range resolved {
+		var uses []token.Pos
+		for _, use := range unguarded(body, name) {
+			if use < bound {
+				continue
+			}
+			if !refusal.IsValid() || use < refusal {
+				uses = append(uses, use)
+			}
+		}
+		if len(uses) > 0 {
 			loose[name] = uses
 		}
 	}
@@ -463,17 +476,19 @@ func converts(call *ast.CallExpr) bool {
 	return false
 }
 
-// refused reports whether the function opens by asking the subject about the
-// build it just resolved, and turning them away.
+// refusedAt finds where the function asks the subject about the build it just
+// resolved, and turns them away.
 //
 // The test is deliberately narrow: the refusal stands in the function's own
-// statement list, so that it covers everything after it. A check of the same
-// shape nested inside another condition covers only what that condition
-// covers, which is how a collaborator received a whole build's approved
+// statement list, so that it covers everything after it, and a use before it
+// is still reported. A check of the same shape nested inside another condition
+// covers only what that condition covers, which is how a collaborator received a whole build's approved
 // statements — the only subject question on that path was reached when the
 // caller asked for undisclosed work, and a caller asking for what is published
 // went past it.
-func refusedIn(body *ast.BlockStmt, names map[string]token.Pos) bool {
+//
+// It answers where the first refusal stands, and token.NoPos where none does.
+func refusedAt(body *ast.BlockStmt, names map[string]token.Pos) token.Pos {
 	for _, statement := range body.List {
 		switch branch := statement.(type) {
 		case *ast.IfStmt:
@@ -482,7 +497,7 @@ func refusedIn(body *ast.BlockStmt, names map[string]token.Pos) bool {
 			// disclosed?" — is the same shape and the opposite act, and
 			// taking it for a refusal exempts the function that asks it.
 			if leaves(branch.Body) && refuses(branch.Cond, names) {
-				return true
+				return branch.Pos()
 			}
 		case *ast.SwitchStmt:
 			// A switch with no tag is a chain of ifs, and a case refusing
@@ -497,13 +512,13 @@ func refusedIn(body *ast.BlockStmt, names map[string]token.Pos) bool {
 				}
 				for _, cond := range arm.List {
 					if refuses(cond, names) {
-						return true
+						return branch.Pos()
 					}
 				}
 			}
 		}
 	}
-	return false
+	return token.NoPos
 }
 
 // refuses reports whether a condition is the refusal itself: the negation of a

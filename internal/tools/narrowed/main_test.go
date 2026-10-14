@@ -91,6 +91,21 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			false,
 		},
 		{
+			// A refusal covers what comes after it. A read before it has
+			// already answered whoever asked.
+			"read before the refusal",
+			`func f() {
+				named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+				_ = err
+				rows := store.Unnarrowed(ctx, named.ProductID)
+				if !subject.Reads(access.Public, named.ProductID) {
+					return nil, access.Denied("read findings here")
+				}
+				_ = rows
+			}`,
+			true,
+		},
+		{
 			// The ordinary handler shape: the read is narrowed in the data
 			// layer, which is what carrying the subject into it means.
 			"handed to something that carries the subject",
