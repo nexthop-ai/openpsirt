@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -38,66 +39,75 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 	for _, c := range []struct {
 		what string
 		file string
-		want tier
+		want []tier
 	}{
-		{"a design document", write("DESIGN-thing.md", "# Thing\n"), documents},
-		{"anything under the interface", "web/src/screens/Home.tsx", web},
-		{"the module files", "go.mod", engines},
-		{"the makefile", "Makefile", everything},
+		{"a design document", write("DESIGN-thing.md", "# Thing\n"), []tier{documents}},
+		{"anything under the interface", "web/src/screens/Home.tsx", []tier{web}},
+		{"the module files", "go.mod", []tier{modules}},
+		{"the interface's manifest", "web/package.json", []tier{web, webPackages}},
+		{"the interface's lockfile", "web/package-lock.json", []tier{web, webPackages}},
+		{"the makefile", "Makefile", []tier{everything}},
 		{
 			// The walk holds no SQL and registers no operation, so the code
 			// tier would take it — and that tier does not run `reserved`.
-			"a gate program", "internal/tools/walk/walk.go", everything,
+			"a gate program", "internal/tools/walk/walk.go", []tier{everything},
 		},
-		{"the database package", "internal/database/connect.go", engines},
-		{"the test harness", "internal/dbtest/dbtest.go", engines},
-		{"the schema package", "internal/schema/indexes_test.go", engines},
+		{"the database package", "internal/database/connect.go", []tier{engines}},
+		{"the test harness", "internal/dbtest/dbtest.go", []tier{engines}},
+		{"the schema package", "internal/schema/indexes_test.go", []tier{engines}},
 		{
 			"go holding a query",
 			write("store.go", "package p\n\nfunc read() { db.NewSelect().Model(&x) }\n"),
-			engines,
+			[]tier{engines},
 		},
 		{
 			"go holding SQL in a string",
 			write("raw.go", "package p\n\nconst q = `SELECT 1 FROM thing`\n"),
-			engines,
+			[]tier{engines},
 		},
 		{
 			"go registering an operation",
 			write("route.go", "package p\n\nfunc r() { huma.Register(api, huma.Operation{"+
 				"OperationID: \"x\"}, h) }\n"),
-			api,
+			[]tier{api},
 		},
 		{
 			// A field's description is written into the document, wherever
 			// the type is declared.
 			"go declaring a documented field",
 			write("types.go", "package p\n\ntype X struct{ A int `json:\"a\" doc:\"x\"` }\n"),
-			api,
+			[]tier{api},
 		},
 		{
 			// A type a route answers with changes the document through its
 			// field names alone, with no tag to find.
 			"any go in the package the document is generated from",
 			write("internal/httpapi/shape.go", "package httpapi\n\ntype X struct{ A int }\n"),
-			api,
+			[]tier{api},
 		},
 		{
 			"any go in a route package beneath it",
 			write("internal/httpapi/core/shape.go", "package core\n\ntype X struct{ A int }\n"),
-			api,
+			[]tier{api},
+		},
+		{
+			// A route file that also joins strings is both: the API document
+			// is generated from it, and the query pattern matches it.
+			"go in the API package that also reads as a query",
+			write("internal/httpapi/both.go", "package httpapi\n\nfunc f() { strings.Join(nil, \"\") }\n"),
+			[]tier{engines, api},
 		},
 		{
 			"plain go",
 			write("plain.go", "package p\n\nfunc add(a, b int) int { return a + b }\n"),
-			code,
+			[]tier{code},
 		},
 		{
-			"a file that is not there any more", filepath.Join(dir, "gone.go"), everything,
+			"a file that is not there any more", filepath.Join(dir, "gone.go"), []tier{everything},
 		},
 	} {
-		if got := classify(c.file); got != c.want {
-			t.Errorf("%s classified as %s, want %s", c.what, name(got), name(c.want))
+		if got := classify(c.file); !slices.Equal(got, c.want) {
+			t.Errorf("%s classified as %v, want %v", c.what, names(got), names(c.want))
 		}
 	}
 }
@@ -131,6 +141,9 @@ func TestTheTiersAboveDocumentsCarryTheOneBelow(t *testing.T) {
 		{"an interface change is not code", []string{"web/src/app/App.tsx"}, code, false},
 		{"the route table is code too", []string{"web/src/app/routes.json"}, code, true},
 		{"the route table is the interface too", []string{"web/src/app/routes.json"}, web, true},
+		{"a module change is code too", []string{"go.mod"}, code, true},
+		{"a module change is the engines too", []string{"go.sum"}, engines, true},
+		{"an interface manifest is not code", []string{"web/package.json"}, code, false},
 	} {
 		if got := tiers(c.files)[c.also]; got != c.want {
 			t.Errorf("%s: reached %s = %v, want %v", c.what, name(c.also), got, c.want)
@@ -198,4 +211,91 @@ func TestATargetInNoOrderStillRuns(t *testing.T) {
 	if chosen := targets(map[tier]bool{code: true}); !slices.Contains(chosen, "a-target-nobody-ordered") {
 		t.Errorf("a target left out of the order was left out of the gate: %v", chosen)
 	}
+}
+
+func names(ts []tier) []string {
+	out := make([]string, 0, len(ts))
+	for _, t := range ts {
+		out = append(out, name(t))
+	}
+	return out
+}
+
+func TestEveryNarrowTierScansForSecrets(t *testing.T) {
+	// Any file can carry a credential, and one pushed is in the remote's
+	// history before CI reads it. The everything tier runs it inside check.
+	checked := 0
+	for tr, targets := range runs {
+		if tr == everything || tr == api || tr == engines || tr == modules || tr == webPackages {
+			continue
+		}
+		checked++
+		if !slices.Contains(targets, "secrets") {
+			t.Errorf("the %s tier runs %v, which leaves out the secret scan", name(tr), targets)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no narrow tier was examined, so this checked nothing")
+	}
+	// The tiers skipped above reach one that runs it.
+	for _, tr := range []tier{api, engines, modules} {
+		if !slices.Contains(targets(map[tier]bool{tr: true, code: true}), "secrets") {
+			t.Errorf("the %s tier reaches no secret scan", name(tr))
+		}
+	}
+	if !slices.Contains(targets(map[tier]bool{web: true, webPackages: true}), "secrets") {
+		t.Error("the web packages tier reaches no secret scan")
+	}
+}
+
+func TestEveryTargetCheckRunsIsChosenBySomeTier(t *testing.T) {
+	// A target check runs and no tier chooses is one a commit can fail in CI
+	// with the local gate green, which is the narrowing the gate promises
+	// never to do.
+	makefile, err := os.ReadFile(filepath.Join("..", "..", "..", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prerequisites := checkPrerequisites(string(makefile))
+	if len(prerequisites) == 0 {
+		t.Fatal("the makefile's check target lists no prerequisites, so this checked nothing")
+	}
+	for _, missing := range unchosenBy(prerequisites, runs) {
+		t.Errorf("check runs %q and no narrow tier chooses it", missing)
+	}
+}
+
+func TestATargetNoTierChoosesIsReported(t *testing.T) {
+	tiers := map[tier][]string{code: {"build"}, everything: {"check"}}
+	got := unchosenBy(checkPrerequisites("check: build lint\n\tdo\n"), tiers)
+	if !slices.Equal(got, []string{"lint"}) {
+		t.Errorf("unchosen: %v, want [lint]", got)
+	}
+}
+
+// checkPrerequisites is what the makefile's check target depends on.
+func checkPrerequisites(makefile string) []string {
+	for _, line := range strings.Split(makefile, "\n") {
+		if rest, ok := strings.CutPrefix(line, "check:"); ok {
+			return strings.Fields(rest)
+		}
+	}
+	return nil
+}
+
+// unchosenBy is each prerequisite no tier but everything runs.
+func unchosenBy(prerequisites []string, tiers map[tier][]string) []string {
+	var out []string
+	for _, p := range prerequisites {
+		found := false
+		for tr, targets := range tiers {
+			if tr != everything && slices.Contains(targets, p) {
+				found = true
+			}
+		}
+		if !found {
+			out = append(out, p)
+		}
+	}
+	return out
 }

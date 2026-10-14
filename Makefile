@@ -296,10 +296,14 @@ full:
 	esac
 
 # What a change to documents alone can break: a link pointing at a heading that
-# has been renamed, and the style the design documents are written in. Seconds.
-# The other half of that tier is "unclaimed", which is a check of its own.
+# has been renamed, the style the design documents are written in, and every
+# Go test that reads a document — the build document's tables and the
+# configuration reference are held to the code by tests in those packages, and
+# a test in internal/build holds this list to them. Seconds. The other half of
+# that tier is "unclaimed", which is a check of its own.
+DOCS_PACKAGES := ./internal/docs/ ./internal/build/ ./internal/config/
 docs-check:
-	$(GO) test ./internal/docs/
+	$(GO) test $(DOCS_PACKAGES)
 
 # The linter is also the vet. Its govet runs every analyzer go vet does, over
 # test files and over the file behind the "measure" tag, so a separate go vet

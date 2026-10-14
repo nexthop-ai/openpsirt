@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -38,12 +39,15 @@ import (
 type tier int
 
 const (
-	// A document can break a link to a heading that was renamed, and it can
-	// leave a decision in force that nothing names. Nothing else in the gate
-	// can fail for a prose edit.
+	// A document can break a link to a heading that was renamed, leave a
+	// decision in force that nothing names, fail a Go test that reads it, or
+	// carry a credential. Nothing else in the gate can fail for a prose edit.
 	documents tier = iota
 	// The interface, checked by its own toolchain.
 	web
+	// What the interface installs. A new package can carry a license the
+	// binary may not ship.
+	webPackages
 	// Go that reaches no SQL: the type checks, the analysis gates, the quick
 	// test loop.
 	code
@@ -54,6 +58,10 @@ const (
 	// A query, the schema, a migration, or the harness the tests share. This
 	// is the tier that costs, and the only one that proves portability.
 	engines
+	// The Go modules. A module moved is every package that imports it, so this
+	// carries the engines, and it is also a new set of advisories, licenses
+	// and inventory entries.
+	modules
 	// Everything. What a path nobody classified takes, and what a session ends
 	// with.
 	everything
@@ -61,13 +69,20 @@ const (
 
 // runs is what each tier runs, in the order a person wants to see a failure:
 // the fast and specific before the slow and broad.
+//
+// The secret scan is in every tier, because any file can carry a credential,
+// and a credential pushed is in the remote's history before CI reads it.
 var runs = map[tier][]string{
-	documents: {"docs-check", "unclaimed"},
-	web:       {"web-check", "spdx"},
+	// The README and the documentation home share a block pins-check holds
+	// equal.
+	documents:   {"docs-check", "unclaimed", "pins-check", "secrets"},
+	web:         {"web-check", "spdx", "secrets"},
+	webPackages: {"licenses"},
 	code: {"build", "lint", "unreachable", "readable", "negatives", "confined", "granted",
-		"narrowed", "attached", "vendored", "spdx", "test"},
+		"narrowed", "attached", "vendored", "spdx", "pins-check", "sbom-shape", "secrets", "test"},
 	api:     {"openapi-current", "web-api"},
 	engines: {"reserved", "test-all", "check-engines"},
+	modules: {"govulncheck", "licenses", "sbom"},
 	// Everything, the container and the chart included. Those are the one
 	// tier CI runs and the local gate did not, which is how a web build
 	// reaching outside `web/` passed every check here and failed the image:
@@ -82,9 +97,9 @@ var runs = map[tier][]string{
 // The order targets are printed in, which is the order make runs them.
 var order = []string{
 	"build", "lint", "unreachable", "readable", "negatives", "reserved", "confined", "granted",
-	"narrowed", "attached", "vendored", "spdx",
-	"docs-check", "unclaimed", "openapi-current",
-	"test", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
+	"narrowed", "attached", "vendored", "spdx", "pins-check", "secrets",
+	"docs-check", "unclaimed", "openapi-current", "govulncheck", "licenses", "sbom",
+	"test", "sbom-shape", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
 }
 
 func main() {
@@ -157,31 +172,41 @@ func targets(reached map[tier]bool) []string {
 func tiers(touched []string) map[tier]bool {
 	reached := map[tier]bool{}
 	for _, file := range touched {
-		t := classify(file)
-		reached[t] = true
-		// The tiers above documents and web add to the one below rather than
-		// replacing it: a change that moves a query is still Go, and has to
-		// compile and pass the analysis gates before anything asks four
-		// engines about it.
-		if t == api || t == engines {
-			reached[code] = true
+		landed := classify(file)
+		names := make([]string, 0, len(landed))
+		for _, t := range landed {
+			reached[t] = true
+			names = append(names, name(t))
+			// The tiers above documents and web add to the one below rather
+			// than replacing it: a change that moves a query is still Go, and
+			// has to compile and pass the analysis gates before anything asks
+			// four engines about it.
+			if t == api || t == engines || t == modules {
+				reached[code] = true
+			}
+			if t == modules {
+				reached[engines] = true
+			}
 		}
 		// The interface's route table is read by a Go test as well as the
 		// interface's own, which holds the server's links to it.
 		if file == routeTable {
 			reached[code] = true
 		}
-		fmt.Fprintf(os.Stderr, "gate: %s -> %s\n", file, name(t))
+		fmt.Fprintf(os.Stderr, "gate: %s -> %s\n", file, strings.Join(names, ", "))
 	}
 	return reached
 }
 
 func name(t tier) string {
-	return [...]string{"documents", "web", "code", "api", "engines", "everything"}[t]
+	return [...]string{"documents", "web", "web packages", "code", "api", "engines", "modules", "everything"}[t]
 }
 
 // routeTable is the interface's table of the addresses it answers.
 const routeTable = "web/src/app/routes.json"
+
+// webManifests are the files that say what the interface installs.
+var webManifests = []string{"web/package.json", "web/package-lock.json"}
 
 // storage is where the queries, the schema and the harness the tests share
 // live. A change under any of these is portability work whatever it looks
@@ -209,20 +234,25 @@ var operation = regexp.MustCompile(`huma\.(Register|Operation)|Summary:|Operatio
 // document as much as the operation is.
 const apiPackage = "internal/httpapi/"
 
-func classify(file string) tier {
+// classify is every tier one file lands in. A file can land in more than one: a
+// route file that also holds a query is both the API document's input and
+// portability work, and choosing one of the two drops the other's checks.
+func classify(file string) []tier {
 	switch {
+	case slices.Contains(webManifests, file):
+		return []tier{web, webPackages}
 	case strings.HasPrefix(file, "web/"):
-		return web
+		return []tier{web}
 	case path.Ext(file) == ".md":
-		return documents
+		return []tier{documents}
 	case file == "go.mod" || file == "go.sum":
-		return engines
+		return []tier{modules}
 	case path.Ext(file) != ".go":
 		// The makefile, the container, the chart, the generated document, an
 		// asset, a test fixture. Each of these can break something no narrower
 		// tier covers, and there are few enough of them that being generous
 		// costs little.
-		return everything
+		return []tier{everything}
 	}
 	// The gate programs themselves, and the reader they share. A change here
 	// can stop any check looking at part of the tree, and no narrower tier
@@ -231,27 +261,30 @@ func classify(file string) tier {
 	// Widening the skip set would then make the quoting gate read less while
 	// this reported green.
 	if strings.HasPrefix(file, "internal/tools/") {
-		return everything
+		return []tier{everything}
 	}
 	for _, dir := range storage {
 		if strings.HasPrefix(file, dir) {
-			return engines
+			return []tier{engines}
 		}
 	}
 	content, err := os.ReadFile(file) //nolint:gosec // G304: a path git reported as changed in this checkout
 	if err != nil {
 		// Deleted, or unreadable. Either way this is not the place to decide
 		// what it used to hold.
-		return everything
+		return []tier{everything}
 	}
-	switch {
-	case query.Match(content):
-		return engines
-	case operation.Match(content), inAPIPackage(file):
-		return api
-	default:
-		return code
+	var landed []tier
+	if query.Match(content) {
+		landed = append(landed, engines)
 	}
+	if operation.Match(content) || inAPIPackage(file) {
+		landed = append(landed, api)
+	}
+	if len(landed) == 0 {
+		landed = append(landed, code)
+	}
+	return landed
 }
 
 // changed lists every path this checkout differs from its last commit by:
