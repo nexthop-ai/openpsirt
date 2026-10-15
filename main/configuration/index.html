@@ -3281,10 +3281,10 @@ asking on before a name was held back, the version an index gave for that name
 is removed the next time the pass reaches it, along with the summary and the
 project address. All of it came from sending the name. Nothing else is
 affected and no upgrade step is needed.</p>
-<p>Read what it held back, and what no index knew. The report is at
+<p>Read what it held back, and what no index knew or answered. The report is at
 <code>/v1/upstream/unanswered</code> and on the System screen. Held-back names say what
-the default is costing; names no public index has heard of are private modules
-and vendored forks, and they are the candidates to promote into
+the default is costing; names no public index knew or answered are mostly
+private modules and vendored forks, and they are the candidates to promote into
 <code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
 <h2 id="outbound-exclusions">Outbound exclusions<a class="headerlink" href="#outbound-exclusions" title="Permanent link">&para;</a></h2>
 <p>Two fetches go to hosts somebody else chose: the repository a patch link names,
@@ -3917,6 +3917,26 @@ v0.5.0's schema in one step and carries none of the upgrades before it.</p>
 <tr>
 <td>A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan</td>
 <td>Nothing. Its findings close and reopen once, on the next scan of each build holding it, and judgments beneath it are asked again</td>
+</tr>
+<tr>
+<td>A build's scanner is given the distribution, the source package and the other package-identifier qualifiers that builds of its own product stated for a component. v0.8.0 filled them onto the component row every product shares, from whichever product stated them first</td>
+<td>State each component's distribution and source package in every build's inventory. On a branch's first scan after the upgrade, a component its own product never described that way loses the matches another product's description gave it, and those findings close as unexplained. A tag is not scanned from a new inventory, and keeps the description the upgrade copied onto its nodes, which on v0.8.0 may be another product's</td>
+</tr>
+<tr>
+<td>Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per claim; an issue fixed in two products is one fix</td>
+<td>Nothing. A figure read before the upgrade may differ from the same period read after it</td>
+</tr>
+<tr>
+<td>Every day and moment the API answers is in UTC. v0.8.0 answered some in the database server's zone</td>
+<td>Nothing where the database server runs in UTC. Otherwise a due date or a disclosure date near midnight reads one day off from what v0.8.0 answered</td>
+</tr>
+<tr>
+<td>A CSAF document states the base vector inside the vector held, in the specification's order. v0.8.0 published the vector as held, metrics outside the base set included</td>
+<td>Nothing. An advisory v0.8.0 issued from such a vector reads as changed since it went out; issue it again to send the corrected document</td>
+</tr>
+<tr>
+<td><code>triage.deferral-threshold</code> and <code>scanning.quiet-after</code> are whole numbers of days, and a part-day value is refused when set</td>
+<td>Nothing. A value v0.8.0 stored between two days is read as the later whole day everywhere: <code>12h</code> is one day</td>
 </tr>
 </tbody>
 </table>

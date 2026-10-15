@@ -7620,7 +7620,7 @@ components:
           format: int64
           type: integer
         found:
-          description: How many of those the repository holds
+          description: How many of those the repository's copy resolves to one commit
           format: int64
           type: integer
         held_bytes:
@@ -7674,7 +7674,7 @@ components:
           description: When a visit last began
           type: string
         found:
-          description: How many of those the repository holds
+          description: How many of those the repository's copy resolves to one commit
           format: int64
           type: integer
         held_bytes:
@@ -8963,7 +8963,7 @@ components:
             - report
           type: string
         lookup:
-          description: "'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit"
+          description: "'found' is a commit the copy of its repository holds. 'absent' is a hash the copy does not resolve to one commit: no commit has it, or it is an abbreviation more than one object shares. Omitted where no copy has been asked, or where the link names no commit"
           enum:
             - found
             - absent
@@ -9577,6 +9577,9 @@ components:
         team_name:
           description: The team's display name, where it differs from its name
           type: string
+        team_retired:
+          description: Whether the team is retired. A rule whose team is retired places nothing
+          type: boolean
         upstream:
           description: A source package name. Catches every binary package built from it
           type: string
@@ -11267,7 +11270,7 @@ components:
           description: The package identifier, which is the name that would be sent
           type: string
         why:
-          description: "'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"
+          description: "'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and came back with no version: not known, or refused. 'unreadable' is an identifier nothing can turn into a request"
           enum:
             - ours
             - unknown
@@ -11939,10 +11942,9 @@ components:
           description: The identity this deployment holds for them
           type: string
         kind:
-          description: A person who signed in, or a credential
+          description: Always a person. A pipeline key is refused this route
           enum:
             - person
-            - key
           type: string
         name:
           description: The display name, where one is recorded
@@ -12338,7 +12340,7 @@ paths:
 
         `product` and `vulnerability` narrow it to what covers them, which is what a screen about one flaw asks before somebody starts another advisory about it.
 
-        Requires: public-triage or private-triage. What you hold decides what comes back rather than whether you may ask
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. What you hold decides what comes back rather than whether you may ask
       operationId: list-advisories
       parameters:
         - description: Only advisories covering something in this product
@@ -12404,7 +12406,7 @@ paths:
 
         Requires a prefix configured for this deployment to mint under.
 
-        Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
       operationId: start-advisory
       requestBody:
         content:
@@ -12546,7 +12548,7 @@ paths:
 
         Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
 
-        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: retitle-advisory
       parameters:
         - in: path
@@ -12591,7 +12593,7 @@ paths:
 
         Answers 422 where no agreement is standing.
 
-        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: withdraw-advisory-approval
       parameters:
         - in: path
@@ -12627,7 +12629,7 @@ paths:
 
         Requires a triage role on every product the advisory covers.
 
-        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: approve-advisory
       parameters:
         - in: path
@@ -12747,7 +12749,7 @@ paths:
 
         Answers 409 where nobody has agreed to what the advisory says.
 
-        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: record-advisory-issued
       parameters:
         - in: path
@@ -12792,7 +12794,7 @@ paths:
 
         Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
 
-        Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
       operationId: add-advisory-issue
       parameters:
         - in: path
@@ -12835,7 +12837,7 @@ paths:
 
         Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
 
-        Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
       operationId: drop-advisory-issue
       parameters:
         - in: path
@@ -12882,7 +12884,7 @@ paths:
 
         A release the issue is not in answers 404.
 
-        Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: mark-advisory-release
       parameters:
         - in: path
@@ -14150,7 +14152,7 @@ paths:
 
         A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
 
-        Requires: public-triage or private-triage
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
       operationId: reaffirm-claim
       parameters:
         - in: path
@@ -16664,7 +16666,7 @@ paths:
       description: |-
         Takes everything off your list at once, and says how many that was. Conditions that are still true will not come back while they hold.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: acknowledge-all-notifications
       responses:
         "200":
@@ -16692,7 +16694,7 @@ paths:
 
         Two lifetimes, and the difference matters to a caller. An event happened once and goes away when you acknowledge it. A condition is true while something is true and clears itself when that stops, so a build that resumes being scanned leaves this list without anybody dismissing it.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: list-notifications
       parameters:
         - description: The number returned
@@ -16742,7 +16744,7 @@ paths:
 
         Acknowledging a condition hides it rather than resolving it: what it is about is still true, and the pass that derives it will not raise it again while it holds.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: acknowledge-notification
       parameters:
         - in: path
@@ -26908,7 +26910,7 @@ paths:
 
         Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
 
-        Requires: public-triage or private-triage
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
       operationId: reaffirm-many
       requestBody:
         content:
@@ -27884,7 +27886,7 @@ paths:
       description: |-
         Ends the session the request arrived on, everywhere rather than in this browser alone — the session is stored, so it stops working whichever copy of the application answers next.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: sign-out
       responses:
         "204":
@@ -27913,7 +27915,7 @@ paths:
 
         Capabilities, not roles, for that reason. Which roles produce which capability is the server's rule and stays there.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: get-current-subject
       responses:
         "200":
@@ -27942,7 +27944,7 @@ paths:
 
         You are found on a chat platform by the address recorded against you, which `GET /v1/session/me` reports as `reachable`. Refused where this deployment offers no chat platform, which `GET /v1/session/me` reports as `chat`.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: set-chat
       requestBody:
         content:
@@ -27975,7 +27977,7 @@ paths:
 
         Nothing is sent anywhere without an address recorded against you, which `GET /v1/session/me` reports as `reachable`.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: set-digest
       requestBody:
         content:
@@ -28477,7 +28479,7 @@ paths:
 
         A token is a live reference to you rather than a copy of what you could do when it was made, so what one reaches shrinks the moment your roles do.
 
-        Requires: your own credential
+        Requires: your own sign-in, as a person and not a pipeline key
       operationId: list-my-tokens
       responses:
         "200":
@@ -28503,7 +28505,7 @@ paths:
 
         Expiry is not optional, and `lifetime` may not exceed the ceiling an administrator has set. A credential that never runs out is one nobody ever revokes, and those are found when somebody leaves and nobody knows what breaks if it is turned off.
 
-        Requires: your own credential. Signed in, not through a token: a token cannot mint another.
+        Requires: your own sign-in, as a person and not a pipeline key. Signed in, not through a token: a token cannot mint another.
       operationId: mint-token
       requestBody:
         content:
@@ -28537,7 +28539,7 @@ paths:
 
         Yours alone. An administrator withdraws anybody else's through the administration paths.
 
-        Requires: your own credential. Signed in, not through a token: a token cannot withdraw another.
+        Requires: your own sign-in, as a person and not a pipeline key. Signed in, not through a token: a token cannot withdraw another.
       operationId: revoke-my-token
       parameters:
         - in: path
@@ -28896,7 +28898,7 @@ paths:
 
         Asking sends a component's name to that ecosystem's index, so names this deployment calls its own are never sent. `ours` is what they were matched against, narrowed to the products you may read.
 
-        `unknown` is a component no public index has heard of — a private module or a vendored fork — and is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. `unreadable` is an identifier nothing can turn into a request.
+        `unknown` is a component sent to its public index that came back with no version: not known, or refused in a way the index will repeat. Most are private modules or vendored forks, and the list is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. `unreadable` is an identifier nothing can turn into a request.
 
         A component the pass has not reached is not here. It is waiting rather than unanswered.
 
