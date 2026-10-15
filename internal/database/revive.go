@@ -56,7 +56,8 @@ func TakeUpAgain(ctx context.Context, revive *bun.UpdateQuery, readBack *bun.Sel
 // The write repeats that the row is in use, so two retirements at once record
 // one act: the second matches nothing. A row already retired, and a row that
 // was never there, both answer false; telling those apart is the caller's.
-// also adds to the write whatever else retiring that kind of row clears.
+// The functions in also add to the write what retiring that kind of row
+// clears beside the date.
 func Retire(ctx context.Context, db bun.IDB, model any, id int64, at time.Time,
 	also ...func(*bun.UpdateQuery) *bun.UpdateQuery) (bool, error) {
 
