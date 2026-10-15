@@ -16,6 +16,7 @@ import { Fab } from "../ui/Drawer";
 import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
 import { Wide } from "../ui/Wide";
+import { sizeSaid } from "../ui/size";
 import { inventoryChangesAt, runAt } from "../app/routes";
 import { linkTo } from "../api/links";
 
@@ -334,7 +335,7 @@ function Sent({
         if (!doc.held || !doc.document_id) {
           return (
             <span key={`${doc.kind}-${i}`} className="doc letgo" title={said}>
-              {what} {size(doc.size_bytes ?? 0)}
+              {what} {sizeSaid(doc.size_bytes ?? 0)}
             </span>
           );
         }
@@ -345,21 +346,12 @@ function Sent({
             href={where(doc.document_id)}
             title={`Download it as it arrived — ${said}`}
           >
-            {what} {size(doc.size_bytes ?? 0)}
+            {what} {sizeSaid(doc.size_bytes ?? 0)}
           </a>
         );
       })}
     </span>
   );
-}
-
-// Bytes as somebody reads them. Whole units below a thousand of the next one,
-// because "1.2 MB" is the answer to how large a file is and "1,234,567 bytes"
-// is the answer to a question nobody asked.
-function size(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // A count of what a run changed, or nothing where this row is not where that
