@@ -28,8 +28,8 @@ import (
 // AdvisoryOver mints an advisory, names one issue in one product on it, and
 // answers the identifier it was minted under.
 //
-// Two requests where there used to be none: an advisory is a record of its own
-// now, so what a document is about is stated rather than read off the path.
+// Two requests, because an advisory is a record of its own: what a document is
+// about is stated rather than read off the path.
 func AdvisoryOver(t *testing.T, r *Reach, who, product, identifier string) string {
 	t.Helper()
 	made := AsPerson(t, r, who, http.MethodPost, "/v1/advisories", `{}`)

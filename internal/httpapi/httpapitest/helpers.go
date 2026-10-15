@@ -39,10 +39,8 @@ func RefusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
 // build, and answers with nothing: every test here reads back through the API.
 //
 // The two seeds below differ in the graph they apply and what the report
-// carries, and in nothing else — they had a locate, a target lookup, a scan
-// record, a run and an apply written out twice between them, which is five
-// calls whose failure modes a reader has to check twice to find out they are
-// the same.
+// carries, and in nothing else, so the locate, the target lookup, the scan
+// record, the run and the apply they share are written here once.
 func (r *Reach) Scan(t *testing.T, hash string, snapshot graph.Snapshot,
 	reported []finding.Reported) {
 

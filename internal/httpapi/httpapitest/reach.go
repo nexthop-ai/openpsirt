@@ -308,11 +308,11 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err := rights.Claim(ctx, administrator.ID, "admin"); err != nil {
 		return cast{}, err
 	}
-	// An administrator who granted themselves reading, which is
-	// how one reaches findings since an administrator stopped
-	// reading by administering — and the point of the pair is that
-	// the grant is visible in the same record as everybody else's
-	// rather than implied by the flag.
+	// An administrator who granted themselves reading, which is how
+	// an administrator reaches findings: administering grants no
+	// reading. The point of the pair is that the grant is visible in
+	// the same record as everybody else's rather than implied by the
+	// flag.
 	adminReader, err := rights.Ensure(ctx, "admin-reader", ShownAs("admin-reader"), new(true), nil)
 	if err != nil {
 		return cast{}, err
