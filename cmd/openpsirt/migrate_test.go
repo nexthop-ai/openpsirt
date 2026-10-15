@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -68,7 +69,7 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 		}
 		for _, want := range []string{
 			"migrate up", "AUTO_MIGRATE",
-			itoa(applied), itoa(wanted),
+			strconv.FormatInt(applied, 10), strconv.FormatInt(wanted, 10),
 		} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("the refusal does not say %q: %v", want, err)
@@ -155,7 +156,7 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 				t.Errorf("%s a schema ahead of this build was allowed", what)
 				continue
 			}
-			for _, want := range []string{itoa(wanted + 1), itoa(wanted), "restore the backup"} {
+			for _, want := range []string{strconv.FormatInt(wanted+1, 10), strconv.FormatInt(wanted, 10), "restore the backup"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
 				}
@@ -202,25 +203,11 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 				t.Errorf("%s a schema a release before v0.5.0 built was allowed", what)
 				continue
 			}
-			for _, want := range []string{itoa(v040), "v0.6.0"} {
+			for _, want := range []string{strconv.FormatInt(v040, 10), "v0.6.0"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
 				}
 			}
 		}
 	})
-}
-
-// itoa keeps the assertion above readable without pulling in a formatter for
-// one number.
-func itoa(n int64) string {
-	if n == 0 {
-		return "0"
-	}
-	var digits []byte
-	for n > 0 {
-		digits = append([]byte{byte('0' + n%10)}, digits...)
-		n /= 10
-	}
-	return string(digits)
 }

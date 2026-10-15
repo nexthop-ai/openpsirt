@@ -33,18 +33,7 @@ func tree(t *testing.T, files map[string]string) {
 			t.Fatal(err)
 		}
 	}
-	was, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(root); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Chdir(was); err != nil {
-			t.Fatal(err)
-		}
-	})
+	t.Chdir(root)
 }
 
 func TestAWalkThatReachesNothingRefuses(t *testing.T) {
