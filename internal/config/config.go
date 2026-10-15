@@ -69,11 +69,9 @@ type Config struct {
 	DBIdleTimeout time.Duration
 	DBLifetime    time.Duration
 	// DBRequireEncryption states that the connection to the database must be
-	// encrypted, and one that is not is refused as the process starts. Off is
-	// what every deployment had: encrypted where the server offers it, and
-	// cleartext where it does not. Both are choices now, and which one is in
-	// force is stated rather than inherited from what a server happened to
-	// offer.
+	// encrypted, and one that is not is refused as the process starts. Off,
+	// the connection is encrypted where the server offers it and in cleartext
+	// where it does not.
 	DBRequireEncryption bool
 	// ScannerPath is where the vulnerability scanner lives. Empty means
 	// whatever the environment resolves.

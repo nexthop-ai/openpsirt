@@ -48,9 +48,9 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 			t.Fatal(err)
 		}
 		// And somebody who may read work nobody has announced but not argue
-		// about it. They are the role the rule actually turns on: the
-		// condition used to be sent to whoever could read the flaw, and a
-		// report refuses them, so the notice named a report they cannot open.
+		// about it. They are the role the rule turns on: a report refuses
+		// them, so a notice sent to them would name a report they cannot
+		// open.
 		reads, err := rights.Ensure(ctx, "reads@example.com", "Reads", nil, nil)
 		if err != nil {
 			t.Fatal(err)
