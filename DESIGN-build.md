@@ -803,6 +803,7 @@ by two toolchains with the gate green.
 | Each tool's module under `tools/` is held to the same `go` line rule | The image and the workflows build the tools with the image's release |
 | The image's `node` tag is the one pin of the interface's Node, and every workflow installs the release `make node-version` reads from it | The pull request moving the tag moves the interface's toolchain everywhere |
 | A workflow naming a Node release itself fails | A second copy of the number is the one a bump leaves behind |
+| The `modernc.org/libc` the build selects is the one `modernc.org/sqlite` requires, and `pins-check` fails otherwise | The SQLite driver is generated against one libc release, and libc's own notes ask for that release and no other. Another module requiring a newer one moves it by minimal version selection with no line here changing. goose 3.29.0 requires a newer libc than sqlite 1.60.1, and Dependabot is told to ignore goose from there until sqlite moves |
 
 | What that costs | What answers it |
 |---|---|

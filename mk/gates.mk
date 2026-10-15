@@ -341,6 +341,15 @@ pins-check:
 	  [ "$$(printf '%s\n%s\n' "$$declared" "$$image" | sort -V | head -n 1)" = "$$declared" ] || { \
 	  echo "go.mod declares Go $$declared and the image builds with $$image, which is older."; \
 	  echo "Move the image's golang tag first: it is the one pin of the toolchain."; fail=1; }; \
+	sqlite=$$($(GO) list -m -f '{{.Version}}' modernc.org/sqlite); \
+	libc=$$($(GO) list -m -f '{{.Version}}' modernc.org/libc); \
+	generated=$$($(GO) mod graph | awk -v s="modernc.org/sqlite@$$sqlite" \
+	  '$$1 == s && $$2 ~ /^modernc\.org\/libc@/ { sub(/^.*@/, "", $$2); print $$2 }'); \
+	[ -n "$$sqlite" ] && [ -n "$$libc" ] && [ -n "$$generated" ] || { \
+	  echo "modernc.org/sqlite, modernc.org/libc or the libc sqlite requires was not found, so they were not compared."; fail=1; }; \
+	[ -z "$$generated" ] || [ "$$libc" = "$$generated" ] || { \
+	  echo "the build selects modernc.org/libc $$libc, and modernc.org/sqlite $$sqlite is generated against $$generated."; \
+	  echo "Another module moved libc past sqlite's pin: hold that module back until sqlite moves."; fail=1; }; \
 	tools=0; \
 	for mod in tools/*/go.mod; do \
 	  [ -f "$$mod" ] || continue; \
