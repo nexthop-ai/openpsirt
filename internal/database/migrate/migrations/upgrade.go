@@ -362,18 +362,9 @@ func (u *upgrader) hasIndex(table, name string) (bool, error) {
 		query = `SELECT 1 FROM "pg_catalog"."pg_indexes"
 			WHERE "schemaname" = CURRENT_SCHEMA() AND "tablename" = ? AND "indexname" = ?`
 	default:
-		query = `SELECT 1 FROM "information_schema"."STATISTICS"
-			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "INDEX_NAME" = ? LIMIT 1`
+		query = mysqlIndexProbe
 	}
-	var probe int
-	err := u.tx.QueryRowContext(u.ctx, query, table, name).Scan(&probe)
-	if database.IsNoRows(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("ask whether %s has index %s: %w", table, name, err)
-	}
-	return true, nil
+	return exists(u.ctx, u.tx, fmt.Sprintf("%s has index %s", table, name), query, table, name)
 }
 
 // pick finds the statement creating a table among a migration's statements,

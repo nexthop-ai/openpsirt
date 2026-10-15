@@ -82,7 +82,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	// refused naming it before anything opens. What is written rests on the
 	// same questions asked again inside, because a retry runs against a
 	// database that has moved.
-	standing, err := s.filedAgainst(ctx, productID, vulnerabilityID)
+	standing, err := filedAgainst(ctx, s.db, productID, vulnerabilityID)
 	if err != nil {
 		return nil, err
 	}
@@ -116,17 +116,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// different engine or after an index changed. The earliest
 		// filing is the one to copy: it is the record of what was
 		// first known about this issue here.
-		var rows []Finding
-		err := tx.NewSelect().Model(&rows).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where("st.product_id = ?", productID).
-			Where("f.vulnerability_id = ?", vulnerabilityID).
-			Where("f.closed_at IS NULL").
-			Order("f.opened_at ASC", "f.id ASC").
-			Scan(ctx)
+		rows, err := filedAgainst(ctx, tx, productID, vulnerabilityID)
 		if err != nil {
-			return fmt.Errorf("read which builds hold it: %w", err)
+			return err
 		}
 		if len(rows) == 0 {
 			return ErrNothingOpenThere
@@ -276,10 +268,11 @@ func openIn(targetID, vulnerabilityID, componentID int64, name string,
 	}
 }
 
-// filedAgainst is every open finding for one issue in one product.
-func (s *Store) filedAgainst(ctx context.Context, productID, vulnerabilityID int64) ([]Finding, error) {
+// filedAgainst is every open finding for one issue in one product, earliest
+// opened first.
+func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) ([]Finding, error) {
 	var rows []Finding
-	err := s.db.NewSelect().Model(&rows).
+	err := db.NewSelect().Model(&rows).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Where("st.product_id = ?", productID).

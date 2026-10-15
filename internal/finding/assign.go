@@ -326,18 +326,37 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// way, so it describes what actually moved. Any one row answers: they
 	// are one issue at one component in one build, and visibility belongs
 	// to the finding rather than to the place.
-	private, err := s.db.NewSelect().Model((*Finding)(nil)).
-		Column("id").
-		Where(inThisProduct, productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
-		Where("closed_at IS NULL").
-		Where("visibility = ?", access.Private).
-		Exists(ctx)
+	//
+	// Asked of every visibility rather than of what the caller may read: what
+	// moved carries its visibility to whoever now holds it, whether or not the
+	// caller can see every row of it.
+	every := []access.Visibility{access.Public, access.Private}
+	private, err := anyUndisclosed(ctx, s.db, every, oneFinding(productID, vulnerabilityID, componentID))
 	if err != nil {
 		return moved, false, fmt.Errorf("read whether that finding is disclosed: %w", err)
 	}
 	return moved, private, nil
+}
+
+// anyUndisclosed reports whether any open finding naming selects is
+// undisclosed, among the visibilities given.
+func anyUndisclosed(ctx context.Context, db bun.IDB, visible []access.Visibility,
+	naming func(*bun.SelectQuery) *bun.SelectQuery) (bool, error) {
+
+	return naming(db.NewSelect().Model((*Finding)(nil)).Column("id")).
+		Where("closed_at IS NULL").
+		Where("visibility IN (?)", bun.List(visible)).
+		Where("visibility = ?", access.Private).
+		Exists(ctx)
+}
+
+// oneFinding names one issue at one component across a product's builds.
+func oneFinding(productID, vulnerabilityID, componentID int64) func(*bun.SelectQuery) *bun.SelectQuery {
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where(inThisProduct, productID).
+			Where("vulnerability_id = ?", vulnerabilityID).
+			Where("component_id = ?", componentID)
+	}
 }
 
 // strictestOf is the tightest visibility any open place of this finding
@@ -354,15 +373,7 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 func (s *Store) strictestOf(ctx context.Context, productID int64, visible []access.Visibility,
 	vulnerabilityID, componentID int64) (access.Visibility, error) {
 
-	private, err := s.db.NewSelect().Model((*Finding)(nil)).
-		Column("id").
-		Where(inThisProduct, productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id = ?", componentID).
-		Where("closed_at IS NULL").
-		Where("visibility IN (?)", bun.List(visible)).
-		Where("visibility = ?", access.Private).
-		Exists(ctx)
+	private, err := anyUndisclosed(ctx, s.db, visible, oneFinding(productID, vulnerabilityID, componentID))
 	if err != nil {
 		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)
 	}
@@ -400,15 +411,11 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 	// Matched on the fold, the way the upgrade itself resolves what it covers:
 	// naming any binary of a source package reaches all of them, so asking
 	// about the binary alone would miss the embargo sitting on its sibling.
-	private, err := s.db.NewSelect().Model((*Finding)(nil)).
-		Column("id").
-		Where("target_id IN (?)", bun.List(targets)).
-		Where("closed_at IS NULL").
-		Where("visibility IN (?)", bun.List(visible)).
-		Where("visibility = ?", access.Private).
-		Where(`component_id IN (SELECT c.id FROM "component" AS "c"
-			WHERE `+FoldedOn+` IN (?))`, bun.List(folds)).
-		Exists(ctx)
+	private, err := anyUndisclosed(ctx, s.db, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("target_id IN (?)", bun.List(targets)).
+			Where(`component_id IN (SELECT c.id FROM "component" AS "c"
+			WHERE `+FoldedOn+` IN (?))`, bun.List(folds))
+	})
 	if err != nil {
 		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)
 	}

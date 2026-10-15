@@ -137,15 +137,11 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		// it. Narrowed by what the caller may see, like StrictestOf.
 		strictest := access.Public
 		for _, fold := range folds {
-			private, err := tx.NewSelect().Model((*Finding)(nil)).
-				Column("id").
-				Where(inThisProduct, productID).
-				Where("vulnerability_id IN (?)", bun.List(byFold[fold])).
-				Where(inFold, fold).
-				Where("closed_at IS NULL").
-				Where("visibility IN (?)", bun.List(visible)).
-				Where("visibility = ?", access.Private).
-				Exists(ctx)
+			private, err := anyUndisclosed(ctx, tx, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
+				return q.Where(inThisProduct, productID).
+					Where("vulnerability_id IN (?)", bun.List(byFold[fold])).
+					Where(inFold, fold)
+			})
 			if err != nil {
 				return fmt.Errorf("read how far this is disclosed: %w", err)
 			}
