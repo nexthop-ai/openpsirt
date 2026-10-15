@@ -185,9 +185,8 @@ func buildCounts(s finding.Standing) BuildCountsBody {
 		Stream: s.Stream, Variant: s.Variant, Kind: core.LineKind(s.Kind), Total: s.Total,
 		StreamName:  s.StreamName,
 		VariantName: s.VariantName,
-		Critical:    s.ByBand["critical"], High: s.ByBand["high"],
-		Medium: s.ByBand["medium"], Low: s.ByBand["low"],
 	}
+	body.Critical, body.High, body.Medium, body.Low = core.BandCounts(s.ByBand)
 	body.LastScannedAt = core.StampAt(s.LastScanned)
 	return body
 }

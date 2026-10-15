@@ -231,6 +231,13 @@ type Narrowing struct {
 	Ascending    bool            `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }
 
+// BandCounts reads counts keyed by severity band into the four a body states,
+// worst first, by the domain's own list of bands.
+func BandCounts(by map[string]int) (critical, high, medium, low int) {
+	bands := finding.Bands()
+	return by[bands[0]], by[bands[1]], by[bands[2]], by[bands[3]]
+}
+
 // Paging is how much of a list to return, kept apart from the filters so that
 // something answering the whole of a narrowing — an export — can take every
 // filter without also offering a page size it does not honor. A parameter that

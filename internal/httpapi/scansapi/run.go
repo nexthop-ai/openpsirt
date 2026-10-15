@@ -99,9 +99,7 @@ func registerRun(api huma.API, in core.Deps) {
 
 // runChangeBody turns a run's counts into the shape the screen reads.
 func runChangeBody(total int, by map[string]int) RunChangeBody {
-	return RunChangeBody{
-		Total:    total,
-		Critical: by["critical"], High: by["high"],
-		Medium: by["medium"], Low: by["low"],
-	}
+	body := RunChangeBody{Total: total}
+	body.Critical, body.High, body.Medium, body.Low = core.BandCounts(by)
+	return body
 }
