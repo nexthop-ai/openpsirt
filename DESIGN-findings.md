@@ -468,9 +468,13 @@ that answers slowly holds the one pass for as long as a fetch is allowed.
 | Among hosts past their share, the one that has had least goes first | Two slow hosts share what is left between them |
 | Within those, the order above is unchanged | Urgency still decides between repositories on one host |
 | No host is exempt by name | A host serving many linked repositories, github.com among them, is held to the same share and visited as often as the pass has nothing else due |
+| A host waits out a day where a repository on it failed within the day and none on it was reached within the day | A host whose every visit fails costs the pass one failed visit a day, however many repositories its links name. One repository reached says the host answers, so a repository that is gone does not hold back every other on a host that serves many |
+| Within one wake, a host has one repository never fetched before visited before any host has a second | A first fetch is the longest a visit takes, and the links a scan file carries choose the hosts. Repositories already fetched keep the order above |
 
 The report's positions are worked out by the same rule, from the same rows,
-so any replica answers them.
+so any replica answers them. A repository on a host waiting out has no
+position. The one-first-fetch rule belongs to a wake under way and is not in
+the report's positions.
 
 A visit fetches the repository's branches, writes git's commit-graph index,
 and looks up every due commit in it, most urgent first.

@@ -77,6 +77,10 @@ type Pass struct {
 	// renew is how often a visit asks for the lease again; renewTick where
 	// nothing set it.
 	renew time.Duration
+	// firsts is how many repositories never fetched before each host has had
+	// visited in the cycle under way, keyed on the host in the address. Nil
+	// outside a cycle.
+	firsts map[string]int
 }
 
 // Options is what a deployment decides about the copies.
@@ -152,7 +156,13 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 // The same repository chosen twice running also stops it. A visit either looks
 // up what was due or leaves the repository out for a day, so a second choice of
 // it means the visit changed nothing, and going round again would spin.
+//
+// A host has one repository never fetched before visited in a cycle before any
+// host has a second. A scan file chooses the hosts its links name, and a first
+// fetch is the longest a visit takes.
 func (p *Pass) cycle(ctx context.Context) int {
+	p.firsts = map[string]int{}
+	defer func() { p.firsts = nil }()
 	visits, last := 0, ""
 	for ctx.Err() == nil {
 		mine, err := p.holding(ctx)
@@ -226,6 +236,9 @@ func (p *Pass) Once(ctx context.Context) (string, error) {
 	if err != nil || next == nil {
 		return "", err
 	}
+	if p.firsts != nil && next.repository.FetchedAt == nil {
+		p.firsts[Commit{Repository: next.repository.URL}.Host()]++
+	}
 	return next.repository.URL, p.visit(ctx, *next, commits)
 }
 
@@ -248,6 +261,10 @@ type candidate struct {
 
 // choose picks the repository to visit: the first in the order plan puts
 // them in, counting a copy as held when it is on this disk.
+//
+// Within a cycle, a repository never fetched before is passed over while
+// another never fetched before sits on a host that has had fewer first
+// fetches in the cycle.
 func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.Time) (*candidate, error) {
 	ordered, err := plan(ctx, p.db, commits, p.excluded, now, func(repository repositoryRow) bool {
 		return p.copies.has(repository.URL)
@@ -258,10 +275,22 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 	// A repository with no row is one the report counts before the pass has
 	// recorded it. The pass records every one before it plans, so this skips
 	// nothing it could visit.
+	fewest := -1
 	for _, one := range ordered {
-		if one.repository.ID != 0 {
-			return one, nil
+		if one.repository.ID != 0 && one.repository.FetchedAt == nil {
+			if n := p.firsts[Commit{Repository: one.repository.URL}.Host()]; fewest < 0 || n < fewest {
+				fewest = n
+			}
 		}
+	}
+	for _, one := range ordered {
+		if one.repository.ID == 0 {
+			continue
+		}
+		if one.repository.FetchedAt == nil && p.firsts[Commit{Repository: one.repository.URL}.Host()] > fewest {
+			continue
+		}
+		return one, nil
 	}
 	return nil, nil
 }
@@ -277,6 +306,10 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 // is left for a day. A repository whose host has had its share of the pass is
 // planned after every repository whose host has not, and among those, the host
 // that has had the least goes first.
+//
+// A host waits out with its repository: where a repository on it failed within
+// RetryAfter and none on it was reached within RetryAfter, no repository on it
+// is planned.
 //
 // held says whether a repository's copy is on the disk that counts. The pass
 // asks its own disk; the progress report, answered by any replica, reads the
@@ -298,12 +331,14 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 		return nil, fmt.Errorf("read the commits due a look: %w", err)
 	}
 	spent := hostTime(repositories, now)
+	down := hostsDown(repositories, now)
 	byID := map[int64]*candidate{}
 	for _, repository := range repositories {
 		// Asked of the host in the address, which is stored whole, rather
 		// than of the host column, which is cut to the width of a name and
 		// can lose the suffix an exclusion names.
-		if excluded.Host(Commit{Repository: repository.URL}.Host()) || waitingOut(repository, now) {
+		host := Commit{Repository: repository.URL}.Host()
+		if excluded.Host(host) || down[host] || waitingOut(repository, now) {
 			continue
 		}
 		byID[repository.ID] = &candidate{repository: repository, held: held(repository)}
@@ -347,6 +382,9 @@ func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded 
 					continue // excluded, or out for a day
 				}
 			} else {
+				if down[commit.Host()] {
+					continue
+				}
 				one = &candidate{repository: repositoryRow{URL: commit.Repository, Host: commit.Host()}}
 			}
 			unseen[commit.Repository] = one
@@ -424,6 +462,33 @@ func notYetRecorded(ctx context.Context, db bun.IDB, commits map[Commit]urgency,
 		}
 	}
 	return out, nil
+}
+
+// hostsDown is the hosts that wait out, keyed on the host in the address: one
+// of their repositories failed within RetryAfter, and none was reached within
+// it.
+//
+// A repository that was reached says the host answers, so one repository that
+// is gone does not hold back every other on a host that serves many. A host
+// whose every visit fails costs the pass one failed visit a day.
+func hostsDown(repositories []repositoryRow, now time.Time) map[string]bool {
+	since := now.Add(-RetryAfter)
+	failed, reached := map[string]bool{}, map[string]bool{}
+	for _, repository := range repositories {
+		host := Commit{Repository: repository.URL}.Host()
+		if waitingOut(repository, now) {
+			failed[host] = true
+		}
+		if repository.ReachedAt != nil && repository.ReachedAt.After(since) {
+			reached[host] = true
+		}
+	}
+	for host := range failed {
+		if reached[host] {
+			delete(failed, host)
+		}
+	}
+	return failed
 }
 
 // waitingOut reports whether a repository's last visit failed less than a day

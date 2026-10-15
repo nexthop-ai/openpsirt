@@ -5,9 +5,11 @@ package patchbranch_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -69,11 +71,19 @@ func TestAHostPastItsShareOfThePassWaitsBehindEveryOtherHost(t *testing.T) {
 					t.Fatalf("the first visit is reported as %+v", repositories)
 				}
 				// The visit began longer ago than the host's share. When it
-				// ended is what the visit recorded.
+				// ended is what the visit recorded. A failed visit's host was
+				// reached earlier in the day, so it answers and does not wait
+				// out.
+				began := time.Now().UTC().Add(-patchbranch.HostShare - time.Hour)
 				if _, err := db.DB.NewRaw(`UPDATE "patch_repository" SET "fetched_at" = ? WHERE "url" = ?`,
-					time.Now().UTC().Add(-patchbranch.HostShare-time.Hour),
-					slowRepository("first")).Exec(ctx); err != nil {
+					began, slowRepository("first")).Exec(ctx); err != nil {
 					t.Fatal(err)
+				}
+				if !reaches {
+					if _, err := db.DB.NewRaw(`UPDATE "patch_repository" SET "reached_at" = ? WHERE "url" = ?`,
+						began.Add(-time.Hour), slowRepository("first")).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
 				}
 				issue(t, db, "CVE-2025-0102", "critical", slowLink("second", second.fix))
 				issue(t, db, "CVE-2025-0103", "low", link("other", other.fix))
@@ -91,6 +101,85 @@ func TestAHostPastItsShareOfThePassWaitsBehindEveryOtherHost(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestAHostWhoseRepositoryFailedAndNoneWasReachedWaitsADay(t *testing.T) {
+	// A host whose every visit fails costs the pass one failed visit a day,
+	// whatever number of repositories its links name. A host that answered
+	// for one repository within the day keeps its others in the plan.
+	for name, answered := range map[string]bool{"Unanswered": false, "Answered": true} {
+		t.Run(name, func(t *testing.T) {
+			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				first, second := project(t), project(t)
+				first.dir = t.TempDir()
+				pass := passOn(t, db, map[string]upstream{
+					slowRepository("first"): first, slowRepository("second"): second,
+				})
+				issue(t, db, "CVE-2025-0107", "critical", slowLink("first", first.fix))
+				if visited, err := pass.Once(ctx); err != nil || visited != slowRepository("first") {
+					t.Fatalf("visited %q, %v", visited, err)
+				}
+				if answered {
+					if _, err := db.DB.NewRaw(`UPDATE "patch_repository" SET "reached_at" = ? WHERE "url" = ?`,
+						time.Now().UTC().Add(-time.Hour), slowRepository("first")).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+				issue(t, db, "CVE-2025-0108", "critical", slowLink("second", second.fix))
+				visited, err := pass.Once(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := ""
+				if answered {
+					want = slowRepository("second")
+				}
+				if visited != want {
+					t.Errorf("visited %q, want %q", visited, want)
+				}
+				repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, each := range repositories {
+					if each.URL == slowRepository("second") && !answered && each.Position != 0 {
+						t.Errorf("the report places a repository on a host waiting out at %d", each.Position)
+					}
+				}
+			})
+		})
+	}
+}
+
+func TestAHostHasOneFirstFetchInACycleBeforeAnyHostHasTwo(t *testing.T) {
+	// Two repositories on one host plus one on another: the second host is
+	// visited before the first host's second repository, although the first
+	// host's are the more urgent.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		first, second, other := project(t), project(t), project(t)
+		projects := map[string]upstream{
+			slowRepository("first"): first, slowRepository("second"): second,
+			repositoryOf("other"): other,
+		}
+		var order []string
+		pass := passOn(t, db, projects).Locating(func(_ context.Context, repository string) string {
+			if !slices.Contains(order, repository) {
+				order = append(order, repository)
+			}
+			return projects[repository].dir
+		})
+		issue(t, db, "CVE-2025-0109", "critical", slowLink("first", first.fix))
+		issue(t, db, "CVE-2025-0110", "critical", slowLink("second", second.fix))
+		issue(t, db, "CVE-2025-0111", "low", link("other", other.fix))
+		if visits := pass.Cycle(ctx); visits != 3 {
+			t.Fatalf("the cycle visited %d repositories, want 3", visits)
+		}
+		if len(order) != 3 || order[1] != repositoryOf("other") {
+			t.Errorf("fetched in the order %v, want the other host second", order)
+		}
+	})
 }
 
 func TestARemoteErrorInBytesThatAreNotTextIsRecordedAndWaitsADay(t *testing.T) {
