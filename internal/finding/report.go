@@ -181,18 +181,44 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
 	// Against the product it was reported against, like reading it. Clearing
 	// the condition in one product's queue from another product's rights is
 	// the same hole seen from the write side.
-	told, err := s.ReportFor(ctx, subject, vulnerabilityID)
-	if err != nil {
-		return err
+	//
+	// The issue's reports are one per product at most once issues merge. The
+	// one answered is the first unanswered one the subject may handle, and
+	// otherwise the first they may handle, which keeps its date. Somebody
+	// handling both products' reports answers each in turn.
+	var rows []FlawReport
+	if err := s.db.NewSelect().Model(&rows).
+		Where(FiledUnder(filed.Issue), vulnerabilityID).
+		OrderExpr("id").Scan(ctx); err != nil {
+		return fmt.Errorf("read who told us: %w", err)
 	}
-	if told == nil {
-		return ErrNoSuchReport
+	var handled *FlawReport
+	var refused error
+	for i := range rows {
+		if mayReadReports(subject, rows[i].ProductID) != nil {
+			continue
+		}
+		// Answering is working the report, which reading it does not grant.
+		if err := mayHandle(subject, rows[i].ProductID); err != nil {
+			if refused == nil {
+				refused = err
+			}
+			continue
+		}
+		if rows[i].AcknowledgedAt == nil {
+			return s.answered(ctx, subject, rows[i].ID)
+		}
+		if handled == nil {
+			handled = &rows[i]
+		}
 	}
-	// Answering is working the report, which reading it does not grant.
-	if err := mayHandle(subject, told.ProductID); err != nil {
-		return err
+	switch {
+	case handled != nil:
+		return s.answered(ctx, subject, handled.ID)
+	case refused != nil:
+		return refused
 	}
-	return s.answered(ctx, subject, told.ID)
+	return ErrNoSuchReport
 }
 
 // answered writes the acknowledgment against one report.

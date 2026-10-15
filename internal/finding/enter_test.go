@@ -852,6 +852,20 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 		} else if told.AcknowledgedAt == nil {
 			t.Error("the second product answered its reporter and nothing was recorded")
 		}
+
+		// Somebody handling both products' reports answers the one still
+		// unanswered, which here is the first product's.
+		if err := f.store.Acknowledge(ctx, both, kept); err != nil {
+			t.Fatal(err)
+		}
+		mine := access.NewPerson(person.ID, "somebody@example.com", false, map[int64][]access.Role{
+			f.productID: {access.PublicTriage, access.PrivateTriage},
+		}, 0)
+		if told, err = f.store.ReportFor(ctx, mine, kept); err != nil {
+			t.Fatal(err)
+		} else if told == nil || told.Contact != "first@example.org" || told.AcknowledgedAt == nil {
+			t.Errorf("somebody handling both products answered and the first product's report reads %+v", told)
+		}
 	})
 }
 
