@@ -1211,10 +1211,10 @@ excludes as unaffected.
 | NVD's CPE configuration | The fix on each stable branch: the kernel's ranges run to the next mainline release's fix | A release already carrying the backport |
 | A distribution's tracker | Where the bug arrived: it records where a release is fixed | A release older than the bug |
 
-| Measured against the CVE List on 2026-10-07 | Kernel issues open | Excluded | Findings closed |
-|---|---|---|---|
-| ONIE, upstream 6.18.55 | 183 | 37, 36 of them fixed on 6.18.y at or before 6.18.55 | 37 |
-| SONiC, Debian 6.12.41-1 and its `linux-perf` at 6.12.107-1 | 6,785 | 173 at one place or more, 121 of them at every place | 7,745 |
+| Build | CVE List of | Kernel issues open | Excluded | Findings closed |
+|---|---|---|---|---|
+| ONIE, upstream 6.18.55 | 2026-10-07 | 183 | 37, 36 of them fixed on 6.18.y at or before 6.18.55 | 37 |
+| SONiC, Debian 6.12.41-1 and its `linux-perf` at 6.12.107-1 | 2026-10-15 | 6,833 | 174 at one place or more, 121 of them at every place | 7,790 |
 
 ### Entries
 
