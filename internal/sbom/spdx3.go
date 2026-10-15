@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -290,9 +291,13 @@ func (c *reader) spdx3Imports(e *spdx3Element) error {
 // imported one is named by it: its time does not move between builds and its
 // roots are another product's. Several elements none of which is left as the
 // only unnamed one leave the document unsettled, and the file is refused
-// rather than read as whichever came last.
+// rather than read as whichever came last. An inventory element the imported
+// document carries is set aside with it.
 func (c *reader) spdx3Document() error {
 	if len(c.spdx3Documents) == 0 {
+		for _, one := range c.spdx3Sboms {
+			c.spdx3Inventory(one)
+		}
 		return nil
 	}
 	named := map[string]bool{}
@@ -319,7 +324,45 @@ func (c *reader) spdx3Document() error {
 	if !c.headerOnly {
 		c.rootRefs = append(c.rootRefs, e.rootElements...)
 	}
+
+	// An inventory element is an imported document's where an import names
+	// it, where an imported document names it as a root, or where every root
+	// it names is an imported document's root and none is this document's.
+	theirs, ours := map[string]bool{}, map[string]bool{}
+	for _, ref := range e.rootElements {
+		ours[ref] = true
+	}
+	for _, one := range c.spdx3Documents {
+		if one.id == e.id {
+			continue
+		}
+		for _, ref := range one.rootElements {
+			if !ours[ref] {
+				theirs[ref] = true
+			}
+		}
+	}
+	for _, one := range c.spdx3Sboms {
+		if named[one.id] || theirs[one.id] {
+			continue
+		}
+		if len(one.rootElements) > 0 && !slices.ContainsFunc(one.rootElements, func(ref string) bool {
+			return !theirs[ref]
+		}) {
+			continue
+		}
+		c.spdx3Inventory(one)
+	}
 	return nil
+}
+
+// spdx3Inventory takes an inventory element as this document's: its roots are
+// the build's, and a relationship it states can name them.
+func (c *reader) spdx3Inventory(e spdx3Element) {
+	c.spdx3DocumentRefs[e.id] = true
+	if !c.headerOnly {
+		c.rootRefs = append(c.rootRefs, e.rootElements...)
+	}
 }
 
 // spdx3ExternalIdentifiers reads the identifiers an element carries beside its
@@ -363,11 +406,7 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 		c.spdx3Documents = append(c.spdx3Documents, e)
 		return nil
 	case spdx3Sbom:
-		c.spdx3DocumentRefs[e.id] = true
-		if c.headerOnly {
-			return nil
-		}
-		c.rootRefs = append(c.rootRefs, e.rootElements...)
+		c.spdx3Sboms = append(c.spdx3Sboms, e)
 		return nil
 	case spdx3File:
 		if err := c.refile(); err != nil {

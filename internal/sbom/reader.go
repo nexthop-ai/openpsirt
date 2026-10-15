@@ -156,6 +156,10 @@ type reader struct {
 	// too, and which one is the file's own is settled once every element is
 	// in hand.
 	spdx3Documents []spdx3Element
+	// spdx3Sboms are the inventory elements as they were read, settled with
+	// the documents: an inventory element an imported document carries names
+	// that document's roots.
+	spdx3Sboms []spdx3Element
 	// spdx3Describes are the describes relationships as they were read, kept
 	// until the walk is over. Which element is the document is itself stated
 	// by an element, in no fixed position, so whether a relationship came

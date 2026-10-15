@@ -802,9 +802,27 @@ func TestTheDocumentElementIsTheOneImportingTheOthers(t *testing.T) {
 	if !strings.Contains(minimalSPDX3, original) {
 		t.Fatal("the fixture's document element moved")
 	}
+	// Each document's inventory element beside it. The imported one names
+	// the imported document's root, and taken as this document's it would
+	// make two roots of one build.
+	inventories := `{"spdxId": "urn:own-sbom", "type": "software_Sbom", "creationInfo": "_:creationInfo",
+     "rootElement": ["urn:root"]},
+    {"spdxId": "urn:imported-sbom", "type": "software_Sbom", "creationInfo": "_:importedInfo",
+     "rootElement": ["urn:a"]}`
+	namedImport := strings.Replace(own, `"externalSpdxId": "https://example.invalid/imported"}`,
+		`"externalSpdxId": "https://example.invalid/imported"},
+      {"type": "ExternalMap", "externalSpdxId": "urn:imported-sbom"}`, 1)
+	asRoot := strings.Replace(imported, `"rootElement": ["urn:a"]`, `"rootElement": ["urn:imported-sbom"]`, 1)
 	for _, tc := range []struct{ name, elements string }{
 		{"own first", own + ",\n    " + imported},
 		{"imported first", imported + ",\n    " + own},
+		{"an inventory each, the imported one naming only its roots",
+			inventories + ",\n    " + own + ",\n    " + imported},
+		{"an inventory each, the imported one named in the imports",
+			namedImport + ",\n    " + imported + ",\n    " +
+				strings.Replace(inventories, `["urn:a"]`, `["urn:a", "urn:root"]`, 1)},
+		{"an inventory each, the imported one the imported document's root",
+			own + ",\n    " + asRoot + ",\n    " + inventories},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			doc := read(t, strings.Replace(minimalSPDX3, original, tc.elements, 1))
