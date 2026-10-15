@@ -28,7 +28,7 @@ func TestTwoBuildsSayWhichNamesTheyDifferOn(t *testing.T) {
 		httpapitest.Read(t, r, "reader", platforms, &out.Body)
 		var got []string
 		for _, row := range out.Body.Items {
-			got = append(got, row.Change+" "+row.Name+" ["+strings.Join(row.Before, " ")+
+			got = append(got, string(row.Change)+" "+row.Name+" ["+strings.Join(row.Before, " ")+
 				"] -> ["+strings.Join(row.After, " ")+"]")
 		}
 		want := []string{

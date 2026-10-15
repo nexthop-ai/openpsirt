@@ -155,7 +155,7 @@ func TestTheListingAndTheReceiptSayTheSameThing(t *testing.T) {
 		_, listed := moved(t, f, f.Key, f.Path+"/"+strconv.FormatInt(scanID, 10)+"/changes")
 		counted := map[string]int{}
 		for _, row := range listed.Body.Items {
-			counted[row.Change]++
+			counted[string(row.Change)]++
 		}
 
 		_, receipt := httpapitest.Receipts(t, f, f.Key, f.Path)

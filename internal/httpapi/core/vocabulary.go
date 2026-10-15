@@ -478,6 +478,25 @@ type SettingSection string
 // Schema offers every section, in the order a screen shows them.
 func (SettingSection) Schema(huma.Registry) *huma.Schema { return words(setting.Sections()) }
 
+// Visibility is whether something has been disclosed.
+type Visibility string
+
+// Schema offers both visibilities, disclosed first.
+func (Visibility) Schema(huma.Registry) *huma.Schema { return words(access.Visibilities()) }
+
+// ChangeKind is what one scan did to one name.
+type ChangeKind string
+
+// Schema offers every kind of change, in the order the delta counts them.
+func (ChangeKind) Schema(huma.Registry) *huma.Schema { return words(graph.ChangeKinds()) }
+
+// VariantSpread is how a group is spread over the variants of a branch, as a
+// request narrows by it.
+type VariantSpread string
+
+// Schema offers every narrowing by spread.
+func (VariantSpread) Schema(huma.Registry) *huma.Schema { return words(finding.VariantSpreads()) }
+
 // Which is the words of a vocabulary a rule of its own keeps, in its order.
 // A subset is the domain's rule applied, never a shorter list typed here.
 func Which[T ~string](all []T, keeps func(T) bool) []T {

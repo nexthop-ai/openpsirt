@@ -5,6 +5,9 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"io/fs"
+	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -125,20 +128,10 @@ func keeping[T ~string](all []T, keeps func(T) bool) []string {
 	return words(slices.DeleteFunc(all, func(one T) bool { return !keeps(one) }))
 }
 
-// TestEveryEnumInTheDocumentIsAListSomethingStates holds every closed
-// vocabulary the document offers to a list a package states.
-//
-// An enum is a domain vocabulary offered, so it has to be one of the lists
-// the owning package names, in its order: a retyped literal fails here whether
-// it is the whole list, a shorter one or the same words reordered. The few
-// enums no domain package owns are a format's or a route's own words, and are
-// listed below by name, so a new enum is either built from its package or
-// added there on purpose.
-//
-// Both directions: an entry no enum offers is a list this test carries for
-// nothing, which is how a hand-kept table goes stale.
-func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
-	stated := map[string][]string{
+// statedVocabularies is every closed vocabulary a domain package states, by
+// name, as the document offers it.
+func statedVocabularies() map[string][]string {
+	return map[string][]string{
 		"outcomes":                       words(triage.Outcomes()),
 		"outcomes one at a time":         words(triage.OutcomesOneAtATime()),
 		"outcomes in bulk":               words(triage.OutcomesInBulk()),
@@ -206,19 +199,36 @@ func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
 		"bundle sorts":                   words(finding.BundleSortKeys()),
 		"closures":                       words(finding.Closures()),
 		"exchange document kinds":        words(vex.Kinds()),
+		"visibilities":                   words(access.Visibilities()),
+		"inventory changes":              words(graph.ChangeKinds()),
+		"spread over variants":           words(finding.VariantSpreads()),
 	}
+}
+
+// TestEveryEnumInTheDocumentIsAListSomethingStates holds every closed
+// vocabulary the document offers to a list a package states.
+//
+// An enum is a domain vocabulary offered, so it has to be one of the lists
+// the owning package names, in its order: a shorter copy or the same words
+// reordered fails here. A whole list typed back as a literal builds the same
+// document, so the source check below is what catches that one. The few
+// enums no domain package owns are a format's or a route's own words, and are
+// listed below by name, so a new enum is either built from its package or
+// added there on purpose.
+//
+// Both directions: an entry no enum offers is a list this test carries for
+// nothing, which is how a hand-kept table goes stale.
+func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
+	stated := statedVocabularies()
 	// What no domain package owns: a file format's words, or a route's own
 	// answer that nothing beneath it names.
 	owned := map[string][]string{
-		"export formats":       {"csv", "json"},
-		"visibilities":         {"public", "private"},
-		"inventory changes":    {"added", "removed", "changed"},
-		"spread over variants": {"only", "every"},
-		"register sides":       {"open", "closed"},
-		"CVE record statuses":  {"affected", "unaffected"},
-		"commit lookups":       {"found", "absent"},
-		"upload answers":       {"queued", "already_held"},
-		"subject kinds":        {"person", "key"},
+		"export formats":      {"csv", "json"},
+		"register sides":      {"open", "closed"},
+		"CVE record statuses": {"affected", "unaffected"},
+		"commit lookups":      {"found", "absent"},
+		"upload answers":      {"queued", "already_held"},
+		"subject kinds":       {"person", "key"},
 	}
 
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -250,4 +260,66 @@ func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
 			}
 		}
 	})
+}
+
+// enumTag is a struct tag's literal enum.
+var enumTag = regexp.MustCompile(`enum:"([^"]*)"`)
+
+// retypedIn is every stated vocabulary a source file types back as a literal
+// enum tag, by name.
+func retypedIn(source string, stated map[string][]string) []string {
+	var found []string
+	for _, tag := range enumTag.FindAllStringSubmatch(source, -1) {
+		listed := strings.Split(tag[1], ",")
+		for name, each := range stated {
+			if slices.Equal(each, listed) {
+				found = append(found, name)
+			}
+		}
+	}
+	return found
+}
+
+// A literal enum tag naming a stated vocabulary in full is caught in the
+// source, because it builds the same document as the vocabulary type does.
+func TestRetypedInFindsAStatedListTypedBack(t *testing.T) {
+	stated := map[string][]string{"reference kinds": {"patch", "advisory", "report"}}
+	if got := retypedIn("Kind string `json:\"kind\" enum:\"patch,advisory,report\"`", stated); !slices.Equal(got, []string{"reference kinds"}) {
+		t.Errorf("a whole stated list typed back was reported as %v", got)
+	}
+	if got := retypedIn("Format string `query:\"format\" enum:\"csv,json\"`", stated); len(got) != 0 {
+		t.Errorf("a format's own words were reported as %v", got)
+	}
+}
+
+// TestNoEnumTagTypesBackAStatedVocabulary fails a literal enum tag anywhere in
+// the API's source whose words are a list a domain package states.
+func TestNoEnumTagTypesBackAStatedVocabulary(t *testing.T) {
+	stated := statedVocabularies()
+	read := 0
+	tree := os.DirFS(".")
+	err := fs.WalkDir(tree, ".", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		source, err := fs.ReadFile(tree, path)
+		if err != nil {
+			return err
+		}
+		read++
+		for _, name := range retypedIn(string(source), stated) {
+			t.Errorf("%s types the %s back as a literal enum tag — use the vocabulary type "+
+				"that builds them from their package", path, name)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read == 0 {
+		t.Fatal("no source file was read, so this checked nothing")
+	}
 }

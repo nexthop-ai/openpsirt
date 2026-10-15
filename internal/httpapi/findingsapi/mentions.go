@@ -38,12 +38,12 @@ func registerMentions(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Asking about disclosed findings, the default, needs public-read or "+
 		"public-triage; about undisclosed findings, private-read or private-triage.",
 		core.ReadRights()...), func(ctx context.Context, input *struct {
-		Product    string `path:"product"`
-		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The kind of finding the text is about"`
-		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`
-		Limit      int    `query:"limit" default:"25" minimum:"1" maximum:"100"`
+		Product    string          `path:"product"`
+		Visibility core.Visibility `query:"visibility" default:"public" doc:"The kind of finding the text is about"`
+		Term       string          `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`
+		Limit      int             `query:"limit" default:"25" minimum:"1" maximum:"100"`
 	}) (*core.ListOutput[MentionableBody], error) {
-		subject, product, wanted, err := readersHere(ctx, in, input.Product, input.Visibility)
+		subject, product, wanted, err := readersHere(ctx, in, input.Product, string(input.Visibility))
 		if err != nil {
 			return nil, err
 		}

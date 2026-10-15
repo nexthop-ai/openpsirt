@@ -22,7 +22,7 @@ type InventoryChangeBody struct {
 	Name string `json:"name" doc:"The component name, as the document wrote it"`
 	// Change is the word the count on the receipt uses for it, so a caller
 	// reading both is reading one answer.
-	Change string `json:"change" enum:"added,removed,changed" doc:"What the upload did to this name"`
+	Change core.ChangeKind `json:"change" doc:"What the upload did to this name"`
 	// Before and After carry every version of the name on each side. A
 	// vendored tree ships one name at several versions at once, and which of
 	// them moved is the answer somebody opened this for.
@@ -56,13 +56,13 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 			"rather than a change to one, and for an upload nothing has read yet.",
 		Tags: []string{"Scans"},
 	}, core.AnySubject, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
-		Stream  string `path:"stream"`
-		Variant string `path:"variant"`
-		Scan    int64  `path:"scan" doc:"The upload, as a receipt names it"`
-		Change  string `query:"change" enum:"added,removed,changed" doc:"One kind of change alone"`
-		Limit   int    `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
-		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
+		Product string          `path:"product"`
+		Stream  string          `path:"stream"`
+		Variant string          `path:"variant"`
+		Scan    int64           `path:"scan" doc:"The upload, as a receipt names it"`
+		Change  core.ChangeKind `query:"change" doc:"One kind of change alone"`
+		Limit   int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset  int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryChanges, error) {
 		subject, err := core.Requester(ctx)
 		if err != nil {
@@ -115,7 +115,7 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 		out.Body.Total = total
 		for _, change := range changes {
 			out.Body.Items = append(out.Body.Items, InventoryChangeBody{
-				Name: change.Name, Change: string(change.Kind),
+				Name: change.Name, Change: core.ChangeKind(change.Kind),
 				Before: change.Before, After: change.After,
 			})
 		}
@@ -125,10 +125,10 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 
 // InventoryDifferenceBody is one name two builds hold differently.
 type InventoryDifferenceBody struct {
-	Name   string   `json:"name" doc:"The component name, as a document wrote it"`
-	Change string   `json:"change" enum:"added,removed,changed" doc:"How the later build differs from the earlier one on this name"`
-	Before []string `json:"before,omitempty" doc:"The versions the earlier build holds. Empty where only the later build holds the name"`
-	After  []string `json:"after,omitempty" doc:"The versions the later build holds. Empty where only the earlier build holds the name"`
+	Name   string          `json:"name" doc:"The component name, as a document wrote it"`
+	Change core.ChangeKind `json:"change" doc:"How the later build differs from the earlier one on this name"`
+	Before []string        `json:"before,omitempty" doc:"The versions the earlier build holds. Empty where only the later build holds the name"`
+	After  []string        `json:"after,omitempty" doc:"The versions the later build holds. Empty where only the earlier build holds the name"`
 }
 
 // ListedInventoryDifferences is how two builds' inventories differ, as the
@@ -179,16 +179,16 @@ func registerInventoryComparison(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		TwoBuilds
-		Change string `query:"change" enum:"added,removed,changed" doc:"One kind of change alone"`
-		Limit  int    `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
-		Offset int    `query:"offset" minimum:"0" doc:"The number skipped"`
+		Change core.ChangeKind `query:"change" doc:"One kind of change alone"`
+		Limit  int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
+		Offset int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryDifferences, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
 		changes, total, err := input.differences(ctx, in, subject, input.Product,
-			input.Change, input.Limit, input.Offset)
+			string(input.Change), input.Limit, input.Offset)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func registerInventoryComparison(api huma.API, in core.Deps) {
 		out.Body.Items = make([]InventoryDifferenceBody, 0, len(changes))
 		for _, change := range changes {
 			out.Body.Items = append(out.Body.Items, InventoryDifferenceBody{
-				Name: change.Name, Change: string(change.Kind),
+				Name: change.Name, Change: core.ChangeKind(change.Kind),
 				Before: change.Before, After: change.After,
 			})
 		}
@@ -221,7 +221,7 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Format  string `path:"format" enum:"csv,json"`
 		TwoBuilds
-		Change string `query:"change" enum:"added,removed,changed" doc:"One kind of change alone"`
+		Change core.ChangeKind `query:"change" doc:"One kind of change alone"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -230,7 +230,7 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 		// Worked out whole before the response starts, so a build out of reach
 		// or without an inventory is refused with a status rather than a file
 		// cut short. It is bounded by what two builds hold now.
-		changes, _, err := input.differences(ctx, in, subject, input.Product, input.Change, 0, 0)
+		changes, _, err := input.differences(ctx, in, subject, input.Product, string(input.Change), 0, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -239,7 +239,7 @@ func registerInventoryComparisonExport(api huma.API, in core.Deps) {
 			About: []core.Stated{
 				{Label: "earlier build", Value: input.From + " (" + input.FromVariant + ")"},
 				{Label: "later build", Value: input.To + " (" + input.ToVariant + ")"},
-				{Label: "change", Value: input.Change},
+				{Label: "change", Value: string(input.Change)},
 			},
 			Header: []string{"change", "name", "before", "after"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {

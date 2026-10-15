@@ -847,6 +847,10 @@ const (
 	EveryVariant VariantSpread = "every"
 )
 
+// VariantSpreads is every narrowing by spread a request can ask for. No
+// narrowing is the absence of one, so it is not among them.
+func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, EveryVariant} }
+
 // onThisRowsBranch is the branch the row's own build sits on.
 //
 // Spelled as a scalar subquery, which is how the other five lookups of this

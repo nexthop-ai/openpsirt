@@ -141,6 +141,9 @@ const (
 	Private Visibility = "private"
 )
 
+// Visibilities is both visibilities, disclosed first.
+func Visibilities() []Visibility { return []Visibility{Public, Private} }
+
 // AsVisibility reads a stored value, treating anything unrecognized as not
 // disclosed. Unset has to read as private, or a column added later defaults
 // every existing row to visible.

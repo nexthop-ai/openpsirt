@@ -54,11 +54,11 @@ type EmbargoedBuildBody struct {
 type EnteredBody struct {
 	// Identifier is the name it is filed under here, minted because a flaw
 	// nobody has announced has no CVE to file it under.
-	Identifier string `json:"identifier" doc:"The identifier this deployment filed it under, such as SONIC-2026-0001"`
-	Component  string `json:"component" doc:"The component in the build that carries it"`
-	Visibility string `json:"visibility" enum:"public,private" doc:"Whether it has been disclosed"`
-	DueAt      string `json:"due_at,omitempty" doc:"The date it has to be answered by"`
-	Builds     int    `json:"builds" doc:"The number of builds it was recorded against"`
+	Identifier string          `json:"identifier" doc:"The identifier this deployment filed it under, such as SONIC-2026-0001"`
+	Component  string          `json:"component" doc:"The component in the build that carries it"`
+	Visibility core.Visibility `json:"visibility" doc:"Whether it has been disclosed"`
+	DueAt      string          `json:"due_at,omitempty" doc:"The date it has to be answered by"`
+	Builds     int             `json:"builds" doc:"The number of builds it was recorded against"`
 	// Places is how many findings that made. A component can sit in more than
 	// one place in a build, and a finding is a component at a place, so a
 	// flaw recorded against one build can open several — which is what a
@@ -229,7 +229,7 @@ func registerEntry(api huma.API, in core.Deps) {
 		}
 		out.Body = EnteredBody{
 			Identifier: identifier, Component: component,
-			Visibility: string(rows[0].Visibility),
+			Visibility: core.Visibility(rows[0].Visibility),
 			Builds:     len(builds), Places: len(rows),
 		}
 		// Every row got the same one, because they are the same flaw.

@@ -317,6 +317,9 @@ const (
 	Changed ChangeKind = "changed"
 )
 
+// ChangeKinds is every kind of change, in the order the delta counts them.
+func ChangeKinds() []ChangeKind { return []ChangeKind{Added, Removed, Changed} }
+
 // Changes is every name one scan moved, in the order they are worth reading.
 //
 // The same comparison the counts on a receipt are made of, read off the same
