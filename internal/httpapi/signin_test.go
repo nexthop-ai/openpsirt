@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -848,6 +849,50 @@ func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
 	}
 	if hasSession(rec.Result().Cookies()) {
 		t.Error("a sign-in over a lookup that failed was handed a session")
+	}
+}
+
+// A sign-in whose session could not be written is a fault, answered in the
+// words every fault is answered in and with no session handed over. The match
+// succeeds here, so what fails is the write after it.
+func TestASignInWhoseSessionCouldNotBeStartedSaysNothingAboutWhy(t *testing.T) {
+	handle := dbtest.Without(t, "session")
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
+	rights := access.NewStore(handle.DB)
+	product, err := catalog.NewStore(handle.DB).DeclareProduct(t.Context(), "mine", "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	granted, err := rights.Ensure(t.Context(), "granted", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.Claim(t.Context(), granted.ID, "granted"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.GrantRole(t.Context(), granted.ID, product.ID, access.PublicRead); err != nil {
+		t.Fatal(err)
+	}
+	handler, _ := httpapi.New(quiet, nil, core.Deps{
+		Mode: func(context.Context) access.Mode { return access.Direct },
+		DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
+		Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
+		Providers: map[string]signin.Provider{"stub": provider},
+		PlainHTTP: true,
+		BaseURL:   "http://example.com",
+	})
+	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("a sign-in whose session could not be written answered %d, want 500: %s",
+			rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "something went wrong") ||
+		strings.Contains(rec.Body.String(), "session") {
+		t.Errorf("the fault said more than that something went wrong: %s", rec.Body.String())
+	}
+	if hasSession(rec.Result().Cookies()) {
+		t.Error("a sign-in whose session could not be written was handed one")
 	}
 }
 
