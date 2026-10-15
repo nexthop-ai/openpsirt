@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/uptrace/bun"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // StreamsByID names the branches and tags already known by identifier, in one
@@ -18,8 +18,8 @@ func (s *Store) StreamsByID(ctx context.Context, ids []int64) (map[int64]Stream,
 		return by, nil
 	}
 	var rows []Stream
-	if err := s.db.NewSelect().Model(&rows).
-		Where(`"s"."id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+	where, args := database.InAnyOf(`"s"."id"`, ids)
+	if err := s.db.NewSelect().Model(&rows).Where(where, args...).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up streams by identifier: %w", err)
 	}
 	for _, row := range rows {
@@ -36,8 +36,8 @@ func (s *Store) VariantsByID(ctx context.Context, ids []int64) (map[int64]Varian
 		return by, nil
 	}
 	var rows []Variant
-	if err := s.db.NewSelect().Model(&rows).
-		Where(`"v"."id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
+	where, args := database.InAnyOf(`"v"."id"`, ids)
+	if err := s.db.NewSelect().Model(&rows).Where(where, args...).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up variants by identifier: %w", err)
 	}
 	for _, row := range rows {
