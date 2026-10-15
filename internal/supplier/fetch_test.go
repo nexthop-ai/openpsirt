@@ -676,3 +676,36 @@ func TestAPublisherWhoseDirectoryNamesNothingIsReportedRatherThanSilent(t *testi
 		}
 	})
 }
+
+func TestAListingWithMisshapedFieldsNobodyReadsIsStillRead(t *testing.T) {
+	// A publisher writing a field the reader does not use in a shape the
+	// standard does not allow, in the description and in the feed, still has
+	// its documents read.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.override = func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/.well-known/csaf/provider-metadata.json":
+				_, _ = fmt.Fprintf(w, `{"publisher":"Example Linux","role":7,"distributions":[{"rolie":{"feeds":[
+					{"summary":["public"],"tlp_label":"WHITE","url":%q}]}}]}`, p.server.URL+"/feed.json")
+			case "/feed.json":
+				_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
+					{"summary":"text","format":"csaf","link":[{"rel":"self","href":%q}],
+					 "updated":"2026-09-20T00:00:00Z","content":{"type":"application/json","src":%q}}]}}`,
+					p.server.URL+"/2026/EL-6.json", p.server.URL+"/2026/EL-6.json")
+			case "/2026/EL-6.json":
+				_, _ = fmt.Fprint(w, advisory("EL-2026-0006", "libnl-3-200", "3.7.1", "CVE-2026-6666"))
+			default:
+				http.NotFound(w, r)
+			}
+		}
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Documents != 1 || took.Recorded != 1 {
+			t.Fatalf("the pass read %d documents and recorded %d claims", took.Documents, took.Recorded)
+		}
+	})
+}

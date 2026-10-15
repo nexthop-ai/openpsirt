@@ -4,7 +4,6 @@
 package supplier
 
 import (
-	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -54,22 +53,4 @@ func TestTheReaderReadsOnlyNamesTheWrittenShapeDeclares(t *testing.T) {
 func jsonName(field reflect.StructField) string {
 	name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
 	return name
-}
-
-// A field the reader does not use, in a shape the standard does not allow,
-// leaves the listing readable.
-func TestAFeedWithAMisshapedFieldNobodyReadsIsStillRead(t *testing.T) {
-	const served = `{"feed":{"entry":[{"summary":"text","updated":"2026-03-04T05:30:00Z",` +
-		`"content":{"src":"https://example.test/a.json"}}]}}`
-	var feed rolieFeed
-	if err := json.Unmarshal([]byte(served), &feed); err != nil {
-		t.Fatalf("the feed was refused: %v", err)
-	}
-	if len(feed.Feed.Entries) != 1 || feed.Feed.Entries[0].Content.Source != "https://example.test/a.json" {
-		t.Errorf("the feed read as %+v", feed)
-	}
-	var whole csaf.Feed
-	if err := json.Unmarshal([]byte(served), &whole); err == nil {
-		t.Error("the written shape took a string summary, so this feed tests nothing")
-	}
 }
