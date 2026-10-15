@@ -56,6 +56,12 @@ func TestParseURLRejectsWhatWeDoNotSupport(t *testing.T) {
 func TestMySQLDSNIsRewrittenForItsDriver(t *testing.T) {
 	// The driver wants user:pass@tcp(host:port)/db, not a URL. Handing it the
 	// URL unchanged fails at connect time with an unhelpful message.
+	//
+	// The mode is named rather than appended to whatever the server holds. A
+	// server whose global sql_mode omits strictness truncates an oversized
+	// value with no error, which is the one portability difference that loses
+	// data rather than reporting it. Naming the mode makes it a property of
+	// this application rather than of the server it was pointed at.
 	got, err := ParseURL("mysql://user:secret@db.example:3306/openpsirt")
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
@@ -118,23 +124,6 @@ func TestMySQLDSNNegotiatesTLSUnlessTheURLSaysOtherwise(t *testing.T) {
 		}
 		if contains(got.DSN, "tls=preferred") {
 			t.Errorf("ParseURL(%q) DSN %q overrode the transport the URL asked for", raw, got.DSN)
-		}
-	}
-}
-
-func TestMySQLDSNAssertsStrictnessRatherThanInheritingIt(t *testing.T) {
-	// Appending alone keeps whatever the server already held, and a server
-	// whose global sql_mode omits strictness truncates an oversized value with
-	// no error — the one portability difference that loses data rather than
-	// reporting it. Naming the mode makes it a property of this application
-	// rather than of the server it was pointed at.
-	got, err := ParseURL("mysql://u:p@h/db")
-	if err != nil {
-		t.Fatalf("ParseURL: %v", err)
-	}
-	for _, want := range []string{"CONCAT", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
-		if !contains(got.DSN, url.QueryEscape(want)) && !contains(got.DSN, want) {
-			t.Errorf("DSN %q is missing %q", got.DSN, want)
 		}
 	}
 }

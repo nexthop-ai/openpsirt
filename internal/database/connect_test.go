@@ -86,12 +86,6 @@ func TestSimpleQueryRunsEverywhere(t *testing.T) {
 	})
 }
 
-func TestOpenRejectsAnUnsupportedURL(t *testing.T) {
-	if _, err := database.ParseURL("oracle://user@host/db"); err == nil {
-		t.Fatal("an unsupported database was accepted")
-	}
-}
-
 func containsFold(haystack, needle string) bool {
 	lower := func(s string) string {
 		b := []byte(s)
