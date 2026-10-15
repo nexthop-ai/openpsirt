@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InboxReport } from "./InboxReport";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
-import { only, press, type } from "../test/fill";
+import { only, press, change } from "../test/controls";
 
 const mount = mounted();
 
@@ -80,7 +80,7 @@ describe("one vulnerability report", () => {
       (each) => each.textContent === "Accept",
     );
     expect(accept?.disabled).toBe(true);
-    type(mount.host().querySelector<HTMLInputElement>("#accept-as"), " CVE-2026-9 ");
+    change(mount.host().querySelector<HTMLInputElement>("#accept-as"), " CVE-2026-9 ");
     await press(mount.host(), "Accept");
     await settle();
     const [path, init] = only(writes.put);

@@ -57,10 +57,10 @@ function groupBox(consumer: string): HTMLInputElement {
 }
 
 describe("the places a decision covers", () => {
-  it("leaves out only the rows the filter shows when a group is unticked", () => {
+  it("leaves out only the rows the filter shows when a group is unticked", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    press(mount.host(), "Exclude places…");
+    await press(mount.host(), "Exclude places…");
     change(mount.host().querySelector<HTMLInputElement>(".locfilter"), "netfilter");
     expect(mount.host().querySelector(".grp .cnt")?.textContent).toBe("1 of 1");
     act(() => groupBox("kernel").click());
@@ -68,22 +68,22 @@ describe("the places a decision covers", () => {
     expect(mount.host().textContent).toContain("13 of 14 covered · 1 left open under kernel");
   });
 
-  it("covers everything again on Cover all", () => {
+  it("covers everything again on Cover all", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    press(mount.host(), "Exclude places…");
+    await press(mount.host(), "Exclude places…");
     act(() => groupBox("sshd").click());
     expect([...left.now]).toEqual(["sshd/sshd"]);
-    press(mount.host(), "Cover all");
+    await press(mount.host(), "Cover all");
     expect(left.now.size).toBe(0);
     expect(mount.host().textContent).toContain("2 consumers");
   });
 
-  it("leaves out one place from inside an opened group", () => {
+  it("leaves out one place from inside an opened group", async () => {
     left.now = new Set();
     mount.render(<Holding />);
-    press(mount.host(), "Exclude places…");
-    press(mount.host(), "▸");
+    await press(mount.host(), "Exclude places…");
+    await press(mount.host(), "▸");
     const place = Array.from(mount.host().querySelectorAll("label.loc")).find(
       (each) => each.querySelector(".id")?.textContent === "module-3",
     );

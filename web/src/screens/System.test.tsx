@@ -13,7 +13,7 @@ import {
   watchInvalidations,
   type Answer,
 } from "../test/mount";
-import { only, press } from "../test/fill";
+import { only, press } from "../test/controls";
 
 const mount = mounted();
 

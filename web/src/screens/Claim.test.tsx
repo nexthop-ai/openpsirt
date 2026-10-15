@@ -6,7 +6,7 @@ import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Claim } from "./Claim";
 import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
-import { only } from "../test/fill";
+import { only } from "../test/controls";
 
 const mount = mounted();
 

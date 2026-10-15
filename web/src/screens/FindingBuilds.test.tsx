@@ -33,7 +33,7 @@ function serving(held: { stream: string; variant: string }[], total: number) {
 
 async function opened() {
   mount.render(screen(<AffectedBuilds product="sonic" vulnerability="OPENPSIRT-2026-1" />));
-  press(mount.host(), "▸ Which builds this affects");
+  await press(mount.host(), "▸ Which builds this affects");
   await settle();
 }
 
@@ -51,7 +51,7 @@ describe("correcting which builds a flaw affects", () => {
     const sent = serving([{ stream: "master", variant: "broadcom" }], 1);
     await opened();
     tick(mount.host(), "v1.0");
-    press(mount.host(), "Set which builds it affects");
+    await press(mount.host(), "Set which builds it affects");
     await settle();
     expect(sent()).toHaveLength(1);
     expect((sent()[0]?.[1] as { body: unknown }).body).toEqual({
@@ -75,7 +75,7 @@ describe("correcting which builds a flaw affects", () => {
     tick(mount.host(), "v1.0");
     expect(button(mount.host(), "Set which builds it affects").disabled).toBe(true);
     change(mount.host().querySelector("#affects-because"), "Cut before the code arrived.");
-    press(mount.host(), "Set which builds it affects");
+    await press(mount.host(), "Set which builds it affects");
     await settle();
     expect((sent()[0]?.[1] as { body: unknown }).body).toEqual({
       builds: [{ stream: "master", variant: "broadcom" }],

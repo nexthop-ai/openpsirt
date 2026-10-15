@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebhookDelivery, Webhooks } from "./Webhooks";
 import { answer, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
-import { labeled, only, press, type } from "../test/fill";
+import { labeled, only, press, change } from "../test/controls";
 
 const mount = mounted();
 
@@ -59,12 +59,12 @@ describe("the webhooks an administrator configures", () => {
     mount.render(screen(<Webhooks />));
     await settle();
     await press(mount.host(), "Add webhook");
-    type(labeled(mount.host(), "Name"), " sec2 ");
-    type(labeled(mount.host(), "Kind"), " ");
-    type(labeled(mount.host(), "URL"), "https://hooks.example.com/x");
-    type(labeled(mount.host(), "Signing secret"), "short");
+    change(labeled(mount.host(), "Name"), " sec2 ");
+    change(labeled(mount.host(), "Kind"), " ");
+    change(labeled(mount.host(), "URL"), "https://hooks.example.com/x");
+    change(labeled(mount.host(), "Signing secret"), "short");
     expect(submit()?.disabled).toBe(true);
-    type(labeled(mount.host(), "Signing secret"), "0123456789abcdef");
+    change(labeled(mount.host(), "Signing secret"), "0123456789abcdef");
     expect(submit()?.disabled).toBe(false);
     await act(async () => submit()?.click());
     await settle();

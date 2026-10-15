@@ -68,7 +68,7 @@ describe("recording a flaw", () => {
   it("records it undisclosed when the disclosure control is left alone", async () => {
     const sent = serving({ may_hide: true, triages_public: true });
     await fillIn();
-    press(mount.host(), "Record flaw, undisclosed");
+    await press(mount.host(), "Record flaw, undisclosed");
     await settle();
     const body = recorded(sent());
     expect(body).not.toHaveProperty("disclosed");
@@ -83,7 +83,7 @@ describe("recording a flaw", () => {
     const sent = serving({ may_hide: true, triages_public: true });
     await fillIn();
     pick(mount.host(), "Public");
-    press(mount.host(), "Record flaw");
+    await press(mount.host(), "Record flaw");
     await settle();
     expect(recorded(sent())).toMatchObject({ disclosed: true });
   });
@@ -98,7 +98,7 @@ describe("recording a flaw", () => {
     tick(mount.host(), "broadcom");
     change(mount.host().querySelector("textarea"), "A public flaw.");
     await settle();
-    press(mount.host(), "Record flaw");
+    await press(mount.host(), "Record flaw");
     await settle();
     expect(recorded(sent())).toMatchObject({ disclosed: true });
   });

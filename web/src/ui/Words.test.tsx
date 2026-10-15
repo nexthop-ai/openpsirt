@@ -5,7 +5,7 @@ import { act, useState } from "react";
 import { describe, expect, it } from "vitest";
 import { Words } from "./Words";
 import { mounted } from "../test/mount";
-import { type } from "../test/fill";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -36,16 +36,16 @@ function key(name: string) {
 describe("a field of words", () => {
   it("takes each word a comma finishes and keeps typing after the last", () => {
     mount.render(<Host />);
-    type(field(), "a, b ,a, c");
+    change(field(), "a, b ,a, c");
     expect(held()).toBe("a|b");
     expect(field()?.value).toBe(" c");
   });
 
   it("takes a word on Enter, and ignores one already held", () => {
     mount.render(<Host start={["a"]} />);
-    type(field(), " b ");
+    change(field(), " b ");
     key("Enter");
-    type(field(), "a");
+    change(field(), "a");
     key("Enter");
     expect(held()).toBe("a|b");
     expect(field()?.value).toBe("");

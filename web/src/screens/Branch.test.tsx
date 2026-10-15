@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Branch } from "./Branch";
 import { mounted, screen, serve, settle, type Answer } from "../test/mount";
-import type { Init } from "../test/fill";
+import type { Init } from "../test/controls";
 
 const mount = mounted();
 

@@ -62,10 +62,10 @@ describe("the people on a case", () => {
     expect(button(mount.host(), "Add collaborator").disabled).toBe(true);
     change(mount.host().querySelector<HTMLInputElement>("#bring-in"), "Cy (cy)");
     await settle();
-    press(mount.host(), "Add collaborator");
+    await press(mount.host(), "Add collaborator");
     await settle();
     expect(put().map(pathOf)).toEqual([{ ...issue, identity: "cy" }]);
-    press(mount.host(), "×");
+    await press(mount.host(), "×");
     await settle();
     expect(taken().map(pathOf)).toEqual([{ ...issue, identity: "bob" }]);
   });
@@ -94,10 +94,10 @@ describe("closing a recorded flaw by hand", () => {
         />,
       ),
     );
-    press(mount.host(), "Close as fixed…");
+    await press(mount.host(), "Close as fixed…");
     expect(button(mount.host(), "Close as fixed").disabled).toBe(true);
     change(mount.host().querySelector("#res-because"), "  Checked in 1.0.1.  ");
-    press(mount.host(), "Close as fixed");
+    await press(mount.host(), "Close as fixed");
     await settle();
     expect(sent().map(bodyOf)).toEqual([{ because: "Checked in 1.0.1." }]);
   });
@@ -119,13 +119,13 @@ describe("the files attached to an issue", () => {
     const removed = answer("DELETE", () => ({ data: {} }));
     mount.render(screen(<Attachments about={issue} admin />));
     await settle();
-    press(mount.host(), "Remove");
+    await press(mount.host(), "Remove");
     expect(button(mount.host(), "Remove the file").disabled).toBe(true);
     change(
       mount.host().querySelector<HTMLInputElement>(".files input"),
       "A credential was pasted.",
     );
-    press(mount.host(), "Remove the file");
+    await press(mount.host(), "Remove the file");
     await settle();
     expect(removed().map(pathOf)).toEqual([{ token: "tok-1" }]);
     expect(removed().map(bodyOf)).toEqual([{ reason: "A credential was pasted." }]);
@@ -146,10 +146,10 @@ describe("the tags on a finding", () => {
     const removed = answer("DELETE", () => ({ data: {} }));
     const changed = vi.fn();
     mount.render(screen(<Marks at={at} tags={["triaged"]} mayMark onChanged={changed} />));
-    press(mount.host(), "+ Tag");
+    await press(mount.host(), "+ Tag");
     await settle();
     change(mount.host().querySelector<HTMLInputElement>("#tag-with"), "upstream asked");
-    press(mount.host(), "Add");
+    await press(mount.host(), "Add");
     await settle();
     expect(put().map(pathOf)).toEqual([
       {
@@ -185,10 +185,10 @@ describe("ending an embargo", () => {
     serve(() => ({ data: { items: [] } }));
     const sent = accept(() => ({ data: { in_force: false } }));
     mount.render(screen(<Disclose {...issue} />));
-    press(mount.host(), "Disclose…");
+    await press(mount.host(), "Disclose…");
     expect(button(mount.host(), "Disclose").disabled).toBe(true);
     change(mount.host().querySelector("textarea"), "Published upstream.");
-    press(mount.host(), "Disclose");
+    await press(mount.host(), "Disclose");
     await settle();
     expect(sent().map(bodyOf)).toEqual([{ reason: "Published upstream." }]);
     expect(mount.host().textContent).toContain("stays undisclosed until a second person agrees");
@@ -207,7 +207,7 @@ describe("the notes on an issue", () => {
     await settle();
     expect(mount.host().textContent).toContain("Notes on this issue");
     change(mount.host().querySelector("textarea"), "Vendor says next week.");
-    press(mount.host(), "Note");
+    await press(mount.host(), "Note");
     await settle();
     expect(sent().map(pathOf)).toEqual([issue]);
     expect(sent().map(bodyOf)).toEqual([{ body: "Vendor says next week." }]);

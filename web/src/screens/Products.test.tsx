@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Products } from "./Products";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
-import { choose, labeled, only, press, type } from "../test/fill";
+import { change, labeled, only, press } from "../test/controls";
 
 const mount = mounted();
 
@@ -55,7 +55,7 @@ describe("the products an administrator manages", () => {
   it("sends a display name alone when the name was left as it was", async () => {
     const writes = await drawn();
     await press(host(), "Edit");
-    type(labeled(host(), "Shown as"), "SONiC 2");
+    change(labeled(host(), "Shown as"), "SONiC 2");
     await press(host(), "Save");
     await settle();
     const [path, init] = only(writes.patch);
@@ -67,7 +67,7 @@ describe("the products an administrator manages", () => {
   it("sends the new name when it changed", async () => {
     const writes = await drawn();
     await press(host(), "Edit");
-    type(labeled(host(), "Name"), "sonic-os");
+    change(labeled(host(), "Name"), "sonic-os");
     await press(host(), "Save");
     await settle();
     expect(only(writes.patch)[1].body).toEqual({ name: "sonic-os", display_name: "SONiC" });
@@ -77,7 +77,7 @@ describe("the products an administrator manages", () => {
     const writes = await drawn();
     await press(host(), "Add product");
     const drawer = host();
-    type(labeled(drawer, "Name"), " edgeos ");
+    change(labeled(drawer, "Name"), " edgeos ");
     const add = Array.from(drawer.querySelectorAll("button")).filter(
       (each) => each.textContent?.trim() === "Add product",
     );
@@ -88,7 +88,7 @@ describe("the products an administrator manages", () => {
 
   it("sets the triage line picked", async () => {
     const writes = await drawn();
-    choose(
+    change(
       host().querySelector<HTMLSelectElement>(
         'select[aria-label="What sonic considers worth triaging"]',
       ),
@@ -103,7 +103,7 @@ describe("the products an administrator manages", () => {
   it("sends pair thresholds as numbers, and a blank one as the deployment's", async () => {
     const writes = await drawn();
     await press(host(), "deployment’s");
-    type(
+    change(
       host().querySelector<HTMLInputElement>(
         'input[aria-label="Share of sonic\'s agreements one pair may give, as a percentage"]',
       ),

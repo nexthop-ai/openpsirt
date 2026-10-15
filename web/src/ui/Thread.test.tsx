@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Thread } from "./Thread";
 import { belongTo } from "../app/drafts";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { button, press, type } from "../test/fill";
+import { button, press, change } from "../test/controls";
 
 const mount = mounted();
 
@@ -75,7 +75,7 @@ describe("a thread of comments", () => {
     await settle();
     const field = mount.host().querySelector<HTMLTextAreaElement>("textarea");
     expect(button(mount.host(), "Comment").disabled).toBe(true);
-    type(field, "Checked again.");
+    change(field, "Checked again.");
     await press(mount.host(), "Comment");
     expect(onAdd).toHaveBeenCalledWith("Checked again.", expect.any(Function));
     const done = onAdd.mock.calls[0]?.[1];

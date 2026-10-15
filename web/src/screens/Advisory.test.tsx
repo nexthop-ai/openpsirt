@@ -52,7 +52,7 @@ describe("one advisory", () => {
     expect(mount.host().textContent).toContain("Names no flaw");
     expect(button(mount.host(), "Save").disabled).toBe(true);
     change(mount.host().querySelector<HTMLInputElement>(".card input"), "Two flaws in the socket");
-    press(mount.host(), "Save");
+    await press(mount.host(), "Save");
     await settle();
     expect(patched().map(bodyOf)).toEqual([{ title: "Two flaws in the socket" }]);
   });
@@ -68,7 +68,7 @@ describe("one advisory", () => {
       mount.host().querySelector<HTMLInputElement>('input[list="advisory-flaws"]'),
       " CVE-2026-2 ",
     );
-    press(mount.host(), "Name it");
+    await press(mount.host(), "Name it");
     await settle();
     expect(posted()).toEqual([
       [
@@ -86,7 +86,7 @@ describe("one advisory", () => {
     const removed = answer("DELETE", () => ({ data: {} }));
     mount.render(screen(<Advisory />, ADDRESS, PATTERN));
     await settle();
-    press(mount.host(), "Take off");
+    await press(mount.host(), "Take off");
     await settle();
     expect(removed()[0]?.[1]).toEqual({
       params: { path: { advisory: "SONIC-2026-1", product: "sonic", vulnerability: "CVE-2026-1" } },
@@ -111,7 +111,7 @@ describe("one advisory", () => {
     expect(mount.host().textContent).toContain("Nobody has agreed to what it says");
     expect(button(mount.host(), "Take every agreement back").disabled).toBe(true);
     expect(button(mount.host(), "Record that it went out").disabled).toBe(true);
-    press(mount.host(), "Mark affected");
+    await press(mount.host(), "Mark affected");
     await settle();
     expect(bodyOf(put()[0] as Sent)).toEqual({
       product: "sonic",
@@ -131,7 +131,7 @@ describe("one advisory", () => {
       mount.host().querySelector<HTMLInputElement>('input[placeholder^="What changed"]'),
       " First edition ",
     );
-    press(mount.host(), "Record that it went out");
+    await press(mount.host(), "Record that it went out");
     await settle();
     expect(posted().map(([path, init]) => [path, (init as { body: unknown }).body])).toEqual([
       ["/v1/advisories/{advisory}/issuance", { summary: "First edition" }],

@@ -5,19 +5,20 @@ import { act } from "react";
 
 // What a person does to a drawn screen, each through React's own act.
 
-// The button whose text is exactly the label, or a failure naming it.
-export function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const found = Array.from(host.querySelectorAll("button")).find(
+// The button whose text is exactly the label, among those inside a node.
+export function button(within: ParentNode, label: string): HTMLButtonElement {
+  const found = Array.from(within.querySelectorAll("button")).find(
     (each) => each.textContent?.trim() === label,
   );
-  if (!found) throw new Error(`no button ${label}`);
+  if (!found) throw new Error(`no button reads "${label}"`);
   return found;
 }
 
-// Presses the button whose text is exactly the label.
-export function press(host: HTMLElement, label: string): void {
-  const found = button(host, label);
-  act(() => found.click());
+// Presses the button whose text is exactly the label, and lets what the
+// press started settle.
+export async function press(within: ParentNode, label: string): Promise<void> {
+  const found = button(within, label);
+  await act(async () => found.click());
 }
 
 // Sets a field's value the way typing or picking does, so React's own
@@ -58,4 +59,30 @@ export function pick(host: HTMLElement, words: string): void {
   );
   if (!card) throw new Error(`no choice ${words}`);
   act(() => card.click());
+}
+
+// The field a label names, by the label's text.
+export function labeled(within: ParentNode, text: string): HTMLInputElement {
+  const label = Array.from(within.querySelectorAll("label")).find(
+    (each) => each.textContent?.trim() === text,
+  );
+  const id = label?.getAttribute("for");
+  const found = id
+    ? within.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`)
+    : label?.querySelector<HTMLInputElement>("input");
+  if (!found) throw new Error(`no field labeled "${text}"`);
+  return found;
+}
+
+// What one request was sent with, as the generated client takes it.
+export type Init = {
+  params?: { path?: Record<string, unknown>; query?: Record<string, unknown> };
+  body?: unknown;
+};
+
+// The one request a write sent, failing where it sent none or several.
+export function only(sent: () => unknown[]): [path: string, init: Init] {
+  const all = sent() as [string, Init][];
+  if (all.length !== 1) throw new Error(`sent ${all.length} requests where one was expected`);
+  return all[0] as [string, Init];
 }

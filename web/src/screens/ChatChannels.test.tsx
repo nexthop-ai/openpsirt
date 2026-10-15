@@ -38,7 +38,7 @@ describe("the chat channels", () => {
     const sent = accept(() => ({ data: {} }));
     mount.render(screen(<ChatChannels platforms={["slack", "zulip"]} />));
     await settle();
-    press(mount.host(), "Add channel");
+    await press(mount.host(), "Add channel");
     change(field("declare-name"), " kernel-psirt ");
     change(field("chat-platform"), "zulip");
     change(field("declare-channel"), " security ");
@@ -65,7 +65,7 @@ describe("the chat channels", () => {
     const sent = accept(() => ({ data: {} }));
     mount.render(screen(<ChatChannels platforms={["slack", "zulip"]} />));
     await settle();
-    press(mount.host(), "Add channel");
+    await press(mount.host(), "Add channel");
     change(field("chat-platform"), "zulip");
     change(field("declare-topic"), "typed before switching");
     change(field("chat-platform"), "slack");
@@ -105,7 +105,7 @@ describe("the chat channels", () => {
     expect(mount.host().textContent).toContain("No chat platform is configured.");
     expect(mount.host().textContent).toContain("Team kernel");
     expect(mount.host().textContent).not.toContain("hooks");
-    press(mount.host(), "Retire");
+    await press(mount.host(), "Retire");
     await settle();
     expect(removed()[0]?.[1]).toEqual({ params: { path: { name: "kernel-psirt", kind: "*" } } });
   });

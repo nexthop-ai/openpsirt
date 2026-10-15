@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Variants } from "./Variants";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
-import { choose, labeled, only, press, type } from "../test/fill";
+import { change, labeled, only, press } from "../test/controls";
 
 const mount = mounted();
 
@@ -55,7 +55,7 @@ describe("the variants a product is built as", () => {
       (each) => each.textContent === "Edit",
     );
     await act(async () => edits[0]?.click());
-    choose(mount.host().querySelector<HTMLSelectElement>("#edit-facing"), "no");
+    change(mount.host().querySelector<HTMLSelectElement>("#edit-facing"), "no");
     await press(mount.host(), "Save");
     await settle();
     const [path, init] = only(patch);
@@ -67,7 +67,7 @@ describe("the variants a product is built as", () => {
   it("declares a variant under the product, shipping unless said otherwise", async () => {
     const { post } = await product();
     await press(mount.host(), "Add variant");
-    type(labeled(mount.host(), "Name"), " mellanox ");
+    change(labeled(mount.host(), "Name"), " mellanox ");
     const add = Array.from(mount.host().querySelectorAll("button")).filter(
       (each) => each.textContent?.trim() === "Add variant",
     );

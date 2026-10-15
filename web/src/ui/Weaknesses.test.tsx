@@ -5,7 +5,7 @@ import { act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Weaknesses } from "./Weaknesses";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { type } from "../test/fill";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -45,14 +45,14 @@ function enter() {
 describe("the kinds of flaw a finding names", () => {
   it("takes an identifier in any case and writes it the one way", async () => {
     await drawn();
-    type(field(), "cwe-79");
+    change(field(), "cwe-79");
     enter();
     expect(held()).toBe("CWE-79");
   });
 
   it("refuses words that are not an identifier, and says how to write one", async () => {
     await drawn();
-    type(field(), "buffer things");
+    change(field(), "buffer things");
     enter();
     expect(held()).toBe("");
     expect(mount.host().textContent).toContain("type CWE- and a number");
@@ -61,7 +61,7 @@ describe("the kinds of flaw a finding names", () => {
   it("stops at the most a finding may carry", async () => {
     const many = Array.from({ length: 16 }, (_, i) => `CWE-${i + 1}`);
     await drawn(many);
-    type(field(), "CWE-999");
+    change(field(), "CWE-999");
     enter();
     expect(held()?.split("|")).toHaveLength(16);
     expect(mount.host().textContent).toContain("16 at most.");
@@ -76,7 +76,7 @@ describe("the kinds of flaw a finding names", () => {
 
   it("says the names could not be searched, and that a number still works", async () => {
     await drawn([], true);
-    type(field(), "read");
+    change(field(), "read");
     await settle();
     expect(mount.host().textContent).toContain("Couldn’t search the names.");
   });

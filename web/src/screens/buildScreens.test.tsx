@@ -7,7 +7,7 @@ import { InventoryChanges } from "./InventoryChanges";
 import { Run } from "./Run";
 import { Upgrades } from "./Upgrades";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
-import { press, type Init } from "../test/fill";
+import { press, type Init } from "../test/controls";
 
 const mount = mounted();
 

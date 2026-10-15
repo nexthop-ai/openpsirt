@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Holder, type Held } from "./Holder";
 import { mounted, screen, serve, settle, type Answer } from "../test/mount";
-import { type, type Init } from "../test/fill";
+import { change, type Init } from "../test/controls";
 
 const mount = mounted();
 
@@ -68,7 +68,7 @@ describe("choosing who holds something", () => {
   it("asks only for people who may read an undisclosed finding", async () => {
     const { asked, box } = await drawn({ undisclosed: true });
     expect(asked()[0]).toEqual({ visibility: "private", limit: 25 });
-    type(box, " ker ");
+    change(box, " ker ");
     await settle();
     expect(asked().at(-1)).toEqual({ visibility: "private", q: "ker", limit: 25 });
   });

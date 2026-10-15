@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Became, Happened } from "./QueueMine";
 import { accept, mounted, screen, settle } from "../test/mount";
-import { button, only, type } from "../test/fill";
+import { button, only, change } from "../test/controls";
 import type { Body } from "../api/client";
 
 const mount = mounted();
@@ -52,7 +52,7 @@ describe("the claims somebody proposed", () => {
     );
     await act(async () => first?.click());
     expect(button(mount.host(), "Hold 1 back").disabled).toBe(true);
-    type(mount.host().querySelector("textarea"), "these two are exploited");
+    change(mount.host().querySelector("textarea"), "these two are exploited");
     await act(async () => button(mount.host(), "Hold 1 back").click());
     await settle();
     const [path, init] = only(sent);

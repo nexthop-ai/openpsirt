@@ -75,7 +75,7 @@ describe("scheduling an upgrade of a component", () => {
     act(() => offered.find((each) => each.querySelector(".id")?.textContent === "3.8")?.click());
     change(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2026-12-01");
     change(mount.host().querySelector("textarea"), "The packaged fix.");
-    press(mount.host(), "Schedule for 1");
+    await press(mount.host(), "Schedule for 1");
     await settle();
     const [path, init] = sent()[0] as Sent;
     expect(path).toBe("/v1/products/{product}/components/{component}/upgrade");

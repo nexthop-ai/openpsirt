@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Inbox } from "./Inbox";
 import { location, mounted, screen, serve, settle } from "../test/mount";
-import { press } from "../test/fill";
+import { press } from "../test/controls";
 
 const mount = mounted();
 

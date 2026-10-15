@@ -49,12 +49,12 @@ describe("the branches and tags of a product", () => {
     const posted = answer("POST", () => ({ data: {} }));
     mount.render(screen(<Branches />, ADDRESS, PATTERN));
     await settle();
-    press(mount.host(), "Add branch or tag");
+    await press(mount.host(), "Add branch or tag");
     expect(button(drawer(), "Add branch").disabled).toBe(true);
     change(drawer().querySelector("#declare-name"), " 202505 ");
     change(drawer().querySelector("#declare-kind"), "tag");
     change(drawer().querySelector("#declare-cut-from"), "master");
-    press(drawer(), "Add tag");
+    await press(drawer(), "Add tag");
     await settle();
     expect(posted().map(bodyOf)).toEqual([{ name: "202505", kind: "tag", parent: "master" }]);
   });
@@ -64,12 +64,12 @@ describe("the branches and tags of a product", () => {
     const posted = answer("POST", () => ({ data: {} }));
     mount.render(screen(<Branches />, ADDRESS, PATTERN));
     await settle();
-    press(mount.host(), "Add branch or tag");
+    await press(mount.host(), "Add branch or tag");
     change(drawer().querySelector("#declare-name"), "next");
     change(drawer().querySelector("#declare-kind"), "tag");
     change(drawer().querySelector("#declare-cut-from"), "master");
     change(drawer().querySelector("#declare-kind"), "branch");
-    press(drawer(), "Add branch");
+    await press(drawer(), "Add branch");
     await settle();
     expect(posted().map(bodyOf)).toEqual([{ name: "next", kind: "branch" }]);
   });
@@ -85,7 +85,7 @@ describe("the branches and tags of a product", () => {
     act(() => edits[1]?.click());
     await settle();
     change(drawer().querySelector("#declare-name"), " 2024.11 ");
-    press(drawer(), "Save");
+    await press(drawer(), "Save");
     await settle();
     expect(patched().map(pathOf)).toEqual([{ product: "sonic", stream: "202411" }]);
     expect(patched().map(bodyOf)).toEqual([{ name: "2024.11" }]);
@@ -96,7 +96,7 @@ describe("the branches and tags of a product", () => {
     const removed = answer("DELETE", () => ({ data: {} }));
     mount.render(screen(<Branches />, ADDRESS, PATTERN));
     await settle();
-    press(mount.host(), "Retire");
+    await press(mount.host(), "Retire");
     await settle();
     expect(removed().map(pathOf)).toEqual([{ product: "sonic", stream: "master" }]);
   });

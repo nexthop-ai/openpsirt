@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ByBump, ByComponent, Pager, Peek, Sits } from "./FindingsViews";
 import type { Row } from "./list";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { press } from "../test/fill";
+import { press } from "../test/controls";
 
 const mount = mounted();
 

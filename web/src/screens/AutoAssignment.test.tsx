@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutoAssignment } from "./AutoAssignment";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
-import { button, choose, only, press, type, type Init } from "../test/fill";
+import { button, change, only, press, type Init } from "../test/controls";
 
 const mount = mounted();
 
@@ -53,14 +53,14 @@ const field = (selector: string) => mount.host().querySelector<HTMLInputElement>
 const text = () => mount.host().textContent ?? "";
 
 async function fill(upstream: string) {
-  type(field('input[placeholder="kernel to the platform team"]'), "kernel rule");
-  choose(
+  change(field('input[placeholder="kernel to the platform team"]'), "kernel rule");
+  change(
     Array.from(mount.host().querySelectorAll<HTMLSelectElement>("select")).find((each) =>
       each.textContent?.includes("Pick a team"),
     ) ?? null,
     "platform",
   );
-  type(field("#rule-upstream"), upstream);
+  change(field("#rule-upstream"), upstream);
   await settle();
 }
 

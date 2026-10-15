@@ -5,7 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dependencies } from "./Dependencies";
 import { location, mounted, screen, serve, settle } from "../test/mount";
-import { type, type Init } from "../test/fill";
+import { change, type Init } from "../test/controls";
 
 const mount = mounted();
 
@@ -126,7 +126,7 @@ describe("the whole tree somebody with a role reads", () => {
     const box = mount
       .host()
       .querySelector<HTMLInputElement>('input[aria-label="Find a component"]');
-    type(box, " openssl ");
+    change(box, " openssl ");
     await act(async () => box?.form?.requestSubmit());
     await settle();
     expect(location()).toContain("q=openssl");

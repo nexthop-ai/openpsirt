@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReasonEditor } from "./ReasonEditor";
 import { belongTo } from "../app/drafts";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
-import { button, only, press, type } from "../test/fill";
+import { button, only, press, change } from "../test/controls";
 
 const mount = mounted();
 
@@ -47,9 +47,9 @@ describe("revising and withdrawing a claim's reasoning", () => {
     await press(mount.host(), "Revise reasoning");
     const field = mount.host().querySelector<HTMLTextAreaElement>("textarea");
     expect(field?.value).toBe("Unreachable.");
-    type(field, "   ");
+    change(field, "   ");
     expect(button(mount.host(), "Save revision").disabled).toBe(true);
-    type(field, "Unreachable, and the module is not loaded.");
+    change(field, "Unreachable, and the module is not loaded.");
     await press(mount.host(), "Save revision");
     await settle();
     const [path, init] = only(put);

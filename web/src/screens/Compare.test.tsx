@@ -65,7 +65,7 @@ describe("comparing two builds", () => {
     const spy = serving();
     mount.render(screen(<Compare />, `/products/sonic/compare?${PAIR}`, PATTERN));
     await settle();
-    press(mount.host(), "Include undisclosed");
+    await press(mount.host(), "Include undisclosed");
     await settle();
     expect(queriesOf(spy, "/v1/products/{product}/comparison").at(-1)).toMatchObject({
       include_undisclosed: true,
@@ -77,7 +77,7 @@ describe("comparing two builds", () => {
     mount.render(screen(<Compare />, `/products/sonic/compare?${PAIR}`, PATTERN));
     await settle();
     expect(queriesOf(spy, "/v1/products/{product}/comparison/notes")).toEqual([]);
-    press(mount.host(), "Write release notes");
+    await press(mount.host(), "Write release notes");
     await settle();
     expect(queriesOf(spy, "/v1/products/{product}/comparison/notes")).toEqual(
       queriesOf(spy, "/v1/products/{product}/comparison").slice(-1),

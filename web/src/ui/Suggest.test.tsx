@@ -5,7 +5,7 @@ import { act, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Suggest } from "./Suggest";
 import { mounted } from "../test/mount";
-import { type } from "../test/fill";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -39,15 +39,15 @@ function key(box: HTMLInputElement, name: string) {
 describe("a text box that suggests", () => {
   it("offers nothing until two characters are typed", () => {
     const { box } = drawn();
-    type(box, "l");
+    change(box, "l");
     expect(shown()).toEqual([]);
-    type(box, "li");
+    change(box, "li");
     expect(shown()).toEqual(["linux", "libnl"]);
   });
 
   it("picks from the keyboard, wrapping past either end", () => {
     const { box, onPick } = drawn();
-    type(box, "li");
+    change(box, "li");
     key(box, "ArrowUp");
     key(box, "Enter");
     expect(onPick).toHaveBeenCalledWith("libnl");
@@ -57,14 +57,14 @@ describe("a text box that suggests", () => {
 
   it("closes on Escape", () => {
     const { box } = drawn();
-    type(box, "li");
+    change(box, "li");
     key(box, "Escape");
     expect(shown()).toEqual([]);
   });
 
   it("says nothing is called what was typed", () => {
     const { box } = drawn([]);
-    type(box, "zz");
+    change(box, "zz");
     expect(mount.host().textContent).toContain("Nothing here is called that.");
   });
 });

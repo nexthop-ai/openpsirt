@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VEX } from "./VEX";
 import { accept, location, mounted, screen, serve, settle } from "../test/mount";
-import { only, press, type Init } from "../test/fill";
+import { only, press, type Init } from "../test/controls";
 
 const mount = mounted();
 
