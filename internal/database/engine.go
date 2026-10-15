@@ -280,14 +280,14 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 }
 
 // recursion lifts the bound these two engines put on a recursive statement's
-// rounds, which the walks down a build's graph would otherwise reach.
+// rounds, which the walks of a build's graph would otherwise reach.
 //
 // Both stop at a thousand rounds by default: MySQL with an error, MariaDB with
-// a short answer and a warning. The walks down carry no depth, so their rounds
-// are the length of the longest chain in a build, and a chain longer than a
-// thousand is a legal document. A walk adds a node once, so no walk takes more
-// rounds than a build has components, and a million is past every bound on
-// that. Each engine names the setting differently and refuses the other's, and
+// a short answer and a warning. No walk, down or up, carries a depth, so its
+// rounds are the length of the longest chain in a build, and a chain longer
+// than a thousand is a legal document. A walk adds a node once, so no walk
+// takes more rounds than a build has components, and a million is past every
+// bound on that. Each engine names the setting differently and refuses the other's, and
 // one an operator set in the URL is left as it is.
 func recursion(engine Engine, u *url.URL) string {
 	name := "cte_max_recursion_depth"

@@ -821,14 +821,15 @@ would report it on the day one starts.
 | MariaDB | a thousand rounds, returning what it has, with a warning | `max_recursive_iterations` of a million |
 | PostgreSQL, SQLite | nothing | nothing |
 
-The walks down a build's graph carry no depth, so their rounds are the length of
-the longest chain in the build, and a chain past a thousand is a legal document.
+Every walk of a build's graph carries no depth, down or up, so its rounds are
+the length of the longest chain in the build, and a chain past a thousand is a
+legal document.
 Short of the setting, MySQL fails the count beneath the tree's root and MariaDB
 answers it short without saying so. A walk adds a component once, so no walk
 takes more rounds than a build has components, which a million is past. Set on
 the connection, named per engine because each refuses the other's name, and left
-alone where the database URL sets it. A test walks a chain of 1,100 on all four,
-and fails on those two without the setting.
+alone where the database URL sets it. A test walks a chain of 1,100 down and up
+on all four, and fails on those two without the setting.
 
 ## Absence and failure
 

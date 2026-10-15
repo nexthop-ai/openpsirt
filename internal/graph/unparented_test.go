@@ -222,8 +222,8 @@ func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
 func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 	// The two engines of the MySQL family stop a recursive statement after a
 	// thousand rounds unless told otherwise — one with an error, the other
-	// with a short answer — and the walks down carry no depth to stop them
-	// sooner. A chain this long is a legal document.
+	// with a short answer — and no walk, down or up, carries a depth to stop
+	// it sooner. A chain this long is a legal document.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		const length = 1100
@@ -257,6 +257,12 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 		}
 		if len(ids) != length || !slices.Contains(ids, last) {
 			t.Errorf("the subtree under the first link holds %d components, want all %d", len(ids), length)
+		}
+		// The climb reads every node above the end of the chain, however far.
+		// Drawing a chain from it stops at the bound on how deep a chain is
+		// shown, which is a separate limit from the engine's.
+		if _, err := f.store.Chains(ctx, everyone(f), f.targetID, []int64{last}); err != nil {
+			t.Errorf("climbing from the end of the chain: %v", err)
 		}
 	})
 }
