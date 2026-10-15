@@ -132,7 +132,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// closed when the last of its places is, and the places are what fans
 	// out.
 	var spans []struct {
-		Rank    int     `bun:"rank"`
+		Rank    int     `bun:"band_rank"`
 		Seconds float64 `bun:"seconds"`
 		Issues  int     `bun:"issues"`
 	}
@@ -164,7 +164,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		TableExpr(`(?) AS "grouped"`, closed).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
 		Join(rating.For(rating.OnGrouped)).
-		ColumnExpr(`MAX(` + rankCase(rating.BandExpr, 0) + `) AS "rank"`).
+		ColumnExpr(`MAX(` + rankCase(rating.BandExpr, 0) + `) AS "band_rank"`).
 		ColumnExpr(`MAX(grouped.closed_at) AS "closed_at"`).
 		ColumnExpr(`MIN(grouped.opened_at) AS "opened_at"`).
 		GroupExpr("grouped.vulnerability_id")
@@ -173,10 +173,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// own, because averaging inside the grouping would average the places.
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_issue"`, perIssue).
-		ColumnExpr(`per_issue.rank AS "rank"`).
+		ColumnExpr(`per_issue.band_rank AS "band_rank"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
 		ColumnExpr(secondsBetween(s.db)+` AS "seconds"`).
-		GroupExpr("per_issue.rank").
+		GroupExpr("per_issue.band_rank").
 		Scan(ctx, &spans); err != nil {
 		return nil, fmt.Errorf("read how long fixes took: %w", err)
 	}
