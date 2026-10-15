@@ -154,47 +154,11 @@ func (p *provider) adapter(t *testing.T, cfg OIDCConfig) (*OIDC, error) {
 	return NewOIDC(t.Context(), cfg)
 }
 
-func TestTheAddressASignInStartsAtCarriesTheDigestAndNotTheSecret(t *testing.T) {
-	// The control this names lives in the address Begin produces, so the test
-	// reads that address. A digest compared with its own preimage differs for
-	// every implementation, a broken one included.
-	p := standing(t)
-	adapter, err := p.adapter(t, OIDCConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	at, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
-	if err != nil {
-		t.Fatal(err)
-	}
-	parsed, err := url.Parse(at)
-	if err != nil {
-		t.Fatal(err)
-	}
-	query := parsed.Query()
-	if got := query.Get("code_challenge"); got != pending.challenge() {
-		t.Errorf("the address carries %q as the challenge, want the digest", got)
-	}
-	if query.Get("code_challenge") == pending.Verifier {
-		t.Error("the address carries the secret the proof key hashes")
-	}
-	if got := query.Get("code_challenge_method"); got != "S256" {
-		t.Errorf("the challenge method is %q", got)
-	}
-	if query.Get("nonce") != pending.Nonce || pending.Nonce == "" {
-		t.Errorf("the address does not carry the nonce this sign-in will be tied to")
-	}
-	if query.Get("state") != pending.State || pending.State == "" {
-		t.Error("the address does not carry the state this sign-in will be matched on")
-	}
-}
-
-func TestATokenForADifferentSignInIsRefused(t *testing.T) {
-	// The nonce is the only thing tying a verified identity token to the
-	// sign-in that started here. Without the comparison a token issued for
-	// some other sign-in verifies perfectly well and is accepted.
-	p := standing(t)
-	adapter, err := p.adapter(t, OIDCConfig{})
+// begun is an adapter against the standing provider with one sign-in started
+// on it.
+func (p *provider) begun(t *testing.T, cfg OIDCConfig) (*OIDC, Pending) {
+	t.Helper()
+	adapter, err := p.adapter(t, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,6 +166,15 @@ func TestATokenForADifferentSignInIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return adapter, pending
+}
+
+func TestATokenForADifferentSignInIsRefused(t *testing.T) {
+	// The nonce is the only thing tying a verified identity token to the
+	// sign-in that started here. Without the comparison a token issued for
+	// some other sign-in verifies perfectly well and is accepted.
+	p := standing(t)
+	adapter, pending := p.begun(t, OIDCConfig{})
 
 	// The provider answers with a token minted for somebody else's sign-in.
 	p.claims["nonce"] = "a-different-sign-in"
@@ -239,14 +212,7 @@ func TestATokenNamingNobodyIsRefused(t *testing.T) {
 	// with nothing stable to match on. access.MatchProvider's own comment
 	// relies on the adapters to make this check.
 	p := standing(t)
-	adapter, err := p.adapter(t, OIDCConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
-	if err != nil {
-		t.Fatal(err)
-	}
+	adapter, pending := p.begun(t, OIDCConfig{})
 	p.claims["nonce"] = pending.Nonce
 	p.claims["sub"] = "   "
 	if _, err := adapter.Complete(t.Context(), "a-code", pending,
@@ -277,6 +243,35 @@ func TestAProviderNamingItsEndpointsElsewhereIsRefusedAtStartup(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "somewhere.else.example") {
 			t.Errorf("the refusal for the %s endpoint does not say where: %v", c.what, err)
+		}
+	}
+}
+
+// An endpoint on the issuer's own host is still refused over plain http, or
+// where the document names it unreadably: a token redeemed over http carries
+// the client secret in the clear.
+func TestAProviderNamingAnEndpointItCannotBeReachedAtSafelyIsRefusedAtStartup(t *testing.T) {
+	for _, field := range []string{"authorization_endpoint", "token_endpoint", "jwks_uri"} {
+		for _, c := range []struct {
+			what  string
+			named func(p *provider) string
+			says  string
+		}{
+			{"over plain http", func(p *provider) string {
+				return "http://" + strings.TrimPrefix(p.URL, "https://") + "/x"
+			}, "is not https"},
+			{"unreadably", func(*provider) string { return "::" }, "unreadable"},
+		} {
+			p := standing(t)
+			p.document = map[string]any{field: c.named(p)}
+			_, err := p.adapter(t, OIDCConfig{})
+			if err == nil {
+				t.Errorf("a provider naming its %s %s was accepted", field, c.what)
+				continue
+			}
+			if !strings.Contains(err.Error(), c.says) {
+				t.Errorf("a provider naming its %s %s was refused for another reason: %v", field, c.what, err)
+			}
 		}
 	}
 }
@@ -329,14 +324,7 @@ func TestAGroupsClaimIsReadUnderTheNameItReports(t *testing.T) {
 	// A name with stray spaces yielding no groups locks out every arrival once
 	// roles come from groups.
 	p := standing(t)
-	adapter, err := p.adapter(t, OIDCConfig{GroupsClaim: " groups "})
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, pending, err := adapter.Begin(t.Context(), "https://here.example/back")
-	if err != nil {
-		t.Fatal(err)
-	}
+	adapter, pending := p.begun(t, OIDCConfig{GroupsClaim: " groups "})
 	p.claims["nonce"] = pending.Nonce
 	p.claims["preferred_username"] = "ana"
 	p.claims["groups"] = []string{"kernel"}
@@ -501,6 +489,31 @@ func forge(t *testing.T, org string, handler http.HandlerFunc) *GitHub {
 	return adapter
 }
 
+// ana is the account a GitHub stand-in describes where its details do not
+// matter.
+var ana = map[string]any{"login": "ana", "id": 42}
+
+// forgeAnswering is a GitHub stand-in that grants a token, describes the
+// account as user and its addresses as emails, and lists teams through the
+// handler given, or answers none where it is nil.
+func forgeAnswering(t *testing.T, org string, user, emails any, teams http.HandlerFunc) *GitHub {
+	t.Helper()
+	return forge(t, org, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/token"):
+			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
+		case r.URL.Path == "/user":
+			writeJSON(w, user)
+		case r.URL.Path == "/user/emails":
+			writeJSON(w, emails)
+		case r.URL.Path == "/user/teams" && teams != nil:
+			teams(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
 func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 	// GitHub's organization logins are case-insensitive to look up and
 	// canonical in what it hands back, so the operator's spelling and GitHub's
@@ -519,16 +532,8 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 		{"NEXTHOP-AI", "Nexthop-AI"},
 	} {
 		typed, canonical := c.typed, c.canonical
-		adapter := forge(t, typed, func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case strings.HasPrefix(r.URL.Path, "/token"):
-				writeJSON(w, map[string]any{
-					"access_token": "a-token", "token_type": "Bearer"})
-			case r.URL.Path == "/user":
-				writeJSON(w, map[string]any{"login": "ana", "id": 42, "name": "Ana Ruiz"})
-			case r.URL.Path == "/user/emails":
-				writeJSON(w, []any{})
-			case r.URL.Path == "/user/teams":
+		adapter := forgeAnswering(t, typed, map[string]any{"login": "ana", "id": 42, "name": "Ana Ruiz"}, []any{},
+			func(w http.ResponseWriter, _ *http.Request) {
 				// The canonical casing, which is what GitHub answers with.
 				writeJSON(w, []any{
 					map[string]any{"slug": "kernel",
@@ -536,10 +541,7 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 					map[string]any{"slug": "elsewhere",
 						"organization": map[string]any{"login": "another-org"}},
 				})
-			default:
-				http.NotFound(w, r)
-			}
-		})
+			})
 		who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
 			"https://here.example/back")
 		if err != nil {
@@ -561,24 +563,14 @@ func TestAPublicAddressIsNotTakenForAVerifiedOne(t *testing.T) {
 	// The address on the profile is whatever somebody chose to show publicly.
 	// An authorization waiting under a work address would be redeemable by
 	// anybody willing to claim it, so only the verified list counts.
-	adapter := forge(t, "", func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/token"):
-			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
-		case r.URL.Path == "/user":
-			writeJSON(w, map[string]any{
-				"login": "ana", "id": 42, "email": "public@example.test"})
-		case r.URL.Path == "/user/emails":
-			writeJSON(w, []any{
-				map[string]any{"email": "unverified@example.test",
-					"primary": true, "verified": false},
-				map[string]any{"email": "verified@example.test",
-					"primary": false, "verified": true},
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	})
+	adapter := forgeAnswering(t, "",
+		map[string]any{"login": "ana", "id": 42, "email": "public@example.test"},
+		[]any{
+			map[string]any{"email": "unverified@example.test",
+				"primary": true, "verified": false},
+			map[string]any{"email": "verified@example.test",
+				"primary": false, "verified": true},
+		}, nil)
 	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
 		"https://here.example/back")
 	if err != nil {
@@ -597,32 +589,21 @@ func TestTeamsAreReadPastTheFirstPage(t *testing.T) {
 	// to, so one page is not a page of ours — and truncating it would silently
 	// strip roles from whoever happens to be in a lot of teams, which is a
 	// refusal nobody could diagnose from either side.
-	adapter := forge(t, "ours", func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/token"):
-			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
-		case r.URL.Path == "/user":
-			writeJSON(w, map[string]any{"login": "ana", "id": 42})
-		case r.URL.Path == "/user/emails":
-			writeJSON(w, []any{})
-		case r.URL.Path == "/user/teams":
-			// A full first page of somebody else's teams, then ours on the
-			// second: read once, the answer is no teams at all.
-			if r.URL.Query().Get("page") == "1" {
-				full := make([]any, 0, teamPageSize)
-				for i := range teamPageSize {
-					full = append(full, map[string]any{
-						"slug":         "other" + strconv.Itoa(i),
-						"organization": map[string]any{"login": "theirs"}})
-				}
-				writeJSON(w, full)
-				return
+	adapter := forgeAnswering(t, "ours", ana, []any{}, func(w http.ResponseWriter, r *http.Request) {
+		// A full first page of somebody else's teams, then ours on the
+		// second: read once, the answer is no teams at all.
+		if r.URL.Query().Get("page") == "1" {
+			full := make([]any, 0, teamPageSize)
+			for i := range teamPageSize {
+				full = append(full, map[string]any{
+					"slug":         "other" + strconv.Itoa(i),
+					"organization": map[string]any{"login": "theirs"}})
 			}
-			writeJSON(w, []any{map[string]any{
-				"slug": "kernel", "organization": map[string]any{"login": "ours"}}})
-		default:
-			http.NotFound(w, r)
+			writeJSON(w, full)
+			return
 		}
+		writeJSON(w, []any{map[string]any{
+			"slug": "kernel", "organization": map[string]any{"login": "ours"}}})
 	})
 	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
 		"https://here.example/back")
@@ -679,8 +660,15 @@ func TestBothAdaptersStartASignInTheSameWay(t *testing.T) {
 		// The nonce is the one difference, and it is the one that matters:
 		// without it there is nothing tying a verified identity token to this
 		// sign-in.
-		if _, isOIDC := adapter.(*OIDC); isOIDC != (query.Get("nonce") != "") {
+		_, isOIDC := adapter.(*OIDC)
+		if isOIDC != (query.Get("nonce") != "") {
 			t.Errorf("%s carries nonce=%q", adapter.Name(), query.Get("nonce"))
+		}
+		if isOIDC && query.Get("nonce") != pending.Nonce {
+			t.Errorf("%s carries nonce=%q, not the one this sign-in is tied to", adapter.Name(), query.Get("nonce"))
+		}
+		if query.Get("state") != pending.State || pending.State == "" {
+			t.Errorf("%s does not carry the state this sign-in will be matched on", adapter.Name())
 		}
 	}
 }

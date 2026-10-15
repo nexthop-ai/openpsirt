@@ -21,26 +21,15 @@ import (
 // nil`: the sign-in then completes with every team read so far.
 func TestATeamListingPastTheLastPageReadIsRefused(t *testing.T) {
 	var asked atomic.Int64
-	adapter := forge(t, "ours", func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/token"):
-			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
-		case r.URL.Path == "/user":
-			writeJSON(w, map[string]any{"login": "ana", "id": 42})
-		case r.URL.Path == "/user/emails":
-			writeJSON(w, []any{})
-		case r.URL.Path == "/user/teams":
-			asked.Add(1)
-			full := make([]any, 0, teamPageSize)
-			for i := range teamPageSize {
-				full = append(full, map[string]any{
-					"slug":         "team" + r.URL.Query().Get("page") + "-" + strconv.Itoa(i),
-					"organization": map[string]any{"login": "ours"}})
-			}
-			writeJSON(w, full)
-		default:
-			http.NotFound(w, r)
+	adapter := forgeAnswering(t, "ours", ana, []any{}, func(w http.ResponseWriter, r *http.Request) {
+		asked.Add(1)
+		full := make([]any, 0, teamPageSize)
+		for i := range teamPageSize {
+			full = append(full, map[string]any{
+				"slug":         "team" + r.URL.Query().Get("page") + "-" + strconv.Itoa(i),
+				"organization": map[string]any{"login": "ours"}})
 		}
+		writeJSON(w, full)
 	})
 	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
 		"https://here.example/back")
@@ -59,29 +48,18 @@ func TestATeamListingPastTheLastPageReadIsRefused(t *testing.T) {
 // A listing of exactly the bound in full pages is whole: the page after it is
 // empty, and every team on the pages read is kept.
 func TestATeamListingOfExactlyTheBoundIsWhole(t *testing.T) {
-	adapter := forge(t, "ours", func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/token"):
-			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
-		case r.URL.Path == "/user":
-			writeJSON(w, map[string]any{"login": "ana", "id": 42})
-		case r.URL.Path == "/user/emails":
-			writeJSON(w, []any{})
-		case r.URL.Path == "/user/teams":
-			page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-			full := make([]any, 0, teamPageSize)
-			for i := range teamPageSize {
-				if page > maxTeamPages {
-					break
-				}
-				full = append(full, map[string]any{
-					"slug":         "team" + strconv.Itoa(page) + "-" + strconv.Itoa(i),
-					"organization": map[string]any{"login": "ours"}})
+	adapter := forgeAnswering(t, "ours", ana, []any{}, func(w http.ResponseWriter, r *http.Request) {
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		full := make([]any, 0, teamPageSize)
+		for i := range teamPageSize {
+			if page > maxTeamPages {
+				break
 			}
-			writeJSON(w, full)
-		default:
-			http.NotFound(w, r)
+			full = append(full, map[string]any{
+				"slug":         "team" + strconv.Itoa(page) + "-" + strconv.Itoa(i),
+				"organization": map[string]any{"login": "ours"}})
 		}
+		writeJSON(w, full)
 	})
 	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"},
 		"https://here.example/back")
