@@ -6,7 +6,6 @@ package findingsapi
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -91,15 +90,9 @@ func registerPatchBranches(api huma.API, in core.Deps) {
 				Commits: one.Commits, Looked: one.Looked, Found: one.Found,
 				Reason: one.Reason,
 			}
-			if one.RetryAt != nil {
-				body.RetryAt = one.RetryAt.UTC().Format(time.RFC3339)
-			}
-			if one.FetchedAt != nil {
-				body.FetchedAt = one.FetchedAt.UTC().Format(time.RFC3339)
-			}
-			if one.ReachedAt != nil {
-				body.ReachedAt = one.ReachedAt.UTC().Format(time.RFC3339)
-			}
+			body.RetryAt = core.StampAt(one.RetryAt)
+			body.FetchedAt = core.StampAt(one.FetchedAt)
+			body.ReachedAt = core.StampAt(one.ReachedAt)
 			if one.HeldBytes != nil {
 				body.HeldBytes = *one.HeldBytes
 			}

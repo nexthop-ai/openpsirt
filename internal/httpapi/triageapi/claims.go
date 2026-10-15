@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -273,7 +272,7 @@ func registerReaffirmClaim(api huma.API, in core.Deps) {
 func claimBody(c triage.Claim, proposedBy, proposedByName string) ClaimBody {
 	body := ClaimBody{
 		ID: c.ID, Kind: core.ClaimKind(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
-		ProposedAt: c.ProposedAt.UTC().Format(time.RFC3339),
+		ProposedAt: core.Stamp(c.ProposedAt),
 		Elsewhere:  c.Elsewhere,
 	}
 	if c.DerivedFrom != nil {

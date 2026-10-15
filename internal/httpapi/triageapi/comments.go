@@ -6,7 +6,6 @@ package triageapi
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -54,11 +53,9 @@ func registerComments(api huma.API, in core.Deps) {
 				ID: comment.ID, Body: comment.Body,
 				WrittenBy:     who.Identity(comment.WrittenBy),
 				WrittenByName: who.Label(comment.WrittenBy),
-				WrittenAt:     comment.WrittenAt.UTC().Format(time.RFC3339),
+				WrittenAt:     core.Stamp(comment.WrittenAt),
 			}
-			if comment.EditedAt != nil {
-				body.EditedAt = comment.EditedAt.UTC().Format(time.RFC3339)
-			}
+			body.EditedAt = core.StampAt(comment.EditedAt)
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
@@ -119,7 +116,7 @@ func registerComments(api huma.API, in core.Deps) {
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, core.WasSaidBody{
 				Version: row.Ordinal, Body: row.Body,
-				ReplacedAt: row.ReplacedAt.UTC().Format(time.RFC3339),
+				ReplacedAt: core.Stamp(row.ReplacedAt),
 			})
 		}
 		return out, nil

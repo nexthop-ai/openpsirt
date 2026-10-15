@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -400,7 +399,7 @@ func rulingBodies(ctx context.Context, in core.Deps, subject access.Subject,
 			Disposition: core.DispositionRulable(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: core.RulingState(row.State()),
 			ProposedBy: who.Identity(row.ProposedBy), ProposedByName: who.Label(row.ProposedBy),
-			ProposedAt: row.ProposedAt.UTC().Format(time.RFC3339),
+			ProposedAt: core.Stamp(row.ProposedAt),
 			Yours:      row.ProposedBy == subject.ID,
 		}
 		if body.Reports == nil {
@@ -412,15 +411,11 @@ func rulingBodies(ctx context.Context, in core.Deps, subject access.Subject,
 		if row.ApprovedBy != nil {
 			body.ApprovedBy, body.ApprovedByName = who.Identity(*row.ApprovedBy), who.Label(*row.ApprovedBy)
 		}
-		if row.ApprovedAt != nil {
-			body.ApprovedAt = row.ApprovedAt.UTC().Format(time.RFC3339)
-		}
+		body.ApprovedAt = core.StampAt(row.ApprovedAt)
 		if row.WithdrawnBy != nil {
 			body.WithdrawnBy, body.WithdrawnByName = who.Identity(*row.WithdrawnBy), who.Label(*row.WithdrawnBy)
 		}
-		if row.WithdrawnAt != nil {
-			body.WithdrawnAt = row.WithdrawnAt.UTC().Format(time.RFC3339)
-		}
+		body.WithdrawnAt = core.StampAt(row.WithdrawnAt)
 		out = append(out, body)
 	}
 	return out, nil

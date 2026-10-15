@@ -315,14 +315,12 @@ func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) 
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			FoundHere:  row.FoundHere,
 			RecordedBy: who.Identity(row.RecordedBy), RecordedByName: who.Label(row.RecordedBy),
-			RecordedAt: row.RecordedAt.UTC().Format(time.RFC3339),
+			RecordedAt: core.Stamp(row.RecordedAt),
 		}
 		if row.ReceivedOn != nil {
 			body.Received = row.ReceivedOn.UTC().Format(time.DateOnly)
 		}
-		if row.AcknowledgedAt != nil {
-			body.Acknowledged = row.AcknowledgedAt.UTC().Format(time.RFC3339)
-		}
+		body.Acknowledged = core.StampAt(row.AcknowledgedAt)
 		if row.AcknowledgedBy != nil {
 			body.AcknowledgedBy = who.Identity(*row.AcknowledgedBy)
 			body.AcknowledgedByName = who.Label(*row.AcknowledgedBy)
@@ -343,9 +341,7 @@ func reportBodies(ctx context.Context, in core.Deps, rows []finding.FlawReport) 
 				body.DuplicateOf = identifiers[*ruling.DuplicateOf]
 			}
 		}
-		if row.EvaluatedAt != nil {
-			body.Evaluated = row.EvaluatedAt.UTC().Format(time.RFC3339)
-		}
+		body.Evaluated = core.StampAt(row.EvaluatedAt)
 		if row.EvaluatedBy != nil {
 			body.EvaluatedBy = who.Identity(*row.EvaluatedBy)
 			body.EvaluatedByName = who.Label(*row.EvaluatedBy)

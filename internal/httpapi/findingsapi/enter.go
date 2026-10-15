@@ -644,7 +644,7 @@ func registerMovements(api huma.API, in core.Deps) {
 				Was: dayOf(row.Was), Until: dayOf(row.Until),
 				By:      who.Identity(row.AskedBy),
 				ByName:  who.Label(row.AskedBy),
-				AskedAt: row.AskedAt.UTC().Format(time.RFC3339),
+				AskedAt: core.Stamp(row.AskedAt),
 				Reason:  row.Reason,
 				// Said rather than left to be worked out: the person who asked
 				// may not be the one who agrees, and a row somebody cannot act

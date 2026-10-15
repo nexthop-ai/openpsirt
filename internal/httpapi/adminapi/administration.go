@@ -61,7 +61,7 @@ func personBody(person *access.Account, doors []access.Identity, estate []access
 	body := PersonBody{
 		Identity: person.Identity, DisplayName: person.DisplayName,
 		Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
-		Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
+		Audits: person.Audits, DeactivatedAt: core.StampAt(person.DeactivatedAt),
 		Email: person.Email, EmailSource: core.EmailSource(person.EmailSource),
 	}
 	for _, door := range doors {

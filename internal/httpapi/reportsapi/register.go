@@ -100,7 +100,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 	}
 	measured := &core.MeasuredBody{
 		Scan: scan.ID, ScanHash: scan.ContentHash,
-		BuiltAt: scan.BuiltAt.UTC().Format(time.RFC3339),
+		BuiltAt: core.Stamp(scan.BuiltAt),
 	}
 	last, err := finding.NewStore(in.DB.DB).LatestRun(ctx, subject, targetID)
 	if err != nil && !errors.Is(err, access.ErrDenied) {
@@ -112,9 +112,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 			last.ScannerVersion, last.DatabaseVersion
 		measured.RecordsVersion = last.RecordsVersion
 		measured.RanHere = last.RanHere
-		if last.FinishedAt != nil {
-			measured.RanAt = last.FinishedAt.UTC().Format(time.RFC3339)
-		}
+		measured.RanAt = core.StampAt(last.FinishedAt)
 	}
 	// The documents that arrived rather than the ones still held, so a build
 	// whose contents were let go still names the inventory it was read from.

@@ -3215,7 +3215,7 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: The latest moment one of them stopped
+          description: The latest moment one of them stopped. Absent where none of them says when
           type: string
         builds:
           description: Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant
@@ -3240,7 +3240,6 @@ components:
           type: string
       required:
         - state
-        - at
         - rows
         - places
         - builds

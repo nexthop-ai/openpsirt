@@ -7971,8 +7971,8 @@ export interface components {
             on: string;
         };
         EndedReachBody: {
-            /** @description The latest moment one of them stopped */
-            at: string;
+            /** @description The latest moment one of them stopped. Absent where none of them says when */
+            at?: string;
             /** @description Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant */
             builds: string[] | null;
             /**

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -112,7 +111,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			Body   AdvisoryBody
 		}{Status: http.StatusCreated, Body: AdvisoryBody{
 			Advisory: made.Identifier, Title: made.Title,
-			MintedAt: made.MintedAt.UTC().Format(time.RFC3339),
+			MintedAt: core.Stamp(made.MintedAt),
 			Covers:   []CoveredBody{},
 		}}, nil
 	})
@@ -154,7 +153,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 				Advisory: one.Identifier, Title: one.Title,
 				Issues: one.Issues, Products: one.Products, Issuances: one.Issuances,
 				Status: core.AdvisoryStatus(one.Status()), Agreed: one.Agreed,
-				MintedAt: one.MintedAt.UTC().Format(time.RFC3339),
+				MintedAt: core.Stamp(one.MintedAt),
 			})
 		}
 		out.Body.Total = total
@@ -198,7 +197,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		body.AgreedBy = make([]AgreerBody, 0, len(where.Agreed))
 		for i, one := range where.Agreed {
 			body.AgreedBy = append(body.AgreedBy, AgreerBody{
-				Person: where.AgreedBy[i], AgreedAt: one.ApprovedAt.UTC().Format(time.RFC3339),
+				Person: where.AgreedBy[i], AgreedAt: core.Stamp(one.ApprovedAt),
 			})
 		}
 		return &struct{ Body AdvisoryBody }{Body: body}, nil
@@ -278,7 +277,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		}{Status: http.StatusCreated, Body: CoveredBody{
 			Product: added.Product, ProductName: added.ProductName,
 			Vulnerability: added.Issue, Summary: added.Summary,
-			AddedAt: added.AddedAt.UTC().Format(time.RFC3339),
+			AddedAt: core.Stamp(added.AddedAt),
 		}}, nil
 	})
 
@@ -377,7 +376,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		for _, one := range gone {
 			out.Body.Items = append(out.Body.Items, IssuanceBody{
 				Version: one.Ordinal, Digest: one.Digest, Summary: one.Summary,
-				IssuedAt: one.IssuedAt.UTC().Format(time.RFC3339),
+				IssuedAt: core.Stamp(one.IssuedAt),
 			})
 		}
 		return out, nil
@@ -445,7 +444,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			Status int
 			Body   AgreementBody
 		}{Status: http.StatusCreated, Body: AgreementBody{
-			Edition: given.Edition, AgreedAt: given.AgreedAt.UTC().Format(time.RFC3339),
+			Edition: given.Edition, AgreedAt: core.Stamp(given.AgreedAt),
 		}}, nil
 	})
 
@@ -515,7 +514,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			Body   IssuanceBody
 		}{Status: http.StatusCreated, Body: IssuanceBody{
 			Version: recorded.Ordinal, Digest: recorded.Digest,
-			Summary: recorded.Summary, IssuedAt: recorded.IssuedAt.UTC().Format(time.RFC3339),
+			Summary: recorded.Summary, IssuedAt: core.Stamp(recorded.IssuedAt),
 		}}, nil
 	})
 }
@@ -524,14 +523,14 @@ func registerAdvisory(api huma.API, in core.Deps) {
 func bodyFor(row *advisory.Advisory, held []advisory.Covered) AdvisoryBody {
 	body := AdvisoryBody{
 		Advisory: row.Identifier, Title: row.Title,
-		MintedAt: row.MintedAt.UTC().Format(time.RFC3339),
+		MintedAt: core.Stamp(row.MintedAt),
 		Covers:   make([]CoveredBody, 0, len(held)),
 	}
 	for _, one := range held {
 		body.Covers = append(body.Covers, CoveredBody{
 			Product: one.Product, ProductName: one.ProductName,
 			Vulnerability: one.Issue, Summary: one.Summary,
-			AddedAt: one.AddedAt.UTC().Format(time.RFC3339),
+			AddedAt: core.Stamp(one.AddedAt),
 		})
 	}
 	return body

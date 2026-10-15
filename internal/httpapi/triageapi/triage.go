@@ -415,9 +415,7 @@ func registerTriage(api huma.API, in core.Deps) {
 				Places:    row.Places,
 				Finding:   named[i].Finding,
 			}
-			if row.When != nil {
-				entry.When = row.When.UTC().Format(time.RFC3339)
-			}
+			entry.When = core.StampAt(row.When)
 			if row.By != 0 {
 				entry.By, entry.ByName = who.Identity(row.By), who.Label(row.By)
 			}

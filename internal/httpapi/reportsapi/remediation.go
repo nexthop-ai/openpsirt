@@ -237,9 +237,7 @@ func repeatBodies(rows []triage.Repeated) []RepeatBody {
 			TotalDays: int(math.Round(row.TotalDays)),
 			Standing:  row.Standing,
 		}
-		if !row.LastUntil.IsZero() {
-			item.LastUntil = row.LastUntil.UTC().Format(time.RFC3339)
-		}
+		item.LastUntil = core.Stamp(row.LastUntil)
 		out = append(out, item)
 	}
 	return out

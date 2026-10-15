@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -258,7 +257,7 @@ func collaboratorBodies(ctx context.Context, in core.Deps, productID, issueID in
 		body := CollaboratorBody{
 			Identity: handles[id], AddedBy: by.Identity(row.AddedBy),
 			AddedByName: by.Label(row.AddedBy),
-			AddedAt:     row.AddedAt.UTC().Format(time.RFC3339),
+			AddedAt:     core.Stamp(row.AddedAt),
 		}
 		body.Name = core.LabelBeside(names[id], handles[id])
 		out = append(out, body)

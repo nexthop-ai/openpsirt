@@ -141,8 +141,8 @@ func registerObligations(api huma.API, in core.Deps) {
 					Passed: due.Passed, Near: due.Near, Answered: due.Answered,
 				}
 				if !due.StartsAt.IsZero() {
-					one.StartsAt = due.StartsAt.UTC().Format(time.RFC3339)
-					one.EndsAt = due.EndsAt.UTC().Format(time.RFC3339)
+					one.StartsAt = core.Stamp(due.StartsAt)
+					one.EndsAt = core.Stamp(due.EndsAt)
 				}
 				body.Windows = append(body.Windows, one)
 			}
@@ -356,7 +356,7 @@ func windowFor(window obligation.Window) WindowBody {
 	body := WindowBody{
 		ID: window.ID, Name: window.Name, Hours: window.Hours,
 		Products:   []string{},
-		DeclaredAt: window.DeclaredAt.UTC().Format(time.RFC3339),
+		DeclaredAt: core.Stamp(window.DeclaredAt),
 	}
 	if window.LeadHours != nil {
 		body.LeadHours = *window.LeadHours

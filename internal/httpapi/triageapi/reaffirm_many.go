@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -100,9 +99,7 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 				Was:        finding.SeverityWord(row.Was),
 				Now:        finding.SeverityWord(row.Now),
 			}
-			if row.LapsedAt != nil {
-				entry.LapsedAt = row.LapsedAt.UTC().Format(time.RFC3339)
-			}
+			entry.LapsedAt = core.StampAt(row.LapsedAt)
 			out.Body.Items = append(out.Body.Items, entry)
 		}
 		out.Body.Total = total

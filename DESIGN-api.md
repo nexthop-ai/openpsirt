@@ -434,6 +434,11 @@ before it is written rather than formatted behind a literal `Z`. A day is the
 UTC day of its moment, in a response, a report and an export alike, and a field
 answered as a time is converted to UTC before it is answered.
 
+A moment that is not known is left out of a response. A field that can be
+without one is optional, and a missing time is never written as the year 1 or
+as an empty string. Every moment a response states goes through one renderer,
+which holds both rules.
+
 ## Addresses and labels
 
 A product, a person and a team each answer to two strings: the one that

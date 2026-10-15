@@ -131,7 +131,7 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 			Identity: person.Identity, DisplayName: person.DisplayName,
 			Admin: person.IsAdmin, AdminByConfiguration: person.IsBootstrap,
 			Audits:        person.Audits,
-			DeactivatedAt: orAbsent(person.DeactivatedAt),
+			DeactivatedAt: core.StampAt(person.DeactivatedAt),
 		}
 
 		named, err := productNames(ctx, a)
@@ -182,8 +182,8 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 			}
 			body.Record = &PersonRecordBody{
 				Proposed: record.Proposed, Approved: record.Approved, Withdrawn: record.Withdrawn,
-				LastProposedAt: orAbsent(record.LastProposedAt),
-				LastApprovedAt: orAbsent(record.LastApprovedAt),
+				LastProposedAt: core.StampAt(record.LastProposedAt),
+				LastApprovedAt: core.StampAt(record.LastApprovedAt),
 			}
 		}
 
@@ -194,7 +194,7 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		body.ToldTotal = toldTotal
 		for _, row := range told {
 			body.Told = append(body.Told, ToldBody{
-				At: row.CreatedAt.UTC().Format(time.RFC3339), Kind: string(row.Kind),
+				At: core.Stamp(row.CreatedAt), Kind: string(row.Kind),
 				Body: row.Body, Link: row.Link, Private: row.Private,
 				Read: row.ReadAt != nil, Cleared: row.ClearedAt != nil,
 			})
@@ -228,13 +228,6 @@ func whoChanged(ctx context.Context, in core.Deps, a core.Administering, changes
 		}
 	}
 	return who, nil
-}
-
-func orAbsent(at *time.Time) string {
-	if at == nil {
-		return ""
-	}
-	return at.UTC().Format(time.RFC3339)
 }
 
 // registerDeactivation is somebody leaving, and somebody coming back.
@@ -310,12 +303,10 @@ func registerDeactivation(api huma.API, a core.Administering) {
 				if err != nil {
 					return core.WentWrong(a.Logger, "when they left could not be read", err)
 				}
-				if again.DeactivatedAt != nil {
-					out.Body.Since = again.DeactivatedAt.UTC().Format(time.RFC3339)
-				}
+				out.Body.Since = core.StampAt(again.DeactivatedAt)
 				return nil
 			}
-			out.Body.Since = time.Now().UTC().Format(time.RFC3339)
+			out.Body.Since = core.Stamp(time.Now())
 
 			if err := core.Noted(ctx, tx, trail.Account, person.Identity,
 				trail.Said("active", true), trail.Said("deactivated", true)); err != nil {

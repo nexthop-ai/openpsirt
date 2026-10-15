@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -113,7 +112,7 @@ func registerVEX(api huma.API, in core.Deps) {
 			for _, one := range gone {
 				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
 					Version: one.Ordinal, Digest: one.Digest, IssuedBy: one.IssuedBy,
-					IssuedAt: one.IssuedAt.UTC().Format(time.RFC3339),
+					IssuedAt: core.Stamp(one.IssuedAt),
 				})
 			}
 			return out, nil
@@ -166,7 +165,7 @@ func registerVEX(api huma.API, in core.Deps) {
 				VEXIssuanceBody: VEXIssuanceBody{
 					Version: recorded.Ordinal, Digest: recorded.Digest,
 					IssuedBy: subject.Identity,
-					IssuedAt: recorded.IssuedAt.UTC().Format(time.RFC3339),
+					IssuedAt: core.Stamp(recorded.IssuedAt),
 				},
 				Document: json.RawMessage(recorded.Document),
 			}}, nil

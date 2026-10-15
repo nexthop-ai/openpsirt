@@ -240,9 +240,7 @@ func DecisionBodyOf(d triage.Decision) DecisionBody {
 	// carries it. A reader told nothing takes a claim nobody agreed to as in
 	// force.
 	body.NeedsApproval = d.NeedsApproval
-	if d.SentBackAt != nil {
-		body.SentBackAt = d.SentBackAt.UTC().Format(time.RFC3339)
-	}
+	body.SentBackAt = StampAt(d.SentBackAt)
 	if d.SelectedBy != nil {
 		body.SelectedBy = *d.SelectedBy
 	}
@@ -363,7 +361,7 @@ func DescribeDecisions(ctx context.Context, in Deps, store *triage.Store,
 			Reasoning:      reasoning[decision.ID],
 			ProposedBy:     who.Identity(decision.ProposedBy),
 			ProposedByName: who.Label(decision.ProposedBy),
-			ProposedAt:     decision.ProposedAt.UTC().Format(time.RFC3339),
+			ProposedAt:     Stamp(decision.ProposedAt),
 			AgeDays:        int(store.Age(&decision).Hours() / 24),
 		})
 	}

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -71,7 +70,7 @@ type ClaimDetail struct {
 // what they reached at that moment.
 type EndedReachBody struct {
 	State  core.ClaimStateEnded `json:"state" doc:"How these rows stopped applying"`
-	At     string               `json:"at" doc:"The latest moment one of them stopped"`
+	At     string               `json:"at,omitempty" doc:"The latest moment one of them stopped. Absent where none of them says when"`
 	Rows   int                  `json:"rows" doc:"The number of decisions that stopped this way"`
 	Places int                  `json:"places" doc:"The number of distinct places they sat at. The findings list takes claim and claim_state to list what sits there now"`
 	Builds []string             `json:"builds" doc:"Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant"`
@@ -85,9 +84,7 @@ func endedReach(parts []triage.EndedPart) []EndedReachBody {
 			State: core.ClaimStateEnded(part.State), Rows: part.Rows, Places: part.Places,
 			Builds: part.Builds,
 		}
-		if !part.At.IsZero() {
-			body.At = part.At.UTC().Format(time.RFC3339)
-		}
+		body.At = core.Stamp(part.At)
 		out = append(out, body)
 	}
 	return out
@@ -285,9 +282,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 			Ended:              endedReach(whole.Ended),
 			Undisclosed:        whole.Undisclosed,
 		}
-		if whole.When != nil {
-			body.When = whole.When.UTC().Format(time.RFC3339)
-		}
+		body.When = core.StampAt(whole.When)
 		if whole.By != 0 {
 			who, err := core.WhoSigned(ctx, in.DB.DB, []int64{whole.By})
 			if err != nil {
@@ -343,7 +338,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 				ID: revision.ID, Ordinal: revision.Ordinal, Body: revision.Body,
 				WrittenBy:     who.Identity(revision.WrittenBy),
 				WrittenByName: who.Label(revision.WrittenBy),
-				WrittenAt:     revision.WrittenAt.UTC().Format(time.RFC3339),
+				WrittenAt:     core.Stamp(revision.WrittenAt),
 			})
 		}
 		return out, nil
@@ -394,11 +389,9 @@ func registerTriageReading(api huma.API, in core.Deps) {
 				ID: approval.ID, RevisionID: approval.RevisionID,
 				ApprovedBy:     who.Identity(approval.ApprovedBy),
 				ApprovedByName: who.Label(approval.ApprovedBy),
-				ApprovedAt:     approval.ApprovedAt.UTC().Format(time.RFC3339),
+				ApprovedAt:     core.Stamp(approval.ApprovedAt),
 			}
-			if approval.WithdrawnAt != nil {
-				body.WithdrawnAt = approval.WithdrawnAt.UTC().Format(time.RFC3339)
-			}
+			body.WithdrawnAt = core.StampAt(approval.WithdrawnAt)
 			if approval.Batch != nil {
 				body.Batch = *approval.Batch
 			}

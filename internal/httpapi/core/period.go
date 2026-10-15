@@ -114,10 +114,19 @@ func InUTC(at *time.Time) *time.Time {
 	return &moment
 }
 
-// Stamp renders a time the one way the API states times.
+// Stamp renders a time the one way the API states times. An unknown time is
+// the empty string, which an optional field then leaves out.
 func Stamp(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
 	return t.UTC().Format(time.RFC3339)
+}
+
+// StampAt is Stamp for a time that may be absent.
+func StampAt(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return Stamp(*t)
 }

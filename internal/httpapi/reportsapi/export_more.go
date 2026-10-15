@@ -585,7 +585,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 				rows := make([][]string, 0, len(changes))
 				for _, change := range changes {
 					rows = append(rows, []string{
-						change.At.UTC().Format(time.RFC3339), string(change.Actor),
+						core.Stamp(change.At), string(change.Actor),
 						people.Identity(change.Person()), people.Label(change.Person()),
 						string(change.Kind), change.Name,
 						core.OrBlank(change.Was), core.OrBlank(change.Became),

@@ -51,7 +51,7 @@ func attachmentBody(a *attach.Attachment) AttachmentBody {
 	out := AttachmentBody{
 		Token: a.Token, Reference: markdown.Attachment + ":" + a.Token,
 		Filename: a.Filename, ContentType: a.ContentType, Size: a.SizeBytes,
-		Inline: a.Inline(), UploadedAt: a.UploadedAt.UTC().Format(time.RFC3339),
+		Inline: a.Inline(), UploadedAt: core.Stamp(a.UploadedAt),
 	}
 	if a.Redacted() {
 		out.Redacted = true

@@ -95,7 +95,7 @@ func preamble(out Exporting, now time.Time, asked string) []Stated {
 	if out.What != "" {
 		said = append(said, Stated{"export", out.What})
 	}
-	said = append(said, Stated{"taken on", now.UTC().Format(time.RFC3339)})
+	said = append(said, Stated{"taken on", Stamp(now)})
 	for _, one := range out.About {
 		if one.Value == "" {
 			continue

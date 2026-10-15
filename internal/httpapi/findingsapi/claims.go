@@ -83,7 +83,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 			NeedsApproval:   one.Decision.NeedsApproval,
 			ProposedBy:      who.Identity(one.Claim.ProposedBy),
 			ProposedByName:  who.Label(one.Claim.ProposedBy),
-			ProposedAt:      one.Claim.ProposedAt.UTC().Format(time.RFC3339),
+			ProposedAt:      core.Stamp(one.Claim.ProposedAt),
 			Places:          one.Places, Builds: one.Builds,
 			Elsewhere: one.Claim.Elsewhere,
 		}
@@ -92,11 +92,9 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.Identity(one.ApprovedBy), who.Label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
+			body.ApprovedAt = core.StampAt(one.ApprovedAt)
 		}
-		if one.SentBackAt != nil {
-			body.SentBackAt = one.SentBackAt.UTC().Format(time.RFC3339)
-		}
+		body.SentBackAt = core.StampAt(one.SentBackAt)
 		standingOut = append(standingOut, body)
 	}
 
@@ -109,7 +107,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: core.Outcome(said.Outcome),
 			Justification: core.Justification(core.OrBlank(said.Justification)),
 			ProposedBy:    who.Identity(d.ProposedBy), ProposedByName: who.Label(d.ProposedBy),
-			ProposedAt: d.ProposedAt.UTC().Format(time.RFC3339),
+			ProposedAt: core.Stamp(d.ProposedAt),
 			Ended:      core.ClaimStateEnded(d.State),
 			About:      core.OrBlank(d.ComponentUpstreamVersion),
 			Reasoning:  one.Reasoning,
@@ -120,9 +118,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 		if said.DeferredUntil != nil {
 			body.DeferredUntil = said.DeferredUntil.UTC().Format(time.DateOnly)
 		}
-		if d.EndedAt != nil {
-			body.EndedAt = d.EndedAt.UTC().Format(time.RFC3339)
-		}
+		body.EndedAt = core.StampAt(d.EndedAt)
 		if one.ApprovedBy != 0 {
 			body.ApprovedBy, body.ApprovedByName = who.Identity(one.ApprovedBy), who.Label(one.ApprovedBy)
 		}
@@ -138,7 +134,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.Identity(one.ApprovedBy), who.Label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
+			body.ApprovedAt = core.StampAt(one.ApprovedAt)
 		}
 		similarOut = append(similarOut, body)
 	}
@@ -158,7 +154,7 @@ func decidedAbout(ctx context.Context, in core.Deps, subject access.Subject, pro
 		}
 		if one.ApprovedAt != nil {
 			body.ApprovedBy, body.ApprovedByName = who.Identity(one.ApprovedBy), who.Label(one.ApprovedBy)
-			body.ApprovedAt = one.ApprovedAt.UTC().Format(time.RFC3339)
+			body.ApprovedAt = core.StampAt(one.ApprovedAt)
 		}
 		elsewhereOut = append(elsewhereOut, body)
 	}
