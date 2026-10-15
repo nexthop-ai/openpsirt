@@ -120,8 +120,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 	if f.Component != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
-			` WHERE `+finding.SameIssue("cf.vulnerability_id", "de.vulnerability_id")+
-			` AND cf.place_identity = de.place_identity AND cc.name_folded = ?)`,
+			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND cc.name_folded = ?)`,
 			graph.Folded(f.Component))
 	}
 	// One build, with the build's own product required to be the one that
@@ -136,8 +135,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
 			JOIN "target" AS "bt" ON bt.id = bf.target_id
 			JOIN "stream" AS "bs" ON bs.id = bt.stream_id
-			WHERE ` + finding.SameIssue("bf.vulnerability_id", "de.vulnerability_id") + `
-			  AND bf.place_identity = de.place_identity
+			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
 			  AND bf.target_id = ? AND bs.product_id = de.product_id`
 		args := []any{f.TargetID}
 		if mayRead != "" {
@@ -425,8 +423,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 			SELECT MIN(f2.id) FROM "finding" AS "f2"
 			JOIN "target" AS "tg2" ON tg2.id = f2.target_id
 			JOIN "stream" AS "st2" ON st2.id = tg2.stream_id
-			WHERE f2.vulnerability_id = dv.issue_id
-				AND f2.place_identity = de.place_identity
+			WHERE `+finding.DecisionAtPlace("f2")+`
 				AND st2.product_id = de.product_id)`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).

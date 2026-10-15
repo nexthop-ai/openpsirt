@@ -99,9 +99,7 @@ func standsAs(product string, state decisionState) string {
 	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
 			JOIN "component" AS "c" ON c.id = f2.component_id
 			LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id
-			JOIN "vulnerability" AS "dv" ON dv.issue_id = f2.vulnerability_id
-			JOIN "decision" AS "de" ON de.vulnerability_id = dv.id
-			  AND de.place_identity = f2.place_identity
+			JOIN (` + Decisions + `) ON ` + DecisionAtPlace("f2") + `
 			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE f2.id = f.id
 			  AND de.product_id = ` + product + `
@@ -174,7 +172,7 @@ func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQu
 		TableExpr(`"decision" AS "de"`).
 		Join(DecisionIssue).
 		Join(`CROSS JOIN `+source, args...).
-		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
+		Where(DecisionAtPlace("f2")).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Where(coversAsked)
 }

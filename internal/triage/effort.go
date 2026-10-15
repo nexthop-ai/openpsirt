@@ -106,8 +106,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// rows. Every figure below counts distinct identifiers for that
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision table however many builds share the place it names.
-			Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = dv.issue_id
-			AND pf.place_identity = de.place_identity
+			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionAtPlace("pf")+`
 			AND pf.target_id IN (SELECT "et"."id" FROM "target" AS "et"
 				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
 				WHERE "es"."product_id" = de.product_id)

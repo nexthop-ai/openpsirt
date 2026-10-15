@@ -298,8 +298,7 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where(finding.SameIssue("f.vulnerability_id", "de.vulnerability_id")).
-		Where("f.place_identity = de.place_identity").
+		Where(finding.DecisionFiledAt("de", "f")).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
 		Where(finding.KeyMatches)
@@ -442,7 +441,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		// gives: SQLite otherwise starts from every open finding.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
@@ -597,7 +596,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		// The decision on the outside, as buildsCovered has it.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

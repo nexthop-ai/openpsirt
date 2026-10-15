@@ -69,8 +69,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 			Where("f.target_id = ?", targetID).
 			Where("f.closed_at IS NULL").
-			Where("f.vulnerability_id = dv.issue_id").
-			Where("f.place_identity = de.place_identity")
+			Where(finding.DecisionAtPlace("f"))
 	}
 	matching := "COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr +
 		" AND COALESCE(de.consumer_upstream_version, '') = " + finding.ConsumerUpstreamExpr
@@ -87,8 +86,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 			Where("st.product_id = de.product_id").
 			Where("f.closed_at IS NULL").
-			Where("f.vulnerability_id = dv.issue_id").
-			Where("f.place_identity = de.place_identity").
+			Where(finding.DecisionAtPlace("f")).
 			Where(matching)
 	}
 

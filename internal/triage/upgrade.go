@@ -420,7 +420,7 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		TableExpr(`"decision" AS "de"`).
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

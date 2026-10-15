@@ -615,7 +615,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd".promise) AS "promise"`).
-		Join(`LEFT JOIN (?) AS "pd" ON "pd".issue_id = f.vulnerability_id AND "pd".place_identity = f.place_identity`, promises).
+		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd".issue_id`, `"pd".place_identity`, "f"), promises).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).

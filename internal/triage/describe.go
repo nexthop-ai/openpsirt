@@ -105,7 +105,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// describe a page of thirty-two, against 0.1 ms the other way round.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
@@ -245,7 +245,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		// The decision on the outside, as above.
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
-		Where("f.vulnerability_id = dv.issue_id AND f.place_identity = de.place_identity").
+		Where(finding.DecisionAtPlace("f")).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).

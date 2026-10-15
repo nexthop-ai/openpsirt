@@ -743,8 +743,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
 			WHERE dc.claim_id = ?
 			  AND dc.product_id = ` + where + `
-			  AND ` + SameIssue("f.vulnerability_id", "dc.vulnerability_id") + `
-			  AND dc.place_identity = f.place_identity`
+			  AND ` + DecisionFiledAt("dc", "f")
 		asked := append([]any{f.Claim}, args...)
 		if states := trimmed(f.ClaimStates); len(states) > 0 {
 			held += " AND dc.state IN (?)"

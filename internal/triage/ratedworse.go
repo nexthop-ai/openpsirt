@@ -165,8 +165,7 @@ var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
 	` JOIN "target" AS "tgc" ON tgc.id = fc.target_id` +
 	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
 	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
-	` AND fc.vulnerability_id = dv.issue_id` +
-	` AND fc.place_identity = de.place_identity` +
+	` AND ` + finding.DecisionAtPlace("fc") +
 	` AND COALESCE(de.component_upstream_version, '') = ` + finding.ComponentUpstreamExpr +
 	` AND COALESCE(de.consumer_upstream_version, '') = ` + finding.ConsumerUpstreamExpr + `)`
 

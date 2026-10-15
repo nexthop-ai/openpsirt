@@ -249,7 +249,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		TableExpr(`"decision" AS "de"`).
 		Join(DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f2"`).
-		Where("f2.vulnerability_id = dv.issue_id AND f2.place_identity = de.place_identity").
+		Where(DecisionAtPlace("f2")).
 		Join(`JOIN "target" AS "tg2" ON tg2.id = f2.target_id`).
 		Join(`JOIN "stream" AS "st2" ON st2.id = tg2.stream_id`).
 		ColumnExpr(`f2.id AS "finding_id"`).

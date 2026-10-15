@@ -86,9 +86,50 @@ func DecisionAt(product string) string {
 	default:
 		panic("finding.DecisionAt: " + product + " is not a product the statement names")
 	}
-	return "de.product_id = " + product +
-		" AND dv.issue_id = f.vulnerability_id" +
-		" AND de.place_identity = f.place_identity"
+	return "de.product_id = " + product + " AND " + DecisionAtPlace("f")
+}
+
+// DecisionAtPlace is the issue and the place of DecisionAt without the
+// product, for a statement that holds the product another way: the finding's
+// build joined to the decision's product, a build of it bound, or the
+// decision's product compared beside it. A statement holding the product in no
+// way matches decisions of every product that ships the place.
+//
+// finding is the alias the statement gives the finding, from the ones code
+// names. Anything else is a programming error, because it is placed in the
+// statement as written.
+func DecisionAtPlace(finding string) string {
+	return decidedPlaceIn("dv.issue_id", "de.place_identity", finding)
+}
+
+// DecisionFiledAt is DecisionAtPlace for a statement that reads a decision
+// without the issue it is filed under, so the issue is asked through
+// SameIssue. decision is `de` or `dc`, the aliases code gives a decision row.
+func DecisionFiledAt(decision, finding string) string {
+	switch decision {
+	case "de", "dc":
+	default:
+		panic("finding.DecisionFiledAt: " + decision + " is not a decision the statement names")
+	}
+	findingAlias(finding)
+	return SameIssue(finding+".vulnerability_id", decision+".vulnerability_id") +
+		" AND " + decision + ".place_identity = " + finding + ".place_identity"
+}
+
+// decidedPlaceIn is the issue and the place of a decision, under the columns
+// given, being the finding's.
+func decidedPlaceIn(issue, place, finding string) string {
+	findingAlias(finding)
+	return issue + " = " + finding + ".vulnerability_id AND " + place + " = " + finding + ".place_identity"
+}
+
+// findingAlias refuses a finding alias that no statement here gives one.
+func findingAlias(finding string) {
+	switch finding {
+	case "f", "f2", "g", "fc", "cf", "bf", "pf":
+	default:
+		panic("finding: " + finding + " is not a finding the statement names")
+	}
 }
 
 // coversHere says a decision row `de` is about the finding it was correlated

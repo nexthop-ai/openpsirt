@@ -590,8 +590,7 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	// undisclosed findings sit behind a claim to somebody who may not read one.
 	covered, err := s.db.NewSelect().
 		TableExpr(finding.Decisions).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = dv.issue_id`+
-			" AND f.place_identity = de.place_identity").
+		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
