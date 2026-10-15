@@ -3611,7 +3611,8 @@ scan file. So it is bounded the way a scan file is, from the same budget, and
 each bound left unset keeps the built-in value.</p>
 <p>A report past its ceiling fails the run rather than being read in part: half a
 report reads as a product that stopped having problems. Complaints past theirs
-are dropped instead, because a scanner with a lot to say still scanned.</p>
+lose their beginning instead, because a scanner with a lot to say still scanned,
+and one that failed says why at the end.</p>
 <table>
 <thead>
 <tr>
@@ -3631,7 +3632,7 @@ are dropped instead, because a scanner with a lot to say still scanned.</p>
 <tr>
 <td><code>OPENPSIRT_SCANNER_MAX_COMPLAINT</code></td>
 <td><code>scanner.max_complaint</code></td>
-<td>How much of what a scanner said while running is kept</td>
+<td>How much of what a scanner said while running is kept, from the end</td>
 <td>1 MB</td>
 </tr>
 <tr>
