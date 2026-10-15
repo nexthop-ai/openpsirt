@@ -149,9 +149,9 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var row *FlawReport
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Read inside, because a retry runs against a database where a
 		// product may have been renamed, and a reference minted from a name
 		// that is gone reads as another product's.
@@ -296,8 +296,9 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 		return nil, ErrNoSuchIssueHere
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
+	var now time.Time
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now = s.now().UTC().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
 			Set("vulnerability_id = ?", vulnerabilityID).
 			Set("evaluated_at = ?", now).

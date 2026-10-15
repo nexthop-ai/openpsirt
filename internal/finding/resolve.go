@@ -74,10 +74,10 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		return nil, access.Denied(fmt.Sprintf("close a finding in product %d", productID))
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
-	out := &Resolved{At: now}
+	out := &Resolved{}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		out.Closed = 0
+		now := s.now().UTC().Truncate(time.Microsecond)
+		out.At, out.Closed = now, 0
 
 		// Read inside the transaction, because a retry re-runs this against a
 		// database that has moved: what is open there, and what visibility it

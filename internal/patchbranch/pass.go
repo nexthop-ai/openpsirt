@@ -608,12 +608,12 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 	for _, name := range branches {
 		kept = append(kept, branchRow{CommitID: id, Branch: name})
 	}
-	now := p.Now().UTC()
 	handle, ok := database.Handle(p.db)
 	if !ok {
 		return errors.New("recording a lookup needs a database handle")
 	}
 	return database.InTransaction(ctx, handle, func(ctx context.Context, tx bun.Tx) error {
+		now := p.Now().UTC()
 		if _, err := tx.NewDelete().Model((*branchRow)(nil)).
 			Where("commit_id = ?", id).Exec(ctx); err != nil {
 			return fmt.Errorf("clear the branches a commit was on: %w", err)

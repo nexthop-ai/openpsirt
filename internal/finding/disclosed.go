@@ -59,10 +59,10 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 	if err := markdown.Check(reason); err != nil {
 		return nil, err
 	}
-	now := s.now().UTC().Truncate(time.Microsecond)
 
 	var out *Movement
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		ends, err := undisclosedHere(ctx, tx, productID, vulnerabilityID)
 		if err != nil {
 			return err

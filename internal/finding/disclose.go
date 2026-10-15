@@ -490,11 +490,11 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 		return nil, err
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	until = until.UTC().Truncate(time.Microsecond)
 
 	var out *Movement
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Where it ends now, read inside the transaction: a retry re-runs
 		// this against a database another movement may have moved.
 		was, err := endsAt(ctx, tx, productID, vulnerabilityID)
@@ -580,10 +580,10 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 	if subject.ID == 0 {
 		return nil, access.Denied("agree to a disclosure movement without being anybody")
 	}
-	now := s.now().UTC().Truncate(time.Microsecond)
 
 	var agreed *Movement
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		asked := new(Movement)
 		agreed = asked
 		if err := tx.NewSelect().Model(asked).Where("id = ?", id).Scan(ctx); err != nil {

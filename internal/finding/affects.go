@@ -102,9 +102,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	out := &Reset{}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		out.Added, out.Closed = 0, 0
 
 		// rows is what is open now, read inside the transaction: a

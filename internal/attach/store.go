@@ -330,9 +330,9 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 
-	now := s.now().Truncate(time.Microsecond)
 	var row *Attachment
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		now := s.now().Truncate(time.Microsecond)
 		// Built inside, because an insert writes the generated identifier back
 		// into the model. A retry of a rolled-back attempt would re-insert a
 		// model already carrying the key that attempt was given.

@@ -109,8 +109,8 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 		return nil, nil, err
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		_, err := openEdition(ctx, tx, row.ID, subject.ID, title, now)
 		return err
 	})
@@ -253,9 +253,9 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		return nil, ErrSamePerson
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var given *Agreement
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Read inside the transaction, because the edition the advisory
 		// points at is what is being agreed to and it moves under an edit.
 		// Read outside, the agreement would name an edition that had already
@@ -351,9 +351,9 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 	if err := s.mayWrite(ctx, subject, row, "take back an agreement"); err != nil {
 		return err
 	}
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var taken int64
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		result, err := tx.NewUpdate().Model((*Approval)(nil)).
 			Set("withdrawn_at = ?", now).
 			Set("withdrawn_by = ?", subject.ID).

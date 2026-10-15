@@ -473,9 +473,9 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 		return 0, access.Denied("move work assigned to somebody else")
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		if to != nil {
 			if err := mayReadAllOf(ctx, tx, from, *to); err != nil {
 				return err

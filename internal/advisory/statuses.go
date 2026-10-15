@@ -228,8 +228,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		return ErrNoSuchRelease
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Every mark on this release filed under any name of the issue, the
 		// way the document reads them: a mark set before the issue merged
 		// into another is the other's.

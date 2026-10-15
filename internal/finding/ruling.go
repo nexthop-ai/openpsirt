@@ -219,9 +219,9 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 		return nil, ErrNoReports
 	}
 
-	now := s.now().UTC().Truncate(time.Microsecond)
 	var ruling *ReportRuling
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		cap, err := setting.NewStore(tx).Count(ctx,
 			setting.TogetherCap, setting.DefaultTogetherCap)
 		if err != nil {
@@ -431,8 +431,8 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 	if err := mayApproveRuling(subject, productID); err != nil {
 		return nil, err
 	}
-	now := s.now().UTC().Truncate(time.Microsecond)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		ruling, err := rulingIn(ctx, tx, productID, rulingID)
 		if err != nil {
 			return err
@@ -496,8 +496,8 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 	if err := mayHandle(subject, productID); err != nil {
 		return nil, err
 	}
-	now := s.now().UTC().Truncate(time.Microsecond)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
 		// Read for whether it is here at all. Whether it is still standing
 		// is asked in the write, so two people withdrawing at once cannot
 		// both succeed.

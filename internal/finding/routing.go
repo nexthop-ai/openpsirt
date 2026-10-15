@@ -82,9 +82,9 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 			return nil, err
 		}
 	}
-	createdAt := s.now().UTC().Truncate(time.Microsecond)
 	var rule *Routing
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		createdAt := s.now().UTC().Truncate(time.Microsecond)
 		// Built inside, because an insert writes the generated identifier back
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both

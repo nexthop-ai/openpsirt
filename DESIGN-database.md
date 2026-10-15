@@ -955,6 +955,7 @@ defect.
 | The VEX document being recorded as gone out | What the record says went out. Generated from the transaction recording it, on every attempt, so a retry describes the database it commits to |
 | The product a supplier, an uploaded VEX document or an uploaded advisory names | Which product the source or the statements are recorded against |
 | The claims a document makes, folded and paired | Which standing claims it repeats and which it sets aside. Copied from the caller's on every attempt, so a retry starts from what the document said |
+| The moment a write is dated | When an edition, a mint, a decision, a closure or any other recorded act happened. Read from the clock on every attempt, so the attempt that loses a race and is taken again is not dated before the write it lost to |
 
 A read made before the transaction as an early refusal is repeated inside it;
 the one inside decides.

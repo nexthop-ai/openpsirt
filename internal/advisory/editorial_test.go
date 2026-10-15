@@ -614,15 +614,27 @@ func TestTwoEditsAtOnceTakeTheNextTwoNumbers(t *testing.T) {
 		if err := rival(); err != nil {
 			t.Errorf("the first of two edits at once answered %v", err)
 		}
-		var ordinals []int
-		if err := f.db.DB.NewSelect().TableExpr(`"advisory_edition" AS "ae"`).
+		var editions []advisory.Edition
+		if err := f.db.DB.NewSelect().Model(&editions).
 			Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ae"."advisory_id"`).
-			ColumnExpr(`"ae"."ordinal"`).Where(`"ad"."identifier" = ?`, named).
-			OrderExpr(`"ae"."ordinal"`).Scan(ctx, &ordinals); err != nil {
+			Where(`"ad"."identifier" = ?`, named).
+			OrderExpr(`"ae"."ordinal"`).Scan(ctx); err != nil {
 			t.Fatal(err)
+		}
+		var ordinals []int
+		for _, edition := range editions {
+			ordinals = append(ordinals, edition.Ordinal)
 		}
 		if !slices.Equal(ordinals, []int{1, 2, 3}) {
 			t.Errorf("the advisory holds editions %v, want 1, 2 and 3", ordinals)
+		}
+		// The edition taken again is dated by the attempt that wrote it, so
+		// it is not dated before the edition it follows.
+		for i := 1; i < len(editions); i++ {
+			if editions[i].WrittenAt.Before(editions[i-1].WrittenAt) {
+				t.Errorf("edition %d is dated %v, before edition %d at %v", editions[i].Ordinal,
+					editions[i].WrittenAt, editions[i-1].Ordinal, editions[i-1].WrittenAt)
+			}
 		}
 
 		minting, rivalMint := dbtest.RivalAfterRead(t, f.db, "advisory", "advisory", 5*time.Second,
@@ -635,6 +647,14 @@ func TestTwoEditsAtOnceTakeTheNextTwoNumbers(t *testing.T) {
 		}
 		if err := rivalMint(); err != nil {
 			t.Errorf("the first of two advisories minted at once answered %v", err)
+		}
+		var minted []advisory.Advisory
+		if err := f.db.DB.NewSelect().Model(&minted).
+			OrderExpr(`"ad"."minted_year" DESC, "ad"."mint_number" DESC`).Limit(2).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(minted) != 2 || minted[0].MintedAt.Before(minted[1].MintedAt) {
+			t.Errorf("the advisory minted again is dated before the one it follows: %+v", minted)
 		}
 	})
 }
