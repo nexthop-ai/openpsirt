@@ -358,9 +358,9 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 func (b agingBucket) holds(now time.Time) (string, []any) {
 	older := now.Add(-time.Duration(b.from) * 24 * time.Hour)
 	if b.to == 0 {
-		return "f.opened_at <= ?", []any{older}
+		return `"f"."opened_at" <= ?`, []any{older}
 	}
-	return "f.opened_at <= ? AND f.opened_at > ?",
+	return `"f"."opened_at" <= ? AND "f"."opened_at" > ?`,
 		[]any{older, now.Add(-time.Duration(b.to) * 24 * time.Hour)}
 }
 

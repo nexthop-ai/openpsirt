@@ -130,7 +130,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`MIN("c"."version") AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
+		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// The version a fix arrived in, where any place knows one. Folded to
@@ -142,7 +142,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	// carries and by the same conditions, so the two agree about what
 	// "agreed" means. Nothing here asks whether a claim is with its author,
 	// so that column is not read and not computed.
-	err = decisionCounts(sightings, "st.product_id", nil,
+	err = decisionCounts(sightings, `"st"."product_id"`, nil,
 		claimWaiting, claimApproved, claimLapsed).
 		// Grouped on the component itself, not on its name. The total beside
 		// this list counts one sighting per component, and a build that ships

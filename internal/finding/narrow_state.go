@@ -30,7 +30,7 @@ import (
 // Exported because the same question is asked outside this package: what is
 // undecided is what the notification sweep means by work sitting still, and a
 // second spelling of it would be a second definition of "decided".
-const KeyMatches = "(cl.outcome = '" + OutcomeMismatched + "' OR (" + VersionsMatch + "))"
+const KeyMatches = `("cl"."outcome" = '` + OutcomeMismatched + "' OR (" + VersionsMatch + "))"
 
 // VersionsMatch says a decision row `de` was written against the versions a
 // finding's component `c` and consumer `uc` hold now, which is the half of
@@ -41,8 +41,8 @@ const VersionsMatch = componentMatches + " AND " + consumerMatches
 
 // componentMatches and consumerMatches are the two halves of VersionsMatch.
 const (
-	componentMatches = "COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr
-	consumerMatches  = "COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr
+	componentMatches = `COALESCE("de"."component_upstream_version", '') = ` + ComponentUpstreamExpr
+	consumerMatches  = `COALESCE("de"."consumer_upstream_version", '') = ` + ConsumerUpstreamExpr
 )
 
 // keyMatchesOn is KeyMatches over a decision under another alias, with the
@@ -53,7 +53,7 @@ const (
 // out again, so the rule has one spelling. KeyMatches stays a constant because
 // other constants are built from it.
 func keyMatchesOn(decision, outcome string) string {
-	return strings.NewReplacer("cl.outcome", outcome, "de.", decision+".").Replace(KeyMatches)
+	return strings.NewReplacer(`"cl"."outcome"`, outcome, `"de".`, `"`+decision+`".`).Replace(KeyMatches)
 }
 
 // PlannedFilter is whether a promised upgrade covers a finding.
@@ -85,11 +85,11 @@ const (
 // placed in the statement as written.
 func DecisionAt(product string) string {
 	switch product {
-	case "?", "st.product_id", "de.product_id":
+	case "?", `"st"."product_id"`, `"de"."product_id"`:
 	default:
 		panic("finding.DecisionAt: " + product + " is not a product the statement names")
 	}
-	return "de.product_id = " + product + " AND " + DecisionAtPlace("f")
+	return `"de"."product_id" = ` + product + " AND " + DecisionAtPlace("f")
 }
 
 // DecisionAtPlace is the issue and the place of DecisionAt without the
@@ -102,7 +102,7 @@ func DecisionAt(product string) string {
 // names. Anything else is a programming error, because it is placed in the
 // statement as written.
 func DecisionAtPlace(finding string) string {
-	return decidedPlaceIn("dv.issue_id", "de.place_identity", finding)
+	return decidedPlaceIn(`"dv"."issue_id"`, `"de"."place_identity"`, finding)
 }
 
 // DecisionFiledAt is DecisionAtPlace for a statement that reads a decision
@@ -115,15 +115,15 @@ func DecisionFiledAt(decision, finding string) string {
 		panic("finding.DecisionFiledAt: " + decision + " is not a decision the statement names")
 	}
 	findingAlias(finding)
-	return SameIssue(finding+".vulnerability_id", decision+".vulnerability_id") +
-		" AND " + decision + ".place_identity = " + finding + ".place_identity"
+	return SameIssue(`"`+finding+`"."vulnerability_id"`, `"`+decision+`"."vulnerability_id"`) +
+		` AND "` + decision + `"."place_identity" = "` + finding + `"."place_identity"`
 }
 
 // decidedPlaceIn is the issue and the place of a decision, under the columns
 // given, being the finding's.
 func decidedPlaceIn(issue, place, finding string) string {
 	findingAlias(finding)
-	return issue + " = " + finding + ".vulnerability_id AND " + place + " = " + finding + ".place_identity"
+	return issue + ` = "` + finding + `"."vulnerability_id" AND ` + place + ` = "` + finding + `"."place_identity"`
 }
 
 // findingAlias refuses a finding alias that no statement here gives one.
@@ -146,7 +146,7 @@ func findingAlias(finding string) {
 // A claim with no key has lapsed or been withdrawn, and by definition its
 // versions no longer match — what it says about the place is history, and it
 // is matched by place so that "lapsed" can be said at all.
-const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
+const coversHere = `("de"."live_key" IS NULL OR (` + KeyMatches + "))"
 
 // byState joins what each place has been decided as, for the conditions
 // statesHaving asks of a group.
@@ -204,7 +204,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	decided := f.flagColumns(decisionsOutward(q))
 	if f.decidedIssues != nil {
 		// On the decisions, for the reason decidedBeside gives.
-		decided = f.amongDecidedIssues(decided, "dv.issue_id")
+		decided = f.amongDecidedIssues(decided, `"dv"."issue_id"`)
 	}
 	decided = decided.Where(`"de"."product_id" = ?`, f.ProductID)
 	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`, decided)

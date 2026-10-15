@@ -48,7 +48,7 @@ func TestTheDetectorFindsAVisibilityWordOrderedOver(t *testing.T) {
 			t.Errorf("%s was not reported", spelling)
 		}
 	}
-	expr, _ := access.AnyPrivate("f.visibility")
+	expr, _ := access.AnyPrivate(`"f"."visibility"`)
 	if got := visibilityOrderedOver("b.go", expr); len(got) != 0 {
 		t.Errorf("the one spelling was reported as %v", got)
 	}
@@ -109,8 +109,8 @@ func TestAPrivateCountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
 
 func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {
 	for name, ask := range map[string]func(){
-		"PrivateCountAs": func() { access.PrivateCountAs("f.visibility", `x", "y`) },
-		"AnyPrivateAs":   func() { access.AnyPrivateAs("f.visibility", `x", "y`) },
+		"PrivateCountAs": func() { access.PrivateCountAs(`"f"."visibility"`, `x", "y`) },
+		"AnyPrivateAs":   func() { access.AnyPrivateAs(`"f"."visibility"`, `x", "y`) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {
@@ -121,7 +121,7 @@ func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {
 			ask()
 		})
 	}
-	if expr, _ := access.PrivateCountAs("f.visibility", "private_rows"); !strings.HasSuffix(expr, ` AS "private_rows"`) {
+	if expr, _ := access.PrivateCountAs(`"f"."visibility"`, "private_rows"); !strings.HasSuffix(expr, ` AS "private_rows"`) {
 		t.Errorf("a plain name was selected as %s", expr)
 	}
 }

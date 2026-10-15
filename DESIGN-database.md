@@ -751,6 +751,24 @@ here is written in capitals and every declared name in lower case, so
 function, and the arguments after a builder method's SQL are values, which are
 free to be a word the schema has a column of.
 
+A qualified column is read in every literal of the code that runs, not only in
+a statement. A fragment held in a constant, a struct field, a return value or
+the tail of a concatenation names no table, so the statement marker never
+admits it; an alias, a dot and a declared column, all in lower case, is the
+marker instead.
+
+| Literal | Read as |
+|---|---|
+| A clause: a comparison written with spaces, a parenthesis, or a keyword in capitals | Every qualified column in it |
+| One qualified name and nothing else, handed to a call, returned, given as a field's value, or held in a constant of a named type | That name |
+| An argument of a builder method or function that quotes its argument itself | Nothing: the callee quotes it |
+| An argument of a standard library call, a map's key, a constant of plain string type | Nothing: a setting's key is written the same way |
+| Anything in a test | Nothing: a test hands a detector the bare spellings it exists to find |
+
+A helper that places a column it is given as written takes it quoted, so a
+list of the columns it accepts lists them quoted too. A helper that builds a
+column from an alias it is given writes the quotes around the alias itself.
+
 The schema sweep reads a table's and an index's declaration: a name after a
 keyword that always precedes one, and a name where a column belongs in the
 outermost parentheses. A statement of any other kind, a condition, and a clause
@@ -803,7 +821,9 @@ What was already read where it was written is left out, so one defect is
 reported once.
 
 A name that reaches SQL from outside the file is still invisible, because the
-check reads source as text and there is no parser here for four dialects. That
+check reads source as text and there is no parser here for four dialects. So
+is a column built from an alias at run time, which is quoted by the code that
+builds it. That
 is the safe direction for a check that fails a build. It looks only inside the
 builder's own methods: reading doc comments too reports the English word "as"
 as an invented name.

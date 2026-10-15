@@ -553,7 +553,7 @@ var bundleOrder = map[BundleSortKey]struct {
 	BundlesByIssues:   {expr: "issues"},
 	BundlesByPlaces:   {expr: "places"},
 	BundlesByBuilds:   {expr: "builds"},
-	BundlesByDeadline: {expr: "MIN(f.due_at)", nothing: true},
+	BundlesByDeadline: {expr: `MIN("f"."due_at")`, nothing: true},
 }
 
 // BundleSortKeys are the orders somebody may ask this list for, in the order
@@ -592,7 +592,7 @@ func bundleSorted(filter Filter) string {
 // exists to answer and what it orders by unless somebody asks otherwise. It is
 // also the tie-break under every other order, so that a page boundary is a
 // boundary rather than a place rows move across.
-const byWeight = "issues DESC, places DESC, f.component_id"
+const byWeight = `issues DESC, places DESC, "f"."component_id"`
 
 // componentOrder is how the by-component view is ordered.
 //

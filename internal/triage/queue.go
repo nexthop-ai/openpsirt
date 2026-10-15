@@ -138,7 +138,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 		// A promise is missed only while a finding it covers is still open
 		// where the reader may see it. A kept promise closes its findings and
 		// leaves its date and its decision as they were.
-		q = q.Where("EXISTS (?)", readableFindings(openUnder(q), subject, "f", "st.product_id"))
+		q = q.Where("EXISTS (?)", readableFindings(openUnder(q), subject, "f", `"st"."product_id"`))
 	}
 	// One product where the caller named one, and whatever else the reader
 	// narrowed by. A claim is decided in a product, so this narrows the same
@@ -149,7 +149,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 		if filter.Mine {
 			q = q.Where(`"de"."proposed_by" = ?`, subject.ID)
 		}
-		outOfReach, args := notDecidableWhere(subject, `"other"`)
+		outOfReach, args := notDecidableWhere(subject, "other")
 		return s.reachableClaims(decidableBy(q, subject, "de"), outOfReach, args)
 	}
 	q = approvableBy(q, subject, "de")
@@ -169,7 +169,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 			Where(`NOT EXISTS (SELECT 1 FROM "claim_revision" AS "wrote"
 			WHERE "wrote"."claim_id" = "de"."claim_id" AND "wrote"."written_by" = ?)`, subject.ID)
 	}
-	outOfReach, args := notApprovableWhere(subject, `"other"`)
+	outOfReach, args := notApprovableWhere(subject, "other")
 	return s.reachableClaims(q, outOfReach, args)
 }
 
@@ -283,7 +283,7 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 	if release := strings.ToLower(strings.TrimSpace(f.Release)); release != "" {
 		// An open finding the row covers, in a build of the named release.
 		covers := openUnder(q).Where(`"st"."name" = ?`, release)
-		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", "st.product_id"))
+		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", `"st"."product_id"`))
 	}
 	return q
 }
@@ -460,7 +460,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
-	err := readableFindings(query, subject, "f", "st.product_id").
+	err := readableFindings(query, subject, "f", `"st"."product_id"`).
 		GroupExpr(`"de"."claim_id", "st"."name", "va"."name"`).
 		OrderExpr(`"de"."claim_id", "st"."name", "va"."name"`).
 		Scan(ctx, &rows)
@@ -610,7 +610,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
 		Where(`"f"."fixed_in" <> ''`)
-	if err := readableFindings(known, subject, "f", "st.product_id").
+	if err := readableFindings(known, subject, "f", `"st"."product_id"`).
 		GroupExpr(`"de"."claim_id", "f"."vulnerability_id"`).
 		Scan(ctx, &fixes); err != nil {
 		return nil, fmt.Errorf("read which of these have a fix: %w", err)

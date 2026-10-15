@@ -24,6 +24,7 @@
 // | Invented names | `AS <word>` in a statement or a builder argument | an alias or an output name written bare |
 // | Tables | a table after FROM, JOIN, INTO or UPDATE, or opening a table expression | a table the migrations declare, written bare |
 // | Declared columns | a statement, the SQL argument of a builder method, and a clause built in a variable and handed to one | a column the migrations declare, written bare, alone or after a qualifier |
+// | Qualified columns | every literal outside the tests and the migrations: a clause, or one qualified name handed to code that places it | a column the migrations declare, written bare after a qualifier |
 // | Definitions | the migrations' data-definition literals | a declared name that collides with a word an engine reserves |
 // | Model aliases | a struct tag's alias | an alias that collides with a word an engine reserves |
 //

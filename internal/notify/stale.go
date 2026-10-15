@@ -279,7 +279,7 @@ func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
-		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
+		ColumnExpr(access.PrivateCountAs(`"de"."visibility"`, "private_rows")).
 		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."proposed_by"`)
 }
 
@@ -410,7 +410,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(access.PrivateCountAs("f.visibility", "private_rows")).
+		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private_rows")).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_at" IS NOT NULL`).
 		Where(`"f"."assigned_at" <= ?`, since).
@@ -419,7 +419,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			TableExpr(finding.Decisions).
 			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 			ColumnExpr("1").
-			Where(finding.DecisionAt("st.product_id")).
+			Where(finding.DecisionAt(`"st"."product_id"`)).
 			Where(`"de"."live_key" IS NOT NULL`).
 			Where(finding.KeyMatches)).
 		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."vulnerability_id", "f"."component_id"`)

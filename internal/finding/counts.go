@@ -32,11 +32,11 @@ const (
 func (l Level) column() (string, bool) {
 	switch l {
 	case ByProduct:
-		return "st.product_id", true
+		return `"st"."product_id"`, true
 	case ByStream:
-		return "tg.stream_id", true
+		return `"tg"."stream_id"`, true
 	case ByVariant:
-		return "tg.variant_id", true
+		return `"tg"."variant_id"`, true
 	}
 	return "", false
 }

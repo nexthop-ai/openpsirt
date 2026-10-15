@@ -218,6 +218,165 @@ func importedNames(file *ast.File) map[string]bool {
 	return names
 }
 
+// qualifiedBare matches a column written bare after the name qualifying it:
+// an alias, a quoted alias, or the placeholder the builder fills with a
+// model's alias. Nothing word-like may stand before the qualifier or after
+// the column, which keeps a file name, a host name, a quoted word and a
+// version string out.
+var qualifiedBare = regexp.MustCompile(
+	"(?:^|[^A-Za-z0-9_.\"'`/?\\[-])((?:\"[a-z_][a-z0-9_]*\"|\\?[A-Za-z]+|[a-z_][a-z0-9_]*)\\.([a-z_][a-z0-9_]*))(?:[^A-Za-z0-9_.(\"'`/-]|$)")
+
+// qualifiedAlone matches a literal that is one qualified column and nothing
+// else, which is a name handed to code rather than a clause.
+var qualifiedAlone = regexp.MustCompile(`\A\s*(?:"[a-z_][a-z0-9_]*"|\??[A-Za-z_][A-Za-z0-9_]*)\.[a-z_][a-z0-9_]*\s*\z`)
+
+// sqlShaped recognizes a literal holding a clause: a comparison written with
+// the spaces every query here gives one, a parenthesis, or a keyword written
+// in capitals as every keyword here is. A sentence naming a setting's key and
+// an option assigning one have none of them.
+var sqlShaped = regexp.MustCompile(`\s(?:=|<>|!=|<=|>=|<|>)\s|\(|\b(?:AND|OR|IS|NOT|NULL|IN|ON|AS|ASC|DESC|CASE|WHEN|THEN|ELSE|END|SELECT|WHERE|FROM|JOIN|EXISTS|BY)\b`)
+
+// qualifiedColumns reports every declared column a clause writes bare after a
+// qualifier, in a literal that carries no statement marker.
+//
+// A fragment held in a constant, a struct field, a return value or the tail
+// of a concatenation is SQL the statement marker does not recognize, because
+// it names no table. The qualified form is the marker instead: an alias, a
+// dot and a column the schema declares, in a literal shaped like a clause.
+func qualifiedColumns(text string, columns map[string]bool, path string, line int) []found {
+	if qualifiedAlone.MatchString(text) || !sqlShaped.MatchString(text) {
+		return nil
+	}
+	return qualifiedIn(text, columns, path, line)
+}
+
+// qualifiedName reports the column a literal holding one qualified column and
+// nothing else writes bare.
+func qualifiedName(text string, columns map[string]bool, path string, line int) []found {
+	if !qualifiedAlone.MatchString(text) {
+		return nil
+	}
+	return qualifiedIn(strings.TrimSpace(text), columns, path, line)
+}
+
+func qualifiedIn(text string, columns map[string]bool, path string, line int) []found {
+	var bad []found
+	for _, match := range qualifiedBare.FindAllStringSubmatchIndex(text, -1) {
+		word := text[match[4]:match[5]]
+		if !columns[word] {
+			continue
+		}
+		one := bareColumn{word: word, qualifier: text[match[2] : match[4]-1]}
+		bad = append(bad, found{word: word, file: path, line: line, bare: true, column: one.quoted()})
+	}
+	return bad
+}
+
+// quotingCallee is every function given a qualified column that quotes it
+// itself: the builder's methods and the two functions that quote a name for
+// an engine. A name handed to one of them is written bare on purpose.
+var quotingCallee = map[string]bool{
+	"Column": true, "ExcludeColumn": true, "Order": true, "Group": true, "Table": true, "Ident": true,
+}
+
+// handedNames reports every declared column a literal holding one qualified
+// name writes bare, where the literal is handed to code that places it in a
+// statement: an argument, a returned value, a field's value, or a constant of
+// a named type. A call on a standard library package writes no SQL, and a
+// function in quotingCallee quotes what it is given.
+func handedNames(fset *token.FileSet, path string, file *ast.File, columns map[string]bool, std map[string]bool) []found {
+	var bad []found
+	read := func(expr ast.Expr) {
+		lit, ok := expr.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return
+		}
+		text, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return
+		}
+		bad = append(bad, qualifiedName(text, columns, path, fset.Position(lit.Pos()).Line)...)
+	}
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch typed := node.(type) {
+		case *ast.CallExpr:
+			name := ""
+			switch fun := typed.Fun.(type) {
+			case *ast.SelectorExpr:
+				name = fun.Sel.Name
+				if x, ok := fun.X.(*ast.Ident); ok && std[x.Name] {
+					return true
+				}
+			case *ast.Ident:
+				name = fun.Name
+			}
+			if quotingCallee[name] {
+				return true
+			}
+			for _, arg := range typed.Args {
+				read(arg)
+			}
+		case *ast.ReturnStmt:
+			for _, result := range typed.Results {
+				read(result)
+			}
+		case *ast.KeyValueExpr:
+			// A field's value. A map's keyed by a literal is a table of
+			// cases, and a case is free to be a setting's key.
+			if _, field := typed.Key.(*ast.Ident); field {
+				read(typed.Value)
+			}
+		case *ast.ValueSpec:
+			if ident, ok := typed.Type.(*ast.Ident); ok && ident.Name != "string" {
+				for _, value := range typed.Values {
+					read(value)
+				}
+			}
+		}
+		return true
+	})
+	return bad
+}
+
+// quotedArguments is where every literal handed straight to a function in
+// quotingCallee starts.
+func quotedArguments(file *ast.File) map[token.Pos]bool {
+	quoted := map[token.Pos]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if selector, ok := call.Fun.(*ast.SelectorExpr); ok && quotingCallee[selector.Sel.Name] {
+			for _, arg := range call.Args {
+				if lit, ok := arg.(*ast.BasicLit); ok {
+					quoted[lit.Pos()] = true
+				}
+			}
+		}
+		return true
+	})
+	return quoted
+}
+
+// standardNames is the name each standard library import of a file binds: a
+// path whose first element names no host.
+func standardNames(file *ast.File) map[string]bool {
+	names := map[string]bool{}
+	for _, spec := range file.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil || strings.Contains(strings.SplitN(path, "/", 2)[0], ".") {
+			continue
+		}
+		name := path[strings.LastIndex(path, "/")+1:]
+		if spec.Name != nil {
+			name = spec.Name.Name
+		}
+		names[name] = true
+	}
+	return names
+}
+
 // unquotedColumns reports, as findings, every declared column the text writes
 // bare.
 func unquotedColumns(text string, columns map[string]bool, path string, line int) []found {

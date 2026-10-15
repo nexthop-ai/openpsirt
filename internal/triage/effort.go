@@ -80,7 +80,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	// names with no product in it, so it matches the same pair in every
 	// product, and a name read off a finding the reader may not read is the
 	// disclosure.
-	readableHere, readableArgs := readableFindingsOn(subject, "pf", "de.product_id")
+	readableHere, readableArgs := readableFindingsOn(subject, "pf", `"de"."product_id"`)
 	if readableHere == "" {
 		readableHere = "1 = 1"
 	}
@@ -114,7 +114,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			Join(`LEFT JOIN "component" AS "pc" ON "pc"."id" = "pf"."component_id"`).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."product_id", COALESCE("pc"."name", '')`)
-		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
+		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
 	}
 
 	var rows []Spent

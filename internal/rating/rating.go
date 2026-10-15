@@ -33,16 +33,16 @@ type On string
 const (
 	// OnStream is the product the row's stream belongs to, for a query that
 	// spans products and reads each row's own.
-	OnStream On = "st.product_id"
+	OnStream On = `"st"."product_id"`
 	// OnDecision is the product a decision was recorded in.
-	OnDecision On = "de.product_id"
+	OnDecision On = `"de"."product_id"`
 	// OnGrouped is the product column of a derived table aliased grouped,
 	// for a query that reduces its findings to one row per issue and product
 	// before the rating is joined.
-	OnGrouped On = "grouped.product_id"
+	OnGrouped On = `"grouped"."product_id"`
 	// OnPartial is the product the partial groups of the two-level form,
 	// read as "f", carry.
-	OnPartial On = "f.product_id"
+	OnPartial On = `"f"."product_id"`
 	// onBound is one product, bound. Used through Here.
 	onBound On = "?"
 )
@@ -58,7 +58,7 @@ const (
 // every caller already joins.
 func For(product On) string {
 	return `LEFT JOIN "issue_rating" AS "ir" ON "ir"."vulnerability_id" = "v"."id"` +
-		` AND ir.product_id = ` + string(product)
+		` AND "ir"."product_id" = ` + string(product)
 }
 
 // Here is For with the product bound.
@@ -134,4 +134,4 @@ func Folded(word string) (string, bool) {
 }
 
 // EffectiveExpr is the rating in force in one product, as a word.
-const EffectiveExpr = `COALESCE(ir.severity, v.severity, '')`
+const EffectiveExpr = `COALESCE("ir"."severity", "v"."severity", '')`

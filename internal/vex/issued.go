@@ -390,7 +390,7 @@ func settledDigest(doc *Statements) (string, error) {
 // a document issued between the two would be published under a name this had
 // already said nothing was published under.
 func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
-	return anyIssuedWhere(ctx, db, "tg.variant_id = ?", variantID, "variant")
+	return anyIssuedWhere(ctx, db, `"tg"."variant_id" = ?`, variantID, "variant")
 }
 
 // AnyIssuedForStream reports whether a document has gone out for any variant of
@@ -399,7 +399,7 @@ func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool
 // The release is inside the same identifier the variant is, for the same
 // reasons AnyIssuedForVariant gives.
 func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
-	return anyIssuedWhere(ctx, db, "tg.stream_id = ?", streamID, "release")
+	return anyIssuedWhere(ctx, db, `"tg"."stream_id" = ?`, streamID, "release")
 }
 
 // AnyIssuedForProduct reports whether a document has gone out for any build of

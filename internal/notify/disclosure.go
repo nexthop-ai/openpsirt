@@ -79,7 +79,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Publisher       string `bun:"publisher"`
 		Undisclosed     bool   `bun:"undisclosed"`
 	}
-	undisclosed, private := access.AnyPrivate("de.visibility")
+	undisclosed, private := access.AnyPrivate(`"de"."visibility"`)
 	err := w.db.NewSelect().
 		TableExpr(finding.Decisions).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "de"."from_statement_id"`).
@@ -171,9 +171,9 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		// would be told twice about one thing.
 		Where(func() string {
 			if lead > 0 {
-				return "f.disclose_at > ?"
+				return `"f"."disclose_at" > ?`
 			}
-			return "f.disclose_at <= ?"
+			return `"f"."disclose_at" <= ?`
 		}(), time.Now().UTC()).
 		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)

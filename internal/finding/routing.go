@@ -328,7 +328,7 @@ func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
 	// differently outside ASCII, so asking one to made whether a rule swept a
 	// component depend on which engine was running. Folded on the way in, this
 	// is an equality test and it can use the index.
-	const name = `COALESCE(NULLIF(c.upstream_folded, ''), c.name_folded)`
+	const name = `COALESCE(NULLIF("c"."upstream_folded", ''), "c"."name_folded")`
 	if glob, like := globbed(pattern); glob {
 		return query.Where(`"component_id" IN (SELECT "c"."id" FROM "component" AS "c"
 			WHERE `+name+` LIKE ?`+database.LikeClause+`)`, like)
@@ -428,7 +428,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(inThisProductAs("f.target_id"), productID)
+			Where(inThisProductAs(`"f"."target_id"`), productID)
 		if upstream != "" {
 			q = bySource(q, upstream)
 		}

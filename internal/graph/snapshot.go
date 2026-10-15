@@ -995,7 +995,7 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 
 	within, args := "", []any{targetID, bun.List(readable)}
 	if only != nil {
-		within, args = " AND f.component_id IN (?)", append(args, bun.List(only))
+		within, args = ` AND "f"."component_id" IN (?)`, append(args, bun.List(only))
 	}
 	return query.
 		Join(`LEFT JOIN (SELECT g.cid AS "cid", COUNT(*) AS "n"
@@ -1025,7 +1025,7 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.SelectQuery {
 	within, args := "", []any{targetID}
 	if only != nil {
-		within, args = " AND dp.component_id IN (?)", append(args, bun.List(only))
+		within, args = ` AND "dp"."component_id" IN (?)`, append(args, bun.List(only))
 	}
 	return query.
 		Join(`LEFT JOIN (SELECT "dp"."component_id" AS "cid", COUNT(*) AS "n"

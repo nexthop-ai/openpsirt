@@ -68,7 +68,7 @@ func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, product
 		Where(`"tg"."stream_id" IN (?)`, bun.List(streams)).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID)
+		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID)
 	if !onCase {
 		_, all := subject.Products()
 		q = inOneProduct(q, subject, productID, all)

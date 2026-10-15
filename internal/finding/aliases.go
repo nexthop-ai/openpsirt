@@ -235,7 +235,7 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 func recordedByHand(ctx context.Context, db bun.IDB, id int64) (bool, error) {
 	recorded, err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Where(HeldAs("f.vulnerability_id"), id).
+		Where(HeldAs(`"f"."vulnerability_id"`), id).
 		Where(`"f"."kind" = ?`, Entered).
 		Exists(ctx)
 	if err != nil {

@@ -534,12 +534,12 @@ type evidenceRow struct {
 var standingHere = `FROM ` + Decisions + `
 	JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 	WHERE ` + DecisionAt("?") + `
-	  AND de.live_key IS NOT NULL
+	  AND "de"."live_key" IS NOT NULL
 	  AND ` + KeyMatches + `
-	ORDER BY CASE WHEN cl.outcome = '` + OutcomeMismatched + `'
-	                   AND (de.state = 'approved'
-	                        OR (de.needs_approval = FALSE AND de.sent_back_at IS NULL))
-	              THEN 0 ELSE 1 END, de.id
+	ORDER BY CASE WHEN "cl"."outcome" = '` + OutcomeMismatched + `'
+	                   AND ("de"."state" = 'approved'
+	                        OR ("de"."needs_approval" = FALSE AND "de"."sent_back_at" IS NULL))
+	              THEN 0 ELSE 1 END, "de"."id"
 	LIMIT 1`
 
 // Detail reads everything held about one issue in one component of a build.

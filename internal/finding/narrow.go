@@ -352,7 +352,7 @@ type Filter struct {
 // build the fragment and forget the value that goes with it.
 func (f Filter) product() (string, []any) {
 	if f.Across {
-		return "st.product_id", nil
+		return `"st"."product_id"`, nil
 	}
 	return "?", []any{f.ProductID}
 }
@@ -538,7 +538,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// A condition on the issue, which every place of a group shares: it
 		// drops whole groups, and only groups the conditions over a group
 		// drop anyway.
-		q = f.amongDecidedIssues(q, "f.vulnerability_id")
+		q = f.amongDecidedIssues(q, `"f"."vulnerability_id"`)
 	}
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say
@@ -565,7 +565,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// capitals, through the fold stored beside the name.
 	if names := trimmed(f.Components); len(names) > 0 {
 		q = q.Where(`"f"."component_id" IN (?)`,
-			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
+			componentsWhere(q, `"c"."name_folded" IN (?)`, bun.List(foldedNames(names))))
 	}
 	// Lowered on both sides rather than asked to compare loosely: the
 	// engines do not agree on what a case-insensitive comparison is, and
@@ -591,7 +591,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	}
 	if names := trimmed(f.Exclude); len(names) > 0 {
 		q = q.Where(`"f"."component_id" NOT IN (?)`,
-			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
+			componentsWhere(q, `"c"."name_folded" IN (?)`, bun.List(foldedNames(names))))
 	}
 	if kinds := trimmed(f.Ecosystems); len(kinds) > 0 {
 		// One subquery holding an OR rather than one per kind, because a
@@ -627,7 +627,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`"f"."consumer_id" IS NULL`)
 	} else if under := strings.TrimSpace(f.Under); under != "" {
 		q = q.Where(`"f"."consumer_id" IN (?)`,
-			componentsWhere(q, "c.name_folded = ?", graph.Folded(under)))
+			componentsWhere(q, `"c"."name_folded" = ?`, graph.Folded(under)))
 	}
 	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
@@ -746,7 +746,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ` + DecisionFiledAt("dc", "f")
 		asked := append([]any{f.Claim}, args...)
 		if states := trimmed(f.ClaimStates); len(states) > 0 {
-			held += " AND dc.state IN (?)"
+			held += ` AND "dc"."state" IN (?)`
 			asked = append(asked, bun.List(states))
 		}
 		q = q.Where(held+")", asked...)
@@ -869,7 +869,7 @@ func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, 
 // shape here are written, rather than as a join correlated outward from
 // inside a subquery.
 const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
-	` WHERE tg0.id = f.target_id)`
+	` WHERE "tg0"."id" = "f"."target_id")`
 
 // acrossVariants keeps rows by how the variants of a branch share them.
 //
@@ -1042,18 +1042,18 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	if len(publishers) > 0 || len(saidIt) > 0 {
 		// The statements being asked about, written once and used for
 		// both arms of the union below.
-		asked := []string{"ss.superseded_at IS NULL"}
+		asked := []string{`"ss"."superseded_at" IS NULL`}
 		var about []any
 		if len(publishers) > 0 {
 			lowered := make([]string, 0, len(publishers))
 			for _, name := range publishers {
 				lowered = append(lowered, strings.ToLower(name))
 			}
-			asked = append(asked, "ss.publisher IN (?)")
+			asked = append(asked, `"ss"."publisher" IN (?)`)
 			about = append(about, bun.List(lowered))
 		}
 		if len(saidIt) > 0 {
-			asked = append(asked, "ss.status IN (?)")
+			asked = append(asked, `"ss"."status" IN (?)`)
 			about = append(about, bun.List(saidIt))
 		}
 		narrowing := strings.Join(asked, " AND ")

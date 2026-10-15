@@ -24,7 +24,7 @@ import (
 // One spelling, because every reader asking whether a row is somebody's work
 // asks this: the deadline lists, the overdue counts, the review routing, and
 // the notifications.
-const NotArguedAway = "(f.suppressed_by IS NULL AND f.stated_by IS NULL)"
+const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)`
 
 // LatestAtItsPlace says no row of the same issue has been recorded at the same
 // place in the same build after the finding `f`.
@@ -43,7 +43,7 @@ const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 // who disagrees with a supplier marks the place affected, and the next run
 // opens it again, so the place has to be reachable while the statement has it
 // closed.
-const Decidable = "(f.closed_at IS NULL OR (f.closed_because = '" + string(Disclaimed) + "' AND " +
+const Decidable = `("f"."closed_at" IS NULL OR ("f"."closed_because" = '` + string(Disclaimed) + "' AND " +
 	LatestAtItsPlace + "))"
 
 // disclaiming is what a run needs to apply suppliers' statements: the

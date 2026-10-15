@@ -194,7 +194,7 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	// grant does not leave their work unreachable.
 	held, err := holdingAny(s.db.NewSelect().
 		TableExpr(`"person" AS "p"`).ColumnExpr(`"p"."id"`).
-		Where(`"p"."id" = ?`, personID), "p.id", Roles(), productID).Exists(ctx)
+		Where(`"p"."id" = ?`, personID), `"p"."id"`, Roles(), productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}

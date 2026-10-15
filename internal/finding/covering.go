@@ -45,11 +45,11 @@ const (
 
 // coveringOutcomes is the outcomes that cover a place for one reader.
 func coveringOutcomes(reader Reader) string {
-	wontFix := `(cl.outcome = '` + OutcomeWontFix + `' AND COALESCE(cl.mitigation, '') <> '')`
+	wontFix := `("cl"."outcome" = '` + OutcomeWontFix + `' AND COALESCE("cl"."mitigation", '') <> '')`
 	if reader == ForReleases {
-		wontFix = `cl.outcome = '` + OutcomeWontFix + `'`
+		wontFix = `"cl"."outcome" = '` + OutcomeWontFix + `'`
 	}
-	return `(cl.outcome IN ('` + OutcomeNotApplicable + `', '` + OutcomeMismatched + `', '` +
+	return `("cl"."outcome" IN ('` + OutcomeNotApplicable + `', '` + OutcomeMismatched + `', '` +
 		OutcomeAlreadyFixed + `') OR ` + wontFix + `)`
 }
 

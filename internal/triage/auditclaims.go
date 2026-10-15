@@ -184,7 +184,7 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		ColumnExpr(`COUNT(DISTINCT "c"."name_folded") AS "components"`).
 		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
 		GroupExpr(`"de"."claim_id"`)
-	components = readableFindings(components, subject, "f", "st.product_id")
+	components = readableFindings(components, subject, "f", `"st"."product_id"`)
 	var named []struct {
 		ClaimID    int64 `bun:"claim_id"`
 		Components int   `bun:"components"`

@@ -116,8 +116,8 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
 	held, err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."visibility" = ?`, access.Private).
 		Exists(ctx)
 	if err != nil {
@@ -142,13 +142,13 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 	}
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(access.PrivateCountAs("f.visibility", "places")).
+		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "places")).
 		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" = ? THEN 1 END) AS "public"`, access.Public).
 		ColumnExpr(`COALESCE(MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END), `+
 			`MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END)) AS "ends"`,
 			access.Private, access.Private).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Scan(ctx, &held)
 	if err != nil {
 		return nil, fmt.Errorf("read whether this issue is undisclosed: %w", err)
@@ -231,8 +231,8 @@ func (s *Store) ToTell(ctx context.Context, subject access.Subject,
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "person" AS "ps" ON "ps"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`DISTINCT "ps"."id"`).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		OrderExpr(`"ps"."id"`).
 		Scan(ctx, &out.People)
 	if err != nil {

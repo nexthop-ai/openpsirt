@@ -120,7 +120,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	}
 	err = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`,
 		decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).

@@ -58,12 +58,12 @@ func wordsDigest(words string) string {
 // "stw". Every reader of a claim's reasoning reads it through this join, in
 // this package and outside it.
 func WordsJoin(alias string) string {
-	return `LEFT JOIN "statement_text" AS "stw" ON "stw"."id" = ` + alias + `.statement_id`
+	return `LEFT JOIN "statement_text" AS "stw" ON "stw"."id" = "` + alias + `"."statement_id"`
 }
 
 // WordsColumn is the reasoning a row points at, read through WordsJoin, and
 // the empty string where it gave none.
-const WordsColumn = `COALESCE(stw.words, '')`
+const WordsColumn = `COALESCE("stw"."words", '')`
 
 // internWords is the stored copy of each of the reasoning given, writing the
 // ones not yet held.

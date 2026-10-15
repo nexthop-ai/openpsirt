@@ -270,7 +270,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 // product, so sending it to administrators alone would be both a disclosure
 // to people who may not read it and silence for the people who can act.
 func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, error) {
-	standing, args := finding.OffTheClock("st.product_id", time.Now().UTC())
+	standing, args := finding.OffTheClock(`"st"."product_id"`, time.Now().UTC())
 
 	var rows []struct {
 		Product       string `bun:"product"`
@@ -285,7 +285,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Undisclosed     bool  `bun:"undisclosed"`
 		Exploited       bool  `bun:"exploited"`
 	}
-	undisclosed, private := access.AnyPrivate("f.visibility")
+	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
 	err := findingsWith(w.db.NewSelect(), true).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
 		ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END) = 1 AS "exploited"`).

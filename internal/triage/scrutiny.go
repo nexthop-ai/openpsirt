@@ -109,8 +109,8 @@ type Grown struct {
 // proposer, and none that has been taken back. A flag would report what
 // something asserted about itself.
 const standingAlone = `NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
-	` WHERE ex.claim_id = de.claim_id AND ex.withdrawn_at IS NULL` +
-	` AND ex.approved_by <> de.proposed_by)`
+	` WHERE "ex"."claim_id" = "de"."claim_id" AND "ex"."withdrawn_at" IS NULL` +
+	` AND "ex"."approved_by" <> "de"."proposed_by")`
 
 // Scrutinize reports how the second-person rule is holding.
 //
@@ -450,7 +450,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(finding.KeyMatches).
-		Apply(readableFindingsBy(subject, "f", "st.product_id")).
+		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"de"."claim_id"`).
 		Scan(ctx, &rows)
 	if err != nil {

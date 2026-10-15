@@ -109,7 +109,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		TableExpr(`"upgrade" AS "ug"`).
 		ColumnExpr(`"ug"."target_id"`).
 		Where(`"ug"."fold_key" = ?`, fold).
-		Where(inThisProductAs("ug.target_id"), productID).
+		Where(inThisProductAs(`"ug"."target_id"`), productID).
 		Scan(ctx, &already); err != nil {
 		return 0, fmt.Errorf("read what is already committed: %w", err)
 	}

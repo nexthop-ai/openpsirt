@@ -277,7 +277,7 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 	narrowed := ""
 	if outcome != "" {
 		narrowed = `
-		  AND cl.outcome = ?`
+		  AND "cl"."outcome" = ?`
 		args = append(args, outcome)
 	}
 	return `EXISTS (SELECT 1 FROM ` + Decisions + `
@@ -285,7 +285,7 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 		WHERE ` + DecisionAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `
-		  AND (cl.deferred_until IS NULL OR cl.deferred_until > ?)` + narrowed + `)`,
+		  AND ("cl"."deferred_until" IS NULL OR "cl"."deferred_until" > ?)` + narrowed + `)`,
 		args
 }
 
@@ -310,7 +310,7 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 // Pair it with whatever says the claim still applies — `live_key IS NOT NULL`
 // where any version will do, KeyMatches where the versions matter.
 func InForce() (string, []any) {
-	return "(de.state = ? OR (de.state = ? AND de.needs_approval = ? AND de.sent_back_at IS NULL))",
+	return `("de"."state" = ? OR ("de"."state" = ? AND "de"."needs_approval" = ? AND "de"."sent_back_at" IS NULL))`,
 		[]any{"approved", "proposed", false}
 }
 
@@ -358,7 +358,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	}
 	limit = database.AList.Of(limit)
 
-	standing, args := OffTheClock("st.product_id", s.now())
+	standing, args := OffTheClock(`"st"."product_id"`, s.now())
 	// The narrowing, on its own, so the page and the count ask the same
 	// question of the same joins. Two spellings of one predicate is how a
 	// total stops describing the list it sits under.

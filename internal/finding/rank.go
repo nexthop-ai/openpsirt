@@ -200,8 +200,8 @@ const exploiting = exploitedBand
 // Counted rather than aggregated as a boolean, which is the same question
 // asked portably — the four engines do not agree on a boolean aggregate.
 const (
-	exploitedAcross     = `MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END)`
-	exploitedHereAcross = `MAX(CASE WHEN f.urgency_exploited_here THEN 1 ELSE 0 END)`
+	exploitedAcross     = `MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END)`
+	exploitedHereAcross = `MAX(CASE WHEN "f"."urgency_exploited_here" THEN 1 ELSE 0 END)`
 )
 
 // bounded keeps a signal inside the range its place value allows.

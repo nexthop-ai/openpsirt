@@ -131,12 +131,12 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 	// undisclosed finding is what puts a place in a build, and a judgment
 	// matching through one is a judgment matched by something not shown.
 	if f.TargetID != 0 {
-		mayRead, readArgs := readableFindingsOn(subject, "bf", "de.product_id")
+		mayRead, readArgs := readableFindingsOn(subject, "bf", `"de"."product_id"`)
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
 			JOIN "target" AS "bt" ON "bt"."id" = "bf"."target_id"
 			JOIN "stream" AS "bs" ON "bs"."id" = "bt"."stream_id"
 			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
-			  AND bf.target_id = ? AND bs.product_id = de.product_id`
+			  AND "bf"."target_id" = ? AND "bs"."product_id" = "de"."product_id"`
 		args := []any{f.TargetID}
 		if mayRead != "" {
 			clause += " AND " + mayRead

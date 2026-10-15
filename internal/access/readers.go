@@ -213,5 +213,5 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 		ColumnExpr(`"p"."id" AS "id"`).
 		ColumnExpr(`"p"."identity" AS "identity"`).
 		ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."identity") AS "name"`).
-		Where(`"p"."deactivated_at" IS NULL`), "p.id", enough, productID)
+		Where(`"p"."deactivated_at" IS NULL`), `"p"."id"`, enough, productID)
 }

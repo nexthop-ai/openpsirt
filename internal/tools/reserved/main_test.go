@@ -354,3 +354,62 @@ func q() {
 		t.Errorf("reported %v, want only the column in the clause", got)
 	}
 }
+
+func TestAQualifiedColumnInAFragmentIsReadWhereverItIsHeld(t *testing.T) {
+	const source = `package x
+
+import "strings"
+
+const keyMatches = "(cl.outcome = 'mismatched' OR de.live_key IS NULL)"
+
+type On string
+
+const OnStream On = "st.product_id"
+
+const RoutingBatch = "routing.batch"
+
+var allowed = map[string]bool{"q.visibility": true}
+
+type key struct{ expr string }
+
+var keys = []key{{expr: "f.target_id"}}
+
+func product() string { return "tg.stream_id" }
+
+func q() {
+	db.Where(HeldAs("f.vulnerability_id"))
+	db.Column("c.id").Order("tpl.told_id ASC")
+	_ = strings.Contains(body, "setting.kind")
+	_ = errorf("set publisher.name, or publisher.namespace in a file")
+	_ = []string{"-c", "user.name=test"}
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/x/x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns := map[string]bool{
+		"outcome": true, "live_key": true, "product_id": true, "batch": true, "visibility": true,
+		"target_id": true, "stream_id": true, "vulnerability_id": true, "id": true, "told_id": true,
+		"kind": true, "name": true, "namespace": true,
+	}
+	bad, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{}, columns, nil)
+	var got []string
+	for _, one := range ordered(bad) {
+		got = append(got, one.column)
+	}
+	want := `"de"."live_key" "cl"."outcome" "st"."product_id" "f"."target_id" "tg"."stream_id" "f"."vulnerability_id"`
+	if strings.Join(got, " ") != want {
+		t.Errorf("reported %v, want %s", got, want)
+	}
+
+	// A test hands a detector the bare spellings it exists to find.
+	file, err = parser.ParseFile(fset, "internal/x/x_test.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bad, _ := checkFile(fset, "internal/x/x_test.go", file, map[string]bool{}, columns, nil); len(bad) != 0 {
+		t.Errorf("a test was read for the qualified form: %v", bad)
+	}
+}

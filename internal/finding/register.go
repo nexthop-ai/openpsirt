@@ -357,17 +357,17 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // carries, spelled beside the column they are read from so the filter and the
 // word cannot come to mean different things.
 func registerState(word ClaimStanding) (string, bool) {
-	live := "de.live_key IS NOT NULL"
-	lapsed := "de.state = 'lapsed'"
+	live := `"de"."live_key" IS NOT NULL`
+	lapsed := `"de"."state" = 'lapsed'`
 	switch word {
 	case StandingUndecided:
-		return "de.id IS NULL", true
+		return `"de"."id" IS NULL`, true
 	case StandingAgreed:
-		return "(" + live + " AND de.state = 'approved')", true
+		return "(" + live + ` AND "de"."state" = 'approved')`, true
 	case StandingLapsed:
 		return "(" + lapsed + ")", true
 	case StandingWaiting:
-		return "(" + live + " AND de.state NOT IN ('approved', 'lapsed'))", true
+		return "(" + live + ` AND "de"."state" NOT IN ('approved', 'lapsed'))`, true
 	default:
 		return "", false
 	}
@@ -412,7 +412,7 @@ func (s *Store) registerJoins(productID int64,
 // a correction, which covers the place at any version. The one reported is
 // the one the finding's own screen names: the correction in force, and
 // otherwise the oldest.
-var onTheRecordHere = `((de.live_key IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
+var onTheRecordHere = `(("de"."live_key" IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
 	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
 		JOIN "vulnerability" AS "d3v" ON "d3v"."id" = "d3"."vulnerability_id"
 		WHERE "d3"."product_id" = "de"."product_id"
@@ -428,19 +428,19 @@ var onTheRecordHere = `((de.live_key IS NOT NULL AND ` + keyMatchesOn("de", outc
 		  AND "d2v"."issue_id" = "dv"."issue_id"
 		  AND "d2"."place_identity" = "de"."place_identity"
 		  AND (("d2"."live_key" IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
-		    OR (d2.state = 'lapsed' AND d2.id > de.id)))))`
+		    OR ("d2"."state" = 'lapsed' AND "d2"."id" > "de"."id")))))`
 
 // outcomeOf is the outcome of a decision's claim, as a scalar.
 func outcomeOf(decision string) string {
-	return `(SELECT "clr"."outcome" FROM "claim" AS "clr" WHERE "clr"."id" = ` + decision + `.claim_id)`
+	return `(SELECT "clr"."outcome" FROM "claim" AS "clr" WHERE "clr"."id" = "` + decision + `"."claim_id")`
 }
 
 // rankOf orders the live decisions at one place the way the finding's screen
 // does: a correction in force before anything else.
 func rankOf(decision string) string {
 	return `(CASE WHEN ` + outcomeOf(decision) + ` = '` + OutcomeMismatched + `'
-		AND (` + decision + `.state = 'approved'
-		  OR (` + decision + `.needs_approval = FALSE AND ` + decision + `.sent_back_at IS NULL))
+		AND ("` + decision + `"."state" = 'approved'
+		  OR ("` + decision + `"."needs_approval" = FALSE AND "` + decision + `"."sent_back_at" IS NULL))
 		THEN 0 ELSE 1 END)`
 }
 
@@ -518,7 +518,7 @@ func (s *Store) registerQuery(productID int64,
 // onTheRecord opens the case expression each of the decision's own columns is
 // wrapped in: a decision is part of this record where it is live or where it
 // lapsed, and a superseded one is not.
-const onTheRecord = `CASE WHEN de.live_key IS NOT NULL OR de.state = 'lapsed' THEN `
+const onTheRecord = `CASE WHEN "de"."live_key" IS NOT NULL OR "de"."state" = 'lapsed' THEN `
 
 // disposedFrom is one row as the register states it.
 func disposedFrom(row registerRow) Disposed {

@@ -138,11 +138,11 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 			CROSS JOIN "decision" AS "de"
 			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 			WHERE "de"."vulnerability_id" = "dv"."id"
-			  AND ` + finding.DecisionAt("st.product_id") + `
+			  AND ` + finding.DecisionAt(`"st"."product_id"`) + `
 			  AND "de"."live_key" IS NOT NULL
 			  AND ` + finding.KeyMatches + `)`).
 		GroupExpr(`"st"."product_id", "f"."place_identity"`)
-	if err := readableFindings(undecided, subject, "f", "st.product_id").
+	if err := readableFindings(undecided, subject, "f", `"st"."product_id"`).
 		Scan(ctx, &open); err != nil {
 		return nil, fmt.Errorf("read what else is undecided there: %w", err)
 	}

@@ -44,6 +44,13 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 	// children, so one walk could not. Keyed by the literal's position, since
 	// a line can carry a statement and a fragment that is not one.
 	seen := map[token.Pos]bool{}
+	// columnsRead is seen and every literal the qualified pass read, so a
+	// column it reported is not reported again where the literal is used.
+	columnsRead := map[token.Pos]bool{}
+	quotedHere := quotedArguments(file)
+	// The qualified form is read in the code that runs. A test is where a
+	// detector is handed the bare spellings it exists to find.
+	production := !definitions && !strings.HasSuffix(path, "_test.go")
 	ast.Inspect(file, func(node ast.Node) bool {
 		lit, ok := node.(*ast.BasicLit)
 		if !ok || lit.Kind != token.STRING {
@@ -66,9 +73,16 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 		// word after AS, and "as" is a word in nearly every English sentence
 		// in this repository.
 		if !statement.MatchString(text) {
+			if production && !quotedHere[lit.Pos()] {
+				if hits := qualifiedColumns(text, columns, path, at); len(hits) > 0 {
+					bad = append(bad, hits...)
+					columnsRead[lit.Pos()] = true
+				}
+			}
 			return true
 		}
 		seen[lit.Pos()] = true
+		columnsRead[lit.Pos()] = true
 		for _, match := range invented.FindAllStringSubmatch(text, -1) {
 			bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 		}
@@ -76,6 +90,10 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 		bad = append(bad, unquotedColumns(text, columns, path, at)...)
 		return true
 	})
+
+	if production {
+		bad = append(bad, handedNames(fset, path, file, columns, standardNames(file))...)
+	}
 
 	ast.Inspect(file, func(node ast.Node) bool {
 		if definitions {
@@ -173,7 +191,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 				text := withoutSQLComments(joined(parts))
 				for _, bare := range bareColumns(text, columns) {
 					one, whole := pieceAt(parts, bare.start, bare.end)
-					if whole && seen[one.pos] {
+					if whole && columnsRead[one.pos] {
 						continue
 					}
 					bad = append(bad, found{word: bare.word, file: path, line: one.line, bare: true, column: bare.quoted()})
@@ -191,7 +209,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 			continue
 		}
 		pieces := assembled(fn, seen, nil)
-		quoted := assembled(fn, seen, quotedByBuilder)
+		quoted := assembled(fn, columnsRead, quotedByBuilder)
 		ast.Inspect(fn.Body, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
 			if !ok {

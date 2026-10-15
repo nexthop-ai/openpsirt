@@ -599,7 +599,7 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(finding.KeyMatches).
-		Apply(readableFindingsBy(subject, "f", "st.product_id")).
+		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what this covers: %w", err)

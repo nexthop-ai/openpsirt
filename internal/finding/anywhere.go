@@ -186,7 +186,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`)
-		return filter.ofPage(lined(q, "f.urgency >= ?", int64(exploiting)))
+		return filter.ofPage(lined(q, `"f"."urgency" >= ?`, int64(exploiting)))
 	}
 	// grouped is the page's grouping in two levels (see twolevel.go). The
 	// first groups each product's places by issue and component, and by
@@ -203,11 +203,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		if len(filter.severities()) > 0 || filter.Reassessed {
 			rows = withRating(rows, rating.OnStream)
 		}
-		hot := `CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END`
+		hot := `CASE WHEN "f"."urgency" >= ? THEN 1 ELSE 0 END`
 		keys := []partKey{
-			{expr: "st.product_id", name: "product_id"},
-			{expr: "f.vulnerability_id", name: "vulnerability_id"},
-			{expr: "f.component_id", name: "component_id"},
+			{expr: `"st"."product_id"`, name: "product_id"},
+			{expr: `"f"."vulnerability_id"`, name: "vulnerability_id"},
+			{expr: `"f"."component_id"`, name: "component_id"},
 		}
 		if !wasBelow {
 			keys = append(keys, partKey{expr: hot, args: []any{int64(exploiting)}, name: "hot"})
@@ -341,7 +341,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`0 AS "total"`)
 	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
-	body = decisionCounts(body, "st.product_id", nil,
+	body = decisionCounts(body, `"st"."product_id"`, nil,
 		claimWaiting, claimApproved, claimLapsed, claimSentBack).
 		Where(`"st"."product_id" IN (?)`, bun.List(within)).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
@@ -432,4 +432,4 @@ var ratedAt = rankCase(rating.BandExpr, 0)
 //
 // Zero for anything that is not a band, which is what makes the sentinel for
 // "no line" compare below every rating.
-var lineAt = rankCase("COALESCE(NULLIF(p.triage_floor, ''), ?)", 0)
+var lineAt = rankCase(`COALESCE(NULLIF("p"."triage_floor", ''), ?)`, 0)

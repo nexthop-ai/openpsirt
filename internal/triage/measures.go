@@ -145,7 +145,7 @@ type Measuring struct {
 // narrow applies it to a query over the decision, aliased de, keyed on
 // whoever proposed.
 func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
-	return m.by(q, "de.proposed_by")
+	return m.by(q, `"de"."proposed_by"`)
 }
 
 // by is the same, for a count keyed on somebody else — an agreement is the
@@ -191,7 +191,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	sameProduct := `AND EXISTS (SELECT 1 FROM "target" AS "tg"
 			JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 			WHERE "tg"."id" = "f"."target_id" AND "st"."product_id" = "de"."product_id")`
-	mayRead, readArgs := readableFindingsOn(subject, "f", "de.product_id")
+	mayRead, readArgs := readableFindingsOn(subject, "f", `"de"."product_id"`)
 	if mayRead != "" {
 		sameProduct += " AND " + mayRead
 	}
@@ -324,7 +324,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 			ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."proposed_by"`)
-		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
+		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Proposed }); err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 			Where(`"de"."state" = ?`, Withdrawn).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."proposed_by"`)
-		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
+		return only.narrow(readableBy(from(q, `"de"."proposed_at"`, since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 			Where(`"da"."withdrawn_at" IS NULL`).
 			Where(`"da"."approved_at" < ?`, until).
 			GroupExpr(`"da"."approved_by"`)
-		return only.by(readableBy(from(q, "da.approved_at", since), subject, "de"), "da.approved_by")
+		return only.by(readableBy(from(q, `"da"."approved_at"`, since), subject, "de"), `"da"."approved_by"`)
 	}, func(w *Worked) *int { return &w.Approved }); err != nil {
 		return nil, err
 	}

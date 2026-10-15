@@ -575,7 +575,7 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`MAX("f"."disclose_at")`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
+		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(`"f"."visibility" = ?`, access.Private).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."disclose_at" IS NOT NULL`).

@@ -440,7 +440,7 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 	}
 	reads, err := holdingAny(s.db.NewSelect().
 		TableExpr(`"person" AS "p"`).ColumnExpr(`"p"."id"`).
-		Where(`"p"."id" = ?`, personID), "p.id", enough, productID).Exists(ctx)
+		Where(`"p"."id" = ?`, personID), `"p"."id"`, enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they may see this: %w", err)
 	}
@@ -535,7 +535,7 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "tmm"."person_id"`).
 		ColumnExpr(`"tmm"."person_id"`).
 		Where(`"tmm"."team_id" = ?`, teamID).
-		Where(`"pe"."deactivated_at" IS NULL`), "tmm.person_id", enough, productID).Exists(ctx)
+		Where(`"pe"."deactivated_at" IS NULL`), `"tmm"."person_id"`, enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether anybody on that team may see this: %w", err)
 	}

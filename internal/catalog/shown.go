@@ -25,7 +25,7 @@ func Shown(displayName, name string) string {
 // The alias is spliced into the statement, so only text a caller wrote in
 // code reaches it (REQ-66).
 func ShownExpr(alias string) string {
-	return `COALESCE(NULLIF(` + alias + `.display_name, ''), ` + alias + `.name)`
+	return `COALESCE(NULLIF("` + alias + `"."display_name", ''), "` + alias + `"."name")`
 }
 
 // BuildNames adds the six columns that name a build — its product, stream and

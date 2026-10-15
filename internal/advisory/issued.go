@@ -151,7 +151,7 @@ func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	// The product half is inside it: a product this reader holds nothing on
 	// is in none of the groups the issue clause admits.
 	q = wholeIssues(q, subject)
-	return everyIssue(q, subject, "ac.added_at <= ai.issued_at AND ac.removed_at > ai.issued_at")
+	return everyIssue(q, subject, `"ac"."added_at" <= "ai"."issued_at" AND "ac"."removed_at" > "ai"."issued_at"`)
 }
 
 // wholeIssues narrows a statement over "advisory" as "ad" to the advisories
@@ -169,7 +169,7 @@ func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // document is: a row saying an advisory went out is as much a disclosure as
 // the document.
 func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
-	return everyIssue(q, subject, "ac.removed_at IS NULL")
+	return everyIssue(q, subject, `"ac"."removed_at" IS NULL`)
 }
 
 // everyIssue narrows a statement over "advisory" as "ad" to the advisories
@@ -187,7 +187,7 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 		return q
 	}
 	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
 	bound := append([]any{finding.Entered}, args...)
 	bound = append(bound, access.Private)
 	bound = append(bound, args...)

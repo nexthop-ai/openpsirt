@@ -67,8 +67,8 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.WhereOr(`"claim"."outcome" = ?`, Mismatched).
 			WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				q = matchVersion(q, "de.component_upstream_version", at.ComponentUpstream)
-				return matchVersion(q, "de.consumer_upstream_version", at.ConsumerUpstream)
+				q = matchVersion(q, `"de"."component_upstream_version"`, at.ComponentUpstream)
+				return matchVersion(q, `"de"."consumer_upstream_version"`, at.ConsumerUpstream)
 			})
 	})
 
@@ -315,13 +315,13 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 			q = q.Where(`"de"."product_id" IN (?)`, bun.List(f.ProductIDs))
 		}
 		if len(f.Outcomes) > 0 {
-			q = saying(q, "fc.outcome IN (?)", bun.List(f.Outcomes))
+			q = saying(q, `"fc"."outcome" IN (?)`, bun.List(f.Outcomes))
 		}
 		if len(f.States) > 0 {
 			q = q.Where(`"de"."state" IN (?)`, bun.List(f.States))
 		}
 		if f.Expired {
-			q = saying(q, "fc.deferred_until IS NOT NULL AND fc.deferred_until <= ?", s.now())
+			q = saying(q, `"fc"."deferred_until" IS NOT NULL AND "fc"."deferred_until" <= ?`, s.now())
 		}
 		if f.Stopped {
 			// The claims whose date has passed, as a set the rows are tested

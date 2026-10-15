@@ -52,8 +52,8 @@ const GroupedAcross = "st.product_id, " + GroupedOn
 // was derived from, so they do not vary within a fold in any way a person can
 // see — but the key folds capitals and the column does not, so grouping on
 // them as well could split a fold that two producers spelled differently.
-const SourceName = `CASE WHEN COALESCE(c.upstream_name, '') <> '' THEN c.upstream_name
-		ELSE c.name END`
+const SourceName = `CASE WHEN COALESCE("c"."upstream_name", '') <> '' THEN "c"."upstream_name"
+		ELSE "c"."name" END`
 
 // SourceVersion falls back independently of SourceName, through the same
 // expression the version a decision expires on is read with: one fold and one
@@ -66,7 +66,7 @@ var SourceVersion = upstreamVersionOf("c")
 // ComponentUpstreamExpr is this over "c" and ConsumerUpstreamExpr over "uc",
 // spelled as constants because other constants are built from them.
 func upstreamVersionOf(alias string) string {
-	return strings.ReplaceAll(ComponentUpstreamExpr, "c.", alias+".")
+	return strings.ReplaceAll(ComponentUpstreamExpr, `"c".`, `"`+alias+`".`)
 }
 
 // PerFold puts one of those expressions under an aggregate, for a query that

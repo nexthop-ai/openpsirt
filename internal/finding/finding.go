@@ -168,8 +168,8 @@ const (
 // it is neither opened nor fixed: what counts what a run opened or closed, or
 // how long a fix took, leaves it out. It carries no deadline, so no deadline
 // can be judged met by it, and it is in no open set a trend or a list reads.
-const wasOpen = `(f.opened_run_id IS NULL OR f.closed_run_id IS NULL
-	OR f.opened_run_id <> f.closed_run_id)`
+const wasOpen = `("f"."opened_run_id" IS NULL OR "f"."closed_run_id" IS NULL
+	OR "f"."opened_run_id" <> "f"."closed_run_id")`
 
 // Closures are every reason a finding stops being open, in the order they are
 // offered.

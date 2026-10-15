@@ -99,9 +99,9 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 		// decimal on two of the four engines and the cast that fixes it is
 		// spelled per engine, which is why the rule says to write two counts
 		// — and this was the second copy of a shape recorded as removed.
-		ColumnExpr(access.PrivateCountAs("f.visibility", "undisclosed")).
+		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "undisclosed")).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(finding.HeldAs("f.vulnerability_id"), vulnerabilityID).
+		Where(finding.HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Scan(ctx, &counted)
 	if err != nil {
 		return access.Private, false, fmt.Errorf("read how disclosed an issue is: %w", err)

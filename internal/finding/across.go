@@ -549,8 +549,8 @@ const promiseSpan = int64(1) << 40
 // densely, two promises alike in all three share a rank, and the later claim
 // stands.
 const promiseRank = `DENSE_RANK() OVER (ORDER BY` +
-	` CASE WHEN COALESCE(cl.upgrade_to, '') <> '' THEN 1 ELSE 0 END,` +
-	` CASE WHEN cl.committed_to IS NULL THEN 0 ELSE 1 END, cl.committed_to)`
+	` CASE WHEN COALESCE("cl"."upgrade_to", '') <> '' THEN 1 ELSE 0 END,` +
+	` CASE WHEN "cl"."committed_to" IS NULL THEN 0 ELSE 1 END, "cl"."committed_to")`
 
 // openAcross is what is open across each fold, per build: the counts, how they
 // were rated, where the fold could go, and what has been promised for it.
@@ -602,7 +602,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		GroupExpr(`"dv"."issue_id", "de"."place_identity"`)
-	folds, foldOf, foldArgs := held.folds(`"pf".component_id`)
+	folds, foldOf, foldArgs := held.folds(`"pf"."component_id"`)
 	perFix := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
@@ -614,7 +614,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd".promise) AS "promise"`).
-		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd".issue_id`, `"pd".place_identity`, "f"), promises).
+		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."place_identity"`, "f"), promises).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -655,7 +655,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 
 	const (
 		oneFix    = `CASE WHEN "pi".lo = "pi".hi THEN "pi".lo END`
-		severalOf = `CASE WHEN "pi".lo <> "pi".hi THEN "pi".vulnerability_id END`
+		severalOf = `CASE WHEN "pi".lo <> "pi".hi THEN "pi"."vulnerability_id" END`
 	)
 	// Scanned a column at a time, because the columns are as many as the
 	// binaries.

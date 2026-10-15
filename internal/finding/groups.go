@@ -927,7 +927,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// sort after "public", so a maximum of the word answers "public" for
 		// a mixed group. The four engines do not agree on a boolean aggregate
 		// either, and counting is the same question asked portably.
-		ColumnExpr(access.AnyPrivateAs("f.visibility", "undisclosed")).
+		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
 		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
 		// Both ends of what the places say, because a group whose places
 		// disagree is what FixMixed is for and a minimum alone cannot say it:

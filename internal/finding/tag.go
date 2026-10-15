@@ -131,7 +131,7 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID)
 	if err := InTheFoldOf(q, componentID).
 		GroupExpr(`"f"."component_id"`).

@@ -247,12 +247,12 @@ func forChannel(q *bun.SelectQuery, to Outbound, offered []string,
 	case to.ProductID != nil:
 		return q.Where(`"nt"."private" = ?`, false).
 			Where(`"nt"."product_id" = ?`, *to.ProductID).
-			Where("NOT EXISTS (?)", covering(q, offered, "narrower.team_id = nt.team_id"))
+			Where("NOT EXISTS (?)", covering(q, offered, `"narrower"."team_id" = "nt"."team_id"`))
 	}
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(`"nt"."private" = ?`, true).
 			WhereOr("NOT EXISTS (?)", covering(q, offered,
-				"narrower.product_id = nt.product_id OR narrower.team_id = nt.team_id"))
+				`"narrower"."product_id" = "nt"."product_id" OR "narrower"."team_id" = "nt"."team_id"`))
 	})
 }
 
@@ -375,8 +375,8 @@ func direct(q *bun.SelectQuery, platform string, offered []string,
 				WhereOr(`EXISTS (SELECT 1 FROM "chat_preference" AS "also" `+
 					`WHERE "also"."person_id" = "nt"."person_id" AND "also"."shared" = ?)`, true).
 				WhereOr("NOT EXISTS (?)", covering(q, offered,
-					"(narrower.product_id IS NULL AND narrower.team_id IS NULL) "+
-						"OR narrower.product_id = nt.product_id OR narrower.team_id = nt.team_id"))
+					`("narrower"."product_id" IS NULL AND "narrower"."team_id" IS NULL) `+
+						`OR "narrower"."product_id" = "nt"."product_id" OR "narrower"."team_id" = "nt"."team_id"`))
 		})
 }
 

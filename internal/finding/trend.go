@@ -167,7 +167,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// component.
 	if name := strings.TrimSpace(within.Component); name != "" {
 		moments = moments.Where(`"f"."component_id" IN (?)`,
-			componentsWhere(moments, "c.name_folded = ?", graph.Folded(name)))
+			componentsWhere(moments, `"c"."name_folded" = ?`, graph.Folded(name)))
 	}
 	if within.Beneath != nil {
 		targets, err := s.Builds(ctx, scope)

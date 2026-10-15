@@ -232,7 +232,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
-	if err := readableFindings(query, subject, "f", "st.product_id").
+	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
 		Scan(ctx, &counted); err != nil {
 		return Reach{}, fmt.Errorf("count what that claim covers: %w", err)
 	}
@@ -299,7 +299,7 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(`"f"."opened_at" <= "de"."ended_at"`).
 		Where(`("f"."closed_at" IS NULL OR "f"."closed_at" > "de"."ended_at")`)
-	if err := readableFindings(query, subject, "f", "st.product_id").
+	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
 		GroupExpr(`"de"."state", "st"."name", "va"."name"`).
 		OrderExpr(`"de"."state", "st"."name", "va"."name"`).
 		Scan(ctx, &reached); err != nil {

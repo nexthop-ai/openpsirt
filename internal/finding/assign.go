@@ -701,7 +701,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// when any of its places is. The alternative reads worse in both
 	// directions — a group with one late place among forty is late, and
 	// calling it a fortieth of one is a number nobody acts on.
-	standing, args := OffTheClock("st.product_id", s.now())
+	standing, args := OffTheClock(`"st"."product_id"`, s.now())
 	late := mine().
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -941,7 +941,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		// Any undisclosed row makes the group undisclosed. Written as a sum
 		// rather than a boolean aggregate: the four engines do not agree on
 		// one, and counting is the same question asked portably.
-		ColumnExpr(access.AnyPrivateAs("f.visibility", "undisclosed")).
+		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The total rides on the page, as the findings list's does: the
 		// groups the narrowing admits, counted after the grouping and before

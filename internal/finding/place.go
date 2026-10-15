@@ -29,8 +29,8 @@ import (
 // and compared against them in another. Two spellings of the same expression
 // is how a decision starts lapsing on one path and standing on the other.
 const (
-	ComponentUpstreamExpr = "COALESCE(NULLIF(c.upstream_version, ''), c.version, '')"
-	ConsumerUpstreamExpr  = "COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')"
+	ComponentUpstreamExpr = `COALESCE(NULLIF("c"."upstream_version", ''), "c"."version", '')`
+	ConsumerUpstreamExpr  = `COALESCE(NULLIF("uc"."upstream_version", ''), "uc"."version", '')`
 )
 
 // inFoldOf narrows a read of findings `f` to the places one judgment about an

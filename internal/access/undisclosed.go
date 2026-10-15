@@ -9,9 +9,9 @@ import "regexp"
 // undisclosed rows of. A column is placed in the statement as written, so it
 // comes from this set rather than from a caller.
 var visibilityColumns = map[string]bool{
-	"f.visibility":  true,
-	"de.visibility": true,
-	"q.visibility":  true,
+	`"f"."visibility"`:  true,
+	`"de"."visibility"`: true,
+	`"q"."visibility"`:  true,
 }
 
 // PrivateCount is an aggregate counting the rows of a group whose visibility

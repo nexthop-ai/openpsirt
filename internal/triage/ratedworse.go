@@ -164,7 +164,7 @@ var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
 	` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"` +
 	` JOIN "target" AS "tgc" ON "tgc"."id" = "fc"."target_id"` +
 	` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"` +
-	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
+	` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL` +
 	` AND ` + finding.DecisionAtPlace("fc") +
 	` AND ` + finding.VersionsMatch + `)`
 

@@ -200,7 +200,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 	}
 	// Undisclosed where any open finding there is, disclosed where there are
 	// findings and none is, and nothing where there are none.
-	undisclosed, private := access.AnyPrivate("f.visibility")
+	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The issue the decision is read as, which is the one the new line holds.
@@ -248,7 +248,7 @@ func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.Se
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
-			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtPlace("f") + ` AND f.closed_at IS NULL
+			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtPlace("f") + ` AND "f"."closed_at" IS NULL
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
 	}
@@ -375,7 +375,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// what a carried judgment would be written at.
 		Landing string `bun:"landing"`
 	}
-	undisclosed, private := access.AnyPrivate("f.visibility")
+	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The issue each decision is read as, which is the one the new line holds.

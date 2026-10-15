@@ -84,10 +84,10 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// everything held.
 	within, bounds := "", []any{}
 	if !since.IsZero() {
-		within, bounds = ` AND f.closed_at >= ?`, append(bounds, since)
+		within, bounds = ` AND "f"."closed_at" >= ?`, append(bounds, since)
 	}
 	if !until.IsZero() {
-		within, bounds = within+` AND f.closed_at < ?`, append(bounds, until)
+		within, bounds = within+` AND "f"."closed_at" < ?`, append(bounds, until)
 	}
 	// A standing deferral at the place, asked as a correlated existence test
 	// rather than a join, so a place with two of them counts once. It is the

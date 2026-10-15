@@ -49,11 +49,11 @@ var order = map[SortKey]struct {
 	column bool
 }{
 	ByUrgency:    {expr: "urgency", column: true},
-	ByAge:        {expr: "MIN(f.opened_at)"},
-	ByDeadline:   {expr: "MIN(f.due_at)"},
+	ByAge:        {expr: `MIN("f"."opened_at")`},
+	ByDeadline:   {expr: `MIN("f"."due_at")`},
 	ByPlaces:     {expr: "places", column: true},
-	ByLikelihood: {expr: "MAX(COALESCE(v.likelihood_ppm, 0))", issue: true},
-	BySeverity:   {expr: "MAX(COALESCE(v.score_centi, 0))", issue: true},
+	ByLikelihood: {expr: `MAX(COALESCE("v"."likelihood_ppm", 0))`, issue: true},
+	BySeverity:   {expr: `MAX(COALESCE("v"."score_centi", 0))`, issue: true},
 }
 
 // orderedBy is the by-component view's order: what an asked-for key sorts by,
