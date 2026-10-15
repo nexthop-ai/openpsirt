@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -1047,7 +1048,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		if len(publishers) > 0 {
 			lowered := make([]string, 0, len(publishers))
 			for _, name := range publishers {
-				lowered = append(lowered, strings.ToLower(name))
+				lowered = append(lowered, typedname.Matching(name))
 			}
 			asked = append(asked, `"ss"."publisher" IN (?)`)
 			about = append(about, bun.List(lowered))

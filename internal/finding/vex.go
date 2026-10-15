@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Statement is what a third party's document says about a component we ship.
@@ -328,7 +329,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	if err := from.valid(); err != nil {
 		return 0, 0, err
 	}
-	publisher := strings.ToLower(strings.TrimSpace(from.Publisher))
+	publisher := typedname.Matching(from.Publisher)
 	identifier := strings.TrimSpace(from.Identifier)
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0

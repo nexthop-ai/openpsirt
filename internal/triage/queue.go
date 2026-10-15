@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Waiting is one claim somebody has to look at, with what an approver needs in
@@ -191,7 +192,7 @@ func (s *Store) waitingClaims(subject access.Subject, filter QueueFilter) *bun.S
 func (s *Store) reachableClaims(grouped *bun.SelectQuery, outOfReach string, args []any) *bun.SelectQuery {
 	return s.db.NewSelect().TableExpr(`(?) AS "waiting"`, grouped).
 		ColumnExpr(`"waiting"."claim_id" AS "claim_id"`).
-		ColumnExpr(`"waiting".newest AS "newest"`).
+		ColumnExpr(`"waiting"."newest" AS "newest"`).
 		Join(`LEFT JOIN "decision" AS "other" ON "other"."claim_id" = "waiting"."claim_id" AND (`+
 			outOfReach+`)`, args...).
 		Where(`"other"."id" IS NULL`)
@@ -280,7 +281,7 @@ func (f QueueFilter) narrow(q *bun.SelectQuery, subject access.Subject) *bun.Sel
 			q.NewSelect().TableExpr(`"claim" AS "qc"`).Column("qc.id").
 				Where(`"qc"."outcome" IN (?)`, bun.List(f.Outcomes)))
 	}
-	if release := strings.ToLower(strings.TrimSpace(f.Release)); release != "" {
+	if release := typedname.Matching(f.Release); release != "" {
 		// An open finding the row covers, in a build of the named release.
 		covers := openUnder(q).Where(`"st"."name" = ?`, release)
 		q = q.Where("EXISTS (?)", readableFindings(covers, subject, "f", `"st"."product_id"`))
