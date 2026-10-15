@@ -294,7 +294,6 @@ var settable = []struct {
 		setting.Duration, nil, func(core.Deps) string { return setting.DefaultDisclosureLead.String() }, false},
 }
 
-// theSwitch is the two values an on-or-off setting may take.
 // inDays is the duration settings that are stated in whole days, with what a
 // refusal of a part-day value says.
 var inDays = map[string]struct{ because, example string }{
@@ -302,6 +301,7 @@ var inDays = map[string]struct{ because, example string }{
 	setting.QuietAfter:        {"a build's silence is shown in days", "168h for a week"},
 }
 
+// theSwitch is the two values an on-or-off setting may take.
 var theSwitch = []string{setting.On, setting.Off}
 
 // theFloor is the words the triage line may be set to, from the package that
