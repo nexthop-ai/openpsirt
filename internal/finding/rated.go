@@ -110,9 +110,8 @@ const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS "tg"
 // inThisProductAs is the same condition over a qualified column, for the reads
 // that alias the table they narrow.
 //
-// Named rather than written out, which is what it was at a dozen sites: one of
-// them spelled the same question as a nested membership on the stream, with
-// nothing saying why, and the rest were the constant's own text typed again.
+// Named rather than written out, so every read that narrows a target to a
+// product asks it in one spelling.
 func inThisProductAs(column string) string {
 	return column + ` IN (SELECT tg.id FROM "target" AS "tg"
 	JOIN "stream" AS "st" ON st.id = tg.stream_id

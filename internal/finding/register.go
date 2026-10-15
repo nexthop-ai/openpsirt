@@ -478,11 +478,10 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(onTheRecord + `de.proposed_at ELSE NULL END AS "proposed_at"`).
 		// The agreement that put it in force, asked as a scalar rather than
 		// joined. Nothing makes an approval unique per decision — a second
-		// approver adds a row — and joined, each extra one multiplied the
-		// finding it belongs to into two rows on a page whose total counts
-		// findings. The page then held one row fewer than it said, and every
-		// later offset skipped one, so an auditor paging a register silently
-		// never saw some of it.
+		// approver adds a row — and joined, each extra one multiplies the
+		// finding it belongs to on a page whose total counts findings, so the
+		// page holds fewer findings than it says and every later offset skips
+		// some of the register.
 		ColumnExpr(onTheRecord + `COALESCE((SELECT p2.identity FROM "claim_approval" AS "da2"
 			JOIN "person" AS "p2" ON p2.id = da2.approved_by
 			WHERE da2.claim_id = de.claim_id AND da2.withdrawn_at IS NULL

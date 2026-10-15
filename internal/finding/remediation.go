@@ -128,9 +128,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	out := &Remediation{TimeToFix: map[string]time.Duration{}}
 
 	// spans is how long each issue took, averaged per severity band.
-	// Averaged over the issue rather than over its rows: an issue is
-	// closed when the last of its places is, and the places are what fans
-	// out.
+	// Averaged over the issue rather than over its rows, because the places
+	// are what fans out: an issue counts once where any of its places closed
+	// by a fix in the window, and took from the first of those places to
+	// open to the last of them to close.
 	var spans []struct {
 		Rank    int     `bun:"band_rank"`
 		Seconds float64 `bun:"seconds"`

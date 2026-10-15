@@ -83,9 +83,8 @@ func Tail(s string, most int) string {
 // which is what every indexed name column in this schema is declared in:
 // PostgreSQL, MySQL and MariaDB all count a VARCHAR's length in characters.
 // Cut at the same number of bytes, a name written in a script that takes three
-// bytes a character was cut to a third of what the column holds — and where
-// the cut feeds a hash, two names differing only past that third folded
-// together.
+// bytes a character is cut to a third of what the column holds, and where the
+// cut feeds a hash, two names differing only past that third fold together.
 //
 // It is not the same function as Head with a bigger number. The two answer
 // different questions, and a caller bounding bytes — a message, a program's

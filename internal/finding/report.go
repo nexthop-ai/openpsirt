@@ -126,13 +126,12 @@ func (t Told) When() *time.Time {
 
 // ReportFor reads who told us about one issue, or nil where nobody did.
 //
-// Authorized here, against the product the report was made against. It was
-// authorized by the caller instead, which resolved the issue in whatever
-// product the request named — and an issue's identity spans its aliases, so
-// the moment a shared name is recorded the same issue is open in other
-// products. Somebody holding triage rights in any of those could read a
-// reporter's name, address and received date for a report made about a
-// product they hold nothing in.
+// Authorized here, against the product the report was made against, rather
+// than against the product a request names. An issue's identity spans its
+// aliases, so once a shared name is recorded the same issue is open in other
+// products, and triage rights in any of those would read a reporter's name,
+// address and received date for a report about a product the reader holds
+// nothing in.
 //
 // The same rule a report reached by its reference takes, because it is the
 // same row. Asked as the issue's own visibility instead, judging a claim

@@ -118,8 +118,8 @@ func TestTheClassScoresAreTheOnesABaseVectorConsults(t *testing.T) {
 //
 // Class five contributes none — exploitation is unstated on every base vector
 // — so the class below it is stepped toward and never read. Measuring what a
-// class steps toward rather than what is read counts thirty-six entries as
-// checked that nothing consults.
+// class steps toward rather than what is read counts entries nothing consults
+// as checked.
 func reads(e eqs) []string {
 	keys := []string{e.key()}
 	for class := 1; class <= 4; class++ {

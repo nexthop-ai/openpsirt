@@ -82,9 +82,9 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		// products' tags interleave by date and mean nothing side by side.
 		//
 		// Refused rather than answered empty. An empty list is what a product
-		// with no releases looks like, so a request that named no product got
-		// the same answer as one whose product has nothing to plot — and the
-		// route's own description says a product must be named.
+		// with no releases looks like, and a request naming no product is a
+		// different answer: the route's own description says a product must
+		// be named.
 		return nil, ErrNoProductNamed
 	}
 	limit = database.APlot.Of(limit)
@@ -108,7 +108,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`tg.stream_id AS "stream_id"`).
 		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		Where("st.kind = ?", "tag").
+		Where("st.kind = ?", catalog.Tag).
 		Where("f.closed_at IS NULL").
 		GroupExpr("tg.stream_id, f.vulnerability_id")
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))

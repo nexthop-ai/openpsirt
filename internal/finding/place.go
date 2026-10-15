@@ -533,8 +533,9 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 // which must not differ between the read that writes it and the read that
 // matches it.
 //
-// It does not take the ordering with it: the three order differently, and what
-// a decision is keyed on must not depend on what the database returned first.
+// It does not take the ordering with it: each reader orders its own way, and
+// what a decision is keyed on must not depend on what the database returned
+// first.
 func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 	return q.
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).

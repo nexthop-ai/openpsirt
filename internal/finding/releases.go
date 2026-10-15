@@ -120,11 +120,10 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// against it. Read separately and merged, because the counts come from
 	// the findings and a build with none has no finding to be read from.
 	//
-	// Driven from the findings alone, a release with nothing open was simply
-	// absent — and absent is how this list says "never scanned". So a clean
-	// build read as an unmeasured one, which is the opposite of what it is,
-	// and it was missing from the chart that is meant to show the estate
-	// getting better.
+	// Absent is how this list says "never scanned", so a build with nothing
+	// open is listed: a clean build read as an unmeasured one is the opposite
+	// of what it is, and the chart showing the estate getting better needs
+	// it.
 	var scanned []struct {
 		Stream  string `bun:"stream"`
 		Kind    string `bun:"kind"`
@@ -190,9 +189,9 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 	}
 	// A person, and one who may see this product. `Sees` alone is true for a
 	// pipeline credential naming the product, which ignores the stream and
-	// variant that credential is pinned to — `Releases` beside this checks the
-	// kind explicitly and this did not. No route reaches it as a pipeline
-	// today; the next one added would.
+	// variant that credential is pinned to, so the kind is checked here as
+	// `Releases` beside this checks it. No pipeline route reaches it; a route
+	// that admits a pipeline must pass the build scope explicitly.
 	if subject.Kind != access.Person {
 		return nil, access.Denied("read what the releases hold")
 	}

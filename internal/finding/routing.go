@@ -229,11 +229,10 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 			// rather than placing work where nothing can be picked up from.
 			continue
 		}
-		// The room a rule gets is what the batch has left to read. Handing it
-		// what the batch has left to *write* gave the next rule the room the
-		// last one lost to a human assignment, which is first-match-wins
-		// undone for that batch: work the earlier rule had claimed went to a
-		// later one instead.
+		// The room a rule gets is what the batch has left to read, not what it
+		// has left to write. The room the last rule lost to a human assignment
+		// is not the next rule's, or first-match-wins is undone for that batch
+		// and work the earlier rule claimed goes to a later one.
 		read, n, err := s.applyOne(ctx, productID, rule, party, cap-seen)
 		if errors.Is(err, ErrTooBroad) {
 			outgrown = append(outgrown, rule.ID)
@@ -538,9 +537,9 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 			}).
 			// One more than the cap, so that reaching it is distinguishable
 			// from landing on it exactly. The cap is the store's, not the
-			// constant: a store built with a smaller reach truncated at the
-			// shipped number and never tripped its own refusal, which is
-			// quietly applying to part of what a rule names.
+			// constant: a store built with a smaller reach that truncates at
+			// the shipped number never trips its own refusal, and applies a
+			// rule to part of what it names.
 			Limit(s.reaching()+1).
 			Scan(ctx, &roots); err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
