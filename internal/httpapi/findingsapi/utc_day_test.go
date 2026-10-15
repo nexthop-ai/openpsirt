@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // One instant is one day whatever zone the server's clock read it in. Pinned
@@ -22,11 +21,5 @@ func TestAFindingsDayIsTheUTCDayOfItsMoment(t *testing.T) {
 	if row.Due != "2026-10-15" || row.DiscloseAt != "2026-10-15" || row.Opened != "2026-10-01" {
 		t.Errorf("the row reads due %s, disclosed %s, opened %s; want the UTC days 2026-10-15, 2026-10-15, 2026-10-01",
 			row.Due, row.DiscloseAt, row.Opened)
-	}
-	if moved := core.InUTC(&due); moved.Location() != time.UTC || !moved.Equal(due) {
-		t.Errorf("a moment answered as a time is %v, want the same instant in UTC", moved)
-	}
-	if core.InUTC(nil) != nil {
-		t.Error("no moment is answered as one")
 	}
 }

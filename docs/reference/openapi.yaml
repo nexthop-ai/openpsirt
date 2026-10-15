@@ -378,18 +378,15 @@ components:
           type: string
         caught_up_to:
           description: The newest moment in what they list that has been read
-          format: date-time
           type: string
         name:
           description: The name this supplier is configured under
           type: string
         read:
           description: When a read of this supplier last succeeded
-          format: date-time
           type: string
         tried:
           description: When this supplier was last tried
-          format: date-time
           type: string
         url:
           description: Where the supplier describes what they publish
@@ -4258,7 +4255,6 @@ components:
           type: integer
         first_seen:
           description: The moment a scan of this deployment first reported the package
-          format: date-time
           type: string
         issues:
           description: Distinct vulnerabilities open against this binary alone
@@ -4275,7 +4271,6 @@ components:
           type: string
         newest_released_at:
           description: The date that version shipped, where the index said
-          format: date-time
           type: string
         newest_version:
           description: The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package
@@ -7707,7 +7702,6 @@ components:
           type: object
         committed_to:
           description: The date the work promised here is due
-          format: date-time
           type: string
         consumers:
           description: The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted
@@ -7715,7 +7709,6 @@ components:
           type: integer
         due_at:
           description: The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees
-          format: date-time
           type: string
         ecosystem:
           description: The ecosystem the package identifiers name
@@ -8811,7 +8804,6 @@ components:
       properties:
         moved_at:
           description: "The moment the snapshot last moved: the most recent time any snapshot was read for the first time"
-          format: date-time
           type: string
         stale:
           description: Whether it has gone the same span without moving that counts as stopped for the scanner's data
@@ -10078,7 +10070,6 @@ components:
           type: string
         stopped_at:
           description: The moment it was set aside
-          format: date-time
           type: string
       required:
         - id
@@ -10631,14 +10622,12 @@ components:
       properties:
         from:
           description: The build time of the first scan that stated it
-          format: date-time
           type: string
         purl:
           description: The package identifier as the build stated it, version and qualifiers included
           type: string
         until:
           description: The build time of the scan that stated something else. Absent while it is what the build states
-          format: date-time
           type: string
         version:
           description: The version as the build stated it, empty where it stated none
@@ -11626,7 +11615,6 @@ components:
           type: string
         moved_at:
           description: "The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
-          format: date-time
           type: string
         records:
           $ref: "#/components/schemas/RecordsDataBody"

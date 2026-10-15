@@ -6331,22 +6331,13 @@ export interface components {
             readonly $schema?: string;
             /** @description The reason the last attempt stopped, where one did */
             because?: string;
-            /**
-             * Format: date-time
-             * @description The newest moment in what they list that has been read
-             */
+            /** @description The newest moment in what they list that has been read */
             caught_up_to?: string;
             /** @description The name this supplier is configured under */
             name: string;
-            /**
-             * Format: date-time
-             * @description When a read of this supplier last succeeded
-             */
+            /** @description When a read of this supplier last succeeded */
             read?: string;
-            /**
-             * Format: date-time
-             * @description When this supplier was last tried
-             */
+            /** @description When this supplier was last tried */
             tried?: string;
             /** @description Where the supplier describes what they publish */
             url: string;
@@ -8601,10 +8592,7 @@ export interface components {
              * @description The number of things pulling this binary in here
              */
             consumers: number;
-            /**
-             * Format: date-time
-             * @description The moment a scan of this deployment first reported the package
-             */
+            /** @description The moment a scan of this deployment first reported the package */
             first_seen: string;
             /**
              * Format: int64
@@ -8617,10 +8605,7 @@ export interface components {
             name: string;
             /** @description The namespace the package identifier names, where it names one. Send it back with the version and ecosystem where a build holds one name at one version as two components */
             namespace?: string;
-            /**
-             * Format: date-time
-             * @description The date that version shipped, where the index said
-             */
+            /** @description The date that version shipped, where the index said */
             newest_released_at?: string;
             /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
             newest_version?: string;
@@ -10451,20 +10436,14 @@ export interface components {
             by_severity?: {
                 [key: string]: number;
             };
-            /**
-             * Format: date-time
-             * @description The date the work promised here is due
-             */
+            /** @description The date the work promised here is due */
             committed_to?: string;
             /**
              * Format: int64
              * @description The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted
              */
             consumers: number;
-            /**
-             * Format: date-time
-             * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees
-             */
+            /** @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees */
             due_at?: string;
             /** @description The ecosystem the package identifiers name */
             ecosystem?: string;
@@ -11131,10 +11110,7 @@ export interface components {
             version: string;
         };
         RecordsDataBody: {
-            /**
-             * Format: date-time
-             * @description The moment the snapshot last moved: the most recent time any snapshot was read for the first time
-             */
+            /** @description The moment the snapshot last moved: the most recent time any snapshot was read for the first time */
             moved_at?: string;
             /** @description Whether it has gone the same span without moving that counts as stopped for the scanner's data */
             stale: boolean;
@@ -11885,10 +11861,7 @@ export interface components {
             last_error?: string;
             /** @description The subject of the work */
             reference: string;
-            /**
-             * Format: date-time
-             * @description The moment it was set aside
-             */
+            /** @description The moment it was set aside */
             stopped_at: string;
         };
         SettingBody: {
@@ -12200,17 +12173,11 @@ export interface components {
             statement?: string;
         };
         StatedVersionBody: {
-            /**
-             * Format: date-time
-             * @description The build time of the first scan that stated it
-             */
+            /** @description The build time of the first scan that stated it */
             from: string;
             /** @description The package identifier as the build stated it, version and qualifiers included */
             purl?: string;
-            /**
-             * Format: date-time
-             * @description The build time of the scan that stated something else. Absent while it is what the build states
-             */
+            /** @description The build time of the scan that stated something else. Absent while it is what the build states */
             until?: string;
             /** @description The version as the build stated it, empty where it stated none */
             version: string;
@@ -12729,10 +12696,7 @@ export interface components {
              * @example https://example.com/schemas/VulnerabilityDataBody.json
              */
             readonly $schema?: string;
-            /**
-             * Format: date-time
-             * @description The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
-             */
+            /** @description The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change */
             moved_at?: string;
             /** @description The CVE record snapshot the scans narrowed their matches with */
             records: components["schemas"]["RecordsDataBody"];

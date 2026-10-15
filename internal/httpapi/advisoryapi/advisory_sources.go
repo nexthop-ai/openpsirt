@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -27,10 +26,10 @@ type AdvisorySourceBody struct {
 	// Tried, Read, CaughtUpTo and Because say whether it is working, which is
 	// the question an operator has about a source and one nothing else
 	// answers.
-	Tried      *time.Time `json:"tried,omitempty" doc:"When this supplier was last tried"`
-	Read       *time.Time `json:"read,omitempty" doc:"When a read of this supplier last succeeded"`
-	CaughtUpTo *time.Time `json:"caught_up_to,omitempty" doc:"The newest moment in what they list that has been read"`
-	Because    string     `json:"because,omitempty" doc:"The reason the last attempt stopped, where one did"`
+	Tried      string `json:"tried,omitempty" doc:"When this supplier was last tried"`
+	Read       string `json:"read,omitempty" doc:"When a read of this supplier last succeeded"`
+	CaughtUpTo string `json:"caught_up_to,omitempty" doc:"The newest moment in what they list that has been read"`
+	Because    string `json:"because,omitempty" doc:"The reason the last attempt stopped, where one did"`
 }
 
 // registerAdvisorySources configures which suppliers this deployment reads
@@ -66,8 +65,8 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		out.Body.Items = make([]AdvisorySourceBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, AdvisorySourceBody{
-				Name: row.Display, URL: row.URL, Tried: core.InUTC(row.FetchedAt),
-				Read: core.InUTC(row.ReachedAt), CaughtUpTo: core.InUTC(row.CaughtUpTo), Because: row.Failed,
+				Name: row.Display, URL: row.URL, Tried: core.StampAt(row.FetchedAt),
+				Read: core.StampAt(row.ReachedAt), CaughtUpTo: core.StampAt(row.CaughtUpTo), Because: row.Failed,
 			})
 		}
 		return out, nil

@@ -46,8 +46,8 @@ type SetAsideBody struct {
 	// SBOM. It is why this route asks for administration rather than for the
 	// grant that reads the records — that grant is declared, three times over,
 	// to reach no product's findings.
-	LastError string    `json:"last_error,omitempty" doc:"The reason it stopped, where anything reported one. Worker output, which may quote what the job was about"`
-	StoppedAt time.Time `json:"stopped_at" doc:"The moment it was set aside"`
+	LastError string `json:"last_error,omitempty" doc:"The reason it stopped, where anything reported one. Worker output, which may quote what the job was about"`
+	StoppedAt string `json:"stopped_at" doc:"The moment it was set aside"`
 }
 
 // QueuedBody is how much of one kind of work is waiting, against the bound
@@ -69,9 +69,9 @@ type VulnerabilityDataBody struct {
 	// Since is when the data last moved, which is the most recent time any
 	// version was seen for the first time. A version that comes back was not a
 	// change the second time.
-	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
-	StaleAt string     `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
-	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
+	Since   string `json:"moved_at,omitempty" doc:"The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
+	StaleAt string `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
+	Stale   bool   `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
 	// Records is the CVE record snapshot the runs narrowed matches with,
 	// which moves apart from the scanner's data and goes stale apart from it.
 	Records RecordsDataBody `json:"records" doc:"The CVE record snapshot the scans narrowed their matches with"`
@@ -80,9 +80,9 @@ type VulnerabilityDataBody struct {
 // RecordsDataBody is the CVE record snapshot this deployment's scans narrow
 // their matches with.
 type RecordsDataBody struct {
-	Version string     `json:"version,omitempty" doc:"The snapshot the newest finished run read, as the moment it describes. Absent where no run has read one, and nothing is narrowed"`
-	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the snapshot last moved: the most recent time any snapshot was read for the first time"`
-	Stale   bool       `json:"stale" doc:"Whether it has gone the same span without moving that counts as stopped for the scanner's data"`
+	Version string `json:"version,omitempty" doc:"The snapshot the newest finished run read, as the moment it describes. Absent where no run has read one, and nothing is narrowed"`
+	Since   string `json:"moved_at,omitempty" doc:"The moment the snapshot last moved: the most recent time any snapshot was read for the first time"`
+	Stale   bool   `json:"stale" doc:"Whether it has gone the same span without moving that counts as stopped for the scanner's data"`
 }
 
 func registerWork(api huma.API, in core.Deps) {
@@ -120,7 +120,7 @@ func registerWork(api huma.API, in core.Deps) {
 		}
 		out := &answer{}
 		out.Body.Version = data.Version
-		out.Body.Since = core.InUTC(data.Since)
+		out.Body.Since = core.StampAt(data.Since)
 		out.Body.StaleAt = data.After.String()
 		// Answered here as well as said by the condition, because a screen
 		// somebody opens after being told is a screen that has to agree with
@@ -128,7 +128,7 @@ func registerWork(api huma.API, in core.Deps) {
 		out.Body.Stale = data.StaleAt(time.Now())
 		if data.Records != nil {
 			out.Body.Records = RecordsDataBody{
-				Version: data.Records.Version, Since: core.InUTC(data.Records.Since),
+				Version: data.Records.Version, Since: core.StampAt(data.Records.Since),
 				Stale: data.Records.StaleAt(time.Now()),
 			}
 		}
@@ -188,7 +188,7 @@ func registerWork(api huma.API, in core.Deps) {
 		for _, job := range jobs {
 			body := SetAsideBody{
 				ID: job.ID, Kind: job.Kind, Reference: job.Reference,
-				Attempts: job.Attempts, StoppedAt: job.UpdatedAt.UTC(),
+				Attempts: job.Attempts, StoppedAt: core.Stamp(job.UpdatedAt),
 			}
 			if job.LastError != nil {
 				body.LastError = *job.LastError

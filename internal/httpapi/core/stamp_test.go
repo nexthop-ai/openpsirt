@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -36,6 +37,37 @@ func TestAnUnknownMomentIsStatedAsNothingAndAKnownOneInUTC(t *testing.T) {
 	}
 }
 
+// timeField matches a struct field of type time.Time that JSON encodes, which
+// it writes in the zone the value carries and to the nanosecond.
+var timeField = regexp.MustCompile("\\*?time\\.Time\\s+`json:\"([a-z_]+)")
+
+// sealed is the one time.Time field JSON encodes that is not a response: the
+// moment a sign-in in progress was sealed into its cookie.
+const sealed = "minted"
+
+// unstamped is every way a source file states a moment without Stamp.
+func unstamped(source string) []string {
+	var why []string
+	if strings.Contains(source, "Format(time.RFC3339") || strings.Contains(source, `"2006-01-02T15:04:05`) {
+		why = append(why, "formats a moment by hand")
+	}
+	for _, match := range timeField.FindAllStringSubmatch(source, -1) {
+		if match[1] != sealed {
+			why = append(why, "encodes "+match[1]+" as a time.Time")
+		}
+	}
+	return why
+}
+
+func TestAMomentEncodedAsATimeIsReported(t *testing.T) {
+	if got := unstamped("\tStoppedAt time.Time `json:\"stopped_at\"`\n\tUntil *time.Time `json:\"until,omitempty\"`"); len(got) != 2 {
+		t.Errorf("two encoded times were reported as %v", got)
+	}
+	if got := unstamped("\tStoppedAt string `json:\"stopped_at\"`\n\tMinted time.Time `json:\"minted\"`"); len(got) != 0 {
+		t.Errorf("a stamped moment and the sealed sign-in were reported as %v", got)
+	}
+}
+
 // A response states a moment through Stamp alone. Formatted by hand, a zero
 // time answers as the year 1 where the renderer would leave it out.
 func TestEveryMomentAResponseStatesGoesThroughStamp(t *testing.T) {
@@ -57,9 +89,8 @@ func TestEveryMomentAResponseStatesGoesThroughStamp(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(source), "Format(time.RFC3339") ||
-			strings.Contains(string(source), `"2006-01-02T15:04:05`) {
-			t.Errorf("%s formats a moment by hand; state it through core.Stamp or core.StampAt", path)
+		for _, why := range unstamped(string(source)) {
+			t.Errorf("%s %s; state it through core.Stamp or core.StampAt", path, why)
 		}
 		return nil
 	})

@@ -103,17 +103,6 @@ func Stating(since, until time.Time) (string, string) {
 	return from, to
 }
 
-// InUTC is a moment in UTC, or nothing where there is none, for a field
-// answered as a time rather than as text: a time keeps the zone it was read
-// in, and one instant read in two zones is two days on two screens.
-func InUTC(at *time.Time) *time.Time {
-	if at == nil {
-		return nil
-	}
-	moment := at.UTC()
-	return &moment
-}
-
 // Stamp renders a time the one way the API states times. An unknown time is
 // the empty string, which an optional field then leaves out.
 func Stamp(t time.Time) string {

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -48,11 +47,11 @@ type PerBuildBody struct {
 	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
 	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
-	DueAt    *time.Time         `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
+	DueAt    string             `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
 	// CommittedTo is the promise already made for this build, read off the
 	// decisions.
-	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
-	UpgradeTo   string     `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
+	CommittedTo string `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
+	UpgradeTo   string `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
 }
 
 // FoldPackageBody is one binary package of a source package, as one build
@@ -81,15 +80,15 @@ type FoldPackageBody struct {
 	// Summary is the ecosystem index's own description of the package, where
 	// one was asked and answered. Absent is the ordinary case rather than a
 	// gap.
-	Summary    string     `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
-	ProjectURL string     `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say"`
-	Supplier   string     `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
-	License    string     `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
-	Newest     string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
-	NewestAt   *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
-	FirstSeen  time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
-	Issues     int        `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
-	Consumers  int        `json:"consumers" doc:"The number of things pulling this binary in here"`
+	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
+	ProjectURL string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say"`
+	Supplier   string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	License    string `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
+	Newest     string `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
+	NewestAt   string `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
+	FirstSeen  string `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
+	Issues     int    `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
+	Consumers  int    `json:"consumers" doc:"The number of things pulling this binary in here"`
 	// StatedVersions is what a container image was stamped with, build by
 	// build. An image is identified by its name, so its version is not
 	// part of what it is.
@@ -98,10 +97,10 @@ type FoldPackageBody struct {
 
 // StatedVersionBody is one version a build stated for a container image.
 type StatedVersionBody struct {
-	Version string     `json:"version" doc:"The version as the build stated it, empty where it stated none"`
-	Purl    string     `json:"purl,omitempty" doc:"The package identifier as the build stated it, version and qualifiers included"`
-	From    time.Time  `json:"from" doc:"The build time of the first scan that stated it"`
-	Until   *time.Time `json:"until,omitempty" doc:"The build time of the scan that stated something else. Absent while it is what the build states"`
+	Version string `json:"version" doc:"The version as the build stated it, empty where it stated none"`
+	Purl    string `json:"purl,omitempty" doc:"The package identifier as the build stated it, version and qualifiers included"`
+	From    string `json:"from" doc:"The build time of the first scan that stated it"`
+	Until   string `json:"until,omitempty" doc:"The build time of the scan that stated something else. Absent while it is what the build states"`
 }
 
 // registerComponent answers a component across the builds that carry it.
@@ -171,7 +170,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				var stated []StatedVersionBody
 				for _, each := range one.Stated {
 					stated = append(stated, StatedVersionBody{Version: each.Version, Purl: each.Purl,
-						From: each.From.UTC(), Until: core.InUTC(each.Until)})
+						From: core.Stamp(each.From), Until: core.StampAt(each.Until)})
 				}
 				if ecosystem == "" {
 					ecosystem = graph.EcosystemOf(one.Purl)
@@ -182,7 +181,7 @@ func registerComponent(api huma.API, in core.Deps) {
 					PackagePageURL: page, PackagePageName: called,
 					Summary: one.Summary, ProjectURL: one.ProjectURL,
 					Supplier: one.Supplier, License: one.License,
-					Newest: one.Newest, NewestAt: core.InUTC(one.NewestAt), FirstSeen: one.FirstSeen.UTC(),
+					Newest: one.Newest, NewestAt: core.StampAt(one.NewestAt), FirstSeen: core.Stamp(one.FirstSeen),
 					Issues: one.Issues, Consumers: one.Consumers,
 					StatedVersions: stated,
 				})
@@ -195,7 +194,7 @@ func registerComponent(api huma.API, in core.Deps) {
 				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
-				DueAt:    core.InUTC(build.DueAt), CommittedTo: core.InUTC(build.CommittedTo), UpgradeTo: build.UpgradeTo,
+				DueAt:    core.StampAt(build.DueAt), CommittedTo: core.StampAt(build.CommittedTo), UpgradeTo: build.UpgradeTo,
 			})
 		}
 		return out, nil
