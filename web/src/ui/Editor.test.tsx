@@ -136,3 +136,106 @@ describe("a thread", () => {
     expect(mount.host().textContent).toContain("What it said first.");
   });
 });
+
+describe("naming somebody and attaching a file", () => {
+  function Mentioning({ visibility }: { visibility?: "public" | "private" }) {
+    const [value, setValue] = useState("");
+    return (
+      <>
+        <Editor
+          value={value}
+          onChange={setValue}
+          label="Reasoning"
+          mentions={{ product: "sonic", visibility }}
+          attachTo={{ product: "sonic", vulnerability: "CVE-2026-1" }}
+        />
+        <output>{value}</output>
+      </>
+    );
+  }
+
+  const field = () => mount.host().querySelector<HTMLTextAreaElement>("textarea");
+  const said = () => mount.host().querySelector("output")?.textContent;
+
+  it("offers only people who may read what this is about, narrowed by what follows the @", async () => {
+    const reads = serve((path) =>
+      path === "/v1/products/{product}/mentionable"
+        ? { data: { items: [{ identity: "ana", name: "Ana Lopez" }] } }
+        : undefined,
+    );
+    mount.render(screen(<Mentioning visibility="private" />));
+    await settle();
+    type(field(), "Ask @an");
+    await settle();
+    const asked = (reads.mock.calls as unknown as [string, { params: { query: object } }][]).at(-1);
+    expect(asked?.[1].params.query).toEqual({ visibility: "private", limit: 25, q: "an" });
+    const offered = Array.from(mount.host().querySelectorAll("button")).find((each) =>
+      each.textContent?.startsWith("@ana"),
+    );
+    await act(async () => offered?.click());
+    expect(said()).toBe("Ask @ana ");
+  });
+
+  it("writes an image the server took as one inline, and anything else as a link", async () => {
+    serve(() => undefined);
+    const answers = [
+      { filename: "shot.png", reference: "attachment:aaaa", inline: true },
+      { filename: "trace.txt", reference: "attachment:bbbb", inline: false },
+    ];
+    vi.spyOn(api, "POST").mockImplementation((async () => ({
+      data: answers.shift(),
+      error: undefined,
+      response: new Response(null, { status: 201 }),
+    })) as never);
+    mount.render(screen(<Mentioning />));
+    await settle();
+    const chooser = mount.host().querySelector<HTMLInputElement>('input[type="file"]');
+    for (const name of ["shot.png", "trace.txt"]) {
+      Object.defineProperty(chooser, "files", {
+        value: [new File(["x"], name)],
+        configurable: true,
+      });
+      await act(async () => chooser?.dispatchEvent(new Event("change", { bubbles: true })));
+      await settle();
+    }
+    expect(said()).toContain("![shot.png](attachment:aaaa)");
+    expect(said()).toContain("[trace.txt](attachment:bbbb)");
+    expect(said()).not.toContain("![trace.txt]");
+  });
+
+  it("says why a file was refused", async () => {
+    serve(() => undefined);
+    vi.spyOn(api, "POST").mockImplementation((async () => ({
+      data: undefined,
+      error: { detail: "the file is larger than this deployment takes" },
+      response: new Response(null, { status: 413 }),
+    })) as never);
+    mount.render(screen(<Mentioning />));
+    await settle();
+    const chooser = mount.host().querySelector<HTMLInputElement>('input[type="file"]');
+    Object.defineProperty(chooser, "files", {
+      value: [new File(["x"], "big.bin")],
+      configurable: true,
+    });
+    await act(async () => chooser?.dispatchEvent(new Event("change", { bubbles: true })));
+    await settle();
+    expect(mount.host().textContent).toContain("larger than this deployment takes");
+  });
+
+  it("wraps the cursor in the mark pressed, and previews the text", async () => {
+    serve(() => undefined);
+    mount.render(screen(<Mentioning />));
+    await settle();
+    type(field(), "see ");
+    await act(async () =>
+      mount.host().querySelector<HTMLButtonElement>('button[title="Bold"]')?.click(),
+    );
+    expect(said()).toBe("see ****");
+    await act(async () =>
+      Array.from(mount.host().querySelectorAll("button"))
+        .find((each) => each.textContent === "Preview")
+        ?.click(),
+    );
+    expect(field()).toBeNull();
+  });
+});
