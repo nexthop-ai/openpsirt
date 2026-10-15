@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 		if len(waiting) != 1 {
 			t.Fatalf("an unanswered report raised %d notices: %v", len(waiting), waiting)
 		}
-		if !httpapitest.Contains(waiting[0], "A. Researcher") {
+		if !strings.Contains(waiting[0], "A. Researcher") {
 			t.Errorf("the notice does not say who is waiting: %q", waiting[0])
 		}
 		// And not to somebody who may not read undisclosed work here.

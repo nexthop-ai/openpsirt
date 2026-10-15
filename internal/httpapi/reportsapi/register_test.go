@@ -86,10 +86,10 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 		// it answerable to an auditor — and a header saying things were left
 		// out above a file that left nothing out is worse than saying nothing,
 		// because it reads as complete about what remains.
-		if httpapitest.Contains(got.Body.String(), "# triaged at or above") {
+		if strings.Contains(got.Body.String(), "# triaged at or above") {
 			t.Error("the register export claims a triage line it does not apply")
 		}
-		if !httpapitest.Contains(got.Body.String(), "CVE-2026-9999") {
+		if !strings.Contains(got.Body.String(), "CVE-2026-9999") {
 			t.Error("the register export holds no rows")
 		}
 		// Somebody who holds nothing on the product gets nothing at all.
@@ -161,7 +161,7 @@ func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 		<-finishing[0]
 		held, finishing = held[1:], finishing[1:]
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
-		if got.Code != http.StatusOK || !httpapitest.Contains(got.Body.String(), "CVE-2026-9999") {
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "CVE-2026-9999") {
 			t.Errorf("an export after a slot was given back answered %d: %s",
 				got.Code, got.Body.String())
 		}

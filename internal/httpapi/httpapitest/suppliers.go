@@ -8,13 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -46,65 +42,29 @@ func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideT
 	claims []sbom.Suppression) {
 
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	acmeY := graph.Described{Purl: "pkg:generic/acme-y@" + version, Name: "acme-y", Version: version}
 	zlib := graph.Described{Purl: "pkg:generic/zlib@1.2.11", Name: "zlib", Version: "1.2.11"}
 	curl := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
 	snap := graph.Snapshot{
-		Root:       product,
+		Root:       SeededRoot,
 		Components: []graph.Described{acmeY, zlib},
 		Dependencies: []graph.Dependency{
-			{Parent: product, Child: acmeY},
+			{Parent: SeededRoot, Child: acmeY},
 			{Parent: acmeY, Child: zlib},
 		},
 	}
 	if outsideToo {
 		snap.Components = append(snap.Components, curl)
 		snap.Dependencies = append(snap.Dependencies,
-			graph.Dependency{Parent: product, Child: curl}, graph.Dependency{Parent: curl, Child: zlib})
+			graph.Dependency{Parent: SeededRoot, Child: curl}, graph.Dependency{Parent: curl, Child: zlib})
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, snap); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := fixture.RecordClaims(ctx, r.DB.DB, target.ID, scan.ID, claims,
-		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+	target, scan := r.Shipped(t, SeededBuild, hash, snap)
+	r.Argued(t, target, scan, claims)
+	r.Ran(t, target, []finding.Reported{{
 		Issue: finding.Named{
 			Identifier: "CVE-2022-37434", Severity: "critical",
 			Description: "A heap overflow in inflateGetHeader.", Score: 9.8,
 		},
 		Component: zlib, FixState: finding.FixedUpstream, FixedIn: "1.2.12",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}})
 }

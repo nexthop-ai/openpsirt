@@ -36,7 +36,7 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 		if len(empty.Statements) != 0 {
 			t.Fatalf("a build with nothing approved says %d things", len(empty.Statements))
 		}
-		if !httpapitest.Contains(empty.Context, "openvex.dev") || empty.Author == "" {
+		if !strings.Contains(empty.Context, "openvex.dev") || empty.Author == "" {
 			t.Errorf("the document does not name its format and its author: %+v", empty)
 		}
 
@@ -92,7 +92,7 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 			t.Errorf("the statement is about %+v, want the build", one.Products)
 		}
 		if len(one.Products[0].Subcomponents) != 1 ||
-			!httpapitest.Contains(one.Products[0].Subcomponents[0].ID, "linux-image") {
+			!strings.Contains(one.Products[0].Subcomponents[0].ID, "linux-image") {
 			t.Errorf("the statement does not name the component: %+v", one.Products[0])
 		}
 	})
@@ -536,7 +536,7 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 		if got := doc.Statements[0].ImpactStatement; got != stops {
 			t.Errorf("the statement says %q, want what stops it", got)
 		}
-		if httpapitest.Contains(doc.Statements[0].ImpactStatement, "build flags") {
+		if strings.Contains(doc.Statements[0].ImpactStatement, "build flags") {
 			t.Errorf("the reasoning reached the document: %q", doc.Statements[0].ImpactStatement)
 		}
 	})

@@ -4,23 +4,17 @@
 package httpapitest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
@@ -54,25 +48,8 @@ func AdvisoryOver(t *testing.T, r *Reach, who, product, identifier string) strin
 // Advised uploads one CSAF security advisory.
 func (r *Reach) Advised(t *testing.T, who, filename, document string) *httptest.ResponseRecorder {
 	t.Helper()
-	var body bytes.Buffer
-	form := multipart.NewWriter(&body)
-	part, err := form.CreateFormFile("advisory", filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := part.Write([]byte(document)); err != nil {
-		t.Fatal(err)
-	}
-	if err := form.Close(); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/v1/products/mine/supplier-advisories", &body)
-	req.Header.Set("Content-Type", form.FormDataContentType())
-	req.Header.Set(TestHeader, who)
-	FromOurOwnPage(req)
-	rec := httptest.NewRecorder()
-	r.Handler.ServeHTTP(rec, req)
-	return rec
+	body, kind := Form(t, Part{Field: "advisory", Filename: filename, Content: document})
+	return r.Post(t, who, http.MethodPost, "/v1/products/mine/supplier-advisories", body, kind)
 }
 
 // SupplierAdvisory is a conforming CSAF security advisory about one package at
@@ -140,21 +117,7 @@ func (r *Reach) WhatPublishersSay(t *testing.T) saidOnTheFinding {
 // Named configures a supplier for a product, or asks for one to be withdrawn.
 func (r *Reach) Named(t *testing.T, who, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	var reader io.Reader
-	if body != "" {
-		reader = strings.NewReader(body)
-	}
-	req := httptest.NewRequest(method, path, reader)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	if who != "" {
-		req.Header.Set(TestHeader, who)
-	}
-	FromOurOwnPage(req)
-	rec := httptest.NewRecorder()
-	r.Handler.ServeHTTP(rec, req)
-	return rec
+	return AsPerson(t, r, who, method, path, body)
 }
 
 // supplierRow is one row of the list, as the API returns it.
@@ -211,53 +174,11 @@ func (r *Reach) ScannedInTwoImages(t *testing.T) {
 // scannedUnder is one issue in libnl, pulled in by the two components given.
 func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "two-places", BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	library := graph.Described{
-		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
-	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:       product,
-		Components: []graph.Described{first, second, library},
-		Dependencies: []graph.Dependency{
-			{Parent: product, Child: first}, {Parent: first, Child: library},
-			{Parent: product, Child: second}, {Parent: second, Child: library},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	// One report, two places: the places come from the graph, and the library
 	// hangs off both consumers.
 	reported := []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
-		Component: library, FixState: finding.NoFix,
+		Component: SeededLib, FixState: finding.NoFix,
 	}}
 	// An issue in the first consumer itself, reported against it as the
 	// scanner is given it: an image as it is stored.
@@ -267,9 +188,14 @@ func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 			Component: first.AsImage(), FixState: finding.NoFix,
 		})
 	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
-		t.Fatal(err)
-	}
+	r.Scan(t, "two-places", graph.Snapshot{
+		Root:       SeededRoot,
+		Components: []graph.Described{first, second, SeededLib},
+		Dependencies: []graph.Dependency{
+			{Parent: SeededRoot, Child: first}, {Parent: first, Child: SeededLib},
+			{Parent: SeededRoot, Child: second}, {Parent: second, Child: SeededLib},
+		},
+	}, reported)
 }
 
 // ScannedBeneathAProduct is one issue in one library that curl pulls in
@@ -281,65 +207,35 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 	t.Helper()
 	ctx := t.Context()
 
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "beneath-a-product", BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
+	target := r.TargetOf(t, SeededBuild)
+	scan := r.Recorded(t, target, "beneath-a-product")
 	if root != "" {
 		if _, err := r.DB.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, root).
-			Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, scan).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	curl := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
 	libssh := graph.Described{Purl: "pkg:deb/debian/libssh@0.10.6", Name: "libssh", Version: "0.10.6"}
 	app := graph.Described{Purl: "pkg:deb/debian/app@1.0", Name: "app", Version: "1.0"}
-	library := graph.Described{
-		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
-	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:       product,
+	library := SeededLib
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target, scan, graph.Snapshot{
+		Root:       SeededRoot,
 		Components: []graph.Described{curl, libssh, app, library},
 		Dependencies: []graph.Dependency{
-			{Parent: product, Child: curl}, {Parent: curl, Child: library},
+			{Parent: SeededRoot, Child: curl}, {Parent: curl, Child: library},
 			{Parent: curl, Child: libssh}, {Parent: libssh, Child: library},
-			{Parent: product, Child: app}, {Parent: app, Child: library},
-			{Parent: product, Child: library},
+			{Parent: SeededRoot, Child: app}, {Parent: app, Child: library},
+			{Parent: SeededRoot, Child: library},
 		},
 	}); err != nil {
 		t.Fatal(err)
 	}
-
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
-		{
-			Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
-			Component: library, FixState: finding.NoFix,
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r.Ran(t, target, []finding.Reported{{
+		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+		Component: library, FixState: finding.NoFix,
+	}})
 }
 
 // PatchedKernel is the two-issue build with the first issue patched in the
@@ -354,23 +250,33 @@ func (r *Reach) PatchedKernel(t *testing.T) {
 	}})
 }
 
+// vexDoc is the parts of the build's VEX document the readers below look at.
+type vexDoc struct {
+	Statements []struct {
+		Vulnerability struct {
+			Name string `json:"name"`
+		} `json:"vulnerability"`
+		Status   string `json:"status"`
+		Products []struct {
+			Subcomponents []struct {
+				ID string `json:"@id"`
+			} `json:"subcomponents"`
+		} `json:"products"`
+	} `json:"statements"`
+}
+
+// vexDoc reads the build's VEX document as a triager.
+func (r *Reach) vexDoc(t *testing.T) vexDoc {
+	t.Helper()
+	var doc vexDoc
+	Read(t, r, "triager", ABuild, &doc)
+	return doc
+}
+
 // FixedIn reads the document and returns what it says is fixed, by issue.
 func (r *Reach) FixedIn(t *testing.T) map[string][]string {
 	t.Helper()
-	var doc struct {
-		Statements []struct {
-			Vulnerability struct {
-				Name string `json:"name"`
-			} `json:"vulnerability"`
-			Status   string `json:"status"`
-			Products []struct {
-				Subcomponents []struct {
-					ID string `json:"@id"`
-				} `json:"subcomponents"`
-			} `json:"products"`
-		} `json:"statements"`
-	}
-	Read(t, r, "triager", ABuild, &doc)
+	doc := r.vexDoc(t)
 	fixed := map[string][]string{}
 	for _, one := range doc.Statements {
 		if one.Status != "fixed" {
@@ -398,20 +304,7 @@ func (r *Reach) PatchedRows(t *testing.T, statement string) {
 // subcomponent each statement names, in the order the document holds them.
 func (r *Reach) VexStatements(t *testing.T) [][3]string {
 	t.Helper()
-	var doc struct {
-		Statements []struct {
-			Vulnerability struct {
-				Name string `json:"name"`
-			} `json:"vulnerability"`
-			Status   string `json:"status"`
-			Products []struct {
-				Subcomponents []struct {
-					ID string `json:"@id"`
-				} `json:"subcomponents"`
-			} `json:"products"`
-		} `json:"statements"`
-	}
-	Read(t, r, "triager", ABuild, &doc)
+	doc := r.vexDoc(t)
 	var out [][3]string
 	for _, one := range doc.Statements {
 		inside := ""
@@ -433,29 +326,12 @@ func (r *Reach) Vexed(t *testing.T, who, publisher, document string) *httptest.R
 // publisher in the query only where one is given.
 func (r *Reach) VexedAs(t *testing.T, who, publisher, filename, document string) *httptest.ResponseRecorder {
 	t.Helper()
-	var body bytes.Buffer
-	form := multipart.NewWriter(&body)
-	part, err := form.CreateFormFile("statements", filename)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := part.Write([]byte(document)); err != nil {
-		t.Fatal(err)
-	}
-	if err := form.Close(); err != nil {
-		t.Fatal(err)
-	}
 	at := "/v1/products/mine/vex-statements"
 	if publisher != "" {
 		at += "?publisher=" + publisher
 	}
-	req := httptest.NewRequest(http.MethodPost, at, &body)
-	req.Header.Set("Content-Type", form.FormDataContentType())
-	req.Header.Set(TestHeader, who)
-	FromOurOwnPage(req)
-	rec := httptest.NewRecorder()
-	r.Handler.ServeHTTP(rec, req)
-	return rec
+	body, kind := Form(t, Part{Field: "statements", Filename: filename, Content: document})
+	return r.Post(t, who, http.MethodPost, at, body, kind)
 }
 
 // Said is a conforming OpenVEX document making one statement.
@@ -493,20 +369,7 @@ func (r *Reach) Alerts(t *testing.T, who, kind string) []string {
 		slog.New(slog.NewTextHandler(io.Discard, nil))).Once(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	var waiting struct {
-		Items []struct {
-			Kind string `json:"kind"`
-			Body string `json:"body"`
-		} `json:"items"`
-	}
-	Read(t, r, who, "/v1/notifications", &waiting)
-	var about []string
-	for _, one := range waiting.Items {
-		if one.Kind == kind {
-			about = append(about, one.Body)
-		}
-	}
-	return about
+	return r.Told(t, who, kind)
 }
 
 const ABuild = "/v1/products/mine/streams/master/variants/broadcom/vex"

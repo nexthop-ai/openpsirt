@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -250,7 +251,7 @@ func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
 				t.Errorf("%s answers somebody with nothing on this product %d: %s",
 					path, got.Code, got.Body.String())
 			}
-			if !httpapitest.Contains(got.Body.String(), "no product is declared by that name") {
+			if !strings.Contains(got.Body.String(), "no product is declared by that name") {
 				t.Errorf("%s words its refusal differently from every other product route: %s",
 					path, got.Body.String())
 			}

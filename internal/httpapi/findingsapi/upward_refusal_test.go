@@ -5,6 +5,7 @@ package findingsapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -38,7 +39,7 @@ func TestABuildNeverScannedIsTheProductsBusinessOnly(t *testing.T) {
 		}
 		reader := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, "")
 		httpapitest.RefusedWith(t, reader, http.StatusNotFound)
-		if !httpapitest.Contains(reader.Body.String(), "nothing has been scanned") {
+		if !strings.Contains(reader.Body.String(), "nothing has been scanned") {
 			t.Errorf("a reader of the product is told %s", reader.Body.String())
 		}
 	})

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -61,7 +62,7 @@ func TestAgreeingToAMovementTheDateHasPassedIsAConflict(t *testing.T) {
 		}
 		overtaken := agree(nearer)
 		httpapitest.RefusedWith(t, overtaken, http.StatusConflict)
-		if !httpapitest.Contains(overtaken.Body.String(), "the date has moved since this was asked for") {
+		if !strings.Contains(overtaken.Body.String(), "the date has moved since this was asked for") {
 			t.Errorf("the refusal does not say the date moved: %s", overtaken.Body.String())
 		}
 	})

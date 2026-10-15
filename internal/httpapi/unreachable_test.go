@@ -136,13 +136,9 @@ func overAClosedDatabaseAs(t *testing.T, r *httpapitest.Reach, logged slog.Handl
 	if err != nil {
 		t.Fatal(err)
 	}
-	sources, err := access.ParseSources("192.0.2.1")
-	if err != nil {
-		t.Fatal(err)
-	}
 	handler, _ := httpapi.New(slog.New(logged), nil, core.Deps{
 		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()), Files: files,
-		Access:    access.NewResolver(r.Rights, access.Trust{Header: httpapitest.TestHeader, From: sources}),
+		Access:    httpapitest.Trusting(t, r.Rights),
 		Publisher: who,
 	})
 	return handler
@@ -193,15 +189,10 @@ func (c *counting) WithGroup(string) slog.Handler      { return c }
 func TestACallerWhoCannotBeLookedUpIsNotToldTheyAreUnauthorized(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		gone := dbtest.Closed(t)
-		sources, err := access.ParseSources("192.0.2.1")
-		if err != nil {
-			t.Fatal(err)
-		}
 		logged := &counting{}
 		handler, _ := httpapi.New(slog.New(logged), nil, core.Deps{
 			DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
-			Access: access.NewResolver(access.NewStore(gone.DB),
-				access.Trust{Header: httpapitest.TestHeader, From: sources}),
+			Access: httpapitest.Trusting(t, access.NewStore(gone.DB)),
 		})
 		req := httptest.NewRequest(http.MethodGet, "/v1/session/me", nil)
 		req.Header.Set(httpapitest.TestHeader, "reader")

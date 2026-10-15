@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -238,7 +239,7 @@ func TestARuleSaysWhatItWouldCatchBeforeItIsSaved(t *testing.T) {
 		}
 		// One rule, both binary packages: the whole reason the key is the
 		// source package.
-		if !httpapitest.Contains(caught.Components[0]+" "+caught.Components[1], "libcurl4t64") {
+		if !strings.Contains(caught.Components[0]+" "+caught.Components[1], "libcurl4t64") {
 			t.Errorf("it does not name what it matches: %v", caught.Components)
 		}
 		if caught.Work == 0 || caught.Unheld != caught.Work {

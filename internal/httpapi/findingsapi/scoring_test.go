@@ -6,6 +6,7 @@ package findingsapi_test
 import (
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -32,7 +33,7 @@ func TestAVectorIsScoredAndAnUnscorableOneRefused(t *testing.T) {
 
 		blank := httpapitest.AsPerson(t, r, "reader", http.MethodGet, "/v1/score?vector=%20%20", "")
 		httpapitest.RefusedWith(t, blank, http.StatusUnprocessableEntity)
-		if !httpapitest.Contains(blank.Body.String(), "state a vector") {
+		if !strings.Contains(blank.Body.String(), "state a vector") {
 			t.Errorf("a blank vector is not told to state one: %s", blank.Body.String())
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, "/v1/score?vector="+

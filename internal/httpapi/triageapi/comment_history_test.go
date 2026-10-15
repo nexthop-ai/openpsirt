@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -70,10 +71,10 @@ func TestWhatACommentSaidBeforeIsKept(t *testing.T) {
 		if len(after.Items) != 2 {
 			t.Fatalf("two edits left %d earlier versions: %+v", len(after.Items), after.Items)
 		}
-		if after.Items[0].Version != 1 || !httpapitest.Contains(after.Items[0].Body, "patch list.") {
+		if after.Items[0].Version != 1 || !strings.Contains(after.Items[0].Body, "patch list.") {
 			t.Errorf("the first version reads as %+v", after.Items[0])
 		}
-		if after.Items[1].Version != 2 || !httpapitest.Contains(after.Items[1].Body, "changelog") {
+		if after.Items[1].Version != 2 || !strings.Contains(after.Items[1].Body, "changelog") {
 			t.Errorf("the second version reads as %+v", after.Items[1])
 		}
 		if after.Items[0].ReplacedAt == "" {
@@ -87,7 +88,7 @@ func TestWhatACommentSaidBeforeIsKept(t *testing.T) {
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/comments", claim), &discussion)
-		if len(discussion.Items) != 1 || !httpapitest.Contains(discussion.Items[0].Body, "wrong package") {
+		if len(discussion.Items) != 1 || !strings.Contains(discussion.Items[0].Body, "wrong package") {
 			t.Errorf("the comment reads as %+v", discussion.Items)
 		}
 

@@ -6,6 +6,7 @@ package triageapi_test
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func TestAClaimNobodyApprovesIsSaidToWhoeverCouldApproveIt(t *testing.T) {
 		if len(waiting) != 1 {
 			t.Fatalf("a claim waiting ten days raised %d notices: %v", len(waiting), waiting)
 		}
-		if !httpapitest.Contains(waiting[0], "second person") {
+		if !strings.Contains(waiting[0], "second person") {
 			t.Errorf("the notice does not say what it is waiting for: %q", waiting[0])
 		}
 
@@ -82,7 +83,7 @@ func TestAClaimSentBackAndLeftIsSaidToItsAuthor(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("a claim sent back a week ago raised %d notices: %v", len(told), told)
 		}
-		if !httpapitest.Contains(told[0], "applies to nothing") {
+		if !strings.Contains(told[0], "applies to nothing") {
 			t.Errorf("the notice does not say what leaving it costs: %q", told[0])
 		}
 		// It is not also reported as waiting on an approver: it is not.
@@ -139,7 +140,7 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("a deferral ending in four days raised %d notices: %v", len(told), told)
 		}
-		if !httpapitest.Contains(told[0], soon) {
+		if !strings.Contains(told[0], soon) {
 			t.Errorf("the notice does not say when it ends: %q", told[0])
 		}
 
@@ -191,7 +192,7 @@ func TestWorkSittingInATeamQueueIsSaidToTheTeam(t *testing.T) {
 			if len(told) != 1 {
 				t.Fatalf("%s was told %d times about the queue: %v", who, len(told), told)
 			}
-			if !httpapitest.Contains(told[0], "Kernel") {
+			if !strings.Contains(told[0], "Kernel") {
 				t.Errorf("the notice does not name the queue: %q", told[0])
 			}
 		}
@@ -284,7 +285,7 @@ func TestAnAgreementTakenBackIsSaidToWhoeverProposedIt(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("undoing an agreement told the proposer %d times: %v", len(told), told)
 		}
-		if !httpapitest.Contains(told[0], "taken back") {
+		if !strings.Contains(told[0], "taken back") {
 			t.Errorf("the notice does not say what happened: %q", told[0])
 		}
 		// And the view says so too, apart from "waiting": somebody had agreed.
@@ -317,7 +318,7 @@ func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
 		if len(told) != 1 {
 			t.Fatalf("revising told the approver %d times: %v", len(told), told)
 		}
-		if !httpapitest.Contains(told[0], "no longer counts") {
+		if !strings.Contains(told[0], "no longer counts") {
 			t.Errorf("the notice does not say what happened: %q", told[0])
 		}
 		// The person who made the edit knows already.
@@ -401,7 +402,7 @@ func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T
 		}
 		// Why, not only that. The proposer was not part of what caused this,
 		// so a notice saying an agreement went away sends them looking.
-		if !httpapitest.Contains(told[0], "exploited") {
+		if !strings.Contains(told[0], "exploited") {
 			t.Errorf("the notice does not say what caused it: %q", told[0])
 		}
 	})

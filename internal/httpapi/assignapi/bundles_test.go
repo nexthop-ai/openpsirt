@@ -105,7 +105,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
 				`"builds":[{"stream":"master","variant":"broadcom"}]}`)
 		httpapitest.RefusedWith(t, unreasoned, http.StatusUnprocessableEntity)
-		if !httpapitest.Contains(unreasoned.Body.String(), "reasoning") {
+		if !strings.Contains(unreasoned.Body.String(), "reasoning") {
 			t.Errorf("the refusal does not name the reasoning: %s", unreasoned.Body.String())
 		}
 
@@ -127,7 +127,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		// The caller may triage here; what they asked for cannot be done, and
 		// the answer names the release so they know which one to drop.
 		httpapitest.RefusedWith(t, refused, http.StatusUnprocessableEntity)
-		if !httpapitest.Contains(refused.Body.String(), "release master is retired") {
+		if !strings.Contains(refused.Body.String(), "release master is retired") {
 			t.Errorf("the refusal does not name the retired release: %s", refused.Body.String())
 		}
 		var left struct {

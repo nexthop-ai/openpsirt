@@ -114,15 +114,9 @@ func catalogOn(t *testing.T, on httpapitest.Engines, fn func(t *testing.T, d *de
 		if err := rights.Claim(t.Context(), administrator.ID, "admin"); err != nil {
 			t.Fatal(err)
 		}
-		// httptest sends from a documentation address; the fixture's proxy is
-		// taken to sit there.
-		sources, err := access.ParseSources("192.0.2.1")
-		if err != nil {
-			t.Fatal(err)
-		}
 		handler, _ := httpapi.New(quiet, nil, core.Deps{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()),
-			Access: access.NewResolver(rights, access.Trust{Header: httpapitest.TestHeader, From: sources}),
+			Access: httpapitest.Trusting(t, rights),
 		})
 		fn(t, &declaring{handler: handler, access: rights, admin: "admin", db: db})
 	})

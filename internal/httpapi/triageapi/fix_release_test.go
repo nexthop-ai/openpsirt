@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,7 +120,7 @@ func TestAWindowCountingFromTheFixRunsFromANamedTagsReleaseDate(t *testing.T) {
 			t.Errorf("the record's fix releases read %+v", fixes)
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
-		if len(open) != 1 || !httpapitest.Contains(open[0], "the release of the fix") {
+		if len(open) != 1 || !strings.Contains(open[0], "the release of the fix") {
 			t.Errorf("the running windows are %v, want the one counting from the fix", open)
 		}
 

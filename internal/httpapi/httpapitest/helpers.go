@@ -4,10 +4,14 @@
 package httpapitest
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // RefusedWith pins the status a refusal answers with.
@@ -35,48 +40,110 @@ func RefusedWith(t *testing.T, got *httptest.ResponseRecorder, want int) {
 	}
 }
 
-// Scan applies one snapshot and one set of reported findings to the seeded
-// build, and answers with nothing: every test here reads back through the API.
-//
-// The two seeds below differ in the graph they apply and what the report
-// carries, and in nothing else, so the locate, the target lookup, the scan
-// record, the run and the apply they share are written here once.
-func (r *Reach) Scan(t *testing.T, hash string, snapshot graph.Snapshot,
-	reported []finding.Reported) {
+// Build names one build of a product by its three names.
+type Build struct{ Product, Stream, Variant string }
 
+// SeededBuild is the build every Reach is declared with.
+var SeededBuild = Build{Product: "mine", Stream: "master", Variant: "broadcom"}
+
+// The scanner run every seed reports through.
+const (
+	seededScanner         = "grype"
+	seededScannerVersion  = "0.112.0"
+	seededDatabaseVersion = "2026-08-28"
+)
+
+// TargetOf is the target a build's names resolve to. The names must already
+// be declared.
+func (r *Reach) TargetOf(t testing.TB, b Build) int64 {
 	t.Helper()
-	ctx := t.Context()
-
 	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
+	located, err := names.Locate(t.Context(), b.Product, b.Stream, b.Variant)
 	if err != nil {
 		t.Fatal(err)
 	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	target, err := names.TargetFor(t.Context(), located.StreamID, located.VariantID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
+	return target.ID
+}
+
+// Recorded records one accepted upload against a target, built now, and
+// answers with its scan.
+//
+// The hash is what tells two uploads of one build apart, so a seed applied
+// twice to one build passes a hash of its own each time.
+func (r *Reach) Recorded(t testing.TB, target int64, hash string) int64 {
+	t.Helper()
+	made, outcome, err := ingest.NewStore(r.DB.DB).Record(t.Context(), ingest.Arriving{
+		TargetID: target, ContentHash: hash, ParserVersion: "test",
+		// Not ahead of the clock: a build stamped in the future is refused,
+		// because accepting one means no later scan is ever newer.
+		BuiltAt: time.Now().UTC(),
 	})
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, snapshot); err != nil {
+	return made.ID
+}
+
+// Shipped records an upload of a build and applies its graph, with no scanner
+// run: what a build holds before anything has been reported against it.
+func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snapshot) (target, scan int64) {
+	t.Helper()
+	target = r.TargetOf(t, b)
+	scan = r.Recorded(t, target, hash)
+	if _, err := fixture.ApplyGraph(t.Context(), r.DB.DB, target, scan, snapshot); err != nil {
 		t.Fatal(err)
 	}
+	return target, scan
+}
+
+// Argued records what an upload argues about what it ships, with statements
+// and pedigree both stated by the build.
+func (r *Reach) Argued(t testing.TB, target, scan int64, claims []sbom.Suppression) {
+	t.Helper()
+	if _, err := fixture.RecordClaims(t.Context(), r.DB.DB, target, scan, claims,
+		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ran applies one scanner run reporting these findings against a target.
+func (r *Reach) Ran(t testing.TB, target int64, reported []finding.Reported) {
+	t.Helper()
 	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
+	run, err := findings.Begin(t.Context(), finding.Run{
+		TargetID: target, Scanner: seededScanner, ScannerVersion: seededScannerVersion,
+		DatabaseVersion: seededDatabaseVersion, RanHere: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
+	if _, err := findings.Apply(t.Context(), target, run.ID, reported); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// ScanAt ships a build and applies one run reporting these findings against
+// it.
+func (r *Reach) ScanAt(t testing.TB, b Build, hash string, snapshot graph.Snapshot,
+	reported []finding.Reported) (target, scan int64) {
+
+	t.Helper()
+	target, scan = r.Shipped(t, b, hash, snapshot)
+	r.Ran(t, target, reported)
+	return target, scan
+}
+
+// Scan is ScanAt on the seeded build. Every test here reads back through the
+// API, so it answers with nothing.
+func (r *Reach) Scan(t *testing.T, hash string, snapshot graph.Snapshot,
+	reported []finding.Reported) {
+
+	t.Helper()
+	r.ScanAt(t, SeededBuild, hash, snapshot, reported)
 }
 
 // Scanned puts a build behind the handler: one component under the product,
@@ -182,34 +249,66 @@ func Read(t *testing.T, r *Reach, who, path string, into any) {
 // AsPerson makes a request the way a signed-in person does.
 func AsPerson(t *testing.T, r *Reach, who, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
-	var reader *strings.Reader
+	contentType := ""
 	if body != "" {
-		reader = strings.NewReader(body)
-	} else {
-		reader = strings.NewReader("")
+		contentType = "application/json"
 	}
-	req := httptest.NewRequest(method, path, reader)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
+	return r.Post(t, who, method, path, strings.NewReader(body), contentType)
+}
+
+// Post makes a request with a body of a given type the way a signed-in person
+// does. Nobody is named where who is empty, which is a caller who has not
+// signed in.
+func (r *Reach) Post(t testing.TB, who, method, path string, body io.Reader,
+	contentType string) *httptest.ResponseRecorder {
+
+	t.Helper()
+	req := httptest.NewRequest(method, path, body)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
-	req.Header.Set(TestHeader, who)
+	if who != "" {
+		req.Header.Set(TestHeader, who)
+	}
 	FromOurOwnPage(req)
 	rec := httptest.NewRecorder()
 	r.Handler.ServeHTTP(rec, req)
 	return rec
 }
 
-func Itoa(n int64) string {
-	if n == 0 {
-		return "0"
+// Part is one part of a multipart form: a file where it has a file name, and a
+// plain field where it has none.
+type Part struct{ Field, Filename, Content string }
+
+// Form encodes parts as a multipart body, in order, and answers with the body
+// and the content type naming its boundary.
+func Form(t testing.TB, parts ...Part) (*bytes.Buffer, string) {
+	t.Helper()
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	for _, part := range parts {
+		if part.Filename == "" {
+			if err := form.WriteField(part.Field, part.Content); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		}
+		file, err := form.CreateFormFile(part.Field, part.Filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(file, part.Content); err != nil {
+			t.Fatal(err)
+		}
 	}
-	var out []byte
-	for n > 0 {
-		out = append([]byte{byte('0' + n%10)}, out...)
-		n /= 10
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
 	}
-	return string(out)
+	return &body, form.FormDataContentType()
 }
+
+// Itoa is an identifier as a path segment.
+func Itoa(n int64) string { return strconv.FormatInt(n, 10) }
 
 // IndexOf is where a column sits, or -1.
 //

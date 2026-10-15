@@ -109,7 +109,7 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 		// one message that names an undisclosed finding on purpose, and it
 		// goes to the person who has just been granted it.
 		told := r.Told(t, "triager", "brought-in")
-		if len(told) != 1 || !httpapitest.Contains(told[0], embargoed) {
+		if len(told) != 1 || !strings.Contains(told[0], embargoed) {
 			t.Errorf("being brought into a case was said as %v", told)
 		}
 
@@ -121,7 +121,7 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=case", &trail)
-		if len(trail.Items) == 0 || !httpapitest.Contains(trail.Items[0].About, embargoed) {
+		if len(trail.Items) == 0 || !strings.Contains(trail.Items[0].About, embargoed) {
 			t.Errorf("bringing somebody into a case is not in the trail: %+v", trail.Items)
 		}
 
@@ -394,7 +394,7 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 		} {
 			got := httpapitest.AsPerson(t, r, "outsider", c.method, c.path, c.body)
 			httpapitest.RefusedWith(t, got, http.StatusNotFound)
-			if httpapitest.Contains(got.Body.String(), invisible) {
+			if strings.Contains(got.Body.String(), invisible) {
 				t.Errorf("%s %s says the product does not exist, having admitted them "+
 					"to the same product elsewhere in the same breath: %s",
 					c.method, c.path, got.Body.String())
@@ -405,7 +405,7 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 		// where that answer is the right one.
 		got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, "/v1/products/mine/overview", "")
 		httpapitest.RefusedWith(t, got, http.StatusNotFound)
-		if !httpapitest.Contains(got.Body.String(), invisible) {
+		if !strings.Contains(got.Body.String(), invisible) {
 			t.Errorf("the product's overview refused a case collaborator for something "+
 				"other than the product: %s", got.Body.String())
 		}

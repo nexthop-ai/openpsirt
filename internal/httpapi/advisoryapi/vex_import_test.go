@@ -385,7 +385,7 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 		// not.
 		named := r.VexedAs(t, "admin", "", strings.Repeat("d", 187)+".json", document)
 		httpapitest.RefusedWith(t, named, http.StatusUnprocessableEntity)
-		if !httpapitest.Contains(named.Body.String(), "?publisher=") {
+		if !strings.Contains(named.Body.String(), "?publisher=") {
 			t.Errorf("a file name too long to be the publisher is not told how to name one: %s",
 				named.Body.String())
 		}

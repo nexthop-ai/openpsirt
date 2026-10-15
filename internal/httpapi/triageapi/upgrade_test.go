@@ -256,7 +256,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 			t.Fatalf("moving the promise answered %d: %s", got.Code, got.Body.String())
 		}
 		told := r.Told(t, "reviewer", "approval-withdrawn")
-		if len(told) != 1 || !httpapitest.Contains(told[0], "promise") {
+		if len(told) != 1 || !strings.Contains(told[0], "promise") {
 			t.Errorf("moving an agreed promise told the approver %v", told)
 		}
 
@@ -270,7 +270,7 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 			t.Fatalf("restating the promise answered %d: %s", got.Code, got.Body.String())
 		}
 		told = r.Told(t, "reviewer", "approval-withdrawn")
-		if len(told) != 2 || !httpapitest.Contains(told[0]+told[1], "The reasoning") {
+		if len(told) != 2 || !strings.Contains(told[0]+told[1], "The reasoning") {
 			t.Errorf("restating an agreed promise told the approver %v", told)
 		}
 	})

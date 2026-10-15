@@ -4,23 +4,17 @@
 package httpapitest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -39,50 +33,16 @@ func (r *Reach) ScannedTwoIssues(t *testing.T) {
 // what the build argues about what it ships.
 func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom.Suppression) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:         product,
+	target, scan := r.Shipped(t, SeededBuild, hash, graph.Snapshot{
+		Root:         SeededRoot,
 		Components:   []graph.Described{kernel},
-		Dependencies: []graph.Dependency{{Parent: product, Child: kernel}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := fixture.RecordClaims(ctx, r.DB.DB, target.ID, scan.ID, claims,
-		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
+		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: kernel}},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+	r.Argued(t, target, scan, claims)
+	r.Ran(t, target, []finding.Reported{
 		{
 			Issue: finding.Named{
 				Identifier: "CVE-2026-9999", Severity: "high",
@@ -99,9 +59,7 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 			},
 			Component: kernel, FixState: finding.NoFix,
 		},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 }
 
 // Claimed records one judgment about a finding through the API and returns
@@ -160,22 +118,7 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 	r.Agreed(t, made.ClaimID)
 
 	// The code moves under them, which is what a lapse is.
-	if _, err := r.DB.DB.NewUpdate().Table("component").
-		Set(`"version" = ?`, "8.6.0-1").Set(`"upstream_version" = ?`, "8.6.0").
-		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var targets []int64
-	if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-		ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
-		t.Fatal(err)
-	}
-	store := triage.NewStore(r.DB.DB)
-	for _, target := range targets {
-		if _, err := store.Lapse(ctx, target); err != nil {
-			t.Fatal(err)
-		}
-	}
+	r.CurlMovedTo(t, "8.6.0")
 	lapsed, err := r.DB.DB.NewSelect().Table("decision").
 		Where(`"claim_id" = ?`, made.ClaimID).Where(`"state" = ?`, "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {
@@ -624,21 +567,11 @@ func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
 // RanAgainst records a finished scanner run stating a data version.
 func (r *Reach) RanAgainst(t *testing.T, version string, started time.Time) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
 	finished := started.Add(time.Minute)
 	if _, err := r.DB.NewInsert().Model(&finding.Run{
-		TargetID: target.ID, Scanner: "grype", DatabaseVersion: version, RanHere: true,
-		StartedAt: started, FinishedAt: &finished,
-	}).Exec(ctx); err != nil {
+		TargetID: r.TargetOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version,
+		RanHere: true, StartedAt: started, FinishedAt: &finished,
+	}).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -646,30 +579,14 @@ func (r *Reach) RanAgainst(t *testing.T, version string, started time.Time) {
 // Attached puts one file against the scanned issue and returns its token.
 func (r *Reach) Attached(t *testing.T, who string) string {
 	t.Helper()
-	body := &bytes.Buffer{}
-	form := multipart.NewWriter(body)
-	part, err := form.CreateFormFile("file", "evidence.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := part.Write([]byte("the request that answered before anybody signed in")); err != nil {
-		t.Fatal(err)
-	}
-	// Hanging off the issue rather than off text somebody is part way
-	// through writing, so it is listed at once and never swept.
-	if err := form.WriteField("evidence", "true"); err != nil {
-		t.Fatal(err)
-	}
-	if err := form.Close(); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodPost,
-		"/v1/products/mine/issues/CVE-2026-9999/attachments", body)
-	req.Header.Set("Content-Type", form.FormDataContentType())
-	req.Header.Set(TestHeader, who)
-	FromOurOwnPage(req)
-	rec := httptest.NewRecorder()
-	r.Handler.ServeHTTP(rec, req)
+	body, kind := Form(t,
+		Part{Field: "file", Filename: "evidence.txt",
+			Content: "the request that answered before anybody signed in"},
+		// Hanging off the issue rather than off text somebody is part way
+		// through writing, so it is listed at once and never swept.
+		Part{Field: "evidence", Content: "true"})
+	rec := r.Post(t, who, http.MethodPost,
+		"/v1/products/mine/issues/CVE-2026-9999/attachments", body, kind)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("attaching a file answered %d: %s", rec.Code, rec.Body.String())
 	}

@@ -6,6 +6,7 @@ package advisoryapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -413,7 +414,7 @@ func TestAnAdvisoryIsReadWholeBeforeAndAfterItGoesOut(t *testing.T) {
 		}
 		hidden("after")
 		after := httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, at, "")
-		if after.Code != http.StatusOK || !httpapitest.Contains(after.Body.String(), `"changed":false`) {
+		if after.Code != http.StatusOK || !strings.Contains(after.Body.String(), `"changed":false`) {
 			t.Errorf("once it went out a reader of undisclosed work got %d: %s",
 				after.Code, after.Body.String())
 		}

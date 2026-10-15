@@ -45,14 +45,9 @@ func TestALastRoleAndTheWorkHandedBackAreWithdrawnTogether(t *testing.T) {
 	if err := rights.GrantRole(ctx, triager.ID, mine.ID, access.PublicRead); err != nil {
 		t.Fatal(err)
 	}
-	sources, err := access.ParseSources("192.0.2.1")
-	if err != nil {
-		t.Fatal(err)
-	}
 	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
 		DB: handle, Queue: queue.New(handle, queue.DefaultOptions()),
-		Access: access.NewResolver(rights,
-			access.Trust{Header: httpapitest.TestHeader, From: sources}),
+		Access: httpapitest.Trusting(t, rights),
 	})
 
 	got := httpapitest.AsPerson(t, &httpapitest.Reach{Handler: handler}, "admin",

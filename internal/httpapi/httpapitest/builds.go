@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // StateOf is how far one build has decided the finding the helpers seed.
@@ -34,50 +32,20 @@ func (r *Reach) StateOf(t *testing.T, variant string) string {
 // carries two issues: the shape a tree count has to answer per path.
 func (r *Reach) ScannedShared(t *testing.T) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "shared", BuiltAt: time.Now().UTC(), ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	a := graph.Described{Purl: "pkg:oci/docker-a@1", Name: "docker-a", Version: "1"}
 	b := graph.Described{Purl: "pkg:oci/docker-b@1", Name: "docker-b", Version: "1"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:       product,
+	r.Scan(t, "shared", graph.Snapshot{
+		Root:       SeededRoot,
 		Components: []graph.Described{a, b, lib},
 		Dependencies: []graph.Dependency{
-			{Parent: product, Child: a}, {Parent: product, Child: b},
+			{Parent: SeededRoot, Child: a}, {Parent: SeededRoot, Child: b},
 			{Parent: a, Child: lib}, {Parent: b, Child: lib},
 		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+	}, []finding.Reported{
 		{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"}, Component: lib, FixState: finding.NoFix},
 		{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "low"}, Component: lib, FixState: finding.NoFix},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 }
 
 // AlsoIn ships the same graph and the same findings in a second variant of the
@@ -85,55 +53,21 @@ func (r *Reach) ScannedShared(t *testing.T) {
 // builds.
 func (r *Reach) AlsoIn(t *testing.T, variant string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	product, err := names.ProductByName(ctx, "mine")
-	if err != nil {
+	if _, err := catalog.NewStore(r.DB.DB).DeclareVariant(t.Context(),
+		r.productID(t), variant, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := names.DeclareVariant(ctx, product.ID, variant, true); err != nil {
-		t.Fatal(err)
-	}
-	located, err := names.Locate(ctx, "mine", "master", variant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "shared-" + variant,
-		BuiltAt: time.Now().UTC(), ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-	root := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:         root,
+	r.ScanAt(t, Build{"mine", "master", variant}, "shared-"+variant, graph.Snapshot{
+		Root:         SeededRoot,
 		Components:   []graph.Described{lib},
-		Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: lib}},
+	}, []finding.Reported{
 		{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
 			Component: lib, FixState: finding.NoFix},
 		{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "low"},
 			Component: lib, FixState: finding.NoFix},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 }
 
 // AlsoHolds gives another product's build a finding for one issue by name.
@@ -144,84 +78,33 @@ func (r *Reach) AlsoIn(t *testing.T, variant string) {
 // advisory to a release through the finding table has to tell apart.
 func (r *Reach) AlsoHolds(t *testing.T, product, stream, variant, identifier string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, product, stream, variant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+	r.Ran(t, r.TargetOf(t, Build{product, stream, variant}), []finding.Reported{{
 		Issue:     finding.Named{Identifier: identifier, Severity: "high"},
 		Component: SeededLib,
 		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}})
 }
 
 // ScannedAlso is a second build of the same product, holding the same issue at
 // the same place, with the library at the given version.
 func (r *Reach) ScannedAlso(t *testing.T, variant, version string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	first, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
+	if _, err := catalog.NewStore(r.DB.DB).DeclareVariant(t.Context(),
+		r.productID(t), variant, true); err != nil {
 		t.Fatal(err)
 	}
-	declared, err := names.DeclareVariant(ctx, first.ProductID, variant, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, first.StreamID, declared.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "also-" + variant, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	library := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@" + version, Name: "libnl-3-200", Version: version,
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:         product,
+	r.ScanAt(t, Build{"mine", "master", variant}, "also-"+variant, graph.Snapshot{
+		Root:         SeededRoot,
 		Components:   []graph.Described{library},
-		Dependencies: []graph.Dependency{{Parent: product, Child: library}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: library}},
+	}, []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
 		Component: library,
 		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}})
 }
 
 // ShipsTwice re-applies the build's graph holding one name at two versions,
@@ -229,49 +112,21 @@ func (r *Reach) ScannedAlso(t *testing.T, variant, version string) {
 // three vendored copies of one library.
 func (r *Reach) ShipsTwice(t *testing.T) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "two-versions", ParserVersion: "test",
-		// Newer than the first, and not ahead of the clock: a build stamped in
-		// the future is refused, because accepting one means no later scan is
-		// ever newer.
-		BuiltAt: time.Now().UTC(),
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
-	consumer := graph.Described{
-		Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0",
-	}
 	older := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 	}
 	newer := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.9.0", Name: "libnl-3-200", Version: "3.9.0",
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root:       product,
-		Components: []graph.Described{consumer, older, newer},
+	r.Shipped(t, SeededBuild, "two-versions", graph.Snapshot{
+		Root:       SeededRoot,
+		Components: []graph.Described{SeededConsumer, older, newer},
 		Dependencies: []graph.Dependency{
-			{Parent: product, Child: consumer},
-			{Parent: consumer, Child: older},
-			{Parent: consumer, Child: newer},
+			{Parent: SeededRoot, Child: SeededConsumer},
+			{Parent: SeededConsumer, Child: older},
+			{Parent: SeededConsumer, Child: newer},
 		},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 }
 
 // SeededTwin is SeededLib described again under a namespace of the producer's
@@ -309,26 +164,6 @@ func (r *Reach) ShipsUnderTwoNamespaces(t *testing.T, carrying ...graph.Describe
 // at two versions, both vulnerable to the same issue.
 func (r *Reach) ScannedOneIssueAtTwoVersions(t *testing.T) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "one-issue-two-versions", BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	older := graph.Described{
 		Purl: "pkg:golang/golang.org/x/crypto@0.14.0", Name: "golang.org/x/crypto",
 		Version: "0.14.0", UpstreamName: "golang.org/x/crypto", UpstreamVersion: "0.14.0",
@@ -339,87 +174,37 @@ func (r *Reach) ScannedOneIssueAtTwoVersions(t *testing.T) {
 	}
 	shipped := []graph.Described{older, newer}
 	edges := make([]graph.Dependency, 0, len(shipped))
-	for _, one := range shipped {
-		edges = append(edges, graph.Dependency{Parent: product, Child: one})
-	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root: product, Components: shipped, Dependencies: edges,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	var reported []finding.Reported
 	for _, at := range shipped {
+		edges = append(edges, graph.Dependency{Parent: SeededRoot, Child: at})
 		reported = append(reported, finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-46595", Severity: "critical"},
 			Component: at, FixState: finding.FixedUpstream, FixedIn: "0.31.0",
 		})
 	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
-		t.Fatal(err)
-	}
+	r.Scan(t, "one-issue-two-versions", graph.Snapshot{
+		Root: SeededRoot, Components: shipped, Dependencies: edges,
+	}, reported)
 }
 
 // ScannedTag declares a tag of "mine" built as broadcom and scans it holding
 // the seeded library at a version of its own, with the seeded issue against it.
 func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	product, err := names.ProductByName(ctx, "mine")
-	if err != nil {
+	if _, err := catalog.NewStore(r.DB.DB).DeclareStream(t.Context(),
+		r.productID(t), tag, catalog.Tag, nil); err != nil {
 		t.Fatal(err)
-	}
-	stream, err := names.DeclareStream(ctx, product.ID, tag, catalog.Tag, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	variant, err := names.VariantByName(ctx, product.ID, "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, stream.ID, variant.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "tag-" + tag, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
 	}
 	lib := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@" + version, Name: "libnl-3-200", Version: version,
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, graph.Snapshot{
+	r.ScanAt(t, Build{"mine", tag, "broadcom"}, "tag-"+tag, graph.Snapshot{
 		Root: SeededRoot, Components: []graph.Described{lib},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: lib}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+	}, []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
 		Component: lib, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}})
 }
 
 // AlsoScannedInto puts the same component and issue behind a second product,
@@ -427,45 +212,15 @@ func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 // same key in both.
 func (r *Reach) AlsoScannedInto(t *testing.T, product, stream, variant string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, product, stream, variant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "elsewhere-" + product, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, graph.Snapshot{
+	r.ScanAt(t, Build{product, stream, variant}, "elsewhere-"+product, graph.Snapshot{
 		Root:         SeededRoot,
 		Components:   []graph.Described{SeededLib},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: SeededLib}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+	}, []finding.Reported{{
 		Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
 		Component: SeededLib,
 		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}})
 }
 
 // AheadOfUs is a date still to come and inside the deadline anything in these
@@ -532,26 +287,6 @@ func (r *Reach) ScannedTwoSources(t *testing.T) {
 
 func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described) {
 	t.Helper()
-	ctx := t.Context()
-
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", variant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "siblings-" + variant, BuiltAt: time.Now().UTC(),
-		ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
-
-	product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	// Two binary packages of one source, which is what the key collapses.
 	four := graph.Described{
 		Purl: "pkg:deb/debian/libcurl4t64@8.4.0-1", Name: "libcurl4t64", Version: "8.4.0-1",
@@ -564,21 +299,7 @@ func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described
 	shipped := append([]graph.Described{four, three}, also...)
 	edges := make([]graph.Dependency, 0, len(shipped))
 	for _, one := range shipped {
-		edges = append(edges, graph.Dependency{Parent: product, Child: one})
-	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
-		Root: product, Components: shipped, Dependencies: edges,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
+		edges = append(edges, graph.Dependency{Parent: SeededRoot, Child: one})
 	}
 	var reported []finding.Reported
 	for _, at := range shipped {
@@ -600,7 +321,7 @@ func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described
 		Issue:     finding.Named{Identifier: "CVE-2026-CURL3", Severity: "high"},
 		Component: four, FixState: finding.NoFix,
 	})
-	if _, err := findings.Apply(ctx, target.ID, run.ID, reported); err != nil {
-		t.Fatal(err)
-	}
+	r.ScanAt(t, Build{"mine", "master", variant}, "siblings-"+variant, graph.Snapshot{
+		Root: SeededRoot, Components: shipped, Dependencies: edges,
+	}, reported)
 }

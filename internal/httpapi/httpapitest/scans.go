@@ -4,12 +4,10 @@
 package httpapitest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -54,31 +52,13 @@ func Nowish() time.Time { return time.Now().UTC().Add(-time.Hour) }
 // Upload builds the multipart request a build sends.
 func Upload(t *testing.T, path, inventory string, suppressions ...string) *http.Request {
 	t.Helper()
-	var body bytes.Buffer
-	form := multipart.NewWriter(&body)
-
-	part, err := form.CreateFormFile("inventory", "sonic.cdx.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.WriteString(part, inventory); err != nil {
-		t.Fatal(err)
-	}
+	parts := []Part{{Field: "inventory", Filename: "sonic.cdx.json", Content: inventory}}
 	for i, s := range suppressions {
-		part, err := form.CreateFormFile("suppressions", fmt.Sprintf("vex-%d.json", i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := io.WriteString(part, s); err != nil {
-			t.Fatal(err)
-		}
+		parts = append(parts, Part{Field: "suppressions", Filename: fmt.Sprintf("vex-%d.json", i), Content: s})
 	}
-	if err := form.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	req := httptest.NewRequest(http.MethodPost, path, &body)
-	req.Header.Set("Content-Type", form.FormDataContentType())
+	body, kind := Form(t, parts...)
+	req := httptest.NewRequest(http.MethodPost, path, body)
+	req.Header.Set("Content-Type", kind)
 	return req
 }
 
@@ -215,15 +195,8 @@ func ProductHere(t *testing.T, f *IngestFixture) int64 {
 func (r *Reach) InventoryOf(t *testing.T, contents string) int64 {
 	t.Helper()
 	ctx := t.Context()
-	located, err := catalog.NewStore(r.DB.DB).Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := catalog.NewStore(r.DB.DB).TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, err := ingest.NewStore(r.DB.DB).Newest(ctx, target.ID)
+	target := r.TargetOf(t, SeededBuild)
+	scan, err := ingest.NewStore(r.DB.DB).Newest(ctx, target)
 	if err != nil || scan == nil {
 		t.Fatalf("the build has no upload to hang an inventory on: %v", err)
 	}
@@ -234,7 +207,7 @@ func (r *Reach) InventoryOf(t *testing.T, contents string) int64 {
 	}
 	var runID int64
 	if err := r.DB.DB.NewSelect().Table("scan_run").ColumnExpr(`"id"`).
-		Where(`"target_id" = ?`, target.ID).Order("id DESC").Limit(1).
+		Where(`"target_id" = ?`, target).Order("id DESC").Limit(1).
 		Scan(ctx, &runID); err != nil {
 		t.Fatal(err)
 	}
@@ -263,20 +236,6 @@ func (r *Reach) Inventoried(t *testing.T, variant, hash string, held map[string]
 			t.Fatal(err)
 		}
 	}
-	located, err := names.Locate(ctx, "mine", "master", variant)
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(), ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
 	top := graph.Described{Purl: "pkg:generic/mine-" + variant + "@1.0", Name: "mine-" + variant, Version: "1.0"}
 	snap := graph.Snapshot{Root: top}
 	for name, version := range held {
@@ -286,9 +245,7 @@ func (r *Reach) Inventoried(t *testing.T, variant, hash string, held map[string]
 		snap.Components = append(snap.Components, component)
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: top, Child: component})
 	}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, snap); err != nil {
-		t.Fatal(err)
-	}
+	r.Shipped(t, Build{"mine", "master", variant}, hash, snap)
 }
 
 // TwoPlatforms is one release built for two platforms that differ by one name

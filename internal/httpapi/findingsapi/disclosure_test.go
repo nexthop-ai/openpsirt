@@ -5,6 +5,7 @@ package findingsapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func TestAnEmbargoIsSaidBeforeItsDateNotOnIt(t *testing.T) {
 		}
 		// It says the thing somebody has to act on, which is that arranging an
 		// extension takes a second person and therefore takes time.
-		if !httpapitest.Contains(coming[0], "second person") {
+		if !strings.Contains(coming[0], "second person") {
 			t.Errorf("the notice does not say what has to be arranged: %q", coming[0])
 		}
 		// And it is not also being reported as arrived, which would be one

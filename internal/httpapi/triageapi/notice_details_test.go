@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 			t.Errorf("before any notice the window reads %+v, want no start and no end", final)
 		}
 		if open := r.Alerts(t, "private-triage", "obligation-open"); len(open) != 1 ||
-			!httpapitest.Contains(open[0], "Notification") {
+			!strings.Contains(open[0], "Notification") {
 			t.Errorf("before any notice the running windows are %v, want the notification alone", open)
 		}
 
@@ -77,7 +78,7 @@ func TestAWindowCountingFromANoticeRaisesNothingUntilTheNotice(t *testing.T) {
 			t.Errorf("after the notice the window reads %+v, want it started at %s", final, told)
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
-		if len(open) != 1 || !httpapitest.Contains(open[0], `the first notice for "Notification"`) {
+		if len(open) != 1 || !strings.Contains(open[0], `the first notice for "Notification"`) {
 			t.Errorf("after the notice the running windows are %v, want the final report", open)
 		}
 	})
@@ -141,7 +142,7 @@ func TestRetiringAWindowAnotherCountsFromConflictsNamingIt(t *testing.T) {
 		}
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
 			fmt.Sprintf("/v1/obligation-windows/%d", notification), "")
-		if got.Code != http.StatusConflict || !httpapitest.Contains(got.Body.String(), "Final report") {
+		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), "Final report") {
 			t.Errorf("retiring a window another counts from answered %d: %s", got.Code, got.Body.String())
 		}
 	})

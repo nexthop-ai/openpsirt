@@ -396,10 +396,10 @@ func TestAListShowsOnlyWhatTheAskerHolds(t *testing.T) {
 		r.Handler.ServeHTTP(rec, req)
 
 		body := rec.Body.String()
-		if !httpapitest.Contains(body, "mine") {
+		if !strings.Contains(body, "mine") {
 			t.Errorf("the product they hold something on is missing: %s", body)
 		}
-		if httpapitest.Contains(body, "theirs") {
+		if strings.Contains(body, "theirs") {
 			t.Errorf("a product they hold nothing on was listed: %s", body)
 		}
 	})
@@ -423,10 +423,10 @@ func TestScanningShowsOnlyTheBuildsTheAskerHolds(t *testing.T) {
 		// Both directions. "Theirs is absent" is also what an endpoint
 		// answering nothing to everybody looks like, and a fixture that builds
 		// no builds at all satisfies both.
-		if !httpapitest.Contains(body, "mine") {
+		if !strings.Contains(body, "mine") {
 			t.Errorf("the build they hold something on is missing: %s", body)
 		}
-		if httpapitest.Contains(body, "theirs") {
+		if strings.Contains(body, "theirs") {
 			t.Errorf("a product they hold nothing on was listed: %s", body)
 		}
 	})

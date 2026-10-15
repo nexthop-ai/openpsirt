@@ -5,6 +5,7 @@ package findingsapi_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -54,7 +55,7 @@ func TestPackageKindsAnswerOnlyWhatTheReaderMaySee(t *testing.T) {
 		// no kind, and says so with an empty list rather than an absent one.
 		got := httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet,
 			"/v1/products/mine/findings/package-kinds", "")
-		if got.Code != http.StatusOK || !httpapitest.Contains(got.Body.String(), `"items":[]`) {
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), `"items":[]`) {
 			t.Errorf("undisclosed reading alone answered %d: %s", got.Code, got.Body.String())
 		}
 

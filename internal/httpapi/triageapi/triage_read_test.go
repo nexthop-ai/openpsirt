@@ -331,7 +331,7 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 			fmt.Sprintf("/v1/claims/%d/comments", claim),
 			`{"body":"a reader should not be able to write this"}`)
 		httpapitest.RefusedWith(t, wrote, http.StatusNotFound)
-		if !httpapitest.Contains(wrote.Body.String(), "no decision is recorded there") {
+		if !strings.Contains(wrote.Body.String(), "no decision is recorded there") {
 			t.Errorf("a reader writing on a decision was refused in other words: %s",
 				wrote.Body.String())
 		}

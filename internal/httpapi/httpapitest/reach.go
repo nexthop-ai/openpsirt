@@ -26,7 +26,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
@@ -100,6 +99,9 @@ type Reach struct {
 	// API is the document the server builds from its own registrations, so a
 	// test can walk every operation rather than a list somebody maintains.
 	API huma.API
+	// Deps is what the handler was built from, so a test that needs one more
+	// thing wired builds a second handler from the same deployment.
+	Deps core.Deps
 }
 
 // Response is what came back, for the tests that compare answers rather than
@@ -154,21 +156,12 @@ func (r *Reach) As(t *testing.T, who, method, path string) int {
 func (r *Reach) SentByTheKey(t *testing.T) int64 {
 	t.Helper()
 	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "mine", "master", "broadcom")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
 	key, err := r.Rights.ResolveKey(ctx, r.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
 	made, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
+		TargetID: r.TargetOf(t, SeededBuild), ContentHash: "sent-by-the-key", BuiltAt: time.Now().UTC(),
 		ParserVersion: "test", Credential: ingest.Sender(key),
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -492,16 +485,24 @@ func ReachAdjusted(t *testing.T, on withCast, adjust func(*core.Deps), fn func(t
 	reach(t, on, examplePublisher, adjust, fn)
 }
 
+// Trusting resolves callers through rights, taking the test header as the
+// signed-in identity. httptest sends from a documentation address, and the
+// proxy the header is trusted from is taken to sit there.
+func Trusting(t testing.TB, rights *access.Store) *access.Resolver {
+	t.Helper()
+	sources, err := access.ParseSources("192.0.2.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return access.NewResolver(rights, access.Trust{Header: TestHeader, From: sources})
+}
+
 func reach(t *testing.T, on withCast, as publisher.Named, adjust func(*core.Deps),
 	fn func(t *testing.T, r *Reach)) {
 	t.Helper()
 	on(t, func(t *testing.T, db *database.DB, made cast) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		rights := access.NewStore(db.DB)
-		sources, err := access.ParseSources("192.0.2.1")
-		if err != nil {
-			t.Fatal(err)
-		}
 		// A place for attachments, so the operations that carry REQ-70's
 		// control answer rather than saying the deployment holds none.
 		files, err := attach.NewFiles(t.TempDir())
@@ -510,7 +511,7 @@ func reach(t *testing.T, on withCast, as publisher.Named, adjust func(*core.Deps
 		}
 		deps := core.Deps{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
-			Access: access.NewResolver(rights, access.Trust{Header: TestHeader, From: sources}),
+			Access: Trusting(t, rights),
 			// The identity this deployment publishes as, which an advisory
 			// and a VEX document both need. Passed in, because the deployment
 			// that has not been told is a case of its own.
@@ -527,19 +528,8 @@ func reach(t *testing.T, on withCast, as publisher.Named, adjust func(*core.Deps
 		adjust(&deps)
 		handler, api := httpapi.New(quiet, nil, deps)
 		fn(t, &Reach{Handler: handler, Key: made.key, Revoked: made.revoked,
-			Rights: rights, DB: db, API: api})
+			Rights: rights, DB: db, API: api, Deps: deps})
 	})
-}
-
-func Contains(haystack, needle string) bool {
-	return len(haystack) >= len(needle) && (func() bool {
-		for i := 0; i+len(needle) <= len(haystack); i++ {
-			if haystack[i:i+len(needle)] == needle {
-				return true
-			}
-		}
-		return false
-	})()
 }
 
 // DeclaredScope reads the scope off an operation's declaration, whichever
@@ -566,14 +556,6 @@ func DeclaredScope(t *testing.T, asks any) string {
 // short-circuits and neither of its arms is ever executed.
 func Deriving(t *testing.T, r *Reach, groups bool) *Reach {
 	t.Helper()
-	files, err := attach.NewFiles(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	sources, err := access.ParseSources("192.0.2.1")
-	if err != nil {
-		t.Fatal(err)
-	}
 	settings := setting.NewStore(r.DB)
 	if groups {
 		if _, _, err := settings.Change(t.Context(), setting.RoleMode,
@@ -581,26 +563,25 @@ func Deriving(t *testing.T, r *Reach, groups bool) *Reach {
 			t.Fatal(err)
 		}
 	}
-	// Wired the way the process wires it — a read of the stored mode, through
-	// a store holding the root database handle — rather than a closure over a
-	// constant. A constant exercises both arms of the guard and neither can
-	// deadlock, which is the difference between testing what the guard decides
-	// and testing where it reads from.
-	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil,
-		core.Deps{
-			DB: r.DB, Queue: queue.New(r.DB, queue.DefaultOptions()), Files: files,
-			Access: access.NewResolver(r.Rights,
-				access.Trust{Header: TestHeader, From: sources}),
-			Mode: func(ctx context.Context) access.Mode {
-				stored, _, err := settings.Get(ctx, setting.RoleMode)
-				if err != nil {
-					return access.Direct
-				}
-				return access.AsMode(stored)
-			},
-		})
+	// The deployment r was built from, so a route that needs a publisher, the
+	// names this deployment calls its own or a chat platform answers here as
+	// it does there. The mode is wired the way the process wires it — a read
+	// of the stored mode, through a store holding the root database handle —
+	// rather than a closure over a constant. A constant exercises both arms of
+	// the guard and neither can deadlock, which is the difference between
+	// testing what the guard decides and testing where it reads from.
+	deps := r.Deps
+	deps.Mode = func(ctx context.Context) access.Mode {
+		stored, _, err := settings.Get(ctx, setting.RoleMode)
+		if err != nil {
+			return access.Direct
+		}
+		return access.AsMode(stored)
+	}
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, deps)
 	with := *r
 	with.Handler = handler
+	with.Deps = deps
 	return &with
 }
 
@@ -650,52 +631,22 @@ func Operations(item *huma.PathItem) map[string]*huma.Operation {
 // would test that path rather than this one.
 func SeedTheirs(t *testing.T, r *Reach) (disclosed, undisclosed string) {
 	t.Helper()
-	ctx := t.Context()
-	names := catalog.NewStore(r.DB.DB)
-	located, err := names.Locate(ctx, "theirs", "master", "mellanox")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scan, outcome, err := ingest.NewStore(r.DB.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "estate-theirs",
-		BuiltAt: time.Now().UTC(), ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		t.Fatalf("record scan: %v %v", outcome, err)
-	}
 	root := graph.Described{Purl: "pkg:deb/debian/theirs@1.0", Name: "theirs", Version: "1.0"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libestate@2.1", Name: "libestate", Version: "2.1"}
-	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
+	disclosed, undisclosed = "CVE-2026-9001", "CVE-2026-9002"
+	r.ScanAt(t, Build{"theirs", "master", "mellanox"}, "estate-theirs", graph.Snapshot{
 		Root: root, Components: []graph.Described{lib},
 		Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	findings := finding.NewStore(r.DB.DB)
-	run, err := findings.Begin(ctx, finding.Run{
-		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
-		DatabaseVersion: "2026-08-28", RanHere: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	disclosed, undisclosed = "CVE-2026-9001", "CVE-2026-9002"
-	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{
+	}, []finding.Reported{
 		{Issue: finding.Named{Identifier: disclosed, Severity: "high"},
 			Component: lib, FixState: finding.NoFix},
 		{Issue: finding.Named{Identifier: undisclosed, Severity: "high"},
 			Component: lib, FixState: finding.NoFix},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
 	if _, err := r.DB.DB.NewUpdate().Table("finding").
 		Set(`"visibility" = ?`, access.Private).
 		Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
-			undisclosed).Exec(ctx); err != nil {
+			undisclosed).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return disclosed, undisclosed

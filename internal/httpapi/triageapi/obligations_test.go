@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,7 +73,7 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 			t.Fatalf("recording a notice answered %d: %s", got.Code, got.Body.String())
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
-		if len(open) != 1 || !httpapitest.Contains(open[0], "Final report") {
+		if len(open) != 1 || !strings.Contains(open[0], "Final report") {
 			t.Errorf("after the early warning was answered, the running ones are %v", open)
 		}
 
@@ -233,7 +234,7 @@ func TestARunningWindowStopsBeingSaidWhenItsWindowOrItsRecordGoes(t *testing.T) 
 			t.Fatalf("retiring answered %d: %s", got.Code, got.Body.String())
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
-		if len(open) != 1 || !httpapitest.Contains(open[0], "Notification") {
+		if len(open) != 1 || !strings.Contains(open[0], "Notification") {
 			t.Errorf("after retiring the early warning, the running ones are %v", open)
 		}
 
@@ -374,7 +375,7 @@ func TestAWindowWarnsBeforeItsEndWhereItNamesAWarning(t *testing.T) {
 		r.AttackedAt(t, time.Now().UTC().Add(-20*time.Hour))
 
 		near := r.Alerts(t, "private-triage", "obligation-near")
-		if len(near) != 1 || !httpapitest.Contains(near[0], "Early warning") {
+		if len(near) != 1 || !strings.Contains(near[0], "Early warning") {
 			t.Fatalf("the windows near their end raised %v, want the early warning alone", near)
 		}
 		// The notice raised when the record stood stays beside it.
@@ -435,7 +436,7 @@ func TestAWindowLimitedToAnotherProductDoesNotRunForThisOne(t *testing.T) {
 			t.Fatalf("the shelf holds %+v, want the window naming this product alone", seen)
 		}
 		open := r.Alerts(t, "private-triage", "obligation-open")
-		if len(open) != 1 || !httpapitest.Contains(open[0], "Ours") {
+		if len(open) != 1 || !strings.Contains(open[0], "Ours") {
 			t.Errorf("the running notices are %v, want the window naming this product alone", open)
 		}
 	})
@@ -445,7 +446,7 @@ func TestAWindowNamingAProductNobodyDeclaredIsRefusedWhole(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
 			`{"name":"Half known","hours":24,"products":["mine","nowhere"]}`)
-		if got.Code != http.StatusUnprocessableEntity || !httpapitest.Contains(got.Body.String(), "nowhere") {
+		if got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "nowhere") {
 			t.Fatalf("a window naming an undeclared product answered %d: %s", got.Code, got.Body.String())
 		}
 		var listed struct {

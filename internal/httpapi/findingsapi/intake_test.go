@@ -6,6 +6,7 @@ package findingsapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,7 +68,7 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 		if len(waiting) != 1 {
 			t.Fatalf("an unanswered claim raised %d notices: %v", len(waiting), waiting)
 		}
-		if !httpapitest.Contains(waiting[0], recorded.Reference) {
+		if !strings.Contains(waiting[0], recorded.Reference) {
 			t.Errorf("the notice does not name the claim: %q", waiting[0])
 		}
 		if told := r.Alerts(t, "triager", "unanswered-report"); len(told) != 0 {
