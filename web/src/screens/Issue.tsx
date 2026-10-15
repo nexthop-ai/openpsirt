@@ -30,8 +30,8 @@ export function Issue() {
   const who = useWho();
   const opener = useRowOpener();
   // The identity alone. A note records who wrote it by the name they sign in
-  // under, and matching a display name as well made ownership turn on a label
-  // anybody can be given.
+  // under, and a display name is a label anybody can be given, so ownership
+  // does not turn on one.
   const mine = (writtenBy: string) => !!who.data && writtenBy === who.data.identity;
   const found = useIssue(vulnerability);
 

@@ -21,8 +21,7 @@ const WHOLE_FOUR = {
 
 // Composing a CVSS base vector, which is what gets stored and what every
 // deadline is worked out from. The module is a `.tsx` file, which is no
-// barrier to a `.ts` test: a `.tsx` module is importable from one, and six
-// already do it.
+// barrier to a `.ts` test: a `.tsx` module is importable from one.
 describe("what a composed vector says it is", () => {
   it("keeps the version the vector being edited was recorded under", () => {
     // The base formula is the same in 3.0 and 3.1, so the score does not move

@@ -13,21 +13,14 @@ import { cut } from "./cut";
 // holding the issue at another version are offered, because a tick there
 // is a claim about code nobody has looked at.
 //
-// A third kind was declared, rendered and never populated — a build already
-// past the fix, shown and not offered. The endpoint splits its answer two
-// ways, so the only construction of a plan in the tree passed the empty list
-// and the card could not draw whatever the read returned. The document was the
-// thing left over rather than the code, so it goes with it; if the endpoint
-// grows the bucket the card comes back with it.
-//
 // The offer is a version, not a variant, and it says so. The same
 // product built two ways is one piece of work — a matching build is reached by
 // lookup and never asked about — so anything that reaches this list is here
-// because the code differs. Labeling those entries by their build read as
-// "approve this for mellanox", which is a question nobody should be asked and
-// which made a variant look like a decision somebody had to take twice.
+// because the code differs. Labeling those entries by their build would read
+// as "approve this for mellanox", which is a question nobody should be asked
+// and makes a variant look like a decision somebody has to take twice.
 //
-// One screen, not one per entry. Walking them individually made a routine
+// One screen, not one per entry. Walking them individually makes a routine
 // decision several sheets deep, and the thing being weighed is one line each:
 // does the reasoning hold at that version too. They are unticked to start,
 // because that is the whole control — a tick is the claim.

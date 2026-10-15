@@ -185,9 +185,9 @@ export function ByComponent({
     <>
       <p className="hint" style={{ margin: "0 0 8px" }}>
         Ordered by {own(orderedBy, asked) ?? asked}.{" "}
-        {/* The same answer as a file, narrowed the same way. This is
-            the shape a release meeting argues over, and taking it away meant
-            copying the table out. */}
+        {/* The same answer as a file, narrowed the same way. This is the
+            shape a release meeting argues over, and a file spares copying the
+            table out. */}
         <a href={componentsFile(at, query, "csv")}>CSV</a> ·{" "}
         <a href={componentsFile(at, query, "json")}>JSON</a>
       </p>

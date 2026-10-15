@@ -99,9 +99,8 @@ describe("the renderer", () => {
 
   it("keeps a link to somewhere in this deployment", () => {
     // DESIGN-text.md: one finding referring to another is ordinary, and the
-    // submission check accepts it. The sanitizer went on deleting the anchor
-    // and leaving the text — a link accepted when it was written stopped
-    // being a link when anybody read it, and nothing reported it.
+    // submission check accepts it. The sanitizer keeps the anchor, so a link
+    // accepted when it was written is still a link when anybody reads it.
     const out = render("See [the other one](/findings/CVE-2026-1000).");
     expect(out).toContain('href="/findings/CVE-2026-1000"');
     // Ours, so it opens here rather than being sent away with a policy meant

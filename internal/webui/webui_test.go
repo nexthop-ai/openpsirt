@@ -25,7 +25,7 @@ func TestTheInterfaceIsEitherThereOrSaysWhyNot(t *testing.T) {
 	switch {
 	case err == nil:
 		if pages == nil {
-			t.Fatal("no error and no filesystem, which is the state that used to be silent")
+			t.Fatal("no error and no filesystem, which says nothing about why there is no interface")
 		}
 		if _, err := pages.Open("index.html"); err != nil {
 			t.Errorf("the interface was answered and has no page to serve: %v", err)

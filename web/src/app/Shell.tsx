@@ -786,6 +786,3 @@ function Me({ who }: { who: Who }) {
     </div>
   );
 }
-
-// Two letters for the corner. A display name people set is usually a full
-// name; an identity is usually not, and either has to fit in 30 pixels.

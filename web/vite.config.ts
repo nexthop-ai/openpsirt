@@ -12,17 +12,16 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: { outDir: "dist", emptyOutDir: true, assetsDir: "assets" },
-  // The renderer carries the sanitizing that used to run on the server, so it
-  // is tested against the same corpus of payloads. DOMPurify needs a DOM to
-  // sanitize in, which is what jsdom is here for.
+  // The renderer sanitizes what it renders, in the browser, so it is tested
+  // against a corpus of payloads. DOMPurify needs a DOM to sanitize in, which
+  // is what jsdom is here for.
   //
   // `.test.tsx` as well as `.test.ts`, because JSX cannot be written in a
   // `.ts` file and without the second pattern no component can be rendered in
   // a test at all. A `.tsx` *module* is importable from a `.ts` test either
   // way, so an untested pure function in a `.tsx` file is a choice rather than
-  // a limit — and the pure functions are what is tested here. Rendering a
-  // component needs a library to render it with, and none is installed:
-  // nothing is gained by carrying one before the first test that renders.
+  // a limit. A component is rendered with React's own root, mounted in jsdom,
+  // and no rendering library is installed.
   //
   // Coverage is measured and reported for the interface the way it is for the
   // Go half, so that a figure quoted for this repository covers both.
