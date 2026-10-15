@@ -8,8 +8,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
-	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -142,6 +143,25 @@ func (f *fixture) upload(t *testing.T, who access.Subject, name string, body []b
 		t.Fatalf("upload %s: %v", name, err)
 	}
 	return row
+}
+
+// past is older than the window a deployment keeps an unattached upload for.
+const past = 48 * time.Hour
+
+// age moves the upload time of the named uploads, or of every upload where
+// none is named, ago into the past.
+func (f *fixture) age(t *testing.T, ago time.Duration, tokens ...string) {
+	t.Helper()
+	q := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
+		Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-ago))
+	if len(tokens) == 0 {
+		q = q.Where("1 = 1")
+	} else {
+		q = q.Where(`"token" IN (?)`, bun.List(tokens))
+	}
+	if _, err := q.Exec(t.Context()); err != nil {
+		t.Fatalf("age uploads: %v", err)
+	}
 }
 
 // A one-pixel PNG, so that the type is decided from real bytes rather than
@@ -383,11 +403,7 @@ func TestUploadsNothingRefersToAreCollected(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Both are made old enough to be looked at.
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where("1 = 1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past)
 
 		gone, err := f.store.Sweep(ctx, 24*time.Hour)
 		if err != nil {
@@ -422,14 +438,6 @@ func TestAnUploadTooBigOrWithNoRoomIsRefused(t *testing.T) {
 			strings.NewReader(body), int64(len(body)), roomy, 1024, plenty, false)
 		if err != attach.ErrNoRoom {
 			t.Errorf("an upload with no room answered %v, want it named as full", err)
-		}
-		// And the refused bytes are not sitting in the store.
-		entries, err := os.ReadDir(f.root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(entries) != 0 {
-			t.Errorf("a refused upload left %d entries behind", len(entries))
 		}
 	})
 }
@@ -486,6 +494,11 @@ func TestTwoUploadsTogetherCannotBothTakeTheLastRoom(t *testing.T) {
 		}
 		if stored != 1 || full != 1 {
 			t.Fatalf("%d stored and %d refused for room, where one fits", stored, full)
+		}
+		// The refused upload carried its bytes before the transaction that
+		// refused it, and nothing but the row tells the sweep they are there.
+		if held := filesUnder(t, f.root); held != 1 {
+			t.Errorf("the store holds %d files after one upload was kept and one refused", held)
 		}
 	})
 }
@@ -600,11 +613,7 @@ func TestAnUndeletableObjectDoesNotStallTheSweep(t *testing.T) {
 		who := f.who(t, access.PublicTriage)
 		stuck := f.upload(t, who, "stuck.log", []byte("the store will not let this go"))
 		after := f.upload(t, who, "after.log", []byte("this goes"))
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where("1 = 1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past)
 		var said bytes.Buffer
 		store := attach.NewStore(f.db.DB, refusing{Storage: f.files, key: stuck.ObjectKey}).
 			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
@@ -702,11 +711,7 @@ func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
 		if err := f.store.Redact(ctx, f.admin(t), redacted.Token, "a credential"); err != nil {
 			t.Fatalf("redact: %v", err)
 		}
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where(`"token" = ?`, redacted.Token).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past, redacted.Token)
 
 		gone, err := f.store.Sweep(ctx, 24*time.Hour)
 		if err != nil {
@@ -730,9 +735,11 @@ func TestARecentUploadAndARedactedOneSurviveTheSweep(t *testing.T) {
 
 func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
 	// NewKeeper supplies both production defaults for the attachment sweep:
-	// how long an upload is left, and how often the pass runs. Nothing else
-	// reads either, so a test that drives Sweep directly says nothing about
-	// what a deployment actually sweeps with.
+	// how long an upload is left, and how often the pass runs. The keeper here
+	// is built and run with zero for both, as a deployment builds it, so what
+	// is swept is what a deployment sweeps. An upload a day and a half old is
+	// taken and one under a day old is left, which pins the window from both
+	// sides.
 	//
 	// Nil where the deployment holds no files, which is the arm that keeps a
 	// worker from being started for a feature nobody configured: a goroutine
@@ -746,22 +753,20 @@ func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
 		defer stop()
 		who := f.who(t, access.PublicTriage)
 		abandoned := f.upload(t, who, "abandoned.log", []byte("nothing points here"))
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where(`"token" = ?`, abandoned.Token).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, 36*time.Hour, abandoned.Token)
+		writing := f.upload(t, who, "still-writing.log", []byte("nothing points here yet"))
+		f.age(t, 23*time.Hour, writing.Token)
 
-		keeper := attach.NewKeeper(f.db.DB, f.files, hush(), 24*time.Hour)
+		keeper := attach.NewKeeper(f.db.DB, f.files, hush(), 0)
 		if keeper == nil {
 			t.Fatal("a deployment that keeps files was given no sweep to run")
 		}
 		returned := make(chan struct{})
 		go func() {
 			defer close(returned)
-			// Longer than this test runs for, so the first wake is what does
-			// the work.
-			keeper.Run(ctx, time.Hour)
+			// The interval a deployment runs with is longer than this test
+			// runs for, so the first wake is what does the work.
+			keeper.Run(ctx, 0)
 		}()
 
 		deadline := time.Now().Add(20 * time.Second)
@@ -771,17 +776,37 @@ func TestTheKeeperSweepsOnItsOwnAndIsNothingWhereNoFilesAreKept(t *testing.T) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
-		if _, err := f.store.Find(ctx, who, abandoned.Token); err == nil {
-			t.Error("the sweep ran and left an upload nothing refers to")
-		}
-
 		stop()
 		select {
 		case <-returned:
 		case <-time.After(10 * time.Second):
 			t.Fatal("the loop did not return when its context ended")
 		}
+
+		if _, err := f.store.Find(t.Context(), who, abandoned.Token); err == nil {
+			t.Error("the sweep ran and left an upload a day and a half old that nothing refers to")
+		}
+		if _, err := f.store.Find(t.Context(), who, writing.Token); err != nil {
+			t.Errorf("the sweep took an upload under a day old: %v", err)
+		}
 	})
+}
+
+// filesUnder counts the regular files under root, leaving out the
+// directories a store makes to hold them.
+func filesUnder(t *testing.T, root string) int {
+	t.Helper()
+	n := 0
+	err := filepath.WalkDir(root, func(_ string, d fs.DirEntry, err error) error {
+		if err == nil && d.Type().IsRegular() {
+			n++
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
 
 // hush is a logger that writes nothing, for the background pass.
@@ -800,11 +825,7 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 		ctx := t.Context()
 		who := f.who(t, access.PublicTriage)
 		racing := f.upload(t, who, "racing.log", []byte("text is about to point here"))
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where("1 = 1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past)
 		// Referred to between the sweep reading its page and acting on it,
 		// which is the window rather than a moment either side of it.
 		attach.AfterPage(f.store, func() {
@@ -843,11 +864,7 @@ func TestAFileRedactedWhileTheSweepRunsKeepsItsRecord(t *testing.T) {
 		ctx := t.Context()
 		who := f.who(t, access.PublicTriage)
 		racing := f.upload(t, who, "a-credential.log", []byte("about to be redacted"))
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where(`"token" = ?`, racing.Token).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past, racing.Token)
 		attach.AfterPage(f.store, func() {
 			if err := f.store.Redact(ctx, f.admin(t), racing.Token, "a credential"); err != nil {
 				t.Error(err)
@@ -881,11 +898,7 @@ func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
 		defer stop()
 		who := f.who(t, access.PublicTriage)
 		stuck := f.upload(t, who, "stuck.log", []byte("nothing will ever point here"))
-		if _, err := f.db.DB.NewUpdate().Model((*attach.Attachment)(nil)).
-			Set(`"uploaded_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
-			Where("1 = 1").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.age(t, past)
 
 		var said bytes.Buffer
 		store := attach.NewStore(f.db.DB, f.files).
