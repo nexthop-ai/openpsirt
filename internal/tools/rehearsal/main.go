@@ -55,6 +55,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -779,7 +780,7 @@ func tablesOf(path string) ([]string, error) {
 			continue
 		}
 		table, _, _ := strings.Cut(fields[1], ".")
-		if table != "goose_db_version" {
+		if table != migrate.VersionTable {
 			seen[table] = true
 		}
 	}
@@ -792,7 +793,7 @@ func tablesOf(path string) ([]string, error) {
 func unionTables(a, b []string) []string {
 	seen := map[string]bool{}
 	for _, t := range append(slices.Clone(a), b...) {
-		if t != "goose_db_version" {
+		if t != migrate.VersionTable {
 			seen[t] = true
 		}
 	}

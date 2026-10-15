@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -137,13 +138,13 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 		// library records one. The tables it would have made are beside the
 		// point: what is pinned is that a higher applied version is refused.
 		if _, err := db.ExecContext(ctx,
-			`INSERT INTO "goose_db_version" ("version_id", "is_applied") VALUES (?, ?)`,
+			`INSERT INTO "`+migrate.VersionTable+`" ("version_id", "is_applied") VALUES (?, ?)`,
 			wanted+1, true); err != nil {
 			t.Fatalf("record a later migration: %v", err)
 		}
 		t.Cleanup(func() {
 			_, _ = db.ExecContext(context.WithoutCancel(ctx),
-				`DELETE FROM "goose_db_version" WHERE "version_id" = ?`, wanted+1)
+				`DELETE FROM "`+migrate.VersionTable+`" WHERE "version_id" = ?`, wanted+1)
 		})
 
 		for what, err := range map[string]error{
@@ -177,11 +178,11 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 		const v040 = 38
 		record := func(ctx context.Context, from, to int64) error {
 			if _, err := db.ExecContext(ctx,
-				`DELETE FROM "goose_db_version" WHERE "version_id" = ?`, from); err != nil {
+				`DELETE FROM "`+migrate.VersionTable+`" WHERE "version_id" = ?`, from); err != nil {
 				return err
 			}
 			_, err := db.ExecContext(ctx,
-				`INSERT INTO "goose_db_version" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
+				`INSERT INTO "`+migrate.VersionTable+`" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
 			return err
 		}
 		if err := record(ctx, migrations.Baseline, v040); err != nil {

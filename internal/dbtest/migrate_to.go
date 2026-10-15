@@ -52,7 +52,7 @@ func Empty(t *testing.T, db *database.DB) {
 	// Children before the rows they reference, which is the order the list
 	// keeps for deleting, and the order the engines that enforce foreign keys
 	// on a drop need.
-	for _, table := range append(slices.Clone(tables), "goose_db_version") {
+	for _, table := range append(slices.Clone(tables), migrate.VersionTable) {
 		if _, err := db.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
 			t.Fatalf("drop %s: %v", table, err)
 		}

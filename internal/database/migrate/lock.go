@@ -305,7 +305,7 @@ func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name 
 // both of which fail with the engine's own permission message rather than
 // silently.
 func versionTableExists(ctx context.Context, db *database.DB) (bool, error) {
-	return tableExists(ctx, db, versionTable)
+	return tableExists(ctx, db, VersionTable)
 }
 
 // tableExists reports whether the catalog holds a table of a given name, by
@@ -351,6 +351,6 @@ func catalogQuery(engine database.Engine) (string, error) {
 	return "", fmt.Errorf("no way to read the catalog of %s", engine)
 }
 
-// versionTable is the migration library's bookkeeping table, which it names
+// VersionTable is the migration library's bookkeeping table, which it names
 // and this only reads.
-const versionTable = "goose_db_version"
+const VersionTable = "goose_db_version"

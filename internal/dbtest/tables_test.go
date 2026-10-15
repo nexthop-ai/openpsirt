@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 // The table list is what empties a database between two tests in a package,
@@ -40,7 +41,7 @@ func TestTheTableListNamesEveryTableTheSchemaMakes(t *testing.T) {
 		for _, name := range made {
 			// The migration bookkeeping table is the schema's own and holds
 			// what version is applied. Emptying it would undo the migration.
-			if name == migrationVersionTable {
+			if name == migrate.VersionTable {
 				continue
 			}
 			if !listed[name] {
@@ -57,7 +58,3 @@ func TestTheTableListNamesEveryTableTheSchemaMakes(t *testing.T) {
 		}
 	})
 }
-
-// migrationVersionTable is goose's own bookkeeping, which records what is
-// applied and is therefore not a table tests empty.
-const migrationVersionTable = "goose_db_version"
