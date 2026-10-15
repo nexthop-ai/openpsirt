@@ -250,7 +250,7 @@ func TestMarkingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
 			"vendor"); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("a private-only triager took a mark off a disclosed finding: %v", err)
 		}
-		if on, err := f.store.TagsOn(ctx, f.productID, issue, disclosed); err != nil {
+		if on, err := f.store.TagsOn(ctx, f.productID, issue, disclosed, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		} else if len(on) != 1 || on[0] != "vendor" {
 			t.Errorf("the disclosed finding is marked %q, want the one mark put there", on)

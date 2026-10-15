@@ -442,7 +442,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// The words somebody put on the page's rows, read in one statement
 	// rather than per row: a tag is worth showing where the filter that
 	// finds it lives, and a query per row is fifty queries for a page.
-	marks, err := s.tagsFor(ctx, filter.ProductID, rows)
+	marks, err := s.tagsFor(ctx, filter.ProductID, rows, visible)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -450,7 +450,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	groups := make([]Group, 0, len(rows))
 	for _, row := range rows {
 		group := groupFrom(row, named, rated, shipped, filter.Floor)
-		group.Tags = marks[markKey{row.VulnerabilityID, row.ComponentID}]
+		group.Tags = marks[markKey{row.VulnerabilityID, row.Fold}]
 		if oneBuild {
 			// The number of distinct ways down: the consumers this
 			// component has here, plus one for the build pulling it in

@@ -8,6 +8,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // The words people put on findings.
@@ -36,7 +37,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 		}
 		// The spelling somebody used is what comes back, because a mark shown
 		// folded reads as the tool having changed what they wrote.
-		on, err := f.store.TagsOn(t.Context(), f.productID, issue, component)
+		on, err := f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -51,7 +52,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 			"waiting on vendor"); err != nil {
 			t.Fatal(err)
 		}
-		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component); err != nil {
+		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		}
 		if len(on) != 1 || on[0] != "Waiting On Vendor" {
@@ -152,7 +153,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 			"WAITING on vendor"); err != nil {
 			t.Fatal(err)
 		}
-		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component); err != nil {
+		if on, err = f.store.TagsOn(t.Context(), f.productID, issue, component, access.Visibilities()); err != nil {
 			t.Fatal(err)
 		}
 		if len(on) != 0 {
@@ -175,7 +176,7 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 		if err := f.store.TagIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
 			t.Fatal(err)
 		}
-		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib)
+		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib, access.Visibilities())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,13 +205,108 @@ func TestATagIsPutOnReadAndTakenOffAcrossTheFold(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, component := range []int64{viaLib, viaTool} {
-			on, err := f.store.TagsOn(ctx, f.productID, issue, component)
+			on, err := f.store.TagsOn(ctx, f.productID, issue, component, access.Visibilities())
 			if err != nil {
 				t.Fatal(err)
 			}
 			if len(on) != 0 {
 				t.Errorf("taken off through one package, the fold is still marked %q", on)
 			}
+		}
+	})
+}
+
+// A tag is an act on a finding, at the finding's own visibility. Read and
+// taken off through the fold, it reaches only the packages whose findings the
+// caller may see or triage.
+func TestATagIsReadAndTakenOffOnlyWhereItsFindingMayBeSeen(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, tool := f.curlFold(t)
+		f.undisclose(t, f.target, "CVE-2026-CURL", tool.Name)
+		issue := f.issueID(t, "CVE-2026-CURL")
+		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
+
+		if err := f.store.TagIt(ctx, f.someoneElse(t, access.PrivateTriage), f.productID,
+			issue, viaTool, "embargo"); err != nil {
+			t.Fatal(err)
+		}
+		public := f.someoneElse(t, access.PublicTriage)
+		if err := f.store.TagIt(ctx, public, f.productID, issue, viaLib, "vendor"); err != nil {
+			t.Fatal(err)
+		}
+
+		on, err := f.store.TagsOn(ctx, f.productID, issue, viaLib, []access.Visibility{access.Public})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(on) != 1 || on[0] != "vendor" {
+			t.Errorf("a reader of disclosed work reads the fold as marked %q, want only the disclosed mark", on)
+		}
+		rows, _, err := f.store.Groups(ctx, public, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range rows {
+			if row.Vulnerability == "CVE-2026-CURL" && (len(row.Tags) != 1 || row.Tags[0] != "vendor") {
+				t.Errorf("a reader of disclosed work sees the row marked %q, want only the disclosed mark", row.Tags)
+			}
+		}
+		marked, _, err := f.store.Groups(ctx, public, f.scope, 50, 0, finding.Filter{Tags: []string{"embargo"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(marked) != 0 {
+			t.Errorf("filtering on the undisclosed mark found %d rows a reader of disclosed work sees", len(marked))
+		}
+
+		if err := f.store.Untag(ctx, public, f.productID, issue, viaLib, "embargo"); err != nil {
+			t.Fatal(err)
+		}
+		on, err = f.store.TagsOn(ctx, f.productID, issue, viaTool, access.Visibilities())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(on) != 2 {
+			t.Errorf("a triager of disclosed work took a mark off an undisclosed finding: left %q", on)
+		}
+	})
+}
+
+// A package that joins a fold after a word was put on it carries the word on
+// the list, as it does on the finding screen.
+func TestAPackageJoiningAFoldLaterCarriesItsTag(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, _ := f.curlFold(t)
+		who := f.someoneElse(t, access.PublicTriage)
+		issue := f.issueID(t, "CVE-2026-CURL")
+		if err := f.store.TagIt(ctx, who, f.productID, issue, f.componentID(t, lib.Name), "vendor"); err != nil {
+			t.Fatal(err)
+		}
+
+		joined := graph.Described{
+			Purl: "pkg:deb/debian/libcurl3t64-gnutls@8.5.0", Name: "libcurl3t64-gnutls", Version: "8.5.0",
+			UpstreamName: "curl", UpstreamVersion: "8.5.0",
+		}
+		f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{joined},
+			Dependencies: []graph.Dependency{{Parent: root, Child: joined}}})
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-CURL", Severity: "high"},
+			Component: joined, FixState: finding.FixedUpstream, FixedIn: "8.6.0",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+
+		rows, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{Tags: []string{"vendor"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("filtering on the fold's mark found %d rows, want the package that joined it", len(rows))
+		}
+		if len(rows[0].Tags) != 1 || rows[0].Tags[0] != "vendor" {
+			t.Errorf("the package that joined the fold is listed as marked %q", rows[0].Tags)
 		}
 	})
 }

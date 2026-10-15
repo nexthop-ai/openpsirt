@@ -696,15 +696,27 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND vw.cwe IN (?))`, bun.List(upper))
 	}
 	if words := foldedTags(f.Tags); len(words) > 0 {
-		// One issue in one component of one product, which is the grain a tag
-		// is put on and the grain this list groups by — so the membership test
-		// is on the group's own key rather than on a place.
+		// A tag belongs to the fold, so a row carries a word put on any
+		// package of its fold, including one put on before the row's own
+		// package joined it. The word counts where its own package carries a
+		// finding of the issue in the product at the row's visibility: a word
+		// on a package whose findings sit at another visibility says what that
+		// finding is about.
 		where, args := f.product()
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
+			JOIN "component" AS "ct" ON ct.id = ft.component_id
 			WHERE ft.product_id = `+where+`
 			  AND ft.vulnerability_id = f.vulnerability_id
-			  AND ft.component_id = f.component_id
-			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
+			  AND ct.fold_key = (SELECT c1.fold_key FROM "component" AS "c1"
+				WHERE c1.id = f.component_id)
+			  AND ft.tag IN (?)
+			  AND EXISTS (SELECT 1 FROM "finding" AS "fv"
+				JOIN "target" AS "tv" ON tv.id = fv.target_id
+				JOIN "stream" AS "sv" ON sv.id = tv.stream_id
+				WHERE sv.product_id = ft.product_id
+				  AND fv.vulnerability_id = ft.vulnerability_id
+				  AND fv.component_id = ft.component_id
+				  AND fv.visibility = f.visibility))`, append(args, bun.List(words))...)
 	}
 	// Something a person recorded here rather than a scanner reporting it. Its
 	// own question rather than a shade of another: a recorded flaw is the only

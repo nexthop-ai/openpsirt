@@ -813,7 +813,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 	evidence.RoutedBy = placed
 	// The words somebody put on it.
-	marks, err := s.TagsOn(ctx, productID, vulnerabilityID, componentID)
+	marks, err := s.TagsOn(ctx, productID, vulnerabilityID, componentID, visible)
 	if err != nil {
 		return nil, err
 	}

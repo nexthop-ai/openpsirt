@@ -382,9 +382,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// screen somebody reaches before they have picked a product.
 	wanted := make(map[acrossKey]bool, len(heads))
 	for _, head := range heads {
-		wanted[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}] = true
+		wanted[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}] = true
 	}
-	marks, err := s.tagsAcross(ctx, wanted, within, issues, components)
+	marks, err := s.tagsAcross(ctx, subject, products, all, wanted)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -413,7 +413,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		// an action has a build to name. What says there are others is the
 		// count beside it.
 		group.Builds, group.Stream, group.Variant = row.Builds, row.Stream, row.Variant
-		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.ComponentID}]
+		group.Tags = marks[acrossKey{head.ProductID, head.VulnerabilityID, head.Fold}]
 		groups = append(groups, group)
 	}
 	return groups, total, nil
