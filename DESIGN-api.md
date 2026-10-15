@@ -516,7 +516,7 @@ route, sign-in and the served interface, and registers each area in turn.
 
 | Rule | Why |
 |---|---|
-| An area reaches the rest of the API only through one shared package | The dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies and helpers a second area needs live there. Areas import nothing of each other, so each builds and tests alone |
+| An area reaches the rest of the API only through one shared package | The dependencies a handler runs on, resolving a caller, the declared rights, the refusal sentences, and the bodies and helpers a second area needs live there. Areas import nothing of each other, test files included, so each builds and tests alone; a test fails an area that imports another |
 | An area's tests sit beside it, over one shared harness | Each area is one test binary with a database of its own, so the areas run beside each other: 39 s for the API's tests on all four engines on a twelve-core machine, against 107 s for the same tests as one binary |
 | Every area registers into the one description | The document stays one generated file, and a method and path claimed twice is still caught across areas |
 | A check over the source reads every area | The count of registrations, the struct tags a trail filter offers, and the exact-status rule on refusals each walk the whole tree, and fail when they find nothing |
