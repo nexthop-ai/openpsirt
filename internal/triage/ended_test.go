@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -541,6 +542,54 @@ func TestARevivedClaimHasNoMomentItStoppedApplying(t *testing.T) {
 		}
 		if got.EndedAt != nil {
 			t.Errorf("the revived row still ended at %v", got.EndedAt)
+		}
+	})
+}
+
+func TestAClaimWithAWithdrawnRowIsNotReaffirmedAmongMany(t *testing.T) {
+	// Withdrawing a partly lapsed claim leaves its lapsed row lapsed, and the
+	// row's finding is still open. Re-affirming many claims, and one claim
+	// whole, ask the rule the single form asks: the claim was taken back.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		at := f.selection(t)
+		var run int64
+		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("opened_run_id").
+			Where(`"target_id" = ?`, at.TargetID).Limit(1).Scan(ctx, &run); err != nil {
+			t.Fatal(err)
+		}
+		f.finds(t, build{target: at.TargetID, run: run}, at.ComponentID, "second-place-of-libfoo",
+			access.Public)
+		claimID, recorded, _, err := f.store.Together(ctx, f.triager, at, f.wontFix(),
+			triage.DefaultBounds())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(recorded) < 2 {
+			t.Fatalf("the claim holds %d rows, want a lapsed one and a withdrawn one", len(recorded))
+		}
+		f.ends(t, recorded[0], time.Now().UTC().Truncate(time.Microsecond))
+		if ok, err := f.store.Reaffirmable(ctx, f.triager, claimID); err != nil || !ok {
+			t.Fatalf("a partly lapsed claim reads as re-affirmable %v (%v), want true, "+
+				"so this checks nothing", ok, err)
+		}
+		if err := f.store.Withdraw(ctx, f.triager, claimID); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.ReaffirmMany(ctx, f.triager, triage.ReaffirmingMany{
+			ClaimIDs:  []int64{claimID},
+			Reasoning: "Still in a driver this image never loads.", By: f.proposer,
+			Bounds: triage.DefaultBounds(),
+		}); !refusal.In(err) || !strings.Contains(err.Error(), "has not lapsed") {
+			t.Errorf("a withdrawn claim was re-affirmed among many: %v", err)
+		}
+		if _, err := f.store.ReaffirmClaim(ctx, f.triager, triage.ReaffirmingClaim{
+			PreviousClaimID: claimID,
+			Reasoning:       "Still in a driver this image never loads.", By: f.proposer,
+			Bounds: triage.DefaultBounds(),
+		}); !refusal.In(err) || !strings.Contains(err.Error(), "has not lapsed") {
+			t.Errorf("a withdrawn claim was re-affirmed whole: %v", err)
 		}
 	})
 }

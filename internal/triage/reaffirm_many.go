@@ -343,6 +343,17 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 		return reaffirmPlan{}, refusal.Errorf(
 			"only the person who made a decision may re-affirm it; anybody else proposes it afresh")
 	}
+	// And only a claim the list of what is yours to re-affirm holds, the rule
+	// the single form asks. A claim with a withdrawn row is one somebody took
+	// back, and re-making it carries an agreement onto what was withdrawn.
+	reaffirmable, err := s.yoursToReaffirm(subject).Where(`"de"."claim_id" = ?`, previousClaimID).Exists(ctx)
+	if err != nil {
+		return reaffirmPlan{}, fmt.Errorf("read whether that claim is yours to re-affirm: %w", err)
+	}
+	if !reaffirmable {
+		return reaffirmPlan{}, refusal.Errorf(
+			"that decision has not lapsed, or something has been decided at that place since")
+	}
 
 	where, err := s.whereTheyAreNow(ctx, subject, lapsed)
 	if err != nil {

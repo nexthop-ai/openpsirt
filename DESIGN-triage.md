@@ -1225,6 +1225,7 @@ above.
 | What may be carried is read from the row, not from what a caller supplied | A caller holding a stale copy would carry an agreement since withdrawn; a caller inventing one would carry an agreement that never existed. A withdrawn decision keeps its approval rows, so without this a version bump would undo a withdrawal |
 | All of it is one transaction | Written as three steps, a process stopping in the middle leaves a claim standing that nobody agreed to and that no review queue shows |
 | Only a decision that lapsed is re-affirmed, with nothing decided at its place since | The rule the list of what is yours to re-affirm holds, asked again of the one decision named. A decision still standing re-made at another version carried its agreement there, and no second person saw the new place |
+| Re-affirming a whole claim, or many, asks the same rule of each claim named | A claim with a withdrawn row was taken back by its author, and re-making its lapsed rows carries an agreement onto a judgment that was withdrawn |
 | The carried agreement is guarded on the revision | An agreement is an agreement to particular words |
 
 ### Re-affirmation across claims
