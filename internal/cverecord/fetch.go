@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -254,22 +253,8 @@ func (f *Fetcher) download(ctx context.Context, address string) (string, error) 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download the CVE List archive: answered %s", resp.Status)
 	}
-	target, err := os.CreateTemp(f.dir, ".archive-*.zip")
-	if err != nil {
-		return "", fmt.Errorf("make room for the CVE List archive: %w", err)
-	}
-	written, err := io.Copy(target, io.LimitReader(resp.Body, largestArchive+1))
-	if closed := target.Close(); err == nil {
-		err = closed
-	}
-	if err == nil && written > largestArchive {
-		err = tooLarge(fmt.Sprintf("the CVE List archive is larger than %d bytes", largestArchive))
-	}
-	if err != nil {
-		_ = os.Remove(target.Name())
-		return "", fmt.Errorf("download the CVE List archive: %w", err)
-	}
-	return target.Name(), nil
+	return spool(f.dir, ".archive-*.zip", resp.Body, largestArchive,
+		"the CVE List archive", "download")
 }
 
 // get asks for one address, answering a redirect as a response rather than an

@@ -98,20 +98,29 @@ func unpack(member *zip.File, scratch string) (string, error) {
 		return "", fmt.Errorf("open the archive inside the CVE List archive: %w", err)
 	}
 	defer source.Close()
-	target, err := os.CreateTemp(scratch, ".cves-*.zip")
+	return spool(scratch, ".cves-*.zip", source, largestInner,
+		"the archive inside the CVE List archive", "unpack")
+}
+
+// spool copies at most most bytes from r to a new file in dir, named after
+// pattern, and names the file. A source longer than most is refused as too
+// large, and a file that was not written whole is removed. Errors name what
+// was being copied, and verb says what was being done with it.
+func spool(dir, pattern string, r io.Reader, most int64, what, verb string) (string, error) {
+	target, err := os.CreateTemp(dir, pattern)
 	if err != nil {
-		return "", fmt.Errorf("make room for the archive inside the CVE List archive: %w", err)
+		return "", fmt.Errorf("make room for %s: %w", what, err)
 	}
-	written, err := io.Copy(target, io.LimitReader(source, largestInner+1))
+	written, err := io.Copy(target, io.LimitReader(r, most+1))
 	if closed := target.Close(); err == nil {
 		err = closed
 	}
-	if err == nil && written > largestInner {
-		err = tooLarge(fmt.Sprintf("the archive inside the CVE List archive is larger than %d bytes", largestInner))
+	if err == nil && written > most {
+		err = tooLarge(fmt.Sprintf("%s is larger than %d bytes", what, most))
 	}
 	if err != nil {
 		_ = os.Remove(target.Name())
-		return "", fmt.Errorf("unpack the archive inside the CVE List archive: %w", err)
+		return "", fmt.Errorf("%s %s: %w", verb, what, err)
 	}
 	return target.Name(), nil
 }
@@ -289,7 +298,7 @@ func kept(record *Record, stated Entry, versions []struct {
 // canNarrow reports whether a line is one that could ever narrow a match: an
 // unaffected line in an ordered scheme whose first version can be read.
 func canNarrow(line Line) bool {
-	if !strings.EqualFold(line.Status, "unaffected") || !ordered(line) || line.Changes {
+	if !readableUnaffected(line) {
 		return false
 	}
 	_, ok := vercmp.Order(vercmp.Semantic, line.Version, line.Version)

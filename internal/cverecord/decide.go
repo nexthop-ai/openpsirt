@@ -173,6 +173,12 @@ func ordered(line Line) bool {
 	return orderedType(line.VersionType)
 }
 
+// readableUnaffected reports whether a line states unaffected in terms this
+// can read: a line this orders, and no list of changes inside the range.
+func readableUnaffected(line Line) bool {
+	return strings.EqualFold(line.Status, "unaffected") && ordered(line) && !line.Changes
+}
+
 // orderedType reports whether a line's version type is one this orders.
 //
 // A line with no type is read as release numbers, which is how the kernel's
@@ -263,7 +269,7 @@ func leading(version string, n int) (string, bool) {
 // 6.18 branch from 6.18.27 on. That is the release to move to without leaving
 // the branch, which a scanner's range cut from another branch does not say.
 func branchFix(line Line, version string) (string, bool) {
-	if !strings.EqualFold(line.Status, "unaffected") || !ordered(line) || line.Changes {
+	if !readableUnaffected(line) {
 		return "", false
 	}
 	bound := strings.TrimSpace(line.LessThanOrEqual)
