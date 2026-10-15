@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -116,6 +117,49 @@ func TestARecordedFlawIsHeldToTheWindowsForOurOwnProducts(t *testing.T) {
 			if row.DueAt == nil || !row.DueAt.Equal(row.OpenedAt.Add(480*time.Hour)) {
 				t.Errorf("a recorded critical is due %v, want twenty days from %v",
 					row.DueAt, row.OpenedAt)
+			}
+		}
+	})
+}
+
+func TestARecordedFlawBelowTheTriageLineIsOffTheClock(t *testing.T) {
+	// The product's triage line holds a recorded flaw the same way it holds a
+	// scanned one: rated below it, the flaw is not work, so it carries no
+	// deadline and reaches no running-out or overdue list. Rated above it,
+	// the clock runs from the rating.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if err := catalog.NewStore(f.db.DB).SetTriageFloor(ctx, f.productID, "high"); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "low",
+			Summary: "The management socket accepts a request nobody authenticated.",
+			Told:    finding.Told{FoundHere: true},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, row := range f.rowsOf(t, identifier) {
+			if row.RatedAt == nil {
+				t.Fatal("a flaw recorded with a severity carries no rating moment")
+			}
+			if row.DueAt != nil {
+				t.Errorf("a low flaw under a high triage line is due %v, want no deadline", row.DueAt)
+			}
+		}
+
+		if _, err := f.store.Assess(ctx, who, f.productID, f.issueID(t, identifier),
+			"critical", "Reachable from the management network."); err != nil {
+			t.Fatal(err)
+		}
+		own := finding.DefaultOwnWindows()
+		for _, row := range f.rowsOf(t, identifier) {
+			if row.RatedAt == nil || row.DueAt == nil || !row.DueAt.Equal(row.RatedAt.Add(own.Critical)) {
+				t.Errorf("rated critical, the flaw is due %v, want %v from its rating %v",
+					row.DueAt, own.Critical, row.RatedAt)
 			}
 		}
 	})
