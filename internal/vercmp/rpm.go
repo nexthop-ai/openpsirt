@@ -154,10 +154,10 @@ func rpmSegment(a, b string) int {
 			return -1
 		}
 		if numeric {
-			one, two = strings.TrimLeft(one, "0"), strings.TrimLeft(two, "0")
-			if len(one) != len(two) {
-				return sign(len(one) - len(two))
+			if c := compareNumeric(one, two); c != 0 {
+				return c
 			}
+			continue
 		}
 		if c := strings.Compare(one, two); c != 0 {
 			return sign(c)
