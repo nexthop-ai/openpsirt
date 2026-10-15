@@ -10598,8 +10598,10 @@ export interface components {
             /** @description The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
             from: string;
-            /** @description The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's */
+            /** @description The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's */
             held_by?: string;
+            /** @description The carrying party's display name, where it differs from held_by */
+            held_by_name?: string;
             /**
              * Format: int64
              * @description Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them

@@ -152,7 +152,7 @@ export function Upgrades() {
                       {row.by ? on(row.by) : "—"}
                       {row.state === "lapsed" && <span className="state lapsed"> past</span>}
                     </td>
-                    <td className="hint">{row.held_by || "no one"}</td>
+                    <td className="hint">{row.held_by_name || row.held_by || "no one"}</td>
                     <td className="hint">{on(row.declared_at)}</td>
                   </tr>
                 );

@@ -64,13 +64,15 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 		// comes back to.
 		var waiting struct {
 			Items []struct {
-				HeldBy string `json:"held_by"`
+				HeldBy     string `json:"held_by"`
+				HeldByName string `json:"held_by_name"`
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades",
 			&waiting)
-		if len(waiting.Items) != 1 || waiting.Items[0].HeldBy != "Platform" {
-			t.Errorf("the plan says it is carried by %+v, want the team by its display name", waiting.Items)
+		if len(waiting.Items) != 1 || waiting.Items[0].HeldBy != "platform" || waiting.Items[0].HeldByName != "Platform" {
+			t.Errorf("the plan says it is carried by %+v, want the team's name with its display name beside it",
+				waiting.Items)
 		}
 	})
 }

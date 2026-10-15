@@ -224,10 +224,11 @@ type Planned struct {
 	// By is the date the promise named, where a judgment promised one. Read
 	// from the commitment, which is the record a release plan is kept in.
 	By *time.Time
-	// HeldBy is what the party carrying it is called, where one party carries all of what is
+	// HeldBy is the identity or team name of the party carrying it, and
+	// HeldByName what it is called, where one party carries all of what is
 	// still open under it. A bump split between two people is nobody's, and
 	// saying it is somebody's would hand them work that is half theirs.
-	HeldBy string
+	HeldBy, HeldByName string
 	// State is where this stands, derived from the scans and the date and set
 	// by nobody.
 	State UpgradeState
@@ -478,7 +479,7 @@ func (s *Store) holders(ctx context.Context, planned []Planned, held map[string]
 	}
 	for i := range planned {
 		if who := held[planned[i].Fold].party; who != nil {
-			planned[i].HeldBy = named[*who].Name
+			planned[i].HeldBy, planned[i].HeldByName = named[*who].Address, named[*who].Name
 		}
 	}
 	return nil

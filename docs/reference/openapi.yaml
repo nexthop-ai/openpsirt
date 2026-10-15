@@ -7966,7 +7966,10 @@ components:
         from:
           type: string
         held_by:
-          description: The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's
+          description: The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's
+          type: string
+        held_by_name:
+          description: The carrying party's display name, where it differs from held_by
           type: string
         issues:
           description: "Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"

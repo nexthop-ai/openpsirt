@@ -258,9 +258,10 @@ type PlannedBody struct {
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
-	By     string            `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
-	HeldBy string            `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
-	State  core.UpgradeState `json:"state" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
+	By         string            `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
+	HeldBy     string            `json:"held_by,omitempty" doc:"The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
+	HeldByName string            `json:"held_by_name,omitempty" doc:"The carrying party's display name, where it differs from held_by"`
+	State      core.UpgradeState `json:"state" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
 	// ClaimID is the claim that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
 	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
@@ -349,7 +350,7 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 			},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "places",
-				"declared_at", "by", "held_by", "state", "claim",
+				"declared_at", "by", "held_by", "held_by_name", "state", "claim",
 			},
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 				page := core.Window(rows, limit, offset)
@@ -366,7 +367,7 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 						row.Upstream, row.From, row.To,
 						strings.Join(row.Components, " "),
 						strconv.Itoa(row.Issues), strconv.Itoa(row.Places),
-						row.DeclaredAt, row.By, row.HeldBy, string(row.State), claim,
+						row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), claim,
 					})
 				}
 				return written, nil
@@ -388,7 +389,8 @@ func plannedBodies(planned []finding.Planned) []PlannedBody {
 			Components: one.Components,
 			Issues:     one.Issues, Places: one.Places,
 			DeclaredAt: one.DeclaredAt.UTC().Format(time.DateOnly),
-			HeldBy:     one.HeldBy, State: core.UpgradeState(one.State),
+			HeldBy:     one.HeldBy, HeldByName: core.LabelBeside(one.HeldByName, one.HeldBy),
+			State:   core.UpgradeState(one.State),
 			ClaimID: one.ClaimID,
 		}
 		if row.Components == nil {
