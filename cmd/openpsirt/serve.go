@@ -164,14 +164,17 @@ func (p passes) loops() []loop {
 }
 
 func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside passes) error {
-	return serveBeside(cfg, logger, handler, beside.background)
+	return serveBeside(context.Background(), cfg, logger, handler, beside.background)
 }
 
 // serveBeside serves, with whatever start begins running beside the server
 // stopped and waited for on every way out.
-func serveBeside(cfg config.Config, logger *slog.Logger, handler http.Handler,
+//
+// It shuts down on an interrupt, a SIGTERM, or parent ending, and all three
+// take the same path.
+func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger, handler http.Handler,
 	start func(context.Context) *sync.WaitGroup) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	// Reading stops when the signal arrives, before the server drains, so a

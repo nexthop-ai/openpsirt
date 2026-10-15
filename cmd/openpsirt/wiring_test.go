@@ -42,7 +42,7 @@ func taken(t *testing.T) config.Config {
 // from under a worker mid-query.
 func TestAFailedListenStopsTheWorkersBeforeReturning(t *testing.T) {
 	var stopped atomic.Bool
-	err := serveBeside(taken(t), discard(), http.NotFoundHandler(),
+	err := serveBeside(t.Context(), taken(t), discard(), http.NotFoundHandler(),
 		func(ctx context.Context) *sync.WaitGroup {
 			var workers sync.WaitGroup
 			workers.Add(1)
@@ -62,14 +62,14 @@ func TestAFailedListenStopsTheWorkersBeforeReturning(t *testing.T) {
 	}
 }
 
-// A worker that does not stop within the grace fails the exit, as an overrun
-// request does, rather than being waited on for ever.
-func TestAWorkerThatOverrunsTheGraceFailsTheExit(t *testing.T) {
+// A worker that does not stop within the grace after a failed listen fails the
+// exit, rather than being waited on for ever.
+func TestAWorkerThatOverrunsTheGraceAfterAFailedListenFailsTheExit(t *testing.T) {
 	cfg := taken(t)
 	cfg.ShutdownGrace = 50 * time.Millisecond
 	release := make(chan struct{})
 	defer close(release)
-	err := serveBeside(cfg, discard(), http.NotFoundHandler(),
+	err := serveBeside(t.Context(), cfg, discard(), http.NotFoundHandler(),
 		func(context.Context) *sync.WaitGroup {
 			var workers sync.WaitGroup
 			workers.Add(1)
@@ -81,6 +81,44 @@ func TestAWorkerThatOverrunsTheGraceFailsTheExit(t *testing.T) {
 		})
 	if err == nil || !strings.Contains(err.Error(), "did not stop within") {
 		t.Errorf("an overrunning worker answered %v", err)
+	}
+}
+
+// A signal ends serving. The parent ending stands in for it here, because it
+// takes the same path.
+func signalled(t *testing.T, worker func(ctx context.Context)) error {
+	t.Helper()
+	parent, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	cfg := config.Config{Addr: "127.0.0.1:0", ShutdownGrace: 50 * time.Millisecond}
+	return serveBeside(parent, cfg, discard(), http.NotFoundHandler(),
+		func(ctx context.Context) *sync.WaitGroup {
+			var workers sync.WaitGroup
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				worker(ctx)
+			}()
+			cancel()
+			return &workers
+		})
+}
+
+// A worker still running past the grace after a signal fails the exit, as an
+// overrun request does, so a supervisor reading the exit code sees it.
+func TestAWorkerThatOverrunsTheGraceAfterASignalFailsTheExit(t *testing.T) {
+	release := make(chan struct{})
+	defer close(release)
+	err := signalled(t, func(context.Context) { <-release })
+	if err == nil || !strings.Contains(err.Error(), "did not stop within") {
+		t.Errorf("an overrunning worker answered %v", err)
+	}
+}
+
+// A worker that stops when asked lets a signalled server exit cleanly.
+func TestAWorkerThatStopsWhenSignalledLeavesACleanExit(t *testing.T) {
+	if err := signalled(t, func(ctx context.Context) { <-ctx.Done() }); err != nil {
+		t.Errorf("a server whose worker stopped answered %v", err)
 	}
 }
 
