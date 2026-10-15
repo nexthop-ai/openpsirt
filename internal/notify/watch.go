@@ -360,7 +360,7 @@ func (w *Watch) tidy(ctx context.Context) (int64, error) {
 // scanned are two numbers that can disagree, and the one nobody is looking at
 // would be the one that drifts.
 func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
-	after, err := setting.NewStore(w.db).Duration(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
+	after, err := setting.NewStore(w.db).Days(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
 	if err != nil {
 		return nil, fmt.Errorf("read how long counts as quiet: %w", err)
 	}

@@ -295,6 +295,13 @@ var settable = []struct {
 }
 
 // theSwitch is the two values an on-or-off setting may take.
+// inDays is the duration settings that are stated in whole days, with what a
+// refusal of a part-day value says.
+var inDays = map[string]struct{ because, example string }{
+	setting.DeferralThreshold: {"a deferral is dated in days", "720h for thirty days"},
+	setting.QuietAfter:        {"a build's silence is shown in days", "168h for a week"},
+}
+
 var theSwitch = []string{setting.On, setting.Off}
 
 // theFloor is the words the triage line may be set to, from the package that
@@ -414,18 +421,18 @@ func registerSettings(api huma.API, in core.Deps) {
 						"every reader treats it as unset and falls back to the shipped value",
 						input.Body.Value))
 			}
+			// A deferral is dated in days and a build's silence is shown in
+			// days, and a screen is told each threshold in days: a threshold
+			// between two whole days is one no screen can state.
+			if days, named := inDays[input.Name]; named && (d < 24*time.Hour || d%(24*time.Hour) != 0) {
+				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+					"%q is not a whole number of days — %s, so write it as %s",
+					input.Body.Value, days.because, days.example))
+			}
 			// Refused here as well as at the sign-in that would use it, for
 			// the reason the markdown policy is enforced before storage:
 			// somebody who asks for a year should be told the limit now
 			// rather than discover it when nobody can sign in.
-			// A deferral is dated in days, and a screen taking a date is told
-			// the threshold in days: a threshold between two whole days is
-			// one no date can be measured against.
-			if input.Name == setting.DeferralThreshold && (d < 24*time.Hour || d%(24*time.Hour) != 0) {
-				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
-					"%q is not a whole number of days — a deferral is dated in days, "+
-						"so write it as 720h for thirty days", input.Body.Value))
-			}
 			if input.Name == setting.SessionLifetime && d > access.MaxSessionLifetime {
 				return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 					"a sign-in may last at most %s. Group membership is read at "+

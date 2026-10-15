@@ -849,6 +849,25 @@ func (s *Store) Duration(ctx context.Context, name string, fallback time.Duratio
 	return parsed, nil
 }
 
+// Days reads a setting as Duration does, rounded up to a whole number of
+// days.
+//
+// For a span a screen states in days. Where the server measured a part-day
+// value the screen cannot state, the two disagree about which side of the
+// line a thing falls on. A part-day value is refused when one of these is set,
+// and one stored before that is read this way.
+func (s *Store) Days(ctx context.Context, name string, fallback time.Duration) (time.Duration, error) {
+	d, err := s.Duration(ctx, name, fallback)
+	if err != nil {
+		return 0, err
+	}
+	const day = 24 * time.Hour
+	if part := d % day; part != 0 {
+		d += day - part
+	}
+	return d, nil
+}
+
 // Count reads a setting as a whole number of things, falling back where it is
 // unset, where nobody can parse what is stored, or where what is stored is not
 // a positive count.

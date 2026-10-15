@@ -270,8 +270,14 @@ func (all spans[K]) total(key K) time.Duration {
 // first attempt that merely waited — decided against a policy that has since
 // changed, and recorded a claim as needing nobody under one that says it does.
 func (s *Store) deferralThreshold(ctx context.Context) (time.Duration, error) {
-	return setting.NewStore(s.db).Duration(ctx, setting.DeferralThreshold,
-		DefaultDeferralThreshold)
+	return DeferralThreshold(ctx, s.db)
+}
+
+// DeferralThreshold reads the threshold as the gate and every screen measure
+// it: in whole days, because a deferral is dated in days and a form is told
+// the threshold in days.
+func DeferralThreshold(ctx context.Context, db bun.IDB) (time.Duration, error) {
+	return setting.NewStore(db).Days(ctx, setting.DeferralThreshold, DefaultDeferralThreshold)
 }
 
 // DefaultDeferralThreshold is the shipped span, where nobody has said.

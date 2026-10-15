@@ -176,7 +176,7 @@ func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]inges
 	if err != nil {
 		return nil, 0, err
 	}
-	quietAfter, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
+	quietAfter, err := setting.NewStore(in.DB.DB).Days(ctx, setting.QuietAfter, setting.DefaultQuietAfter)
 	if err != nil {
 		return nil, 0, core.WentWrong(in.Logger, "the settings could not be read", err)
 	}

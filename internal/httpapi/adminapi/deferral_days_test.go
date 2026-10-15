@@ -53,3 +53,28 @@ func TestAThresholdUnderADayStillPublishesOne(t *testing.T) {
 		}
 	})
 }
+
+// How long a build may go unscanned is a whole number of days, because the
+// scanning screen states it in days and flags a build against that number.
+// One stored between two days is read as the later whole day.
+func TestQuietAfterIsAWholeNumberOfDays(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		const at = "/v1/settings/" + setting.QuietAfter
+		for _, value := range []string{"12h", "36h"} {
+			got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, at, `{"value":"`+value+`"}`)
+			if got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("quiet after %s answered %d, want 422: %s", value, got.Code, got.Body.String())
+			}
+		}
+		if err := setting.NewStore(r.DB.DB).Set(t.Context(), setting.QuietAfter, "12h"); err != nil {
+			t.Fatal(err)
+		}
+		var scanning struct {
+			QuietAfterDays int `json:"quiet_after_days"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/scanning", &scanning)
+		if scanning.QuietAfterDays != 1 {
+			t.Errorf("quiet after twelve hours publishes %d days, want 1", scanning.QuietAfterDays)
+		}
+	})
+}

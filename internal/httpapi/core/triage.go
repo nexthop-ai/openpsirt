@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -266,11 +265,8 @@ func DeferralThreshold(ctx context.Context, in Deps) (time.Duration, error) {
 	if in.DB == nil {
 		return triage.DefaultDeferralThreshold, nil
 	}
-	// The same shipped span the store falls back to. Written out here as well,
-	// the two disagree about what a deployment that has said nothing is
-	// doing.
-	return setting.NewStore(in.DB.DB).Duration(ctx, setting.DeferralThreshold,
-		triage.DefaultDeferralThreshold)
+	// The store's own read, so the screens and the gate measure one value.
+	return triage.DeferralThreshold(ctx, in.DB.DB)
 }
 
 // DecisionDetail is a decision with everything needed to understand it without

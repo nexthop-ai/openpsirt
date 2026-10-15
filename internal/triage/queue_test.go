@@ -399,3 +399,33 @@ func TestTheQueuesTotalAskedAloneIsThePagesTotal(t *testing.T) {
 		}
 	})
 }
+
+// A threshold stored between two days is read as the later whole day, which
+// is what the decision form is told. Read as stored, an eighteen-hour
+// deferral the form calls standing on its own went to a second person.
+func TestAPartDayThresholdIsReadAsTheWholeDayTheFormIsTold(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.DeferralThreshold, "12h"); err != nil {
+			t.Fatal(err)
+		}
+		threshold, err := triage.DeferralThreshold(ctx, f.db.DB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if threshold != 24*time.Hour {
+			t.Fatalf("a twelve-hour threshold reads as %v, want one day", threshold)
+		}
+		until := time.Now().UTC().Add(18 * time.Hour)
+		needs, err := f.store.NeedsApproval(ctx, triage.Proposal{
+			Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
+			Reasoning: "Not today.", By: f.proposer,
+		}, threshold)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if needs {
+			t.Error("an eighteen-hour deferral under a one-day threshold needed a second person")
+		}
+	})
+}
