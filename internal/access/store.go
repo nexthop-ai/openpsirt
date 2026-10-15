@@ -991,14 +991,7 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 	// happen, and then asked whether the person still held anything here —
 	// which, for a role they never had, came back no, and handed back every
 	// finding they were dealing with in that product.
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("withdraw %q: %w", role, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("they do not hold %q here: %w", role, ErrNothingMatched)
-	}
-	return nil
+	return matched(res, fmt.Sprintf("withdraw %q", role), fmt.Sprintf("they do not hold %q here", role))
 }
 
 // HoldsAnythingIn reports whether somebody still has any role on a product.
@@ -1283,11 +1276,7 @@ func (s *Store) Deactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they left: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return false, fmt.Errorf("record that they left: %w", err)
-	}
-	return n > 0, nil
+	return database.Changed(res, "record that they left")
 }
 
 // Reactivate clears the date, so they may sign in again with whatever they
@@ -1301,9 +1290,5 @@ func (s *Store) Reactivate(ctx context.Context, personID int64) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("record that they are back: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return false, fmt.Errorf("record that they are back: %w", err)
-	}
-	return n > 0, nil
+	return database.Changed(res, "record that they are back")
 }

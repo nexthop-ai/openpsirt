@@ -10,7 +10,6 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -78,14 +77,8 @@ func (s *Store) WithdrawEstateRole(ctx context.Context, personID int64, role Rol
 	if err != nil {
 		return fmt.Errorf("withdraw %q across every product: %w", role, err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("withdraw %q across every product: %w", role, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("they do not hold %q across every product: %w", role, ErrNothingMatched)
-	}
-	return nil
+	return matched(res, fmt.Sprintf("withdraw %q across every product", role),
+		fmt.Sprintf("they do not hold %q across every product", role))
 }
 
 // EstateGrants is what somebody holds across every product, in force or not.

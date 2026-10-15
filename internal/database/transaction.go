@@ -404,3 +404,13 @@ func Affected(res sql.Result) (int64, error) {
 	}
 	return n, nil
 }
+
+// Changed reports whether a statement matched any row. A failure to read the
+// count is wrapped in act, which names what the statement was doing.
+func Changed(res sql.Result, act string) (bool, error) {
+	n, err := Affected(res)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", act, err)
+	}
+	return n > 0, nil
+}

@@ -402,11 +402,7 @@ func (t *Talk) claimDirect(ctx context.Context, platform string, id int64) (bool
 	if err != nil {
 		return false, fmt.Errorf("take another attempt at a direct delivery: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return false, fmt.Errorf("take another attempt at a direct delivery: %w", err)
-	}
-	return n > 0, nil
+	return database.Changed(res, "take another attempt at a direct delivery")
 }
 
 // settleDirect records how the claimed direct deliveries went. given up

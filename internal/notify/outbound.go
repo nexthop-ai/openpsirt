@@ -377,11 +377,7 @@ func (s *Signal) retake(ctx context.Context, held Delivery, rowID int64,
 	if err != nil {
 		return false, fmt.Errorf("take a delivery again for a condition that returned: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return false, fmt.Errorf("take a delivery again for a condition that returned: %w", err)
-	}
-	return n > 0, nil
+	return database.Changed(res, "take a delivery again for a condition that returned")
 }
 
 // what one attempt came to.
