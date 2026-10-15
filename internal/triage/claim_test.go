@@ -630,37 +630,62 @@ func TestAnActionThatSaysTwoThingsIsRefused(t *testing.T) {
 	// permitted a per-place outcome and version, and nothing has ever produced
 	// one. A set that disagrees is two claims somebody meant to record as one,
 	// and taking the first quietly loses whichever half was not first.
-	each(t, func(t *testing.T, f *fixture) {
-		places := f.places("under-a", "under-b")
-		proposals := make([]triage.Proposal, 0, len(places))
-		for i, at := range places {
-			outcome := triage.NotApplicable
-			justification := triage.CodeNotInExecutePath
-			if i == 1 {
-				outcome, justification = triage.WontFix, ""
-			}
-			proposals = append(proposals, triage.Proposal{
-				Place: at, Outcome: outcome, Justification: justification,
-				Reasoning: "The parser is never reached: we only call the encoder.",
-				By:        f.proposer, NeedsApproval: true,
+	//
+	// Each case differs from the first proposal in one field alone, so each
+	// reaches the one refusal it names.
+	day := time.Now().UTC().AddDate(0, 0, 30).Truncate(24 * time.Hour)
+	later := day.AddDate(0, 0, 1)
+	cases := []struct {
+		name   string
+		said   string
+		differ func(p *triage.Proposal)
+	}{
+		{"outcome", "one outcome", func(p *triage.Proposal) { p.Outcome, p.Justification = triage.WontFix, "" }},
+		{"justification", "one justification", func(p *triage.Proposal) { p.Justification = triage.CodeNotPresent }},
+		{"mitigation", "one mitigation", func(p *triage.Proposal) { p.Mitigation = "b" }},
+		{"fixed version", "one fixed version", func(p *triage.Proposal) { p.FixedVersion = "1.1" }},
+		{"upgrade version", "one version to upgrade to", func(p *triage.Proposal) { p.UpgradeTo = "2.1" }},
+		{"date to look again", "one date to look again", func(p *triage.Proposal) { p.DeferredUntil = &later }},
+		{"date to act by", "one date to act by", func(p *triage.Proposal) { p.CommittedTo = &later }},
+		{"reasoning", "one piece of reasoning", func(p *triage.Proposal) { p.Reasoning = "The encoder is never reached either." }},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				places := f.places("under-a", "under-b")
+				proposals := make([]triage.Proposal, 0, len(places))
+				for i, at := range places {
+					p := triage.Proposal{
+						Place: at, Outcome: triage.NotApplicable,
+						Justification: triage.CodeNotInExecutePath,
+						Mitigation:    "a", FixedVersion: "1.0", UpgradeTo: "2.0",
+						DeferredUntil: &day, CommittedTo: &day,
+						Reasoning: "The parser is never reached: we only call the encoder.",
+						By:        f.proposer, NeedsApproval: true,
+					}
+					if i == 1 {
+						c.differ(&p)
+					}
+					proposals = append(proposals, p)
+				}
+				_, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
+				if err == nil {
+					t.Fatalf("an action recording two of its %s was accepted", c.name)
+				}
+				if !strings.Contains(err.Error(), c.said) {
+					t.Errorf("refused with %q, which does not say %q", err, c.said)
+				}
+				// And nothing was written: half an action is not one.
+				count, err := f.db.DB.NewSelect().Model((*triage.Claim)(nil)).Count(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if count != 0 {
+					t.Errorf("a refused action left %d claims behind", count)
+				}
 			})
-		}
-		_, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
-		if err == nil {
-			t.Fatal("an action recording two outcomes was accepted")
-		}
-		if !strings.Contains(err.Error(), "one outcome") {
-			t.Errorf("refused with %q, which does not say what was wrong", err)
-		}
-		// And nothing was written: half an action is not one.
-		count, err := f.db.DB.NewSelect().Model((*triage.Claim)(nil)).Count(t.Context())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if count != 0 {
-			t.Errorf("a refused action left %d claims behind", count)
-		}
-	})
+		})
+	}
 }
 
 // agreeTo is one person agreeing to a whole claim, which is what agreeing is:
