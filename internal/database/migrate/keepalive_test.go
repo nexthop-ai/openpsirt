@@ -18,11 +18,10 @@ import (
 // a use that can time out is one a network stall turns into a lost lock.
 func TestTheKeepAliveUseHasNoDeadline(t *testing.T) {
 	recorded := &contextRecorder{}
-	sql.Register("keepalive-recorder", recorded)
-	db, err := sql.Open("keepalive-recorder", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Opened from a connector rather than registered by name, because the
+	// driver registry is global and a second run in one process would
+	// register the name twice.
+	db := sql.OpenDB(recorded)
 	defer func() { _ = db.Close() }()
 	conn, err := db.Conn(t.Context())
 	if err != nil {
@@ -51,8 +50,8 @@ func TestTheKeepAliveUseHasNoDeadline(t *testing.T) {
 	}
 }
 
-// contextRecorder is a driver that records whether a statement's context
-// carried a deadline.
+// contextRecorder is a driver, and its own connector, that records whether a
+// statement's context carried a deadline.
 type contextRecorder struct {
 	mu        sync.Mutex
 	count     int
@@ -66,6 +65,12 @@ func (r *contextRecorder) uses() int {
 }
 
 func (r *contextRecorder) Open(string) (driver.Conn, error) { return recorderConn{r}, nil }
+
+func (r *contextRecorder) Connect(context.Context) (driver.Conn, error) {
+	return recorderConn{r}, nil
+}
+
+func (r *contextRecorder) Driver() driver.Driver { return r }
 
 type recorderConn struct{ r *contextRecorder }
 
