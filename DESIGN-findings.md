@@ -869,20 +869,20 @@ one issue, and a product's claims are not.
 ### Recorded words on a shared issue
 
 A flaw recorded here writes its summary as the issue's description, its minted
-identifier among the issue's names, its addresses, its kinds of flaw, and its
-severity, score and rating on the issue. The issue row is the one every product
+identifier among the issue's names, its addresses and its kinds of flaw on the
+issue. Its rating is the recording product's own (§ The rating in force). The issue row is the one every product
 holding the issue reads, so those follow the record rather than the row
 (REQ-42).
 
 | Rule | Reason |
 |---|---|
 | The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The summary of an undisclosed flaw in another product is the embargo |
-| The severity word, and the score and every rating that name no publisher, are left out under the same rule | How bad its recorder judged an undisclosed flaw is part of the record. A rating a feed published names its source and a recorded flaw's never does, so a sourced rating is the world's and stays. The severity word names nobody and is filled by whichever report arrived first, so it goes whole |
+| The severity word, and the score and every rating that name no publisher, are left out under the same rule | A rating that names no publisher is not a feed's, and the reader is told only what a feed published. A sourced rating is the world's and stays. The severity word names nobody and is filled by whichever report arrived first, so it goes whole |
 | A finding's evidence leaves out the kinds of flaw too | A recorded flaw's classification is part of what its recorder wrote |
 | Every reader asks the one rule: the issue page and document, a finding's evidence, the component's issue list, the approaching-disclosure list, a decision's issue and an approver's outliers, and an advisory's covered issues and its document | One rule in one place keeps a new reader from being the one that forgets it |
 | A text match over descriptions matches nothing in a withheld description | A filter that matched it would say what the summary holds, one guess at a time |
-| An advisory's document leaves out the summary, the other names, the addresses and the unsourced ratings under the rule, asked of whoever generates it | The advisory is held to a reader of every place of its issues in its own product, which says nothing about a record in another product holding the same issue |
-| The working severity of a finding is read from the issue row unwithheld: lists, sorting, filtering, deadlines and urgency, and the baseline a decision records | These are the reader's own product's clock and rank. A withheld score there would rank and date the product's own work by a number nobody published, and a decision recorded against it would lapse on the next rating |
+| An advisory's document leaves out the summary, the other names and the addresses wherever another product holds a record of the issue, whoever generates it | A document is published to everybody, so a record another product holds is out of its readers' reach however much the person generating it may read |
+| The working severity of a finding is read from the issue row and the reader's own product's rating: lists, sorting, filtering, deadlines and urgency, and the baseline a decision records | A recorded flaw's rating is never on the issue row (§ The rating in force), so the row carries only what a feed published |
 
 ### Dispositions
 
@@ -1878,6 +1878,8 @@ person is asked for. What moved is the spelling a query needs.
 |---|---|
 | A query presenting a severity joins the rating | The expression reads a column of the joined rating, so a statement that reads it without the join does not compile on any of the four engines. That is the failure being chosen; the alternative is a query that silently answers for the wrong product |
 | It says which product it is asking about | Bound where the scope names one product, read off the row's own stream where the list spans products, read off the decision where the row is a decision. Three named spellings rather than a string parameter, because a placeholder cannot bind a column name |
+| A flaw recorded here is rated by the product that recorded it, and its rating is that product's rating in force | Its word, score, vector and scheme are held per product, never on the issue row every product holding the issue reads. Written there, the record's rating sorted, filtered, counted and clocked another product's findings, which says how bad an undisclosed flaw is to readers who may not see it. The word is in force in the recording product, a rating claim there replaces it, and withdrawing the claim returns to it |
+| The recording product's lists, documents and exports carry the score it recorded | Read beside the issue's own on a recorded flaw's rows alone, so the lookup is made for few rows. The issue page and a finding's evidence carry it where every record of the issue is in the reader's reach. Sorting by score reads the issue's own: a recorded flaw with no published score sorts with the unscored, as a product's own word never decided that order |
 | A query reading the published word says so | Five do, deliberately: what needs a second person is a rating milder than what the *world* called it, and a product that had already rated it milder would otherwise let the next step down through unwatched. Those alias the column `published`. Aliased `severity` they read as the rating in force, which is the one thing they must not be taken for |
 
 ## File organization

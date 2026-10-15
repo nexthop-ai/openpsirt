@@ -152,8 +152,46 @@ func (v *Vulnerabilities) DescribeFor(ctx context.Context, subject access.Subjec
 	}
 	if withheld {
 		known.withholdRecorded()
+		return known, nil
+	}
+	// Every record of the issue is in this reader's reach, so the rating a
+	// product recorded it at stands where the issue holds none of its own.
+	if err := v.recordedOver(ctx, &known, id); err != nil {
+		return Named{}, err
 	}
 	return known, nil
+}
+
+// recordedOver fills in what the issue holds no value of its own for from the
+// rating a product recorded it at: the word, and the score, its vector and its
+// scheme. Where several products recorded it, the first to have done so.
+func (v *Vulnerabilities) recordedOver(ctx context.Context, known *Named, id int64) error {
+	var rows []RecordedRating
+	if err := v.db.NewSelect().Model(&rows).
+		Where(`"rr"."vulnerability_id" = ?`, id).
+		OrderExpr(`"rr"."id"`).Limit(1).Scan(ctx); err != nil {
+		return fmt.Errorf("read how this was rated when it was recorded: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	recorded := rows[0]
+	if known.Severity == "" && recorded.Severity != nil {
+		known.Severity = *recorded.Severity
+	}
+	if known.Score == 0 && recorded.ScoreCenti != nil {
+		known.Score = float64(*recorded.ScoreCenti) / 100
+		known.Vector, known.ScoreVersion, known.ScoreSource = deref(recorded.Vector), deref(recorded.ScoreVersion), ""
+	}
+	return nil
+}
+
+// deref is a string held as optional, or nothing.
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // withholdRecorded leaves out what a flaw recorded out of the reader's reach
@@ -231,6 +269,38 @@ func RecordedOutOfReach(ctx context.Context, db bun.IDB, subject access.Subject,
 		return nil, fmt.Errorf("read where these issues were recorded: %w", err)
 	}
 	for _, id := range withheld {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// RecordedElsewhere reports, of these issues, which have a flaw recorded here
+// about them in a product other than this one.
+//
+// Asked by what one product publishes about an issue, whoever generates it:
+// a published document is read by everybody, so another product's record is
+// out of its reach whatever the generator may read.
+func RecordedElsewhere(ctx context.Context, db bun.IDB, productID int64,
+	ids []int64) (map[int64]bool, error) {
+
+	out := make(map[int64]bool, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	var elsewhere []int64
+	if err := db.NewSelect().
+		TableExpr(`"vulnerability" AS "ro"`).
+		ColumnExpr(`"ro"."id"`).
+		Where(`"ro"."id" IN (?)`, bun.List(ids)).
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "rf"
+			JOIN "target" AS "rt" ON "rt"."id" = "rf"."target_id"
+			JOIN "stream" AS "rs" ON "rs"."id" = "rt"."stream_id"
+			WHERE "rf"."vulnerability_id" = "ro"."issue_id"
+			AND "rf"."kind" = ? AND "rs"."product_id" <> ?)`, Entered, productID).
+		Scan(ctx, &elsewhere); err != nil {
+		return nil, fmt.Errorf("read where else these issues were recorded: %w", err)
+	}
+	for _, id := range elsewhere {
 		out[id] = true
 	}
 	return out, nil

@@ -929,6 +929,8 @@ var tables = []string{
 	"assessment",
 	// Before product and vulnerability, both of which it points at.
 	"issue_rating",
+	// Before product and vulnerability, both of which it points at.
+	"recorded_rating",
 	"personal_token",
 	"person_identity",
 	"group_admin",

@@ -905,14 +905,14 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
 		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
-		ColumnExpr(`MAX(COALESCE("v"."score_centi", 0)) AS "score_centi"`).
+		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
 		// Any of the issues folded here carrying a score at all.
 		// Written as a number rather than as a boolean, because the four
 		// engines do not agree about what a boolean out of an aggregate is.
-		ColumnExpr(`MAX(CASE WHEN "v"."score_centi" IS NULL THEN 0 ELSE 1 END) AS "scored"`).
+		ColumnExpr(`MAX(CASE WHEN `+ScoreHere+` IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		// The scheme that score is on. A group is one issue, so every row it
 		// folds carries the same one and the aggregate is that value.
-		ColumnExpr(`MAX(COALESCE("v"."score_version", '')) AS "score_version"`).
+		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
 		// The earliest opening among these places, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not

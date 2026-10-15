@@ -397,24 +397,24 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
+		// The rating stays off the issue row, which every product holding
+		// the issue reads. It is this product's rating, recorded below.
 		named := Named{
 			Identifier:  identifier,
-			Severity:    severity,
 			Description: in.Summary,
 			Weaknesses:  kinds,
 		}
 		if len(kinds) > 0 {
 			named.PrimaryWeakness = kinds[0]
 		}
-		if scored != nil {
-			named.Vector = scored.Vector
-			named.Score = float64(scored.ScoreCenti) / 100
-		}
 		interned, err := NewVulnerabilities(tx).Intern(ctx, []Named{named})
 		if err != nil {
 			return err
 		}
 		vulnerabilityID := interned[identifier]
+		if err := recordRating(ctx, tx, productID, vulnerabilityID, severity, scored); err != nil {
+			return err
+		}
 
 		own, err := LoadOwnWindows(ctx, tx)
 		if err != nil {

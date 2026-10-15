@@ -385,6 +385,17 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 			severity = left[0]
 		}
 	}
+	// With no rating claim left in force, the word the flaw was recorded at
+	// here is the rating again.
+	if severity == "" {
+		recorded, err := recordedIn(ctx, tx, productID, vulnerabilityID)
+		if err != nil {
+			return err
+		}
+		if recorded != nil && recorded.Severity != nil {
+			severity = *recorded.Severity
+		}
+	}
 	if severity == "" {
 		if _, err := tx.NewDelete().Model((*IssueRating)(nil)).
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).

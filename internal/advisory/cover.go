@@ -43,10 +43,10 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		a.undisclosed = true
 	}
 	// A flaw recorded in another product about the same issue writes its
-	// summary, its minted name, its addresses and its rating onto the issue.
-	// Where that record sits out of this subject's reach all four are left
-	// out, by the rule the issue page follows.
-	recorded, err := finding.RecordedOutOfReach(ctx, s.db, subject, []int64{issue.ID})
+	// summary, its minted name and its addresses onto the issue. A document
+	// is published to everybody, so where another product holds a record of
+	// the issue all three are left out, whoever generates it.
+	recorded, err := finding.RecordedElsewhere(ctx, s.db, one.ProductID, []int64{issue.ID})
 	if err != nil {
 		return err
 	}
@@ -188,6 +188,13 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	}
 	if withheld {
 		ratings = finding.Sourced(ratings)
+	}
+	// The vector this product recorded the flaw with, which is held off the
+	// issue row: the advisory is this product's word on its own flaw.
+	if vector, err := finding.RecordedVector(ctx, s.db, one.ProductID, issue.ID); err != nil {
+		return err
+	} else if vector != "" && issue.Vector == "" {
+		issue.Vector = vector
 	}
 	vulnerability.Scores = scoresFor(issue, ratings, rated)
 	vulnerability.Remediations = remediationsFor(fixed, fixable, unfixed)

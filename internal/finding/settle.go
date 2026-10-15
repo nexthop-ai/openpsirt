@@ -281,6 +281,39 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		}
 	}
 
+	// The rating a product recorded a flaw at goes with the rating in force
+	// it backs. Where the kept issue already holds one in that product, its
+	// own stays, as its rating in force does.
+	var recorded []RecordedRating
+	if err := v.db.NewSelect().Model(&recorded).
+		Where(`"rr"."vulnerability_id" IN (?, ?)`, kept, gone).
+		Scan(ctx); err != nil {
+		return fmt.Errorf("read how the merged issues were recorded: %w", err)
+	}
+	keptRecorded := map[int64]bool{}
+	for _, r := range recorded {
+		if r.VulnerabilityID == kept {
+			keptRecorded[r.ProductID] = true
+		}
+	}
+	for _, r := range recorded {
+		if r.VulnerabilityID != gone {
+			continue
+		}
+		var err error
+		if keptRecorded[r.ProductID] {
+			_, err = v.db.NewDelete().Model((*RecordedRating)(nil)).
+				Where(`"id" = ?`, r.ID).Exec(ctx)
+		} else {
+			_, err = v.db.NewUpdate().Model((*RecordedRating)(nil)).
+				Set(`"vulnerability_id" = ?`, kept).
+				Where(`"id" = ?`, r.ID).Exec(ctx)
+		}
+		if err != nil {
+			return fmt.Errorf("carry how a flaw was recorded to the issue it is: %w", err)
+		}
+	}
+
 	// A tag is a product's word on a row, kept only while it is on it, so it
 	// moves with the findings it marks. One already on the kept issue's row is
 	// the same word said once.

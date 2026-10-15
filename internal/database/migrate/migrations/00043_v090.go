@@ -37,7 +37,7 @@ func upV090(ctx context.Context, sqldb *sql.DB) error {
 			createImageVersionV090, foldDestinationsV090, attemptDeliveriesV090, mergeImagesV090,
 			shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 			graphNodeUpstreamV090,
-			dropLastChangedV090,
+			dropLastChangedV090, createRecordedRatingV090, moveRecordedRatingsV090,
 		} {
 			if err := inV020(ctx, sqldb, step); err != nil {
 				return err
@@ -79,12 +79,14 @@ func createImageVersionV090(ctx context.Context, tx bun.Tx) error {
 //   - A graph node records the source package its build stated for the
 //     component.
 //   - A finding no longer records when anything about it last moved.
+//   - The rating a flaw was recorded at is held by the product that recorded
+//     it, off the issue row every product reads.
 func upgradeV090(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		createImageVersionV090, foldDestinationsV090, attemptDeliveriesV090, mergeImagesV090,
 		shapeWordsV090, moveWordsV090, dropWordsV090, patchVisitEndV090,
 		graphNodeUpstreamV090,
-		dropLastChangedV090,
+		dropLastChangedV090, createRecordedRatingV090, moveRecordedRatingsV090,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err
