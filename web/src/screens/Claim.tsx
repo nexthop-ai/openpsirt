@@ -26,7 +26,7 @@ import { Exploited, Severity } from "../ui/Severity";
 import { on } from "../ui/when";
 import { mayOf, useWho } from "../app/session";
 import type { Who } from "../app/session";
-import { allFindingsAt, claimAt, findingAt } from "../app/routes";
+import { allFindingsAt, claimAt, findingOf } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 import { stripeOf } from "../ui/stripe";
 import { OutlierRows } from "../ui/OutlierRows";
@@ -234,23 +234,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
           <span className="id">{claim.finding.component}</span>{" "}
           {claim.finding.version && <span className="id">{claim.finding.version}</span>}
           {" · "}
-          <Link
-            className="linkish"
-            to={findingAt(
-              {
-                product: claim.finding.product,
-                stream: claim.finding.stream,
-                variant: claim.finding.variant,
-              },
-              {
-                vulnerability: claim.finding.vulnerability,
-                component: claim.finding.component,
-                version: claim.finding.version ?? "",
-                ecosystem: claim.finding.ecosystem,
-                namespace: claim.finding.namespace,
-              },
-            )}
-          >
+          <Link className="linkish" to={findingOf(claim.finding)}>
             Open the finding →
           </Link>
         </p>

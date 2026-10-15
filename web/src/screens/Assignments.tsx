@@ -16,7 +16,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingAt } from "../app/routes";
+import { findingOf } from "../app/routes";
 
 // One page of what somebody holds. The answer carries a total, so this is a
 // page rather than a cap and the footer pages through the rest.
@@ -385,14 +385,7 @@ function Held({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = findingAt(
-                {
-                  product: row.product ?? "",
-                  stream: row.stream ?? "",
-                  variant: row.variant ?? "",
-                },
-                row,
-              );
+              const to = findingOf(row);
               return (
                 <tr
                   key={`${row.product} ${row.vulnerability} ${row.component} ${row.version}`}

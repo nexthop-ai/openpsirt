@@ -13,7 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { UNOWNED_LIST, usePaging } from "./list";
-import { claimAt, decisionAt, findingAt, issueAt } from "../app/routes";
+import { claimAt, decisionAt, findingOf, issueAt } from "../app/routes";
 import { unwrap } from "../api/queries";
 import { claimOf, useAfterClaim, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
@@ -664,7 +664,7 @@ function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked
       after();
     },
   });
-  const decideAgain = f ? findingPath(f) : claimAt(claim.id);
+  const decideAgain = f ? findingOf(f) : claimAt(claim.id);
   const words = wordsFor(reason);
 
   return (
@@ -853,7 +853,7 @@ function Card({
         {f?.exploited && <Exploited when />}
         {/* The issue opens its finding, which carries everything an approver
             could want; the decision record is one link further, from there. */}
-        <Link to={f ? findingPath(f) : decisionAt(claim.decisionId)} className="linkish id">
+        <Link to={f ? findingOf(f) : decisionAt(claim.decisionId)} className="linkish id">
           {claim.title}
         </Link>
         {/* What is being claimed, in its own right rather than as the fifth
@@ -1192,29 +1192,6 @@ function Card({
         </div>
       )}
     </article>
-  );
-}
-
-// The address of a claim's finding, with everything that picks its component.
-function findingPath(f: {
-  product?: string;
-  stream?: string;
-  variant?: string;
-  vulnerability?: string;
-  component?: string;
-  version?: string;
-  ecosystem?: string;
-  namespace?: string;
-}): string {
-  return findingAt(
-    { product: f.product ?? "", stream: f.stream ?? "", variant: f.variant ?? "" },
-    {
-      vulnerability: f.vulnerability ?? "",
-      component: f.component ?? "",
-      version: f.version ?? "",
-      ecosystem: f.ecosystem,
-      namespace: f.namespace,
-    },
   );
 }
 
