@@ -2422,8 +2422,10 @@ to start.</p>
    trusted header with no provider at all where the old one cannot be reached
    either. A binding is withdrawn while the provider that made it is still
    configured.</li>
-<li><code>DELETE /v1/people/{identity}/identifier</code> for each person. The
-   authorization and the roles stay; only the pin goes.</li>
+<li>Unbind each person, signed in as an administrator: <strong>Unbind</strong> beside their
+   name on the Access screen, or <code>DELETE /v1/people/{identity}/identifier</code>
+   from that session. A personal token is refused. The authorization and the
+   roles stay; only the pin goes.</li>
 <li>Configure the new provider and restart. Each name is redeemed again by
    whoever next arrives holding it.</li>
 </ol>
