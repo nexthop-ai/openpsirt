@@ -149,7 +149,7 @@ without the archaeology.
 |---|---|
 | "Read as the first sighting of whichever version ran last, an air-gapped deployment was told the data had not moved in seven months" | "A version that recurs is not a change. A restored bundle reproduces a version string exactly" |
 | "Maintained as a complement, every other unaskable ecosystem passed this filter, reached the asker, found none and was recorded empty" | "Candidates are built from the list of ecosystems with an index, never from its complement" |
-| "This panicked into the recovery middleware and answered 500, where the route already has words for it" | "A handler reached without a database refuses in words" |
+| "This panicked into the recovery middleware and answered 500, where the route already has words for it" | "A process with no database is answered by the router, in words, before any handler runs" |
 
 A section that has drifted reads a particular way: a heading that asks a
 question, paragraphs opening with a bolded claim, a reason three sentences past

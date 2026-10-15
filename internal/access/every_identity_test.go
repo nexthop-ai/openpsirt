@@ -32,6 +32,12 @@ func TestEveryIdentityIsWhatEachPersonsOwnReadAnswers(t *testing.T) {
 			}
 		}
 
+		// A second way in for zed, claimed later and sorting first, so the
+		// order the two are read in is the order of their names.
+		if err := rights.Claim(ctx, people[0], "aaa-zed"); err != nil {
+			t.Fatal(err)
+		}
+
 		every, err := rights.EveryIdentity(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -49,6 +55,9 @@ func TestEveryIdentityIsWhatEachPersonsOwnReadAnswers(t *testing.T) {
 			}) {
 				t.Errorf("person %d signs in by %+v read together and %+v read alone", id, every[id], one)
 			}
+		}
+		if len(every[people[0]]) != 2 {
+			t.Errorf("zed signs in by %+v, want both ways in", every[people[0]])
 		}
 		if got, held := every[people[2]]; held {
 			t.Errorf("somebody with no way in signs in by %+v", got)

@@ -13,8 +13,8 @@ import (
 // StreamsByID names the branches and tags already known by identifier, in one
 // read. An identifier that names nothing is absent from the answer.
 //
-// Beside ProductByID because a credential and a target both carry identifiers
-// and a screen listing either has to say the names somebody typed.
+// A credential and a target both carry identifiers, and a screen listing
+// either says the names somebody typed.
 func (s *Store) StreamsByID(ctx context.Context, ids []int64) (map[int64]Stream, error) {
 	by := make(map[int64]Stream, len(ids))
 	if len(ids) == 0 {
