@@ -13,9 +13,8 @@ func TestWhatAScannerComplainedIsStillStorableOnceItIsBounded(t *testing.T) {
 	// The scanner's complaints quote package names from the inventory, which
 	// is somebody else's text, and the cut keeps the end — so the partial
 	// character lands at the front of what is stored. It is written to the
-	// run's caution and to the job's last error on four engines: PostgreSQL
-	// refuses invalid UTF-8 outright and MySQL and MariaDB refuse it in
-	// strict mode.
+	// run's caution and to the job's last error, where half a character is
+	// stored as a replacement character.
 	//
 	// Swept over a length, because where the cut falls depends on how long the
 	// whole complaint is: one fixed string is as likely as not to land on a
@@ -36,8 +35,8 @@ func TestWhatAScannerComplainedIsStillStorableOnceItIsBounded(t *testing.T) {
 
 func TestWhatIsKeptOfAChattyScannerIsStorable(t *testing.T) {
 	// The bound is applied where the excess is dropped, and what survives is
-	// written to the run's caution — a real column, on four engines, three of
-	// which refuse invalid UTF-8. The trim beside it keeps the end, so a
+	// written to the run's caution, where half a character is stored as a
+	// replacement character. The trim beside it keeps the end, so a
 	// partial character left at the tail of what was kept survives into the
 	// stored value.
 	//

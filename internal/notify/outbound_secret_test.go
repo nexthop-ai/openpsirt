@@ -63,11 +63,9 @@ func TestAFailureDoesNotCarryBackAnAddressItWroteEscaped(t *testing.T) {
 func TestAFailureOutsideASCIIIsStillStorableOnceItIsBounded(t *testing.T) {
 	// The stored failure is the standard library's own error text, which
 	// quotes an address somebody else chose, so it can carry characters
-	// outside ASCII at the 400-byte cut. What is left goes into a column on
-	// four engines: PostgreSQL refuses invalid UTF-8 outright and MySQL and
-	// MariaDB refuse it in strict mode, and the update is only logged when it
-	// fails — leaving the operator's one view of why a destination refuses
-	// permanently empty.
+	// outside ASCII at the 400-byte cut. What is left goes into a column, the
+	// operator's one view of why a destination refuses, and half a character
+	// is stored there as a replacement character.
 	//
 	// Swept over a leading offset, because where the cut falls depends on the
 	// length of the whole message: one fixed string is as likely as not to

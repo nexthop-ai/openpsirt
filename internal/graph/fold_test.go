@@ -186,9 +186,9 @@ func TestTheFoldIsWrittenAsAComponentIsRecorded(t *testing.T) {
 
 func TestALongNameOutsideASCIIStaysStorableAfterItIsCut(t *testing.T) {
 	// A component name is a producer's text and the lookup key is bounded, so
-	// the cut can fall inside a character. What is left is written to a column
-	// on four engines: PostgreSQL refuses invalid UTF-8 outright and MySQL and
-	// MariaDB refuse it in strict mode.
+	// the cut can fall inside a character. Half a character is stored as a
+	// replacement character, and the stored key then matches no name a later
+	// scan reports.
 	name := strings.Repeat("é", 200)
 	folded := graph.Folded(name)
 	if !utf8.ValidString(folded) {

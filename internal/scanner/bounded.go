@@ -36,8 +36,8 @@ func (b *bounded) Write(p []byte) (int, error) {
 		return b.kept.Write(p)
 	}
 	b.over = true
-	// Cut on a character boundary: what is kept is stored, and three engines
-	// of four refuse invalid UTF-8.
+	// Cut on a character boundary: what is kept is stored, and half a
+	// character is stored as a replacement character.
 	//
 	// The cut is taken from the whole of p, so a character p splits at the
 	// limit is dropped whole.

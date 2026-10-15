@@ -79,8 +79,8 @@ func TestAHostPastItsShareOfThePassWaitsBehindEveryOtherHost(t *testing.T) {
 }
 
 func TestARemoteErrorInBytesThatAreNotTextIsRecordedAndWaitsADay(t *testing.T) {
-	// git quotes what a remote said, and a remote says what it likes. Three
-	// engines of four refuse invalid UTF-8, and a failure that cannot be
+	// git quotes what a remote said, and a remote says what it likes. The
+	// failure is recorded whatever its bytes, and a failure that cannot be
 	// recorded leaves the repository first in line at every wake.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

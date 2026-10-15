@@ -865,10 +865,9 @@ func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
 }
 
 func TestALongNameIsShortenedBetweenCharacters(t *testing.T) {
-	// The bound on a served and stored filename was a byte slice, so a name
-	// whose hundred-and-twentieth byte falls inside a character was stored as
-	// something three engines of four refuse — and the refusal lands on the
-	// upload rather than on the name.
+	// A served and stored filename is cut between characters, so a name whose
+	// hundred-and-twentieth byte falls inside a character is stored as it is
+	// served rather than with a replacement character where the cut fell.
 	for _, most := range []int{118, 119, 120, 121} {
 		name := strings.Repeat("a", most-1) + strings.Repeat("é", 40) + ".log"
 		got := attach.SafeName(name)

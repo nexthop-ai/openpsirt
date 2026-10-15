@@ -11,9 +11,8 @@ import (
 
 func TestACutInsideACharacterLeavesValidText(t *testing.T) {
 	// The euro sign is three bytes, so a bound that is not a multiple of
-	// three falls inside one. What survives has to be something an engine
-	// will store: PostgreSQL refuses invalid UTF-8 and so do MySQL and
-	// MariaDB in strict mode.
+	// three falls inside one. What survives is valid text, so it is stored as
+	// it is rather than with a replacement character where the cut fell.
 	text := strings.Repeat("€", 10)
 	for most := 1; most <= len(text); most++ {
 		head := Head(text, most)
