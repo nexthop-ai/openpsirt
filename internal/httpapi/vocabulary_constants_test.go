@@ -166,15 +166,85 @@ func constantsOf(t *testing.T, dir, typ string) map[string]string {
 					continue
 				}
 				for i, constant := range value.Names {
-					literal, ok := value.Values[i].(*ast.BasicLit)
-					if !ok || literal.Kind != token.STRING {
-						continue
+					if word, ok := stringValue(t, file, value.Values[i]); ok {
+						found[constant.Name] = word
 					}
-					word, err := strconv.Unquote(literal.Value)
-					if err != nil {
-						t.Fatalf("read the value of %s: %v", constant.Name, err)
+				}
+			}
+		}
+	}
+	return found
+}
+
+// stringValue is the string a constant's value spells: a literal, or a
+// constant of another package of this module named by its selector, which is
+// how a vocabulary declared from another package's spelling reads.
+func stringValue(t *testing.T, file *ast.File, value ast.Expr) (string, bool) {
+	t.Helper()
+
+	switch value := value.(type) {
+	case *ast.BasicLit:
+		if value.Kind != token.STRING {
+			return "", false
+		}
+		word, err := strconv.Unquote(value.Value)
+		if err != nil {
+			t.Fatalf("read the value %s: %v", value.Value, err)
+		}
+		return word, true
+	case *ast.SelectorExpr:
+		pkg, ok := value.X.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		for _, imported := range file.Imports {
+			path, err := strconv.Unquote(imported.Path.Value)
+			if err != nil || !strings.HasPrefix(path, module) || filepath.Base(path) != pkg.Name {
+				continue
+			}
+			word, ok := untypedConstantsOf(t, filepath.Join("..", "..", strings.TrimPrefix(path, module)))[value.Sel.Name]
+			return word, ok
+		}
+	}
+	return "", false
+}
+
+// untypedConstantsOf is every constant a package's source declares as a string
+// literal with no type, by the constant's own name.
+func untypedConstantsOf(t *testing.T, dir string) map[string]string {
+	t.Helper()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]string{}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		path := filepath.Join(dir, name)
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		for _, decl := range file.Decls {
+			group, ok := decl.(*ast.GenDecl)
+			if !ok || group.Tok != token.CONST {
+				continue
+			}
+			for _, spec := range group.Specs {
+				value, ok := spec.(*ast.ValueSpec)
+				if !ok || value.Type != nil || len(value.Values) != len(value.Names) {
+					continue
+				}
+				for i, constant := range value.Names {
+					if literal, ok := value.Values[i].(*ast.BasicLit); ok && literal.Kind == token.STRING {
+						if word, err := strconv.Unquote(literal.Value); err == nil {
+							found[constant.Name] = word
+						}
 					}
-					found[constant.Name] = word
 				}
 			}
 		}
