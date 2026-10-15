@@ -31,8 +31,9 @@ func graphNodeV090(t *columnTypes) []string {
 
 // graphNodeUpstreamV090 adds the source package a build stated to each node,
 // and fills it on every node v0.8.0 recorded from the component the node
-// holds: that is what a scanner was given for it until now, and the build's
-// next scan writes what the build itself states.
+// holds: that is what a v0.8.0 scanner was given for it. On v0.8.0 that value
+// can be another product's statement. A moving line's next scan replaces it
+// with what the build states; a tag is not uploaded again and keeps it.
 func graphNodeUpstreamV090(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {

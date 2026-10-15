@@ -5,6 +5,7 @@ package migrations_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -344,6 +345,52 @@ func TestTheV090UpgradeStoppedPartWayMergesWholeOnTheNextStart(t *testing.T) {
 		exec(`DROP TRIGGER "stop_v090"`)
 		dbtest.MigrateTo(t, db, v090)
 		imagesAreMergedV090(t, ctx, db, w)
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// An upgrade stopped at its last step, filling the source package on each
+// node, has committed every column the steps before it added. The next start
+// steps over each of them and fills the nodes.
+func TestTheV090UpgradeStoppedAtTheNodeFillCompletesOnTheNextStart(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		switch db.Server.Engine {
+		case database.MySQL, database.MariaDB:
+		default:
+			t.Skip("data definition is transactional here, so the whole upgrade is undone with it")
+		}
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v080)
+		w := seedV080Images(t, ctx, db)
+		exec := func(stmt string) {
+			t.Helper()
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatalf("%v\n%s", err, stmt)
+			}
+		}
+		// The merge before it updates the image's nodes and no other, so a
+		// trigger refusing an update of libnl's node stops the fill alone.
+		exec(fmt.Sprintf(`CREATE TRIGGER "stop_v090_node" BEFORE UPDATE ON "graph_node" FOR EACH ROW
+			BEGIN
+				IF OLD."component_id" = %d THEN
+					SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'stopped at the fill';
+				END IF;
+			END`, w.libnl))
+		if err := migrate.UpTo(ctx, db, quiet(), v090); err == nil {
+			t.Fatal("the upgrade went through a trigger refusing every node update")
+		}
+		exec(`DROP TRIGGER "stop_v090_node"`)
+		dbtest.MigrateTo(t, db, v090)
+		imagesAreMergedV090(t, ctx, db, w)
+		var filled int
+		if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "graph_node" WHERE "component_id" = ?
+			AND "upstream_name" = 'libnl3'`, w.libnl).Scan(ctx, &filled); err != nil {
+			t.Fatal(err)
+		}
+		if filled == 0 {
+			t.Error("the restarted upgrade did not fill libnl's node with its source package")
+		}
 		leaveAtLatest(t, ctx, db)
 	})
 }
