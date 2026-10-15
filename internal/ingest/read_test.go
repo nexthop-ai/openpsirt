@@ -204,6 +204,51 @@ func TestAScanReadIntoAFullBacklogIsStillApplied(t *testing.T) {
 	})
 }
 
+// The scan an inventory leaves to be done commits with the graph. A failure
+// to queue it that is not a full backlog fails the read with nothing applied:
+// committed first, the graph stands while the read reports failure, which
+// marks an applied scan failed.
+func TestAScanThatCannotBeQueuedLeavesNothingApplied(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory)
+		// The queue's own table, moved away between the parse and the
+		// transaction that applies it, so queueing the scan is the statement
+		// that fails.
+		away := func(from, to string) {
+			t.Helper()
+			if _, err := f.db.ExecContext(context.WithoutCancel(ctx),
+				`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+				t.Fatal(err)
+			}
+		}
+		moved := false
+		t.Cleanup(func() {
+			if moved {
+				away("job_away", "job")
+			}
+		})
+		reader := f.reading(sbom.Limits{}).BeforeApplying(func() {
+			away("job", "job_away")
+			moved = true
+		})
+
+		_, err := reader.Once(ctx)
+		away("job_away", "job")
+		moved = false
+		if err == nil {
+			t.Fatal("a read whose scan could not be queued reported success")
+		}
+		nodes, err := nodesNow(ctx, f.db.DB, f.branch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(nodes) != 0 {
+			t.Errorf("%d nodes stand from a read that failed", len(nodes))
+		}
+	})
+}
+
 func TestABranchScanKeepsTheRecordAndNotTheContents(t *testing.T) {
 	// The next night supersedes what it was sent, so keeping the files
 	// grows storage with the calendar rather than with what is being
