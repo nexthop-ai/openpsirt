@@ -299,33 +299,7 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	var now time.Time
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		now = s.now().UTC().Truncate(time.Microsecond)
-		res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
-			Set("vulnerability_id = ?", vulnerabilityID).
-			Set("evaluated_at = ?", now).
-			Set("evaluated_by = ?", subject.ID).
-			Where("id = ?", row.ID).
-			// Whether it is still unjudged is asked here and nowhere else: a
-			// read before the write answers about a row that may have moved
-			// since.
-			Where("vulnerability_id IS NULL").
-			// A report under a ruling is answered, or about to be. Accepting
-			// it as well would leave it two things at once.
-			Where("ruling_id IS NULL").
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-		changed, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("judge that report: %w", err)
-		}
-		if changed == 0 {
-			return ErrAlreadyJudged
-		}
-		// Asked once the report is judged, of every other report: the unique
-		// index keeps one per issue row and nothing keeps one across the
-		// names merged into an issue.
-		return refuseIfReported(ctx, tx, vulnerabilityID, row.ID)
+		return judgeReport(ctx, tx, row.ID, vulnerabilityID, subject.ID, now, "judge that report")
 	})
 	switch {
 	case errors.Is(err, ErrAlreadyJudged), errors.Is(err, ErrIssueReported):
@@ -341,6 +315,42 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	row.VulnerabilityID = &vulnerabilityID
 	row.EvaluatedAt, row.EvaluatedBy = &now, &subject.ID
 	return row, nil
+}
+
+// judgeReport records that a report is evidence for an issue, and who said
+// so. A failure to write is wrapped in doing.
+//
+// A duplicate key is returned as it came: the unique index keeps one report
+// per issue row, and each caller decides what losing to it means.
+func judgeReport(ctx context.Context, tx bun.IDB, reportID, vulnerabilityID, by int64,
+	now time.Time, doing string) error {
+
+	res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
+		Set("vulnerability_id = ?", vulnerabilityID).
+		Set("evaluated_at = ?", now).
+		Set("evaluated_by = ?", by).
+		Where("id = ?", reportID).
+		// Whether it is still unjudged is asked here and nowhere else: a read
+		// before the write answers about a row that may have moved since.
+		Where("vulnerability_id IS NULL").
+		// A report under a ruling is answered, or about to be. Accepting it as
+		// well would leave it two things at once.
+		Where("ruling_id IS NULL").
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	changed, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("%s: %w", doing, err)
+	}
+	if changed == 0 {
+		return ErrAlreadyJudged
+	}
+	// Asked once the report is judged, of every other report: the unique index
+	// keeps one per issue row and nothing keeps one across the names merged
+	// into an issue.
+	return refuseIfReported(ctx, tx, vulnerabilityID, reportID)
 }
 
 // ErrNoSuchIssueHere is the one answer for an issue that is not in this

@@ -225,23 +225,10 @@ func (d *Documents) Discard(ctx context.Context, scanID int64) error {
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		// Read inside, because a retry runs against a database that
 		// has moved and this is what the delete is aimed at.
-		var ids []int64
-		if err := tx.NewSelect().Model((*Document)(nil)).
-			Column("id").
-			Where("scan_id = ?", scanID).
-			Where("discarded_at IS NULL").
-			Scan(ctx, &ids); err != nil {
-			return fmt.Errorf("read which documents are held: %w", err)
-		}
-		if len(ids) == 0 {
-			return nil
-		}
-		if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-			_, err := tx.NewDelete().Model((*chunk)(nil)).
-				Where("document_id IN (?)", bun.List(batch)).Exec(ctx)
+		held, err := deleteChunks(ctx, tx, scanID, true,
+			"read which documents are held", "discard document content")
+		if err != nil || !held {
 			return err
-		}); err != nil {
-			return fmt.Errorf("discard document content: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*Document)(nil)).
 			Set("discarded_at = ?", asStored(d.now())).
@@ -341,28 +328,45 @@ func (d *Documents) sameInventory(ctx context.Context, scanID int64, hash string
 // going and the rows replacing them are one act, and a failure between them
 // would leave a scan with nothing to read.
 func (d *Documents) Remove(ctx context.Context, scanID int64) error {
-	var ids []int64
-	if err := d.db.NewSelect().Model((*Document)(nil)).
-		Column("id").
-		Where("scan_id = ?", scanID).
-		Scan(ctx, &ids); err != nil {
-		return fmt.Errorf("read which documents this scan has: %w", err)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		_, err := d.db.NewDelete().Model((*chunk)(nil)).
-			Where("document_id IN (?)", bun.List(batch)).Exec(ctx)
+	held, err := deleteChunks(ctx, d.db, scanID, false,
+		"read which documents this scan has", "remove document content")
+	if err != nil || !held {
 		return err
-	}); err != nil {
-		return fmt.Errorf("remove document content: %w", err)
 	}
 	if _, err := d.db.NewDelete().Model((*Document)(nil)).
 		Where("scan_id = ?", scanID).Exec(ctx); err != nil {
 		return fmt.Errorf("remove what this scan arrived with: %w", err)
 	}
 	return nil
+}
+
+// deleteChunks removes the contents of a scan's documents, every one or only
+// the ones still held, and reports whether there were any. reading and
+// removing name the two steps in an error.
+func deleteChunks(ctx context.Context, db bun.IDB, scanID int64, heldOnly bool,
+	reading, removing string) (bool, error) {
+
+	var ids []int64
+	q := db.NewSelect().Model((*Document)(nil)).
+		Column("id").
+		Where("scan_id = ?", scanID)
+	if heldOnly {
+		q = q.Where("discarded_at IS NULL")
+	}
+	if err := q.Scan(ctx, &ids); err != nil {
+		return false, fmt.Errorf("%s: %w", reading, err)
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		_, err := db.NewDelete().Model((*chunk)(nil)).
+			Where("document_id IN (?)", bun.List(batch)).Exec(ctx)
+		return err
+	}); err != nil {
+		return false, fmt.Errorf("%s: %w", removing, err)
+	}
+	return true, nil
 }
 
 // Held returns one document of one scan, for reading its contents back.

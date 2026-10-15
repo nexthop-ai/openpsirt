@@ -176,18 +176,10 @@ func intern(ctx context.Context, db bun.IDB, commits map[Commit]urgency, now tim
 	if err := db.NewSelect().Model(&recorded).Column("repository_id", "commit_hash").Scan(ctx); err != nil {
 		return fmt.Errorf("read the commits already recorded: %w", err)
 	}
-	type key struct {
-		repository int64
-		hash       string
-	}
-	seen := map[key]bool{}
-	for _, row := range recorded {
-		seen[key{row.RepositoryID, row.Hash}] = true
-	}
 	var missing []commitRow
-	for commit := range commits {
+	for _, commit := range unrecorded(commits, have, recorded) {
 		id, ok := have[identity(commit.Repository)]
-		if !ok || seen[key{id, commit.Hash}] {
+		if !ok {
 			continue
 		}
 		missing = append(missing, commitRow{RepositoryID: id, Hash: commit.Hash, CreatedAt: now})
@@ -205,6 +197,35 @@ func intern(ctx context.Context, db bun.IDB, commits map[Commit]urgency, now tim
 		return fmt.Errorf("record the commits patch links name: %w", err)
 	}
 	return nil
+}
+
+// unrecorded is the linked commits with no row: in a repository with no row,
+// or in one whose row has no row for the commit. A repository is matched on
+// the identity of its address, which its row is keyed on. In order of address,
+// then hash.
+func unrecorded(commits map[Commit]urgency, idOf map[string]int64, rows []commitRow) []Commit {
+	type key struct {
+		repository int64
+		hash       string
+	}
+	seen := map[key]bool{}
+	for _, row := range rows {
+		seen[key{row.RepositoryID, row.Hash}] = true
+	}
+	var out []Commit
+	for commit := range commits {
+		if id, ok := idOf[identity(commit.Repository)]; ok && seen[key{id, commit.Hash}] {
+			continue
+		}
+		out = append(out, commit)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Repository != out[j].Repository {
+			return out[i].Repository < out[j].Repository
+		}
+		return out[i].Hash < out[j].Hash
+	})
+	return out
 }
 
 // Label is what is known about the branches a patch link's commit is on.

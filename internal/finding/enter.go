@@ -523,27 +523,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// rather than through the store, because the store holds a
 		// database and this is inside one of its transactions.
 		if reported != nil {
-			res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
-				Set("vulnerability_id = ?", vulnerabilityID).
-				Set("evaluated_at = ?", now).
-				Set("evaluated_by = ?", subject.ID).
-				Where("id = ?", reported.ID).
-				// Still unjudged and under no ruling when this lands, for
-				// the reason accepting a report as an existing issue asks.
-				Where("vulnerability_id IS NULL").
-				Where("ruling_id IS NULL").
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("judge the report this is recorded from: %w", err)
-			}
-			changed, err := database.Affected(res)
-			if err != nil {
-				return fmt.Errorf("judge the report this is recorded from: %w", err)
-			}
-			if changed == 0 {
-				return ErrAlreadyJudged
-			}
-			return refuseIfReported(ctx, tx, vulnerabilityID, reported.ID)
+			return judgeReport(ctx, tx, reported.ID, vulnerabilityID, subject.ID, now,
+				"judge the report this is recorded from")
 		}
 		// Every flaw has a report, whether it was sent in or found here, so
 		// the Inbox is the one list of where flaws came from and the same

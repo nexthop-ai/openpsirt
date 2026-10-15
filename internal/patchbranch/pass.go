@@ -413,26 +413,16 @@ func notYetRecorded(ctx context.Context, db bun.IDB, commits map[Commit]urgency,
 	if err := db.NewSelect().Model(&rows).Column("repository_id", "commit_hash").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the commits already recorded: %w", err)
 	}
-	urlOf := map[int64]string{}
+	idOf := map[string]int64{}
 	for _, repository := range repositories {
-		urlOf[repository.ID] = repository.URL
-	}
-	seen := map[Commit]bool{}
-	for _, row := range rows {
-		seen[Commit{Repository: urlOf[row.RepositoryID], Hash: row.Hash}] = true
+		idOf[repository.URLIdentity] = repository.ID
 	}
 	var out []Commit
-	for commit := range commits {
-		if !seen[commit] && !excluded.Host(commit.Host()) {
+	for _, commit := range unrecorded(commits, idOf, rows) {
+		if !excluded.Host(commit.Host()) {
 			out = append(out, commit)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Repository != out[j].Repository {
-			return out[i].Repository < out[j].Repository
-		}
-		return out[i].Hash < out[j].Hash
-	})
 	return out, nil
 }
 

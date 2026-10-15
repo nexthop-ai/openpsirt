@@ -425,46 +425,31 @@ func (v *Vulnerabilities) settleRatingClaims(ctx context.Context, kept, gone, me
 		Scan(ctx, &standing); err != nil {
 		return fmt.Errorf("read the rating claims standing about the merged issue: %w", err)
 	}
-	byProduct := map[int64][]standingClaim{}
-	var products []int64
-	for _, c := range standing {
-		if _, seen := byProduct[c.ProductID]; !seen {
-			products = append(products, c.ProductID)
+	retire := func(c, winner standingClaim) error {
+		product := c.ProductID
+		if _, err := v.db.NewUpdate().TableExpr(`"assessment"`).
+			Set(`"state" = ?`, AssessmentWithdrawn).
+			Set(`"decided_at" = ?`, now).
+			Set(`"decided_by" = NULL`).
+			Set(`"withdrawn_because" = ?`, why.because).
+			Set(`"live_vulnerability_id" = NULL`).
+			Where(`"id" = ?`, c.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("withdraw rating claim %d, which a merge superseded: %w", c.ID, err)
 		}
-		byProduct[c.ProductID] = append(byProduct[c.ProductID], c)
+		if err := v.trailSuperseded(ctx, why, product,
+			"rating claim: "+c.Severity+", "+c.State); err != nil {
+			return err
+		}
+		if c.Severity != winner.Severity {
+			v.displaced = append(v.displaced, Displaced{
+				Kind: DisplacedRating, ProductID: product,
+				RecordID: c.ID, StandingID: winner.ID, MergeID: mergeID,
+			})
+		}
+		return nil
 	}
-	for _, product := range products {
-		here := byProduct[product]
-		winner := here[0]
-		for _, c := range here[1:] {
-			if c.outranks(winner) {
-				winner = c
-			}
-		}
-		for _, c := range here {
-			if c.ID == winner.ID {
-				continue
-			}
-			if _, err := v.db.NewUpdate().TableExpr(`"assessment"`).
-				Set(`"state" = ?`, AssessmentWithdrawn).
-				Set(`"decided_at" = ?`, now).
-				Set(`"decided_by" = NULL`).
-				Set(`"withdrawn_because" = ?`, why.because).
-				Set(`"live_vulnerability_id" = NULL`).
-				Where(`"id" = ?`, c.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("withdraw rating claim %d, which a merge superseded: %w", c.ID, err)
-			}
-			if err := v.trailSuperseded(ctx, why, product,
-				"rating claim: "+c.Severity+", "+c.State); err != nil {
-				return err
-			}
-			if c.Severity != winner.Severity {
-				v.displaced = append(v.displaced, Displaced{
-					Kind: DisplacedRating, ProductID: product,
-					RecordID: c.ID, StandingID: winner.ID, MergeID: mergeID,
-				})
-			}
-		}
+	settled := func(winner standingClaim, contested bool) error {
+		product := winner.ProductID
 		if winner.LiveID != kept {
 			if _, err := v.db.NewUpdate().TableExpr(`"assessment"`).
 				Set(`"live_vulnerability_id" = ?`, kept).
@@ -472,12 +457,56 @@ func (v *Vulnerabilities) settleRatingClaims(ctx context.Context, kept, gone, me
 				return fmt.Errorf("hold rating claim %d under the issue it is read as: %w", winner.ID, err)
 			}
 		}
-		if len(here) > 1 {
+		if contested {
 			// The rating in force follows the claim that stands, and with it
 			// where the product's findings sit and how long they have.
 			if err := liveRating(ctx, v.db, product, kept, "", now); err != nil {
 				return err
 			}
+		}
+		return nil
+	}
+	return settleStanding(standing, func(c standingClaim) int64 { return c.ProductID },
+		func(c standingClaim) int64 { return c.ID }, standingClaim.outranks, retire, settled)
+}
+
+// settleStanding leaves one row standing per product, among rows read in
+// identifier order: the one that outranks every other. Each other row is
+// retired against it, and then settled runs on it, told whether the product
+// held more than one.
+//
+// Products are taken in the order their first row came, so the writes a merge
+// makes are the same on every run.
+func settleStanding[T any](rows []T, product, id func(T) int64, outranks func(a, b T) bool,
+	retire func(loser, winner T) error, settled func(winner T, contested bool) error) error {
+
+	byProduct := map[int64][]T{}
+	var products []int64
+	for _, row := range rows {
+		p := product(row)
+		if _, seen := byProduct[p]; !seen {
+			products = append(products, p)
+		}
+		byProduct[p] = append(byProduct[p], row)
+	}
+	for _, p := range products {
+		here := byProduct[p]
+		winner := here[0]
+		for _, row := range here[1:] {
+			if outranks(row, winner) {
+				winner = row
+			}
+		}
+		for _, row := range here {
+			if id(row) == id(winner) {
+				continue
+			}
+			if err := retire(row, winner); err != nil {
+				return err
+			}
+		}
+		if err := settled(winner, len(here) > 1); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -491,6 +520,15 @@ type standingAttack struct {
 	LiveID     int64     `bun:"live_vulnerability_id"`
 	KnownAt    time.Time `bun:"known_at"`
 	RecordedAt time.Time `bun:"recorded_at"`
+}
+
+// outranks is whether one record has more standing than another: the one
+// recorded later, and otherwise the later row.
+func (a standingAttack) outranks(other standingAttack) bool {
+	if !a.RecordedAt.Equal(other.RecordedAt) {
+		return a.RecordedAt.After(other.RecordedAt)
+	}
+	return a.ID > other.ID
 }
 
 // settleAttacks leaves one record of being attacked standing per product
@@ -512,56 +550,42 @@ func (v *Vulnerabilities) settleAttacks(ctx context.Context, kept, gone, mergeID
 		Scan(ctx, &standing); err != nil {
 		return fmt.Errorf("read the records of being attacked through the merged issue: %w", err)
 	}
-	byProduct := map[int64][]standingAttack{}
-	var products []int64
-	for _, a := range standing {
-		if _, seen := byProduct[a.ProductID]; !seen {
-			products = append(products, a.ProductID)
+	retire := func(a, winner standingAttack) error {
+		product := a.ProductID
+		if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
+			Set(`"cleared_at" = ?`, now).
+			Set(`"cleared_by" = NULL`).
+			Set(`"cleared_because" = ?`, why.because).
+			Set(`"live_vulnerability_id" = NULL`).
+			Where(`"id" = ?`, a.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("clear record %d of being attacked, which a merge superseded: %w", a.ID, err)
 		}
-		byProduct[a.ProductID] = append(byProduct[a.ProductID], a)
+		if err := v.trailSuperseded(ctx, why, product,
+			"exploited here, known "+a.KnownAt.UTC().Format(time.RFC3339)); err != nil {
+			return err
+		}
+		if !a.KnownAt.Equal(winner.KnownAt) {
+			v.displaced = append(v.displaced, Displaced{
+				Kind: DisplacedAttack, ProductID: product,
+				RecordID: a.ID, StandingID: winner.ID, MergeID: mergeID,
+			})
+		}
+		return nil
 	}
-	for _, product := range products {
-		here := byProduct[product]
-		winner := here[0]
-		for _, a := range here[1:] {
-			if a.RecordedAt.After(winner.RecordedAt) ||
-				(a.RecordedAt.Equal(winner.RecordedAt) && a.ID > winner.ID) {
-				winner = a
-			}
+	settled := func(winner standingAttack, _ bool) error {
+		if winner.LiveID == kept {
+			return nil
 		}
-		for _, a := range here {
-			if a.ID == winner.ID {
-				continue
-			}
-			if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
-				Set(`"cleared_at" = ?`, now).
-				Set(`"cleared_by" = NULL`).
-				Set(`"cleared_because" = ?`, why.because).
-				Set(`"live_vulnerability_id" = NULL`).
-				Where(`"id" = ?`, a.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("clear record %d of being attacked, which a merge superseded: %w", a.ID, err)
-			}
-			if err := v.trailSuperseded(ctx, why, product,
-				"exploited here, known "+a.KnownAt.UTC().Format(time.RFC3339)); err != nil {
-				return err
-			}
-			if !a.KnownAt.Equal(winner.KnownAt) {
-				v.displaced = append(v.displaced, Displaced{
-					Kind: DisplacedAttack, ProductID: product,
-					RecordID: a.ID, StandingID: winner.ID, MergeID: mergeID,
-				})
-			}
+		if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
+			Set(`"live_vulnerability_id" = ?`, kept).
+			Where(`"id" = ?`, winner.ID).Exec(ctx); err != nil {
+			return fmt.Errorf("hold record %d of being attacked under the issue it is read as: %w",
+				winner.ID, err)
 		}
-		if winner.LiveID != kept {
-			if _, err := v.db.NewUpdate().TableExpr(`"exploited_here"`).
-				Set(`"live_vulnerability_id" = ?`, kept).
-				Where(`"id" = ?`, winner.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("hold record %d of being attacked under the issue it is read as: %w",
-					winner.ID, err)
-			}
-		}
+		return nil
 	}
-	return nil
+	return settleStanding(standing, func(a standingAttack) int64 { return a.ProductID },
+		func(a standingAttack) int64 { return a.ID }, standingAttack.outranks, retire, settled)
 }
 
 // orBlank reads a version that may not have been stated.
