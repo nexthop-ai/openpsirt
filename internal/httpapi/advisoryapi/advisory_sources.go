@@ -77,8 +77,8 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		out.Body.Items = make([]AdvisorySourceBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, AdvisorySourceBody{
-				Name: row.Display, URL: row.URL, Tried: row.FetchedAt,
-				Read: row.ReachedAt, CaughtUpTo: row.CaughtUpTo, Because: row.Failed,
+				Name: row.Display, URL: row.URL, Tried: core.InUTC(row.FetchedAt),
+				Read: core.InUTC(row.ReachedAt), CaughtUpTo: core.InUTC(row.CaughtUpTo), Because: row.Failed,
 			})
 		}
 		return out, nil

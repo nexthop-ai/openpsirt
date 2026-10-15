@@ -309,11 +309,11 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		}
 		held := "none"
 		if newest != nil {
-			held = newest.BuiltAt.Format(time.RFC3339Nano)
+			held = newest.BuiltAt.UTC().Format(time.RFC3339Nano)
 		}
 		return nil, NotNewer, fmt.Errorf(
 			"%w (%s): built %s, but this variant already holds a scan built %s",
-			ErrRejected, NotNewer, a.BuiltAt.Format(time.RFC3339Nano), held)
+			ErrRejected, NotNewer, a.BuiltAt.UTC().Format(time.RFC3339Nano), held)
 
 	case BuiltInFuture:
 		return nil, BuiltInFuture, fmt.Errorf(
