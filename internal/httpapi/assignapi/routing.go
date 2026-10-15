@@ -169,7 +169,8 @@ func registerRouting(api huma.API, in core.Deps) {
 			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
 			"Applying it to what is open is queued rather than done here. The reply says " +
-			"the rule was recorded, not that the sweep has finished.",
+			"the rule was recorded, not that the sweep has finished. Where the queue is " +
+			"full the rule is not recorded and the answer is 503: send it again later.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "A rule hands work to somebody, continuously, on behalf of whoever wrote it.",
 		[]access.Role{access.Assigner}...), func(ctx context.Context, input *struct {
@@ -200,11 +201,10 @@ func registerRouting(api huma.API, in core.Deps) {
 				nil, trail.Said("to "+team.Called(), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
 			}
-			return nil
+			return queueSweep(ctx, in, tx, product)
 		}); err != nil {
 			return nil, err
 		}
-		queueSweep(ctx, in, product)
 
 		shown := ""
 		if team.DisplayName != "" && team.DisplayName != team.Name {
@@ -280,19 +280,25 @@ func routable(ctx context.Context, in core.Deps, name string) (access.Subject, i
 	return subject, product.ID, access.NewStore(in.DB.DB), nil
 }
 
-// queueSweep asks for the rules to be applied to what is already open.
+// queueSweep asks for the rules to be applied to what is already open, in the
+// transaction that records the rule.
 //
-// Queued rather than run here. A failure to queue is logged rather than
-// returned: the rule is recorded either way, and answering with an error would
-// invite a retry that records it twice.
-func queueSweep(ctx context.Context, in core.Deps, productID int64) {
+// The rule and its sweep commit together. A rule recorded without its sweep
+// leaves every open finding it covers unrouted until another rule is saved, so
+// a full queue refuses the rule and the caller sends it again.
+func queueSweep(ctx context.Context, in core.Deps, tx bun.Tx, productID int64) error {
 	if in.Queue == nil {
-		return
+		return nil
 	}
-	if _, err := in.Queue.Add(ctx, queue.Route,
-		strconv.FormatInt(productID, 10)); err != nil {
-		in.Log().Error("could not queue a routing sweep", "error", err, "product", productID)
+	_, err := in.Queue.AddTx(ctx, tx, queue.Route, strconv.FormatInt(productID, 10))
+	switch {
+	case errors.Is(err, queue.ErrBacklogFull):
+		return huma.NewError(http.StatusServiceUnavailable,
+			"too much work is waiting to be done, so the rule was not recorded: send it again later")
+	case err != nil:
+		return core.WentWrong(in.Logger, "applying the rule could not be queued, so it was not recorded", err)
 	}
+	return nil
 }
 
 // teamsByID is every team's two names, by identifier: the one a write resolves

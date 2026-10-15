@@ -212,7 +212,7 @@ The caller states whether a job commits with the rows it is about.
 | Mode | Used for | Failure mode it prevents |
 |---|---|---|
 | Commit with the rows | Work describing something the same transaction wrote, such as an upload | A job committed alone can be claimed before its rows exist; rows committed without their job are work nobody picks up |
-| Queue afterwards | Work that merely follows a write, such as sweeping routing rules after a rule is recorded | None. A failure to queue is logged rather than returned, because the rule is recorded either way and an error would invite a retry that records it twice |
+| Queue on its own | Work no write of the same act describes: a build the periodic pass finds due, the next batch of a routing sweep, an overtaken scan read again | None needed. Nothing was written beside it, so a failure to queue is returned to whatever asked and leaves no rows waiting on a job |
 
 Every write the queue makes of its own — queueing, claiming, renewing,
 finishing, failing, setting aside, putting back, and taking or handing back a

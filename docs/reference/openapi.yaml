@@ -23532,7 +23532,7 @@ paths:
 
         It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
 
-        Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished.
+        Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
 
         Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
       operationId: add-routing-rule

@@ -341,6 +341,37 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 	})
 }
 
+// A rule and the sweep that applies it to what is open commit together. A
+// rule recorded without its sweep leaves every open finding it covers unrouted
+// until another rule is saved, so a full queue refuses the rule.
+func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"curlers","members":["triager"]}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+		if _, err := queue.New(r.DB, queue.DefaultOptions()).Add(ctx, queue.Route,
+			"another product"); err != nil {
+			t.Fatal(err)
+		}
+		if err := setting.NewStore(r.DB.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
+			"/v1/products/mine/routing-rules",
+			`{"name":"curl to the curlers","team":"curlers","upstream":"curl"}`),
+			http.StatusServiceUnavailable)
+		rules, err := r.DB.DB.NewSelect().Table("routing_rule").Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rules != 0 {
+			t.Error("a rule whose sweep could not be queued was recorded")
+		}
+	})
+}
+
 func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 	// The three routes built on the shared lookup carry no version to choose
 	// with, and the lookup answered "no open finding is recorded there" for a
