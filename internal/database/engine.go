@@ -323,7 +323,10 @@ func recursion(engine Engine, u *url.URL) string {
 // under that mode the server reads both as written, so every backslash is
 // stored doubled, and doubled again on each edit. The list is wrapped in
 // commas so the name is matched whole, taken out twice so a name written twice
-// in a row goes, and the commas are trimmed afterwards.
+// in a row goes, and the commas are trimmed afterwards. A mode's name is read
+// without regard to capitals and the server's REPLACE matches them exactly, so
+// a list the URL names is put in capitals first; the server's own reports its
+// names in capitals already.
 func mode(u *url.URL) string {
 	const ours = ",ANSI_QUOTES,STRICT_TRANS_TABLES,"
 	const dropped = "',NO_BACKSLASH_ESCAPES,'"
@@ -333,7 +336,7 @@ func mode(u *url.URL) string {
 		held = held[1 : len(held)-1]
 	}
 	if held != "" {
-		base = "'" + strings.ReplaceAll(held, "'", "''") + "'"
+		base = "'" + strings.ReplaceAll(strings.ToUpper(held), "'", "''") + "'"
 	}
 	listed := "CONCAT(','," + base + ",'" + ours + "')"
 	for range 2 {

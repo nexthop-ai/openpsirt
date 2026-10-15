@@ -255,35 +255,41 @@ func TestABackslashIsStoredOnceWhateverTheModeAsks(t *testing.T) {
 			if address == "" {
 				t.Skipf("%s is not set", env)
 			}
-			target, err := database.ParseURL(address +
-				"?sql_mode=NO_BACKSLASH_ESCAPES,NO_ZERO_DATE,NO_BACKSLASH_ESCAPES")
-			if err != nil {
-				t.Fatal(err)
-			}
-			db, err := database.Open(t.Context(), target)
-			if err != nil {
-				t.Fatalf("the mode was refused: %v", err)
-			}
-			defer func() { _ = db.Close() }()
-			var held string
-			if err := db.QueryRowContext(t.Context(), "SELECT @@SESSION.sql_mode").Scan(&held); err != nil {
-				t.Fatal(err)
-			}
-			if strings.Contains(held, "NO_BACKSLASH_ESCAPES") {
-				t.Errorf("the session mode %q reads backslashes as written", held)
-			}
-			for _, want := range []string{"NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
-				if !strings.Contains(held, want) {
-					t.Errorf("the session mode %q lacks %s", held, want)
+			// A mode's name is read without regard to capitals, so the
+			// lower-case spelling asks for the same mode.
+			for _, asked := range []string{
+				"NO_BACKSLASH_ESCAPES,NO_ZERO_DATE,NO_BACKSLASH_ESCAPES",
+				"no_backslash_escapes,no_zero_date,No_Backslash_Escapes",
+			} {
+				target, err := database.ParseURL(address + "?sql_mode=" + asked)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			const sent = `C:\path\to \* "quoted\"`
-			var back string
-			if err := db.NewSelect().ColumnExpr("?", sent).Scan(t.Context(), &back); err != nil {
-				t.Fatal(err)
-			}
-			if back != sent {
-				t.Errorf("%q came back as %q", sent, back)
+				db, err := database.Open(t.Context(), target)
+				if err != nil {
+					t.Fatalf("the mode %s was refused: %v", asked, err)
+				}
+				var held string
+				if err := db.QueryRowContext(t.Context(), "SELECT @@SESSION.sql_mode").Scan(&held); err != nil {
+					t.Fatal(err)
+				}
+				if strings.Contains(held, "NO_BACKSLASH_ESCAPES") {
+					t.Errorf("asked for %s, the session mode %q reads backslashes as written", asked, held)
+				}
+				for _, want := range []string{"NO_ZERO_DATE", "ANSI_QUOTES", "STRICT_TRANS_TABLES"} {
+					if !strings.Contains(held, want) {
+						t.Errorf("asked for %s, the session mode %q lacks %s", asked, held, want)
+					}
+				}
+				const sent = `C:\path\to \* "quoted\"`
+				var back string
+				if err := db.NewSelect().ColumnExpr("?", sent).Scan(t.Context(), &back); err != nil {
+					t.Fatal(err)
+				}
+				if back != sent {
+					t.Errorf("asked for %s, %q came back as %q", asked, sent, back)
+				}
+				_ = db.Close()
 			}
 		})
 	}
