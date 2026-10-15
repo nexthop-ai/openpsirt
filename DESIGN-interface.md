@@ -2108,28 +2108,17 @@ with the library.
 
 ## Test coverage
 
-`make check` type-checks every screen against a client generated from the API
-document, so a screen cannot disagree with the shape the server sends and a
-drifted endpoint is a compile error rather than a blank panel. That is real
-coverage and it is most of what the frontend needs.
+| Layer | What pins it |
+|---|---|
+| Shape | `make check` type-checks every screen against a client generated from the API document, so a drifted endpoint is a compile error rather than a blank panel |
+| Computation | What a screen computes rather than draws sits in a function beside the screen and is tested on its own. The sign-out sequence is one: what makes it correct is which parts run before the request and outside the part that can fail |
+| Writes and gates | A screen that sends a write, or decides what a write carries, is drawn in a test inside a router and a query client of its own, and the test reads the request it sent |
+| Invalidation | Each mutation hook is drawn through a real query client, and the test reads the query keys it invalidates once its request lands |
+| Look | What is drawn over what, and how it reads, is checked by a person |
 
-What it is not is a test of what a screen *says*. Five pieces are pulled out and
-tested on their own — what a notification is called, the count on the control
-that opens it, where an unsent draft is kept, where a sign-in comes back to, and
-how a session that ended is noticed — because each is a defect rather than a
-matter of taste if it is wrong. Everything else is checked by a person looking
-at it.
-
-The draft rules are tested and so is the sign-out that calls them: the sequence
-sits in a function of its own rather than in the click handler, because what
-makes it correct is which parts run before the request and outside the part that
-can fail. The panel that offers a way back in is still checked by reading — no
-component is rendered in any test here, so what is drawn over what, and what a
-click does to it, is a person looking at it.
-
-Where a screen computes something rather than draws it, that computation comes
-out into a function beside the screen, which is what makes it testable at all.
-Coverage of the interface is measured and reported by the gate.
+The gate measures statement coverage per file and fails any file no test
+reaches, so a screen added without a test fails it. The entry point and the test
+harness are outside the measure, because neither is a behavior of the interface.
 
 ## Not built
 

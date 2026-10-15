@@ -42,8 +42,13 @@ export default defineConfig({
       reporter: ["text-summary"],
       include: ["src/**/*.{ts,tsx}"],
       // Generated from the API document, and the screens are compiled
-      // against it — a type file has nothing to execute.
-      exclude: ["src/api/schema.d.ts", "src/**/*.test.{ts,tsx}"],
+      // against it — a type file has nothing to execute. The entry point
+      // mounts the app and the harness is what tests draw with; neither is a
+      // behavior of the interface.
+      exclude: ["src/api/schema.d.ts", "src/**/*.test.{ts,tsx}", "src/main.tsx", "src/test/**"],
+      // Every file is reached by some test, so a screen added with none fails
+      // the run.
+      thresholds: { perFile: true, statements: 1 },
     },
   },
   server: {
