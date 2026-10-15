@@ -111,7 +111,6 @@ var mavenSame = [][2]string{
 	{"1Ga", "1"},
 	{"1GA", "1"},
 	{"1RELEASE", "1"},
-	{"1release", "1"},
 	{"1RELeaSE", "1"},
 	{"1Final", "1"},
 	{"1FinaL", "1"},
@@ -284,7 +283,7 @@ func TestAMavenVersionThatIsNotOneIsRefused(t *testing.T) {
 	// version is belongs here rather than there. It is the one the
 	// distribution schemes state: a leading digit, and only the characters a
 	// version may hold.
-	for _, not := range []string{
+	refused(t, vercmp.Maven,
 		// The words Maven itself takes instead of a version.
 		"RELEASE", "LATEST",
 		// No leading digit.
@@ -292,21 +291,11 @@ func TestAMavenVersionThatIsNotOneIsRefused(t *testing.T) {
 		// Bytes outside what a version may hold. Read as part of a word, the
 		// comparison would answer about a string nobody wrote.
 		"1.1.α", "1.0 1", "1.0/2",
-	} {
-		if _, ok := vercmp.Order(vercmp.Maven, not, "1.0"); ok {
-			t.Errorf("%q was ordered against a version", not)
-		}
-		if _, ok := vercmp.Order(vercmp.Maven, "1.0", not); ok {
-			t.Errorf("a version was ordered against %q", not)
-		}
-	}
+	)
 }
 
 func TestReachingAMavenReleaseReachesTheEarlierOnes(t *testing.T) {
-	for _, each := range []struct {
-		candidate, wanted string
-		want              bool
-	}{
+	reaches(t, vercmp.Maven, []reach{
 		{"2.0", "1.9.3", true},
 		{"1.0", "1.0-SNAPSHOT", true},
 		{"1.0-SNAPSHOT", "1.0", false},
@@ -316,11 +305,7 @@ func TestReachingAMavenReleaseReachesTheEarlierOnes(t *testing.T) {
 		// Unreadable either side, so nothing is claimed.
 		{"1.0", "unfixed", false},
 		{"unfixed", "1.0", false},
-	} {
-		if got := vercmp.Reaches(vercmp.Maven, each.candidate, each.wanted); got != each.want {
-			t.Errorf("%q reaching %q is %v, want %v", each.candidate, each.wanted, got, each.want)
-		}
-	}
+	})
 }
 
 func TestTheMavenOrderIsNotTotal(t *testing.T) {

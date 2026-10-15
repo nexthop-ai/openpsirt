@@ -433,7 +433,7 @@ func TestADistributionVersionThatIsNotOneIsRefused(t *testing.T) {
 	// belongs then outranked every real release, because a letter sorts above
 	// a digit.
 	for _, scheme := range []vercmp.Scheme{vercmp.RPM, vercmp.Debian, vercmp.APK} {
-		for _, not := range []string{
+		refused(t, scheme,
 			"", "  ",
 			// No leading digit, which is the rule each scheme states for
 			// itself.
@@ -444,13 +444,37 @@ func TestADistributionVersionThatIsNotOneIsRefused(t *testing.T) {
 			// rather than around it: space at either end is trimmed before
 			// anything reads the string, Unicode space included.
 			"1.1.α", "1.0 1",
-		} {
-			if _, ok := vercmp.Order(scheme, not, "1.0"); ok {
-				t.Errorf("%v ordered %q against a version", scheme, not)
-			}
-			if _, ok := vercmp.Order(scheme, "1.0", not); ok {
-				t.Errorf("%v ordered a version against %q", scheme, not)
-			}
+		)
+	}
+}
+
+// refused asserts that a scheme orders none of the strings against a
+// version, either way round.
+func refused(t *testing.T, scheme vercmp.Scheme, nots ...string) {
+	t.Helper()
+	for _, not := range nots {
+		if _, ok := vercmp.Order(scheme, not, "1.0"); ok {
+			t.Errorf("%v ordered %q against a version", scheme, not)
+		}
+		if _, ok := vercmp.Order(scheme, "1.0", not); ok {
+			t.Errorf("%v ordered a version against %q", scheme, not)
+		}
+	}
+}
+
+// reach is one question an upgrade planner asks: whether moving to the
+// candidate also reaches the version wanted.
+type reach struct {
+	candidate, wanted string
+	want              bool
+}
+
+// reaches asserts the answer to each question on one scheme.
+func reaches(t *testing.T, scheme vercmp.Scheme, cases []reach) {
+	t.Helper()
+	for _, each := range cases {
+		if got := vercmp.Reaches(scheme, each.candidate, each.wanted); got != each.want {
+			t.Errorf("%v: %q reaching %q is %v, want %v", scheme, each.candidate, each.wanted, got, each.want)
 		}
 	}
 }
@@ -552,13 +576,6 @@ func TestAWordWhereAVersionBelongsIsRefused(t *testing.T) {
 		vercmp.PyPI, vercmp.Maven, vercmp.NuGet,
 	}
 	for _, scheme := range schemes {
-		for _, not := range advisoryWords {
-			if _, ok := vercmp.Order(scheme, not, "1.0"); ok {
-				t.Errorf("%v ordered %q against a version", scheme, not)
-			}
-			if _, ok := vercmp.Order(scheme, "1.0", not); ok {
-				t.Errorf("%v ordered a version against %q", scheme, not)
-			}
-		}
+		refused(t, scheme, advisoryWords...)
 	}
 }

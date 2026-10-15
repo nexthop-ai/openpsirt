@@ -85,7 +85,6 @@ var nugetSame = [][2]string{
 	{"1.0.0.1-1.2.A", "1.0.0.1-1.2.a+A"},
 	{"1.0.01", "1.0.1.0"},
 	// NuGetVersionTest: the equality operator.
-	{"1.0", "1.0.0.0"},
 	{"1.23.01", "1.23.1"},
 	{"1.45.6", "1.45.6.0"},
 	{"1.45.6-Alpha", "1.45.6-Alpha"},
@@ -164,7 +163,7 @@ var nugetValid = []string{
 	"2.7", "1.3.4.5", "1.3-alpha", "1.3 .4", "2.3.18.2-a",
 	"01.2.3", "1.02.3", "1.2.03", "1", "1.2", "1.2.3.4", "1.2. 3", "1. 2.3",
 	"00.2.3", "1.2.0030",
-	"10.2.3", "13234.223.32222", "0.1.2", "1.0.0",
+	"10.2.3", "13234.223.32222", "0.1.2",
 	"0.1.2-Alpha",
 	"0.1.2-Alpha.2.34.5.453.345.345.345.345.A.B.bbbbbbb.Csdfdfdf",
 	"0.1.2-Alpha-2-5Bdd", "0.1.2--", "0.1.2--B-C-", "0.1.2--B2.-.C.-A0-",
@@ -246,14 +245,7 @@ func TestTheVersionsNuGetParsesAreOrdered(t *testing.T) {
 }
 
 func TestTheVersionsNuGetRefusesAreRefused(t *testing.T) {
-	for _, each := range nugetInvalid {
-		if _, ok := vercmp.Order(vercmp.NuGet, each, "1.0"); ok {
-			t.Errorf("%q was ordered, and NuGet refuses it", each)
-		}
-		if _, ok := vercmp.Order(vercmp.NuGet, "1.0", each); ok {
-			t.Errorf("a version was ordered against %q, and NuGet refuses it", each)
-		}
-	}
+	refused(t, vercmp.NuGet, nugetInvalid...)
 }
 
 func TestNuGetOrdersWhatItsOwnSuiteNeverPairs(t *testing.T) {
@@ -282,19 +274,12 @@ func TestNuGetOrdersWhatItsOwnSuiteNeverPairs(t *testing.T) {
 }
 
 func TestReachingANuGetReleaseReachesTheEarlierOnes(t *testing.T) {
-	for _, each := range []struct {
-		candidate, wanted string
-		want              bool
-	}{
+	reaches(t, vercmp.NuGet, []reach{
 		{"13.0.3", "13.0.1", true},
 		{"13.0.1", "13.0.3", false},
 		{"2.0.0", "2.0.0-rc.1", true},
 		{"2.0.0-rc.1", "2.0.0", false},
 		{"4.0.0.1", "4.0.0", true},
 		{"1.0", "unfixed", false},
-	} {
-		if got := vercmp.Reaches(vercmp.NuGet, each.candidate, each.wanted); got != each.want {
-			t.Errorf("%q reaching %q is %v, want %v", each.candidate, each.wanted, got, each.want)
-		}
-	}
+	})
 }

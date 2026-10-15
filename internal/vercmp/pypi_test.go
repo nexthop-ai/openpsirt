@@ -288,27 +288,17 @@ func TestAPyPIVersionThatIsNotOneIsRefused(t *testing.T) {
 	// The refusal is PEP 440's own, which is what makes this scheme unlike the
 	// distribution ones: the grammar already says what a version is, so a word
 	// an advisory wrote where a version belongs needs no rule invented for it.
-	for _, not := range append([]string{
+	refused(t, vercmp.PyPI, append([]string{
 		// A fork carrying a branch, and a local version with nothing local.
 		"main-a1b2c3", "1.0+",
-	}, pypiNotVersions...) {
-		if _, ok := vercmp.Order(vercmp.PyPI, not, "1.0"); ok {
-			t.Errorf("%q was ordered against a version", not)
-		}
-		if _, ok := vercmp.Order(vercmp.PyPI, "1.0", not); ok {
-			t.Errorf("a version was ordered against %q", not)
-		}
-	}
+	}, pypiNotVersions...)...)
 }
 
 func TestReachingAPyPIReleaseReachesTheEarlierOnes(t *testing.T) {
 	// The question the picker asks, on the scheme rather than on the
 	// comparison. A post-release reaches the release it follows and a
 	// pre-release does not reach it.
-	for _, each := range []struct {
-		candidate, wanted string
-		want              bool
-	}{
+	reaches(t, vercmp.PyPI, []reach{
 		{"2.0", "1.9.3", true},
 		{"1.0.post1", "1.0", true},
 		{"1.0", "1.0.post1", false},
@@ -319,11 +309,7 @@ func TestReachingAPyPIReleaseReachesTheEarlierOnes(t *testing.T) {
 		// Unreadable either side, so nothing is claimed.
 		{"1.0", "unfixed", false},
 		{"unfixed", "1.0", false},
-	} {
-		if got := vercmp.Reaches(vercmp.PyPI, each.candidate, each.wanted); got != each.want {
-			t.Errorf("%q reaching %q is %v, want %v", each.candidate, each.wanted, got, each.want)
-		}
-	}
+	})
 }
 
 func TestAPyPILocalVersionSpelledLikeASuffixIsStillLocal(t *testing.T) {
