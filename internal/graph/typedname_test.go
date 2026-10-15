@@ -77,7 +77,7 @@ func TestAComponentIsReachedByItsEcosystemWhateverCapitalsItsSchemeHas(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		shouted := graph.Described{Purl: "PKG:deb/debian/foo@1.0", Name: "foo", Version: "1.0"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{shouted},
 			Dependencies: []graph.Dependency{{Parent: root, Child: shouted}},
@@ -97,7 +97,7 @@ func TestAComponentIsReachedByItsEcosystemWhateverCapitalsItsSchemeHas(t *testin
 func TestAPairDeclaredUnderTwoScopesShowsTheSameWordEveryRead(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{zlib},
 			Dependencies: []graph.Dependency{

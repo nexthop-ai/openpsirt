@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -466,13 +467,13 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 			}
 		}
 		bare := graph.Described{Purl: "pkg:deb/debian/openssl@3.0.11-1", Name: "openssl", Version: "3.0.11-1"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), holding(bare)); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), holding(bare)); err != nil {
 			t.Fatal(err)
 		}
 		stated := bare
 		stated.Purl = "pkg:deb/debian/openssl@3.0.11-1?distro=debian-13&upstream=openssl"
 		stated.UpstreamName, stated.UpstreamVersion = "openssl", "3.0.11"
-		if _, err := f.store.Apply(ctx, theirs, f.scanOf(t, theirs), holding(stated)); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, theirs, f.scanOf(t, theirs), holding(stated)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -496,7 +497,7 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 
 		// Another build of the same product stating it fills in what this
 		// build did not.
-		if _, err := f.store.Apply(ctx, sibling, f.scanOf(t, sibling), holding(stated)); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, sibling, f.scanOf(t, sibling), holding(stated)); err != nil {
 			t.Fatal(err)
 		}
 		if got := held(f.targetID); got.Purl != stated.Purl || got.UpstreamName != "openssl" {

@@ -40,7 +40,7 @@ func TestADeferralThresholdIsAWholeNumberOfDays(t *testing.T) {
 // reads to the decision form as no threshold while the server enforces one.
 func TestAThresholdUnderADayStillPublishesOne(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		if err := setting.NewStore(r.DB.DB).Set(t.Context(), setting.DeferralThreshold,
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.DeferralThreshold,
 			"12h"); err != nil {
 			t.Fatal(err)
 		}

@@ -223,12 +223,12 @@ func TestAnAbsenceShorterThanADayIsSaidPlainly(t *testing.T) {
 		db := w.DB
 		ctx := t.Context()
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
-		if err := setting.NewStore(db.DB).Set(ctx, setting.AbsentAfter, "12h"); err != nil {
+		if _, _, err := setting.NewStore(db.DB).Change(ctx, setting.AbsentAfter, "12h"); err != nil {
 			t.Fatal(err)
 		}
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

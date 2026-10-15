@@ -187,7 +187,7 @@ func TestANamespacedSourceTreeClaimCoversThePackageItNames(t *testing.T) {
 		{"a name that merely starts the same",
 			graph.Described{Purl: "pkg:deb/debian/openssl-dev@1.0.2", Name: "openssl-dev", Version: "1.0.2"}, false},
 	} {
-		if got[0].Covers(each.held) != each.covers {
+		if coversAny(got[0], each.held) != each.covers {
 			t.Errorf("%s: covered %v, wanted %v", each.why, !each.covers, each.covers)
 		}
 	}

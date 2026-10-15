@@ -57,7 +57,7 @@ func TestADestinationAddedAgainUnderARetiredNameKeepsItsRow(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := store.RetireDestination(ctx, asks(t, db, who), first.Name, first.Kind); err != nil {
+		if _, err := store.RetireDestination(ctx, asks(t, db, who), first.Name, first.Kind); err != nil {
 			t.Fatal(err)
 		}
 		second := first
