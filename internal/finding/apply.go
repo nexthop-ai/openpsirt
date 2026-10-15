@@ -564,123 +564,63 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// lacked it, and in the document saying this build is fixed. Recorded
 		// once. Where the latest row at that place already says patched, a
 		// re-scan writes nothing but the claim it now stands on.
-		var recording []Finding
-		standsOn := map[int64][]int64{}
-		for _, k := range arrivedPatched {
-			f := wanted[k]
-			if was, recorded := latest[k]; recorded && was.ClosedBecause == Patched {
-				if !equalRef(was.SuppressedBy, f.SuppressedBy) {
-					standsOn[*f.SuppressedBy] = append(standsOn[*f.SuppressedBy], was.ID)
-				}
-				continue
-			}
-			f.ClosedAt = &startedAt
-			f.ClosedRunID = &runID
-			f.ClosedBecause = Patched
-			// Never open, so never due.
-			f.DueAt = nil
-			recording = append(recording, f)
+		recorded, err := recordArrived(ctx, tx, arrivedPatched, wanted, latest, arrivedAs[int64]{
+			reason: Patched,
+			by:     func(k key) int64 { return *wanted[k].SuppressedBy },
+			set:    func(*Finding, int64) {},
+			same:   func(was Finding, claimID int64) bool { return equalRef(was.SuppressedBy, &claimID) },
+			repoint: func(q *bun.UpdateQuery, claimID int64) *bun.UpdateQuery {
+				return q.Set("suppressed_by = ?", claimID).Set("claimed_by = ?", claimID)
+			},
+			recording:  "record %d patched findings",
+			repointing: "point %d patched findings at their claim",
+		}, startedAt, runID)
+		if err != nil {
+			return err
 		}
-		if len(recording) > 0 {
-			if err := database.InBatches(ctx, tx, recording); err != nil {
-				return fmt.Errorf("record %d patched findings: %w", len(recording), err)
-			}
-			applied.Patched += len(recording)
-		}
+		applied.Patched += recorded
 		// A finding first seen with its record stating it unaffected is
 		// recorded, closed, for the same reason: a release comparison against
 		// a build that held the issue says this one never did. Recorded once,
 		// and where the record's lines move, the row is pointed at the new
 		// ones.
-		var recordingCleared []Finding
-		restating := map[string][]int64{}
-		for _, k := range arrivedCleared {
-			f := wanted[k]
-			lines := cleared[k]
-			if was, recorded := latest[k]; recorded && was.ClosedBecause == Unaffected {
-				if was.UnaffectedBy != lines {
-					restating[lines] = append(restating[lines], was.ID)
-				}
-				continue
-			}
-			f.ClosedAt = &startedAt
-			f.ClosedRunID = &runID
-			f.ClosedBecause = Unaffected
-			f.UnaffectedBy = lines
-			f.DueAt = nil
-			recordingCleared = append(recordingCleared, f)
+		recorded, err = recordArrived(ctx, tx, arrivedCleared, wanted, latest, arrivedAs[string]{
+			reason: Unaffected,
+			by:     func(k key) string { return cleared[k] },
+			set:    func(f *Finding, lines string) { f.UnaffectedBy = lines },
+			same:   func(was Finding, lines string) bool { return was.UnaffectedBy == lines },
+			repoint: func(q *bun.UpdateQuery, lines string) *bun.UpdateQuery {
+				return q.Set("unaffected_by = ?", lines)
+			},
+			recording:  "record %d findings their records state are unaffected",
+			repointing: "point %d unaffected findings at their record's lines",
+		}, startedAt, runID)
+		if err != nil {
+			return err
 		}
-		if len(recordingCleared) > 0 {
-			if err := database.InBatches(ctx, tx, recordingCleared); err != nil {
-				return fmt.Errorf("record %d findings their records state are unaffected: %w",
-					len(recordingCleared), err)
-			}
-			applied.Unaffected += len(recordingCleared)
-		}
-		for lines, ids := range restating {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("unaffected_by = ?", lines).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
-				return fmt.Errorf("point %d unaffected findings at their record's lines: %w", len(ids), err)
-			}
-		}
+		applied.Unaffected += recorded
 		// A finding first seen with a supplier's statement answering it on
 		// every route is recorded, closed, for the same reason: a release
 		// comparison and the register have the statement to read. Recorded
 		// once, and where the statement is revised, the row is pointed at the
 		// new one.
-		var recordingDisclaimed []Finding
-		restated := map[int64][]int64{}
-		for _, k := range arrivedDisclaimed {
-			f := wanted[k]
-			statement := disclaimed[k]
-			if was, recorded := latest[k]; recorded && was.ClosedBecause == Disclaimed {
-				if was.StatedBy == nil || *was.StatedBy != statement {
-					restated[statement] = append(restated[statement], was.ID)
-				}
-				continue
-			}
-			f.ClosedAt = &startedAt
-			f.ClosedRunID = &runID
-			f.ClosedBecause = Disclaimed
-			f.StatedBy = &statement
-			f.DueAt = nil
-			recordingDisclaimed = append(recordingDisclaimed, f)
+		recorded, err = recordArrived(ctx, tx, arrivedDisclaimed, wanted, latest, arrivedAs[int64]{
+			reason: Disclaimed,
+			by:     func(k key) int64 { return disclaimed[k] },
+			set:    func(f *Finding, statement int64) { f.StatedBy = &statement },
+			same: func(was Finding, statement int64) bool {
+				return was.StatedBy != nil && *was.StatedBy == statement
+			},
+			repoint: func(q *bun.UpdateQuery, statement int64) *bun.UpdateQuery {
+				return q.Set("stated_by = ?", statement)
+			},
+			recording:  "record %d findings their suppliers state are not affected",
+			repointing: "point %d disclaimed findings at their statement",
+		}, startedAt, runID)
+		if err != nil {
+			return err
 		}
-		if len(recordingDisclaimed) > 0 {
-			if err := database.InBatches(ctx, tx, recordingDisclaimed); err != nil {
-				return fmt.Errorf("record %d findings their suppliers state are not affected: %w",
-					len(recordingDisclaimed), err)
-			}
-			applied.Disclaimed += len(recordingDisclaimed)
-		}
-		for statement, ids := range restated {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("stated_by = ?", statement).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
-				return fmt.Errorf("point %d disclaimed findings at their statement: %w", len(ids), err)
-			}
-		}
-		for claimID, ids := range standsOn {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("suppressed_by = ?", claimID).
-					Set("claimed_by = ?", claimID).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
-				return fmt.Errorf("point %d patched findings at their claim: %w", len(ids), err)
-			}
-		}
+		applied.Disclaimed += recorded
 
 		var closing []heldFinding
 		// With the same issue still wanted at the same place, this row is
@@ -763,75 +703,38 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			applied.Closed++
 		}
+		// A supplier's answer on some routes goes with the place, wherever a
+		// row closes for anything but a supplier's statement.
 		for key, ids := range byReason {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					// The run's own moment, which is what the opening side
-					// dates a finding by: a finding's life is measured
-					// against the runs that observed it, not against when
-					// the write happened to land. The run stays beside it as
-					// provenance, and is what "what did this run change" is
-					// counted by.
-					Set("closed_at = ?", startedAt).
-					Set("closed_run_id = ?", runID).
-					Set("closed_because = ?", key.Reason).
-					// A supplier's answer on some routes went with the place.
-					Set("stated_by = NULL").
-					Set("moved_to = ?", key.MovedTo).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
+			if err := closeIDs(ctx, tx, ids, startedAt, runID, key.Reason,
+				func(q *bun.UpdateQuery) *bun.UpdateQuery {
+					return q.Set("stated_by = NULL").Set("moved_to = ?", key.MovedTo)
+				}); err != nil {
 				return fmt.Errorf("close %d findings: %w", len(ids), err)
 			}
 		}
 		for lines, ids := range clearing {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("closed_at = ?", startedAt).
-					Set("closed_run_id = ?", runID).
-					Set("closed_because = ?", Unaffected).
-					// A supplier's answer on some routes went with the place.
-					Set("stated_by = NULL").
-					Set("moved_to = ?", "").
-					Set("unaffected_by = ?", lines).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
+			if err := closeIDs(ctx, tx, ids, startedAt, runID, Unaffected,
+				func(q *bun.UpdateQuery) *bun.UpdateQuery {
+					return q.Set("stated_by = NULL").Set("moved_to = ?", "").Set("unaffected_by = ?", lines)
+				}); err != nil {
 				return fmt.Errorf("close %d findings their records state are unaffected: %w", len(ids), err)
 			}
 		}
 		for statement, ids := range disclaiming {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("closed_at = ?", startedAt).
-					Set("closed_run_id = ?", runID).
-					Set("closed_because = ?", Disclaimed).
-					Set("moved_to = ?", "").
-					Set("stated_by = ?", statement).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
+			if err := closeIDs(ctx, tx, ids, startedAt, runID, Disclaimed,
+				func(q *bun.UpdateQuery) *bun.UpdateQuery {
+					return q.Set("moved_to = ?", "").Set("stated_by = ?", statement)
+				}); err != nil {
 				return fmt.Errorf("close %d findings their suppliers state are not affected: %w", len(ids), err)
 			}
 		}
 		for claimID, ids := range patching {
-			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-				_, err := tx.NewUpdate().Model((*Finding)(nil)).
-					Set("closed_at = ?", startedAt).
-					Set("closed_run_id = ?", runID).
-					Set("closed_because = ?", Patched).
-					// A supplier's answer on some routes went with the place.
-					Set("stated_by = NULL").
-					Set("moved_to = ?", "").
-					Set("suppressed_by = ?", claimID).
-					Set("claimed_by = ?", claimID).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
-				return err
-			})
-			if err != nil {
+			if err := closeIDs(ctx, tx, ids, startedAt, runID, Patched,
+				func(q *bun.UpdateQuery) *bun.UpdateQuery {
+					return q.Set("stated_by = NULL").Set("moved_to = ?", "").
+						Set("suppressed_by = ?", claimID).Set("claimed_by = ?", claimID)
+				}); err != nil {
 				return fmt.Errorf("close %d patched findings: %w", len(ids), err)
 			}
 		}
@@ -851,6 +754,91 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		return Reranked(ctx, tx, interned.Moved(), startedAt, targetID)
 	})
 	return applied, err
+}
+
+// arrivedAs is how a finding first seen closed for one reason is recorded,
+// and how a row already recorded closed for it is pointed at what closes it
+// now. By is what closes it: the claim that patches it, the record's lines,
+// or the supplier's statement.
+type arrivedAs[By comparable] struct {
+	reason Closure
+	// by is what closes the finding wanted at k.
+	by func(k key) By
+	// set writes it onto a row being recorded.
+	set func(f *Finding, by By)
+	// same reports whether a row already recorded closed for this reason
+	// names it.
+	same func(was Finding, by By) bool
+	// repoint writes it onto rows already recorded.
+	repoint func(q *bun.UpdateQuery, by By) *bun.UpdateQuery
+	// recording and repointing name the two writes in an error, each with
+	// the number of rows.
+	recording, repointing string
+}
+
+// recordArrived records, closed, each finding first seen closed for one
+// reason, and answers how many it recorded.
+//
+// Recorded once. Where the latest row at that place already closed for the
+// reason, nothing is recorded, and the row is pointed at what closes it now
+// where that moved. Never open, so never due.
+func recordArrived[By comparable](ctx context.Context, tx bun.IDB, keys []key,
+	wanted, latest map[key]Finding, as arrivedAs[By], startedAt time.Time, runID int64) (int, error) {
+
+	var recording []Finding
+	repointing := map[By][]int64{}
+	for _, k := range keys {
+		f := wanted[k]
+		by := as.by(k)
+		if was, recorded := latest[k]; recorded && was.ClosedBecause == as.reason {
+			if !as.same(was, by) {
+				repointing[by] = append(repointing[by], was.ID)
+			}
+			continue
+		}
+		f.ClosedAt = &startedAt
+		f.ClosedRunID = &runID
+		f.ClosedBecause = as.reason
+		as.set(&f, by)
+		f.DueAt = nil
+		recording = append(recording, f)
+	}
+	if len(recording) > 0 {
+		if err := database.InBatches(ctx, tx, recording); err != nil {
+			return 0, fmt.Errorf(as.recording+": %w", len(recording), err)
+		}
+	}
+	for by, ids := range repointing {
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := as.repoint(tx.NewUpdate().Model((*Finding)(nil)), by).
+				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return 0, fmt.Errorf(as.repointing+": %w", len(ids), err)
+		}
+	}
+	return len(recording), nil
+}
+
+// closeIDs closes open findings for one reason, writing what rest adds beside
+// it.
+//
+// Dated at the run's own moment, which is what the opening side dates a
+// finding by: a finding's life is measured against the runs that observed it,
+// not against when the write happened to land. The run stays beside it as
+// provenance, and is what "what did this run change" is counted by.
+func closeIDs(ctx context.Context, tx bun.IDB, ids []int64, startedAt time.Time, runID int64,
+	reason Closure, rest func(*bun.UpdateQuery) *bun.UpdateQuery) error {
+
+	return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		_, err := rest(tx.NewUpdate().Model((*Finding)(nil)).
+			Set("closed_at = ?", startedAt).
+			Set("closed_run_id = ?", runID).
+			Set("closed_because = ?", reason)).
+			Where("id IN (?)", bun.List(batch)).Exec(ctx)
+		return err
+	})
 }
 
 // latestClosed reads the most recent closed row of these issues, at each
@@ -925,7 +913,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 //
 // Everything else is what makes it that finding rather than another, and
 // comparing something no update writes would count the finding as changed
-// every night and move its last change forward with nothing having moved.
+// every night and write it with nothing having moved.
 func same(held heldFinding, found Finding) bool {
 	return held.FixState == found.FixState &&
 		held.FixedIn == found.FixedIn &&
