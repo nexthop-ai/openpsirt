@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/uptrace/bun"
 )
@@ -51,16 +52,22 @@ const GroupedAcross = "st.product_id, " + GroupedOn
 // was derived from, so they do not vary within a fold in any way a person can
 // see — but the key folds capitals and the column does not, so grouping on
 // them as well could split a fold that two producers spelled differently.
-const (
-	SourceName = `CASE WHEN COALESCE(c.upstream_name, '') <> '' THEN c.upstream_name
+const SourceName = `CASE WHEN COALESCE(c.upstream_name, '') <> '' THEN c.upstream_name
 		ELSE c.name END`
-	// The two fall back independently, which is the rule
-	// ComponentUpstreamExpr already applies to the version a decision expires
-	// on. One fold and one expiry disagreeing about which version a component
-	// is at is the shape worth not having.
-	SourceVersion = `CASE WHEN COALESCE(c.upstream_version, '') <> ''
-		THEN c.upstream_version ELSE c.version END`
-)
+
+// SourceVersion falls back independently of SourceName, through the same
+// expression the version a decision expires on is read with: one fold and one
+// expiry disagreeing about which version a component is at is the shape worth
+// not having.
+var SourceVersion = upstreamVersionOf("c")
+
+// upstreamVersionOf is the version a component joined under the alias given
+// is at: the upstream version it states, and its own where it states none.
+// ComponentUpstreamExpr is this over "c" and ConsumerUpstreamExpr over "uc",
+// spelled as constants because other constants are built from them.
+func upstreamVersionOf(alias string) string {
+	return strings.ReplaceAll(ComponentUpstreamExpr, "c.", alias+".")
+}
 
 // PerFold puts one of those expressions under an aggregate, for a query that
 // groups on the fold. MIN rather than MAX for no reason beyond having to pick

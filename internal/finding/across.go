@@ -264,8 +264,7 @@ func FoldsNamed(ctx context.Context, db bun.IDB, targets []int64, name, version 
 }
 
 // sourceVersionOf is SourceVersion over the component joined as "cn".
-const sourceVersionOf = `CASE WHEN COALESCE(cn.upstream_version, '') <> ''
-	THEN cn.upstream_version ELSE cn.version END`
+var sourceVersionOf = upstreamVersionOf("cn")
 
 func foldsNamed(db bun.IDB, targets []int64, name string) *bun.SelectQuery {
 	q := db.NewSelect().

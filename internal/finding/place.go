@@ -33,6 +33,28 @@ const (
 	ConsumerUpstreamExpr  = "COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')"
 )
 
+// inFoldOf narrows a read of findings `f` to the places one judgment about an
+// issue at a component in a build covers: every decidable place of the issue
+// in the component's fold, at the visibilities given.
+//
+// The fold rather than the one component named. One judgment covers the whole
+// fold, with no narrowing within it: curl and libcurl4t64 are one source
+// package, so a decision about the issue in one of them is a decision about it
+// in both, and offering the places of one binary alone would let somebody
+// answer a third of the work and read as having answered it.
+func inFoldOf(targetID, vulnerabilityID, componentID int64,
+	visible []access.Visibility) func(*bun.SelectQuery) *bun.SelectQuery {
+
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("f.target_id = ?", targetID).
+			Where("f.vulnerability_id = ?", vulnerabilityID).
+			Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
+				componentID).
+			Where(Decidable).
+			Where("f.visibility IN (?)", bun.List(visible))
+	}
+}
+
 // ErrNoOpenFinding is a place, or a component in a build, where nothing is
 // open against the issue asked about. A sentinel, so a caller can tell it from
 // a read that could not be made.
@@ -462,18 +484,7 @@ func (s *Store) PlacesFor(ctx context.Context, subject access.Subject, targetID 
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`COALESCE(f.fixed_in, '') AS "fixed_in"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		// The fold rather than the one component named. One judgment covers
-		// the whole fold, with no narrowing within it: curl and libcurl4t64
-		// are one source package, so a decision about the issue in one of them
-		// is a decision about it in both — and offering the places of one
-		// binary alone would let somebody answer a third of the work and read
-		// as having answered it.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
-			componentID).
-		Where(Decidable).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
 		OrderExpr("consumer, place_identity, component_upstream, consumer_upstream").
 		Scan(ctx, &rows)
 	if err != nil {

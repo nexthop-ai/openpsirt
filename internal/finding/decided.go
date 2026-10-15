@@ -197,8 +197,7 @@ func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQu
 // of a consumer that is not there, so it is compared as such rather than
 // looked up.
 var coversAsked = func() string {
-	component := "COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr
-	consumer := "COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr
+	component, consumer := componentMatches, consumerMatches
 	covers := strings.NewReplacer(
 		component, `EXISTS (SELECT 1 FROM "component" AS "c"
 			WHERE c.id = f2.component_id AND `+component+`)`,

@@ -71,8 +71,6 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where("f.closed_at IS NULL").
 			Where(finding.DecisionAtPlace("f"))
 	}
-	matching := "COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr +
-		" AND COALESCE(de.consumer_upstream_version, '') = " + finding.ConsumerUpstreamExpr
 
 	// Any open finding in the decision's product, in any build, still at the
 	// versions it was decided about.
@@ -87,7 +85,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where("st.product_id = de.product_id").
 			Where("f.closed_at IS NULL").
 			Where(finding.DecisionAtPlace("f")).
-			Where(matching)
+			Where(finding.VersionsMatch)
 	}
 
 	// Still found here, at versions that are not the ones this was decided
@@ -110,7 +108,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				TableExpr(`"target" AS "tg"`).
 				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 				Where("tg.id = ?", targetID)).
-			Where("EXISTS (?)", openHere(db).Where("NOT ("+matching+")")).
+			Where("EXISTS (?)", openHere(db).Where("NOT ("+finding.VersionsMatch+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
 			OrderExpr("de.id").
 			Limit(database.InBulk.Most)

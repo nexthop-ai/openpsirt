@@ -528,6 +528,54 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	return doc, nil
 }
 
+// closedInBuild is the components of a build whose findings closed for the
+// reason given and that a statement is still made about, one row per issue,
+// name and package identifier, at the visibilities given and up to one past
+// the ceiling, so that reaching it is distinguishable from landing on it. The
+// caller adds what the closure itself still has to hold.
+//
+// The row read beside each is the lowest, which names the same row on every
+// engine, and is read rather than aggregated: a time read through an
+// aggregate comes back as text on one engine and a time on another.
+func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
+	because finding.Closure) *bun.SelectQuery {
+
+	return s.idb().NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(nodeJoin).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		ColumnExpr(`v.id AS "vulnerability_id"`).
+		ColumnExpr(`v.identifier AS "identifier"`).
+		ColumnExpr(`c.name AS "component"`).
+		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
+		ColumnExpr(`MIN(f.id) AS "first"`).
+		Where("f.target_id = ?", targetID).
+		Where("f.closed_because = ?", because).
+		Where("f.visibility IN (?)", bun.List(visible)).
+		Where(stillShips).
+		Where(noneOpenByNameAndPurl).
+		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
+		Limit(s.carrying() + 1)
+}
+
+// stillShips says the component of a finding `f` is still in its build.
+const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
+	WHERE n.target_id = f.target_id AND n.component_id = f.component_id
+		AND n.closed_scan_id IS NULL)`
+
+// noneOpenByNameAndPurl says no place of the issue in a finding `f`'s build is
+// open at a component `c` of the same name and package identifier.
+//
+// Asked of the name and package identifier the statement is made about, which
+// may be several components: one at a version a patch does not reach is
+// affected, and a statement naming both would say otherwise.
+const noneOpenByNameAndPurl = `NOT EXISTS (SELECT 1 FROM "finding" AS "o"
+	JOIN "component" AS "oc" ON oc.id = o.component_id
+	WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
+		AND o.closed_at IS NULL AND oc.name = c.name
+		AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`
+
 // fixedByPatch is an issue a patch the build declares has fixed in one
 // component.
 type fixedByPatch struct {
@@ -561,37 +609,9 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.idb().NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(nodeJoin).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+	err := s.closedInBuild(targetID, visible, finding.Patched).
 		Join(`JOIN "suppression" AS "sup" ON sup.id = f.suppressed_by`).
-		ColumnExpr(`v.id AS "vulnerability_id"`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
-		// The row the date is read from. A time read through an aggregate
-		// comes back as text on one engine and a time on another.
-		ColumnExpr(`MIN(f.id) AS "first"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_because = ?", finding.Patched).
-		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("sup.closed_scan_id IS NULL").
-		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
-			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
-				AND n.closed_scan_id IS NULL)`).
-		// Asked of the name and package identifier the statement is made
-		// about, which may be several components: one at a version the
-		// patch does not reach is affected, and a statement naming both would
-		// say otherwise.
-		Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
-			JOIN "component" AS "oc" ON oc.id = o.component_id
-			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
-				AND o.closed_at IS NULL AND oc.name = c.name
-				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
-		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
-		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what the build's patches fix: %w", err)
@@ -700,41 +720,17 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Purl            string `bun:"purl"`
 		First           int64  `bun:"first"`
 	}
-	err := s.idb().NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(nodeJoin).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
 		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
-		ColumnExpr(`v.id AS "vulnerability_id"`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
-		// The row the statement and the date are read from: the lowest, so
-		// every engine names the same one.
-		ColumnExpr(`MIN(f.id) AS "first"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_because = ?", finding.Disclaimed).
-		Where("f.visibility IN (?)", bun.List(visible)).
 		Where("ss.superseded_at IS NULL").
 		// What the place holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
 		Where(finding.LatestAtItsPlace).
-		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "n"
-			WHERE n.target_id = f.target_id AND n.component_id = f.component_id
-				AND n.closed_scan_id IS NULL)`).
-		Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
-			JOIN "component" AS "oc" ON oc.id = o.component_id
-			WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
-				AND o.closed_at IS NULL AND oc.name = c.name
-				AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`).
-		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
 		// One supplier's statement and no other. Two suppliers answering
 		// places of one component each spoke for their own product, and the
 		// format names the component once: credited to either, the document
 		// says one of them spoke for the other's.
 		Having("COUNT(DISTINCT f.stated_by) = 1").
-		Limit(s.carrying()+1).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)

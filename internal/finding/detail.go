@@ -622,16 +622,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// produced it.
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.opened_run_id AS "opened_run_id"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		// The fold rather than the one component named. One judgment covers
-		// the whole fold, so the screen a judgment is made from has to show
-		// the whole of what it would answer — a form that recorded twelve
+		// The places one judgment covers, so the screen a judgment is made from
+		// shows the whole of what it would answer: a form that recorded twelve
 		// places having shown six is a form nobody can trust.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE c2.id = ?)`,
-			componentID).
-		Where(Decidable).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
 		OrderExpr("f.urgency DESC, component, consumer").
 		Scan(ctx, &rows)
 	if err != nil {

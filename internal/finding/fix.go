@@ -518,7 +518,7 @@ func (s *Store) foldOf(ctx context.Context, db bun.IDB, componentID int64) (key,
 	err = db.NewSelect().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`COALESCE(NULLIF(c.upstream_version, ''), c.version, '') AS "from_version"`).
+		ColumnExpr(ComponentUpstreamExpr+` AS "from_version"`).
 		Where("c.id = ?", componentID).Scan(ctx, &row)
 	if err != nil {
 		return "", "", fmt.Errorf("read what that component folds to: %w", err)

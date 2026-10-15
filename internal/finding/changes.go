@@ -59,23 +59,15 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 	}
 	// One statement per direction rather than one per run: a page of fifty
 	// receipts would otherwise be a hundred round trips to fill two columns.
-	count := func(column string, into func(*Change, int)) error {
+	count := func(column runColumn, into func(*Change, int)) error {
 		var rows []struct {
 			RunID int64 `bun:"run_id"`
 			Count int   `bun:"count"`
 		}
-		// Grouped over a distinct inner select rather than COUNT DISTINCT over
-		// two columns, which not every engine takes.
-		inner := s.db.NewSelect().
-			Distinct().
-			TableExpr(`"finding" AS "f"`).
-			ColumnExpr("f."+column+` AS "run_id"`).
-			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-			ColumnExpr(`f.component_id AS "component_id"`).
-			Where("f.target_id = ?", targetID).
-			Where("f."+column+" IN (?)", bun.List(runIDs)).
-			Where("f.visibility IN (?)", bun.List(visible)).
-			Where(wasOpen)
+		inner, run := runChanged(s.db, targetID, column, visible)
+		inner = inner.
+			ColumnExpr(run+` AS "run_id"`).
+			Where(run+" IN (?)", bun.List(runIDs))
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr(`changed.run_id AS "run_id"`).
@@ -93,10 +85,10 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 		return nil
 	}
 
-	if err := count("opened_run_id", func(c *Change, n int) { c.Opened = n }); err != nil {
+	if err := count(openedByRun, func(c *Change, n int) { c.Opened = n }); err != nil {
 		return nil, err
 	}
-	if err := count("closed_run_id", func(c *Change, n int) { c.Closed = n }); err != nil {
+	if err := count(closedByRun, func(c *Change, n int) { c.Closed = n }); err != nil {
 		return nil, err
 	}
 	return out, nil

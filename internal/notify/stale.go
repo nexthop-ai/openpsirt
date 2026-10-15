@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -69,25 +71,13 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		Rows        int       `bun:"rows_written"`
 		PrivateRows int       `bun:"private_rows"`
 	}
-	err = w.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.proposed_by AS "proposed_by"`).
+	err = claimRollup(w.db, "rows_written").
 		ColumnExpr(`MIN(de.id) AS "decision_id"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(de.proposed_at) AS "proposed_at"`).
-		ColumnExpr(`COUNT(*) AS "rows_written"`).
-		// Counted rather than taken from an aggregate over the word itself. A
-		// visibility is a name and MIN over names would be answering "is any
-		// of this private" by alphabetical accident.
-		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.needs_approval = ?", true).
 		Where("de.sent_back_at IS NULL").
 		Where("de.proposed_at <= ?", since).
-		GroupExpr("de.claim_id, de.product_id, de.proposed_by").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is waiting on a second person: %w", err)
@@ -232,20 +222,11 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		Rows        int       `bun:"rows_written"`
 		PrivateRows int       `bun:"private_rows"`
 	}
-	err = w.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.proposed_by AS "proposed_by"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
+	err = claimRollup(w.db, "rows_written").
 		ColumnExpr(`MIN(de.sent_back_at) AS "sent_back_at"`).
-		ColumnExpr(`COUNT(*) AS "rows_written"`).
-		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		Where("de.state = ?", triage.Proposed).
 		Where("de.sent_back_at IS NOT NULL").
 		Where("de.sent_back_at <= ?", since).
-		GroupExpr("de.claim_id, de.product_id, de.proposed_by").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what was sent back and left: %w", err)
@@ -281,6 +262,27 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 	return out, nil
 }
 
+// claimRollup is every decision row read as one row per claim, product and
+// proposer: the product's name, how many rows the claim wrote there under the
+// alias given, and how many of them are undisclosed. Each sweep adds the
+// conditions and the columns of its own.
+//
+// The undisclosed rows are counted rather than taken from an aggregate over
+// the word itself. A visibility is a name, and MIN over names would answer "is
+// any of this private" by alphabetical accident.
+func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
+	return db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`de.proposed_by AS "proposed_by"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
+		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
+		GroupExpr("de.claim_id, de.product_id, de.proposed_by")
+}
+
 // deferralsEnding is every standing deferral whose date is coming, against the
 // person who asked for it.
 //
@@ -294,9 +296,6 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	if err != nil {
 		return nil, fmt.Errorf("read how much warning a deferral gets: %w", err)
 	}
-	if lead <= 0 {
-		return nil, nil
-	}
 	now := time.Now().UTC()
 	standing, held := finding.InForce()
 
@@ -309,18 +308,10 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		Places      int       `bun:"places"`
 		PrivateRows int       `bun:"private_rows"`
 	}
-	err = w.db.NewSelect().
-		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+	err = claimRollup(w.db, "places").
 		// The argument, which is where the date lives.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.proposed_by AS "proposed_by"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(cl.deferred_until) AS "until"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
 		// its author's to re-affirm, and they were told when it lapsed.
@@ -333,7 +324,6 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		Where("cl.deferred_until IS NOT NULL").
 		Where("cl.deferred_until > ?", now).
 		Where("cl.deferred_until <= ?", now.Add(lead)).
-		GroupExpr("de.claim_id, de.product_id, de.proposed_by").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which deferrals are running out: %w", err)

@@ -3,7 +3,11 @@
 
 package database
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/uptrace/bun"
+)
 
 // LikeEscape is the escape character every LIKE predicate here states.
 //
@@ -52,4 +56,23 @@ func LikeEscaped(value string) string {
 // copy — which is written down beside the callers it still applies to.
 func LikeContains(term string) string {
 	return "%" + LikeEscaped(strings.ToLower(term)) + "%"
+}
+
+// LikeNameOrShown narrows a query to the rows whose name, or the name they are
+// shown by, holds a term somebody typed: matched without regard to capitals
+// and escaped, as LikeContains prepares it. The shown name falls back to the
+// name where it is empty, which is what a person sees. A blank term narrows
+// nothing.
+//
+// The columns are identifiers, quoted where they are placed.
+func LikeNameOrShown(q *bun.SelectQuery, name, shown bun.Ident, term string) *bun.SelectQuery {
+	wanted := strings.TrimSpace(term)
+	if wanted == "" {
+		return q
+	}
+	like := LikeContains(wanted)
+	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.WhereOr("LOWER(?) LIKE ?"+LikeClause, name, like).
+			WhereOr("LOWER(COALESCE(NULLIF(?, ''), ?)) LIKE ?"+LikeClause, shown, name, like)
+	})
 }

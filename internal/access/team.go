@@ -231,20 +231,11 @@ func (s *Store) CountTeams(ctx context.Context, term string) (int, error) {
 // narrowTeams is the team listing's own matching, spelled once so the listing
 // and the count of it cannot come to narrow differently.
 func narrowTeams(query *bun.SelectQuery, term string) *bun.SelectQuery {
-	query = query.Where("retired_at IS NULL")
-	wanted := strings.TrimSpace(term)
-	if wanted == "" {
-		return query
-	}
 	// Matched without regard to capitals, the way every name a person types is
 	// matched here, and escaped: a search box is not a pattern language, and a
 	// term of "%" would answer with every team there is.
-	like := database.LikeContains(wanted)
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr(`LOWER("name") LIKE ?`+database.LikeClause, like).
-			WhereOr(`LOWER(COALESCE(NULLIF("display_name", ''), "name")) LIKE ?`+
-				database.LikeClause, like)
-	})
+	return database.LikeNameOrShown(query.Where("retired_at IS NULL"),
+		bun.Ident("name"), bun.Ident("display_name"), term)
 }
 
 // RetireTeam takes a team out of use. Its membership goes with it — the team

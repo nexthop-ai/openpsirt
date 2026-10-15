@@ -27,3 +27,17 @@ func TestTheVersionMatchUnderAnotherAliasIsTheSameRule(t *testing.T) {
 		}
 	}
 }
+
+// The version a component is at reads the same under every alias, and the two
+// constants other constants are built from are that expression over theirs.
+func TestTheUpstreamVersionIsOneExpressionUnderEveryAlias(t *testing.T) {
+	if got := upstreamVersionOf("c"); got != ComponentUpstreamExpr {
+		t.Errorf("over c the version reads %q, want %q", got, ComponentUpstreamExpr)
+	}
+	if got := upstreamVersionOf("uc"); got != ConsumerUpstreamExpr {
+		t.Errorf("over uc the version reads %q, want %q", got, ConsumerUpstreamExpr)
+	}
+	if got, want := upstreamVersionOf("cp"), "COALESCE(NULLIF(cp.upstream_version, ''), cp.version, '')"; got != want {
+		t.Errorf("over cp the version reads %q, want %q", got, want)
+	}
+}

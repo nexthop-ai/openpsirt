@@ -166,8 +166,7 @@ var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
 	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
 	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
 	` AND ` + finding.DecisionAtPlace("fc") +
-	` AND COALESCE(de.component_upstream_version, '') = ` + finding.ComponentUpstreamExpr +
-	` AND COALESCE(de.consumer_upstream_version, '') = ` + finding.ConsumerUpstreamExpr + `)`
+	` AND ` + finding.VersionsMatch + `)`
 
 // ratedWorseGroup is the standing rows of one claim about one issue in one
 // product that share a baseline, with the rating in force there now.

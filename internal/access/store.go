@@ -1154,16 +1154,7 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 // narrowToTerm is the picker's own matching, spelled once so the page and the
 // count of it cannot come to narrow differently.
 func narrowToTerm(query *bun.SelectQuery, term string) *bun.SelectQuery {
-	wanted := strings.TrimSpace(term)
-	if wanted == "" {
-		return query
-	}
-	like := database.LikeContains(wanted)
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr("LOWER(p.identity) LIKE ?"+database.LikeClause, like).
-			WhereOr("LOWER(COALESCE(NULLIF(p.display_name, ''), p.identity)) LIKE ?"+
-				database.LikeClause, like)
-	})
+	return database.LikeNameOrShown(query, bun.Ident("p.identity"), bun.Ident("p.display_name"), term)
 }
 
 // CountWhoCanRead is how many the picker has to choose from in all.

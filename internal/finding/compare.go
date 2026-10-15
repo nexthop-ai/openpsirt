@@ -402,7 +402,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			// issue, so that row still names it. Upstream where there is one,
 			// because that is the version the match was made against and the
 			// one a fix version is comparable to.
-			ColumnExpr(`COALESCE(NULLIF(cp.upstream_version, ''), cp.version) AS "from_version"`).
+			ColumnExpr(upstreamVersionOf("cp")+` AS "from_version"`).
 			ColumnExpr(`COALESCE(f.moved_to, '') AS "moved_to"`).
 			ColumnExpr(`COALESCE(f.closed_run_id, 0) AS "closed_run"`).
 			Where("f.target_id = ?", targetID).

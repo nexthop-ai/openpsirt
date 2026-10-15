@@ -114,9 +114,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Join(`JOIN "product" AS "pr" ON pr.id = st.product_id`).
 		ColumnExpr(`de.id AS "decision_id"`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr("CASE WHEN COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr+
-			" AND COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr+
-			` THEN 1 ELSE 0 END AS "exact"`).
+		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		Apply(catalog.BuildNames("pr", "st", "va")).

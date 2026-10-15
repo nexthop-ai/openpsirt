@@ -30,9 +30,20 @@ import (
 // Exported because the same question is asked outside this package: what is
 // undecided is what the notification sweep means by work sitting still, and a
 // second spelling of it would be a second definition of "decided".
-const KeyMatches = "(cl.outcome = '" + OutcomeMismatched + "' OR (" +
-	"COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr +
-	" AND COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
+const KeyMatches = "(cl.outcome = '" + OutcomeMismatched + "' OR (" + VersionsMatch + "))"
+
+// VersionsMatch says a decision row `de` was written against the versions a
+// finding's component `c` and consumer `uc` hold now, which is the half of
+// KeyMatches every outcome but a wrong match is held to. A decision stores no
+// version where nothing stated one, and the finding's expression reads that as
+// empty, so the two absences compare as the same absence.
+const VersionsMatch = componentMatches + " AND " + consumerMatches
+
+// componentMatches and consumerMatches are the two halves of VersionsMatch.
+const (
+	componentMatches = "COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr
+	consumerMatches  = "COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr
+)
 
 // keyMatchesOn is KeyMatches over a decision under another alias, with the
 // claim's outcome given as an expression, for a statement that asks it before
