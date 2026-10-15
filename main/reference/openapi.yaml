@@ -12079,6 +12079,8 @@ info:
     Track vulnerabilities in the products you ship.
 
     A request carrying a query parameter the operation does not take is refused with a 400 naming the parameter.
+
+    A NUL character is refused with a 400 naming the input that held it: a query parameter, a path value, a form field, or a string or key in a JSON body. The contents of an uploaded file are not checked.
   title: OpenPSIRT
   version: dev
 openapi: 3.1.0

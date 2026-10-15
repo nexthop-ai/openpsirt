@@ -2082,7 +2082,7 @@ read.</p>
 </tr>
 <tr>
 <td>A PostgreSQL query pair cannot be read</td>
-<td>Refused at startup. The driver drops it, so the mode it held is replaced by the driver's default</td>
+<td>Refused at startup, naming the setting</td>
 </tr>
 <tr>
 <td>The URL asks for cleartext</td>
@@ -3918,6 +3918,14 @@ v0.5.0's schema in one step and carries none of the upgrades before it.</p>
 <tr>
 <td>A claim in a build is keyed on its explanation. A build that changes only the explanation closes the claim and opens a new one. v0.8.0 kept the first explanation and wrote nothing</td>
 <td>Nothing. The upgrade keys every stored claim on its explanation, so nothing closes on the first scan after it</td>
+</tr>
+<tr>
+<td>A NUL character in a query parameter, a path value, a form field, or a string or key in a JSON body is refused with a 400 naming the input. v0.8.0 dropped it from most inputs</td>
+<td>A client sending one sends the text without it. The contents of an uploaded file are not checked</td>
+</tr>
+<tr>
+<td>The query of a PostgreSQL <code>OPENPSIRT_DATABASE_URL</code> is read the way <code>libpq</code> reads it. A <code>+</code> is a plus sign, where v0.8.0 read it as a space. A raw space, an <code>=</code> inside a value, or a <code>%</code> not followed by two hex digits is refused at startup, where v0.8.0 dropped the pair or read it. A key given twice takes its last value, where v0.8.0 took its first</td>
+<td>Percent-encode each of them in a value: a space as <code>%20</code>, <code>=</code> as <code>%3D</code>, <code>%</code> as <code>%25</code>. <code>options=-c%20statement_timeout%3D5000</code>, not <code>options=-c+statement_timeout=5000</code>, and a base64 password parameter ending <code>==</code> as <code>%3D%3D</code>. Give each key once</td>
 </tr>
 <tr>
 <td>A component's name, version and package identifier are held without control characters. A stored component with one in any of them is a different component on the next scan</td>
