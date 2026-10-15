@@ -89,13 +89,7 @@ func TestAnUnstatedLifetimeTakesTheDefault(t *testing.T) {
 	// which lands on the default rather than on a session that never ends.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "someone", "Someone", f.products["sonic"], access.PublicRead)
 		for _, stated := range []time.Duration{0, -time.Minute, -time.Hour * 1000} {
 			issued, err := f.store.StartSession(ctx, person.ID, stated)
 			if err != nil {

@@ -307,13 +307,7 @@ func TestAnAuthorizationNobodyRedeemedStopsBeingRedeemable(t *testing.T) {
 	// anybody who wants those roles.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "alice", "Alice", f.products["sonic"], access.PublicRead)
 		// Written with a window that has already run out by the time anybody
 		// arrives holding the name.
 		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, person.ID, "alice"); err != nil {
@@ -489,13 +483,7 @@ func TestAProxyChargesTheSameWindowAsAProvider(t *testing.T) {
 	// start, which restarts the window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "alice", "Alice", f.products["sonic"], access.PublicRead)
 		if err := f.store.ClaimingWithin(time.Nanosecond).Claim(ctx, person.ID, "alice"); err != nil {
 			t.Fatal(err)
 		}

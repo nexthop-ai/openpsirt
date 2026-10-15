@@ -89,15 +89,9 @@ func TestAnEstateRoleCoversAProductDeclaredLater(t *testing.T) {
 func TestWithdrawingAnEstateRoleLeavesNothingBehind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "the-security-team", "The Security Team", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
 		// One product held in its own right, so what comes back is the
 		// per-product grant rather than everything or nothing.
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "the-security-team", "The Security Team", f.products["sonic"], access.PublicRead)
 		if err := f.store.GrantEstateRole(ctx, person.ID, access.PrivateRead); err != nil {
 			t.Fatal(err)
 		}

@@ -315,13 +315,7 @@ func TestSwitchingToGroupBoundSetsAssignmentsAsideRatherThanDeletingThem(t *test
 	// how the team actually divides work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		holding(t, f, "someone", "Someone", f.products["sonic"], access.PublicRead)
 
 		if err := f.store.SwitchTo(ctx, access.GroupBound); err != nil {
 			t.Fatal(err)

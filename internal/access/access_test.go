@@ -35,6 +35,24 @@ type fixture struct {
 	variants map[string]int64
 }
 
+// holding is somebody holding the given roles on one product.
+func holding(t *testing.T, f *fixture, identity, displayName string, product int64,
+	roles ...access.Role) *access.Account {
+
+	t.Helper()
+	ctx := t.Context()
+	person, err := f.store.Ensure(ctx, identity, displayName, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range roles {
+		if err := f.store.GrantRole(ctx, person.ID, product, role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return person
+}
+
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -107,13 +125,7 @@ func TestAuthenticatingCreatesNobody(t *testing.T) {
 func TestARoleOnOneProductSaysNothingAboutAnother(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "reader", "Reader", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		holding(t, f, "reader", "Reader", f.products["sonic"], access.PublicRead)
 
 		subject, err := f.store.Resolve(ctx, "reader")
 		if err != nil {

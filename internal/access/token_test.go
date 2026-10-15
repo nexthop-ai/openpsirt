@@ -18,13 +18,7 @@ import (
 func holder(t *testing.T, f *fixture) (*access.Account, string) {
 	t.Helper()
 	ctx := t.Context()
-	person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-		t.Fatal(err)
-	}
+	person := holding(t, f, "someone", "Someone", f.products["sonic"], access.PublicRead)
 	if err := f.store.GrantRole(ctx, person.ID, f.products["onie"], access.PublicRead); err != nil {
 		t.Fatal(err)
 	}
@@ -557,15 +551,9 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "scripted", "Scripted", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
 		// Assigned on one product and derived on the other, so that what the
 		// window takes away is distinguishable from the token simply failing.
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "scripted", "Scripted", f.products["sonic"], access.PublicRead)
 		derived := access.Grant{
 			PersonID: person.ID, ProductID: f.products["onie"],
 			Role: access.PublicRead, Source: access.Derived, Active: true,
@@ -676,16 +664,10 @@ func TestATokenCarriesOnlyTheRolesItWasMintedFor(t *testing.T) {
 func TestAReadingTokenCannotWriteOnItsOwnersCase(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "collab", "Collab", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
 		// A case and nothing else, which is the shape that writes without a
 		// role. A reading role beside it so the narrowing has something to
 		// keep.
-		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
+		person := holding(t, f, "collab", "Collab", f.products["sonic"], access.PublicRead)
 		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "SONIC-2026-8100", Severity: "high"},
 		})

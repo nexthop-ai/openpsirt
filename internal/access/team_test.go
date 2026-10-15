@@ -48,13 +48,23 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 		}
 
 		for _, who := range []int64{cleared.ID, plain.ID} {
-			if _, err := f.store.AddToTeam(ctx, team.ID, who, admin.ID); err != nil {
+			added, err := f.store.AddToTeam(ctx, team.ID, who, admin.ID)
+			if err != nil {
 				t.Fatal(err)
 			}
+			if !added {
+				t.Errorf("putting person %d on the team reports nothing changed", who)
+			}
 		}
-		// Said twice, it asserts the same thing.
-		if _, err := f.store.AddToTeam(ctx, team.ID, plain.ID, admin.ID); err != nil {
+		// Said twice, it asserts the same thing, and reports that nothing
+		// changed: the report is what keeps a second membership out of the
+		// trail.
+		added, err := f.store.AddToTeam(ctx, team.ID, plain.ID, admin.ID)
+		if err != nil {
 			t.Errorf("adding somebody already on the team was refused: %v", err)
+		}
+		if added {
+			t.Error("adding somebody already on the team reports a membership begun")
 		}
 		members, err := f.store.MembersOf(ctx, team.ID)
 		if err != nil {
