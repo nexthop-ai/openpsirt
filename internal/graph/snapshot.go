@@ -311,6 +311,71 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 	return described, nil
 }
 
+// Stated is what a build states for each of these components, as
+// CurrentComponents gives it to the scanner: the identifiers and the source
+// package from the build's latest node holding the component, open or closed,
+// with what it left out filled from other builds of the same product. A
+// component the build never held is absent from the answer.
+//
+// Claim matching and a closing finding's explanation read this, so a claim is
+// matched against what the scanner was given and never against the component
+// row, which holds whichever report first described the component.
+func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64) (map[int64]Described, error) {
+	out := make(map[int64]Described, len(componentIDs))
+	if len(componentIDs) == 0 {
+		return out, nil
+	}
+	err := database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
+		var rows []struct {
+			ComponentID     int64  `bun:"component_id"`
+			Purl            string `bun:"purl"`
+			CPE             string `bun:"cpe"`
+			UpstreamName    string `bun:"upstream_name"`
+			UpstreamVersion string `bun:"upstream_version"`
+		}
+		err := s.db.NewSelect().
+			TableExpr(`"graph_node" AS "n"`).
+			ColumnExpr(`n.component_id AS "component_id"`).
+			ColumnExpr(`n.purl AS "purl"`).
+			ColumnExpr(`n.cpe AS "cpe"`).
+			ColumnExpr(`n.upstream_name AS "upstream_name"`).
+			ColumnExpr(`n.upstream_version AS "upstream_version"`).
+			Where("n.target_id = ?", targetID).
+			Where("n.component_id IN (?)", bun.List(batch)).
+			OrderExpr("n.opened_scan_id, n.id").
+			Scan(ctx, &rows)
+		if err != nil {
+			return err
+		}
+		// Ordered earliest first, so the latest node is the one left.
+		for _, row := range rows {
+			out[row.ComponentID] = Described{
+				Purl: row.Purl, CPE: row.CPE,
+				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read what a build states for its components: %w", err)
+	}
+	held := make([]int64, 0, len(out))
+	for id := range out {
+		held = append(held, id)
+	}
+	others, err := s.statedInProduct(ctx, targetID, held)
+	if err != nil {
+		return nil, err
+	}
+	for id, stated := range out {
+		for _, other := range others[id] {
+			stated.FillFrom(other)
+		}
+		out[id] = stated
+	}
+	return out, nil
+}
+
 // statedInProduct is what the other builds of a target's product stated for
 // each of these components, earliest statement first. Only nodes that state
 // something are read.

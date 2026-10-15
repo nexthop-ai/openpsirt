@@ -282,3 +282,40 @@ func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
 		}
 	})
 }
+
+func TestABuildsSourceTreeClaimCoversABinaryAnotherProductDescribedFirst(t *testing.T) {
+	// The component row keeps the first report's description. Another product
+	// stating no source package for the binary leaves the row without one, so
+	// a claim matched against the row misses what this build's scanner was
+	// given from its own node.
+	each(t, func(t *testing.T, f *fixture) {
+		const purl = "pkg:deb/debian/libssl3@3.0.11-1"
+		bare := graph.Described{Purl: purl, Name: "libssl3", Version: "3.0.11-1"}
+		stated := graph.Described{Purl: purl + "?upstream=openssl", Name: "libssl3", Version: "3.0.11-1",
+			UpstreamName: "openssl", UpstreamVersion: "3.0.11"}
+		holding := func(d graph.Described) graph.Snapshot {
+			return graph.Snapshot{Root: root, Components: []graph.Described{d},
+				Dependencies: []graph.Dependency{{Parent: root, Child: d}}}
+		}
+		f.shippedTo(t, f.inAnotherProduct(t, "hedgehog"), holding(bare))
+		f.shipped(t, holding(stated))
+
+		claim := aClaim("CVE-2026-1", sbom.NotAffected, stated, sbom.FromStatement)
+		claim.Targets = []sbom.Target{{Name: "openssl"}}
+		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+			[]sbom.Suppression{claim}, everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", stated)}); err != nil {
+			t.Fatal(err)
+		}
+		open := f.open(t)
+		if len(open) != 1 {
+			t.Fatalf("%d findings open, want 1", len(open))
+		}
+		if open[0].SuppressedBy == nil {
+			t.Error("the build's claim about its source tree does not cover the binary it states was built from it")
+		}
+	})
+}

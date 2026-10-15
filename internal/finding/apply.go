@@ -507,7 +507,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, componentID := range movedFrom {
 			movedIDs = append(movedIDs, componentID)
 		}
-		before, err := componentsByID(ctx, tx, movedIDs)
+		before, err := componentsByID(ctx, tx, targetID, movedIDs)
 		if err != nil {
 			return err
 		}
@@ -545,7 +545,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				patchedBefore = append(patchedBefore, was.ComponentID)
 			}
 		}
-		carried, err := componentsByID(ctx, tx, patchedBefore)
+		carried, err := componentsByID(ctx, tx, targetID, patchedBefore)
 		if err != nil {
 			return err
 		}
@@ -729,7 +729,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, f := range closing {
 			gone = append(gone, f.ComponentID)
 		}
-		departed, err := componentsByID(ctx, tx, gone)
+		departed, err := componentsByID(ctx, tx, targetID, gone)
 		if err != nil {
 			return err
 		}
@@ -1305,11 +1305,13 @@ func upstreamOf(c graph.Component) string {
 	return c.Version
 }
 
-// componentsByID reads the components a set of findings was about.
+// componentsByID reads the components a set of a build's findings was about,
+// with what the build stated for each of them.
 //
 // Each component is asked for once. A kernel's findings name one component
 // thousands of times.
-func componentsByID(ctx context.Context, db bun.IDB, components []int64) (map[int64]graph.Component, error) {
+func componentsByID(ctx context.Context, db bun.IDB, targetID int64,
+	components []int64) (map[int64]graph.Component, error) {
 	if len(components) == 0 {
 		return nil, nil
 	}
@@ -1335,7 +1337,36 @@ func componentsByID(ctx context.Context, db bun.IDB, components []int64) (map[in
 	if err != nil {
 		return nil, fmt.Errorf("read what closing findings were about: %w", err)
 	}
+	if err := withStated(ctx, db, targetID, byID); err != nil {
+		return nil, err
+	}
 	return byID, nil
+}
+
+// withStated replaces each component's identifiers and source package with
+// what the build stated for it, which is what its scanner was given. The row
+// holds whichever report first described the component, in any product, so a
+// claim matched against the row and a finding matched against the build's
+// statement disagree.
+func withStated(ctx context.Context, db bun.IDB, targetID int64, byID map[int64]graph.Component) error {
+	ids := make([]int64, 0, len(byID))
+	for id := range byID {
+		ids = append(ids, id)
+	}
+	stated, err := graph.NewStore(db).Stated(ctx, targetID, ids)
+	if err != nil {
+		return err
+	}
+	for id, said := range stated {
+		c, ok := byID[id]
+		if !ok {
+			continue
+		}
+		c.Purl, c.CPE = said.Purl, said.CPE
+		c.UpstreamName, c.UpstreamVersion = said.UpstreamName, said.UpstreamVersion
+		byID[id] = c
+	}
+	return nil
 }
 
 // openComponents reads what a variant currently contains.
@@ -1348,6 +1379,16 @@ func openComponents(ctx context.Context, db bun.IDB, targetID int64) (inventory,
 		Scan(ctx)
 	if err != nil {
 		return inventory{}, fmt.Errorf("read what the variant contains: %w", err)
+	}
+	stated := make(map[int64]graph.Component, len(rows))
+	for _, row := range rows {
+		stated[row.ID] = row
+	}
+	if err := withStated(ctx, db, targetID, stated); err != nil {
+		return inventory{}, err
+	}
+	for i := range rows {
+		rows[i] = stated[rows[i].ID]
 	}
 
 	held := inventory{
