@@ -325,6 +325,98 @@ func (f *fixture) planner(t *testing.T, roles ...access.Role) access.Subject {
 		map[int64][]access.Role{f.productID: roles}, 0)
 }
 
+// applied runs one scan of the fixture's build reporting what is given, and
+// fails the test where the scan fails.
+func (f *fixture) applied(t *testing.T, reported ...finding.Reported) finding.Applied {
+	t.Helper()
+	got, err := f.store.Apply(t.Context(), f.target, f.run(t), reported)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+// foundOnLibnl is the scan most tests start from: one issue, on libnl.
+func (f *fixture) foundOnLibnl(t *testing.T) finding.Applied {
+	t.Helper()
+	return f.applied(t, found("CVE-2026-1", libnl))
+}
+
+// somebodyElse is a person to have proposed what a test records.
+func (f *fixture) somebodyElse(t *testing.T) int64 {
+	t.Helper()
+	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "somebody@example.com", "Them", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return person.ID
+}
+
+// decisionRow is one decision a test writes directly, as the triage store
+// would have written it. A zero field takes the value every writer here
+// shares; a nil version and an empty key leave their column unset.
+type decisionRow struct {
+	By int64
+	// Claim is the claim the row belongs to. Zero records a dismissal by By.
+	Claim int64
+	// Product is the fixture's product where zero.
+	Product int64
+	Issue   int64
+	Place   string
+	State   string
+	// Visibility is public where empty.
+	Visibility string
+	// Unreviewed is a decision that takes effect without a second person.
+	Unreviewed          bool
+	Component, Consumer *string
+	Key                 string
+	// ProposedAt is the moment of writing where zero.
+	ProposedAt      time.Time
+	SentBack, Ended *time.Time
+}
+
+// decision writes one decision row.
+func (f *fixture) decision(t *testing.T, d decisionRow) {
+	t.Helper()
+	if d.Claim == 0 {
+		d.Claim = claimBy(t, f.db, d.By)
+	}
+	if d.Product == 0 {
+		d.Product = f.productID
+	}
+	if d.Visibility == "" {
+		d.Visibility = "public"
+	}
+	if d.ProposedAt.IsZero() {
+		d.ProposedAt = time.Now().UTC()
+	}
+	row := map[string]any{
+		"claim_id": d.Claim, "product_id": d.Product, "vulnerability_id": d.Issue,
+		"place_identity": d.Place, "visibility": d.Visibility, "state": d.State,
+		"needs_approval": !d.Unreviewed, "proposed_by": d.By, "proposed_at": d.ProposedAt,
+	}
+	if d.Component != nil {
+		row["component_upstream_version"] = *d.Component
+	}
+	if d.Consumer != nil {
+		row["consumer_upstream_version"] = *d.Consumer
+	}
+	if d.Key != "" {
+		// Short, and not the place: the column holds sixty-four characters,
+		// which a place identity fills on its own.
+		row["live_key"] = d.Key
+	}
+	if d.SentBack != nil {
+		row["sent_back_at"] = *d.SentBack
+	}
+	if d.Ended != nil {
+		row["ended_at"] = *d.Ended
+	}
+	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(t.Context()); err != nil {
+		t.Fatalf("record a %s decision: %v", d.State, err)
+	}
+}
+
 // changedNothing is whether a run opened, closed, updated or closed by
 // statement nothing at all.
 func changedNothing(a finding.Applied) bool {

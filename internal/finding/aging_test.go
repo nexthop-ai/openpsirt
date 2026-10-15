@@ -29,16 +29,13 @@ func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) 
 		f.aged(t, "CVE-2026-1", old)
 		f.aged(t, "CVE-2026-2", old)
 
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"),
+		somebody := f.somebodyElse(t)
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
 			finding.PlaceIdentity(swss.Name, ""), "approved", swss.Version, "agreed")
 		// Waiting at every place the low issue sits, so that nothing but the
 		// waiting is what leaves it undecided.
 		for i, consumer := range []string{swss.Name, teamd.Name} {
-			f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"),
+			f.decided(t, somebody, f.issueID(t, "CVE-2026-2"),
 				finding.PlaceIdentity(libnl.Name, consumer), "proposed", libnl.Version,
 				[]string{"waiting-one", "waiting-two"}[i])
 		}

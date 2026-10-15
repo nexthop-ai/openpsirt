@@ -47,31 +47,10 @@ func (f *fixture) placesOf(t *testing.T, identifier string) map[string]finding.F
 // versions given, live where key is not empty.
 func (f *fixture) decidedAt(t *testing.T, by int64, at finding.Finding, state, component, consumer, key string) {
 	t.Helper()
-	row := map[string]any{
-		"claim_id":   claimBy(t, f.db, by),
-		"product_id": f.productID, "vulnerability_id": at.VulnerabilityID,
-		"place_identity": at.PlaceIdentity, "visibility": "public",
-		"state": state, "needs_approval": true, "proposed_by": by,
-		"proposed_at":                time.Now().UTC(),
-		"component_upstream_version": component,
-		"consumer_upstream_version":  consumer,
-	}
-	if key != "" {
-		row["live_key"] = key
-	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(t.Context()); err != nil {
-		t.Fatalf("record a %s claim: %v", state, err)
-	}
-}
-
-// somebodyElse is a person to have proposed what a test records.
-func (f *fixture) somebodyElse(t *testing.T) int64 {
-	t.Helper()
-	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "somebody@example.com", "Them", nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return person.ID
+	f.decision(t, decisionRow{
+		By: by, Issue: at.VulnerabilityID, Place: at.PlaceIdentity, State: state,
+		Component: &component, Consumer: &consumer, Key: key,
+	})
 }
 
 func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhosePlacesNobodyAnswered(t *testing.T) {

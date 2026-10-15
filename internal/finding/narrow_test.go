@@ -157,10 +157,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		var issueID int64
 		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
 			Column("v.id").Where(`"v"."identifier" = ?`, "CVE-2026-1").
@@ -175,25 +172,12 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		// match on its versions would leave a missing product condition
 		// unexercised.
 		place := finding.PlaceIdentity(swss.Name, "")
-		if _, err := f.db.DB.NewInsert().
-			Model(&map[string]any{
-				"claim_id":                   claimBy(t, f.db, somebody.ID),
-				"product_id":                 elsewhere.ID,
-				"vulnerability_id":           issueID,
-				"place_identity":             place,
-				"visibility":                 "public",
-				"state":                      "proposed",
-				"needs_approval":             true,
-				"proposed_by":                somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": swss.Version,
-				"live_key":                   "elsewhere-live-key",
-			}).
-			TableExpr("\"decision\"").Exec(ctx); err != nil {
-			// A row this test cannot write is a reason to fail: skipping would
-			// make it green in exactly the case where it proves nothing.
-			t.Fatalf("could not record a claim in another product: %v", err)
-		}
+		// A row this test cannot write fails it rather than skipping, which
+		// would make it green in exactly the case where it proves nothing.
+		f.decision(t, decisionRow{
+			By: somebody, Product: elsewhere.ID, Issue: issueID, Place: place,
+			State: "proposed", Component: ptr(swss.Version), Key: "elsewhere-live-key",
+		})
 
 		_, waiting, err := f.store.Groups(ctx, who, f.scope, 50, 0,
 			finding.Filter{States: []finding.ClaimStanding{"waiting"}})
@@ -267,13 +251,10 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		place := finding.PlaceIdentity(swss.Name, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), place, "lapsed", "0.9.0", "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), place, "proposed", swss.Version, "again")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), place, "lapsed", "0.9.0", "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), place, "proposed", swss.Version, "again")
 
 		groups, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
 		if err != nil {
@@ -328,12 +309,9 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		// Approved against the older version, in the build that ships it.
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"),
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
 			finding.PlaceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
 		reads := func(target int64, want string) {
@@ -393,23 +371,10 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 // key, which is what says it no longer applies.
 func (f *fixture) decided(t *testing.T, by, issueID int64, place, state, componentVersion, key string) {
 	t.Helper()
-	row := map[string]any{
-		"claim_id":   claimBy(t, f.db, by),
-		"product_id": f.productID, "vulnerability_id": issueID,
-		"place_identity": place, "visibility": "public",
-		"state":          state,
-		"needs_approval": true, "proposed_by": by,
-		"proposed_at":                time.Now().UTC(),
-		"component_upstream_version": componentVersion,
-	}
-	if key != "" {
-		// Short, and not the place: the column holds sixty-four characters,
-		// which a place identity fills on its own.
-		row["live_key"] = key
-	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("\"decision\"").Exec(t.Context()); err != nil {
-		t.Fatalf("record a %s claim: %v", state, err)
-	}
+	f.decision(t, decisionRow{
+		By: by, Issue: issueID, Place: place, State: state,
+		Component: &componentVersion, Key: key,
+	})
 }
 
 func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
@@ -430,10 +395,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		who := f.holding(t, access.PublicTriage)
 
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		var issueID int64
 		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
 			Column("v.id").Where(`"v"."identifier" = ?`, "CVE-2026-1").
@@ -448,24 +410,14 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			row := map[string]any{
-				"claim_id":   claimBy(t, f.db, somebody.ID),
-				"product_id": f.productID, "vulnerability_id": issueID,
-				"place_identity": place, "visibility": "public",
-				"state":          state,
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at": time.Now().UTC(),
-			}
+			row := decisionRow{By: somebody, Issue: issueID, Place: place, State: state}
 			if live {
 				// The test for a claim standing here: a key, and the
 				// version the claim was made against being the one shipping.
-				row["live_key"] = state + "-live-key"
-				row["component_upstream_version"] = swss.Version
+				row.Key = state + "-live-key"
+				row.Component = ptr(swss.Version)
 			}
-			if _, err := f.db.DB.NewInsert().Model(&row).
-				TableExpr("\"decision\"").Exec(ctx); err != nil {
-				t.Fatalf("record a %s claim: %v", state, err)
-			}
+			f.decision(t, row)
 		}
 		count := func(state string) int {
 			t.Helper()
@@ -985,10 +937,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		issueID := f.issueID(t, "CVE-2026-1")
 		place := finding.PlaceIdentity(swss.Name, "")
 
@@ -998,21 +947,11 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			row := map[string]any{
-				"claim_id":   claimBy(t, f.db, somebody.ID),
-				"product_id": productID, "vulnerability_id": issueID,
-				"place_identity": place, "visibility": "public",
-				"state":          "proposed",
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": version,
-				"live_key":                   "the-live-key",
-				"sent_back_at":               time.Now().UTC(),
-			}
-			if _, err := f.db.DB.NewInsert().Model(&row).
-				TableExpr("\"decision\"").Exec(ctx); err != nil {
-				t.Fatalf("record a claim sent back: %v", err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Product: productID, Issue: issueID, Place: place,
+				State: "proposed", Component: &version, Key: "the-live-key",
+				SentBack: ptr(time.Now().UTC()),
+			})
 		}
 		// Both halves of the answer, which have to agree.
 		asked := func(because string, want int) {
@@ -1120,29 +1059,19 @@ func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")
 		if err != nil {
 			t.Fatal(err)
 		}
-		claim, other := claimBy(t, f.db, somebody.ID), claimBy(t, f.db, somebody.ID)
+		claim, other := claimBy(t, f.db, somebody), claimBy(t, f.db, somebody)
 		wrote := func(claimID, productID int64, issue string, at graph.Described, state string) {
 			t.Helper()
-			row := map[string]any{
-				"claim_id": claimID, "product_id": productID,
-				"vulnerability_id": f.issueID(t, issue),
-				"place_identity":   finding.PlaceIdentity(at.Name, ""),
-				"visibility":       "public", "state": state,
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at": time.Now().UTC(), "ended_at": time.Now().UTC(),
-			}
-			if _, err := f.db.DB.NewInsert().Model(&row).
-				TableExpr("\"decision\"").Exec(ctx); err != nil {
-				t.Fatalf("record a decision: %v", err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Claim: claimID, Product: productID,
+				Issue: f.issueID(t, issue), Place: finding.PlaceIdentity(at.Name, ""),
+				State: state, Ended: ptr(time.Now().UTC()),
+			})
 		}
 		wrote(claim, f.productID, "CVE-2026-1", swss, "withdrawn")
 		wrote(claim, f.productID, "CVE-2026-2", teamd, "lapsed")

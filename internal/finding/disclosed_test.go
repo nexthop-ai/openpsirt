@@ -256,16 +256,10 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		if _, err := f.db.DB.NewInsert().Model(&there).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		row := map[string]any{
-			"claim_id":   claimBy(t, f.db, who.ID),
-			"product_id": other, "vulnerability_id": issue,
-			"place_identity": there.PlaceIdentity, "visibility": "private",
-			"state": "proposed", "needs_approval": true, "proposed_by": who.ID,
-			"proposed_at": time.Now().UTC(),
-		}
-		if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.decision(t, decisionRow{
+			By: who.ID, Product: other, Issue: issue, Place: there.PlaceIdentity,
+			Visibility: "private", State: "proposed",
+		})
 		both := access.NewPerson(who.ID, "both@example.com", false, map[int64][]access.Role{
 			f.productID: {access.PrivateTriage}, other: {access.PrivateTriage},
 		}, 0)

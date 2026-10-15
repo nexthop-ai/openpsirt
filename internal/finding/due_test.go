@@ -294,10 +294,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		issueID := f.issueID(t, "CVE-2026-1")
 		place := finding.PlaceIdentity(swss.Name, "")
 
@@ -311,7 +308,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			}
 			// The outcome and the date it defers to are the claim's: one act
 			// is one argument, and this row says where it lands.
-			claimID := claimSaying(t, f.db, somebody.ID, outcome)
+			claimID := claimSaying(t, f.db, somebody, outcome)
 			if until != nil {
 				if _, err := f.db.DB.NewUpdate().TableExpr("\"claim\"").
 					Set(`"deferred_until" = ?`, until.UTC()).
@@ -319,19 +316,10 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 					t.Fatalf("record when it defers to: %v", err)
 				}
 			}
-			row := map[string]any{
-				"claim_id":   claimID,
-				"product_id": f.productID, "vulnerability_id": issueID,
-				"place_identity": place, "visibility": "public",
-				"state":          state,
-				"needs_approval": needsApproval, "proposed_by": somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": version,
-				"live_key":                   "the-live-key",
-			}
-			if _, err := f.db.DB.NewInsert().Model(&row).TableExpr("\"decision\"").Exec(ctx); err != nil {
-				t.Fatalf("record a %s claim: %v", state, err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Claim: claimID, Issue: issueID, Place: place, State: state,
+				Unreviewed: !needsApproval, Component: &version, Key: "the-live-key",
+			})
 		}
 		// Both answers, which have to be the same answer.
 		onTheClock := func(want bool, because string) {

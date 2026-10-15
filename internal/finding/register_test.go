@@ -237,15 +237,10 @@ func (f *fixture) decidedAndLapsed(t *testing.T, at finding.Finding) string {
 	}
 	// Lapsed: the state a sweep writes when the last build holding the
 	// versions moves on, which nulls the live key in the same statement.
-	decision := &triage.Decision{
-		ClaimID: claim.ID, ProductID: f.productID, VulnerabilityID: at.VulnerabilityID,
-		PlaceIdentity: at.PlaceIdentity, Visibility: access.Public,
-		NeedsApproval: true, State: triage.LapsedState,
-		ProposedBy: 1, ProposedAt: now, EndedAt: &now,
-	}
-	if _, err := f.db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
+	f.decision(t, decisionRow{
+		By: 1, Claim: claim.ID, Issue: at.VulnerabilityID, Place: at.PlaceIdentity,
+		State: string(triage.LapsedState), ProposedAt: now, Ended: &now,
+	})
 	return at.PlaceIdentity
 }
 
@@ -347,26 +342,23 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		_, before, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
 		withdrawn := finding.PlaceIdentity(swss.Name, "")
 		lapsed := finding.PlaceIdentity(teamd.Name, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), withdrawn, "withdrawn", swss.Version, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"), withdrawn, "proposed", swss.Version, "again")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-2"), lapsed, "approved", teamd.Version, "anew")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), withdrawn, "withdrawn", swss.Version, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"), withdrawn, "proposed", swss.Version, "again")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "lapsed", teamd.Version, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-2"), lapsed, "approved", teamd.Version, "anew")
 		// Lapsed, claimed again and lapsed again, with nothing live: the
 		// latest lapse is the record.
 		twice := finding.PlaceIdentity(libnl.Name, swss.Name)
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-3"), twice, "lapsed", libnl.Version, "")
 
 		rows, total, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
 		if err != nil {
@@ -430,11 +422,8 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f.decided(t, somebody.ID, f.issueID(t, "CVE-2026-1"),
+		somebody := f.somebodyElse(t)
+		f.decided(t, somebody, f.issueID(t, "CVE-2026-1"),
 			finding.PlaceIdentity(libnl.Name, ""), "approved", libnl.Version, "old")
 
 		reads := func(target int64, want string) {
@@ -469,24 +458,14 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicRead)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		issue, place := f.issueID(t, "CVE-2026-1"), finding.PlaceIdentity(swss.Name, "")
-		f.decided(t, somebody.ID, issue, place, "approved", swss.Version, "keyed")
-		correction := map[string]any{
-			"claim_id":   claimSaying(t, f.db, somebody.ID, "mismatched"),
-			"product_id": f.productID, "vulnerability_id": issue,
-			"place_identity": place, "visibility": "public", "state": "proposed",
-			"needs_approval": true, "proposed_by": somebody.ID,
-			"proposed_at":                time.Now().UTC(),
-			"component_upstream_version": "0.9.0", "live_key": "anywhere",
-		}
-		if _, err := f.db.DB.NewInsert().Model(&correction).
-			TableExpr("\"decision\"").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.decided(t, somebody, issue, place, "approved", swss.Version, "keyed")
+		f.decision(t, decisionRow{
+			By: somebody, Claim: claimSaying(t, f.db, somebody, "mismatched"),
+			Issue: issue, Place: place, State: "proposed",
+			Component: ptr("0.9.0"), Key: "anywhere",
+		})
 
 		reads := func(because, outcome string) {
 			t.Helper()

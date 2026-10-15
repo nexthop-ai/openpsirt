@@ -7,7 +7,6 @@ import (
 	"maps"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -17,21 +16,10 @@ import (
 // decidedSaying records a decision at a place on a claim with one outcome.
 func (f *fixture) decidedSaying(t *testing.T, by, issueID int64, place, state, outcome, componentVersion, key string) {
 	t.Helper()
-	row := map[string]any{
-		"claim_id":   claimSaying(t, f.db, by, outcome),
-		"product_id": f.productID, "vulnerability_id": issueID,
-		"place_identity": place, "visibility": "public",
-		"state":          state,
-		"needs_approval": true, "proposed_by": by,
-		"proposed_at":                time.Now().UTC(),
-		"component_upstream_version": componentVersion,
-	}
-	if key != "" {
-		row["live_key"] = key
-	}
-	if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(t.Context()); err != nil {
-		t.Fatalf("record a %s claim: %v", state, err)
-	}
+	f.decision(t, decisionRow{
+		By: by, Claim: claimSaying(t, f.db, by, outcome), Issue: issueID, Place: place,
+		State: state, Component: &componentVersion, Key: key,
+	})
 }
 
 // The by-component view and the fix bundles keep the groups the findings list

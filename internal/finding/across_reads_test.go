@@ -224,30 +224,20 @@ func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T)
 		}); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		promise := func(product int64, to, key string) {
 			t.Helper()
-			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
+			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
 				Set(`"committed_to" = ?`, time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)).
 				Set(`"upgrade_to" = ?`, to).Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.DB.NewInsert().Model(&map[string]any{
-				"claim_id": claim, "product_id": product,
-				"vulnerability_id": f.issueID(t, "CVE-2026-1"),
-				"place_identity":   finding.PlaceIdentity(libnl.Name, swss.Name),
-				"visibility":       "public", "state": "approved",
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": libnl.Version,
-				"live_key":                   key,
-			}).TableExpr(`"decision"`).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Claim: claim, Product: product,
+				Issue: f.issueID(t, "CVE-2026-1"), Place: finding.PlaceIdentity(libnl.Name, swss.Name),
+				State: "approved", Component: ptr(libnl.Version), Key: key,
+			})
 		}
 		read := func() finding.PerBuild {
 			t.Helper()

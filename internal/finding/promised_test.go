@@ -25,10 +25,7 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		march := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
 		place := finding.PlaceIdentity(libnl.Name, swss.Name)
@@ -36,23 +33,17 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 			issue, to string
 			by        time.Time
 		}{{"CVE-2026-1", "1.9", june}, {"CVE-2026-2", "1.10", march}} {
-			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
+			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
 				Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
 				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.DB.NewInsert().Model(&map[string]any{
-				"claim_id": claim, "product_id": f.productID,
-				"vulnerability_id": f.issueID(t, one.issue),
-				"place_identity":   place, "visibility": "public", "state": "approved",
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": libnl.Version,
-				"live_key":                   []string{"promise-one", "promise-two"}[i],
-			}).TableExpr(`"decision"`).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Claim: claim, Issue: f.issueID(t, one.issue), Place: place,
+				State: "approved", Component: ptr(libnl.Version),
+				Key: []string{"promise-one", "promise-two"}[i],
+			})
 		}
 
 		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), libnl.Name)
@@ -101,30 +92,20 @@ func TestThePromiseThatStandsNamesAVersionThenADateThenTheLatestThenTheLaterClai
 				}); err != nil {
 					t.Fatal(err)
 				}
-				somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				somebody := f.somebodyElse(t)
 				promise := func(issue string, one said) {
 					t.Helper()
-					claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
+					claim := claimSaying(t, f.db, somebody, "upgrade-needed")
 					if _, err := f.db.DB.NewUpdate().Table("claim").
 						Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
 						Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 						t.Fatal(err)
 					}
-					if _, err := f.db.DB.NewInsert().Model(&map[string]any{
-						"claim_id": claim, "product_id": f.productID,
-						"vulnerability_id": f.issueID(t, issue),
-						"place_identity":   finding.PlaceIdentity(libnl.Name, swss.Name),
-						"visibility":       "public", "state": "approved",
-						"needs_approval": true, "proposed_by": somebody.ID,
-						"proposed_at":                time.Now().UTC(),
-						"component_upstream_version": libnl.Version,
-						"live_key":                   fmt.Sprint("promise-", claim),
-					}).TableExpr(`"decision"`).Exec(ctx); err != nil {
-						t.Fatal(err)
-					}
+					f.decision(t, decisionRow{
+						By: somebody, Claim: claim, Issue: f.issueID(t, issue),
+						Place: finding.PlaceIdentity(libnl.Name, swss.Name), State: "approved",
+						Component: ptr(libnl.Version), Key: fmt.Sprint("promise-", claim),
+					})
 				}
 				if c.later {
 					promise("CVE-2026-2", c.loses)
@@ -164,30 +145,20 @@ func TestAPlaceUnderTwoPromisesIsCountedOnce(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		for _, version := range []string{libnl.Version, "3.6.0"} {
-			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
+			claim := claimSaying(t, f.db, somebody, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
 				Set(`"committed_to" = ?`, june).Set(`"upgrade_to" = ?`, "3.9.0").
 				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := f.db.DB.NewInsert().Model(&map[string]any{
-				"claim_id": claim, "product_id": f.productID,
-				"vulnerability_id": f.issueID(t, "CVE-2026-1"),
-				"place_identity":   finding.PlaceIdentity(libnl.Name, swss.Name),
-				"visibility":       "public", "state": "approved",
-				"needs_approval": true, "proposed_by": somebody.ID,
-				"proposed_at":                time.Now().UTC(),
-				"component_upstream_version": version,
-				"live_key":                   fmt.Sprint("promise-", claim),
-			}).TableExpr(`"decision"`).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
+			f.decision(t, decisionRow{
+				By: somebody, Claim: claim, Issue: f.issueID(t, "CVE-2026-1"),
+				Place: finding.PlaceIdentity(libnl.Name, swss.Name), State: "approved",
+				Component: &version, Key: fmt.Sprint("promise-", claim),
+			})
 		}
 
 		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), libnl.Name)

@@ -52,12 +52,9 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 		ctx := t.Context()
 		lib, tool := f.curlFold(t)
 		who := f.holding(t, access.PublicTriage)
-		somebody, err := access.NewStore(f.db.DB).Ensure(ctx, "somebody@example.com", "Them", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		somebody := f.somebodyElse(t)
 		issue := f.issue(t, "CVE-2026-CURL")
-		f.decided(t, somebody.ID, issue, finding.PlaceIdentity(lib.Name, ""), "approved", lib.Version, "lib")
+		f.decided(t, somebody, issue, finding.PlaceIdentity(lib.Name, ""), "approved", lib.Version, "lib")
 
 		count := func(states ...finding.ClaimStanding) int {
 			t.Helper()
@@ -85,7 +82,7 @@ func TestAGroupsStateIsAskedOfEveryPackageInItsFold(t *testing.T) {
 			t.Errorf("a fold with one package decided reads as agreed in %d rows", n)
 		}
 
-		f.decided(t, somebody.ID, issue, finding.PlaceIdentity(tool.Name, ""), "approved", tool.Version, "tool")
+		f.decided(t, somebody, issue, finding.PlaceIdentity(tool.Name, ""), "approved", tool.Version, "tool")
 		if n := count(finding.StandingAgreed); n != 1 {
 			t.Errorf("a fold with every package decided reads as agreed in %d rows, want one", n)
 		}

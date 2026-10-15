@@ -572,33 +572,21 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 
 		// Dismissed at its one place by a decision in force.
 		place := finding.PlaceIdentity(swss.Name, "")
-		dismissed := map[string]any{
-			"claim_id":   claimSaying(t, f.db, who.ID, "not-applicable"),
-			"product_id": f.productID, "vulnerability_id": f.issueID(t, "CVE-2026-2"),
-			"place_identity": place, "visibility": "public", "state": "approved",
-			"needs_approval": true, "proposed_by": who.ID, "proposed_at": time.Now().UTC(),
-			"live_key": "dismissed-key", "component_upstream_version": swss.Version,
-		}
-		if _, err := f.db.DB.NewInsert().Model(&dismissed).TableExpr(`"decision"`).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.decision(t, decisionRow{
+			By: who.ID, Claim: claimSaying(t, f.db, who.ID, "not-applicable"),
+			Issue: f.issueID(t, "CVE-2026-2"), Place: place, State: "approved",
+			Component: ptr(swss.Version), Key: "dismissed-key",
+		})
 		if err := duplicate(named[1], "CVE-2026-2"); !errors.Is(err, finding.ErrDuplicateOfClosed) {
 			t.Errorf("a duplicate of an issue dismissed everywhere was answered %v", err)
 		}
 
 		// Deferred is work that comes back, so it is still open.
-		deferred := map[string]any{
-			"claim_id":   claimSaying(t, f.db, who.ID, "deferred"),
-			"product_id": f.productID, "vulnerability_id": f.issueID(t, "CVE-2026-3"),
-			"place_identity": place, "visibility": "public", "state": "approved",
-			"needs_approval": true, "proposed_by": who.ID, "proposed_at": time.Now().UTC(),
-			"live_key": "deferred-key", "component_upstream_version": swss.Version,
-		}
-		if _, err := f.db.DB.NewInsert().Model(&deferred).TableExpr(`"decision"`).
-			Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		f.decision(t, decisionRow{
+			By: who.ID, Claim: claimSaying(t, f.db, who.ID, "deferred"),
+			Issue: f.issueID(t, "CVE-2026-3"), Place: place, State: "approved",
+			Component: ptr(swss.Version), Key: "deferred-key",
+		})
 		if err := duplicate(named[2], "CVE-2026-3"); err != nil {
 			t.Errorf("a duplicate of a deferred issue was refused: %v", err)
 		}
