@@ -46,3 +46,96 @@ describe("narrowing a bulk decision", () => {
     });
   });
 });
+
+const AT = "/products/sonic/streams/master/variants/x/components/openssl/decide";
+const PATTERN = "/products/:product/streams/:stream/variants/:variant/components/:component/decide";
+
+// The issues at the component, as the server pages them: a page holds up to
+// five hundred, and the fake holds three on the first and two on the second.
+// The total is what makes a second page exist at all.
+function issuesAt(query: { offset?: number }) {
+  const every = ["CVE-1", "CVE-2", "CVE-3", "CVE-4", "CVE-5"].map((name, i) => ({
+    vulnerability: name,
+    places: i + 1,
+    severity: "high",
+  }));
+  const pages: Record<number, typeof every> = { 0: every.slice(0, 3), 500: every.slice(3) };
+  return {
+    data: {
+      items: pages[query.offset ?? 0] ?? [],
+      total: 1003,
+      findings: 15,
+      issue_limit: 4,
+      place_limit: 6,
+    },
+  };
+}
+
+async function together() {
+  const reads = serve((path, init) =>
+    path === ISSUES
+      ? issuesAt((init as { params: { query: { offset?: number } } }).params.query)
+      : { data: { items: [] } },
+  );
+  mount.render(screen(<Together />, AT, PATTERN));
+  await settle();
+  return reads;
+}
+
+const tick = (name: string) =>
+  act(async () =>
+    mount.host().querySelector<HTMLInputElement>(`input[aria-label="Select ${name}"]`)?.click(),
+  );
+const said = () => mount.host().textContent ?? "";
+
+describe("what a bulk decision would write", () => {
+  it("counts the findings each picked issue writes, and warns past the limit", async () => {
+    await together();
+    await tick("CVE-2");
+    expect(said()).toContain("1 issue · 2 findings would be written");
+    await tick("CVE-3");
+    await tick("CVE-1");
+    expect(said()).toContain("3 issues · 6 findings would be written");
+    expect(mount.host().querySelector(".alert.warn")).toBeNull();
+  });
+
+  it("keeps counting what was picked on an earlier page", async () => {
+    await together();
+    await tick("CVE-3");
+    await act(async () =>
+      Array.from(mount.host().querySelectorAll("button"))
+        .find((each) => each.textContent === "Next")
+        ?.click(),
+    );
+    await settle();
+    await tick("CVE-5");
+    // Three places from the first page and five from this one: past the
+    // limit of six, which only the remembered first page shows.
+    expect(said()).toContain("2 issues · 8 findings would be written");
+    expect(said()).toContain("limit 6 findings");
+  });
+
+  it("selects everything matching across pages, and counts it from the server", async () => {
+    await together();
+    await act(async () =>
+      Array.from(mount.host().querySelectorAll("button"))
+        .find((each) => each.textContent === "Select all 1,003 matching")
+        ?.click(),
+    );
+    await settle();
+    expect(said()).toContain("5 of 1,003 selected");
+    expect(said()).toContain("5 issues · 15 findings would be written");
+    expect(said()).toContain("limit 4 issues");
+  });
+
+  it("lets go of the selection when the list is narrowed", async () => {
+    await together();
+    await tick("CVE-1");
+    const box = mount.host().querySelector<HTMLInputElement>(".searchbox input");
+    act(() => {
+      box?.form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await settle();
+    expect(said()).toContain("0 of 1,003 selected");
+  });
+});
