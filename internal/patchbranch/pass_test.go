@@ -462,6 +462,53 @@ func TestARepositoryAlreadyCopiedIsVisitedFirstForNewCommits(t *testing.T) {
 	})
 }
 
+func TestTheMostUrgentCommitDueAgainIsLookedUpFirst(t *testing.T) {
+	// Both repositories copied and every commit looked up, so nothing is
+	// new: what decides is how urgent the commits due again are. The
+	// critical repository is made second, so its identifier is the higher
+	// one and the tie-break would put it last.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		mild, severe := project(t), project(t)
+		issue(t, db, "CVE-2025-0031", "low", link("mild", mild.fix))
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
+			map[string]upstream{"mild": mild, "severe": severe})
+		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("mild") {
+			t.Fatalf("visited %q, %v; want the one repository linked", visited, err)
+		}
+		issue(t, db, "CVE-2025-0032", "critical", link("severe", severe.fix))
+		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("severe") {
+			t.Fatalf("visited %q, %v; want the repository linked since", visited, err)
+		}
+
+		// Every commit's branches looked up longer ago than they stand.
+		if _, err := db.DB.NewUpdate().Table("patch_commit").
+			Set(`"looked_at" = ?`, time.Now().UTC().Add(-patchbranch.LookAgainAfter-time.Hour)).
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		positions := map[string]int{}
+		for _, one := range repositories {
+			positions[one.URL] = one.Position
+		}
+		if positions[repositoryOf("severe")] != 1 || positions[repositoryOf("mild")] != 2 {
+			t.Errorf("the report places them %v, want the critical first", positions)
+		}
+		visited, err := pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if visited != repositoryOf("severe") {
+			t.Errorf("visited %q, want the one whose commit due again is critical", visited)
+		}
+	})
+}
+
 func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
