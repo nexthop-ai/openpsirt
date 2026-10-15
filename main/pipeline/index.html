@@ -861,7 +861,7 @@ it — but a key carries the product it was made for, so a pipeline needs no
 grant of its own.</p>
 <h2 id="the-upload">The upload<a class="headerlink" href="#the-upload" title="Permanent link">&para;</a></h2>
 <p>Your build already produces an SBOM. Send it.</p>
-<pre><code class="language-bash">curl -X POST \
+<pre><code class="language-bash">curl --retry 5 -X POST \
   &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot; \
   -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
   -F &quot;inventory=@sbom.cdx.json&quot;
@@ -888,13 +888,17 @@ grant of its own.</p>
 response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.</p>
+<p>A 503 means the server is already reading as many uploads as it takes at
+once. Send the same request again after the number of seconds in its
+<code>Retry-After</code> header. <code>curl --retry</code> does this, so a matrix of builds finishing
+together each gets its turn rather than failing its step.</p>
 <h3 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h3>
 <pre><code class="language-yaml">- name: Send the inventory to OpenPSIRT
   env:
     OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
     OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
   run: |
-    curl --fail-with-body -X POST \
+    curl --fail-with-body --retry 5 -X POST \
       &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans&quot; \
       -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
       -F &quot;inventory=@sbom.cdx.json&quot;
@@ -907,7 +911,7 @@ only failing the step.</p>
   image: curlimages/curl:latest
   script:
     - |
-      curl --fail-with-body -X POST \
+      curl --fail-with-body --retry 5 -X POST \
         &quot;$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans&quot; \
         -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
         -F &quot;inventory=@sbom.cdx.json&quot;

@@ -792,7 +792,7 @@ and § The pipeline key the key an upload takes.</p>
 </code></pre>
 <h2 id="one-upload">One upload<a class="headerlink" href="#one-upload" title="Permanent link">&para;</a></h2>
 <p>The SBOM and the VEX document go in one request.</p>
-<pre><code class="language-bash">curl -X POST \
+<pre><code class="language-bash">curl --retry 5 -X POST \
   &quot;$OPENPSIRT/v1/products/sonic/streams/202605.1/variants/broadcom/scans&quot; \
   -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
   -F &quot;inventory=@sonic-202605.1.cdx.json&quot; \
@@ -810,7 +810,7 @@ publisher name of its own, or one release's revision sets aside another's.</p>
 <p>A statement naming a root that two builds of the product share, such as two
 variants of one release, is evidence rather than either build's claim. Send
 those with their SBOMs.</p>
-<pre><code class="language-bash">curl -X POST \
+<pre><code class="language-bash">curl --retry 5 -X POST \
   &quot;$OPENPSIRT/v1/products/sonic/vex-statements?publisher=vendor-202605.1-broadcom&quot; \
   -H &quot;Origin: $OPENPSIRT&quot; \
   -F &quot;statements=@sonic-202605.1.openvex.json&quot;
