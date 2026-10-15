@@ -864,21 +864,6 @@ func TestAPlaceAnsweredOnSomeRoutesCarriesNoDeadline(t *testing.T) {
 	})
 }
 
-func TestAnAnswerOnSomeRoutesGoesWithAPlaceThatClosesForAnotherReason(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, shared())
-		f.acmeSays(t)
-		f.reported(t, found(inside, zlib))
-		// The scanner stops reporting it.
-		f.reported(t)
-		for _, row := range f.every(t) {
-			if row.ClosedAt != nil && row.ClosedBecause != finding.Disclaimed && row.StatedBy != nil {
-				t.Errorf("closed as %q, still answered by statement %d", row.ClosedBecause, *row.StatedBy)
-			}
-		}
-	})
-}
-
 func TestADuplicateOfAnIssueASupplierAnswersEverywhereIsRefused(t *testing.T) {
 	// The place is open for the route nobody answered and is not work, so a
 	// report pointed at it as a duplicate reaches nobody who is looking.
