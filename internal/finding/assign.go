@@ -858,7 +858,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	// gives it content is what it has been assigned: an assignment is
 	// itself a grant of visibility of what was assigned. So this answers
 	// for somebody who reads nothing, where they hold something.
-	if subject.Kind != access.Person || (!all && len(products) == 0 && len(mine) == 0) {
+	if !all && len(products) == 0 && len(mine) == 0 {
 		return nil, 0, nil
 	}
 	limit = database.AList.Of(limit)
