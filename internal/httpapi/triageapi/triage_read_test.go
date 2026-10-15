@@ -108,7 +108,7 @@ func TestWhatWasDismissedCanBeListed(t *testing.T) {
 	// queue, which holds exactly the ones nobody has agreed to yet.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		r.Decided(t, place)
+		_, claim := r.DecidedAt(t, place)
 
 		var listed struct {
 			Items []struct {
@@ -135,6 +135,25 @@ func TestWhatWasDismissedCanBeListed(t *testing.T) {
 		httpapitest.Read(t, r, "triager", "/v1/decisions?outcome=wont-fix", &none)
 		if none.Total != 0 {
 			t.Errorf("filtering by an outcome nothing has returned %d", none.Total)
+		}
+
+		// The state filter separates what waits from what is agreed.
+		var waiting, agreed struct {
+			Total int `json:"total"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/decisions?state=proposed", &waiting)
+		httpapitest.Read(t, r, "triager", "/v1/decisions?state=approved", &agreed)
+		if waiting.Total != 1 || agreed.Total != 0 {
+			t.Errorf("before agreement %d wait and %d are agreed, want 1 and 0",
+				waiting.Total, agreed.Total)
+		}
+		r.Agreed(t, claim)
+		waiting.Total, agreed.Total = 0, 0
+		httpapitest.Read(t, r, "triager", "/v1/decisions?state=proposed", &waiting)
+		httpapitest.Read(t, r, "triager", "/v1/decisions?state=approved", &agreed)
+		if waiting.Total != 0 || agreed.Total != 1 {
+			t.Errorf("after agreement %d wait and %d are agreed, want 0 and 1",
+				waiting.Total, agreed.Total)
 		}
 	})
 }
@@ -843,6 +862,100 @@ func TestABuildNamedTwiceInAnotherSpellingIsRefused(t *testing.T) {
 		}
 		if !strings.Contains(got.Body.String(), "named twice") {
 			t.Errorf("the refusal does not say the build is named twice: %s", got.Body.String())
+		}
+	})
+}
+
+// approvalsListed is the approval list of a claim, as a reader decodes it.
+type approvalsListed struct {
+	Items []struct {
+		ID          int64  `json:"id"`
+		RevisionID  int64  `json:"revision_id"`
+		ApprovedBy  string `json:"approved_by"`
+		WithdrawnAt string `json:"withdrawn_at"`
+		Batch       string `json:"batch"`
+		CarriedFrom int64  `json:"carried_from"`
+	} `json:"items"`
+}
+
+// An approval taken back is listed beside the one given after it, with the
+// moment it stopped counting, and one given under a batch names the batch.
+func TestTheApprovalListKeepsWhatWasTakenBackAndNamesTheBatch(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := r.Scanned(t)
+		_, claim := r.DecidedAt(t, place)
+		r.Agreed(t, claim)
+
+		// Revising the words withdraws the agreement to the old ones.
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			`{"reasoning":"Re-checked the call sites; still not reached."}`); got.Code != http.StatusOK {
+			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			`{"batch":"october-review"}`); got.Code != http.StatusOK {
+			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var listed approvalsListed
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", claim), &listed)
+		if len(listed.Items) != 2 {
+			t.Fatalf("the claim lists %d approvals, want the withdrawn one and the live one: %+v",
+				len(listed.Items), listed.Items)
+		}
+		withdrawn, live := 0, 0
+		for _, one := range listed.Items {
+			switch {
+			case one.WithdrawnAt != "" && one.Batch == "":
+				withdrawn++
+			case one.WithdrawnAt == "" && one.Batch == "october-review":
+				live++
+			default:
+				t.Errorf("an approval reads as %+v", one)
+			}
+			if one.CarriedFrom != 0 {
+				t.Errorf("an approval given to this claim reads as carried from %d", one.CarriedFrom)
+			}
+		}
+		if withdrawn != 1 || live != 1 {
+			t.Errorf("%d withdrawn and %d live under the batch, want one of each", withdrawn, live)
+		}
+	})
+}
+
+// A re-affirmation's approval names the agreement it stands on, which belongs
+// to the claim it re-makes.
+func TestAReaffirmedClaimsApprovalNamesTheOneItWasCarriedFrom(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		claimed := r.AgreedThenLapsed(t)
+
+		var earlier approvalsListed
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", claimed), &earlier)
+		if len(earlier.Items) != 1 {
+			t.Fatalf("the lapsed claim lists %d approvals, want 1", len(earlier.Items))
+		}
+
+		again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			`{"reasoning":"Checked again at 8.6.0; the transfer path is still not reached."}`)
+		if again.Code != http.StatusCreated {
+			t.Fatalf("re-affirming answered %d: %s", again.Code, again.Body.String())
+		}
+		var restored struct {
+			ClaimID int64 `json:"claim_id"`
+		}
+		if err := json.Unmarshal(again.Body.Bytes(), &restored); err != nil {
+			t.Fatal(err)
+		}
+
+		var carried approvalsListed
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d/approvals", restored.ClaimID), &carried)
+		if len(carried.Items) != 1 || carried.Items[0].CarriedFrom != earlier.Items[0].ID ||
+			carried.Items[0].ApprovedBy != "reviewer" {
+			t.Errorf("the re-affirmed claim's approvals read %+v, want one carried from %d",
+				carried.Items, earlier.Items[0].ID)
 		}
 	})
 }
