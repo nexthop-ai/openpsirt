@@ -46,8 +46,8 @@ func said(kinds []finding.PackageKind) string {
 func (f *fixture) hideIssue(t *testing.T, identifier string) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-		Set("visibility = ?", access.Private).
-		Where("vulnerability_id = ?", f.issueID(t, identifier)).Exec(t.Context()); err != nil {
+		Set(`"visibility" = ?`, access.Private).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }

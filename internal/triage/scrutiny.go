@@ -132,17 +132,17 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = readableBy(q, subject, "de")
 		if len(productIDs) > 0 {
-			q = q.Where("de.product_id IN (?)", bun.List(productIDs))
+			q = q.Where(`"de"."product_id" IN (?)`, bun.List(productIDs))
 		}
 		// Dated by when the claim was proposed, which is what every section
 		// here is about: a judgment belongs to when it was argued, and dating
 		// it by its agreement would move it out of the period whenever an
 		// approval came late — the ordinary case.
 		if !since.IsZero() {
-			q = q.Where("de.proposed_at >= ?", since)
+			q = q.Where(`"de"."proposed_at" >= ?`, since)
 		}
 		if !until.IsZero() {
-			q = q.Where("de.proposed_at < ?", until)
+			q = q.Where(`"de"."proposed_at" < ?`, until)
 		}
 		return q
 	}
@@ -160,14 +160,14 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	err := narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where("cl.outcome <> ?", Affected).
+		Where(`"cl"."outcome" <> ?`, Affected).
 		Where(standing, held...).
 		Where(standingAlone).
-		GroupExpr("cl.outcome").
+		GroupExpr(`"cl"."outcome"`).
 		Limit(room)).Scan(ctx, &alone)
 	if err != nil {
 		return nil, fmt.Errorf("count what stands with one person behind it: %w", err)
@@ -193,16 +193,16 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	err = narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
-		ColumnExpr(`ap.batch AS "batch"`).
-		ColumnExpr(`pe.identity AS "identity"`).
-		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
+		ColumnExpr(`"ap"."batch" AS "batch"`).
+		ColumnExpr(`"pe"."identity" AS "identity"`).
+		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where("ap.batch IS NOT NULL").
-		Where("ap.withdrawn_at IS NULL").
-		GroupExpr("ap.batch, pe.identity").
+		Where(`"ap"."batch" IS NOT NULL`).
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		GroupExpr(`"ap"."batch", "pe"."identity"`).
 		OrderExpr("written DESC").
 		Limit(room)).Scan(ctx, &bulk)
 	if err != nil {
@@ -229,15 +229,15 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	err = narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
-		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
-		ColumnExpr(`pr.identity AS "proposer"`).
-		ColumnExpr(`ape.identity AS "approver"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
+		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
+		ColumnExpr(`"pr"."identity" AS "proposer"`).
+		ColumnExpr(`"ape"."identity" AS "approver"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where("ap.withdrawn_at IS NULL").
-		GroupExpr("pr.identity, ape.identity").
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		GroupExpr(`"pr"."identity", "ape"."identity"`).
 		OrderExpr("written DESC").
 		Limit(room)).Scan(ctx, &pairs)
 	if err != nil {
@@ -250,10 +250,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// ungrouped and uncut.
 	agreed, err := narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS "pr" ON pr.id = de.proposed_by`).
-		Join(`JOIN "person" AS "ape" ON ape.id = ap.approved_by`).
-		Where("ap.withdrawn_at IS NULL")).Count(ctx)
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "person" AS "pr" ON "pr"."id" = "de"."proposed_by"`).
+		Join(`JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`).
+		Where(`"ap"."withdrawn_at" IS NULL`)).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("count what standing agreements cover: %w", err)
 	}
@@ -279,17 +279,17 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	}
 	err = narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
-		Join(`JOIN "product" AS "pd" ON pd.id = de.product_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`pe.identity AS "identity"`).
-		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
-		ColumnExpr(`pd.name AS "product"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
+		Join(`JOIN "product" AS "pd" ON "pd"."id" = "de"."product_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"pe"."identity" AS "identity"`).
+		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
+		ColumnExpr(`"pd"."name" AS "product"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where("ap.withdrawn_at IS NULL").
+		Where(`"ap"."withdrawn_at" IS NULL`).
 		Where(standing, held...).
 		// The right they used, checked against what they hold now rather than
 		// against what they held then: the question is whether the person who
@@ -297,20 +297,20 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		// is kept so the change can be undone, and it grants nothing while it
 		// sits there — so it is not a right somebody still holds.
 		Where(`NOT EXISTS (SELECT 1 FROM "role_grant" AS "rg"`+
-			` WHERE rg.person_id = ap.approved_by AND rg.product_id = de.product_id`+
-			` AND rg.active = ? AND rg.role = ?)`, true, access.Approver).
+			` WHERE "rg"."person_id" = "ap"."approved_by" AND "rg"."product_id" = "de"."product_id"`+
+			` AND "rg"."active" = ? AND "rg"."role" = ?)`, true, access.Approver).
 		// Nor one held across every product, which is the same right reached
 		// by the other grant. Without this an approver holding it that way
 		// had every approval they ever gave reported as lapsed.
 		Where(`NOT EXISTS (SELECT 1 FROM "role_grant_all" AS "rga"`+
-			` WHERE rga.person_id = ap.approved_by`+
-			` AND rga.active = ? AND rga.role = ?)`, true, access.Approver).
+			` WHERE "rga"."person_id" = "ap"."approved_by"`+
+			` AND "rga"."active" = ? AND "rga"."role" = ?)`, true, access.Approver).
 		// An administrator reaches every product, so one is never in this list
 		// however their grants read. Either half makes one: granted here, or
 		// named in configuration.
 		Where(`NOT EXISTS (SELECT 1 FROM "person" AS "ad"`+
-			` WHERE ad.id = ap.approved_by AND (ad.is_admin = ? OR ad.is_bootstrap = ?))`, true, true).
-		GroupExpr("de.claim_id, pe.identity, pd.name, cl.outcome").
+			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
+		GroupExpr(`"de"."claim_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
 		Limit(room)).Scan(ctx, &lapsed)
 	if err != nil {
@@ -344,19 +344,19 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	// claim that grew after them out of every answer.
 	err = narrow(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		Join(`JOIN "person" AS "pe" ON pe.id = ap.approved_by`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`pe.identity AS "identity"`).
-		ColumnExpr(`MIN(ap.approved_at) AS "approved_at"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`MIN(ap.covered) AS "covered"`).
-		Where("ap.withdrawn_at IS NULL").
-		Where("ap.covered IS NOT NULL").
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ap"."approved_by"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"pe"."identity" AS "identity"`).
+		ColumnExpr(`MIN("ap"."approved_at") AS "approved_at"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
+		ColumnExpr(`MIN("ap"."covered") AS "covered"`).
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		Where(`"ap"."covered" IS NOT NULL`).
 		Where(standing, held...).
-		GroupExpr("de.claim_id, pe.identity, cl.outcome").
-		OrderExpr("de.claim_id, pe.identity")).Scan(ctx, &grew)
+		GroupExpr(`"de"."claim_id", "pe"."identity", "cl"."outcome"`).
+		OrderExpr(`"de"."claim_id", "pe"."identity"`)).Scan(ctx, &grew)
 	if err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
@@ -422,11 +422,11 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	var ids []int64
 	if err := readableBy(s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		ColumnExpr("de.id").
-		Where("de.claim_id IN (?)", bun.List(claims)).
+		ColumnExpr(`"de"."id"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
 		// Live rows only, as a claim's reach is counted: a row withdrawn or
 		// lapsed covers nothing, however well its versions still match.
-		Where("de.live_key IS NOT NULL"), subject, "de").
+		Where(`"de"."live_key" IS NOT NULL`), subject, "de").
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which rows these claims wrote: %w", err)
 	}
@@ -440,18 +440,18 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	err := s.db.NewSelect().
 		TableExpr(finding.Decisions).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
-		Where("de.id IN (?)", bun.List(ids)).
-		Where("f.closed_at IS NULL").
+		Where(`"de"."id" IN (?)`, bun.List(ids)).
+		Where(`"f"."closed_at" IS NULL`).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", "st.product_id")).
-		GroupExpr("de.claim_id").
+		GroupExpr(`"de"."claim_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what these cover: %w", err)
@@ -508,12 +508,12 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("cl.outcome IN (?)", bun.List(OutcomesDismissing())).
-				WhereOr("de.needs_approval = ?", true)
+			return q.WhereOr(`"cl"."outcome" IN (?)`, bun.List(OutcomesDismissing())).
+				WhereOr(`"de"."needs_approval" = ?`, true)
 		}).
 		Where(standing, held...).
 		Where(standingAlone).

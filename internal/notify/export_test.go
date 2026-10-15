@@ -35,7 +35,7 @@ const SweepBatch = sweepBatch
 // watches what was sent cannot tell a settled row from an unsettleable one.
 func StillToTell(s *Signal, ctx context.Context, name string) (int, error) {
 	var to Outbound
-	if err := s.db.NewSelect().Model(&to).Where("name = ?", name).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&to).Where(`"name" = ?`, name).Scan(ctx); err != nil {
 		return 0, err
 	}
 	rows, err := s.window(ctx, to, sweepBatch)

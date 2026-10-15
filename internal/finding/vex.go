@@ -362,12 +362,12 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
-			Where("product_id = ?", productID).
-			Where("publisher = ?", publisher).
-			Where("source = ?", from.Source).
-			Where("document_id = ?", identifier).
-			Where("digest = ?", from.Digest).
-			Where("superseded_at IS NULL").
+			Where(`"product_id" = ?`, productID).
+			Where(`"publisher" = ?`, publisher).
+			Where(`"source" = ?`, from.Source).
+			Where(`"document_id" = ?`, identifier).
+			Where(`"digest" = ?`, from.Digest).
+			Where(`"superseded_at" IS NULL`).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
@@ -392,12 +392,12 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
-			Where("product_id = ?", productID).
-			Where("publisher = ?", publisher).
-			Where("source = ?", from.Source).
-			Where("superseded_at IS NULL")
+			Where(`"product_id" = ?`, productID).
+			Where(`"publisher" = ?`, publisher).
+			Where(`"source" = ?`, from.Source).
+			Where(`"superseded_at" IS NULL`)
 		if from.Source == FromAdvisory {
-			heldBy = heldBy.Where("document_id = ?", identifier)
+			heldBy = heldBy.Where(`"document_id" = ?`, identifier)
 		}
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
@@ -406,8 +406,8 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 
 		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Statement)(nil)).
-				Set("superseded_at = ?", now).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"superseded_at" = ?`, now).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
@@ -418,14 +418,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		for placed, ids := range repeated {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Statement)(nil)).
-					Set("within_purl = ?", nullable(placed.WithinPurl)).
-					Set("within = ?", nullable(placed.Within)).
-					Set("within_about = ?", nullable(placed.WithinAbout)).
-					Set("placement = ?", nullable(placed.Placement)).
-					Set("document = ?", from.Document).
-					Set("digest = ?", from.Digest).
-					Set("restated_at = ?", now).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+					Set(`"within_purl" = ?`, nullable(placed.WithinPurl)).
+					Set(`"within" = ?`, nullable(placed.Within)).
+					Set(`"within_about" = ?`, nullable(placed.WithinAbout)).
+					Set(`"placement" = ?`, nullable(placed.Placement)).
+					Set(`"document" = ?`, from.Document).
+					Set(`"digest" = ?`, from.Digest).
+					Set(`"restated_at" = ?`, now).
+					Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 				return err
 			})
 			if err != nil {
@@ -515,10 +515,10 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	}
 	var said []Statement
 	err := withWords(s.db.NewSelect().Model(&said)).
-		Where("ss.product_id = ?", productID).
-		Where("superseded_at IS NULL").
-		Where("vulnerability IN (?)", bun.List(lowered)).
-		Where("component = ?", folded(component)).
+		Where(`"ss"."product_id" = ?`, productID).
+		Where(`"superseded_at" IS NULL`).
+		Where(`"vulnerability" IN (?)`, bun.List(lowered)).
+		Where(`"component" = ?`, folded(component)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what publishers have said about this: %w", err)
@@ -549,11 +549,11 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		}
 		var beneath []Statement
 		err := withWords(s.db.NewSelect().Model(&beneath)).
-			Where("ss.product_id = ?", productID).
-			Where("superseded_at IS NULL").
-			Where("placement = ?", PlacedProduct).
-			Where("vulnerability IN (?)", bun.List(lowered)).
-			Where("component IN (?)", bun.List(aboveNames)).
+			Where(`"ss"."product_id" = ?`, productID).
+			Where(`"superseded_at" IS NULL`).
+			Where(`"placement" = ?`, PlacedProduct).
+			Where(`"vulnerability" IN (?)`, bun.List(lowered)).
+			Where(`"component" IN (?)`, bun.List(aboveNames)).
 			Scan(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("read what publishers have said about what this sits in: %w", err)
@@ -592,13 +592,13 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 	err := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"component" AS "pc"`).
-		ColumnExpr(`pc.name_folded`).
-		Join(`JOIN "graph_node" AS "pn" ON pn.component_id = pc.id`).
-		Join(`JOIN "target" AS "pt" ON pt.id = pn.target_id`).
-		Join(`JOIN "stream" AS "ps" ON ps.id = pt.stream_id`).
-		Where("ps.product_id = ?", productID).
-		Where("pn.closed_scan_id IS NULL").
-		Where("pc.name_folded IN (?)", bun.List(named)).
+		ColumnExpr(`"pc"."name_folded"`).
+		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"`).
+		Join(`JOIN "target" AS "pt" ON "pt"."id" = "pn"."target_id"`).
+		Join(`JOIN "stream" AS "ps" ON "ps"."id" = "pt"."stream_id"`).
+		Where(`"ps"."product_id" = ?`, productID).
+		Where(`"pn"."closed_scan_id" IS NULL`).
+		Where(`"pc"."name_folded" IN (?)`, bun.List(named)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which suppliers' products this ships: %w", err)

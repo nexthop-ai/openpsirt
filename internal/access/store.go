@@ -226,7 +226,7 @@ func (s *Store) touch(ctx context.Context, model any, id int64, column string,
 		return nil, nil
 	}
 	if _, err := s.db.NewUpdate().Model(model).
-		Set("? = ?", bun.Ident(column), now).Where("id = ?", id).Exec(ctx); err != nil {
+		Set("? = ?", bun.Ident(column), now).Where(`"id" = ?`, id).Exec(ctx); err != nil {
 		return nil, err
 	}
 	return &now, nil
@@ -279,7 +279,7 @@ func (s *Store) move(ctx context.Context, existing *Account, admin, audits *bool
 			continue
 		}
 		result, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("? = ?", bun.Ident(flag.column), *flag.asked).Where("id = ?", existing.ID).
+			Set("? = ?", bun.Ident(flag.column), *flag.asked).Where(`"id" = ?`, existing.ID).
 			Where("? = ?", bun.Ident(flag.column), *flag.held).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
@@ -467,15 +467,15 @@ func (s *Store) SetEmail(ctx context.Context, personID int64, address string, fr
 	}
 
 	update := s.db.NewUpdate().Model((*Account)(nil)).
-		Set("email = ?", address).
-		Set("email_source = ?", from).
-		Where("id = ?", personID)
+		Set(`"email" = ?`, address).
+		Set(`"email_source" = ?`, from).
+		Where(`"id" = ?`, personID)
 	if from == FromProvider {
 		// Only where nobody here has decided. "Nobody has said" and "somebody
 		// said none" are different states and this is why they have to be:
 		// read as the same, the next sign-in puts back exactly the address an
 		// administrator had just removed.
-		update = update.Where("email_source <> ?", Recorded)
+		update = update.Where(`"email_source" <> ?`, Recorded)
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return fmt.Errorf("record where to reach person %d: %w", personID, err)
@@ -494,8 +494,8 @@ func (s *Store) SetDisplayName(ctx context.Context, personID int64, from, to str
 		return refusal.New("a name needs somebody to belong to")
 	}
 	result, err := s.db.NewUpdate().Model((*Account)(nil)).
-		Set("display_name = ?", strings.TrimSpace(to)).
-		Where("id = ?", personID).
+		Set(`"display_name" = ?`, strings.TrimSpace(to)).
+		Where(`"id" = ?`, personID).
 		Where(`COALESCE("display_name", '') = ?`, from).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the name of person %d: %w", personID, err)
@@ -525,9 +525,9 @@ func (s *Store) SetDigest(ctx context.Context, personID int64, wanted, unowned b
 		return refusal.New("a digest listing what nobody owns is still a digest: ask for one")
 	}
 	if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-		Set("digest = ?", wanted).
-		Set("digest_unassigned = ?", unowned).
-		Where("id = ?", personID).Exec(ctx); err != nil {
+		Set(`"digest" = ?`, wanted).
+		Set(`"digest_unassigned" = ?`, unowned).
+		Where(`"id" = ?`, personID).Exec(ctx); err != nil {
 		return fmt.Errorf("record what person %d asked to be sent: %w", personID, err)
 	}
 	return nil

@@ -103,10 +103,10 @@ func (s *Store) Untag(ctx context.Context, subject access.Subject, productID,
 		return err
 	}
 	if _, err := s.db.NewDelete().Model((*Tag)(nil)).
-		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id IN (?)", bun.List(held)).
-		Where("tag = ?", TagAs(typed)).Exec(ctx); err != nil {
+		Where(`"product_id" = ?`, productID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"component_id" IN (?)`, bun.List(held)).
+		Where(`"tag" = ?`, TagAs(typed)).Exec(ctx); err != nil {
 		return fmt.Errorf("take the mark off: %w", err)
 	}
 	return nil
@@ -130,13 +130,13 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 	var held []int64
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr("f.component_id").
+		ColumnExpr(`"f"."component_id"`).
 		Where(inThisProductAs("f.target_id"), productID).
-		Where("f.vulnerability_id = ?", vulnerabilityID)
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID)
 	if err := InTheFoldOf(q, componentID).
-		GroupExpr("f.component_id").
-		Having("SUM(CASE WHEN f.visibility IN (?) THEN 1 ELSE 0 END) > 0", bun.List(triaged)).
-		OrderExpr("f.component_id").
+		GroupExpr(`"f"."component_id"`).
+		Having(`SUM(CASE WHEN "f"."visibility" IN (?) THEN 1 ELSE 0 END) > 0`, bun.List(triaged)).
+		OrderExpr(`"f"."component_id"`).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read whether that finding may be marked: %w", err)
 	}
@@ -160,13 +160,13 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 	var readable []int64
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr("f.component_id").
+		ColumnExpr(`"f"."component_id"`).
 		Where(inThisProductAs("f.target_id"), productID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.visibility IN (?)", bun.List(visible))
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	if err := InTheFoldOf(q, componentID).
-		GroupExpr("f.component_id").
-		OrderExpr("f.component_id").
+		GroupExpr(`"f"."component_id"`).
+		OrderExpr(`"f"."component_id"`).
 		Scan(ctx, &readable); err != nil {
 		return nil, fmt.Errorf("read which packages of the fold may be read: %w", err)
 	}
@@ -175,9 +175,9 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 	}
 	var rows []Tag
 	if err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("component_id IN (?)", bun.List(readable)).
+		Where(`"product_id" = ?`, productID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"component_id" IN (?)`, bun.List(readable)).
 		Order("tag", "id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what it is marked with: %w", err)
 	}
@@ -218,19 +218,19 @@ func (s *Store) TagsInUse(ctx context.Context, subject access.Subject,
 	// same rule the list it filters answers by: offering a filter that
 	// matches nothing the caller may see would be its own small oracle.
 	const onSomethingReadable = `EXISTS (SELECT 1 FROM "finding" AS "f"
-		JOIN "target" AS "tg" ON tg.id = f.target_id
-		JOIN "stream" AS "st" ON st.id = tg.stream_id
-		WHERE st.product_id = ft.product_id
-		  AND f.vulnerability_id = ft.vulnerability_id
-		  AND f.component_id = ft.component_id
-		  AND f.visibility IN (?))`
+		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
+		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+		WHERE "st"."product_id" = "ft"."product_id"
+		  AND "f"."vulnerability_id" = "ft"."vulnerability_id"
+		  AND "f"."component_id" = "ft"."component_id"
+		  AND "f"."visibility" IN (?))`
 	if err := s.db.NewSelect().Model((*Tag)(nil)).
-		ColumnExpr(`MIN(ft.typed) AS "typed"`).
+		ColumnExpr(`MIN("ft"."typed") AS "typed"`).
 		ColumnExpr(`COUNT(*) AS "used"`).
-		Where("ft.product_id = ?", productID).
+		Where(`"ft"."product_id" = ?`, productID).
 		Where(onSomethingReadable, bun.List(visible)).
-		GroupExpr("ft.tag").
-		OrderExpr("used DESC, typed").
+		GroupExpr(`"ft"."tag"`).
+		OrderExpr(`used DESC, "typed"`).
 		Limit(100).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what is in use: %w", err)
@@ -248,10 +248,10 @@ func (s *Store) tagged(ctx context.Context, productID, vulnerabilityID,
 
 	on, err := s.db.NewSelect().Model((*Tag)(nil)).
 		Column("ft.id").
-		Where("ft.product_id = ?", productID).
-		Where("ft.vulnerability_id = ?", vulnerabilityID).
-		Where("ft.component_id = ?", componentID).
-		Where("ft.tag = ?", folded).Exists(ctx)
+		Where(`"ft"."product_id" = ?`, productID).
+		Where(`"ft"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"ft"."component_id" = ?`, componentID).
+		Where(`"ft"."tag" = ?`, folded).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether it is marked: %w", err)
 	}
@@ -290,26 +290,26 @@ func (s *Store) marksOnFolds(ctx context.Context, products, issues []int64, fold
 
 	seen := readable(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr("1").
-		Where("st.product_id = ft.product_id").
-		Where("f.vulnerability_id = ft.vulnerability_id").
-		Where("f.component_id = ft.component_id"))
+		Where(`"st"."product_id" = "ft"."product_id"`).
+		Where(`"f"."vulnerability_id" = "ft"."vulnerability_id"`).
+		Where(`"f"."component_id" = "ft"."component_id"`))
 	var found []foldMark
 	if err := s.db.NewSelect().
 		TableExpr(`"finding_tag" AS "ft"`).
-		Join(`JOIN "component" AS "ct" ON ct.id = ft.component_id`).
-		ColumnExpr(`ft.product_id AS "product_id"`).
-		ColumnExpr(`ft.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`ct.fold_key AS "fold"`).
-		ColumnExpr(`ft.tag AS "tag"`).
-		ColumnExpr(`ft.typed AS "typed"`).
-		Where("ft.product_id IN (?)", bun.List(products)).
-		Where("ft.vulnerability_id IN (?)", bun.List(issues)).
-		Where("ct.fold_key IN (?)", bun.List(folds)).
+		Join(`JOIN "component" AS "ct" ON "ct"."id" = "ft"."component_id"`).
+		ColumnExpr(`"ft"."product_id" AS "product_id"`).
+		ColumnExpr(`"ft"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"ct"."fold_key" AS "fold"`).
+		ColumnExpr(`"ft"."tag" AS "tag"`).
+		ColumnExpr(`"ft"."typed" AS "typed"`).
+		Where(`"ft"."product_id" IN (?)`, bun.List(products)).
+		Where(`"ft"."vulnerability_id" IN (?)`, bun.List(issues)).
+		Where(`"ct"."fold_key" IN (?)`, bun.List(folds)).
 		Where("EXISTS (?)", seen).
-		OrderExpr("ft.tag, ft.id").
+		OrderExpr(`"ft"."tag", "ft"."id"`).
 		Scan(ctx, &found); err != nil {
 		return nil, fmt.Errorf("read what these are marked with: %w", err)
 	}
@@ -334,7 +334,7 @@ func (s *Store) tagsFor(ctx context.Context, productID int64, rows []decorated,
 	}
 	found, err := s.marksOnFolds(ctx, []int64{productID}, issues, folds,
 		func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("f.visibility IN (?)", bun.List(visible))
+			return q.Where(`"f"."visibility" IN (?)`, bun.List(visible))
 		})
 	if err != nil {
 		return nil, err

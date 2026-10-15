@@ -21,10 +21,10 @@ import (
 func (f *fixture) ends(t *testing.T, decisionID int64, at time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-		Set("state = ?", triage.LapsedState).
-		Set("live_key = ?", nil).
-		Set("ended_at = ?", at).
-		Where("id = ?", decisionID).Exec(t.Context()); err != nil {
+		Set(`"state" = ?`, triage.LapsedState).
+		Set(`"live_key" = ?`, nil).
+		Set(`"ended_at" = ?`, at).
+		Where(`"id" = ?`, decisionID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -33,7 +33,7 @@ func (f *fixture) ends(t *testing.T, decisionID int64, at time.Time) {
 func (f *fixture) row(t *testing.T, id int64) triage.Decision {
 	t.Helper()
 	var row triage.Decision
-	if err := f.db.DB.NewSelect().Model(&row).Where("de.id = ?", id).Scan(t.Context()); err != nil {
+	if err := f.db.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, id).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return row
@@ -418,9 +418,9 @@ func TestAWithdrawnClaimReportsWhatItReachedWhenItWasWithdrawn(t *testing.T) {
 		gone := f.build(t, f.product, "2026.02")
 		closed := f.finds(t, gone, libfoo, at.PlaceIdentity, access.Public)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)).
-			Set("closed_run_id = ?", gone.run).
-			Where("id = ?", closed).Exec(ctx); err != nil {
+			Set(`"closed_at" = ?`, time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)).
+			Set(`"closed_run_id" = ?`, gone.run).
+			Where(`"id" = ?`, closed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		made := f.claims(t, at)

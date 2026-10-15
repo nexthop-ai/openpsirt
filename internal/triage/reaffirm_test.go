@@ -37,9 +37,9 @@ func (f *fixture) judged(t *testing.T, at triage.Place, severity int) *triage.De
 func (f *fixture) lapsed(t *testing.T, id int64) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-		Set("state = ?", triage.LapsedState).
-		Set("ended_at = ?", time.Now().UTC()).
-		Where("id = ?", id).Exec(t.Context()); err != nil {
+		Set(`"state" = ?`, triage.LapsedState).
+		Set(`"ended_at" = ?`, time.Now().UTC()).
+		Where(`"id" = ?`, id).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -90,8 +90,8 @@ func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
 		// The world revises it upward, which is what an advisory sweep does.
 		// Read by the store rather than handed in, so this is where it moves.
 		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-			Set("score_centi = ?", 950).
-			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			Set(`"score_centi" = ?`, 950).
+			Where(`"id" = ?`, f.issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -159,8 +159,8 @@ func TestASeverityRiseEscalatesOnlyAClaimItBearsOn(t *testing.T) {
 			agreed[i] = decision
 		}
 		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-			Set("score_centi = ?", 950).
-			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			Set(`"score_centi" = ?`, 950).
+			Where(`"id" = ?`, f.issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for i, c := range cases {
@@ -261,8 +261,8 @@ func TestALapsedClaimNobodyAgreedToIsNotPreAgreed(t *testing.T) {
 		// Lapse's own effect when the versions move, without standing up a
 		// scan to move them.
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-			Set("state = ?", triage.LapsedState).
-			Where("id = ?", neverAgreed.ID).Exec(ctx); err != nil {
+			Set(`"state" = ?`, triage.LapsedState).
+			Where(`"id" = ?`, neverAgreed.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -524,7 +524,7 @@ func TestADecisionUndisclosedSinceIsNotReaffirmedBySomebodyWhoMayNotArgueIt(t *t
 		}
 		f.lapsed(t, agreed.ID)
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-			Set("visibility = ?", access.Private).Where("id = ?", agreed.ID).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).Where(`"id" = ?`, agreed.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		moved := f.at()

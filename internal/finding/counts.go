@@ -65,14 +65,14 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	inner := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(column + ` AS "grouped_by"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.closed_at IS NULL")
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."closed_at" IS NULL`)
 	if !all {
-		inner = inner.Where("st.product_id IN (?)", bun.List(products))
+		inner = inner.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
 	inner = scope.Narrow(onlyVisible(inner, subject, products, all))
 

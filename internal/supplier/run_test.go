@@ -152,8 +152,8 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 		}
 		// Wound back so the publisher's document is ahead of the mark.
 		if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-			Set("caught_up_to = ?", long).
-			Where("id IN (?, ?)", down.ID, up.ID).Exec(ctx); err != nil {
+			Set(`"caught_up_to" = ?`, long).
+			Where(`"id" IN (?, ?)`, down.ID, up.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

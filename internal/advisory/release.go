@@ -169,35 +169,35 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 	// answer would be assembled from thirty moments rather than one.
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		// This build's own name for itself, from the scan that inventory
 		// arrived on. Joined on the target's current scan, which is one row by
 		// key, so it cannot multiply the findings counted below.
-		Join(`LEFT JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
-		ColumnExpr(`st.id AS "stream_id"`).
-		ColumnExpr(`va.id AS "variant_id"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
+		Join(`LEFT JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
+		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"va"."id" AS "variant_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		// Counted rather than filtered, so a release that held the flaw and no
 		// longer does is still a row — that is the release somebody upgrades
 		// to, and dropping it would leave finished work indistinguishable
 		// from a release that never shipped the thing.
-		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NULL THEN 1 END) AS "open"`).
+		ColumnExpr(`COUNT(CASE WHEN "f"."closed_at" IS NULL THEN 1 END) AS "open"`).
 		// Closures that are a fix, from the one list of them. A superseded
 		// closure is the flaw moving with the version, and an unexplained one
 		// is a scanner falling silent; neither says it left.
-		ColumnExpr(`COUNT(CASE WHEN f.closed_because IN (?) THEN 1 END) AS "settled"`,
+		ColumnExpr(`COUNT(CASE WHEN "f"."closed_because" IN (?) THEN 1 END) AS "settled"`,
 			bun.List(finding.Resolving())).
 		// One value per build, aggregated because the grouping is on the
 		// build's names as well as its keys.
-		ColumnExpr(`MIN(COALESCE(sc.root_identifier, '')) AS "root_identifier"`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", issueID).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(finding.NeverPresent())).
-		GroupExpr("st.id, va.id, st.name, va.name").
+		ColumnExpr(`MIN(COALESCE("sc"."root_identifier", '')) AS "root_identifier"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, issueID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`COALESCE("f"."closed_because", '') NOT IN (?)`, bun.List(finding.NeverPresent())).
+		GroupExpr(`"st"."id", "va"."id", "st"."name", "va"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which releases this is in: %w", err)
@@ -252,16 +252,16 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 	}
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`t.stream_id AS "stream_id"`).
-		ColumnExpr(`t.variant_id AS "variant_id"`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", issueID).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("t.stream_id, t.variant_id")
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"t"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"t"."variant_id" AS "variant_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, issueID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"t"."stream_id", "t"."variant_id"`)
 	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)
 	}
@@ -306,18 +306,18 @@ func madeOn(ctx context.Context, db bun.IDB, decisions []int64) (map[int64][]Bui
 		ID int64 `bun:"id"`
 		Built
 	}
-	where, args := database.InAnyOf("de.id", decisions)
+	where, args := database.InAnyOf(`"de"."id"`, decisions)
 	err := db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_build" AS "cb" ON cb.claim_id = de.claim_id`).
-		Join(`JOIN "target" AS "t" ON t.id = cb.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		ColumnExpr(`de.id AS "id"`).
-		ColumnExpr(`st.id AS "stream_id"`).
-		ColumnExpr(`va.id AS "variant_id"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
+		Join(`JOIN "claim_build" AS "cb" ON "cb"."claim_id" = "de"."claim_id"`).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "cb"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
+		ColumnExpr(`"de"."id" AS "id"`).
+		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"va"."id" AS "variant_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		Where(where, args...).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -376,13 +376,13 @@ func overridesOf(ctx context.Context, db bun.IDB, advisoryID, productID,
 	}
 	err := db.NewSelect().
 		TableExpr(`"advisory_override" AS "ao"`).
-		Join(`JOIN "vulnerability" AS "ov" ON ov.id = ao.vulnerability_id`).
-		ColumnExpr(`ao.stream_id AS "stream_id"`).
-		ColumnExpr(`ao.variant_id AS "variant_id"`).
-		Where("ao.advisory_id = ?", advisoryID).
-		Where("ao.product_id = ?", productID).
-		Where("ov.issue_id = ?", issueID).
-		Where("ao.removed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "ov" ON "ov"."id" = "ao"."vulnerability_id"`).
+		ColumnExpr(`"ao"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"ao"."variant_id" AS "variant_id"`).
+		Where(`"ao"."advisory_id" = ?`, advisoryID).
+		Where(`"ao"."product_id" = ?`, productID).
+		Where(`"ov"."issue_id" = ?`, issueID).
+		Where(`"ao"."removed_at" IS NULL`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which releases are marked affected: %w", err)

@@ -99,7 +99,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 		*team = Team{}
 		found := new(Team)
 		err := tx.NewSelect().Model(found).
-			Where("name = ?", matched).Limit(1).Scan(ctx)
+			Where(`"name" = ?`, matched).Limit(1).Scan(ctx)
 		switch {
 		case err == nil && found.RetiredAt == nil:
 			*team = *found
@@ -113,9 +113,9 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 			// there as far as anybody can see. Reinstating is also what
 			// somebody typing a name they retired last week means.
 			if _, err := tx.NewUpdate().Model((*Team)(nil)).
-				Set("retired_at = ?", nil).
-				Set("display_name = ?", shown).
-				Where("id = ?", found.ID).Exec(ctx); err != nil {
+				Set(`"retired_at" = ?`, nil).
+				Set(`"display_name" = ?`, shown).
+				Where(`"id" = ?`, found.ID).Exec(ctx); err != nil {
 				return err
 			}
 			found.RetiredAt, found.DisplayName = nil, shown
@@ -155,8 +155,8 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 	team := new(Team)
 	err := s.db.NewSelect().Model(team).
-		Where("name = ?", typedname.Matching(name)).
-		Where("retired_at IS NULL").
+		Where(`"name" = ?`, typedname.Matching(name)).
+		Where(`"retired_at" IS NULL`).
 		Limit(1).Scan(ctx)
 	if err != nil {
 		// A read that could not be made is not an answer about what exists:
@@ -202,7 +202,7 @@ func (s *Store) TeamsByID(ctx context.Context, ids []int64) (map[int64]Team, err
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, some []int64) error {
 		var teams []Team
 		if err := s.db.NewSelect().Model(&teams).
-			Where("id IN (?)", bun.List(some)).Scan(ctx); err != nil {
+			Where(`"id" IN (?)`, bun.List(some)).Scan(ctx); err != nil {
 			return fmt.Errorf("read the teams named: %w", err)
 		}
 		for _, team := range teams {
@@ -234,7 +234,7 @@ func narrowTeams(query *bun.SelectQuery, term string) *bun.SelectQuery {
 	// Matched without regard to capitals, the way every name a person types is
 	// matched here, and escaped: a search box is not a pattern language, and a
 	// term of "%" would answer with every team there is.
-	return database.LikeNameOrShown(query.Where("retired_at IS NULL"),
+	return database.LikeNameOrShown(query.Where(`"retired_at" IS NULL`),
 		bun.Ident("name"), bun.Ident("display_name"), term)
 }
 
@@ -245,13 +245,13 @@ func narrowTeams(query *bun.SelectQuery, term string) *bun.SelectQuery {
 func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 	write := func(ctx context.Context, db bun.IDB) error {
 		if _, err := db.NewDelete().Model((*Membership)(nil)).
-			Where("team_id = ?", teamID).Exec(ctx); err != nil {
+			Where(`"team_id" = ?`, teamID).Exec(ctx); err != nil {
 			return err
 		}
 		res, err := db.NewUpdate().Model((*Team)(nil)).
-			Set("retired_at = ?", s.now().Truncate(time.Microsecond)).
-			Where("id = ?", teamID).
-			Where("retired_at IS NULL").
+			Set(`"retired_at" = ?`, s.now().Truncate(time.Microsecond)).
+			Where(`"id" = ?`, teamID).
+			Where(`"retired_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -287,7 +287,7 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool
 	add := func(ctx context.Context, db bun.IDB) error {
 		added = false
 		on, err := db.NewSelect().Model((*Membership)(nil)).
-			Where("team_id = ?", teamID).Where("person_id = ?", personID).Count(ctx)
+			Where(`"team_id" = ?`, teamID).Where(`"person_id" = ?`, personID).Count(ctx)
 		if err != nil {
 			return err
 		}
@@ -318,7 +318,7 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool
 // record of who could have seen what.
 func (s *Store) RemoveFromTeam(ctx context.Context, teamID, personID int64) error {
 	res, err := s.db.NewDelete().Model((*Membership)(nil)).
-		Where("team_id = ?", teamID).Where("person_id = ?", personID).Exec(ctx)
+		Where(`"team_id" = ?`, teamID).Where(`"person_id" = ?`, personID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("take that person off the team: %w", err)
 	}
@@ -337,7 +337,7 @@ func (s *Store) MembersOf(ctx context.Context, teamID int64) ([]int64, error) {
 	var people []int64
 	if err := s.db.NewSelect().Model((*Membership)(nil)).
 		Column("person_id").
-		Where("team_id = ?", teamID).
+		Where(`"team_id" = ?`, teamID).
 		Order("person_id").Scan(ctx, &people); err != nil {
 		return nil, fmt.Errorf("read who is on that team: %w", err)
 	}
@@ -351,9 +351,9 @@ func (s *Store) MembersOf(ctx context.Context, teamID int64) ([]int64, error) {
 func (s *Store) TeamsOf(ctx context.Context, personID int64) ([]Team, error) {
 	var teams []Team
 	err := s.db.NewSelect().Model(&teams).
-		Join(`JOIN "team_member" AS "tmm" ON tmm.team_id = tm.id`).
-		Where("tmm.person_id = ?", personID).
-		Where("tm.retired_at IS NULL").
+		Join(`JOIN "team_member" AS "tmm" ON "tmm"."team_id" = "tm"."id"`).
+		Where(`"tmm"."person_id" = ?`, personID).
+		Where(`"tm"."retired_at" IS NULL`).
 		Order("tm.name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read which teams somebody is on: %w", err)
@@ -391,7 +391,7 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 	var people []Account
 	if err := s.db.NewSelect().Model(&people).
 		Column("party_id", "identity", "display_name").
-		Where("party_id IN (?)", bun.List(parties)).Scan(ctx); err != nil {
+		Where(`"party_id" IN (?)`, bun.List(parties)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who holds these: %w", err)
 	}
 	for _, person := range people {
@@ -404,7 +404,7 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 	var teams []Team
 	if err := s.db.NewSelect().Model(&teams).
 		Column("party_id", "name", "display_name").
-		Where("party_id IN (?)", bun.List(parties)).Scan(ctx); err != nil {
+		Where(`"party_id" IN (?)`, bun.List(parties)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams hold these: %w", err)
 	}
 	for _, team := range teams {
@@ -439,8 +439,8 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 		return false, err
 	}
 	reads, err := holdingAny(s.db.NewSelect().
-		TableExpr(`"person" AS "p"`).ColumnExpr("p.id").
-		Where("p.id = ?", personID), "p.id", enough, productID).Exists(ctx)
+		TableExpr(`"person" AS "p"`).ColumnExpr(`"p"."id"`).
+		Where(`"p"."id" = ?`, personID), "p.id", enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they may see this: %w", err)
 	}
@@ -456,8 +456,8 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 // to them is handed to somebody who will never see it.
 func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 	live, err := s.db.NewSelect().Model((*Account)(nil)).
-		Where("id = ?", personID).
-		Where("deactivated_at IS NULL").
+		Where(`"id" = ?`, personID).
+		Where(`"deactivated_at" IS NULL`).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they are still here: %w", err)
@@ -485,11 +485,11 @@ func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 // take: a union inside an EXISTS is a syntax error on SQLite.
 func holdingAny(q *bun.SelectQuery, person string, enough []Role, productID int64) *bun.SelectQuery {
 	return q.Where(`EXISTS (SELECT 1 FROM "role_grant" AS "g"
-			WHERE g.person_id = `+person+` AND g.active = ?
-			  AND g.product_id = ? AND g.role IN (?))
+			WHERE "g"."person_id" = `+person+` AND "g"."active" = ?
+			  AND "g"."product_id" = ? AND "g"."role" IN (?))
 		OR EXISTS (SELECT 1 FROM "role_grant_all" AS "ga"
-			WHERE ga.person_id = `+person+` AND ga.active = ?
-			  AND ga.role IN (?))`,
+			WHERE "ga"."person_id" = `+person+` AND "ga"."active" = ?
+			  AND "ga"."role" IN (?))`,
 		true, productID, bun.List(enough), true, bun.List(enough))
 }
 
@@ -532,10 +532,10 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	// counted either, for the same reason.
 	reads, err := holdingAny(s.db.NewSelect().
 		TableExpr(`"team_member" AS "tmm"`).
-		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).
-		ColumnExpr("tmm.person_id").
-		Where("tmm.team_id = ?", teamID).
-		Where("pe.deactivated_at IS NULL"), "tmm.person_id", enough, productID).Exists(ctx)
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "tmm"."person_id"`).
+		ColumnExpr(`"tmm"."person_id"`).
+		Where(`"tmm"."team_id" = ?`, teamID).
+		Where(`"pe"."deactivated_at" IS NULL`), "tmm.person_id", enough, productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether anybody on that team may see this: %w", err)
 	}

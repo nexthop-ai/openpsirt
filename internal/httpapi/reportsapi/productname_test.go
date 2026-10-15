@@ -164,7 +164,7 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 		r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		for _, table := range []string{"product", "stream", "variant"} {
 			if _, err := r.DB.DB.NewUpdate().Table(table).
-				Set("display_name = ?", "").Where("1 = 1").Exec(t.Context()); err != nil {
+				Set(`"display_name" = ?`, "").Where("1 = 1").Exec(t.Context()); err != nil {
 				t.Fatal(err)
 			}
 		}

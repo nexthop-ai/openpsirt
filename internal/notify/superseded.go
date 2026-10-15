@@ -65,27 +65,27 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 		}
 		q := db.NewSelect().
 			TableExpr(`"product" AS "p"`).
-			Join(`JOIN "vulnerability_merge" AS "vm" ON vm.id = ?`, one.MergeID).
-			Join(`JOIN "vulnerability" AS "va" ON va.id = vm.absorbed_id`).
-			Join(`JOIN "vulnerability" AS "vk" ON vk.id = vm.kept_id`).
-			ColumnExpr(`p.name AS "product"`).
-			ColumnExpr(`vk.issue_id AS "issue_id"`).
-			ColumnExpr(`va.identifier AS "absorbed"`).
-			ColumnExpr(`vk.identifier AS "kept"`).
-			Where("p.id = ?", one.ProductID)
+			Join(`JOIN "vulnerability_merge" AS "vm" ON "vm"."id" = ?`, one.MergeID).
+			Join(`JOIN "vulnerability" AS "va" ON "va"."id" = "vm"."absorbed_id"`).
+			Join(`JOIN "vulnerability" AS "vk" ON "vk"."id" = "vm"."kept_id"`).
+			ColumnExpr(`"p"."name" AS "product"`).
+			ColumnExpr(`"vk"."issue_id" AS "issue_id"`).
+			ColumnExpr(`"va"."identifier" AS "absorbed"`).
+			ColumnExpr(`"vk"."identifier" AS "kept"`).
+			Where(`"p"."id" = ?`, one.ProductID)
 		if one.Kind == finding.DisplacedDecision {
 			// Private where either decision is: the one that stands is what
 			// the link opens, and the one that lapsed is what the message
 			// is about.
 			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de" `+
-				`WHERE de.id IN (?, ?) AND de.visibility = ?) THEN 1 ELSE 0 END AS "private"`,
+				`WHERE "de"."id" IN (?, ?) AND "de"."visibility" = ?) THEN 1 ELSE 0 END AS "private"`,
 				one.RecordID, one.StandingID, string(access.Private))
 		} else {
 			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "finding" AS "f" `+
-				`JOIN "target" AS "tg" ON tg.id = f.target_id `+
-				`JOIN "stream" AS "st" ON st.id = tg.stream_id `+
-				`WHERE f.vulnerability_id = vk.issue_id AND st.product_id = p.id `+
-				`AND f.visibility = ?) THEN 0 ELSE 1 END AS "private"`,
+				`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id" `+
+				`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" `+
+				`WHERE "f"."vulnerability_id" = "vk"."issue_id" AND "st"."product_id" = "p"."id" `+
+				`AND "f"."visibility" = ?) THEN 0 ELSE 1 END AS "private"`,
 				string(access.Public))
 		}
 		var about supersededAbout

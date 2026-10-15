@@ -93,8 +93,8 @@ func TestTheDetectorFindsACorrelationSpelledOut(t *testing.T) {
 		"WHERE `+DecisionAt(\"?\")+`",
 		"WHERE `+finding.DecisionAtPlace(\"f\")+`",
 		"ColumnExpr(`dv.issue_id AS \"vulnerability_id\"`)",
-		`JOIN "vulnerability" AS "dv" ON dv.id = de.vulnerability_id`,
-		`JOIN "finding" AS "f" ON f.vulnerability_id = ri.issue_id`,
+		`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`,
+		`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`,
 		`Where("de.place_identity IN (?)", bun.List(identities))`,
 	}
 	for _, line := range composed {

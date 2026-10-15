@@ -335,7 +335,7 @@ func TestNamingAFixReleaseLandsInTheAdministrativeTrail(t *testing.T) {
 		}
 		if err := f.db.DB.NewSelect().TableExpr(`"admin_change"`).
 			ColumnExpr(`"kind", "by", "was", "became"`).
-			Where("about = ?", "CVE-2026-1 on "+world.ProductName+", fix release").
+			Where(`"about" = ?`, "CVE-2026-1 on "+world.ProductName+", fix release").
 			OrderExpr(`"id" ASC`).Scan(ctx, &rows); err != nil {
 			t.Fatal(err)
 		}
@@ -395,8 +395,8 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.db.DB.NewUpdate().Table("target").Set("last_run_id = ?", run.ID).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("target").Set(`"last_run_id" = ?`, run.ID).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if got := state(t, f.triager); !got.Scanned || got.Open {
@@ -427,7 +427,7 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		}
 
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", now).Where("id = ?", open.ID).Exec(ctx); err != nil {
+			Set(`"closed_at" = ?`, now).Where(`"id" = ?`, open.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if got := state(t, f.insider); !got.Scanned || got.Open {

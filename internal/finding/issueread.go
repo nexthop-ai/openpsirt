@@ -36,11 +36,11 @@ func (v *Vulnerabilities) PointsAtFor(ctx context.Context, subject access.Subjec
 func (v *Vulnerabilities) pointsAt(ctx context.Context, id int64) ([]Reference, error) {
 	var references []Reference
 	if err := v.db.NewSelect().Model(&references).
-		Where("vulnerability_id = ?", id).
+		Where(`"vulnerability_id" = ?`, id).
 		// Patches first, the same order the finding's own evidence reads
 		// them in: for somebody deciding whether to backport, the change
 		// itself is the answer and everything else is background.
-		OrderExpr("CASE WHEN kind = ? THEN 0 ELSE 1 END, url", Patch).
+		OrderExpr(`CASE WHEN "kind" = ? THEN 0 ELSE 1 END, "url"`, Patch).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read where this is written up: %w", err)
 	}
@@ -66,7 +66,7 @@ func (v *Vulnerabilities) ByName(ctx context.Context, name string) (int64, error
 	}
 	var alias Alias
 	if err := v.db.NewSelect().Model(&alias).
-		Where("identifier = ?", normalized).Scan(ctx); err != nil {
+		Where(`"identifier" = ?`, normalized).Scan(ctx); err != nil {
 		return 0, database.FromRead(err, fmt.Errorf("no issue is named %q: %w", name, ErrNoSuchIssue),
 			fmt.Sprintf("look up what issue %q is", name))
 	}
@@ -95,7 +95,7 @@ func (v *Vulnerabilities) IDsByName(ctx context.Context, names []string) (map[st
 	var aliases []Alias
 	if err := v.db.NewSelect().Model(&aliases).
 		Column("identifier", "vulnerability_id").
-		Where("identifier IN (?)", bun.List(wanted)).Scan(ctx); err != nil {
+		Where(`"identifier" IN (?)`, bun.List(wanted)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which issues these are: %w", err)
 	}
 	byIdentifier := make(map[string]int64, len(aliases))
@@ -218,14 +218,14 @@ func recordedOutOfReachOf(subject access.Subject, column string) (string, []any)
 // describe is DescribeFor before anything is withheld.
 func (v *Vulnerabilities) describe(ctx context.Context, id int64) (Named, error) {
 	var row Vulnerability
-	if err := v.db.NewSelect().Model(&row).Where("id = ?", id).Scan(ctx); err != nil {
+	if err := v.db.NewSelect().Model(&row).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 		return Named{}, fmt.Errorf("read what this issue is: %w", err)
 	}
 	var names []string
 	if err := v.db.NewSelect().Model((*Alias)(nil)).
-		ColumnExpr("va.identifier").
-		Where("va.vulnerability_id = ?", id).
-		OrderExpr("va.identifier").
+		ColumnExpr(`"va"."identifier"`).
+		Where(`"va"."vulnerability_id" = ?`, id).
+		OrderExpr(`"va"."identifier"`).
 		Scan(ctx, &names); err != nil {
 		return Named{}, fmt.Errorf("read what else it is called: %w", err)
 	}

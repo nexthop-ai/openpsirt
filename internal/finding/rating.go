@@ -103,8 +103,8 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	}
 	var held []int
 	if err := v.db.NewSelect().Model((*CVSS)(nil)).
-		ColumnExpr("vr.generation").
-		Where("vr.vulnerability_id = ?", id).
+		ColumnExpr(`"vr"."generation"`).
+		Where(`"vr"."vulnerability_id" = ?`, id).
 		Scan(ctx, &held); err != nil {
 		return fmt.Errorf("read the ratings already held: %w", err)
 	}
@@ -120,9 +120,9 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 		}
 		if known[rating.Generation] {
 			if _, err := rating.setOn(v.db.NewUpdate().Model((*CVSS)(nil))).
-				Where("vulnerability_id = ?", id).
-				Where("generation = ?", rating.Generation).
-				Where("score_centi < ?", rating.ScoreCenti).
+				Where(`"vulnerability_id" = ?`, id).
+				Where(`"generation" = ?`, rating.Generation).
+				Where(`"score_centi" < ?`, rating.ScoreCenti).
 				Exec(ctx); err != nil {
 				return fmt.Errorf("raise how the issue is rated: %w", err)
 			}
@@ -151,8 +151,8 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 func (v *Vulnerabilities) settle(ctx context.Context, id int64) (bool, error) {
 	var newest []CVSS
 	if err := v.db.NewSelect().Model(&newest).
-		Where("vr.vulnerability_id = ?", id).
-		OrderExpr("vr.generation DESC").
+		Where(`"vr"."vulnerability_id" = ?`, id).
+		OrderExpr(`"vr"."generation" DESC`).
 		Limit(1).Scan(ctx); err != nil {
 		return false, fmt.Errorf("read the newest rating: %w", err)
 	}
@@ -161,7 +161,7 @@ func (v *Vulnerabilities) settle(ctx context.Context, id int64) (bool, error) {
 	}
 	rating := newest[0]
 	var row Vulnerability
-	if err := v.db.NewSelect().Model(&row).Where("id = ?", id).Scan(ctx); err != nil {
+	if err := v.db.NewSelect().Model(&row).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 		return false, fmt.Errorf("read the issue's rating: %w", err)
 	}
 	if rating.sameAs(row) {
@@ -169,7 +169,7 @@ func (v *Vulnerabilities) settle(ctx context.Context, id int64) (bool, error) {
 	}
 	moved := row.ScoreCenti == nil || *row.ScoreCenti != rating.ScoreCenti
 	if _, err := rating.setOn(v.db.NewUpdate().Model((*Vulnerability)(nil))).
-		Where("id = ?", id).
+		Where(`"id" = ?`, id).
 		Exec(ctx); err != nil {
 		return false, fmt.Errorf("record the issue's rating: %w", err)
 	}
@@ -179,11 +179,11 @@ func (v *Vulnerabilities) settle(ctx context.Context, id int64) (bool, error) {
 // setOn writes a rating's five columns, which are one rating wherever they
 // are held: on the generation and on the issue.
 func (r CVSS) setOn(q *bun.UpdateQuery) *bun.UpdateQuery {
-	return q.Set("score_centi = ?", r.ScoreCenti).
-		Set("vector = ?", r.Vector).
-		Set("score_version = ?", r.Version).
-		Set("score_source = ?", r.Source).
-		Set("score_kind = ?", r.Kind)
+	return q.Set(`"score_centi" = ?`, r.ScoreCenti).
+		Set(`"vector" = ?`, r.Vector).
+		Set(`"score_version" = ?`, r.Version).
+		Set(`"score_source" = ?`, r.Source).
+		Set(`"score_kind" = ?`, r.Kind)
 }
 
 // sameAs reports whether an issue already holds this rating, all five columns
@@ -197,8 +197,8 @@ func (r CVSS) sameAs(v Vulnerability) bool {
 func (v *Vulnerabilities) Ratings(ctx context.Context, id int64) ([]CVSS, error) {
 	var ratings []CVSS
 	if err := v.db.NewSelect().Model(&ratings).
-		Where("vr.vulnerability_id = ?", id).
-		OrderExpr("vr.generation DESC").
+		Where(`"vr"."vulnerability_id" = ?`, id).
+		OrderExpr(`"vr"."generation" DESC`).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how the issue is rated: %w", err)
 	}

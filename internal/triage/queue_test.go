@@ -266,8 +266,8 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 		// taken back. Withdrawing needs nobody, so the whole loop is one
 		// person's.
 		if _, err := f.db.DB.NewUpdate().Table("decision").
-			Set("proposed_at = ?", time.Now().UTC().Add(-28*24*time.Hour)).
-			Where("claim_id = ?", first.ClaimID).Exec(ctx); err != nil {
+			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-28*24*time.Hour)).
+			Where(`"claim_id" = ?`, first.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {

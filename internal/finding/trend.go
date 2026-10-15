@@ -126,36 +126,36 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// join runs before it.
 	moments := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		// The product, because the rating is this product's where it has
 		// stated one, and one issue in two products can be rated twice.
-		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		// Off the row, not through the run that opened it, so a finding
 		// somebody recorded by hand — which has no run — is on the chart.
-		ColumnExpr(`f.opened_at AS "opened_at"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		// And the closing off the row too, for the same reason: a finding a
 		// person closed has no run either.
-		ColumnExpr(`f.closed_at AS "closed_at"`).
-		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
+		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 		// A record taken back as invalid, and a version the issue's record
 		// states is unaffected, were never present, so neither is in any
 		// step's open set.
-		Where("COALESCE(f.closed_because, '') NOT IN (?)", bun.List(NeverPresent())).
+		Where(`COALESCE("f"."closed_because", '') NOT IN (?)`, bun.List(NeverPresent())).
 		// Only what can fall in the range. A finding opened after the last
 		// point contributes to nothing, and one closed before the first
 		// contributes to nothing either — reading the whole table to discard
 		// most of it grows the cost of a chart with the age of the deployment.
-		Where("f.opened_at <= ?", until).
+		Where(`"f"."opened_at" <= ?`, until).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("f.closed_at IS NULL").
-				WhereOr("f.closed_at > ?", since)
+			return q.WhereOr(`"f"."closed_at" IS NULL`).
+				WhereOr(`"f"."closed_at" > ?`, since)
 		}).
 		// Grouped on the stored reason rather than the folded one: a reason
 		// that is absent and one that is empty fold to the same word, so at
 		// worst one moment arrives twice, and a set counts it once.
-		GroupExpr("f.vulnerability_id, st.product_id, f.opened_at, f.closed_at, f.closed_because")
+		GroupExpr(`"f"."vulnerability_id", "st"."product_id", "f"."opened_at", "f"."closed_at", "f"."closed_because"`)
 	// Every narrowing is a condition on a place, so each is applied before
 	// the places are reduced: what a subject may read is decided per finding,
 	// and a moment survives when any place behind it is readable.
@@ -166,7 +166,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// one version of one package is a chart of a moment rather than of a
 	// component.
 	if name := strings.TrimSpace(within.Component); name != "" {
-		moments = moments.Where("f.component_id IN (?)",
+		moments = moments.Where(`"f"."component_id" IN (?)`,
 			componentsWhere(moments, "c.name_folded = ?", graph.Folded(name)))
 	}
 	if within.Beneath != nil {
@@ -180,13 +180,13 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(targets))
 		}
-		moments = moments.Where("f.component_id IN (?)",
+		moments = moments.Where(`"f"."component_id" IN (?)`,
 			graph.Within(moments.DB(), targets[0], *within.Beneath))
 	}
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, moments).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		// This product's rating where it has stated one, folded to the four
 		// words that rank. The other chart on this screen reads it the same
 		// way, so a product that re-rated an issue does not see one severity
@@ -197,11 +197,11 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// word of its own, and the browser draws one "unrated" rung rather
 		// than a key for each.
 		Join(rating.For(rating.OnGrouped)).
-		ColumnExpr(`grouped.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(rating.BandExpr + ` AS "severity"`).
-		ColumnExpr(`grouped.opened_at AS "opened_at"`).
-		ColumnExpr(`grouped.closed_at AS "closed_at"`).
-		ColumnExpr(`grouped.closed_because AS "closed_because"`)
+		ColumnExpr(`"grouped"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"grouped"."closed_at" AS "closed_at"`).
+		ColumnExpr(`"grouped"."closed_because" AS "closed_because"`)
 	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what changed over time: %w", err)
 	}

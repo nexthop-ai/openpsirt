@@ -264,18 +264,18 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 			return err
 		}
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
-			Set("query = ?", kept.Query).
-			Set("display_name = ?", kept.DisplayName).
+			Set(`"query" = ?`, kept.Query).
+			Set(`"display_name" = ?`, kept.DisplayName).
 			// The claim it prepares is replaced too, including with nothing:
 			// saving over a name is deciding what that name means now, and a
 			// prefill that survived being taken off would fire on a filter
 			// somebody thought they had made ordinary.
-			Set("outcome = ?", kept.Outcome).
-			Set("justification = ?", kept.Justification).
-			Set("reasoning = ?", kept.Reasoning).
-			Set("defer_days = ?", kept.DeferDays).
-			Where("person_id = ?", personID).
-			Where("name = ?", matched).
+			Set(`"outcome" = ?`, kept.Outcome).
+			Set(`"justification" = ?`, kept.Justification).
+			Set(`"reasoning" = ?`, kept.Reasoning).
+			Set(`"defer_days" = ?`, kept.DeferDays).
+			Where(`"person_id" = ?`, personID).
+			Where(`"name" = ?`, matched).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -286,15 +286,15 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		}
 		if n > 0 {
 			return db.NewSelect().Model(kept).
-				Where("person_id = ?", personID).
-				Where("name = ?", matched).
+				Where(`"person_id" = ?`, personID).
+				Where(`"name" = ?`, matched).
 				Limit(1).Scan(ctx)
 		}
 		// Counted inside the same transaction as the write it bounds, after
 		// the turn above, and only on the path that adds a row: replacing one
 		// of your own is not how a table fills up.
 		held, err := db.NewSelect().Model((*Filter)(nil)).
-			Where("person_id = ?", personID).
+			Where(`"person_id" = ?`, personID).
 			Count(ctx)
 		if err != nil {
 			return err
@@ -359,7 +359,7 @@ func (s *Store) SavedFilters(ctx context.Context, personID int64,
 	}
 	var kept []Filter
 	total, err := s.db.NewSelect().Model(&kept).
-		Where("person_id = ?", personID).
+		Where(`"person_id" = ?`, personID).
 		Order("name").Limit(cap).ScanAndCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what you have kept: %w", err)
@@ -374,8 +374,8 @@ func (s *Store) SavedFilters(ctx context.Context, personID int64,
 // to mean it at the query rather than only on the screen.
 func (s *Store) ForgetFilter(ctx context.Context, personID int64, name string) error {
 	res, err := s.db.NewDelete().Model((*Filter)(nil)).
-		Where("person_id = ?", personID).
-		Where("name = ?", typedname.Matching(name)).
+		Where(`"person_id" = ?`, personID).
+		Where(`"name" = ?`, typedname.Matching(name)).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("forget that filter: %w", err)

@@ -46,8 +46,8 @@ func (f *fixture) argues(t *testing.T, claims ...sbom.Suppression) {
 // rooted says the last scan's inventory named its root as given.
 func (f *fixture) rooted(t *testing.T, identifier string) {
 	t.Helper()
-	if _, err := f.db.DB.NewUpdate().Table("scan").Set("root_identifier = ?", identifier).
-		Where("id = ?", f.lastScan).Exec(t.Context()); err != nil {
+	if _, err := f.db.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, identifier).
+		Where(`"id" = ?`, f.lastScan).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -329,7 +329,7 @@ func TestARevisionUploadedOnItsOwnReplacesTheClaimSentWithTheInventory(t *testin
 		}
 		var origin string
 		if err := f.db.DB.NewSelect().Table("suppression").Column("origin").
-			Where("id = ?", *f.every(t)[0].ClaimedBy).Scan(t.Context(), &origin); err != nil {
+			Where(`"id" = ?`, *f.every(t)[0].ClaimedBy).Scan(t.Context(), &origin); err != nil {
 			t.Fatal(err)
 		}
 		if origin != finding.Published {
@@ -388,8 +388,8 @@ func TestARootTwoBuildsHoldNamesNeither(t *testing.T) {
 		f.rooted(t, rootPurl)
 		other := f.anotherBranch(t, "release")
 		f.shippedTo(t, other, beside(acmeY))
-		if _, err := f.db.DB.NewUpdate().Table("scan").Set("root_identifier = ?", rootPurl).
-			Where("target_id = ?", other).Exec(t.Context()); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, rootPurl).
+			Where(`"target_id" = ?`, other).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		f.vendorSays(t, rootPurl, sbom.NotAffected, "sha256:vendor-1")

@@ -187,26 +187,26 @@ func CoveredAtPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 func statedPlaceColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
-			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL`).
-		Join(`LEFT JOIN "image_version" AS "giv" ON giv.node_id = gn.id
-			AND giv.closed_scan_id IS NULL`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`LEFT JOIN "graph_node" AS "cn" ON cn.target_id = f.target_id
-			AND cn.component_id = f.consumer_id AND cn.closed_scan_id IS NULL`).
-		Join(`LEFT JOIN "image_version" AS "civ" ON civ.node_id = cn.id
-			AND civ.closed_scan_id IS NULL`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`f.id AS "finding_id"`).
-		ColumnExpr(`v.id AS "vulnerability_id"`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`c.id AS "component_id"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
-		ColumnExpr(`COALESCE(f.consumer_id, 0) AS "consumer_id"`).
-		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`COALESCE(civ.purl, cn.purl, uc.purl, '') AS "consumer_purl"`)
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "graph_node" AS "gn" ON "gn"."target_id" = "f"."target_id"
+			AND "gn"."component_id" = "f"."component_id" AND "gn"."closed_scan_id" IS NULL`).
+		Join(`LEFT JOIN "image_version" AS "giv" ON "giv"."node_id" = "gn"."id"
+			AND "giv"."closed_scan_id" IS NULL`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`LEFT JOIN "graph_node" AS "cn" ON "cn"."target_id" = "f"."target_id"
+			AND "cn"."component_id" = "f"."consumer_id" AND "cn"."closed_scan_id" IS NULL`).
+		Join(`LEFT JOIN "image_version" AS "civ" ON "civ"."node_id" = "cn"."id"
+			AND "civ"."closed_scan_id" IS NULL`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."id" AS "finding_id"`).
+		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
+		ColumnExpr(`"v"."identifier" AS "identifier"`).
+		ColumnExpr(`"c"."id" AS "component_id"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
+		ColumnExpr(`COALESCE("f"."consumer_id", 0) AS "consumer_id"`).
+		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		ColumnExpr(`COALESCE("civ"."purl", "cn"."purl", "uc"."purl", '') AS "consumer_purl"`)
 }
 
 // statedPlace is one place as statedPlaceColumns reads it.
@@ -248,13 +248,13 @@ func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 	}
 	q := covered(statedPlaceColumns(db.NewSelect()), productID, visible, ForStatements).
 		ColumnExpr(`COUNT(*) AS "joined"`).
-		ColumnExpr(`COUNT(cl.id) AS "decided"`).
-		ColumnExpr(`COUNT(DISTINCT cl.outcome) AS "outcomes"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr(`f.id, v.id, v.identifier, c.id, c.name, giv.purl, gn.purl, c.purl, f.consumer_id,
-			uc.name, civ.purl, cn.purl, uc.purl`).
-		Having("COUNT(cl.id) > 0")
+		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
+		ColumnExpr(`COUNT(DISTINCT "cl"."outcome") AS "outcomes"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"f"."id", "v"."id", "v"."identifier", "c"."id", "c"."name", "giv"."purl", "gn"."purl", "c"."purl", "f"."consumer_id",
+			"uc"."name", "civ"."purl", "cn"."purl", "uc"."purl"`).
+		Having(`COUNT("cl"."id") > 0`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the places decisions cover: %w", err)
 	}
@@ -281,12 +281,12 @@ func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
 		components[one.componentID] = true
 	}
 	var rows []statedPlace
-	byIssue, issueArgs := database.InAnyOf("f.vulnerability_id", keysOf(issues))
-	byComponent, componentArgs := database.InAnyOf("f.component_id", keysOf(components))
+	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, keysOf(issues))
+	byComponent, componentArgs := database.InAnyOf(`"f"."component_id"`, keysOf(components))
 	if err := statedPlaceColumns(db.NewSelect()).
-		Where("f.target_id = ?", targetID).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.closed_at IS NULL").
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`"f"."closed_at" IS NULL`).
 		Where(byIssue, issueArgs...).
 		Where(byComponent, componentArgs...).
 		Scan(ctx, &rows); err != nil {

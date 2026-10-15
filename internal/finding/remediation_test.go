@@ -18,10 +18,10 @@ import (
 func (f *fixture) closeIt(t *testing.T, issue string, because finding.Closure, at time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("closed_at = ?", at).
-		Set("closed_because = ?", because).
-		Where("vulnerability_id = ?", f.issueID(t, issue)).
-		Where("closed_at IS NULL").
+		Set(`"closed_at" = ?`, at).
+		Set(`"closed_because" = ?`, because).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, issue)).
+		Where(`"closed_at" IS NULL`).
 		Exec(t.Context()); err != nil {
 		t.Fatalf("close %s: %v", issue, err)
 	}
@@ -31,8 +31,8 @@ func (f *fixture) closeIt(t *testing.T, issue string, because finding.Closure, a
 func (f *fixture) aged(t *testing.T, issue string, at time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("opened_at = ?", at).
-		Where("vulnerability_id = ?", f.issueID(t, issue)).
+		Set(`"opened_at" = ?`, at).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, issue)).
 		Exec(t.Context()); err != nil {
 		t.Fatalf("age %s: %v", issue, err)
 	}
@@ -98,7 +98,7 @@ func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
 		}
 		var places int
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr("COUNT(*)").Where("closed_at IS NULL").Scan(ctx, &places); err != nil {
+			ColumnExpr("COUNT(*)").Where(`"closed_at" IS NULL`).Scan(ctx, &places); err != nil {
 			t.Fatal(err)
 		}
 		if places < 2 {

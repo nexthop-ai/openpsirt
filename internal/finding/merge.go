@@ -59,7 +59,7 @@ func FiledUnderAny(column filed.Column) string { return filed.UnderAny(column) }
 // a decision was filed under may since have merged into the one the finding
 // holds. Written as a join, so every engine reaches the decisions of a finding
 // through an index on each side.
-const Decisions = `"vulnerability" AS "dv" JOIN "decision" AS "de" ON de.vulnerability_id = dv.id`
+const Decisions = `"vulnerability" AS "dv" JOIN "decision" AS "de" ON "de"."vulnerability_id" = "dv"."id"`
 
 // LiveKey is what a live decision is a claim about, hashed: the product, the
 // issue, the place, and both upstream versions it was made against — or the
@@ -91,7 +91,7 @@ func LiveKey(productID, issueID int64, place, componentUpstream, consumerUpstrea
 // DecisionIssue joins `dv`, the issue a decision `de` was filed under, to a
 // query that starts from the decisions. The issue it is read as is
 // `dv.issue_id`.
-const DecisionIssue = `JOIN "vulnerability" AS "dv" ON dv.id = de.vulnerability_id`
+const DecisionIssue = `JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`
 
 // SameIssue is the condition that the finding issue column holds the issue a
 // row filed under the issue in filed is read as. A finding is always filed
@@ -138,7 +138,7 @@ func IssuesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]int64, er
 	var rows []Vulnerability
 	if err := db.NewSelect().Model(&rows).
 		Column("id", "issue_id").
-		Where("vu.id IN (?)", bun.List(ids)).
+		Where(`"vu"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which issues these are: %w", err)
 	}
@@ -153,8 +153,8 @@ func IssuesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]int64, er
 func issueOf(ctx context.Context, db bun.IDB, vulnerabilityID int64) (int64, error) {
 	var issue int64
 	if err := db.NewSelect().Model((*Vulnerability)(nil)).
-		ColumnExpr("vu.issue_id").
-		Where("vu.id = ?", vulnerabilityID).
+		ColumnExpr(`"vu"."issue_id"`).
+		Where(`"vu"."id" = ?`, vulnerabilityID).
 		Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read which issue this is: %w", err)
 	}
@@ -167,7 +167,7 @@ func MergesInto(ctx context.Context, db bun.IDB, issueID int64) ([]Merge, error)
 	var merges []Merge
 	if err := db.NewSelect().Model(&merges).
 		Where(FiledUnder(filed.AbsorbedIssue), issueID).
-		OrderExpr("vm.merged_at, vm.id").
+		OrderExpr(`"vm"."merged_at", "vm"."id"`).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what merged into this issue: %w", err)
 	}
@@ -190,9 +190,9 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 	// second waits, finds a row that is no longer its own issue, and goes
 	// again against what the first committed.
 	res, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-		Set("issue_id = vu.issue_id").
-		Where("vu.id IN (?)", bun.List(rows)).
-		Where("vu.issue_id = vu.id").Exec(ctx)
+		Set(`"issue_id" = "vu"."issue_id"`).
+		Where(`"vu"."id" IN (?)`, bun.List(rows)).
+		Where(`"vu"."issue_id" = "vu"."id"`).Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("take the issues a report named together: %w", err)
 	}
@@ -205,8 +205,8 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 	}
 	var held []Vulnerability
 	if err := v.db.NewSelect().Model(&held).
-		Where("vu.id IN (?)", bun.List(rows)).
-		OrderExpr("vu.id").Scan(ctx); err != nil {
+		Where(`"vu"."id" IN (?)`, bun.List(rows)).
+		OrderExpr(`"vu"."id"`).Scan(ctx); err != nil {
 		return 0, fmt.Errorf("read the issues a report named together: %w", err)
 	}
 	// Every row's filed name first, in the order the rows were recorded, so
@@ -260,13 +260,13 @@ func (v *Vulnerabilities) absorb(ctx context.Context, kept int64, gone Vulnerabi
 	// Every row read as the issue absorbed, itself and anything merged into it
 	// before, is read as the one kept.
 	if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-		Set("issue_id = ?", kept).
-		Where("vu.issue_id = ?", gone.ID).Exec(ctx); err != nil {
+		Set(`"issue_id" = ?`, kept).
+		Where(`"vu"."issue_id" = ?`, gone.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("read %s as the issue it merged into: %w", gone.Identifier, err)
 	}
 	if _, err := v.db.NewUpdate().Model((*Alias)(nil)).
-		Set("vulnerability_id = ?", kept).
-		Where("va.vulnerability_id = ?", gone.ID).Exec(ctx); err != nil {
+		Set(`"vulnerability_id" = ?`, kept).
+		Where(`"va"."vulnerability_id" = ?`, gone.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("carry the names %s goes by: %w", gone.Identifier, err)
 	}
 
@@ -331,9 +331,9 @@ func (v *Vulnerabilities) saidOf(ctx context.Context, row Vulnerability) (Named,
 		said.LikelihoodPercentile = float64(*row.LikelihoodPercentilePPM) / 1_000_000
 	}
 	if err := v.db.NewSelect().Model((*Weakness)(nil)).
-		ColumnExpr("vw.cwe").
-		Where("vw.vulnerability_id = ?", row.ID).
-		OrderExpr("vw.cwe").
+		ColumnExpr(`"vw"."cwe"`).
+		Where(`"vw"."vulnerability_id" = ?`, row.ID).
+		OrderExpr(`"vw"."cwe"`).
 		Scan(ctx, &said.Weaknesses); err != nil {
 		return Named{}, fmt.Errorf("read what kind of flaw %s is: %w", row.Identifier, err)
 	}
@@ -362,16 +362,16 @@ func (v *Vulnerabilities) saidOf(ctx context.Context, row Vulnerability) (Named,
 func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vulnerability) error {
 	if strings.TrimSpace(gone.Severity) != "" {
 		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-			Set("severity = ?", gone.Severity).
-			Where("vu.id = ?", kept).
-			Where("(vu.severity IS NULL OR vu.severity = '')").Exec(ctx); err != nil {
+			Set(`"severity" = ?`, gone.Severity).
+			Where(`"vu"."id" = ?`, kept).
+			Where(`("vu"."severity" IS NULL OR "vu"."severity" = '')`).Exec(ctx); err != nil {
 			return fmt.Errorf("carry how bad %s is said to be: %w", gone.Identifier, err)
 		}
 	}
 	if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-		Set("first_seen_at = ?", gone.FirstSeenAt).
-		Where("vu.id = ?", kept).
-		Where("vu.first_seen_at > ?", gone.FirstSeenAt).Exec(ctx); err != nil {
+		Set(`"first_seen_at" = ?`, gone.FirstSeenAt).
+		Where(`"vu"."id" = ?`, kept).
+		Where(`"vu"."first_seen_at" > ?`, gone.FirstSeenAt).Exec(ctx); err != nil {
 		return fmt.Errorf("carry when %s was first seen: %w", gone.Identifier, err)
 	}
 	return nil
@@ -390,10 +390,10 @@ func (v *Vulnerabilities) describeGaps(ctx context.Context, kept int64, gone Vul
 func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vulnerability, now time.Time) error {
 	var open []Finding
 	if err := v.db.NewSelect().Model(&open).
-		Where("f.vulnerability_id IN (?, ?)", kept, gone.ID).
-		Where("f.closed_at IS NULL").
-		Where("f.kind = ?", Vulnerable).
-		OrderExpr("f.opened_at, f.id").
+		Where(`"f"."vulnerability_id" IN (?, ?)`, kept, gone.ID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."kind" = ?`, Vulnerable).
+		OrderExpr(`"f"."opened_at", "f"."id"`).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is open against %s: %w", gone.Identifier, err)
 	}
@@ -412,9 +412,9 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 		twice = append(twice, f.ID)
 		if stays.AssignedTo == nil && f.AssignedTo != nil {
 			if _, err := v.db.NewUpdate().Model((*Finding)(nil)).
-				Set("assigned_to = ?", *f.AssignedTo).
-				Set("assigned_at = ?", f.AssignedAt).
-				Where("f.id = ?", stays.ID).Exec(ctx); err != nil {
+				Set(`"assigned_to" = ?`, *f.AssignedTo).
+				Set(`"assigned_at" = ?`, f.AssignedAt).
+				Where(`"f"."id" = ?`, stays.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("carry the assignment of a place held twice under %s: %w",
 					gone.Identifier, err)
 			}
@@ -429,18 +429,18 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 			run = &r
 		}
 		if _, err := v.db.NewUpdate().Model((*Finding)(nil)).
-			Set("closed_at = ?", now).
-			Set("closed_run_id = ?", run).
-			Set("closed_because = ?", Invalid).
-			Set("stated_by = NULL").
-			Set("closed_note = ?", "Held twice once "+gone.Identifier+" merged into the issue it is.").
-			Where("f.id IN (?)", bun.List(twice)).Exec(ctx); err != nil {
+			Set(`"closed_at" = ?`, now).
+			Set(`"closed_run_id" = ?`, run).
+			Set(`"closed_because" = ?`, Invalid).
+			Set(`"stated_by" = NULL`).
+			Set(`"closed_note" = ?`, "Held twice once "+gone.Identifier+" merged into the issue it is.").
+			Where(`"f"."id" IN (?)`, bun.List(twice)).Exec(ctx); err != nil {
 			return fmt.Errorf("close a place held twice under %s: %w", gone.Identifier, err)
 		}
 	}
 	if _, err := v.db.NewUpdate().Model((*Finding)(nil)).
-		Set("vulnerability_id = ?", kept).
-		Where("f.vulnerability_id = ?", gone.ID).Exec(ctx); err != nil {
+		Set(`"vulnerability_id" = ?`, kept).
+		Where(`"f"."vulnerability_id" = ?`, gone.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("file the findings of %s under the issue it is: %w", gone.Identifier, err)
 	}
 	return nil

@@ -360,8 +360,8 @@ func TestALineNothingCanEnforceReadsAsNoLine(t *testing.T) {
 		ctx := t.Context()
 		for _, word := range []string{"negligible", "Critical", "none", "  "} {
 			if _, err := f.db.DB.NewUpdate().TableExpr("\"product\"").
-				Set("triage_floor = ?", word).
-				Where("id = ?", f.productID).Exec(ctx); err != nil {
+				Set(`"triage_floor" = ?`, word).
+				Where(`"id" = ?`, f.productID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			line, err := finding.FloorFor(ctx, f.db.DB, f.productID)

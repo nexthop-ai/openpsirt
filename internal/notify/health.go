@@ -200,12 +200,12 @@ func (w *Watch) lastMoved(ctx context.Context, column string) (*time.Time, error
 	err := w.db.NewSelect().
 		TableExpr(`(?) AS "firsts"`, w.db.NewSelect().
 			Model((*finding.Run)(nil)).
-			ColumnExpr(`MIN(sr.started_at) AS "first_seen"`).
-			Where("sr.finished_at IS NOT NULL").
-			Where("sr.failure = ?", "").
+			ColumnExpr(`MIN("sr"."started_at") AS "first_seen"`).
+			Where(`"sr"."finished_at" IS NOT NULL`).
+			Where(`"sr"."failure" = ?`, "").
 			Where("? <> ?", bun.Ident("sr."+column), "").
 			GroupExpr("?", bun.Ident("sr."+column))).
-		ColumnExpr(`MAX(firsts.first_seen) AS "since"`).
+		ColumnExpr(`MAX("firsts"."first_seen") AS "since"`).
 		Scan(ctx, &since)
 	if err != nil {
 		if database.IsNoRows(err) {
@@ -231,10 +231,10 @@ func (w *Watch) inForce(ctx context.Context, column string) (string, error) {
 	err := w.db.NewSelect().
 		Model((*finding.Run)(nil)).
 		ColumnExpr("?", bun.Ident("sr."+column)).
-		Where("sr.finished_at IS NOT NULL").
-		Where("sr.failure = ?", "").
+		Where(`"sr"."finished_at" IS NOT NULL`).
+		Where(`"sr"."failure" = ?`, "").
 		Where("? <> ?", bun.Ident("sr."+column), "").
-		OrderExpr(`sr.started_at DESC`).
+		OrderExpr(`"sr"."started_at" DESC`).
 		Limit(1).Scan(ctx, &version)
 	if err != nil && !database.IsNoRows(err) {
 		return "", fmt.Errorf("read which vulnerability data is in force: %w", err)

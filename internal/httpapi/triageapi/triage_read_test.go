@@ -341,12 +341,12 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 		// disclosed. This is the half a widening written as "anybody on the
 		// product" leaks.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
+			Set(`"visibility" = ?`, "private").
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("decision").
-			Set("visibility = ?", "private").
+			Set(`"visibility" = ?`, "private").
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -479,8 +479,8 @@ func TestStoredTextComesBackExactlyAsWritten(t *testing.T) {
 			"[a link](javascript:alert(2))."
 		if _, err := r.DB.DB.NewUpdate().
 			Table("claim_revision").
-			Set("body = ?", hostile).
-			Where(`claim_id = (SELECT claim_id FROM "decision" WHERE id = ?)`, id).
+			Set(`"body" = ?`, hostile).
+			Where(`"claim_id" = (SELECT "claim_id" FROM "decision" WHERE "id" = ?)`, id).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -601,8 +601,8 @@ func TestABulkClaimCoversWhatTheClaimantCanSeeAndNoMore(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where("id = ?", rows[0].ID).Exec(t.Context()); err != nil {
+			Set(`"visibility" = ?`, "private").
+			Where(`"id" = ?`, rows[0].ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -631,8 +631,8 @@ func TestABulkClaimCoversWhatTheClaimantCanSeeAndNoMore(t *testing.T) {
 		// And the undisclosed one is still open, waiting for somebody who can
 		// see it.
 		standing, err := r.DB.DB.NewSelect().Table("decision").
-			Where("place_identity = ?", rows[0].PlaceIdentity).
-			Where("live_key IS NOT NULL").Count(t.Context())
+			Where(`"place_identity" = ?`, rows[0].PlaceIdentity).
+			Where(`"live_key" IS NOT NULL`).Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

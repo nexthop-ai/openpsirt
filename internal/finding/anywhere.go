@@ -125,29 +125,29 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// asked for, with the build and its stream joined.
 	readable := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if len(filter.Workable.Kinds) == 1 {
-			q = q.Where("st.kind = ?", filter.Workable.Kinds[0])
+			q = q.Where(`"st"."kind" = ?`, filter.Workable.Kinds[0])
 		}
 		if len(filter.Workable.Support) == 1 {
 			switch {
 			case filter.Workable.Support[0] == PastEndOfLife && len(pastEOL) == 0:
 				q = q.Where("1 = 0")
 			case filter.Workable.Support[0] == PastEndOfLife:
-				q = q.Where("st.id IN (?)", bun.List(pastEOL))
+				q = q.Where(`"st"."id" IN (?)`, bun.List(pastEOL))
 			case len(pastEOL) > 0:
-				q = q.Where("st.id NOT IN (?)", bun.List(pastEOL))
+				q = q.Where(`"st"."id" NOT IN (?)`, bun.List(pastEOL))
 			}
 		}
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where("f.closed_at IS NULL")
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(`"f"."closed_at" IS NULL`)
 		return onlyReadable(q, subject, products, all)
 	}
 	// withRating joins the issue and whatever the row's own product rates it: a
 	// rating belongs to a product, so a list spanning them reads each row's
 	// against the product that row is in.
 	withRating := func(q *bun.SelectQuery, product rating.On) *bun.SelectQuery {
-		return q.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(rating.For(product))
 	}
 	// lined keeps what each row's own product's line admits, where somebody
@@ -181,11 +181,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// own rows (see Filter.ofPage).
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = withRating(readable(q).
-			Join(`JOIN "product" AS "p" ON p.id = st.product_id`), rating.OnStream).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`), rating.OnStream).
 			// And the component, for the fold: two binaries of one source
 			// package carrying one issue are one row here as they are on the
 			// per-product list, because they are one thing to decide about.
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`)
 		return filter.ofPage(lined(q, "f.urgency >= ?", int64(exploiting)))
 	}
 	// grouped is the page's grouping in two levels (see twolevel.go). The
@@ -218,9 +218,9 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			q = withRating(q, rating.OnPartial)
 		}
 		if !wasBelow {
-			q = q.Join(`JOIN "product" AS "p" ON p.id = f.product_id`)
+			q = q.Join(`JOIN "product" AS "p" ON "p"."id" = "f"."product_id"`)
 		}
-		return lined(q, "f.hot = ?", 1).GroupExpr("f.product_id, " + GroupedOn)
+		return lined(q, "f.hot = ?", 1).GroupExpr(`"f"."product_id", ` + GroupedOn)
 	}
 
 	var heads []struct {
@@ -238,10 +238,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	// products one issue in one component can be a row in a dozen products.
 	key, sorted := pagedOrder(filter, "product_id", "vulnerability_id", "fold")
 	page := grouped().
-		ColumnExpr(`f.product_id AS "product_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"f"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
-		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
+		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
 		ColumnExpr(overParts.places() + ` AS "places"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`)
 	if key != "" {
@@ -290,61 +290,61 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		decorated
 	}
 	body := narrow(s.db.NewSelect()).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
-		ColumnExpr(`MIN(st.name) AS "stream"`).
-		ColumnExpr(`MIN(va.name) AS "variant"`).
-		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
+		ColumnExpr(`MIN("st"."name") AS "stream"`).
+		ColumnExpr(`MIN("va"."name") AS "variant"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 		// The two exploitation flags, which the packed number above cannot
 		// tell apart. A column this query does not select is left at its zero
 		// value, so both are selected here as on the per-product list.
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
-		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
-		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
+		ColumnExpr(`MAX(COALESCE("v"."score_centi", 0)) AS "score_centi"`).
 		// Whether anything here carries a score at all, and the scheme it is
 		// on. This list spans products, so it is the one place a version 3
 		// number and a version 4 number sit in the same column.
-		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
-		ColumnExpr(`MAX(COALESCE(v.score_version, '')) AS "score_version"`).
+		ColumnExpr(`MAX(CASE WHEN "v"."score_centi" IS NULL THEN 0 ELSE 1 END) AS "scored"`).
+		ColumnExpr(`MAX(COALESCE("v"."score_version", '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
-		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
+		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// One undisclosed place makes the group undisclosed, counted rather
 		// than aggregated over the word — a maximum of the word returns
 		// "public" for a mixed group, which is the one case it matters for.
-		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
+		ColumnExpr(`SUM(CASE WHEN "f"."visibility" = ? THEN 1 ELSE 0 END) > 0 AS "undisclosed"`,
 			access.Private).
-		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
+		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
 		// Both ends, because a group whose places disagree is mixed and a
 		// minimum alone answers with one of the disagreeing values.
-		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
-		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
-		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
+		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
+		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
+		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
 		// How many places a person recorded, which is what says an unrated
 		// group is waiting on a rating rather than off the clock.
-		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
-		ColumnExpr(`MIN(COALESCE(f.matched, '')) AS "matched"`).
-		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
-		ColumnExpr(`MIN(f.consumer_id) AS "consumer_id"`).
-		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
-		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
+		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
+		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
+		ColumnExpr(`MIN("f"."target_id") AS "target_id"`).
+		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
+		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		ColumnExpr(`0 AS "total"`)
 	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, "st.product_id", nil,
 		claimWaiting, claimApproved, claimLapsed, claimSentBack).
-		Where("st.product_id IN (?)", bun.List(within)).
-		Where("f.vulnerability_id IN (?)", bun.List(issues)).
+		Where(`"st"."product_id" IN (?)`, bun.List(within)).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(GroupedAcross)
 	if err := body.Scan(ctx, &rows); err != nil {

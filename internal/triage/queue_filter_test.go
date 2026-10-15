@@ -92,7 +92,7 @@ func TestTheQueueNarrowsBySeverityInForceInTheClaimsProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
-			Set("severity = ?", "critical").Where("id = ?", f.issue).Exec(ctx); err != nil {
+			Set(`"severity" = ?`, "critical").Where(`"id" = ?`, f.issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		f.claimsAbout(t, f.issue, f.proposer, triage.NotApplicable)
@@ -121,8 +121,8 @@ func TestTheQueueNarrowsByHowOldAClaimIs(t *testing.T) {
 		f.claimsAbout(t, f.issue, f.proposer, triage.NotApplicable)
 		f.claimsAbout(t, f.secondIssue(t), f.proposer, triage.NotApplicable)
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-			Set("proposed_at = ?", time.Now().UTC().AddDate(0, 0, -20)).
-			Where("vulnerability_id = ?", f.issue).Exec(ctx); err != nil {
+			Set(`"proposed_at" = ?`, time.Now().UTC().AddDate(0, 0, -20)).
+			Where(`"vulnerability_id" = ?`, f.issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		before := time.Now().UTC().AddDate(0, 0, -10)

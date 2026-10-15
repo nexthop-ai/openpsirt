@@ -70,9 +70,9 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID in
 			Where(run+" IN (?)", bun.List(runIDs))
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
-			ColumnExpr(`changed.run_id AS "run_id"`).
+			ColumnExpr(`"changed"."run_id" AS "run_id"`).
 			ColumnExpr(`COUNT(*) AS "count"`).
-			GroupExpr("changed.run_id").
+			GroupExpr(`"changed"."run_id"`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return fmt.Errorf("count what a run changed: %w", err)

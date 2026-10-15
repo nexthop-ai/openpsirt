@@ -376,10 +376,10 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 	var componentID int64
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"graph_node\" AS \"n\"").
-		Join("JOIN \"component\" AS \"c\" ON c.id = n.component_id").
-		ColumnExpr("c.id").
-		Where("n.target_id = ?", target).
-		Where("c.name = ?", carrier.Name).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"c"."id"`).
+		Where(`"n"."target_id" = ?`, target).
+		Where(`"c"."name" = ?`, carrier.Name).
 		Limit(1).Scan(ctx, &componentID); err != nil {
 		t.Fatal(err)
 	}
@@ -1166,9 +1166,9 @@ func TestAReleaseTheRecordSaysWasNeverAffectedIsNotNamed(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC()).
-			Set("closed_because = ?", finding.Unaffected).
-			Where("target_id = ?", f.tagged).Where("vulnerability_id = ?", issueID).
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Set(`"closed_because" = ?`, finding.Unaffected).
+			Where(`"target_id" = ?`, f.tagged).Where(`"vulnerability_id" = ?`, issueID).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

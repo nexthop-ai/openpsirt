@@ -103,39 +103,39 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		TableExpr(finding.Decisions).
 		// The issue each deferral is read as, so a place put off under two
 		// names that merged is one place put off.
-		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 		// And what that product rates the issue, where it rates it anything.
 		// The report is per product already, and a rating belongs to one — so
 		// the word beside a repeated deferral is the word the team doing the
 		// deferring holds.
 		Join(rating.For(rating.OnDecision)).
 		// The argument, which is where the outcome and the date live.
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		// Grouped on the product's identifier and the issue's, with the names
 		// carried along as labels. Only the product's name is unique, and it
 		// is not the one anybody reads, so two products a catalog displays
 		// alike stay two.
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`v.id AS "issue_id"`).
-		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`"v"."id" AS "issue_id"`).
+		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`de.place_identity AS "place_identity"`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.proposed_at AS "proposed_at"`).
-		ColumnExpr(`cl.deferred_until AS "deferred_until"`).
-		ColumnExpr(`de.state AS "state"`).
-		ColumnExpr(`de.ended_at AS "ended_at"`).
-		ColumnExpr(`CASE WHEN de.live_key IS NOT NULL THEN 1 ELSE 0 END AS "live"`).
-		Where("cl.outcome = ?", Deferred).
+		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
+		ColumnExpr(`"cl"."deferred_until" AS "deferred_until"`).
+		ColumnExpr(`"de"."state" AS "state"`).
+		ColumnExpr(`"de"."ended_at" AS "ended_at"`).
+		ColumnExpr(`CASE WHEN "de"."live_key" IS NOT NULL THEN 1 ELSE 0 END AS "live"`).
+		Where(`"cl"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones counted for the span they were in force,
 		// the way the threshold counts them. Left out, the report built to
 		// catch withdraw-and-defer-again was blind to exactly that pattern.
-		Where("cl.deferred_until IS NOT NULL")
+		Where(`"cl"."deferred_until" IS NOT NULL`)
 	if productID > 0 {
-		q = q.Where("de.product_id = ?", productID)
+		q = q.Where(`"de"."product_id" = ?`, productID)
 	}
 	if err := readableBy(q, subject, "de").Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what keeps being put off: %w", err)

@@ -314,8 +314,8 @@ func ToldAbout(ctx context.Context, db *bun.DB, personID int64,
 	var concerns []string
 	if err := db.NewSelect().Model((*Notification)(nil)).
 		Column("concerns").
-		Where("person_id = ?", personID).
-		Where("concerns IN (?)", bun.List(among)).
+		Where(`"person_id" = ?`, personID).
+		Where(`"concerns" IN (?)`, bun.List(among)).
 		Scan(ctx, &concerns); err != nil {
 		return nil, fmt.Errorf("read what person %d was told: %w", personID, err)
 	}

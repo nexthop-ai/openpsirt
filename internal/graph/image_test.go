@@ -42,8 +42,8 @@ func versions(t *testing.T, f *fixture) []graph.ImageVersion {
 	t.Helper()
 	var rows []graph.ImageVersion
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Join(`JOIN "graph_node" AS "n" ON n.id = iv.node_id`).
-		Where("n.target_id = ?", f.targetID).
+		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
+		Where(`"n"."target_id" = ?`, f.targetID).
 		Order("iv.id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}

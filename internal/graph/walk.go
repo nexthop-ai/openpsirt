@@ -58,16 +58,16 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 	// 167,785 rows for 10,045 components under one real product, 0.81 s
 	// against 0.10 s, and the union ends a cycle on its own.
 	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT n.id AS "node"
+		SELECT "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
+		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
 		UNION
-		SELECT e.child_id
+		SELECT "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND e.parent_id <> e.child_id
+		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = d.node
+		  AND "e"."parent_id" <> "e"."child_id"
 	)
-	SELECT DISTINCT n.component_id FROM "down" AS "d" JOIN "graph_node" AS "n" ON n.id = d.node`,
+	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = d.node`,
 		targetID, bun.List(componentIDs), targetID)
 }
 
@@ -130,18 +130,18 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	// components as though from the one adopting them, so the adopter's count
 	// is its own subtree and theirs as one set, in the same walk as everything
 	// else being counted.
-	seeds := `SELECT n.id AS "start", n.id AS "node"
+	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
+		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
 	walkArgs := []any{targetID, bun.List(of)}
 	if len(adopt.IDs) > 0 {
 		seeds += `
 		UNION ALL
-		SELECT bn.id, n.id
+		SELECT "bn"."id", "n"."id"
 		FROM "graph_node" AS "bn"
-		JOIN "graph_node" AS "n" ON n.target_id = bn.target_id
-		WHERE bn.target_id = ? AND bn.closed_scan_id IS NULL AND bn.component_id = ?
-		  AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
+		JOIN "graph_node" AS "n" ON "n"."target_id" = "bn"."target_id"
+		WHERE "bn"."target_id" = ? AND "bn"."closed_scan_id" IS NULL AND "bn"."component_id" = ?
+		  AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
 		walkArgs = append(walkArgs, targetID, adopt.By, bun.List(adopt.IDs))
 	}
 	walkArgs = append(walkArgs, targetID)
@@ -153,10 +153,10 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	walk := `WITH RECURSIVE "down" AS (
 		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
 		UNION
-		SELECT d.start, e.child_id
+		SELECT d.start, "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE e.target_id = ? AND e.closed_scan_id IS NULL AND e.parent_id = d.node
-		  AND e.parent_id <> e.child_id
+		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = d.node
+		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	`
 
@@ -164,10 +164,10 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		Start   int64 `bun:"start"`
 		Reached int64 `bun:"reached"`
 	}
-	err := s.db.NewRaw(walk+`SELECT DISTINCT sn.component_id AS "start", n.component_id AS "reached"
+	err := s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
 	FROM "down" AS "d"
-	JOIN "graph_node" AS "sn" ON sn.id = d.start
-	JOIN "graph_node" AS "n" ON n.id = d.node`, walkArgs...).
+	JOIN "graph_node" AS "sn" ON "sn"."id" = d.start
+	JOIN "graph_node" AS "n" ON "n"."id" = d.node`, walkArgs...).
 		Scan(ctx, &reached)
 	if err != nil {
 		return nil, fmt.Errorf("walk beneath each component: %w", err)
@@ -191,14 +191,14 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	if len(all) == 0 {
 		return totals, nil
 	}
-	err = s.db.NewRaw(`SELECT g.component_id AS "component_id", g.vulnerability_id AS "vulnerability_id",
+	err = s.db.NewRaw(`SELECT "g"."component_id" AS "component_id", "g"."vulnerability_id" AS "vulnerability_id",
 	       `+rating.EffectiveExpr+` AS "band"
-	FROM (SELECT f.component_id AS "component_id", f.vulnerability_id AS "vulnerability_id"
+	FROM (SELECT "f"."component_id" AS "component_id", "f"."vulnerability_id" AS "vulnerability_id"
 	      FROM "finding" AS "f"
-	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
-	        AND f.component_id IN (?)
-	      GROUP BY f.component_id, f.vulnerability_id) AS "g"
-	JOIN "vulnerability" AS "v" ON v.id = g.vulnerability_id
+	      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
+	        AND "f"."component_id" IN (?)
+	      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
+	JOIN "vulnerability" AS "v" ON "v"."id" = "g"."vulnerability_id"
 	`+rating.Here, targetID, bun.List(visible), bun.List(all), productID).
 		Scan(ctx, &open)
 	if err != nil {
@@ -321,22 +321,22 @@ type region struct {
 func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64) (region, error) {
 	var rows []rise
 	err := s.db.NewRaw(`WITH RECURSIVE "up" AS (
-		SELECT n.id AS "node"
+		SELECT "n"."id" AS "node"
 		FROM "graph_node" AS "n"
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
+		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)
 		UNION
-		SELECT e.parent_id
+		SELECT "e"."parent_id"
 		FROM "up" AS "u" CROSS JOIN "graph_edge" AS "e"
-		WHERE e.child_id = u.node AND e.closed_scan_id IS NULL AND e.parent_id <> e.child_id
+		WHERE "e"."child_id" = u.node AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"
 	)
-	SELECT u.node AS "node", e.parent_id AS "parent",
-	       n.component_id AS "component_id", n.is_root AS "is_root",
-	       c.name AS "name", c.version AS "version", c.purl AS "purl"
+	SELECT u.node AS "node", "e"."parent_id" AS "parent",
+	       "n"."component_id" AS "component_id", "n"."is_root" AS "is_root",
+	       "c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"
 	FROM "up" AS "u"
-	JOIN "graph_node" AS "n" ON n.id = u.node
-	JOIN "component" AS "c" ON c.id = n.component_id
+	JOIN "graph_node" AS "n" ON "n"."id" = u.node
+	JOIN "component" AS "c" ON "c"."id" = "n"."component_id"
 	LEFT JOIN "graph_edge" AS "e"
-	  ON e.child_id = u.node AND e.closed_scan_id IS NULL AND e.parent_id <> e.child_id`,
+	  ON "e"."child_id" = u.node AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"`,
 		targetID, bun.List(componentIDs)).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -428,7 +428,7 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, targetID,
 		return nil, nil
 	}
 	var above []Component
-	if err := s.db.NewSelect().Model(&above).Where("c.id IN (?)", bun.List(ids)).
+	if err := s.db.NewSelect().Model(&above).Where(`"c"."id" IN (?)`, bun.List(ids)).
 		Order("c.id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what sits above it: %w", err)
 	}

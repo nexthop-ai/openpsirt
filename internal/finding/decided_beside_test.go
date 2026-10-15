@@ -93,7 +93,7 @@ func TestALapsedDecisionFiledUnderAMergedIssueFindsTheGroupOfTheIssueItMergedInt
 		}
 		kept, absorbed := f.issueID(t, "CVE-2026-1"), f.issueID(t, "GHSA-aaaa-bbbb-cccc")
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
-			Set("issue_id = ?", kept).Where("id = ?", absorbed).Exec(ctx); err != nil {
+			Set(`"issue_id" = ?`, kept).Where(`"id" = ?`, absorbed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		at := f.placesOf(t, "CVE-2026-1")[swss.Name]
@@ -271,7 +271,7 @@ func TestAGroupHalfHeldIsHeldNeitherByNobodyNorBySomebody(t *testing.T) {
 		hold := func(at finding.Finding) {
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-				Set("assigned_to = ?", party.ID).Where("id = ?", at.ID).Exec(ctx); err != nil {
+				Set(`"assigned_to" = ?`, party.ID).Where(`"id" = ?`, at.ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

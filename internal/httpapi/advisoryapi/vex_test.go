@@ -646,9 +646,9 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 		// judgment about risk would be gone from this document; this one is
 		// a claim about the match, and the match is as wrong as it was.
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("version = ?", "5.11").
-			Set("upstream_version = ?", "5.11").
-			Where("name = ?", "linux-image").Exec(t.Context()); err != nil {
+			Set(`"version" = ?`, "5.11").
+			Set(`"upstream_version" = ?`, "5.11").
+			Where(`"name" = ?`, "linux-image").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		var after struct {

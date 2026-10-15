@@ -125,16 +125,16 @@ func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
 	}
 	var deferrals []Decision
 	if err := narrow(s.db.NewSelect().Model(&deferrals).Relation("Claim")).
-		Where("de.product_id IN (?)", bun.List(productIDs)).
+		Where(`"de"."product_id" IN (?)`, bun.List(productIDs)).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(asked)).
-		Where("claim.outcome = ?", Deferred).
+		Where(`"claim"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones included, for the span they were in force.
 		// Excluded outright, the threshold was defeated by taking a deferral
 		// back and making another: each one alone stayed under the line, the
 		// running total reset to zero every time, and a place stayed hidden
 		// indefinitely with no second person ever seeing it. A withdrawal
 		// shortens the time something was put off; it does not erase it.
-		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
+		Where(`"claim"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
 

@@ -118,16 +118,16 @@ func count(changes []Change) Delta {
 func (s *Store) comparable(ctx context.Context, targetID int64, scanIDs []int64) ([]int64, error) {
 	first := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "fn"`).
-		ColumnExpr(`MIN(fn.opened_scan_id)`).
-		Where("fn.target_id = ?", targetID)
+		ColumnExpr(`MIN("fn"."opened_scan_id")`).
+		Where(`"fn"."target_id" = ?`, targetID)
 
 	var wanted []int64
 	err := s.db.NewSelect().
 		TableExpr(`"scan" AS "sc"`).
-		ColumnExpr(`sc.id`).
-		Where("sc.target_id = ?", targetID).
-		Where("sc.id IN (?)", bun.List(scanIDs)).
-		Where("sc.id > (?)", first).
+		ColumnExpr(`"sc"."id"`).
+		Where(`"sc"."target_id" = ?`, targetID).
+		Where(`"sc"."id" IN (?)`, bun.List(scanIDs)).
+		Where(`"sc"."id" > (?)`, first).
 		Scan(ctx, &wanted)
 	if err != nil {
 		return nil, fmt.Errorf("read which scans this build can be compared across: %w", err)
@@ -221,15 +221,15 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "tn"`).
-		Join(`JOIN "component" AS "tc" ON tc.id = tn.component_id`).
-		ColumnExpr(`tn.opened_scan_id AS "opened"`).
-		ColumnExpr(`tn.closed_scan_id AS "closed"`).
-		ColumnExpr(`tc.name_folded AS "nm"`).
-		Where("tn.target_id = ?", targetID).
-		Where("tn.is_root = ?", false).
+		Join(`JOIN "component" AS "tc" ON "tc"."id" = "tn"."component_id"`).
+		ColumnExpr(`"tn"."opened_scan_id" AS "opened"`).
+		ColumnExpr(`"tn"."closed_scan_id" AS "closed"`).
+		ColumnExpr(`"tc"."name_folded" AS "nm"`).
+		Where(`"tn"."target_id" = ?`, targetID).
+		Where(`"tn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("tn.opened_scan_id IN (?)", bun.List(scanIDs)).
-				WhereOr("tn.closed_scan_id IN (?)", bun.List(scanIDs))
+			return q.Where(`"tn"."opened_scan_id" IN (?)`, bun.List(scanIDs)).
+				WhereOr(`"tn"."closed_scan_id" IN (?)`, bun.List(scanIDs))
 		}).
 		Scan(ctx, &ends)
 	if err != nil {
@@ -266,23 +266,23 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`n.opened_scan_id AS "opened"`).
-		ColumnExpr(`n.closed_scan_id AS "closed"`).
-		ColumnExpr(`c.name_folded AS "nm"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
+		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
+		ColumnExpr(`"c"."name_folded" AS "nm"`).
 		// The name as a producer wrote it, for the listing to show. Two
 		// producers writing one dependency in different capitals are one name
 		// here, and either spelling names the same thing on a screen.
-		ColumnExpr(`c.name AS "dsp"`).
-		ColumnExpr(`c.version AS "ver"`).
-		Where("n.target_id = ?", targetID).
+		ColumnExpr(`"c"."name" AS "dsp"`).
+		ColumnExpr(`"c"."version" AS "ver"`).
+		Where(`"n"."target_id" = ?`, targetID).
 		// The build's own root is not one of its components, and its version
 		// is not stored, so it can neither arrive nor move.
-		Where("n.is_root = ?", false).
-		Where("n.opened_scan_id <= ?", latest).
+		Where(`"n"."is_root" = ?`, false).
+		Where(`"n"."opened_scan_id" <= ?`, latest).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("n.closed_scan_id IS NULL").
-				WhereOr("n.closed_scan_id >= ?", earliest)
+			return q.Where(`"n"."closed_scan_id" IS NULL`).
+				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
 		}).
 		Scan(ctx, &nodes)
 	if err != nil {
@@ -582,14 +582,14 @@ func (s *Store) held(ctx context.Context, targetID, scanID int64) (int, error) {
 	// row.
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`COUNT(DISTINCT c.name_folded)`).
-		Where("n.target_id = ?", targetID).
-		Where("n.is_root = ?", false).
-		Where("n.opened_scan_id < ?", scanID).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`COUNT(DISTINCT "c"."name_folded")`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."is_root" = ?`, false).
+		Where(`"n"."opened_scan_id" < ?`, scanID).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("n.closed_scan_id IS NULL").
-				WhereOr("n.closed_scan_id >= ?", scanID)
+			return q.Where(`"n"."closed_scan_id" IS NULL`).
+				WhereOr(`"n"."closed_scan_id" >= ?`, scanID)
 		}).
 		Scan(ctx, &held)
 	if err != nil {

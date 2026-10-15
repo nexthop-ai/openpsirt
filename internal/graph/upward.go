@@ -94,23 +94,23 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 	}
 	held := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`MIN(c.name) AS "name"`).
-		ColumnExpr(`MIN(c.version) AS "version"`).
-		ColumnExpr(`MIN(c.purl) AS "purl"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_at IS NULL").
-		Where("f.assigned_to IN (?)", bun.List(mine)).
-		GroupExpr("f.component_id").
-		OrderExpr("issues DESC, name").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`MIN("c"."name") AS "name"`).
+		ColumnExpr(`MIN("c"."version") AS "version"`).
+		ColumnExpr(`MIN("c"."purl") AS "purl"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."assigned_to" IN (?)`, bun.List(mine)).
+		GroupExpr(`"f"."component_id"`).
+		OrderExpr(`issues DESC, "name"`).
 		Limit(ours + 1)
 	// An assignment carries an undisclosed row only to somebody who reads
 	// undisclosed work here, so anybody else gets disclosed rows alone — the
 	// rule the work list applies, for the same reason.
 	if !subject.Reads(access.Private, productID) {
-		held = held.Where("f.visibility = ?", access.Public)
+		held = held.Where(`"f"."visibility" = ?`, access.Public)
 	}
 	if err := held.Scan(ctx, &rows); err != nil {
 		return nil, false, fmt.Errorf("read what you hold in this build: %w", err)

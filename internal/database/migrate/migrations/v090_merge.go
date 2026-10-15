@@ -92,15 +92,15 @@ func mergeImagesV090(ctx context.Context, tx bun.Tx) error {
 	}
 	var rows []imageRowV090
 	if err := tx.NewSelect().TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.id, c.identity, c.purl, c.name, c.version`).
-		ColumnExpr(`COALESCE(c.upstream_name, '') AS "upstream_name"`).
-		ColumnExpr(`COALESCE(c.upstream_version, '') AS "upstream_version"`).
-		ColumnExpr(`c.fold_key`).
-		ColumnExpr(`COALESCE(c.supplier, '') AS "supplier"`).
-		ColumnExpr(`COALESCE(c.license, '') AS "license"`).
-		ColumnExpr(`COALESCE(c.cpe, '') AS "cpe"`).
-		Where("c.purl IS NOT NULL").
-		OrderExpr("c.id").
+		ColumnExpr(`"c"."id", "c"."identity", "c"."purl", "c"."name", "c"."version"`).
+		ColumnExpr(`COALESCE("c"."upstream_name", '') AS "upstream_name"`).
+		ColumnExpr(`COALESCE("c"."upstream_version", '') AS "upstream_version"`).
+		ColumnExpr(`"c"."fold_key"`).
+		ColumnExpr(`COALESCE("c"."supplier", '') AS "supplier"`).
+		ColumnExpr(`COALESCE("c"."license", '') AS "license"`).
+		ColumnExpr(`COALESCE("c"."cpe", '') AS "cpe"`).
+		Where(`"c"."purl" IS NOT NULL`).
+		OrderExpr(`"c"."id"`).
 		Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read the components with an identifier: %w", err)
 	}
@@ -147,12 +147,12 @@ func (m *mergerV090) readPlaces(ids []int64) error {
 		batch := ids[from:min(from+500, len(ids))]
 		var some []placeV090
 		if err := m.tx.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr(`st.product_id, f.place_identity, f.component_id, f.consumer_id`).
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			ColumnExpr(`"st"."product_id", "f"."place_identity", "f"."component_id", "f"."consumer_id"`).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.Where("f.component_id IN (?)", bun.List(batch)).
-					WhereOr("f.consumer_id IN (?)", bun.List(batch))
+				return q.Where(`"f"."component_id" IN (?)`, bun.List(batch)).
+					WhereOr(`"f"."consumer_id" IN (?)`, bun.List(batch))
 			}).
 			Distinct().
 			Scan(m.ctx, &some); err != nil {
@@ -230,10 +230,10 @@ func (m *mergerV090) merge(key string, group []imageRowV090) error {
 	}
 	var nodes []nodeRowV090
 	if err := m.tx.NewSelect().TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`n.id, n.target_id, n.component_id, n.is_root, n.opened_scan_id, n.closed_scan_id`).
-		ColumnExpr(`COALESCE(n.purl, '') AS "purl"`).
-		Where("n.component_id IN (?)", bun.List(ids)).
-		OrderExpr("n.target_id, n.opened_scan_id, n.id").
+		ColumnExpr(`"n"."id", "n"."target_id", "n"."component_id", "n"."is_root", "n"."opened_scan_id", "n"."closed_scan_id"`).
+		ColumnExpr(`COALESCE("n"."purl", '') AS "purl"`).
+		Where(`"n"."component_id" IN (?)`, bun.List(ids)).
+		OrderExpr(`"n"."target_id", "n"."opened_scan_id", "n"."id"`).
 		Scan(m.ctx, &nodes); err != nil {
 		return fmt.Errorf("read the nodes of %s: %w", group[0].Name, err)
 	}
@@ -425,13 +425,13 @@ func (m *mergerV090) joinEdges() error {
 			ClosedScanID *int64 `bun:"closed_scan_id"`
 		}
 		if err := m.tx.NewSelect().TableExpr(`"graph_edge" AS "e"`).
-			ColumnExpr(`e.id, e.parent_id, e.child_id, e.kind, e.opened_scan_id, e.closed_scan_id`).
-			Where("e.target_id = ?", target).
+			ColumnExpr(`"e"."id", "e"."parent_id", "e"."child_id", "e"."kind", "e"."opened_scan_id", "e"."closed_scan_id"`).
+			Where(`"e"."target_id" = ?`, target).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.Where("e.parent_id IN (?)", bun.List(kept)).
-					WhereOr("e.child_id IN (?)", bun.List(kept))
+				return q.Where(`"e"."parent_id" IN (?)`, bun.List(kept)).
+					WhereOr(`"e"."child_id" IN (?)`, bun.List(kept))
 			}).
-			OrderExpr("e.parent_id, e.child_id, e.kind, e.opened_scan_id, e.id").
+			OrderExpr(`"e"."parent_id", "e"."child_id", "e"."kind", "e"."opened_scan_id", "e"."id"`).
 			Scan(m.ctx, &edges); err != nil {
 			return fmt.Errorf("read the edges of a build's images: %w", err)
 		}
@@ -477,9 +477,9 @@ func (m *mergerV090) moveTags(ids []int64, survivor int64) error {
 		Tag             string `bun:"tag"`
 	}
 	if err := m.tx.NewSelect().TableExpr(`"finding_tag" AS "ft"`).
-		ColumnExpr(`ft.id, ft.product_id, ft.vulnerability_id, ft.tag`).
-		Where("ft.component_id IN (?)", bun.List(ids)).
-		OrderExpr("ft.added_at, ft.id").
+		ColumnExpr(`"ft"."id", "ft"."product_id", "ft"."vulnerability_id", "ft"."tag"`).
+		Where(`"ft"."component_id" IN (?)`, bun.List(ids)).
+		OrderExpr(`"ft"."added_at", "ft"."id"`).
 		Scan(m.ctx, &tags); err != nil {
 		return fmt.Errorf("read the tags on an image's findings: %w", err)
 	}
@@ -592,13 +592,13 @@ func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) e
 		for from := 0; from < len(places); from += 500 {
 			var rows []decided
 			if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
-				ColumnExpr(`de.id, de.product_id, de.vulnerability_id, de.place_identity, de.live_key, de.state`).
-				ColumnExpr(`de.proposed_at`).
-				ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "component"`).
-				ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer"`).
-				Where("de.product_id = ?", product).
-				Where("de.place_identity IN (?)", bun.List(places[from:min(from+500, len(places))])).
-				Where("de.live_key IS NOT NULL").
+				ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."place_identity", "de"."live_key", "de"."state"`).
+				ColumnExpr(`"de"."proposed_at"`).
+				ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "component"`).
+				ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer"`).
+				Where(`"de"."product_id" = ?`, product).
+				Where(`"de"."place_identity" IN (?)`, bun.List(places[from:min(from+500, len(places))])).
+				Where(`"de"."live_key" IS NOT NULL`).
 				Scan(m.ctx, &rows); err != nil {
 				return fmt.Errorf("read the decisions beneath %s: %w", stored.Name, err)
 			}
@@ -646,8 +646,8 @@ func (m *mergerV090) rekeyDecisions(group []imageRowV090, stored imageRowV090) e
 	for from := 0; from < len(keyList); from += 500 {
 		var some []decided
 		if err := m.tx.NewSelect().TableExpr(`"decision" AS "de"`).
-			ColumnExpr(`de.id, de.live_key, de.state, de.proposed_at`).
-			Where("de.live_key IN (?)", bun.List(keyList[from:min(from+500, len(keyList))])).
+			ColumnExpr(`"de"."id", "de"."live_key", "de"."state", "de"."proposed_at"`).
+			Where(`"de"."live_key" IN (?)`, bun.List(keyList[from:min(from+500, len(keyList))])).
 			Scan(m.ctx, &some); err != nil {
 			return fmt.Errorf("read the decisions already keyed there: %w", err)
 		}
@@ -742,16 +742,16 @@ func (m *mergerV090) rekeyCommitments(group []imageRowV090, stored imageRowV090)
 		TargetID int64 `bun:"target_id"`
 	}
 	if err := m.tx.NewSelect().TableExpr(`"upgrade" AS "ug"`).
-		ColumnExpr(`ug.id, ug.target_id`).
-		Where("ug.fold_key IN (?)", bun.List(folds)).
-		OrderExpr("ug.id").
+		ColumnExpr(`"ug"."id", "ug"."target_id"`).
+		Where(`"ug"."fold_key" IN (?)`, bun.List(folds)).
+		OrderExpr(`"ug"."id"`).
 		Scan(m.ctx, &committed); err != nil {
 		return fmt.Errorf("read the commitments on %s: %w", stored.Name, err)
 	}
 	for _, one := range committed {
 		already, err := m.tx.NewSelect().TableExpr(`"upgrade" AS "ug"`).
-			Where("ug.target_id = ?", one.TargetID).
-			Where("ug.fold_key = ?", stored.FoldKey).
+			Where(`"ug"."target_id" = ?`, one.TargetID).
+			Where(`"ug"."fold_key" = ?`, stored.FoldKey).
 			Exists(m.ctx)
 		if err != nil {
 			return fmt.Errorf("read what a build commits on %s: %w", stored.Name, err)

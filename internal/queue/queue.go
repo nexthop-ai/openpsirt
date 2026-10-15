@@ -262,11 +262,11 @@ func (q *Queue) depthIn(ctx context.Context, db bun.IDB, kind string) (int, erro
 	// which is what this counts.
 	stale := q.now().Truncate(time.Microsecond).Add(-q.opts.ClaimTimeout)
 	n, err := db.NewSelect().Model((*Job)(nil)).
-		Where("kind = ?", kind).
+		Where(`"kind" = ?`, kind).
 		WhereGroup(" AND ", func(s *bun.SelectQuery) *bun.SelectQuery {
 			return s.
-				WhereOr("state = ?", Pending).
-				WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+				WhereOr(`"state" = ?`, Pending).
+				WhereOr(`"state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"`,
 					Running, stale)
 		}).
 		Count(ctx)
@@ -339,16 +339,16 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 		// work out twice, which on an ingest looks like real change. This way
 		// the worst case is slow.
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
-			Set("state = ?", Running).
-			Set("attempts = attempts + 1").
-			Set("claimed_by = ?", worker).
-			Set("claimed_at = ?", now).
-			Set("updated_at = ?", now).
-			Where("id = ?", id).
+			Set(`"state" = ?`, Running).
+			Set(`"attempts" = "attempts" + 1`).
+			Set(`"claimed_by" = ?`, worker).
+			Set(`"claimed_at" = ?`, now).
+			Set(`"updated_at" = ?`, now).
+			Where(`"id" = ?`, id).
 			WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
 				return u.
-					WhereOr("state = ? AND run_after <= ?", Pending, now).
-					WhereOr("state = ? AND claimed_at < ? AND attempts < max_attempts",
+					WhereOr(`"state" = ? AND "run_after" <= ?`, Pending, now).
+					WhereOr(`"state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"`,
 						Running, staleBefore)
 			}).
 			Exec(ctx)
@@ -364,7 +364,7 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 			return nil
 		}
 		job = new(Job)
-		return tx.NewSelect().Model(job).Where("id = ?", id).Scan(ctx)
+		return tx.NewSelect().Model(job).Where(`"id" = ?`, id).Scan(ctx)
 	})
 	if err != nil {
 		return nil, err
@@ -399,13 +399,13 @@ func (q *Queue) Bury(ctx context.Context) (int, error) {
 		now := q.now().Truncate(time.Microsecond)
 		stale := now.Add(-q.opts.ClaimTimeout)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
-			Set("state = ?", Dead).
-			Set("last_error = ?", ErrWorkerGone.Error()).
-			Set("claimed_by = NULL").
-			Set("updated_at = ?", now).
-			Where("state = ?", Running).
-			Where("claimed_at < ?", stale).
-			Where("attempts >= max_attempts").
+			Set(`"state" = ?`, Dead).
+			Set(`"last_error" = ?`, ErrWorkerGone.Error()).
+			Set(`"claimed_by" = NULL`).
+			Set(`"updated_at" = ?`, now).
+			Where(`"state" = ?`, Running).
+			Where(`"claimed_at" < ?`, stale).
+			Where(`"attempts" >= "max_attempts"`).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("set aside work whose worker never came back: %w", err)
@@ -477,8 +477,8 @@ func (q *Queue) Renew(ctx context.Context, id int64, worker string) error {
 func (q *Queue) renewIn(ctx context.Context, tx bun.Tx, id int64, worker string) error {
 	now := q.now().Truncate(time.Microsecond)
 	res, err := heldBy(tx.NewUpdate().Model((*Job)(nil)).
-		Set("claimed_at = ?", now).
-		Set("updated_at = ?", now), id, worker).
+		Set(`"claimed_at" = ?`, now).
+		Set(`"updated_at" = ?`, now), id, worker).
 		Exec(ctx)
 	if err != nil {
 		return err
@@ -490,9 +490,9 @@ func (q *Queue) renewIn(ctx context.Context, tx bun.Tx, id int64, worker string)
 // and claimed by it. A claim that went stale and was taken over matches
 // nothing.
 func heldBy(q *bun.UpdateQuery, id int64, worker string) *bun.UpdateQuery {
-	return q.Where("id = ?", id).
-		Where("state = ?", Running).
-		Where("claimed_by = ?", worker)
+	return q.Where(`"id" = ?`, id).
+		Where(`"state" = ?`, Running).
+		Where(`"claimed_by" = ?`, worker)
 }
 
 // Holding renews a claim for as long as its work runs.
@@ -591,9 +591,9 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
 		res, err := heldBy(tx.NewUpdate().Model((*Job)(nil)).
-			Set("state = ?", Done).
-			Set("claimed_by = NULL").
-			Set("updated_at = ?", now), id, worker).
+			Set(`"state" = ?`, Done).
+			Set(`"claimed_by" = NULL`).
+			Set(`"updated_at" = ?`, now), id, worker).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -610,7 +610,7 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 		// A read that failed is returned for the retry helper, and is not
 		// taken for an answer about the claim.
 		ending := new(Job)
-		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(ending).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoLongerHeld
 			}
@@ -636,15 +636,15 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		job := new(Job)
-		if err := tx.NewSelect().Model(job).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(job).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			return fmt.Errorf("load job %d: %w", id, err)
 		}
 
 		now := q.now().Truncate(time.Microsecond)
 		update := heldBy(tx.NewUpdate().Model((*Job)(nil)).
-			Set("last_error = ?", said).
-			Set("claimed_by = NULL").
-			Set("updated_at = ?", now), id, worker)
+			Set(`"last_error" = ?`, said).
+			Set(`"claimed_by" = NULL`).
+			Set(`"updated_at" = ?`, now), id, worker)
 
 		if matched && job.ClaimedBy == nil && job.LastError != nil && *job.LastError == said &&
 			(job.State == Pending || job.State == Dead) {
@@ -654,12 +654,12 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 			return nil
 		}
 		if job.Attempts >= job.MaxAttempts {
-			update = update.Set("state = ?", Dead)
+			update = update.Set(`"state" = ?`, Dead)
 		} else {
 			// Longer each time, so a dependency that is briefly unavailable is
 			// not hammered while it recovers.
 			delay := time.Duration(job.Attempts) * q.opts.Backoff
-			update = update.Set("state = ?", Pending).Set("run_after = ?", now.Add(delay))
+			update = update.Set(`"state" = ?`, Pending).Set(`"run_after" = ?`, now.Add(delay))
 		}
 		res, err := update.Exec(ctx)
 		if err != nil {
@@ -687,12 +687,12 @@ func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after tim
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
 		res, err := heldBy(tx.NewUpdate().Model((*Job)(nil)).
-			Set("state = ?", Pending).
-			Set("attempts = CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END").
-			Set("claimed_by = NULL").
-			Set("run_after = ?", now.Add(after)).
-			Set("last_error = ?", said).
-			Set("updated_at = ?", now), id, worker).
+			Set(`"state" = ?`, Pending).
+			Set(`"attempts" = CASE WHEN "attempts" > 0 THEN "attempts" - 1 ELSE 0 END`).
+			Set(`"claimed_by" = NULL`).
+			Set(`"run_after" = ?`, now.Add(after)).
+			Set(`"last_error" = ?`, said).
+			Set(`"updated_at" = ?`, now), id, worker).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -708,7 +708,7 @@ func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after tim
 		// An earlier attempt matched the row and its commit was reported
 		// refused. Asked of the row rather than assumed, as Succeed asks.
 		ending := new(Job)
-		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(ending).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return lost
 			}
@@ -783,8 +783,8 @@ func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
 	}
 	var jobs []Job
 	if err := q.db.NewSelect().Model(&jobs).
-		Where("state = ?", Dead).
-		OrderExpr("updated_at DESC, id DESC").
+		Where(`"state" = ?`, Dead).
+		OrderExpr(`"updated_at" DESC, "id" DESC`).
 		Limit(limit).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("list work that was set aside: %w", err)
 	}
@@ -793,7 +793,7 @@ func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
 	// sets aside far more than one page holds — which is exactly the state
 	// somebody opens this in.
 	total, err := q.db.NewSelect().Model((*Job)(nil)).
-		Where("state = ?", Dead).Count(ctx)
+		Where(`"state" = ?`, Dead).Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count work that was set aside: %w", err)
 	}
@@ -821,14 +821,14 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		now := q.now().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
-			Set("state = ?", Pending).
-			Set("attempts = ?", 0).
-			Set("run_after = ?", now).
-			Set("claimed_by = NULL").
-			Set("claimed_at = NULL").
-			Set("updated_at = ?", now).
-			Where("id = ?", id).
-			Where("state = ?", Dead).
+			Set(`"state" = ?`, Pending).
+			Set(`"attempts" = ?`, 0).
+			Set(`"run_after" = ?`, now).
+			Set(`"claimed_by" = NULL`).
+			Set(`"claimed_at" = NULL`).
+			Set(`"updated_at" = ?`, now).
+			Where(`"id" = ?`, id).
+			Where(`"state" = ?`, Dead).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("put job %d back: %w", id, err)
@@ -852,7 +852,7 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 		// which is what was asked: told otherwise, the caller reads the job
 		// as never put back.
 		ending := new(Job)
-		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(ending).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNotSetAside
 			}

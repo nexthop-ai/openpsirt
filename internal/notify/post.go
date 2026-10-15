@@ -157,9 +157,9 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	err = p.db.NewSelect().
 		Model((*Notification)(nil)).
 		ColumnExpr("nt.*").
-		ColumnExpr(`pe.email AS "email"`).
-		Join(`JOIN "person" AS "pe" ON pe.id = nt.person_id`).
-		Where("nt.sent_at IS NULL").
+		ColumnExpr(`"pe"."email" AS "email"`).
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "nt"."person_id"`).
+		Where(`"nt"."sent_at" IS NULL`).
 		// A condition the application has already withdrawn is not news. The
 		// sibling sweep carries the rule and this one did not, so mail went
 		// about a build that had resumed being scanned or an embargo whose
@@ -167,17 +167,17 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		// it, so there is nothing to reconcile the message against. For a
 		// private condition the message says only that there is something
 		// undisclosed needing attention: a message about nothing at all.
-		Where("nt.cleared_at IS NULL").
-		Where("nt.attempts < ?", tries).
+		Where(`"nt"."cleared_at" IS NULL`).
+		Where(`"nt"."attempts" < ?`, tries).
 		// Somebody with no address is told nothing outside the
 		// application and keeps the area inside it. Excluded in the
 		// query rather than skipped after reading, so a deployment
 		// where nobody has an address does no work at all.
-		Where("pe.email IS NOT NULL AND pe.email <> ?", "").
+		Where(`"pe"."email" IS NOT NULL AND "pe"."email" <> ?`, "").
 		// Nothing goes to somebody who has left, including what was
 		// opened for them before they did.
 		Where(`"pe"."deactivated_at" IS NULL`).
-		OrderExpr("nt.created_at ASC, nt.id ASC").
+		OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
 		Limit(sweepBatch).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -192,8 +192,8 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 			// Counted rather than recorded as a failure: the row is still
 			// unsent, which is already the whole of "try this again".
 			if _, err := p.db.NewUpdate().Model((*Notification)(nil)).
-				Set("attempts = attempts + 1").
-				Where("id = ?", row.ID).Exec(ctx); err != nil {
+				Set(`"attempts" = "attempts" + 1`).
+				Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
 				return sent, failed, fmt.Errorf("record a failed send: %w", err)
 			}
 			p.logger.Warn("could not carry a notification out of the application",
@@ -202,9 +202,9 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		}
 		now := p.now()
 		if _, err := p.db.NewUpdate().Model((*Notification)(nil)).
-			Set("sent_at = ?", now).
-			Set("attempts = attempts + 1").
-			Where("id = ?", row.ID).Exec(ctx); err != nil {
+			Set(`"sent_at" = ?`, now).
+			Set(`"attempts" = "attempts" + 1`).
+			Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
 			// Sent and not recorded as sent, which the next sweep will send
 			// again. Reported rather than swallowed: a duplicate message is a
 			// small harm and an unexplained one is a confusing one.
@@ -242,23 +242,23 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 
 	var people []access.Account
 	if err := p.db.NewSelect().Model(&people).
-		Where("digest = ?", true).
+		Where(`"digest" = ?`, true).
 		// Somebody with no address asked for something this cannot deliver.
 		// Narrowed here so a deployment where nobody has one does no work.
-		Where("email IS NOT NULL AND email <> ?", "").
+		Where(`"email" IS NOT NULL AND "email" <> ?`, "").
 		// Somebody who has left keeps the switch and is sent nothing. A
 		// digest is assembled as its reader, which refuses them anyway, and
 		// reselecting them would spend the batch on people it cannot serve.
 		Where(`"deactivated_at" IS NULL`).
 		// One a day. The sweep runs far more often than that, because it
 		// carries the immediate messages too.
-		Where("digest_sent_at IS NULL OR digest_sent_at < ?", p.now().Add(-aDay)).
+		Where(`"digest_sent_at" IS NULL OR "digest_sent_at" < ?`, p.now().Add(-aDay)).
 		// Bounded like every other read here. A deployment with more people
 		// than this sends the rest on the next cycle rather than holding the
 		// lease for as long as it takes. Everybody a cycle reaches has their
 		// stamp moved, so ordering by person is enough for the next cycle to
 		// reach the rest.
-		OrderExpr("id ASC").
+		OrderExpr(`"id" ASC`).
 		Limit(sweepBatch).
 		Scan(ctx, &people); err != nil {
 		return 0, fmt.Errorf("read who asked for a digest: %w", err)
@@ -299,8 +299,8 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 			}
 		}
 		if _, err := p.db.NewUpdate().Model((*access.Account)(nil)).
-			Set("digest_sent_at = ?", asOf).
-			Where("id = ?", person.ID).Exec(ctx); err != nil {
+			Set(`"digest_sent_at" = ?`, asOf).
+			Where(`"id" = ?`, person.ID).Exec(ctx); err != nil {
 			// Reported and carried on, like the sends above. Abandoning the
 			// rest of the list because one row would not update leaves
 			// everybody after this person unsent for the cycle.

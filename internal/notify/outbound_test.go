@@ -950,7 +950,7 @@ func TestADeliveryInFlightIsNotSentTwice(t *testing.T) {
 		attempt := func(at time.Time) {
 			t.Helper()
 			if _, err := db.DB.NewUpdate().TableExpr(`"outbound_delivery"`).
-				Set("failed = ?", "").Set("attempted_at = ?", at).Where("1 = 1").Exec(ctx); err != nil {
+				Set(`"failed" = ?`, "").Set(`"attempted_at" = ?`, at).Where("1 = 1").Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

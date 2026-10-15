@@ -131,7 +131,7 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 		heldUntil := func() time.Time {
 			t.Helper()
 			var row queue.Lease
-			if err := db.DB.NewSelect().Model(&row).Where("name = ?", patchbranch.Lease).
+			if err := db.DB.NewSelect().Model(&row).Where(`"name" = ?`, patchbranch.Lease).
 				Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -173,19 +173,19 @@ func TestAVisitRenewsItsLeaseAndStopsWhenItIsLost(t *testing.T) {
 		// fetch lasts until the visit has stopped, or until it is plain that
 		// it will not.
 		if _, err := db.DB.NewUpdate().Table("patch_repository").
-			Set("fetched_at = NULL").Set("reached_at = NULL").Where("1 = 1").Exec(ctx); err != nil {
+			Set(`"fetched_at" = NULL`).Set(`"reached_at" = NULL`).Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := db.DB.NewUpdate().Table("patch_commit").
-			Set("looked_at = NULL").Where("1 = 1").Exec(ctx); err != nil {
+			Set(`"looked_at" = NULL`).Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		lost := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
 			outward.Excluded{}, nil).Locating(func(visit context.Context, _ string) string {
 			if _, err := db.DB.NewUpdate().Model((*queue.Lease)(nil)).
-				Set("held_by = ?", "two").
-				Set("held_until = ?", time.Now().UTC().Add(time.Hour)).
-				Where("name = ?", patchbranch.Lease).Exec(ctx); err != nil {
+				Set(`"held_by" = ?`, "two").
+				Set(`"held_until" = ?`, time.Now().UTC().Add(time.Hour)).
+				Where(`"name" = ?`, patchbranch.Lease).Exec(ctx); err != nil {
 				t.Error(err)
 			}
 			select {

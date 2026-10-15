@@ -142,11 +142,11 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 		}
 		lastDigest := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
 		if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
-			Set("email = ?", "reader@example.com").
-			Set("digest = ?", true).
-			Set("digest_unassigned = ?", true).
-			Set("digest_sent_at = ?", lastDigest).
-			Where("id = ?", reader.ID).Exec(ctx); err != nil {
+			Set(`"email" = ?`, "reader@example.com").
+			Set(`"digest" = ?`, true).
+			Set(`"digest_unassigned" = ?`, true).
+			Set(`"digest_sent_at" = ?`, lastDigest).
+			Where(`"id" = ?`, reader.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		target := w.Target

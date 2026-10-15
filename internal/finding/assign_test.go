@@ -572,7 +572,7 @@ func TestWorkIsNotGivenAwayWithoutTheAssignerRightThroughAnyPath(t *testing.T) {
 			t.Errorf("assigning everything matching to somebody else without the right: %v", err)
 		}
 		held, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("assigned_to = ?", other).Count(ctx)
+			Where(`"assigned_to" = ?`, other).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

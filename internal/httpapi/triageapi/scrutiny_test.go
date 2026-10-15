@@ -171,8 +171,8 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 		// route by which the two came apart.
 		if _, err := r.DB.DB.NewUpdate().
 			Table("claim_approval").
-			Set("covered = ?", len(ids)-1).
-			Where("claim_id = ?", claim).
+			Set(`"covered" = ?`, len(ids)-1).
+			Where(`"claim_id" = ?`, claim).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

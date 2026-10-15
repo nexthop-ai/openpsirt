@@ -34,8 +34,8 @@ func (f *fixture) shipping(t *testing.T) *shipping {
 func (s *shipping) closes(t *testing.T, identity string) {
 	t.Helper()
 	if _, err := s.fixture.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("closed_at = ?", time.Now().UTC()).
-		Where("id = ?", s.opened[identity]).Exec(t.Context()); err != nil {
+		Set(`"closed_at" = ?`, time.Now().UTC()).
+		Where(`"id" = ?`, s.opened[identity]).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -81,7 +81,7 @@ func (f *fixture) datedPast(t *testing.T, ships *shipping, identity string,
 	}
 	if _, err := f.db.DB.NewUpdate().Table("claim").
 		Set(column+" = ?", past).
-		Where("id = ?", made.ClaimID).Exec(ctx); err != nil {
+		Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return made
@@ -119,8 +119,8 @@ func TestEachQueueReasonListsOnlyItsOwnKind(t *testing.T) {
 		moved.PlaceIdentity = "moved-out-from-under"
 		lapsed := f.claims(t, moved)
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-			Set("state = ?", triage.LapsedState).
-			Where("id = ?", lapsed.ID).Exec(t.Context()); err != nil {
+			Set(`"state" = ?`, triage.LapsedState).
+			Where(`"id" = ?`, lapsed.ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -239,15 +239,15 @@ func TestMovingAPromisedPatchIsGatedByTheDeadlineOfWhatItCovers(t *testing.T) {
 		patch := f.datedPast(t, ships, "patch-with-a-deadline", triage.PatchNeeded)
 		due := time.Now().UTC().AddDate(0, 0, 30).Truncate(time.Second)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("due_at = ?", due).
-			Where("id = ?", ships.opened["patch-with-a-deadline"]).Exec(ctx); err != nil {
+			Set(`"due_at" = ?`, due).
+			Where(`"id" = ?`, ships.opened["patch-with-a-deadline"]).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		needs := func(t *testing.T) bool {
 			t.Helper()
 			var rows []triage.Decision
 			if err := f.db.DB.NewSelect().Model(&rows).
-				Where("de.claim_id = ?", patch.ClaimID).Scan(ctx); err != nil {
+				Where(`"de"."claim_id" = ?`, patch.ClaimID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) == 0 {
@@ -305,8 +305,8 @@ func TestAnExpiredDeferralWithARowTheReaderMayNotDecideIsNotOfferedToThem(t *tes
 			// A date already gone is refused when written, so it is moved
 			// into the past after.
 			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("deferred_until = ?", time.Now().UTC().Add(-time.Hour)).
-				Where("id = ?", recorded[0].ClaimID).Exec(ctx); err != nil {
+				Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
+				Where(`"id" = ?`, recorded[0].ClaimID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return recorded[0].ClaimID

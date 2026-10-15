@@ -86,7 +86,7 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 	// holds, with the path doing the authorizing and the identifier doing the
 	// reading.
 	err = s.db.NewSelect().Model(&run).
-		Where("id = ?", runID).Where("target_id = ?", targetID).Scan(ctx)
+		Where(`"id" = ?`, runID).Where(`"target_id" = ?`, targetID).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("no such run on this build: %w", ErrNoSuchRun)
 	}
@@ -113,19 +113,19 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 		}
 		inner, run := runChanged(s.db, targetID, column, visible)
 		inner = inner.
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(rating.Here, productID).
 			ColumnExpr(rating.BandExpr+` AS "band"`).
 			// The flag rather than the urgency's top bands, which answer
 			// "some exploitation" and would count a product recorded as
 			// attacked here among the issues a feed calls exploited.
-			ColumnExpr(`CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END AS "exploited"`).
+			ColumnExpr(`CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END AS "exploited"`).
 			Where(run+" = ?", runID)
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
 			ColumnExpr(`changed.band AS "band"`).
 			ColumnExpr(`COUNT(*) AS "count"`).
-			ColumnExpr(`SUM(changed.exploited) AS "exploited"`).
+			ColumnExpr(`SUM("changed"."exploited") AS "exploited"`).
 			GroupExpr("changed.band").
 			Scan(ctx, &rows)
 		if err != nil {
@@ -184,9 +184,9 @@ func runChanged(db bun.IDB, targetID int64, column runColumn,
 	return db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(wasOpen), string(database.Column(db, "f."+string(column)))
 }

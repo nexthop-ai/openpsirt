@@ -352,7 +352,7 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	// Folded to match how it was stored. An identity typed with different
 	// capitals is the same person, and looking it up exactly would answer
 	// "nobody" for somebody who is plainly there.
-	err := s.db.NewSelect().Model(person).Where("identity = ?", Folded(identity)).Scan(ctx)
+	err := s.db.NewSelect().Model(person).Where(`"identity" = ?`, Folded(identity)).Scan(ctx)
 	if err != nil {
 		return nil, database.FromRead(err,
 			fmt.Errorf("nobody is recorded as %q: %w", identity, ErrNoSuchPerson),
@@ -408,7 +408,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// must never be counted as access — not here, and not in any report or
 	// review that asks what somebody holds.
 	if err := s.db.NewSelect().Model(&held).
-		Where("person_id = ?", person.ID).Where("active = ?", true).Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, person.ID).Where(`"active" = ?`, true).Scan(ctx); err != nil {
 		return Subject{}, fmt.Errorf("read what %q may do: %w", identity, err)
 	}
 	grants := map[int64][]Role{}
@@ -430,7 +430,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// is held, so the ordinary subject costs nothing.
 	var estate []EstateGrant
 	if err := s.db.NewSelect().Model(&estate).
-		Where("person_id = ?", person.ID).Where("active = ?", true).Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, person.ID).Where(`"active" = ?`, true).Scan(ctx); err != nil {
 		return Subject{}, fmt.Errorf("read what %q may do everywhere: %w", identity, err)
 	}
 	if len(estate) > 0 {

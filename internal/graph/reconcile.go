@@ -23,8 +23,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 
 	var open []Node
 	err := tx.NewSelect().Model(&open).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("read open nodes: %w", err)
@@ -73,11 +73,11 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 	// package it names moves with it, each to a string of its own.
 	for id, says := range restated {
 		if _, err := tx.NewUpdate().Model((*Node)(nil)).
-			Set("purl = ?", nullable(says.purl)).
-			Set("cpe = ?", nullable(says.cpe)).
-			Set("upstream_name = ?", nullable(says.upstreamName)).
-			Set("upstream_version = ?", nullable(says.upstreamVersion)).
-			Where("id = ?", id).Exec(ctx); err != nil {
+			Set(`"purl" = ?`, nullable(says.purl)).
+			Set(`"cpe" = ?`, nullable(says.cpe)).
+			Set(`"upstream_name" = ?`, nullable(says.upstreamName)).
+			Set(`"upstream_version" = ?`, nullable(says.upstreamVersion)).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
 	}
@@ -104,8 +104,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		}
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Node)(nil)).
-				Set("is_root = ?", isRoot).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"is_root" = ?`, isRoot).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
@@ -118,8 +118,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		// years later, and a deleted row cannot answer it.
 		err := database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Node)(nil)).
-				Set("closed_scan_id = ?", scanID).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"closed_scan_id" = ?`, scanID).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
@@ -164,8 +164,8 @@ type edgeAt struct {
 func reconcileEdges(ctx context.Context, tx bun.IDB, targetID, scanID int64, wanted map[edgeAt]bool) (int, int, error) {
 	var open []Edge
 	err := tx.NewSelect().Model(&open).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("read open edges: %w", err)
@@ -200,8 +200,8 @@ func reconcileEdges(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 	if len(gone) > 0 {
 		err := database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Edge)(nil)).
-				Set("closed_scan_id = ?", scanID).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"closed_scan_id" = ?`, scanID).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {

@@ -33,8 +33,8 @@ func TestAFindingSaysWhetherItIsDisclosed(t *testing.T) {
 
 		// The same finding, embargoed.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Set("disclose_at = ?", "2027-01-31").
+			Set(`"visibility" = ?`, "private").
+			Set(`"disclose_at" = ?`, "2027-01-31").
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -77,8 +77,8 @@ func TestAnEmbargoIsSaidBeforeItsDateNotOnIt(t *testing.T) {
 		// and not yet arrived.
 		soon := time.Now().UTC().AddDate(0, 0, 7).Format(time.DateOnly)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Set("disclose_at = ?", soon).
+			Set(`"visibility" = ?`, "private").
+			Set(`"disclose_at" = ?`, soon).
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -117,7 +117,7 @@ func TestAnEmbargoIsSaidBeforeItsDateNotOnIt(t *testing.T) {
 		// opens. Two conditions, because they clear differently.
 		past := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("disclose_at = ?", past).Where("1 = 1").Exec(t.Context()); err != nil {
+			Set(`"disclose_at" = ?`, past).Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if coming := r.Alerts(t, "private-triage", "disclosure-near"); len(coming) != 0 {

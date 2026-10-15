@@ -69,12 +69,12 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 		return held, nil
 	}
 	if err := v.db.NewSelect().Model(&held.aliases).
-		Where("identifier IN (?)", bun.List(names)).Scan(ctx); err != nil {
+		Where(`"identifier" IN (?)`, bun.List(names)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up these vulnerabilities: %w", err)
 	}
 	if err := v.db.NewSelect().Model(&held.filed).
 		Column("id", "identifier_folded", "issue_id").
-		Where("vu.identifier_folded IN (?)", bun.List(folded)).Scan(ctx); err != nil {
+		Where(`"vu"."identifier_folded" IN (?)`, bun.List(folded)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up these vulnerabilities by the names they are filed under: %w", err)
 	}
 	reached := map[int64]bool{}
@@ -93,7 +93,7 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 	}
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []Vulnerability
-		if err := v.db.NewSelect().Model(&rows).Where("id IN (?)", bun.List(batch)).Scan(ctx); err != nil {
+		if err := v.db.NewSelect().Model(&rows).Where(`"id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return fmt.Errorf("read these vulnerabilities: %w", err)
 		}
 		for _, row := range rows {
@@ -101,7 +101,7 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 		}
 		var ratings []CVSS
 		if err := v.db.NewSelect().Model(&ratings).
-			Where("vr.vulnerability_id IN (?)", bun.List(batch)).Scan(ctx); err != nil {
+			Where(`"vr"."vulnerability_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return fmt.Errorf("read how these vulnerabilities are rated: %w", err)
 		}
 		for _, rating := range ratings {
@@ -109,7 +109,7 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 		}
 		var weaknesses []Weakness
 		if err := v.db.NewSelect().Model(&weaknesses).
-			Where("vw.vulnerability_id IN (?)", bun.List(batch)).Scan(ctx); err != nil {
+			Where(`"vw"."vulnerability_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return fmt.Errorf("read what kind of flaw these are: %w", err)
 		}
 		for _, weakness := range weaknesses {
@@ -119,7 +119,7 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 		var references []Reference
 		if err := v.db.NewSelect().Model(&references).
 			Column("vulnerability_id", "url_identity").
-			Where("vr.vulnerability_id IN (?)", bun.List(batch)).Scan(ctx); err != nil {
+			Where(`"vr"."vulnerability_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return fmt.Errorf("read what these vulnerabilities point at: %w", err)
 		}
 		for _, reference := range references {

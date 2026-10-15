@@ -57,7 +57,7 @@ const (
 // is one row for every product; the published word stays on the vulnerability
 // every caller already joins.
 func For(product On) string {
-	return `LEFT JOIN "issue_rating" AS "ir" ON ir.vulnerability_id = v.id` +
+	return `LEFT JOIN "issue_rating" AS "ir" ON "ir"."vulnerability_id" = "v"."id"` +
 		` AND ir.product_id = ` + string(product)
 }
 

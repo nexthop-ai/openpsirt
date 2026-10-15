@@ -36,8 +36,8 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 			t.Fatal(err)
 		}
 		var member int64
-		if err := r.DB.DB.NewSelect().Table("person").ColumnExpr("id").
-			Where("identity = ?", "triager").Scan(ctx, &member); err != nil {
+		if err := r.DB.DB.NewSelect().Table("person").ColumnExpr(`"id"`).
+			Where(`"identity" = ?`, "triager").Scan(ctx, &member); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := rights.AddToTeam(ctx, team.ID, member, member); err != nil {

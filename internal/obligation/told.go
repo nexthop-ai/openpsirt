@@ -154,7 +154,7 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
 		*told = Told{}
 		record := new(triage.ExploitedHere)
-		if err := tx.NewSelect().Model(record).Where("eh.id = ?", recordID).
+		if err := tx.NewSelect().Model(record).Where(`"eh"."id" = ?`, recordID).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchRecord
@@ -279,7 +279,7 @@ func tellable(ctx context.Context, db bun.IDB, subject access.Subject,
 	}
 	var records []triage.ExploitedHere
 	if err := db.NewSelect().Model(&records).
-		Where("eh.id IN (?)", bun.List(recordIDs)).Scan(ctx); err != nil {
+		Where(`"eh"."id" IN (?)`, bun.List(recordIDs)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the records of being exploited: %w", err)
 	}
 	out := records[:0]
@@ -323,7 +323,7 @@ func (s *Store) toldAbout(ctx context.Context,
 	}
 	var rows []Told
 	err := s.db.NewSelect().Model(&rows).
-		Where("tod.exploited_here_id IN (?)", bun.List(allowed)).
+		Where(`"tod"."exploited_here_id" IN (?)`, bun.List(allowed)).
 		Order("tod.told_at ASC", "tod.id ASC").
 		Scan(ctx)
 	if err != nil {
@@ -352,7 +352,7 @@ func withPlaces(ctx context.Context, db bun.IDB, told []Told) error {
 	}
 	var places []ToldPlace
 	if err := db.NewSelect().Model(&places).
-		Where("tpl.told_id IN (?)", bun.List(ids)).
+		Where(`"tpl"."told_id" IN (?)`, bun.List(ids)).
 		Order("tpl.told_id ASC", "tpl.position ASC").
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read the places notices named: %w", err)
@@ -392,7 +392,7 @@ func (s *Store) WindowsNamed(ctx context.Context, subject access.Subject,
 	}
 	var windows []Window
 	if err := s.db.NewSelect().Model(&windows).
-		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"ow"."id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which windows were answered: %w", err)
 	}
 	windows, err := withLimits(ctx, s.db, windows)

@@ -183,7 +183,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 			ID int64 `bun:"id"`
 		}
 		if err := f.db.DB.NewSelect().TableExpr(`"claim_revision" AS "dr"`).
-			ColumnExpr("dr.id AS \"id\"").Where("dr.claim_id = ?", claimed.ClaimID).
+			ColumnExpr(`"dr"."id" AS "id"`).Where(`"dr"."claim_id" = ?`, claimed.ClaimID).
 			Order("dr.id DESC").Limit(1).Scan(ctx, &revision); err != nil {
 			t.Fatal(err)
 		}
@@ -431,8 +431,8 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 				t.Fatal(err)
 			}
 			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("deferred_until = ?", past).
-				Where("id = ?", made.ClaimID).Exec(ctx); err != nil {
+				Set(`"deferred_until" = ?`, past).
+				Where(`"id" = ?`, made.ClaimID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return made
@@ -440,8 +440,8 @@ func TestWhatHasStoppedStandingIsCountedOnceThoughItLapsedAndRanOut(t *testing.T
 		lapse := func(t *testing.T, id int64) {
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
-				Set("state = ?", triage.LapsedState).
-				Where("id = ?", id).Exec(ctx); err != nil {
+				Set(`"state" = ?`, triage.LapsedState).
+				Where(`"id" = ?`, id).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

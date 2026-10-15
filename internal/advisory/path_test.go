@@ -298,9 +298,9 @@ func (f *fixture) openedLongAgo(t *testing.T) string {
 	identifier := f.recorded(t, f.master)
 	if _, err := f.db.DB.NewUpdate().
 		TableExpr(`"finding" AS "f"`).
-		Set("opened_at = ?", time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC)).
-		Where(`f.vulnerability_id = (SELECT v.id FROM "vulnerability" AS "v"
-			WHERE v.identifier = ?)`, identifier).
+		Set(`"opened_at" = ?`, time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC)).
+		Where(`"f"."vulnerability_id" = (SELECT "v"."id" FROM "vulnerability" AS "v"
+			WHERE "v"."identifier" = ?)`, identifier).
 		Exec(t.Context()); err != nil {
 		t.Fatalf("backdating when the flaw was recorded: %v", err)
 	}

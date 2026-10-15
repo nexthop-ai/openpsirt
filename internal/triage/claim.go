@@ -131,8 +131,8 @@ func (s *Store) PointAt(ctx context.Context, subject access.Subject, claimID int
 		return err
 	}
 	if _, err := s.db.NewUpdate().Model((*Claim)(nil)).
-		Set("elsewhere = ?", where).
-		Where("id = ?", claimID).Exec(ctx); err != nil {
+		Set(`"elsewhere" = ?`, where).
+		Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
 		return fmt.Errorf("record where the work is: %w", err)
 	}
 	return nil
@@ -252,8 +252,8 @@ func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
 		return nil, fmt.Errorf("record the reasoning: %w", err)
 	}
 	if _, err := s.db.NewUpdate().Model((*Claim)(nil)).
-		Set("revision_id = ?", revision.ID).
-		Where("id = ?", claim.ID).Exec(ctx); err != nil {
+		Set(`"revision_id" = ?`, revision.ID).
+		Where(`"id" = ?`, claim.ID).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record the reasoning: %w", err)
 	}
 	claim.RevisionID = &revision.ID
@@ -331,11 +331,11 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 	proposals []Proposal) (*Claim, error) {
 
 	source := new(Claim)
-	if err := s.db.NewSelect().Model(source).Where("id = ?", from).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(source).Where(`"id" = ?`, from).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", from))
 	}
 	var rows []Decision
-	if err := s.db.NewSelect().Model(&rows).Where("claim_id = ?", from).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&rows).Where(`"claim_id" = ?`, from).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {
@@ -567,11 +567,11 @@ func (s *Store) intoReturned(ctx context.Context, subject access.Subject, claim 
 		return nil, err
 	}
 	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("claim_id = ?", returned.ID).
-		Set("sent_back_at = ?", now).
-		Where("id IN (?)", bun.List(ids)).
-		Where("claim_id = ?", claim.ID).
-		Where("state = ?", Proposed).Exec(ctx)
+		Set(`"claim_id" = ?`, returned.ID).
+		Set(`"sent_back_at" = ?`, now).
+		Where(`"id" IN (?)`, bun.List(ids)).
+		Where(`"claim_id" = ?`, claim.ID).
+		Where(`"state" = ?`, Proposed).Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", doing, err)
 	}
@@ -633,10 +633,10 @@ func (s *Store) approveWhileRevised(ctx context.Context, claim Claim, ids []int6
 	doing, changed string) error {
 
 	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", Approved).
-		Where("id IN (?)", bun.List(ids)).
-		Where("state = ?", Proposed).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
+		Set(`"state" = ?`, Approved).
+		Where(`"id" IN (?)`, bun.List(ids)).
+		Where(`"state" = ?`, Proposed).
+		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE "ac"."id" = ? AND "ac"."revision_id" = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("%s: %w", doing, err)
@@ -675,7 +675,7 @@ func (s *Store) reasoningOn(ctx context.Context, claim Claim) (string, error) {
 	}
 	revision := new(Revision)
 	if err := s.db.NewSelect().Model(revision).
-		Where("id = ?", *claim.RevisionID).Scan(ctx); err != nil {
+		Where(`"id" = ?`, *claim.RevisionID).Scan(ctx); err != nil {
 		return "", fmt.Errorf("read what it says: %w", err)
 	}
 	return revision.Body, nil
@@ -865,8 +865,8 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			return err
 		}
 		marked, err := tx.NewUpdate().Model((*Decision)(nil)).
-			Set("sent_back_at = ?", now).
-			Where("id IN (?)", bun.List(ids)).Where("state = ?", Proposed).Exec(ctx)
+			Set(`"sent_back_at" = ?`, now).
+			Where(`"id" IN (?)`, bun.List(ids)).Where(`"state" = ?`, Proposed).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("record that this was sent back: %w", err)
 		}
@@ -902,12 +902,12 @@ func (s *Store) claimRows(ctx context.Context, subject access.Subject, claimID i
 	allowed func(access.Subject, int64, int64, access.Visibility) bool) (*Claim, []Decision, error) {
 
 	claim := new(Claim)
-	if err := s.db.NewSelect().Model(claim).Where("id = ?", claimID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(claim).Where(`"id" = ?`, claimID).Scan(ctx); err != nil {
 		return nil, nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", claimID))
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id = ?", claimID).Order("de.id ASC").Scan(ctx); err != nil {
+		Where(`"de"."claim_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {

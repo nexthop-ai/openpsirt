@@ -139,8 +139,8 @@ func openEdition(ctx context.Context, tx bun.Tx, advisoryID, who int64,
 
 	var highest int
 	if err := tx.NewSelect().Model((*Edition)(nil)).
-		ColumnExpr("COALESCE(MAX(ordinal), 0)").
-		Where("advisory_id = ?", advisoryID).
+		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+		Where(`"advisory_id" = ?`, advisoryID).
 		Scan(ctx, &highest); err != nil {
 		return nil, err
 	}
@@ -162,15 +162,15 @@ func openEdition(ctx context.Context, tx bun.Tx, advisoryID, who int64,
 		return nil, err
 	}
 	if _, err := tx.NewUpdate().Model((*Advisory)(nil)).
-		Set("edition_id = ?", edition.ID).
-		Where("id = ?", advisoryID).Exec(ctx); err != nil {
+		Set(`"edition_id" = ?`, edition.ID).
+		Where(`"id" = ?`, advisoryID).Exec(ctx); err != nil {
 		return nil, err
 	}
 	if _, err := tx.NewUpdate().Model((*Approval)(nil)).
-		Set("withdrawn_at = ?", now).
-		Set("withdrawn_by = ?", who).
-		Where("advisory_id = ?", advisoryID).
-		Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
+		Set(`"withdrawn_at" = ?`, now).
+		Set(`"withdrawn_by" = ?`, who).
+		Where(`"advisory_id" = ?`, advisoryID).
+		Where(`"withdrawn_at" IS NULL`).Exec(ctx); err != nil {
 		return nil, err
 	}
 	return edition, nil
@@ -190,7 +190,7 @@ func carryTitle(ctx context.Context, tx bun.Tx, advisoryID int64) (string, error
 	var at Advisory
 	if err := tx.NewSelect().Model(&at).
 		ColumnExpr(`"ad"."edition_id"`).
-		Where("id = ?", advisoryID).Limit(1).Scan(ctx); err != nil {
+		Where(`"id" = ?`, advisoryID).Limit(1).Scan(ctx); err != nil {
 		return "", err
 	}
 	if at.EditionID == nil {
@@ -198,7 +198,7 @@ func carryTitle(ctx context.Context, tx bun.Tx, advisoryID int64) (string, error
 	}
 	var edition Edition
 	err := tx.NewSelect().Model(&edition).
-		Where("id = ?", *at.EditionID).Limit(1).Scan(ctx)
+		Where(`"id" = ?`, *at.EditionID).Limit(1).Scan(ctx)
 	if err != nil && !database.IsNoRows(err) {
 		return "", err
 	}
@@ -262,7 +262,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		// been replaced by the time it was written.
 		var at Advisory
 		if err := tx.NewSelect().Model(&at).
-			Where("id = ?", row.ID).Limit(1).Scan(ctx); err != nil {
+			Where(`"id" = ?`, row.ID).Limit(1).Scan(ctx); err != nil {
 			return err
 		}
 		if at.EditionID == nil {
@@ -270,7 +270,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		}
 		var edition Edition
 		if err := tx.NewSelect().Model(&edition).
-			Where("id = ?", *at.EditionID).Limit(1).Scan(ctx); err != nil {
+			Where(`"id" = ?`, *at.EditionID).Limit(1).Scan(ctx); err != nil {
 			return err
 		}
 		// Whoever wrote the words standing: the title, and every change to
@@ -281,8 +281,8 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		// title's own author agree to it.
 		var written []Edition
 		if err := tx.NewSelect().Model(&written).
-			Where("advisory_id = ?", row.ID).
-			Where("ordinal <= ?", edition.Ordinal).
+			Where(`"advisory_id" = ?`, row.ID).
+			Where(`"ordinal" <= ?`, edition.Ordinal).
 			Order("ordinal DESC").Scan(ctx); err != nil {
 			return err
 		}
@@ -297,9 +297,9 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		var already int
 		if err := tx.NewSelect().Model((*Approval)(nil)).
 			ColumnExpr("COUNT(*)").
-			Where("edition_id = ?", edition.ID).
-			Where("approved_by = ?", subject.ID).
-			Where("withdrawn_at IS NULL").
+			Where(`"edition_id" = ?`, edition.ID).
+			Where(`"approved_by" = ?`, subject.ID).
+			Where(`"withdrawn_at" IS NULL`).
 			Scan(ctx, &already); err != nil {
 			return err
 		}
@@ -355,10 +355,10 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		now := s.now().UTC().Truncate(time.Microsecond)
 		result, err := tx.NewUpdate().Model((*Approval)(nil)).
-			Set("withdrawn_at = ?", now).
-			Set("withdrawn_by = ?", subject.ID).
-			Where("advisory_id = ?", row.ID).
-			Where("withdrawn_at IS NULL").Exec(ctx)
+			Set(`"withdrawn_at" = ?`, now).
+			Set(`"withdrawn_by" = ?`, subject.ID).
+			Where(`"advisory_id" = ?`, row.ID).
+			Where(`"withdrawn_at" IS NULL`).Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -431,8 +431,8 @@ func (s *Store) agreers(ctx context.Context, agreed []Approval) ([]string, error
 		Identity string `bun:"identity"`
 	}
 	if err := s.db.NewSelect().TableExpr(`"person" AS "pe"`).
-		ColumnExpr(`pe.id AS "id"`).ColumnExpr(`pe.identity AS "identity"`).
-		Where("pe.id IN (?)", bun.List(ids)).
+		ColumnExpr(`"pe"."id" AS "id"`).ColumnExpr(`"pe"."identity" AS "identity"`).
+		Where(`"pe"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read who has agreed to it: %w", err)
 	}
@@ -466,9 +466,9 @@ func (s *Store) agreed(ctx context.Context, row *Advisory) ([]Approval, error) {
 	}
 	var rows []Approval
 	err := s.db.NewSelect().Model(&rows).
-		Where("edition_id = ?", *row.EditionID).
-		Where("withdrawn_at IS NULL").
-		OrderExpr("aa.approved_at ASC, aa.id ASC").
+		Where(`"edition_id" = ?`, *row.EditionID).
+		Where(`"withdrawn_at" IS NULL`).
+		OrderExpr(`"aa"."approved_at" ASC, "aa"."id" ASC`).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read who has agreed to it: %w", err)
@@ -539,9 +539,9 @@ func (s *Store) mayWrite(ctx context.Context, subject access.Subject, row *Advis
 	var products []int64
 	err := s.db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
-		ColumnExpr(`DISTINCT ac.product_id`).
-		Where("ac.advisory_id = ?", row.ID).
-		Where("ac.removed_at IS NULL").
+		ColumnExpr(`DISTINCT "ac"."product_id"`).
+		Where(`"ac"."advisory_id" = ?`, row.ID).
+		Where(`"ac"."removed_at" IS NULL`).
 		Scan(ctx, &products)
 	if err != nil {
 		return fmt.Errorf("read what the advisory covers: %w", err)

@@ -39,13 +39,13 @@ func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 		// endpoint: what is being tested is the withdrawal, and standing up an
 		// assigner with reach into this product would test that path instead.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_to = ?", holder.PartyID).
-			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			Set(`"assigned_to" = ?`, holder.PartyID).
+			Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		var before int
 		if err := r.DB.DB.NewSelect().Table("finding").ColumnExpr("COUNT(*)").
-			Where("assigned_to = ?", holder.PartyID).Scan(ctx, &before); err != nil {
+			Where(`"assigned_to" = ?`, holder.PartyID).Scan(ctx, &before); err != nil {
 			t.Fatal(err)
 		}
 		if before == 0 {
@@ -69,7 +69,7 @@ func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 
 		var after int
 		if err := r.DB.DB.NewSelect().Table("finding").ColumnExpr("COUNT(*)").
-			Where("assigned_to = ?", holder.PartyID).Scan(ctx, &after); err != nil {
+			Where(`"assigned_to" = ?`, holder.PartyID).Scan(ctx, &after); err != nil {
 			t.Fatal(err)
 		}
 		if after != 0 {
@@ -113,15 +113,15 @@ func TestWithdrawingAnEstateRoleLeavesNamedProductsAlone(t *testing.T) {
 		// estate grant going is not their last role there.
 		var productID int64
 		if err := r.DB.DB.NewSelect().Table("product").Column("id").
-			Where("name = ?", "theirs").Scan(ctx, &productID); err != nil {
+			Where(`"name" = ?`, "theirs").Scan(ctx, &productID); err != nil {
 			t.Fatal(err)
 		}
 		if err := r.Rights.GrantRole(ctx, theirs.ID, productID, access.PrivateTriage); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_to = ?", holder.PartyID).
-			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			Set(`"assigned_to" = ?`, holder.PartyID).
+			Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -133,7 +133,7 @@ func TestWithdrawingAnEstateRoleLeavesNamedProductsAlone(t *testing.T) {
 
 		var still int
 		if err := r.DB.DB.NewSelect().Table("finding").ColumnExpr("COUNT(*)").
-			Where("assigned_to = ?", holder.PartyID).Scan(ctx, &still); err != nil {
+			Where(`"assigned_to" = ?`, holder.PartyID).Scan(ctx, &still); err != nil {
 			t.Fatal(err)
 		}
 		if still == 0 {

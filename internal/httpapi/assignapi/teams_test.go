@@ -330,8 +330,8 @@ func TestATeamQueueAndItsCountsAreNarrowedPerMember(t *testing.T) {
 		// each clearance — the mixed team a team that grants no roles
 		// exists to allow.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)

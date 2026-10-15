@@ -72,12 +72,12 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = claimRollup(w.db, "rows_written").
-		ColumnExpr(`MIN(de.id) AS "decision_id"`).
-		ColumnExpr(`MIN(de.proposed_at) AS "proposed_at"`).
-		Where("de.state = ?", triage.Proposed).
-		Where("de.needs_approval = ?", true).
-		Where("de.sent_back_at IS NULL").
-		Where("de.proposed_at <= ?", since).
+		ColumnExpr(`MIN("de"."id") AS "decision_id"`).
+		ColumnExpr(`MIN("de"."proposed_at") AS "proposed_at"`).
+		Where(`"de"."state" = ?`, triage.Proposed).
+		Where(`"de"."needs_approval" = ?`, true).
+		Where(`"de"."sent_back_at" IS NULL`).
+		Where(`"de"."proposed_at" <= ?`, since).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is waiting on a second person: %w", err)
@@ -145,19 +145,19 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 	}
 	err := w.db.NewSelect().
 		TableExpr(`"report_ruling" AS "rr"`).
-		Join(`JOIN "product" AS "p" ON p.id = rr.product_id`).
-		Join(`JOIN "report_ruled" AS "rd" ON rd.ruling_id = rr.id`).
-		ColumnExpr(`rr.id AS "ruling_id"`).
-		ColumnExpr(`rr.product_id AS "product_id"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
-		ColumnExpr(`MIN(rr.disposition) AS "disposition"`).
-		ColumnExpr(`MIN(rr.proposed_by) AS "proposed_by"`).
-		ColumnExpr(`MIN(rr.proposed_at) AS "proposed_at"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "rr"."product_id"`).
+		Join(`JOIN "report_ruled" AS "rd" ON "rd"."ruling_id" = "rr"."id"`).
+		ColumnExpr(`"rr"."id" AS "ruling_id"`).
+		ColumnExpr(`"rr"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN("rr"."disposition") AS "disposition"`).
+		ColumnExpr(`MIN("rr"."proposed_by") AS "proposed_by"`).
+		ColumnExpr(`MIN("rr"."proposed_at") AS "proposed_at"`).
 		ColumnExpr(`COUNT(*) AS "reports"`).
-		Where("rr.settled_at IS NULL").
-		Where("rr.withdrawn_at IS NULL").
-		Where("rr.proposed_at <= ?", since).
-		GroupExpr("rr.id, rr.product_id").
+		Where(`"rr"."settled_at" IS NULL`).
+		Where(`"rr"."withdrawn_at" IS NULL`).
+		Where(`"rr"."proposed_at" <= ?`, since).
+		GroupExpr(`"rr"."id", "rr"."product_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return fmt.Errorf("read which rulings are waiting on a second person: %w", err)
@@ -223,10 +223,10 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = claimRollup(w.db, "rows_written").
-		ColumnExpr(`MIN(de.sent_back_at) AS "sent_back_at"`).
-		Where("de.state = ?", triage.Proposed).
-		Where("de.sent_back_at IS NOT NULL").
-		Where("de.sent_back_at <= ?", since).
+		ColumnExpr(`MIN("de"."sent_back_at") AS "sent_back_at"`).
+		Where(`"de"."state" = ?`, triage.Proposed).
+		Where(`"de"."sent_back_at" IS NOT NULL`).
+		Where(`"de"."sent_back_at" <= ?`, since).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what was sent back and left: %w", err)
@@ -273,14 +273,14 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.proposed_by AS "proposed_by"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
 		ColumnExpr(access.PrivateCountAs("de.visibility", "private_rows")).
-		GroupExpr("de.claim_id, de.product_id, de.proposed_by")
+		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."proposed_by"`)
 }
 
 // deferralsEnding is every standing deferral whose date is coming, against the
@@ -310,20 +310,20 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	}
 	err = claimRollup(w.db, "places").
 		// The argument, which is where the date lives.
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`MIN(cl.deferred_until) AS "until"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`MIN("cl"."deferred_until") AS "until"`).
 		// Standing only. A deferral that has been withdrawn or has lapsed is
 		// not one whose end anybody is waiting for — a lapsed one is already
 		// its author's to re-affirm, and they were told when it lapsed.
 		// Nor is one still waiting for a second person: every clause of the
 		// notice would be false, and it would arrive beside the message saying
 		// the claim applies to nothing until somebody agrees.
-		Where("de.live_key IS NOT NULL").
+		Where(`"de"."live_key" IS NOT NULL`).
 		Where(standing, held...).
-		Where("cl.outcome = ?", triage.Deferred).
-		Where("cl.deferred_until IS NOT NULL").
-		Where("cl.deferred_until > ?", now).
-		Where("cl.deferred_until <= ?", now.Add(lead)).
+		Where(`"cl"."outcome" = ?`, triage.Deferred).
+		Where(`"cl"."deferred_until" IS NOT NULL`).
+		Where(`"cl"."deferred_until" > ?`, now).
+		Where(`"cl"."deferred_until" <= ?`, now.Add(lead)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which deferrals are running out: %w", err)
@@ -399,44 +399,44 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	// its rows is.
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "team" AS "tm" ON tm.party_id = f.assigned_to`).
-		ColumnExpr(`tm.id AS "team_id"`).
-		ColumnExpr(`tm.display_name AS "team_display"`).
-		ColumnExpr(`tm.name AS "team_name"`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
+		ColumnExpr(`"tm"."id" AS "team_id"`).
+		ColumnExpr(`"tm"."display_name" AS "team_display"`).
+		ColumnExpr(`"tm"."name" AS "team_name"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(access.PrivateCountAs("f.visibility", "private_rows")).
-		Where("f.closed_at IS NULL").
-		Where("f.assigned_at IS NOT NULL").
-		Where("f.assigned_at <= ?", since).
-		Where("tm.retired_at IS NULL").
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."assigned_at" IS NOT NULL`).
+		Where(`"f"."assigned_at" <= ?`, since).
+		Where(`"tm"."retired_at" IS NULL`).
 		Where("NOT EXISTS (?)", w.db.NewSelect().
 			TableExpr(finding.Decisions).
-			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 			ColumnExpr("1").
 			Where(finding.DecisionAt("st.product_id")).
-			Where("de.live_key IS NOT NULL").
+			Where(`"de"."live_key" IS NOT NULL`).
 			Where(finding.KeyMatches)).
-		GroupExpr("tm.id, tm.display_name, tm.name, st.product_id, f.vulnerability_id, f.component_id")
+		GroupExpr(`"tm"."id", "tm"."display_name", "tm"."name", "st"."product_id", "f"."vulnerability_id", "f"."component_id"`)
 
 	err = w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
-		ColumnExpr(`q.team_id AS "team_id"`).
+		ColumnExpr(`"q"."team_id" AS "team_id"`).
 		ColumnExpr(`MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS "team"`).
 		// The matched name for the link and the typed one for the sentence:
 		// what a screen resolves a queue by is not what somebody calls it.
 		ColumnExpr(`MIN(q.team_name) AS "team_name"`).
-		ColumnExpr(`q.product_id AS "product_id"`).
-		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`"q"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
 		ColumnExpr(`MAX(q.private_rows) AS "private_rows"`).
-		Join(`JOIN "product" AS "p" ON p.id = q.product_id`).
-		GroupExpr("q.team_id, q.product_id").
+		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
+		GroupExpr(`"q"."team_id", "q"."product_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is sitting in a queue: %w", err)

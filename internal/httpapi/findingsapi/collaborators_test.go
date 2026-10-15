@@ -495,7 +495,7 @@ func TestBringingSomebodyInTwiceChangesNothingTheSecondTime(t *testing.T) {
 			t.Errorf("bringing somebody in twice left %d trail rows: %+v", len(trail.Items), trail.Items)
 		}
 		told, err := r.DB.DB.NewSelect().Table("notification").
-			Where("person_id = ?", person.ID).Where("kind = ?", "brought-in").Count(ctx)
+			Where(`"person_id" = ?`, person.ID).Where(`"kind" = ?`, "brought-in").Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

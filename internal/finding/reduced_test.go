@@ -26,10 +26,10 @@ func (f *fixture) placesOf(t *testing.T, identifier string) map[string]finding.F
 		Name string `bun:"name"`
 	}
 	if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`f.id AS "id"`).ColumnExpr(`uc.name AS "name"`).
-		Where("f.vulnerability_id = ?", issue).Where("f.target_id = ?", f.target).
-		Where("f.closed_at IS NULL").Scan(t.Context(), &consumers); err != nil {
+		Join(`JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"f"."id" AS "id"`).ColumnExpr(`"uc"."name" AS "name"`).
+		Where(`"f"."vulnerability_id" = ?`, issue).Where(`"f"."target_id" = ?`, f.target).
+		Where(`"f"."closed_at" IS NULL`).Scan(t.Context(), &consumers); err != nil {
 		t.Fatal(err)
 	}
 	byID := map[int64]finding.Finding{}
@@ -94,7 +94,7 @@ func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhosePlacesNobodyAnsw
 			teamd.Name: now.Add(-120 * 24 * time.Hour),
 		} {
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set("opened_at = ?", opened).Where("id = ?", places[name].ID).Exec(ctx); err != nil {
+				Set(`"opened_at" = ?`, opened).Where(`"id" = ?`, places[name].ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

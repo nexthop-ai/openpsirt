@@ -127,9 +127,9 @@ func reconcileImageVersions(ctx context.Context, tx bun.IDB, targetID, scanID in
 
 	var open []ImageVersion
 	if err := tx.NewSelect().Model(&open).
-		Join(`JOIN "graph_node" AS "n" ON n.id = iv.node_id`).
-		Where("n.target_id = ?", targetID).
-		Where("iv.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"iv"."closed_scan_id" IS NULL`).
 		Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read the versions the build states for its images: %w", err)
 	}
@@ -155,8 +155,8 @@ func reconcileImageVersions(ctx context.Context, tx bun.IDB, targetID, scanID in
 	if len(gone) > 0 {
 		err := database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*ImageVersion)(nil)).
-				Set("closed_scan_id = ?", scanID).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"closed_scan_id" = ?`, scanID).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
@@ -185,13 +185,13 @@ func StatedImages(ctx context.Context, db bun.IDB, targetID int64) (map[int64]Im
 	}
 	if err := db.NewSelect().
 		TableExpr(`"image_version" AS "iv"`).
-		Join(`JOIN "graph_node" AS "n" ON n.id = iv.node_id`).
-		ColumnExpr(`n.component_id AS "component_id"`).
-		ColumnExpr(`iv.version AS "version"`).
-		ColumnExpr(`COALESCE(iv.purl, '') AS "purl"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("iv.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`"iv"."version" AS "version"`).
+		ColumnExpr(`COALESCE("iv"."purl", '') AS "purl"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"iv"."closed_scan_id" IS NULL`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the versions the build states for its images: %w", err)
 	}
@@ -241,18 +241,18 @@ func StatedVersions(ctx context.Context, db bun.IDB, targets, components []int64
 		var some []statedRow
 		if err := db.NewSelect().
 			TableExpr(`"image_version" AS "iv"`).
-			Join(`JOIN "graph_node" AS "n" ON n.id = iv.node_id`).
-			Join(`JOIN "scan" AS "so" ON so.id = iv.opened_scan_id`).
-			Join(`LEFT JOIN "scan" AS "sc" ON sc.id = iv.closed_scan_id`).
-			ColumnExpr(`n.target_id AS "target_id"`).
-			ColumnExpr(`n.component_id AS "component_id"`).
-			ColumnExpr(`iv.version AS "version"`).
-			ColumnExpr(`COALESCE(iv.purl, '') AS "purl"`).
-			ColumnExpr(`so.built_at AS "from_at"`).
-			ColumnExpr(`sc.built_at AS "until_at"`).
-			Where("n.target_id IN (?)", bun.List(targets)).
-			Where("n.component_id IN (?)", bun.List(batch)).
-			OrderExpr("iv.opened_scan_id DESC, iv.id DESC").
+			Join(`JOIN "graph_node" AS "n" ON "n"."id" = "iv"."node_id"`).
+			Join(`JOIN "scan" AS "so" ON "so"."id" = "iv"."opened_scan_id"`).
+			Join(`LEFT JOIN "scan" AS "sc" ON "sc"."id" = "iv"."closed_scan_id"`).
+			ColumnExpr(`"n"."target_id" AS "target_id"`).
+			ColumnExpr(`"n"."component_id" AS "component_id"`).
+			ColumnExpr(`"iv"."version" AS "version"`).
+			ColumnExpr(`COALESCE("iv"."purl", '') AS "purl"`).
+			ColumnExpr(`"so"."built_at" AS "from_at"`).
+			ColumnExpr(`"sc"."built_at" AS "until_at"`).
+			Where(`"n"."target_id" IN (?)`, bun.List(targets)).
+			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
+			OrderExpr(`"iv"."opened_scan_id" DESC, "iv"."id" DESC`).
 			Scan(ctx, &some); err != nil {
 			return err
 		}

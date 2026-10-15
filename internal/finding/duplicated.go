@@ -48,8 +48,8 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	var reports []FlawReport
 	if err := db.NewSelect().Model(&reports).
 		Column("fr.id", "fr.received_on", "fr.recorded_at").
-		Where("fr.id IN (?)", bun.List(reportIDs)).
-		Where("fr.found_here = ?", false).
+		Where(`"fr"."id" IN (?)`, bun.List(reportIDs)).
+		Where(`"fr"."found_here" = ?`, false).
 		Order("fr.id").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read when those claims arrived: %w", err)
@@ -77,7 +77,7 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 
 	later, err := db.NewSelect().Model((*Finding)(nil)).
 		Apply(flawPlaces(productID, vulnerabilityID)).
-		Where("disclose_at IS NULL OR disclose_at > ?", start.at).
+		Where(`"disclose_at" IS NULL OR "disclose_at" > ?`, start.at).
 		Exists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read whether the flaw ends later: %w", err)
@@ -101,9 +101,9 @@ func startOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 func flawPlaces(productID, vulnerabilityID int64) func(*bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(HeldAs("vulnerability_id"), vulnerabilityID).
-			Where("kind = ?", Entered).
-			Where("visibility = ?", access.Private).
-			Where("closed_at IS NULL").
+			Where(`"kind" = ?`, Entered).
+			Where(`"visibility" = ?`, access.Private).
+			Where(`"closed_at" IS NULL`).
 			Where(inThisProduct, productID)
 	}
 }
@@ -113,10 +113,10 @@ func flawPlaces(productID, vulnerabilityID int64) func(*bun.SelectQuery) *bun.Se
 func flawEnds(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (*time.Time, error) {
 	var dated []time.Time
 	if err := db.NewSelect().Model((*Finding)(nil)).
-		ColumnExpr("disclose_at").
+		ColumnExpr(`"disclose_at"`).
 		Apply(flawPlaces(productID, vulnerabilityID)).
-		Where("disclose_at IS NOT NULL").
-		OrderExpr("disclose_at DESC").
+		Where(`"disclose_at" IS NOT NULL`).
+		OrderExpr(`"disclose_at" DESC`).
 		Limit(1).
 		Scan(ctx, &dated); err != nil {
 		return nil, fmt.Errorf("read where the flaw's embargo ends: %w", err)
@@ -136,18 +136,18 @@ func dateFlaw(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 
 	q := db.NewUpdate().Model((*Finding)(nil)).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
-		Where("kind = ?", Entered).
-		Where("visibility = ?", access.Private).
-		Where("closed_at IS NULL").
+		Where(`"kind" = ?`, Entered).
+		Where(`"visibility" = ?`, access.Private).
+		Where(`"closed_at" IS NULL`).
 		Where(inThisProduct, productID)
 	switch {
 	case until == nil:
-		q = q.Set("disclose_at = NULL")
+		q = q.Set(`"disclose_at" = NULL`)
 	case earlier:
-		q = q.Set("disclose_at = ?", *until).
-			Where("disclose_at IS NULL OR disclose_at > ?", *until)
+		q = q.Set(`"disclose_at" = ?`, *until).
+			Where(`"disclose_at" IS NULL OR "disclose_at" > ?`, *until)
 	default:
-		q = q.Set("disclose_at = ?", *until)
+		q = q.Set(`"disclose_at" = ?`, *until)
 	}
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("date the flaw's embargo: %w", err)
@@ -226,7 +226,7 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	issue := *ruling.DuplicateOf
 	var record []Movement
 	if err := tx.NewSelect().Model(&record).
-		Where("product_id = ?", ruling.ProductID).
+		Where(`"product_id" = ?`, ruling.ProductID).
 		Where(FiledUnder(filed.Issue), issue).
 		Order("asked_at", "id").
 		Scan(ctx); err != nil {
@@ -246,8 +246,8 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	var withdrawn []int64
 	if err := tx.NewSelect().Model((*ReportRuling)(nil)).
 		Column("rr.id").
-		Where("rr.id IN (?)", bun.List(rulings)).
-		Where("rr.withdrawn_at IS NOT NULL").
+		Where(`"rr"."id" IN (?)`, bun.List(rulings)).
+		Where(`"rr"."withdrawn_at" IS NOT NULL`).
 		Scan(ctx, &withdrawn); err != nil {
 		return fmt.Errorf("read which rulings still stand: %w", err)
 	}
@@ -342,8 +342,8 @@ func rulingStands(ctx context.Context, db bun.IDB, rulingID *int64) error {
 		return nil
 	}
 	withdrawn, err := db.NewSelect().Model((*ReportRuling)(nil)).
-		Where("rr.id = ?", *rulingID).
-		Where("rr.withdrawn_at IS NOT NULL").
+		Where(`"rr"."id" = ?`, *rulingID).
+		Where(`"rr"."withdrawn_at" IS NOT NULL`).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether the ruling stands: %w", err)
@@ -399,8 +399,8 @@ func (s *Store) DuplicateStarts(ctx context.Context, subject access.Subject,
 	var found []FlawReport
 	if err := s.db.NewSelect().Model(&found).
 		Column("fr.id", "fr.reference").
-		Where("fr.product_id = ?", productID).
-		Where("fr.reference IN (?)", bun.List(named)).
+		Where(`"fr"."product_id" = ?`, productID).
+		Where(`"fr"."reference" IN (?)`, bun.List(named)).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the reports named: %w", err)
 	}

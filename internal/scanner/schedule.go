@@ -188,8 +188,8 @@ func (s *Schedule) alreadyQueued(ctx context.Context) ([]int64, error) {
 	err := s.db.NewSelect().
 		Model((*queue.Job)(nil)).
 		Column("reference").
-		Where("kind = ?", queue.Scan).
-		Where("state IN (?)", bun.List([]queue.State{queue.Pending, queue.Running})).
+		Where(`"kind" = ?`, queue.Scan).
+		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
 		Scan(ctx, &references)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already queued for scanning: %w", err)
@@ -220,15 +220,15 @@ func (s *Schedule) due(ctx context.Context, every time.Duration, queued []int64)
 
 	q := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		ColumnExpr("tg.id").
+		ColumnExpr(`"tg"."id"`).
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "gn"
-			WHERE gn.target_id = tg.id AND gn.closed_scan_id IS NULL)`).
+			WHERE "gn"."target_id" = "tg"."id" AND "gn"."closed_scan_id" IS NULL)`).
 		Where(`NOT EXISTS (SELECT 1 FROM "scan_run" AS "r"
-			WHERE r.target_id = tg.id AND r.started_at >= ?)`, before).
-		OrderExpr("tg.id").
+			WHERE "r"."target_id" = "tg"."id" AND "r"."started_at" >= ?)`, before).
+		OrderExpr(`"tg"."id"`).
 		Limit(dueLimit)
 	if len(queued) > 0 {
-		q = q.Where("tg.id NOT IN (?)", bun.List(queued))
+		q = q.Where(`"tg"."id" NOT IN (?)`, bun.List(queued))
 	}
 
 	var due []int64

@@ -118,8 +118,8 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 		}
 		stream := new(catalog.Stream)
 		if err := tx.NewSelect().Model(stream).
-			Where("s.product_id = ?", record.ProductID).
-			Where("s.name = ?", typedname.Matching(release)).
+			Where(`"s"."product_id" = ?`, record.ProductID).
+			Where(`"s"."name" = ?`, typedname.Matching(release)).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchRelease
@@ -171,8 +171,8 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 		}
 		fix := new(Fix)
 		if err := tx.NewSelect().Model(fix).
-			Where("ef.id = ?", fixID).Where("ef.exploited_here_id = ?", record.ID).
-			Where("ef.withdrawn_at IS NULL").
+			Where(`"ef"."id" = ?`, fixID).Where(`"ef"."exploited_here_id" = ?`, record.ID).
+			Where(`"ef"."withdrawn_at" IS NULL`).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchFix
@@ -180,14 +180,14 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 			return fmt.Errorf("read the release named as carrying the fix: %w", err)
 		}
 		res, err := tx.NewUpdate().Model((*Fix)(nil)).
-			Set("withdrawn_at = ?", s.now().Truncate(time.Microsecond)).
-			Set("withdrawn_by = ?", subject.ID).
+			Set(`"withdrawn_at" = ?`, s.now().Truncate(time.Microsecond)).
+			Set(`"withdrawn_by" = ?`, subject.ID).
 			// Released, so the release may be named again.
-			Set("live_stream_id = ?", nil).
-			Where("id = ?", fix.ID).
+			Set(`"live_stream_id" = ?`, nil).
+			Where(`"id" = ?`, fix.ID).
 			// Still standing when this lands. Two people withdrawing at once
 			// would otherwise both write, and the trail would say it twice.
-			Where("withdrawn_at IS NULL").
+			Where(`"withdrawn_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("withdraw the release named as carrying the fix: %w", err)
@@ -200,8 +200,8 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 			return ErrNoSuchFix
 		}
 		var name string
-		if err := tx.NewSelect().Model((*catalog.Stream)(nil)).ColumnExpr("s.name").
-			Where("s.id = ?", fix.StreamID).Scan(ctx, &name); err != nil {
+		if err := tx.NewSelect().Model((*catalog.Stream)(nil)).ColumnExpr(`"s"."name"`).
+			Where(`"s"."id" = ?`, fix.StreamID).Scan(ctx, &name); err != nil {
 			return fmt.Errorf("read the release named as carrying the fix: %w", err)
 		}
 		return noteFix(ctx, tx, subject, record, trail.Said(name, true), nil)
@@ -221,13 +221,13 @@ func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 	recordID int64) (*triage.ExploitedHere, error) {
 
 	if _, err := tx.NewUpdate().Model((*triage.ExploitedHere)(nil)).
-		Set("cleared_at = cleared_at").
-		Where("id = ?", recordID).Where("cleared_at IS NULL").
+		Set(`"cleared_at" = "cleared_at"`).
+		Where(`"id" = ?`, recordID).Where(`"cleared_at" IS NULL`).
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("hold the record of being exploited: %w", err)
 	}
 	record := new(triage.ExploitedHere)
-	if err := tx.NewSelect().Model(record).Where("eh.id = ?", recordID).
+	if err := tx.NewSelect().Model(record).Where(`"eh"."id" = ?`, recordID).
 		Scan(ctx); err != nil {
 		if database.IsNoRows(err) {
 			return nil, ErrNoSuchRecord
@@ -304,11 +304,11 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().
 		Model((*Fix)(nil)).
 		ColumnExpr("ef.*").
-		ColumnExpr(`st.name AS "release"`).
-		ColumnExpr(`st.display_name AS "release_display"`).
-		ColumnExpr(`st.released_on AS "released_on"`).
-		Join(`JOIN "stream" AS "st" ON st.id = ef.stream_id`).
-		Where("ef.exploited_here_id IN (?)", bun.List(ids)).
+		ColumnExpr(`"st"."name" AS "release"`).
+		ColumnExpr(`"st"."display_name" AS "release_display"`).
+		ColumnExpr(`"st"."released_on" AS "released_on"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "ef"."stream_id"`).
+		Where(`"ef"."exploited_here_id" IN (?)`, bun.List(ids)).
 		Order("ef.named_at ASC", "ef.id ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the releases named as carrying the fix: %w", err)

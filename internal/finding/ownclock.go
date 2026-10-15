@@ -87,25 +87,25 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		ColumnExpr(`f.id AS "id"`).
+		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`f.rated_at AS "rated_at"`).
-		ColumnExpr(`f.fix_state AS "fix_state"`).
-		ColumnExpr(`f.fixed_at AS "fixed_at"`).
-		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
-		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
+		ColumnExpr(`"f"."rated_at" AS "rated_at"`).
+		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
+		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
+		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
+		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."exploited_learned_at" AS "learned_at"`).
 		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
-		Where("f.kind = ?", Entered).
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = ?", productID)
+		Where(`"f"."kind" = ?`, Entered).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"st"."product_id" = ?`, productID)
 	if len(issues) > 0 {
-		q = q.Where("f.vulnerability_id IN (?)", bun.List(issues))
+		q = q.Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues))
 	}
 	if err := q.Scan(ctx, &rows); err != nil {
 		return 0, fmt.Errorf("read the flaws recorded here: %w", err)
@@ -131,9 +131,9 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 
 	if err := database.IDsInBatches(ctx, firstRated, func(ctx context.Context, batch []int64) error {
 		_, err := db.NewUpdate().Model((*Finding)(nil)).
-			Set("rated_at = ?", now).
-			Where("id IN (?)", bun.List(batch)).
-			Where("rated_at IS NULL").
+			Set(`"rated_at" = ?`, now).
+			Where(`"id" IN (?)`, bun.List(batch)).
+			Where(`"rated_at" IS NULL`).
 			Exec(ctx)
 		return err
 	}); err != nil {
@@ -142,8 +142,8 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	for at, ids := range due {
 		if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := db.NewUpdate().Model((*Finding)(nil)).
-				Set("due_at = ?", at).
-				Where("id IN (?)", bun.List(batch)).
+				Set(`"due_at" = ?`, at).
+				Where(`"id" IN (?)`, bun.List(batch)).
 				Exec(ctx)
 			return err
 		}); err != nil {
@@ -155,8 +155,8 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	// from.
 	if err := database.IDsInBatches(ctx, none, func(ctx context.Context, batch []int64) error {
 		_, err := db.NewUpdate().Model((*Finding)(nil)).
-			Set("due_at = NULL").
-			Where("id IN (?)", bun.List(batch)).
+			Set(`"due_at" = NULL`).
+			Where(`"id" IN (?)`, bun.List(batch)).
 			Exec(ctx)
 		return err
 	}); err != nil {

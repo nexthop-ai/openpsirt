@@ -32,10 +32,10 @@ func (f *fixture) undisclose(t *testing.T, target int64, identifier, component s
 		t.Fatalf("resolve %s: %v", component, err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("visibility = ?", access.Private).
-		Where("target_id = ?", target).
-		Where("vulnerability_id = ?", f.issueID(t, identifier)).
-		Where("component_id = ?", at).
+		Set(`"visibility" = ?`, access.Private).
+		Where(`"target_id" = ?`, target).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
+		Where(`"component_id" = ?`, at).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -50,10 +50,10 @@ func (f *fixture) handTo(t *testing.T, target int64, identifier, component strin
 		t.Fatalf("resolve %s: %v", component, err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("assigned_to = ?", party).
-		Where("target_id = ?", target).
-		Where("vulnerability_id = ?", f.issueID(t, identifier)).
-		Where("component_id = ?", at).
+		Set(`"assigned_to" = ?`, party).
+		Where(`"target_id" = ?`, target).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
+		Where(`"component_id" = ?`, at).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

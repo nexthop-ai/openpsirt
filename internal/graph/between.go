@@ -61,14 +61,14 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`n.target_id AS "tgt"`).
-		ColumnExpr(`n.is_root AS "rt"`).
-		ColumnExpr(`c.name_folded AS "nm"`).
-		ColumnExpr(`c.name AS "dsp"`).
-		ColumnExpr(`c.version AS "ver"`).
-		Where("n.target_id IN (?)", bun.List([]int64{fromID, toID})).
-		Where("n.closed_scan_id IS NULL").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"n"."target_id" AS "tgt"`).
+		ColumnExpr(`"n"."is_root" AS "rt"`).
+		ColumnExpr(`"c"."name_folded" AS "nm"`).
+		ColumnExpr(`"c"."name" AS "dsp"`).
+		ColumnExpr(`"c"."version" AS "ver"`).
+		Where(`"n"."target_id" IN (?)`, bun.List([]int64{fromID, toID})).
+		Where(`"n"."closed_scan_id" IS NULL`).
 		Scan(ctx, &nodes)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what two builds contain: %w", err)

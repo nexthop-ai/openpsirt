@@ -281,7 +281,7 @@ func offTheClock(product string, now time.Time, outcome string) (string, []any) 
 		args = append(args, outcome)
 	}
 	return `EXISTS (SELECT 1 FROM ` + Decisions + `
-		JOIN "claim" AS "cl" ON cl.id = de.claim_id
+		JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 		WHERE ` + DecisionAt(product) + `
 		  AND ` + KeyMatches + `
 		  AND ` + standing + `
@@ -364,21 +364,21 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	// total stops describing the list it sits under.
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			// Each row's own product rates its own findings. The list spans
 			// products, so the join reads the stream's product per row rather
 			// than binding one.
 			Join(rating.For(rating.OnStream)).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			// The consumer, for the versions a decision is keyed on.
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-			Where("f.closed_at IS NULL").
-			Where("f.due_at IS NOT NULL").
-			Where("f.due_at <= ?", s.now().UTC().Add(within)).
+			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."due_at" IS NOT NULL`).
+			Where(`"f"."due_at" <= ?`, s.now().UTC().Add(within)).
 			// Nothing the build or a supplier already argued away, and nothing
 			// a decision takes off the clock. Not merely a claim: a proposal waiting for
 			// a second person suppresses nothing, and it took findings off
@@ -388,33 +388,33 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Where(NotArguedAway).
 			Where("NOT "+standing, args...)
 		if !all {
-			q = q.Where("st.product_id IN (?)", bun.List(products))
+			q = q.Where(`"st"."product_id" IN (?)`, bun.List(products))
 		}
 		return scope.Narrow(onlyVisible(q, subject, products, all))
 	}
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many places it sits at there.
-	const grouping = "v.identifier, c.name, c.version, c.purl, f.urgency_exploited, p.name, p.display_name, " +
-		"st.name, st.display_name, va.name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
+	const grouping = `"v"."identifier", "c"."name", "c"."version", "c"."purl", "f"."urgency_exploited", "p"."name", "p"."display_name", ` +
+		`"st"."name", "st"."display_name", "va"."name", "va"."display_name", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`
 
 	query := narrow(s.db.NewSelect()).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
-		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
 		Apply(catalog.BuildNames("p", "st", "va")).
 		// The earliest of the places this row covers, because that is the one
 		// that makes the whole group late.
-		ColumnExpr(`MIN(f.due_at) AS "due"`).
+		ColumnExpr(`MIN("f"."due_at") AS "due"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// Named only where every place has the same person. Reporting one of
 		// several would tell somebody a finding is being dealt with when most
 		// of it is not.
-		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
-		ColumnExpr(`MAX(f.assigned_to) AS "assigned_high"`).
-		ColumnExpr(`COUNT(f.assigned_to) AS "assigned_count"`).
+		ColumnExpr(`MIN("f"."assigned_to") AS "assigned_to"`).
+		ColumnExpr(`MAX("f"."assigned_to") AS "assigned_high"`).
+		ColumnExpr(`COUNT("f"."assigned_to") AS "assigned_count"`).
 		// The number of groups the question has, counted over the grouped
 		// result and before the limit. A screen that counted its own page said
 		// two hundred over a list of four hundred and sixty-two.
@@ -427,7 +427,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// plan. Then the exploited flag, exploited first, because it is in the
 		// grouping: a merge refiles the gone issue's findings with their flag
 		// as it was, so one component in one build can hold a group of each.
-		OrderExpr("due, v.identifier, c.name, f.target_id, c.version, f.component_id, f.urgency_exploited DESC").
+		OrderExpr(`due, "v"."identifier", "c"."name", "f"."target_id", "c"."version", "f"."component_id", "f"."urgency_exploited" DESC`).
 		Limit(limit).Offset(offset)
 
 	var late []Late
@@ -452,7 +452,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// error on one engine and fine on the other three.
 		count, err := s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
-				ColumnExpr("f.vulnerability_id").
+				ColumnExpr(`"f"."vulnerability_id"`).
 				GroupExpr(grouping)).
 			Count(ctx)
 		if err != nil {
@@ -500,22 +500,22 @@ type clockStart struct {
 func clockStarts(now time.Time) []clockStart {
 	return []clockStart{
 		{column: "opened_at", args: []any{now}, from: func(p string) string {
-			return "NOT (" + p + "exploited_learned_at IS NOT NULL AND " +
-				p + "exploited_learned_at > " + p + "opened_at)" +
-				" AND NOT (" + p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
-				p + "fixed_at > " + p + "opened_at)"
+			return "NOT (" + p + `"exploited_learned_at"` + " IS NOT NULL AND " +
+				p + `"exploited_learned_at"` + " > " + p + `"opened_at"` + ")" +
+				" AND NOT (" + p + `"fixed_at"` + " IS NOT NULL AND " + p + `"fixed_at"` + " <= ? AND " +
+				p + `"fixed_at"` + " > " + p + `"opened_at"` + ")"
 		}},
 		{column: "exploited_learned_at", args: []any{now}, from: func(p string) string {
-			return p + "exploited_learned_at IS NOT NULL AND " +
-				p + "exploited_learned_at > " + p + "opened_at" +
-				" AND NOT (" + p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
-				p + "fixed_at > " + p + "exploited_learned_at)"
+			return p + `"exploited_learned_at"` + " IS NOT NULL AND " +
+				p + `"exploited_learned_at"` + " > " + p + `"opened_at"` +
+				" AND NOT (" + p + `"fixed_at"` + " IS NOT NULL AND " + p + `"fixed_at"` + " <= ? AND " +
+				p + `"fixed_at"` + " > " + p + `"exploited_learned_at"` + ")"
 		}},
 		{column: "fixed_at", args: []any{now}, from: func(p string) string {
-			return p + "fixed_at IS NOT NULL AND " + p + "fixed_at <= ? AND " +
-				p + "fixed_at > " + p + "opened_at" +
-				" AND (" + p + "exploited_learned_at IS NULL OR " +
-				p + "fixed_at > " + p + "exploited_learned_at)"
+			return p + `"fixed_at"` + " IS NOT NULL AND " + p + `"fixed_at"` + " <= ? AND " +
+				p + `"fixed_at"` + " > " + p + `"opened_at"` +
+				" AND (" + p + `"exploited_learned_at"` + " IS NULL OR " +
+				p + `"fixed_at"` + " > " + p + `"exploited_learned_at"` + ")"
 		}},
 	}
 }
@@ -562,7 +562,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	// takes the same total and gives the lock back between them.
 	var highest int64
 	if err := s.db.NewSelect().Model((*Finding)(nil)).
-		ColumnExpr("COALESCE(MAX(id), 0)").Scan(ctx, &highest); err != nil {
+		ColumnExpr(`COALESCE(MAX("id"), 0)`).Scan(ctx, &highest); err != nil {
 		return 0, fmt.Errorf("read how far the findings run: %w", err)
 	}
 
@@ -590,8 +590,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		}
 		rated := func(words ...string) func(*bun.UpdateQuery) *bun.UpdateQuery {
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Where("urgency_exploited = ?", false).
-					Where(`vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v" `+
+				return q.Where(`"urgency_exploited" = ?`, false).
+					Where(`"vulnerability_id" IN (SELECT "v"."id" FROM "vulnerability" AS "v" `+
 						rating.Here+` WHERE `+rating.BandExpr+` IN (?))`,
 						productID, bun.List(words))
 			}
@@ -608,12 +608,12 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				return where
 			}
 			return func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return where(q).Where("urgency_exploited_here = ?", true)
+				return where(q).Where(`"urgency_exploited_here" = ?`, true)
 			}
 		}
 		bands := []band{
 			{windows.Exploited, func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Where("urgency_exploited = ?", true)
+				return q.Where(`"urgency_exploited" = ?`, true)
 			}},
 			{windows.Critical, admitted("critical", rated("critical"))},
 			{windows.High, admitted("high", rated("high"))},
@@ -635,13 +635,13 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			var moments []time.Time
 			err = s.db.NewSelect().
 				TableExpr(`"finding" AS "f"`).
-				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				ColumnExpr("f."+start.column).
-				Where("f.closed_at IS NULL").
-				Where("st.product_id = ?", productID).
-				Where(start.from("f."), start.args...).
-				GroupExpr("f."+start.column).
+				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				ColumnExpr(`"f"."`+start.column+`"`).
+				Where(`"f"."closed_at" IS NULL`).
+				Where(`"st"."product_id" = ?`, productID).
+				Where(start.from(`"f".`), start.args...).
+				GroupExpr(`"f"."`+start.column+`"`).
 				Scan(ctx, &moments)
 			if err != nil {
 				return changed, fmt.Errorf("read when the clock started on what is open: %w", err)
@@ -660,23 +660,23 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				for _, each := range bands {
 					for first := 0; first < len(moments); first += database.BatchSize {
 						chunk := moments[first:min(first+database.BatchSize, len(moments))]
-						said, args := whenOpened(start.column, chunk, each.window)
+						said, args := whenOpened(`"`+start.column+`"`, chunk, each.window)
 						query := s.db.NewUpdate().
 							Model((*Finding)(nil)).
-							Set("due_at = "+database.AsTimestamp(s.db, said), args...).
-							Where("id > ?", from).
-							Where("id <= ?", from+recomputeSlice).
-							Where(start.column+" IN (?)", bun.List(chunk)).
+							Set(`"due_at" = `+database.AsTimestamp(s.db, said), args...).
+							Where(`"id" > ?`, from).
+							Where(`"id" <= ?`, from+recomputeSlice).
+							Where(`"`+start.column+`" IN (?)`, bun.List(chunk)).
 							Where(start.from(""), start.args...).
-							Where("closed_at IS NULL").
-							Where("kind <> ?", Entered).
+							Where(`"closed_at" IS NULL`).
+							Where(`"kind" <> ?`, Entered).
 							// A place a supplier answers on some routes
 							// carries no deadline.
-							Where("stated_by IS NULL").
+							Where(`"stated_by" IS NULL`).
 							Where(onClock, onClockArgs...).
-							Where("fix_state <> ?", NoFix).
-							Where("NOT (fix_state = ? AND urgency_exploited = ? AND "+
-								"urgency_exploited_here = ?)", WontFix, false, false)
+							Where(`"fix_state" <> ?`, NoFix).
+							Where(`NOT ("fix_state" = ? AND "urgency_exploited" = ? AND `+
+								`"urgency_exploited_here" = ?)`, WontFix, false, false)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -763,10 +763,10 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 	if !on {
 		clocked = "NOT " + clocked
 	}
-	return `target_id IN (SELECT tg.id FROM "target" AS "tg"
-		JOIN "stream" AS "st" ON st.id = tg.stream_id
-		JOIN "product" AS "p" ON p.id = st.product_id
-		WHERE st.product_id = ? AND ` + clocked + `)`, append([]any{productID}, args...)
+	return `"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
+		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+		JOIN "product" AS "p" ON "p"."id" = "st"."product_id"
+		WHERE "st"."product_id" = ? AND ` + clocked + `)`, append([]any{productID}, args...)
 }
 
 // clearNothingToTake removes the deadline from open findings that carry no
@@ -781,15 +781,15 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 	result, err := s.db.NewUpdate().
 		Model((*Finding)(nil)).
-		Set("due_at = NULL").
-		Where("closed_at IS NULL").
-		Where("due_at IS NOT NULL").
+		Set(`"due_at" = NULL`).
+		Where(`"closed_at" IS NULL`).
+		Where(`"due_at" IS NOT NULL`).
 		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where("fix_state = ?", NoFix).
+			return q.Where(`"fix_state" = ?`, NoFix).
 				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-					return q.Where("fix_state = ?", WontFix).
-						Where("urgency_exploited = ?", false).
-						Where("urgency_exploited_here = ?", false)
+					return q.Where(`"fix_state" = ?`, WontFix).
+						Where(`"urgency_exploited" = ?`, false).
+						Where(`"urgency_exploited_here" = ?`, false)
 				})
 		}).
 		Exec(ctx)
@@ -855,11 +855,11 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 	err := database.IDsInBatches(ctx, streams, func(ctx context.Context, batch []int64) error {
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
-			Set("due_at = NULL").
-			Where("closed_at IS NULL").
-			Where("due_at IS NOT NULL").
-			Where(`target_id IN (SELECT tg.id FROM "target" AS "tg"
-				WHERE tg.stream_id IN (?))`, bun.List(batch)).
+			Set(`"due_at" = NULL`).
+			Where(`"closed_at" IS NULL`).
+			Where(`"due_at" IS NOT NULL`).
+			Where(`"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
+				WHERE "tg"."stream_id" IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("take the deadline off %s: %w", why, err)
@@ -898,13 +898,13 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 		// product recorded being attacked.
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
-			Set("due_at = NULL").
-			Where("closed_at IS NULL").
-			Where("due_at IS NOT NULL").
-			Where("urgency_exploited = ?", false).
-			Where("urgency_exploited_here = ?", false).
+			Set(`"due_at" = NULL`).
+			Where(`"closed_at" IS NULL`).
+			Where(`"due_at" IS NOT NULL`).
+			Where(`"urgency_exploited" = ?`, false).
+			Where(`"urgency_exploited_here" = ?`, false).
 			Where(inThisProduct, productID).
-			Where(`vulnerability_id NOT IN (SELECT v.id FROM "vulnerability" AS "v" `+
+			Where(`"vulnerability_id" NOT IN (SELECT "v"."id" FROM "vulnerability" AS "v" `+
 				rating.Here+` WHERE `+rating.BandExpr+` IN (?))`, productID, bun.List(words)).
 			Exec(ctx)
 		if err != nil {
@@ -935,8 +935,8 @@ func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 	var products []int64
 	if err := s.db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		ColumnExpr("p.id").
-		OrderExpr("p.id").
+		ColumnExpr(`"p"."id"`).
+		OrderExpr(`"p"."id"`).
 		Scan(ctx, &products); err != nil {
 		return nil, fmt.Errorf("read which products there are: %w", err)
 	}

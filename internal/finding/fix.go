@@ -82,17 +82,17 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	// two paths that drift. A commitment another claim argued for is that
 	// claim's to move, so it is kept: its decisions still stand on it.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
-		Where("fold_key = ?", fold).
+		Where(`"fold_key" = ?`, fold).
 		Where(inThisProduct, productID)
 	if claimID != nil {
 		remove = remove.WhereGroup(" AND ", func(q *bun.DeleteQuery) *bun.DeleteQuery {
-			return q.Where("claim_id IS NULL").WhereOr("claim_id = ?", *claimID)
+			return q.Where(`"claim_id" IS NULL`).WhereOr(`"claim_id" = ?`, *claimID)
 		})
 	} else {
-		remove = remove.Where("claim_id IS NULL")
+		remove = remove.Where(`"claim_id" IS NULL`)
 	}
 	if len(wanted) > 0 {
-		remove = remove.Where("target_id NOT IN (?)", bun.List(wanted))
+		remove = remove.Where(`"target_id" NOT IN (?)`, bun.List(wanted))
 	}
 	if _, err := remove.Exec(ctx); err != nil {
 		return 0, fmt.Errorf("withdraw what is no longer committed: %w", err)
@@ -107,8 +107,8 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	var already []int64
 	if err := db.NewSelect().
 		TableExpr(`"upgrade" AS "ug"`).
-		ColumnExpr("ug.target_id").
-		Where("ug.fold_key = ?", fold).
+		ColumnExpr(`"ug"."target_id"`).
+		Where(`"ug"."fold_key" = ?`, fold).
 		Where(inThisProductAs("ug.target_id"), productID).
 		Scan(ctx, &already); err != nil {
 		return 0, fmt.Errorf("read what is already committed: %w", err)
@@ -258,7 +258,7 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 
 	var rows []Upgrade
 	if err := s.db.NewSelect().Model(&rows).
-		Where("target_id = ?", targetID).Order("declared_at ASC", "id ASC").
+		Where(`"target_id" = ?`, targetID).Order("declared_at ASC", "id ASC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this build is waiting on: %w", err)
 	}
@@ -282,13 +282,13 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(FoldedOn).
 		Scan(ctx, &open); err != nil {
@@ -339,7 +339,7 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 
 	var standing Upgrade
 	if err := db.NewSelect().Model(&standing).
-		Where("fold_key = ?", fold).Where("target_id = ?", targetID).
+		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is already committed: %w", err)
 	}
@@ -356,10 +356,10 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 			standing.ToVersion, *standing.ClaimID)
 	}
 	if _, err := db.NewUpdate().Model((*Upgrade)(nil)).
-		Set("to_version = ?", to).
-		Set("committed_to = ?", by).
-		Set("claim_id = ?", claimID).
-		Where("fold_key = ?", fold).Where("target_id = ?", targetID).Exec(ctx); err != nil {
+		Set(`"to_version" = ?`, to).
+		Set(`"committed_to" = ?`, by).
+		Set(`"claim_id" = ?`, claimID).
+		Where(`"fold_key" = ?`, fold).Where(`"target_id" = ?`, targetID).Exec(ctx); err != nil {
 		return fmt.Errorf("change what this release is moving to: %w", err)
 	}
 	return nil
@@ -382,15 +382,15 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
-		ColumnExpr(`c.name AS "name"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		ColumnExpr(`"c"."name" AS "name"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		GroupExpr(FoldedOn+", c.name").
-		OrderExpr("c.name").
+		GroupExpr(FoldedOn+`, "c"."name"`).
+		OrderExpr(`"c"."name"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which packages a bump moves: %w", err)
 	}
@@ -424,22 +424,22 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		// The party rather than a name: the column holds a party, which may be
 		// a person or a team, and the name is looked up once for the few that
 		// come back rather than joined per row.
-		ColumnExpr(`MIN(f.assigned_to) AS "least_holder"`).
-		ColumnExpr(`MAX(f.assigned_to) AS "most_holder"`).
+		ColumnExpr(`MIN("f"."assigned_to") AS "least_holder"`).
+		ColumnExpr(`MAX("f"."assigned_to") AS "most_holder"`).
 		// Two counts rather than a conditional sum: that sum comes back as a
 		// decimal on two of the four engines, and the cast that makes it an
 		// integer is spelled per engine. Counted, a group is wholly held when
 		// the count of holders is the count of rows.
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`COUNT(f.assigned_to) AS "held"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
+		ColumnExpr(`COUNT("f"."assigned_to") AS "held"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		GroupExpr(FoldedOn).
 		Scan(ctx, &rows); err != nil {
@@ -517,9 +517,9 @@ func (s *Store) foldOf(ctx context.Context, db bun.IDB, componentID int64) (key,
 	}
 	err = db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
+		ColumnExpr(`"c"."fold_key" AS "fold_key"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "from_version"`).
-		Where("c.id = ?", componentID).Scan(ctx, &row)
+		Where(`"c"."id" = ?`, componentID).Scan(ctx, &row)
 	if err != nil {
 		return "", "", fmt.Errorf("read what that component folds to: %w", err)
 	}
@@ -575,11 +575,11 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	var here []int64
 	err := db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("tg.id").
-		Where("st.product_id = ?", productID).
-		Where("tg.id IN (?)", bun.List(builds)).
-		OrderExpr("tg.id").
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"tg"."id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"tg"."id" IN (?)`, bun.List(builds)).
+		OrderExpr(`"tg"."id"`).
 		Scan(ctx, &here)
 	if err != nil {
 		return nil, fmt.Errorf("check the builds named are this product's: %w", err)
@@ -610,11 +610,11 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 	}
 	err = db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`tg.id AS "id"`).
-		ColumnExpr(`st.name AS "release"`).
-		Where("tg.id IN (?)", bun.List(ids)).
-		Where("tg.stream_id IN (?)", bun.List(past)).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"tg"."id" AS "id"`).
+		ColumnExpr(`"st"."name" AS "release"`).
+		Where(`"tg"."id" IN (?)`, bun.List(ids)).
+		Where(`"tg"."stream_id" IN (?)`, bun.List(past)).
 		Scan(ctx, &retired)
 	if err != nil {
 		return nil, fmt.Errorf("read which of these builds are out of support: %w", err)

@@ -33,7 +33,7 @@ func (s *Store) Find(ctx context.Context, subject access.Subject, token string) 
 		return nil, ErrNotConfigured
 	}
 	row := new(Attachment)
-	err := s.db.NewSelect().Model(row).Where("token = ?", strings.TrimSpace(token)).Scan(ctx)
+	err := s.db.NewSelect().Model(row).Where(`"token" = ?`, strings.TrimSpace(token)).Scan(ctx)
 	if database.IsNoRows(err) {
 		return nil, access.Denied("reach an attachment")
 	}
@@ -121,9 +121,9 @@ func (s *Store) ForIssue(ctx context.Context, subject access.Subject,
 	}
 	var rows []Attachment
 	if err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
+		Where(`"product_id" = ?`, productID).
 		Where(finding.FiledUnder(filed.Issue), vulnerabilityID).
-		Where("attached_at IS NOT NULL").
+		Where(`"attached_at" IS NOT NULL`).
 		Order("uploaded_at DESC", "id DESC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what hangs off an issue: %w", err)
@@ -147,8 +147,8 @@ func (s *Store) ForReport(ctx context.Context, subject access.Subject,
 	}
 	var rows []Attachment
 	if err := s.db.NewSelect().Model(&rows).
-		Where("flaw_report_id = ?", reportID).
-		Where("attached_at IS NOT NULL").
+		Where(`"flaw_report_id" = ?`, reportID).
+		Where(`"attached_at" IS NOT NULL`).
 		Order("uploaded_at DESC", "id DESC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what arrived with a report: %w", err)
@@ -170,9 +170,9 @@ func Attached(ctx context.Context, db bun.IDB, tokens []string, now time.Time) e
 		return nil
 	}
 	if _, err := db.NewUpdate().Model((*Attachment)(nil)).
-		Set("attached_at = ?", now.UTC().Truncate(time.Microsecond)).
-		Where("token IN (?)", bun.List(tokens)).
-		Where("attached_at IS NULL").
+		Set(`"attached_at" = ?`, now.UTC().Truncate(time.Microsecond)).
+		Where(`"token" IN (?)`, bun.List(tokens)).
+		Where(`"attached_at" IS NULL`).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("record that an attachment is referred to: %w", err)
 	}
@@ -200,7 +200,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 		return ErrNoReason
 	}
 	row := new(Attachment)
-	err := s.db.NewSelect().Model(row).Where("token = ?", strings.TrimSpace(token)).Scan(ctx)
+	err := s.db.NewSelect().Model(row).Where(`"token" = ?`, strings.TrimSpace(token)).Scan(ctx)
 	if database.IsNoRows(err) {
 		return access.Denied("reach an attachment")
 	}
@@ -216,11 +216,11 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		now := s.now().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Attachment)(nil)).
-			Set("redacted_at = ?", now).
-			Set("redacted_by = ?", subject.ID).
-			Set("redacted_reason = ?", reason).
-			Where("token = ?", row.Token).
-			Where("redacted_at IS NULL").
+			Set(`"redacted_at" = ?`, now).
+			Set(`"redacted_by" = ?`, subject.ID).
+			Set(`"redacted_reason" = ?`, reason).
+			Where(`"token" = ?`, row.Token).
+			Where(`"redacted_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -279,9 +279,9 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 	// thing a bounded sweep has to avoid is not making progress.
 	var stale []Attachment
 	if err := s.db.NewSelect().Model(&stale).
-		Where("attached_at IS NULL").
-		Where("redacted_at IS NULL").
-		Where("uploaded_at < ?", before).
+		Where(`"attached_at" IS NULL`).
+		Where(`"redacted_at" IS NULL`).
+		Where(`"uploaded_at" < ?`, before).
 		Order("uploaded_at ASC", "id ASC").
 		Limit(500).
 		Scan(ctx); err != nil {
@@ -309,9 +309,9 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		// since the page was read carries who redacted it and why, and the
 		// record of that is what a redaction leaves.
 		res, err := s.db.NewDelete().Model((*Attachment)(nil)).
-			Where("id = ?", row.ID).
-			Where("attached_at IS NULL").
-			Where("redacted_at IS NULL").
+			Where(`"id" = ?`, row.ID).
+			Where(`"attached_at" IS NULL`).
+			Where(`"redacted_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			failed++
@@ -392,10 +392,10 @@ func (s *Store) Issue(ctx context.Context, subject access.Subject,
 		TableExpr(`"vulnerability" AS "v"`).
 		// The issue the name is read as, which is the issue that stands where
 		// the name was filed under one that merged into it.
-		ColumnExpr("v.issue_id").
+		ColumnExpr(`"v"."issue_id"`).
 		// Against the folded column, folded by the one rule the column was
 		// written with, so this is an equality on a unique column.
-		Where("v.identifier_folded = ?", finding.FoldIdentifier(identifier)).
+		Where(`"v"."identifier_folded" = ?`, finding.FoldIdentifier(identifier)).
 		Scan(ctx, &issue)
 	if database.IsNoRows(err) {
 		return 0, 0, ErrNoSuchIssue

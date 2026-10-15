@@ -88,9 +88,9 @@ func (f *fixture) finds(t *testing.T, in build, componentID int64, place string,
 func (f *fixture) moves(t *testing.T, in build, findingID, toComponent int64, place string) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("closed_at = ?", time.Now().UTC()).
-		Set("closed_run_id = ?", in.run).
-		Where("id = ?", findingID).Exec(t.Context()); err != nil {
+		Set(`"closed_at" = ?`, time.Now().UTC()).
+		Set(`"closed_run_id" = ?`, in.run).
+		Where(`"id" = ?`, findingID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	f.finds(t, in, toComponent, place, access.Public)
@@ -100,7 +100,7 @@ func (f *fixture) moves(t *testing.T, in build, findingID, toComponent int64, pl
 func (f *fixture) stateOf(t *testing.T, id int64) triage.State {
 	t.Helper()
 	var row triage.Decision
-	if err := f.db.DB.NewSelect().Model(&row).Where("id = ?", id).Scan(t.Context()); err != nil {
+	if err := f.db.DB.NewSelect().Model(&row).Where(`"id" = ?`, id).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return row.State

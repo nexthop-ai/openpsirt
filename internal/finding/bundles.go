@@ -117,15 +117,15 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
 
 	page := s.bumps(targets, visible, filter).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, filter.ProductID).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(PerFold(SourceName) + ` AS "upstream"`).
 		ColumnExpr(PerFold(SourceVersion) + ` AS "shipped"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		ColumnExpr(overParts.places() + ` AS "places"`).
-		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."target_id") AS "builds"`).
 		ColumnExpr(overParts.peak() + ` AS "urgency"`).
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.exploitedHere() + ` AS "exploited_here"`).
@@ -214,21 +214,21 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 func (s *Store) bumps(targets []int64, visible []access.Visibility, filter Filter) *bun.SelectQuery {
 	inner := placeHeads(openRows(s.db, targets, visible)).
 		// A bundle is a version to move to.
-		Where("f.fixed_in IS NOT NULL").
-		Where("f.fixed_in <> ?", "").
-		ColumnExpr("f.component_id").
-		ColumnExpr("f.vulnerability_id").
-		ColumnExpr("f.target_id").
-		ColumnExpr("f.fixed_in").
-		GroupExpr("f.component_id, f.vulnerability_id, f.target_id, f.fixed_in")
+		Where(`"f"."fixed_in" IS NOT NULL`).
+		Where(`"f"."fixed_in" <> ?`, "").
+		ColumnExpr(`"f"."component_id"`).
+		ColumnExpr(`"f"."vulnerability_id"`).
+		ColumnExpr(`"f"."target_id"`).
+		ColumnExpr(`"f"."fixed_in"`).
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."target_id", "f"."fixed_in"`)
 	if filter.BundleSort == BundlesByDeadline {
 		// Under the column's own name, so the order reads the same.
-		inner = inner.ColumnExpr(`MIN(f.due_at) AS "due_at"`)
+		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	}
 	return s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, targets, visible)).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		GroupExpr(FoldedOn + ", f.fixed_in")
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		GroupExpr(FoldedOn + `, "f"."fixed_in"`)
 }
 
 // pullersOf is how many things pull a component in, given the distinct
@@ -296,42 +296,42 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 	var components []int64
 	if err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr("c.id").
+		ColumnExpr(`"c"."id"`).
 		Where(FoldedOn+" IN (?)", bun.List(distinct(folds))).
 		Scan(ctx, &components); err != nil {
 		return fmt.Errorf("read which components a bump moves: %w", err)
 	}
-	inFolds, args := database.InAnyOf("f.component_id", components)
+	inFolds, args := database.InAnyOf(`"f"."component_id"`, components)
 	under := filter.asListed(s.db, openRows(s.db, targets, visible).
 		Where(inFolds, args...).
-		Where("f.fixed_in IN (?)", bun.List(distinct(versions))).
-		ColumnExpr("f.fixed_in").
-		ColumnExpr("f.component_id").
-		ColumnExpr("f.target_id").
+		Where(`"f"."fixed_in" IN (?)`, bun.List(distinct(versions))).
+		ColumnExpr(`"f"."fixed_in"`).
+		ColumnExpr(`"f"."component_id"`).
+		ColumnExpr(`"f"."target_id"`).
 		// The issue as well where the groups are restricted after grouping,
 		// which asks it of each group.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if filter.keepsAfterGrouping() {
-				return q.ColumnExpr("f.vulnerability_id").GroupExpr("f.vulnerability_id")
+				return q.ColumnExpr(`"f"."vulnerability_id"`).GroupExpr(`"f"."vulnerability_id"`)
 			}
 			return q
 		}).
-		GroupExpr("f.component_id, f.target_id, f.fixed_in"), targets, visible)
+		GroupExpr(`"f"."component_id", "f"."target_id", "f"."fixed_in"`), targets, visible)
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, under).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
-		GroupExpr(FoldedOn + ", f.fixed_in, c.name, st.name, va.name").
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		GroupExpr(FoldedOn + `, "f"."fixed_in", "c"."name", "st"."name", "va"."name"`).
 		// In the order a reader scans them, so a bundle names its packages and
 		// its builds the same way on every read.
-		OrderExpr("c.name, st.name, va.name")
+		OrderExpr(`"c"."name", "st"."name", "va"."name"`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read which packages a bump moves: %w", err)
 	}
@@ -378,7 +378,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		Total         int   `bun:"total"`
 	}
 	page := s.byComponent(targets, visible, filter).
-		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		// Distinct issues rather than rows, because that is what the findings
 		// list shows and therefore what hiding this component would remove
 		// from it. The first level holds one row per issue.
@@ -394,7 +394,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		// places to one row per issue.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if by, known := order[filter.SortBy]; known && by.issue {
-				return q.Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`)
+				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
 			}
 			return q
 		}).
@@ -475,7 +475,7 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`,
-			s.byComponent(targets, visible, filter).ColumnExpr("f.component_id")).
+			s.byComponent(targets, visible, filter).ColumnExpr(`"f"."component_id"`)).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what is open by component: %w", err)
@@ -493,20 +493,20 @@ func (s *Store) byComponent(targets []int64, visible []access.Visibility,
 	filter Filter) *bun.SelectQuery {
 
 	inner := placeHeads(openRows(s.db, targets, visible)).
-		ColumnExpr("f.component_id").
-		ColumnExpr("f.vulnerability_id").
-		GroupExpr("f.component_id, f.vulnerability_id")
+		ColumnExpr(`"f"."component_id"`).
+		ColumnExpr(`"f"."vulnerability_id"`).
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
 	// The two orders that read an aggregate of the places, carried up under
 	// the column's own name so the expression the order names reads the same.
 	switch filter.SortBy {
 	case ByAge:
-		inner = inner.ColumnExpr(`MIN(f.opened_at) AS "opened_at"`)
+		inner = inner.ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`)
 	case ByDeadline:
-		inner = inner.ColumnExpr(`MIN(f.due_at) AS "due_at"`)
+		inner = inner.ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	}
 	return s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, filter.asListed(s.db, inner, targets, visible)).
-		GroupExpr("f.component_id")
+		GroupExpr(`"f"."component_id"`)
 }
 
 // BundleSortKey is which order the fix-bundle list pages in.
@@ -637,23 +637,23 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 	// rating: a rating is per issue, so reading it for every place would read
 	// it again for every place the issue sits at.
 	pairs := openRows(s.db, targets, visible).
-		ColumnExpr("f.component_id").
-		ColumnExpr("f.vulnerability_id").
-		Where("f.component_id IN (?)", bun.List(ids)).
-		GroupExpr("f.component_id, f.vulnerability_id")
+		ColumnExpr(`"f"."component_id"`).
+		ColumnExpr(`"f"."vulnerability_id"`).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id"`)
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, filter.asListed(s.db, pairs, targets, visible)).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		// This product's rating where it has stated one, which is what every
 		// other surface judges a finding by. Read without it, the strip on
 		// each row drew the published rating and a product that had re-rated
 		// an issue saw its own decision in the list and the world's in the
 		// bars over it.
 		Join(rating.Here, filter.ProductID).
-		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "band"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
-		GroupExpr("f.component_id, " + rating.EffectiveExpr)
+		GroupExpr(`"f"."component_id", ` + rating.EffectiveExpr)
 	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read how what is open here was rated: %w", err)
 	}
@@ -701,20 +701,20 @@ func (s *Store) upgradesFor(ctx context.Context, shipped map[int64]graph.Compone
 		FixedIn     string `bun:"fixed_in"`
 	}
 	query := openRows(s.db, targets, visible).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		Where("f.component_id IN (?)", bun.List(ids)).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
 		// A finding with nothing to move to contributes no upgrade. It is not
 		// absent from the view — it is a row with an empty column, which is
 		// the population that needs a judgment rather than a bump.
-		Where("f.fixed_in IS NOT NULL").
-		Where("f.fixed_in <> ?", "").
+		Where(`"f"."fixed_in" IS NOT NULL`).
+		Where(`"f"."fixed_in" <> ?`, "").
 		// Grouped to one row per issue rather than per version string, because
 		// a version has to be read out of that string before it can be counted
 		// — and grouped rather than plain because the narrowing asks questions
 		// of the places under an issue, which are aggregates.
-		GroupExpr("f.component_id, f.vulnerability_id, f.fixed_in")
+		GroupExpr(`"f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
 	if err := filter.asListed(s.db, query, targets, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where each component could go: %w", err)
 	}

@@ -68,7 +68,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 		}
 		var open int
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("kind = ?", finding.Entered).Where("closed_at IS NULL").
+			Where(`"kind" = ?`, finding.Entered).Where(`"closed_at" IS NULL`).
 			ColumnExpr("COUNT(*)").Scan(t.Context(), &open); err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +218,7 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 		row := rows[0]
 		var name string
 		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS \"c\"").
-			ColumnExpr("c.name").Where("c.id = ?", row.ComponentID).
+			ColumnExpr(`"c"."name"`).Where(`"c"."id" = ?`, row.ComponentID).
 			Scan(t.Context(), &name); err != nil {
 			t.Fatal(err)
 		}
@@ -276,7 +276,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 		}
 		var version string
 		if err := f.db.DB.NewSelect().TableExpr("\"component\" AS \"c\"").
-			ColumnExpr("c.version").Where("c.id = ?", row.ComponentID).
+			ColumnExpr(`"c"."version"`).Where(`"c"."id" = ?`, row.ComponentID).
 			Scan(t.Context(), &version); err != nil {
 			t.Fatal(err)
 		}
@@ -446,9 +446,9 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 		// The record of it stays, saying what happened and why.
 		var closed finding.Finding
 		if err := f.db.DB.NewSelect().Model(&closed).
-			Where("vulnerability_id = ?", issue).
-			Where("target_id = ?", f.target).
-			Where("closed_at IS NOT NULL").Scan(ctx); err != nil {
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"target_id" = ?`, f.target).
+			Where(`"closed_at" IS NOT NULL`).Scan(ctx); err != nil {
 			t.Fatalf("the record went with the build: %v", err)
 		}
 		if closed.ClosedBecause != finding.Invalid {
@@ -664,9 +664,9 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		}
 		var scanned []string
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr("f.place_identity").
-			Where("f.target_id = ?", f.target).
-			Where("f.kind = ?", finding.Vulnerable).
+			ColumnExpr(`"f"."place_identity"`).
+			Where(`"f"."target_id" = ?`, f.target).
+			Where(`"f"."kind" = ?`, finding.Vulnerable).
 			Scan(ctx, &scanned); err != nil {
 			t.Fatal(err)
 		}
@@ -772,7 +772,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 		// Nothing landed: the count is taken before anything is written, and
 		// the whole recording is one transaction either way.
 		open, err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			Where("f.target_id = ?", f.target).Count(ctx)
+			Where(`"f"."target_id" = ?`, f.target).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -820,7 +820,7 @@ func TestEachProductAnswersItsOwnReportUnderAMergedIssue(t *testing.T) {
 			}
 			var name string
 			if err := f.db.DB.NewSelect().TableExpr(`"vulnerability"`).Column("identifier").
-				Where("id = ?", rows[0].VulnerabilityID).Scan(ctx, &name); err != nil {
+				Where(`"id" = ?`, rows[0].VulnerabilityID).Scan(ctx, &name); err != nil {
 				t.Fatal(err)
 			}
 			return name
@@ -892,7 +892,7 @@ func TestAMintedNameKeptOnlyAsAnAliasIsNotDrawnAgain(t *testing.T) {
 		}
 		var filed string
 		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability"`).Column("identifier").
-			Where("id = ?", issue).Scan(ctx, &filed); err != nil {
+			Where(`"id" = ?`, issue).Scan(ctx, &filed); err != nil {
 			t.Fatal(err)
 		}
 		if filed != "CVE-2026-48190" {

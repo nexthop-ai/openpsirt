@@ -227,7 +227,7 @@ func (f *fixture) decidedAndLapsed(t *testing.T, at finding.Finding) string {
 		t.Fatal(err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*triage.Claim)(nil)).
-		Set("revision_id = ?", revision.ID).Where("id = ?", claim.ID).Exec(ctx); err != nil {
+		Set(`"revision_id" = ?`, revision.ID).Where(`"id" = ?`, claim.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.DB.NewInsert().Model(&triage.Approval{
@@ -509,8 +509,8 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 			}
 		}
 		reads("a correction waiting beside an agreed claim", "not-applicable")
-		if _, err := f.db.DB.NewUpdate().Table("decision").Set("state = ?", "approved").
-			Where("live_key = ?", "anywhere").Exec(ctx); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("decision").Set(`"state" = ?`, "approved").
+			Where(`"live_key" = ?`, "anywhere").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		reads("a correction in force beside an agreed claim", "mismatched")

@@ -549,8 +549,8 @@ func TestAScanReadOnALaterAttemptStandsAndBringsNothingOlderBack(t *testing.T) {
 func (f *readerFixture) jobsFor(t *testing.T, scanID int64) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
-		Where("kind = ?", queue.Parse).
-		Where("reference = ?", strconv.FormatInt(scanID, 10)).
+		Where(`"kind" = ?`, queue.Parse).
+		Where(`"reference" = ?`, strconv.FormatInt(scanID, 10)).
 		Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -665,8 +665,8 @@ func (f *readerFixture) jobState(t *testing.T, scanID int64) queue.State {
 	var state queue.State
 	if err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
 		Column("state").
-		Where("kind = ?", queue.Parse).
-		Where("reference = ?", strconv.FormatInt(scanID, 10)).
+		Where(`"kind" = ?`, queue.Parse).
+		Where(`"reference" = ?`, strconv.FormatInt(scanID, 10)).
 		Scan(t.Context(), &state); err != nil {
 		t.Fatalf("read the job for scan %d: %v", scanID, err)
 	}
@@ -793,7 +793,7 @@ func TestAScanKeepsWhatItsDocumentCalledTheThingItIsAbout(t *testing.T) {
 				}
 				var got ingest.Scan
 				if err := f.db.DB.NewSelect().Model(&got).
-					Where("id = ?", scanID).Scan(t.Context()); err != nil {
+					Where(`"id" = ?`, scanID).Scan(t.Context()); err != nil {
 					t.Fatal(err)
 				}
 				if got.RootIdentifier != one.want {
@@ -839,8 +839,8 @@ func TestAnInventoryNothingCouldReadIsHandedToNobody(t *testing.T) {
 func nodesNow(ctx context.Context, db bun.IDB, targetID int64) ([]graph.Node, error) {
 	var nodes []graph.Node
 	err := db.NewSelect().Model(&nodes).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	return nodes, err
 }
@@ -858,7 +858,7 @@ func TestAReArguedBuildWhoseFirstReadFailedIsAppliedOnTheRetry(t *testing.T) {
 		}
 		var hash string
 		if err := f.db.DB.NewSelect().Model((*ingest.Document)(nil)).Column("content_hash").
-			Where("scan_id = ?", first).Where("kind = ?", ingest.InventoryKind).
+			Where(`"scan_id" = ?`, first).Where(`"kind" = ?`, ingest.InventoryKind).
 			Scan(ctx, &hash); err != nil {
 			t.Fatal(err)
 		}
@@ -985,9 +985,9 @@ func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T
 
 		var inverted int
 		inverted, err = f.db.DB.NewSelect().Model((*graph.Node)(nil)).
-			Where("target_id = ?", f.branch).
-			Where("closed_scan_id IS NOT NULL").
-			Where("closed_scan_id < opened_scan_id").
+			Where(`"target_id" = ?`, f.branch).
+			Where(`"closed_scan_id" IS NOT NULL`).
+			Where(`"closed_scan_id" < "opened_scan_id"`).
 			Count(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -1018,7 +1018,7 @@ func TestAScanOlderThanTheOneLastAppliedIsSetAside(t *testing.T) {
 		// The earlier scan stands again under its own identifier, as one the
 		// graph already named does when its bytes are sent again.
 		if _, err := f.db.DB.NewUpdate().Model((*ingest.Scan)(nil)).
-			Set("status = ?", ingest.Accepted).Where("id = ?", earlier).Exec(ctx); err != nil {
+			Set(`"status" = ?`, ingest.Accepted).Where(`"id" = ?`, earlier).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.queue.Add(ctx, queue.Parse, strconv.FormatInt(earlier, 10)); err != nil {

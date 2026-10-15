@@ -59,7 +59,7 @@ func (s *Store) pageClaims(ctx context.Context, subject access.Subject,
 		return out, err
 	}
 	rowsOf := readableBy(s.db.NewSelect().Model(&out.Rows).Relation("Claim").
-		Where("de.claim_id IN (?)", bun.List(out.Order)), subject, "de")
+		Where(`"de"."claim_id" IN (?)`, bun.List(out.Order)), subject, "de")
 	if err := rowsOf.Order("de.id ASC").Scan(ctx); err != nil {
 		return out, fmt.Errorf("read %s: %w", what, err)
 	}
@@ -99,7 +99,7 @@ func (s *Store) claimsOn(ctx context.Context, claims func() *bun.SelectQuery,
 
 	var claimRows []Claim
 	if err := s.db.NewSelect().Model(&claimRows).
-		Where("id IN (?)", bun.List(out.Order)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(out.Order)).Scan(ctx); err != nil {
 		return out, fmt.Errorf("read %s: %w", what, err)
 	}
 	out.Claims = make(map[int64]Claim, len(claimRows))
@@ -139,13 +139,13 @@ func (s *Store) claimSizes(ctx context.Context, subject access.Subject, ids []in
 		Places    int   `bun:"places"`
 	}
 	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`MIN(de.id) AS "earliest"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`MIN("de"."id") AS "earliest"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
-		ColumnExpr(`COUNT(DISTINCT de.vulnerability_id) AS "issues"`).
-		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
-		Where("de.claim_id IN (?)", bun.List(ids)).
-		GroupExpr("de.claim_id"), subject, "de").Scan(ctx, &counted); err != nil {
+		ColumnExpr(`COUNT(DISTINCT "de"."vulnerability_id") AS "issues"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."place_identity") AS "places"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"de"."claim_id"`), subject, "de").Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read %s: %w", what, err)
 	}
 	if len(counted) == 0 {
@@ -157,7 +157,7 @@ func (s *Store) claimSizes(ctx context.Context, subject access.Subject, ids []in
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.id IN (?)", bun.List(firsts)).Scan(ctx); err != nil {
+		Where(`"de"."id" IN (?)`, bun.List(firsts)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read %s: %w", what, err)
 	}
 	byID := make(map[int64]Decision, len(rows))

@@ -475,7 +475,7 @@ func TestAStandingConditionTakesUpWhetherItIsUndisclosed(t *testing.T) {
 			}
 		}
 		var stored []notify.Notification
-		if err := db.DB.NewSelect().Model(&stored).Where("person_id = ?", who.ID).
+		if err := db.DB.NewSelect().Model(&stored).Where(`"person_id" = ?`, who.ID).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}

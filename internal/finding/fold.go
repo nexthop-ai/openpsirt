@@ -85,8 +85,8 @@ func PerFold(expression string) string { return "MIN(" + expression + ")" }
 // rule that placed a third of a fold reported as no rule at all under one
 // name and as the whole thing under another.
 func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
-	return q.Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
+	return q.Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Where(FoldedOn+` = (SELECT "c2"."fold_key" FROM "component" AS "c2" WHERE "c2"."id" = ?)`,
 			componentID)
 }
 
@@ -107,10 +107,10 @@ func InTheFold(ctx context.Context, db bun.IDB, componentID int64) ([]int64, err
 	var ids []int64
 	err := db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr("c.id").
-		Where(FoldedOn+` = (SELECT "c2".fold_key FROM "component" AS "c2" WHERE "c2".id = ?)`,
+		ColumnExpr(`"c"."id"`).
+		Where(FoldedOn+` = (SELECT "c2"."fold_key" FROM "component" AS "c2" WHERE "c2"."id" = ?)`,
 			componentID).
-		OrderExpr("c.id").
+		OrderExpr(`"c"."id"`).
 		Scan(ctx, &ids)
 	if err != nil {
 		return nil, fmt.Errorf("read the packages of this fold: %w", err)

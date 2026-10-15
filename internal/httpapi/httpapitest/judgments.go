@@ -161,13 +161,13 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 
 	// The code moves under them, which is what a lapse is.
 	if _, err := r.DB.DB.NewUpdate().Table("component").
-		Set("version = ?", "8.6.0-1").Set("upstream_version = ?", "8.6.0").
-		Where("name LIKE ?", "%curl%").Exec(ctx); err != nil {
+		Set(`"version" = ?`, "8.6.0-1").Set(`"upstream_version" = ?`, "8.6.0").
+		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var targets []int64
 	if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-		ColumnExpr("t.id").Scan(ctx, &targets); err != nil {
+		ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
 		t.Fatal(err)
 	}
 	store := triage.NewStore(r.DB.DB)
@@ -178,7 +178,7 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 	}
 	var lapsed int
 	lapsed, err := r.DB.DB.NewSelect().Table("decision").
-		Where("claim_id = ?", made.ClaimID).Where("state = ?", "lapsed").Count(ctx)
+		Where(`"claim_id" = ?`, made.ClaimID).Where(`"state" = ?`, "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {
 		t.Fatalf("%d rows of the claim lapsed (err %v), want both", lapsed, err)
 	}
@@ -230,13 +230,13 @@ func (r *Reach) CurlMovedTo(t *testing.T, upstream string) {
 	t.Helper()
 	ctx := t.Context()
 	if _, err := r.DB.DB.NewUpdate().Table("component").
-		Set("version = ?", upstream+"-1").Set("upstream_version = ?", upstream).
-		Where("name LIKE ?", "%curl%").Exec(ctx); err != nil {
+		Set(`"version" = ?`, upstream+"-1").Set(`"upstream_version" = ?`, upstream).
+		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var targets []int64
 	if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-		ColumnExpr("t.id").Scan(ctx, &targets); err != nil {
+		ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
 		t.Fatal(err)
 	}
 	store := triage.NewStore(r.DB.DB)
@@ -278,7 +278,7 @@ func (r *Reach) StateOfClaim(t *testing.T, claim int64) string {
 	t.Helper()
 	var state string
 	if err := r.DB.DB.NewSelect().Table("decision").Column("state").
-		Where("claim_id = ?", claim).Limit(1).Scan(t.Context(), &state); err != nil {
+		Where(`"claim_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
 		t.Fatal(err)
 	}
 	return state
@@ -368,7 +368,7 @@ func (r *Reach) Aged(t *testing.T, claim int64, column string, when time.Time) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("decision").
 		Set(column+" = ?", when).
-		Where("claim_id = ?", claim).Exec(t.Context()); err != nil {
+		Where(`"claim_id" = ?`, claim).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -533,7 +533,7 @@ func (r *Reach) Declared(t *testing.T, name string, hours int) int64 {
 func (r *Reach) Undisclosed(t *testing.T) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("finding").
-		Set("visibility = ?", access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
+		Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -615,8 +615,8 @@ func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
 		t.Fatal(err)
 	}
 	if _, err := r.DB.NewUpdate().Model((*queue.Job)(nil)).
-		Set("state = ?", queue.Dead).Set("attempts = max_attempts").
-		Where("id = ?", job.ID).Exec(ctx); err != nil {
+		Set(`"state" = ?`, queue.Dead).Set(`"attempts" = "max_attempts"`).
+		Where(`"id" = ?`, job.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	return job.ID

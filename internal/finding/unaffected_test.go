@@ -227,8 +227,8 @@ func TestAFindingTheRecordClosedMetAndMissedNoDeadline(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		f.reported(t, found("CVE-2026-1", libnl))
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("due_at = ?", time.Now().UTC().Add(-48*time.Hour)).
-			Where("target_id = ?", f.target).Exec(t.Context()); err != nil {
+			Set(`"due_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
+			Where(`"target_id" = ?`, f.target).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		f.reported(t, unaffectedBy(libnl, recordSays))

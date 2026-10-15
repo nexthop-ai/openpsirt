@@ -87,9 +87,9 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(finding.Decisions).
-			Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 			// The argument, which is where an outcome lives.
-			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+			Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 			// The judgment's subject, reached through the findings at the
 			// place — the same correlation the record's own component filter
 			// makes. A judgment about something since removed matches nothing and
@@ -107,32 +107,32 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// reason: what is being counted is acts, and an act is one row of the
 			// decision table however many builds share the place it names.
 			Join(`LEFT JOIN "finding" AS "pf" ON `+finding.DecisionAtPlace("pf")+`
-			AND pf.target_id IN (SELECT "et"."id" FROM "target" AS "et"
+			AND "pf"."target_id" IN (SELECT "et"."id" FROM "target" AS "et"
 				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
-				WHERE "es"."product_id" = de.product_id)
+				WHERE "es"."product_id" = "de"."product_id")
 			AND `+readableHere, readableArgs...).
-			Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
-			Where("de.proposed_at < ?", until).
-			GroupExpr(`de.product_id, COALESCE(pc.name, '')`)
+			Join(`LEFT JOIN "component" AS "pc" ON "pc"."id" = "pf"."component_id"`).
+			Where(`"de"."proposed_at" < ?`, until).
+			GroupExpr(`"de"."product_id", COALESCE("pc"."name", '')`)
 		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}
 
 	var rows []Spent
 	q := grouped().
-		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_name"`).
-		ColumnExpr(`COALESCE(pc.name, '') AS "component"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
-		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).
-		ColumnExpr(`COUNT(DISTINCT de.proposed_by) AS "people"`).
+		ColumnExpr(`COALESCE("pc"."name", '') AS "component"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."id") AS "decisions"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."proposed_by") AS "people"`).
 		// The upgrades that came out of them, each counted as claims: the
 		// outcome is the claim's, and counting its rows would weigh a judgment
 		// by how far its component happens to fan out.
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
 			` AS "promised"`, bun.List([]Outcome{UpgradeNeeded, PatchNeeded})).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" IN (?) THEN "de"."claim_id" END)`+
 			` AS "dismissed"`, bun.List(OutcomesDismissing())).
-		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome = ? THEN de.claim_id END)`+
+		ColumnExpr(`COUNT(DISTINCT CASE WHEN "cl"."outcome" = ? THEN "de"."claim_id" END)`+
 			` AS "deferred"`, Deferred).
 		// How many rows the question has, counted over the grouped result
 		// and before the limit. A total taken off the page reads a list cut
@@ -142,7 +142,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		// in two products with equal counts ties on everything before it, and
 		// an order that ties lets an engine's top-N sort repeat one row and
 		// skip the other across pages.
-		OrderExpr("claims DESC, decisions DESC, component, de.product_id").
+		OrderExpr(`claims DESC, decisions DESC, "component", "de"."product_id"`).
 		Limit(limit).Offset(offset)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read where the work went: %w", err)
@@ -155,7 +155,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	}
 	// A page past the end carries no row to read the count off.
 	total, err := s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, grouped().ColumnExpr("de.product_id")).
+		TableExpr(`(?) AS "grouped"`, grouped().ColumnExpr(`"de"."product_id"`)).
 		Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count where the work went: %w", err)

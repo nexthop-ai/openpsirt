@@ -146,7 +146,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// longer what would be generated.
 		var at Advisory
 		if err := tx.NewSelect().Model(&at).
-			Where("id = ?", row.ID).Limit(1).Scan(ctx); err != nil {
+			Where(`"id" = ?`, row.ID).Limit(1).Scan(ctx); err != nil {
 			return err
 		}
 		if at.EditionID == nil || row.EditionID == nil || *at.EditionID != *row.EditionID {
@@ -155,8 +155,8 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		var standing int
 		if err := tx.NewSelect().Model((*Approval)(nil)).
 			ColumnExpr("COUNT(*)").
-			Where("edition_id = ?", *at.EditionID).
-			Where("withdrawn_at IS NULL").
+			Where(`"edition_id" = ?`, *at.EditionID).
+			Where(`"withdrawn_at" IS NULL`).
 			Scan(ctx, &standing); err != nil {
 			return err
 		}
@@ -181,8 +181,8 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		var gone []Issuance
 		if err := tx.NewSelect().Model(&gone).
 			Column("ordinal", "issued_at", "summary").
-			Where("advisory_id = ?", row.ID).
-			OrderExpr("ordinal ASC").
+			Where(`"advisory_id" = ?`, row.ID).
+			OrderExpr(`"ordinal" ASC`).
 			Scan(ctx); err != nil {
 			return err
 		}
@@ -205,9 +205,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// two writers reaching here together both find it unset, and the
 		// second writes the same value the first did.
 		if _, err := tx.NewUpdate().Model((*Advisory)(nil)).
-			Set("released_from = ?", doc.Document.Tracking.InitialReleaseDate).
-			Where("id = ?", row.ID).
-			Where("released_from IS NULL").
+			Set(`"released_from" = ?`, doc.Document.Tracking.InitialReleaseDate).
+			Where(`"id" = ?`, row.ID).
+			Where(`"released_from" IS NULL`).
 			Exec(ctx); err != nil {
 			return err
 		}
@@ -382,8 +382,8 @@ func (s *Store) issuances(ctx context.Context, subject access.Subject,
 		// list of what went out, neither of which reads one, and a document
 		// is the largest column here by a wide margin.
 		ExcludeColumn("document").
-		Where("advisory_id = ?", row.ID).
-		OrderExpr("ai.ordinal ASC").
+		Where(`"advisory_id" = ?`, row.ID).
+		OrderExpr(`"ai"."ordinal" ASC`).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what has gone out: %w", err)
@@ -394,8 +394,8 @@ func (s *Store) issuances(ctx context.Context, subject access.Subject,
 	// Every issuance, each at what it named, or none of them.
 	readable, err := narrowed(s.db.NewSelect().
 		TableExpr(`"advisory_issuance" AS "ai"`).
-		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
-		Where("ai.advisory_id = ?", row.ID), subject).Count(ctx)
+		Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ai"."advisory_id"`).
+		Where(`"ai"."advisory_id" = ?`, row.ID), subject).Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("check what advisory %q has named: %w", row.Identifier, err)
 	}

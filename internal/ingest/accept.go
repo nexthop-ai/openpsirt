@@ -350,8 +350,8 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 func (s *Store) Newest(ctx context.Context, targetID int64) (*Scan, error) {
 	scan := new(Scan)
 	err := s.db.NewSelect().Model(scan).
-		Where("target_id = ?", targetID).
-		Where("status = ?", Accepted).
+		Where(`"target_id" = ?`, targetID).
+		Where(`"status" = ?`, Accepted).
 		// The later arrival wins a tie, and a tie is possible: one build
 		// re-sent with different judgments is two submissions at one build
 		// time. Without the second column the engine picks, and which
@@ -385,8 +385,8 @@ func passedBy(scan, newest *Scan) bool {
 func (s *Store) byContent(ctx context.Context, targetID int64, hash string) (*Scan, error) {
 	scan := new(Scan)
 	err := s.db.NewSelect().Model(scan).
-		Where("target_id = ?", targetID).
-		Where("content_hash = ?", hash).
+		Where(`"target_id" = ?`, targetID).
+		Where(`"content_hash" = ?`, hash).
 		Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
@@ -400,7 +400,7 @@ func (s *Store) byContent(ctx context.Context, targetID int64, hash string) (*Sc
 // ByID reads back a scan.
 func (s *Store) ByID(ctx context.Context, id int64) (*Scan, error) {
 	var scan Scan
-	if err := s.db.NewSelect().Model(&scan).Where("id = ?", id).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&scan).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, fmt.Errorf("%w: %d", ErrNoScan, id),
 			fmt.Sprintf("read scan %d", id))
 	}
@@ -428,9 +428,9 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 		reason = "the scan could not be applied"
 	}
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
-		Set("status = ?", Failed).
-		Set("failure = ?", truncate(reason, 2000)).
-		Where("id = ?", id).Exec(ctx)
+		Set(`"status" = ?`, Failed).
+		Set(`"failure" = ?`, truncate(reason, 2000)).
+		Where(`"id" = ?`, id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record that scan %d failed: %w", id, err)
 	}
@@ -486,7 +486,7 @@ func (s *Store) retake(ctx context.Context, a Arriving) (*Scan, error) {
 		return nil, err
 	}
 	if _, err := s.db.NewDelete().Model((*Scan)(nil)).
-		Where("id = ?", failed).Exec(ctx); err != nil {
+		Where(`"id" = ?`, failed).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("retake scan %d: remove the failed attempt: %w", failed, err)
 	}
 	scan.ID = 0
@@ -504,7 +504,7 @@ func (s *Store) named(ctx context.Context, scanID int64) (bool, error) {
 			TableExpr(`?`, bun.Ident(table)).
 			ColumnExpr("1").
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.Where("opened_scan_id = ?", scanID).WhereOr("closed_scan_id = ?", scanID)
+				return q.Where(`"opened_scan_id" = ?`, scanID).WhereOr(`"closed_scan_id" = ?`, scanID)
 			}).
 			Limit(1).
 			Scan(ctx, &found)
@@ -518,7 +518,7 @@ func (s *Store) named(ctx context.Context, scanID int64) (bool, error) {
 	err := s.db.NewSelect().
 		TableExpr(`"target"`).
 		ColumnExpr("1").
-		Where("last_scan_id = ?", scanID).
+		Where(`"last_scan_id" = ?`, scanID).
 		Limit(1).
 		Scan(ctx, &found)
 	if err != nil {
@@ -546,12 +546,12 @@ func (s *Store) Made(ctx context.Context, scanID int64, components, placed int,
 	rootIdentifier string) error {
 
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
-		Set("components = ?", components).
-		Set("placed = ?", placed).
-		Set("root_identifier = ?", rootIdentifier).
-		Set("status = ?", Accepted).
-		Set("failure = ?", "").
-		Where("id = ?", scanID).Exec(ctx)
+		Set(`"components" = ?`, components).
+		Set(`"placed" = ?`, placed).
+		Set(`"root_identifier" = ?`, rootIdentifier).
+		Set(`"status" = ?`, Accepted).
+		Set(`"failure" = ?`, "").
+		Where(`"id" = ?`, scanID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record what the inventory was made of: %w", err)
 	}
@@ -604,12 +604,12 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	// update first because a target being refused once is a target being
 	// refused repeatedly, so the row is nearly always already there.
 	res, err := s.db.NewUpdate().Model((*Refusal)(nil)).
-		Set("at = ?", r.At).
-		Set("reason = ?", r.Reason).
-		Set("credential = ?", r.Credential).
-		Set("built_at = ?", r.BuiltAt).
-		Set("content_hash = ?", r.ContentHash).
-		Where("target_id = ?", r.TargetID).Exec(ctx)
+		Set(`"at" = ?`, r.At).
+		Set(`"reason" = ?`, r.Reason).
+		Set(`"credential" = ?`, r.Credential).
+		Set(`"built_at" = ?`, r.BuiltAt).
+		Set(`"content_hash" = ?`, r.ContentHash).
+		Where(`"target_id" = ?`, r.TargetID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record that an upload was refused: %w", err)
 	}

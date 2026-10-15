@@ -56,15 +56,15 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 	// two values, which the four engines spell differently.
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.proposed_by AS "proposed_by"`).
-		ColumnExpr(`ap.approved_by AS "approved_by"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
-		Where("ap.withdrawn_at IS NULL").
-		Where("ap.approved_by <> de.proposed_by").
-		Where("de.proposed_at >= ?", since).
-		GroupExpr("de.product_id, de.proposed_by, ap.approved_by").
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
+		ColumnExpr(`"ap"."approved_by" AS "approved_by"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
+		Where(`"de"."proposed_at" >= ?`, since).
+		GroupExpr(`"de"."product_id", "de"."proposed_by", "ap"."approved_by"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read who agrees with whom: %w", err)
@@ -75,13 +75,13 @@ func (s *Store) AgreedSince(ctx context.Context, since time.Time) ([]Agreements,
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim_approval" AS "ap" ON ap.claim_id = de.claim_id`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
-		Where("ap.withdrawn_at IS NULL").
-		Where("ap.approved_by <> de.proposed_by").
-		Where("de.proposed_at >= ?", since).
-		GroupExpr("de.product_id").
+		Join(`JOIN "claim_approval" AS "ap" ON "ap"."claim_id" = "de"."claim_id"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
+		Where(`"ap"."withdrawn_at" IS NULL`).
+		Where(`"ap"."approved_by" <> "de"."proposed_by"`).
+		Where(`"de"."proposed_at" >= ?`, since).
+		GroupExpr(`"de"."product_id"`).
 		Scan(ctx, &totals)
 	if err != nil {
 		return nil, fmt.Errorf("count what was agreed to: %w", err)

@@ -983,12 +983,12 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 		Distinct().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."name_folded"`).
-		Join(`JOIN "graph_node" AS "n" ON n.component_id = c.id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where("st.product_id = ?", productID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", false).
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "n"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &names)
 	if err != nil {
 		return nil, fmt.Errorf("read what this product ships: %w", err)

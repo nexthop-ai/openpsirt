@@ -508,8 +508,8 @@ func TestAnIssueTakenOffBeforeAnIssuanceIsNotNamedByIt(t *testing.T) {
 		}
 
 		var stream int64
-		if err := f.db.DB.NewSelect().TableExpr(`"target"`).ColumnExpr("stream_id").
-			Where("id = ?", f.master).Scan(ctx, &stream); err != nil {
+		if err := f.db.DB.NewSelect().TableExpr(`"target"`).ColumnExpr(`"stream_id"`).
+			Where(`"id" = ?`, f.master).Scan(ctx, &stream); err != nil {
 			t.Fatal(err)
 		}
 		for _, asked := range []struct {
@@ -549,7 +549,7 @@ func TestAnIssueWithAnUndisclosedPlaceIsLabelledByIt(t *testing.T) {
 		// The same issue at a second release, recorded later and undisclosed.
 		var first finding.Finding
 		if err := f.db.DB.NewSelect().Model(&first).
-			Where("f.target_id = ?", f.master).Where("f.kind = ?", finding.Entered).
+			Where(`"f"."target_id" = ?`, f.master).Where(`"f"."kind" = ?`, finding.Entered).
 			Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}

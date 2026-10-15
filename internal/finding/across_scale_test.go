@@ -79,7 +79,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			t.Helper()
 			var id int64
 			if err := db.DB.NewSelect().TableExpr(`"decision" AS "de"`).
-				ColumnExpr("COALESCE(MAX(de.id), 0)").Scan(ctx, &id); err != nil {
+				ColumnExpr(`COALESCE(MAX("de"."id"), 0)`).Scan(ctx, &id); err != nil {
 				t.Fatal(err)
 			}
 			return id
@@ -94,8 +94,8 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			plan(n, target.ID)
 		}
 		if _, err := db.DB.NewUpdate().TableExpr(`"decision" AS "de"`).
-			Set("state = ?", "lapsed").Set("live_key = NULL").Set("ended_at = ?", time.Now().UTC()).
-			Where("de.id > ? AND de.id <= ?", before, newest()).
+			Set(`"state" = ?`, "lapsed").Set(`"live_key" = NULL`).Set(`"ended_at" = ?`, time.Now().UTC()).
+			Where(`"de"."id" > ? AND "de"."id" <= ?`, before, newest()).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -109,9 +109,9 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 			Visibility string `bun:"visibility"`
 		}
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			ColumnExpr("f.vulnerability_id, f.place_identity, f.visibility").
-			Where("c.name = ?", "kernel").OrderExpr("f.id").Limit(1).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility"`).
+			Where(`"c"."name" = ?`, "kernel").OrderExpr(`"f"."id"`).Limit(1).
 			Scan(ctx, &kernel); err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		}
 		var open int
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr("COUNT(*)").
-			Where("f.closed_at IS NULL").Scan(ctx, &open); err != nil {
+			Where(`"f"."closed_at" IS NULL`).Scan(ctx, &open); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("%d open rows, %d promised decisions and one kernel claim", open, promised)

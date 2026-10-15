@@ -28,8 +28,8 @@ func TestAssigningEverythingMatchingNamesAnUnheldPieceItCouldNotMove(t *testing.
 		}
 		undisclosed := f.issueID(t, "CVE-2026-2")
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("vulnerability_id = ?", undisclosed).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, undisclosed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		who := f.planner(t, access.PublicTriage, access.Assigner, access.PrivateRead)

@@ -78,13 +78,13 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 
 	now := s.now().Truncate(time.Microsecond)
 	result, err := s.db.NewUpdate().Model((*Collaborator)(nil)).
-		Set("removed_at = ?", now).
-		Set("removed_by = ?", by).
-		Set("live_person_id = ?", nil).
-		Where("product_id = ?", productID).
+		Set(`"removed_at" = ?`, now).
+		Set(`"removed_by" = ?`, by).
+		Set(`"live_person_id" = ?`, nil).
+		Where(`"product_id" = ?`, productID).
 		Where(sameCase(filed.Issue), vulnerabilityID).
-		Where("person_id = ?", personID).
-		Where("live_person_id IS NOT NULL").
+		Where(`"person_id" = ?`, personID).
+		Where(`"live_person_id" IS NOT NULL`).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("take them off that case: %w", err)
@@ -96,11 +96,11 @@ func (s *Store) RemoveFromCase(ctx context.Context, productID, vulnerabilityID, 
 func (s *Store) OnCase(ctx context.Context, productID, vulnerabilityID int64) ([]int64, error) {
 	var people []int64
 	err := s.db.NewSelect().Model((*Collaborator)(nil)).
-		ColumnExpr("cc.person_id").
-		Where("cc.product_id = ?", productID).
+		ColumnExpr(`"cc"."person_id"`).
+		Where(`"cc"."product_id" = ?`, productID).
 		Where(sameCase(filed.CaseIssue), vulnerabilityID).
-		Where("cc.live_person_id IS NOT NULL").
-		OrderExpr("cc.added_at, cc.id").
+		Where(`"cc"."live_person_id" IS NOT NULL`).
+		OrderExpr(`"cc"."added_at", "cc"."id"`).
 		Scan(ctx, &people)
 	if err != nil {
 		return nil, fmt.Errorf("read who is on that case: %w", err)
@@ -125,8 +125,8 @@ func (s *Store) CasesOf(ctx context.Context, personID int64) (map[int64][]int64,
 		ColumnExpr(`"mv"."id" AS "vulnerability_id"`).
 		Join(`JOIN "vulnerability" AS "ci" ON "ci"."id" = "cc"."vulnerability_id"`).
 		Join(`JOIN "vulnerability" AS "mv" ON "mv"."issue_id" = "ci"."issue_id"`).
-		Where("cc.person_id = ?", personID).
-		Where("cc.live_person_id IS NOT NULL").
+		Where(`"cc"."person_id" = ?`, personID).
+		Where(`"cc"."live_person_id" IS NOT NULL`).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read which cases they are on: %w", err)
@@ -153,10 +153,10 @@ func (s *Store) onCase(ctx context.Context, productID, vulnerabilityID,
 
 	on, err := s.db.NewSelect().Model((*Collaborator)(nil)).
 		Column("cc.id").
-		Where("cc.product_id = ?", productID).
+		Where(`"cc"."product_id" = ?`, productID).
 		Where(sameCase(filed.CaseIssue), vulnerabilityID).
-		Where("cc.person_id = ?", personID).
-		Where("cc.live_person_id IS NOT NULL").
+		Where(`"cc"."person_id" = ?`, personID).
+		Where(`"cc"."live_person_id" IS NOT NULL`).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether they are on that case: %w", err)
@@ -171,9 +171,9 @@ func (s *Store) CaseRows(ctx context.Context, productID,
 
 	var rows []Collaborator
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
+		Where(`"product_id" = ?`, productID).
 		Where(sameCase(filed.Issue), vulnerabilityID).
-		Where("live_person_id IS NOT NULL").
+		Where(`"live_person_id" IS NOT NULL`).
 		Order("added_at", "id").
 		Scan(ctx)
 	if err != nil {

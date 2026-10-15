@@ -61,10 +61,10 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.component_id IN (?)", bun.List(fold)).
-			Where("f.closed_at IS NULL").
-			Where("f.visibility IN (?)", bun.List(visible))
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible))
 		if contains != "" {
 			// Matched against what a report says, which is all that is held
 			// about where a flaw lives. Nothing here knows a kernel from a
@@ -76,7 +76,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// then recorded against, so one justification landed on issues
 			// nobody saw. A backslash matched differently on each engine
 			// besides.
-			q = q.Where("f.vulnerability_id IN (?)", describedAs(q, subject, contains))
+			q = q.Where(`"f"."vulnerability_id" IN (?)`, describedAs(q, subject, contains))
 		}
 		return q
 	}
@@ -96,16 +96,16 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 	// action is bounded against and what a screen counting issues
 	// cannot say. Counted over the same narrowing rather than summed from the
 	// page: a page is fifty of eight hundred.
-	reaching, err := narrow(s.db.NewSelect()).ColumnExpr("f.id").Count(ctx)
+	reaching, err := narrow(s.db.NewSelect()).ColumnExpr(`"f"."id"`).Count(ctx)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("count how far these reach: %w", err)
 	}
 	err = narrow(s.db.NewSelect()).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		GroupExpr("f.vulnerability_id").
-		OrderExpr("MAX(f.urgency) DESC, f.vulnerability_id").
+		GroupExpr(`"f"."vulnerability_id"`).
+		OrderExpr(`MAX("f"."urgency") DESC, "f"."vulnerability_id"`).
 		Limit(limit).Offset(offset).
 		Scan(ctx, &heads)
 	if err != nil {
@@ -121,7 +121,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		// issues.
 		if total, err = s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
-				ColumnExpr("f.vulnerability_id").GroupExpr("f.vulnerability_id")).
+				ColumnExpr(`"f"."vulnerability_id"`).GroupExpr(`"f"."vulnerability_id"`)).
 			Count(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("count what is open against this component: %w", err)
 		}
@@ -146,34 +146,34 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		var rows []shown
 		err = s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
-			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`MIN(COALESCE("v"."score_centi", 0)) AS "severity_centi"`).
+			ColumnExpr(`MIN(COALESCE("f"."fixed_in", '')) AS "fixed_in"`).
 			// The issue's own account of itself, whether anybody is known to
 			// be using it, and the published estimate. One row per issue
 			// already, so the aggregate is over one value.
-			ColumnExpr(`MIN(COALESCE(v.description, '')) AS "description"`).
-			ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
+			ColumnExpr(`MIN(COALESCE("v"."description", '')) AS "description"`).
+			ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
 			// Counted rather than compared. A boolean expression in a
 			// select list comes back as a boolean on two engines and as a
 			// number on the other two; a number comes back as a number on
 			// all four.
-			ColumnExpr(`MAX(CASE WHEN v.exploited THEN 1 ELSE 0 END) AS "exploited"`).
+			ColumnExpr(`MAX(CASE WHEN "v"."exploited" THEN 1 ELSE 0 END) AS "exploited"`).
 			// Read off the finding, where a standing record of this product
 			// being attacked is already written for ranking.
-			ColumnExpr(`MAX(CASE WHEN f.urgency_exploited_here THEN 1 ELSE 0 END) AS "exploited_here"`).
+			ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited_here" THEN 1 ELSE 0 END) AS "exploited_here"`).
 			// The earliest deadline among this issue's places here, which is
 			// the one that makes it late. Read with the rest of what a row
 			// shows rather than off the places: the places are read for what
 			// a decision is keyed on, and that read carries no clock.
-			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.component_id IN (?)", bun.List(fold)).
-			Where("f.closed_at IS NULL").
-			Where("f.visibility IN (?)", bun.List(visible)).
-			Where("f.vulnerability_id IN (?)", bun.List(issues)).
-			GroupExpr("f.vulnerability_id").
+			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
+			GroupExpr(`"f"."vulnerability_id"`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return nil, 0, 0, fmt.Errorf("read about what is open against this component: %w", err)
@@ -236,19 +236,19 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.component_id IN (?)", bun.List(fold)).
-		Where("f.closed_at IS NULL").
-		Where("f.vulnerability_id IN (?)", bun.List(issues)).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id, f.place_identity, f.visibility, c.upstream_version, c.version, uc.upstream_version, uc.version").
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility", "c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where these sit: %w", err)
@@ -390,17 +390,17 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 
 	q := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr("f.vulnerability_id").
-		Where("f.target_id = ?", targetID).
-		Where("f.component_id IN (?)", bun.List(fold)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.vulnerability_id")
+		ColumnExpr(`"f"."vulnerability_id"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"f"."vulnerability_id"`)
 	if contains != "" {
 		// The same escaped match the candidate list makes. Spliced raw, a term
 		// holding a percent selects far more than the box said — and this is
 		// the number an approver checks the claim against.
-		q = q.Where("f.vulnerability_id IN (?)", describedAs(q, subject, contains))
+		q = q.Where(`"f"."vulnerability_id" IN (?)`, describedAs(q, subject, contains))
 	}
 	matched, err := tx.NewSelect().TableExpr(`(?) AS "grouped"`, q).Count(ctx)
 	if err != nil {
@@ -417,6 +417,6 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 func describedAs(q *bun.SelectQuery, subject access.Subject, contains string) *bun.SelectQuery {
 	withheld, args := recordedOutOfReachOf(subject, `"v"."id"`)
 	return q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-		Where(`LOWER(v.description) LIKE ?`+database.LikeClause, "%"+containsTerm(contains)+"%").
+		Where(`LOWER("v"."description") LIKE ?`+database.LikeClause, "%"+containsTerm(contains)+"%").
 		Where("NOT ("+withheld+")", args...)
 }

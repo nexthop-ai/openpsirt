@@ -430,13 +430,13 @@ func TestWhatWasReadOrIsOldIsNotCarriedToChat(t *testing.T) {
 		w.tell(t, notify.Telling{Kind: notify.Assigned, Body: "from last week", Link: "/f"})
 		ctx := t.Context()
 		if _, err := w.db.DB.NewUpdate().Model((*notify.Notification)(nil)).
-			Set("read_at = ?", time.Now().UTC()).Where("body = ?", "read already").
+			Set(`"read_at" = ?`, time.Now().UTC()).Where(`"body" = ?`, "read already").
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := w.db.DB.NewUpdate().Model((*notify.Notification)(nil)).
-			Set("created_at = ?", time.Now().UTC().Add(-7*24*time.Hour)).
-			Where("body = ?", "from last week").Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-7*24*time.Hour)).
+			Where(`"body" = ?`, "from last week").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		w.sweep(t)
@@ -499,8 +499,8 @@ func TestAChannelIsNotToldWhatIsOld(t *testing.T) {
 		w.hold(t, notify.BuildQuiet, notify.Holds{About: "quiet-1",
 			Body: "kernel main has not been scanned", ProductID: &w.kernel})
 		if _, err := w.db.DB.NewUpdate().Model((*notify.Notification)(nil)).
-			Set("created_at = ?", time.Now().UTC().Add(-7*24*time.Hour)).
-			Where("about = ?", "quiet-1").Exec(t.Context()); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-7*24*time.Hour)).
+			Where(`"about" = ?`, "quiet-1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		w.sweep(t)

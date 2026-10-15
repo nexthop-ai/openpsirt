@@ -24,8 +24,8 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 		// One of the two undisclosed, so the same page answers differently for
 		// two people — a count is a disclosure with the details removed.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -136,15 +136,15 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		var runID int64
 		if err := r.DB.DB.NewSelect().TableExpr("\"scan_run\" AS \"sr\"").
-			ColumnExpr("MAX(sr.id)").Scan(t.Context(), &runID); err != nil {
+			ColumnExpr(`MAX("sr"."id")`).Scan(t.Context(), &runID); err != nil {
 			t.Fatal(err)
 		}
 		at := fmt.Sprintf(
@@ -216,8 +216,8 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 		// cannot be doing the authorizing while the identifier does the
 		// reading.
 		var elsewhere int64
-		if err := r.DB.DB.NewSelect().TableExpr("\"target\" AS \"tg\"").ColumnExpr("tg.id").
-			Where("tg.id <> (SELECT sr.target_id FROM \"scan_run\" AS \"sr\" WHERE sr.id = ?)", runID).
+		if err := r.DB.DB.NewSelect().TableExpr("\"target\" AS \"tg\"").ColumnExpr(`"tg"."id"`).
+			Where(`"tg"."id" <> (SELECT "sr"."target_id" FROM "scan_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
 			Limit(1).Scan(t.Context(), &elsewhere); err != nil {
 			t.Fatal(err)
 		}
@@ -230,8 +230,8 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 			t.Fatal(err)
 		}
 		var theirs int64
-		if err := r.DB.DB.NewSelect().TableExpr("\"scan_run\" AS \"sr\"").ColumnExpr("MAX(sr.id)").
-			Where("sr.target_id = ?", elsewhere).Scan(t.Context(), &theirs); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr("\"scan_run\" AS \"sr\"").ColumnExpr(`MAX("sr"."id")`).
+			Where(`"sr"."target_id" = ?`, elsewhere).Scan(t.Context(), &theirs); err != nil {
 			t.Fatal(err)
 		}
 		missing := fmt.Sprintf(

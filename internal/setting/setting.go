@@ -582,7 +582,7 @@ func NewStore(db bun.IDB) *Store {
 // nothing anywhere reports it.
 func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 	row := new(Setting)
-	switch err := s.db.NewSelect().Model(row).Where("name = ?", name).Scan(ctx); {
+	switch err := s.db.NewSelect().Model(row).Where(`"name" = ?`, name).Scan(ctx); {
 	case database.IsNoRows(err):
 		return "", false, nil
 	case err != nil:
@@ -642,7 +642,7 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 
 		// The stored value, in the same view as the write that replaces it.
 		held := new(Setting)
-		switch err := tx.NewSelect().Model(held).Where("name = ?", name).Scan(ctx); {
+		switch err := tx.NewSelect().Model(held).Where(`"name" = ?`, name).Scan(ctx); {
 		case database.IsNoRows(err):
 		case err != nil:
 			return fmt.Errorf("read the %q setting: %w", name, err)
@@ -672,8 +672,8 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 		}
 
 		res, err := tx.NewUpdate().Model((*Setting)(nil)).
-			Set("value = ?", value).Set("updated_at = ?", now).
-			Where("name = ?", name).Where("value = ?", before).Exec(ctx)
+			Set(`"value" = ?`, value).Set(`"updated_at" = ?`, now).
+			Where(`"name" = ?`, name).Where(`"value" = ?`, before).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
@@ -740,7 +740,7 @@ func (s *Store) setIfAbsent(ctx context.Context, name, value string) (string, er
 	err := database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		stored = value
 		held := new(Setting)
-		switch err := tx.NewSelect().Model(held).Where("name = ?", name).Scan(ctx); {
+		switch err := tx.NewSelect().Model(held).Where(`"name" = ?`, name).Scan(ctx); {
 		case database.IsNoRows(err):
 		case err != nil:
 			return fmt.Errorf("read the %q setting: %w", name, err)

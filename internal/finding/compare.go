@@ -143,30 +143,30 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	at := func(productID, targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			// The rating this product holds where it has stated one. Read
 			// from the published word alone, a release note contradicted the
 			// findings list it was written from: a product that had re-rated
 			// an issue said one thing on screen and another in the document
 			// it publishes, which is the copy that leaves the building.
 			Join(rating.Here, productID).
-			ColumnExpr(`v.identifier AS "vulnerability"`).
-			ColumnExpr(`c.name AS "component"`).
+			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+			ColumnExpr(`"c"."name" AS "component"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
-			ColumnExpr(`MIN(COALESCE(f.arrived_from, '')) AS "arrived_from"`).
+			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
+			ColumnExpr(`MIN(COALESCE("f"."arrived_from", '')) AS "arrived_from"`).
 			// Properties of the issue rather than of the place, so they are
 			// grouped on rather than aggregated: every row of a group carries
 			// the same three.
-			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-			ColumnExpr(`v.exploited AS "exploited"`).
-			ColumnExpr(`COALESCE(v.advisory, '') AS "advisory"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.visibility IN (?)", bun.List(visible)).
-			GroupExpr("v.identifier, c.name, " + rating.EffectiveExpr +
-				", f.closed_because, v.score_centi, v.exploited, v.advisory")
-		return q.Where("f.closed_at IS NULL")
+			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+			ColumnExpr(`"v"."exploited" AS "exploited"`).
+			ColumnExpr(`COALESCE("v"."advisory", '') AS "advisory"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			GroupExpr(`"v"."identifier", "c"."name", ` + rating.EffectiveExpr +
+				`, "f"."closed_because", "v"."score_centi", "v"."exploited", "v"."advisory"`)
+		return q.Where(`"f"."closed_at" IS NULL`)
 	}
 
 	var was, now []Changed
@@ -283,14 +283,14 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		var rows []Changed
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			ColumnExpr(`v.identifier AS "vulnerability"`).
-			ColumnExpr(`c.name AS "component"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.visibility = ?", access.Private).
-			Where("f.closed_at IS NULL").
-			GroupExpr("v.identifier, c.name").
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+			ColumnExpr(`"c"."name" AS "component"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."visibility" = ?`, access.Private).
+			Where(`"f"."closed_at" IS NULL`).
+			GroupExpr(`"v"."identifier", "c"."name"`).
 			Scan(ctx, &rows)
 		return rows, err
 	}
@@ -392,27 +392,27 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-			Join(`JOIN "component" AS "cp" ON cp.id = f.component_id`).
-			ColumnExpr(`v.identifier AS "vulnerability"`).
-			ColumnExpr(`cp.name AS "component"`).
-			ColumnExpr(`COALESCE(f.closed_because, '') AS "because"`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			Join(`JOIN "component" AS "cp" ON "cp"."id" = "f"."component_id"`).
+			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+			ColumnExpr(`"cp"."name" AS "component"`).
+			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			// The version it went from is the closed row's own component:
 			// what closed is the finding against the version that carried the
 			// issue, so that row still names it. Upstream where there is one,
 			// because that is the version the match was made against and the
 			// one a fix version is comparable to.
 			ColumnExpr(upstreamVersionOf("cp")+` AS "from_version"`).
-			ColumnExpr(`COALESCE(f.moved_to, '') AS "moved_to"`).
-			ColumnExpr(`COALESCE(f.closed_run_id, 0) AS "closed_run"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.closed_at IS NOT NULL").
-			Where("v.identifier IN (?)", bun.List(issues)).
-			Where("cp.name IN (?)", bun.List(components)).
+			ColumnExpr(`COALESCE("f"."moved_to", '') AS "moved_to"`).
+			ColumnExpr(`COALESCE("f"."closed_run_id", 0) AS "closed_run"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."closed_at" IS NOT NULL`).
+			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
+			Where(`"cp"."name" IN (?)`, bun.List(components)).
 			// Ascending, so the last row read for a pair is its highest
 			// identifier — the same row the one-at-a-time form took by
 			// ordering descending and stopping at the first.
-			OrderExpr("f.id ASC").
+			OrderExpr(`"f"."id" ASC`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return nil, fmt.Errorf("read why these went: %w", err)
@@ -489,22 +489,22 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`c.name AS "component"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The soonest of them, which is the date a coordinator reads against.
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`)
+		ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
 	// Counted the way the findings list counts them, through the one spelling
 	// of each state, so a row here and the same row on the list cannot say
 	// different things about how far it has been decided.
 	q = decisionCounts(q, "?", []any{productID}, claimWaiting, claimApproved, claimLapsed).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("v.identifier, c.name")
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"v"."identifier", "c"."name"`)
 	if err := q.Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read how far this build has decided what it still has: %w", err)
 	}
@@ -537,9 +537,9 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	inForce, held := InForce()
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The decision at this place, in this product, in force at the
 		// versions the place holds now — the same match the agreed count above
 		// is made with, so a place counted as agreed contributes its outcome.
@@ -551,20 +551,20 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// MariaDB refuse. Both joins are inner, so the two are the same
 		// question asked in the one place every engine agrees on.
 		Join(`JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
-			AND `+inForce+` AND de.live_key IS NOT NULL`, append([]any{productID}, held...)...).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+			AND `+inForce+` AND "de"."live_key" IS NOT NULL`, append([]any{productID}, held...)...).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		Where(KeyMatches).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`cl.id AS "claim"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"cl"."id" AS "claim"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		// One value per group, because the group is one claim: which bytes an
 		// engine compares to take the minimum cannot change the answer.
-		ColumnExpr(`COALESCE(MIN(cl.justification), '') AS "justification"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("v.identifier, c.name, cl.id, cl.outcome").
+		ColumnExpr(`COALESCE(MIN("cl"."justification"), '') AS "justification"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"v"."identifier", "c"."name", "cl"."id", "cl"."outcome"`).
 		Scan(ctx, &said)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)

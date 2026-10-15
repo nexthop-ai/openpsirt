@@ -91,8 +91,8 @@ func (s *Store) Of(ctx context.Context, subject access.Subject, targetID, scanID
 	}
 	held := new(Scan)
 	if err := s.db.NewSelect().Model(held).
-		Where("id = ?", scanID).
-		Where("target_id = ?", targetID).
+		Where(`"id" = ?`, scanID).
+		Where(`"target_id" = ?`, targetID).
 		Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNoScan,
 			fmt.Sprintf("look up scan %d on this build", scanID))
@@ -131,7 +131,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	limit = database.AList.Of(limit)
 
 	sent := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("target_id = ?", targetID)
+		return q.Where(`"target_id" = ?`, targetID)
 	}
 
 	total, err := sent(s.db.NewSelect().Model((*Scan)(nil))).Count(ctx)
@@ -160,8 +160,8 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// is the one that says where it has got to.
 	var jobs []queue.Job
 	if err := s.db.NewSelect().Model(&jobs).
-		Where("kind = ?", queue.Parse).
-		Where("reference IN (?)", bun.List(references)).
+		Where(`"kind" = ?`, queue.Parse).
+		Where(`"reference" IN (?)`, bun.List(references)).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -183,8 +183,8 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 	// identifier is the tiebreaker, so the result is deterministic.
 	var runs []finding.Run
 	if err := s.db.NewSelect().Model(&runs).
-		Where("target_id = ?", targetID).
-		Where("finished_at IS NOT NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"finished_at" IS NOT NULL`).
 		Order("finished_at DESC", "id DESC").Scan(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -305,8 +305,8 @@ func (s *Store) claims(ctx context.Context, targetID int64,
 	// receipt.
 	q := s.db.NewSelect().TableExpr(`"scan" AS "sc"`).
 		Column("sc.id", "sc.received_at").
-		Where("sc.target_id = ?", targetID).
-		Where("sc.status = ?", Accepted)
+		Where(`"sc"."target_id" = ?`, targetID).
+		Where(`"sc"."status" = ?`, Accepted)
 	// Newest first by when it arrived, which is what "the newest upload this
 	// run covered" asks about. By arrival rather than by identifier because
 	// two uploads recorded at the same moment take their identifiers in
@@ -387,8 +387,8 @@ func (s *Store) readDone(ctx context.Context, filed []filing) (map[int64]bool, e
 		var jobs []queue.Job
 		if err := s.db.NewSelect().Model(&jobs).
 			Column("reference", "state").
-			Where("kind = ?", queue.Parse).
-			Where("reference IN (?)", bun.List(references)).
+			Where(`"kind" = ?`, queue.Parse).
+			Where(`"reference" IN (?)`, bun.List(references)).
 			Order("id ASC").Scan(ctx); err != nil {
 			return err
 		}

@@ -265,7 +265,7 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 		Where(`"p"."retired_at" IS NULL`).
 		Order("name")
 	if !all {
-		query = query.Where("id IN (?)", bun.List(visible))
+		query = query.Where(`"id" IN (?)`, bun.List(visible))
 	}
 	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
@@ -289,7 +289,7 @@ func (s *Store) Streams(ctx context.Context, subject access.Subject, productID i
 		return nil, access.Denied("list the releases of a product")
 	}
 	var rows []Stream
-	query := s.db.NewSelect().Model(&rows).Where("product_id = ?", productID)
+	query := s.db.NewSelect().Model(&rows).Where(`"product_id" = ?`, productID)
 	if !retired {
 		query = query.Where(`"s"."retired_at" IS NULL`)
 	}
@@ -312,7 +312,7 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
+		Where(`"product_id" = ?`, productID).
 		Where(`"v"."retired_at" IS NULL`).
 		Order("name").Scan(ctx)
 	if err != nil {
@@ -334,7 +334,7 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 // kind of correctness that stops being true when somebody adds another.
 func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, streamID int64) ([]Variant, error) {
 	var stream Stream
-	if err := s.db.NewSelect().Model(&stream).Where("id = ?", streamID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&stream).Where(`"id" = ?`, streamID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up the release %d: %w", streamID, err)
 	}
 	if !subject.Sees(stream.ProductID) {
@@ -342,8 +342,8 @@ func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, streamID in
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN "target" AS "tg" ON tg.variant_id = v.id`).
-		Where("tg.stream_id = ?", streamID).Order("v.name").Scan(ctx)
+		Join(`JOIN "target" AS "tg" ON "tg"."variant_id" = "v"."id"`).
+		Where(`"tg"."stream_id" = ?`, streamID).Order("v.name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list what a release is built as: %w", err)
 	}
@@ -430,12 +430,12 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"stream" AS "st"`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`st.kind AS "kind"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
-		Where("st.product_id IN (?)", bun.List(productIDs)).
+		Where(`"st"."product_id" IN (?)`, bun.List(productIDs)).
 		Where(`"st"."retired_at" IS NULL`).
-		GroupExpr("st.product_id, st.kind").
+		GroupExpr(`"st"."product_id", "st"."kind"`).
 		Scan(ctx, &streams); err != nil {
 		return nil, fmt.Errorf("count branches and tags: %w", err)
 	}
@@ -455,11 +455,11 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"variant" AS "va"`).
-		ColumnExpr(`va.product_id AS "product_id"`).
+		ColumnExpr(`"va"."product_id" AS "product_id"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
-		Where("va.product_id IN (?)", bun.List(productIDs)).
+		Where(`"va"."product_id" IN (?)`, bun.List(productIDs)).
 		Where(`"va"."retired_at" IS NULL`).
-		GroupExpr("va.product_id").
+		GroupExpr(`"va"."product_id"`).
 		Scan(ctx, &variants); err != nil {
 		return nil, fmt.Errorf("count variants: %w", err)
 	}

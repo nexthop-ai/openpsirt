@@ -160,7 +160,7 @@ func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
 		store := vex.NewStore(db.DB)
 		vex.Between(store, func() {
 			if _, err := db.DB.NewUpdate().Model((*catalog.Variant)(nil)).
-				Set("name = ?", "bcm").Where("id = ?", variant.ID).Exec(ctx); err != nil {
+				Set(`"name" = ?`, "bcm").Where(`"id" = ?`, variant.ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		})

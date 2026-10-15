@@ -176,9 +176,9 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		// for it rather than assume it cannot happen.
 		if _, err := f.db.DB.NewUpdate().
 			Table("finding").
-			Set("visibility = ?", access.Private).
-			Where("target_id = ?", f.targetID).
-			Where("vulnerability_id = ?", issue).
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"target_id" = ?`, f.targetID).
+			Where(`"vulnerability_id" = ?`, issue).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +214,7 @@ func issueID(t *testing.T, f *fixture, identifier string) int64 {
 	var id int64
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"vulnerability\" AS \"v\"").Column("v.id").
-		Where("v.identifier = ?", identifier).
+		Where(`"v"."identifier" = ?`, identifier).
 		Scan(t.Context(), &id); err != nil {
 		t.Fatalf("%s: %v", identifier, err)
 	}

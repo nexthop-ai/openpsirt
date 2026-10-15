@@ -103,10 +103,10 @@ func (v *Vulnerabilities) writeEstimates(ctx context.Context) error {
 			}
 			on := batch[0].on
 			update := v.db.NewUpdate().Model((*Vulnerability)(nil)).
-				Set("likelihood_ppm = "+byID("likelihood_ppm"), likelihood...).
-				Set("likelihood_percentile_ppm = "+byID("likelihood_percentile_ppm"), percentile...).
-				Set("likelihood_on = ?", on).
-				Where("id IN (?)", bun.List(ids))
+				Set(`"likelihood_ppm" = `+byID("likelihood_ppm"), likelihood...).
+				Set(`"likelihood_percentile_ppm" = `+byID("likelihood_percentile_ppm"), percentile...).
+				Set(`"likelihood_on" = ?`, on).
+				Where(`"id" IN (?)`, bun.List(ids))
 			if _, err := newerEstimate(update, on, byID("likelihood_ppm"), likelihood...).Exec(ctx); err != nil {
 				return fmt.Errorf("record how likely %d issues are: %w", len(batch), err)
 			}
@@ -120,8 +120,8 @@ func (v *Vulnerabilities) writeEstimates(ctx context.Context) error {
 // likelihood is an expression, so a batch can give each issue its own.
 func newerEstimate(update *bun.UpdateQuery, on *time.Time, likelihood string, args ...any) *bun.UpdateQuery {
 	if on != nil {
-		return update.Where("likelihood_ppm IS NULL OR likelihood_on IS NULL OR likelihood_on < ?", *on)
+		return update.Where(`"likelihood_ppm" IS NULL OR "likelihood_on" IS NULL OR "likelihood_on" < ?`, *on)
 	}
-	return update.Where("likelihood_ppm IS NULL OR (likelihood_on IS NULL AND likelihood_ppm <> "+
+	return update.Where(`"likelihood_ppm" IS NULL OR ("likelihood_on" IS NULL AND "likelihood_ppm" <> `+
 		likelihood+")", args...)
 }

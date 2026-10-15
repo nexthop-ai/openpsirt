@@ -27,7 +27,7 @@ func TestABuildWithNoDisplayNamesIsShownByItsNames(t *testing.T) {
 		}
 		for _, table := range []string{"product", "stream", "variant"} {
 			if _, err := f.db.DB.NewUpdate().Table(table).
-				Set("display_name = ?", "").Where("1 = 1").Exec(t.Context()); err != nil {
+				Set(`"display_name" = ?`, "").Where("1 = 1").Exec(t.Context()); err != nil {
 				t.Fatal(err)
 			}
 		}

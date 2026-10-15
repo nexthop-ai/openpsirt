@@ -58,7 +58,7 @@ func wordsDigest(words string) string {
 // "stw". Every reader of a claim's reasoning reads it through this join, in
 // this package and outside it.
 func WordsJoin(alias string) string {
-	return `LEFT JOIN "statement_text" AS "stw" ON stw.id = ` + alias + `.statement_id`
+	return `LEFT JOIN "statement_text" AS "stw" ON "stw"."id" = ` + alias + `.statement_id`
 }
 
 // WordsColumn is the reasoning a row points at, read through WordsJoin, and
@@ -91,7 +91,7 @@ func internWords(ctx context.Context, tx bun.IDB, said []string) (map[string]int
 	for from := 0; from < len(digests); from += database.BatchSize {
 		var rows []Words
 		if err := tx.NewSelect().Model(&rows).Column("id", "words_digest").
-			Where("stw.words_digest IN (?)", bun.List(digests[from:min(from+database.BatchSize, len(digests))])).
+			Where(`"stw"."words_digest" IN (?)`, bun.List(digests[from:min(from+database.BatchSize, len(digests))])).
 			Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read the reasoning already held: %w", err)
 		}

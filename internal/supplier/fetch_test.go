@@ -328,7 +328,7 @@ func (f *ships) reported(t *testing.T, issue, component, version string) int64 {
 	}
 	var id int64
 	if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-		ColumnExpr("f.id").Where("f.target_id = ?", f.target).
+		ColumnExpr(`"f"."id"`).Where(`"f"."target_id" = ?`, f.target).
 		Limit(1).Scan(ctx, &id); err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func passOver(t *testing.T, f *ships, p *publisher, replica string) (*supplier.S
 		t.Fatal(err)
 	}
 	if _, err := f.db.DB.NewUpdate().Model((*supplier.Source)(nil)).
-		Set("caught_up_to = ?", long).Where("id = ?", row.ID).Exec(t.Context()); err != nil {
+		Set(`"caught_up_to" = ?`, long).Where(`"id" = ?`, row.ID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	pass := supplier.NewPass(f.db.DB, quiet(), replica, sbom.Limits{}, outward.Excluded{})
@@ -447,7 +447,7 @@ func TestWhatAPublisherSaysIsFixedDecidesNothingHere(t *testing.T) {
 
 		var after finding.Finding
 		if err := f.db.DB.NewSelect().Model(&after).
-			Where("id = ?", open).Scan(ctx); err != nil {
+			Where(`"id" = ?`, open).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if after.ClosedAt != nil {

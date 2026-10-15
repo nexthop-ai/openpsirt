@@ -52,8 +52,8 @@ func scanned(t *testing.T, fn func(t *testing.T, db *database.DB, s *ingest.Stor
 		// and both have to be reported.
 		file(silent, "stale", 30*24*time.Hour)
 		if _, err := db.DB.NewUpdate().Table("scan").
-			Set("received_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
-			Where("content_hash = ?", "stale").Exec(ctx); err != nil {
+			Set(`"received_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"content_hash" = ?`, "stale").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -203,7 +203,7 @@ func TestAnUploadThatCouldNotBeReadIsNotBeingHeardFrom(t *testing.T) {
 		// The one scan it has could not be read.
 		var id int64
 		if err := db.DB.NewSelect().Table("scan").Column("id").
-			Where("content_hash = ?", "recent").Scan(ctx, &id); err != nil {
+			Where(`"content_hash" = ?`, "recent").Scan(ctx, &id); err != nil {
 			t.Fatal(err)
 		}
 		if err := s.MarkFailed(ctx, id, errors.New("the inventory could not be read")); err != nil {
@@ -368,10 +368,10 @@ func targetOf(t *testing.T, db *database.DB, stream, variant string) int64 {
 	var id int64
 	if err := db.DB.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`tg.id`).
-		Where("st.name = ?", stream).Where("va.name = ?", variant).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		ColumnExpr(`"tg"."id"`).
+		Where(`"st"."name" = ?`, stream).Where(`"va"."name" = ?`, variant).
 		Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)
 	}

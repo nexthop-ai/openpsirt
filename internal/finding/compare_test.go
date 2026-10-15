@@ -319,16 +319,16 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 			{"CVE-2026-VOID", finding.Invalid},
 		} {
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set("closed_because = ?", each.reason).
-				Where("vulnerability_id = ?", f.issueID(t, each.issue)).
-				Where("closed_at IS NOT NULL").
+				Set(`"closed_because" = ?`, each.reason).
+				Where(`"vulnerability_id" = ?`, f.issueID(t, each.issue)).
+				Where(`"closed_at" IS NOT NULL`).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("vulnerability_id = ? OR vulnerability_id = ?",
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ? OR "vulnerability_id" = ?`,
 				f.issueID(t, "CVE-2026-QUIET"), f.issueID(t, "CVE-2026-VOID")).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -429,9 +429,9 @@ func TestAScannerFaultIsNotCountedAsAFix(t *testing.T) {
 			{"CVE-2026-CARRIED", finding.Superseded},
 		} {
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set("closed_because = ?", each.reason).
-				Where("vulnerability_id = ?", f.issueID(t, each.issue)).
-				Where("closed_at IS NOT NULL").
+				Set(`"closed_because" = ?`, each.reason).
+				Where(`"vulnerability_id" = ?`, f.issueID(t, each.issue)).
+				Where(`"closed_at" IS NOT NULL`).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

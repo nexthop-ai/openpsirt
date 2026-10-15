@@ -22,7 +22,7 @@ func (f *fixture) listedOn(t *testing.T, identifier string) *time.Time {
 	t.Helper()
 	var row finding.Vulnerability
 	if err := f.db.DB.NewSelect().Model(&row).
-		Where("id = ?", f.issueID(t, identifier)).Scan(t.Context()); err != nil {
+		Where(`"id" = ?`, f.issueID(t, identifier)).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	return row.ExploitedOn
@@ -33,9 +33,9 @@ func (f *fixture) clockOf(t *testing.T, target int64, identifier string) finding
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id = ?", target).
-		Where("vulnerability_id = ?", f.issueID(t, identifier)).
-		Where("closed_at IS NULL").
+		Where(`"target_id" = ?`, target).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
+		Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}

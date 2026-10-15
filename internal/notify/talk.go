@@ -149,8 +149,8 @@ func (t *Talk) Once(ctx context.Context) (sent, failed int, err error) {
 func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent, failed int, err error) {
 	var destinations []Outbound
 	if err := t.db.NewSelect().Model(&destinations).
-		Where("retired_at IS NULL").Where("platform = ?", chat.Platform()).
-		OrderExpr("id ASC").Scan(ctx); err != nil {
+		Where(`"retired_at" IS NULL`).Where(`"platform" = ?`, chat.Platform()).
+		OrderExpr(`"id" ASC`).Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read which channels there are: %w", err)
 	}
 	type place struct{ channel, topic string }
@@ -179,7 +179,7 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 				ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
 				Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`)
 			q = forChannel(q, to, offered, t.now().Add(-chatHorizon)).
-				OrderExpr("nt.created_at ASC, nt.id ASC").
+				OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
 				Limit(atMostComposed)
 			if err := q.Scan(ctx, &rows); err != nil {
 				return sent, failed, fmt.Errorf("read what a channel has to be told: %w", err)
@@ -239,18 +239,18 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 func forChannel(q *bun.SelectQuery, to Outbound, offered []string,
 	since time.Time) *bun.SelectQuery {
 
-	q = q.Where("nt.kind IN (?)", bun.List(shared())).
-		Where("nt.created_at >= ?", since)
+	q = q.Where(`"nt"."kind" IN (?)`, bun.List(shared())).
+		Where(`"nt"."created_at" >= ?`, since)
 	switch {
 	case to.TeamID != nil:
-		return q.Where("nt.private = ?", false).Where("nt.team_id = ?", *to.TeamID)
+		return q.Where(`"nt"."private" = ?`, false).Where(`"nt"."team_id" = ?`, *to.TeamID)
 	case to.ProductID != nil:
-		return q.Where("nt.private = ?", false).
-			Where("nt.product_id = ?", *to.ProductID).
+		return q.Where(`"nt"."private" = ?`, false).
+			Where(`"nt"."product_id" = ?`, *to.ProductID).
 			Where("NOT EXISTS (?)", covering(q, offered, "narrower.team_id = nt.team_id"))
 	}
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("nt.private = ?", true).
+		return q.Where(`"nt"."private" = ?`, true).
 			WhereOr("NOT EXISTS (?)", covering(q, offered,
 				"narrower.product_id = nt.product_id OR narrower.team_id = nt.team_id"))
 	})
@@ -262,10 +262,10 @@ func covering(q *bun.SelectQuery, offered []string, where string) *bun.SelectQue
 	return q.NewSelect().
 		TableExpr(`"outbound" AS "narrower"`).
 		ColumnExpr("1").
-		Where("narrower.retired_at IS NULL").
-		Where("narrower.platform IN (?)", bun.List(offered)).
+		Where(`"narrower"."retired_at" IS NULL`).
+		Where(`"narrower"."platform" IN (?)`, bun.List(offered)).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("narrower.kind = ?", Everything).WhereOr("narrower.kind = nt.kind")
+			return q.Where(`"narrower"."kind" = ?`, Everything).WhereOr(`"narrower"."kind" = "nt"."kind"`)
 		}).
 		Where("(" + where + ")")
 }
@@ -279,9 +279,9 @@ func (t *Talk) directs(ctx context.Context, chat Chat, offered []string) (sent, 
 		Email    string `bun:"email"`
 	}
 	if err := direct(t.db.NewSelect().Model((*Notification)(nil)), chat.Platform(), offered, since).
-		ColumnExpr("nt.person_id").ColumnExpr(`"pe"."email" AS "email"`).
-		GroupExpr(`nt.person_id, "pe"."email"`).
-		OrderExpr("MIN(nt.created_at) ASC, nt.person_id ASC").
+		ColumnExpr(`"nt"."person_id"`).ColumnExpr(`"pe"."email" AS "email"`).
+		GroupExpr(`"nt"."person_id", "pe"."email"`).
+		OrderExpr(`MIN("nt"."created_at") ASC, "nt"."person_id" ASC`).
 		Limit(peoplePerSweep).
 		Scan(ctx, &people); err != nil {
 		return 0, 0, fmt.Errorf("read who has something to be told in chat: %w", err)
@@ -293,8 +293,8 @@ func (t *Talk) directs(ctx context.Context, chat Chat, offered []string) (sent, 
 			ColumnExpr("nt.*").
 			ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
 			Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`).
-			Where("nt.person_id = ?", person.PersonID).
-			OrderExpr("nt.created_at ASC, nt.id ASC").
+			Where(`"nt"."person_id" = ?`, person.PersonID).
+			OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
 			Limit(atMostComposed).
 			Scan(ctx, &rows); err != nil {
 			return sent, failed, fmt.Errorf("read what somebody has to be told in chat: %w", err)
@@ -357,10 +357,10 @@ func direct(q *bun.SelectQuery, platform string, offered []string,
 
 	return q.
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "nt"."person_id"`).
-		Where("nt.cleared_at IS NULL").
+		Where(`"nt"."cleared_at" IS NULL`).
 		// Read in the application is told already.
-		Where("nt.read_at IS NULL").
-		Where("nt.created_at >= ?", since).
+		Where(`"nt"."read_at" IS NULL`).
+		Where(`"nt"."created_at" >= ?`, since).
 		Where(`"pe"."email" IS NOT NULL AND "pe"."email" <> ?`, "").
 		// Nothing goes to somebody who has left.
 		Where(`"pe"."deactivated_at" IS NULL`).
@@ -370,8 +370,8 @@ func direct(q *bun.SelectQuery, platform string, offered []string,
 			`WHERE "went"."notification_id" = "nt"."id" AND "went"."platform" = ? `+
 			`AND ("went"."sent_at" IS NOT NULL OR "went"."attempts" >= ?))`, platform, tries).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where("nt.kind NOT IN (?)", bun.List(shared())).
-				WhereOr("nt.private = ?", true).
+			return q.Where(`"nt"."kind" NOT IN (?)`, bun.List(shared())).
+				WhereOr(`"nt"."private" = ?`, true).
 				WhereOr(`EXISTS (SELECT 1 FROM "chat_preference" AS "also" `+
 					`WHERE "also"."person_id" = "nt"."person_id" AND "also"."shared" = ?)`, true).
 				WhereOr("NOT EXISTS (?)", covering(q, offered,
@@ -395,9 +395,9 @@ func (t *Talk) claimDirect(ctx context.Context, platform string, id int64) (bool
 	// Tried before and not gone. Another attempt is taken by moving the count,
 	// conditionally, so two replicas reaching it together take it once.
 	res, err := t.db.NewUpdate().Model((*ChatDelivery)(nil)).
-		Set("attempts = attempts + 1").
-		Where("notification_id = ?", id).Where("platform = ?", platform).
-		Where("sent_at IS NULL").Where("attempts < ?", tries).
+		Set(`"attempts" = "attempts" + 1`).
+		Where(`"notification_id" = ?`, id).Where(`"platform" = ?`, platform).
+		Where(`"sent_at" IS NULL`).Where(`"attempts" < ?`, tries).
 		Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("take another attempt at a direct delivery: %w", err)
@@ -416,14 +416,14 @@ func (t *Talk) settleDirect(ctx context.Context, platform string, rows []noting,
 		ids[i] = row.ID
 	}
 	q := t.db.NewUpdate().Model((*ChatDelivery)(nil)).
-		Where("notification_id IN (?)", bun.List(ids)).Where("platform = ?", platform)
+		Where(`"notification_id" IN (?)`, bun.List(ids)).Where(`"platform" = ?`, platform)
 	switch {
 	case sendErr == nil:
-		q = q.Set("sent_at = ?", t.now().UTC().Truncate(time.Microsecond)).Set("failed = ?", "")
+		q = q.Set(`"sent_at" = ?`, t.now().UTC().Truncate(time.Microsecond)).Set(`"failed" = ?`, "")
 	case givenUp:
-		q = q.Set("attempts = ?", tries).Set("failed = ?", trimTo(sendErr.Error(), mostOfAFailure))
+		q = q.Set(`"attempts" = ?`, tries).Set(`"failed" = ?`, trimTo(sendErr.Error(), mostOfAFailure))
 	default:
-		q = q.Set("failed = ?", trimTo(sendErr.Error(), mostOfAFailure))
+		q = q.Set(`"failed" = ?`, trimTo(sendErr.Error(), mostOfAFailure))
 	}
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("record how a direct message went: %w", err)
@@ -462,7 +462,7 @@ func (s *Store) ChatChoicesOf(ctx context.Context, subject access.Subject) (Chat
 	}
 	var rows []ChatPreference
 	if err := s.db.NewSelect().Model(&rows).
-		Where("person_id = ?", subject.ID).Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, subject.ID).Scan(ctx); err != nil {
 		return ChatChoices{}, fmt.Errorf("read what is sent in chat: %w", err)
 	}
 	if len(rows) == 0 {
@@ -488,8 +488,8 @@ func (s *Store) SetChatChoices(ctx context.Context, subject access.Subject, c Ch
 	now := s.now().Truncate(time.Microsecond)
 	change := func() (int64, error) {
 		res, err := s.db.NewUpdate().Model((*ChatPreference)(nil)).
-			Set("direct = ?", c.Direct).Set("shared = ?", c.Shared).Set("updated_at = ?", now).
-			Where("person_id = ?", subject.ID).Exec(ctx)
+			Set(`"direct" = ?`, c.Direct).Set(`"shared" = ?`, c.Shared).Set(`"updated_at" = ?`, now).
+			Where(`"person_id" = ?`, subject.ID).Exec(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("record what is sent in chat: %w", err)
 		}

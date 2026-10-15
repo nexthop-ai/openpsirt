@@ -79,34 +79,34 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// copies away.
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		Where("st.product_id = ?", productID).
-		Where("f.closed_at IS NULL").
-		GroupExpr("f.target_id, f.vulnerability_id, f.component_id")
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."closed_at" IS NULL`).
+		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`)
 	pairs = inOneProduct(pairs, subject, productID, all)
 	inner := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, pairs).
-		Join(`JOIN "target" AS "tg" ON tg.id = grouped.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "grouped"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.kind AS "kind"`).
-		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."kind" AS "kind"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "at"`, inner).
 		ColumnExpr(`at.stream AS "stream"`).
-		ColumnExpr(`at.kind AS "kind"`).
+		ColumnExpr(`"at"."kind" AS "kind"`).
 		ColumnExpr(`at.variant AS "variant"`).
 		ColumnExpr(`at.band AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr("at.stream, at.kind, at.variant, at.band").
+		GroupExpr(`at.stream, "at"."kind", at.variant, at.band`).
 		// Ordered here rather than in the caller, so every reader of this gets
 		// the same sequence. A chart whose points move between requests is
 		// worse than one that is wrong in a fixed way.
@@ -131,15 +131,15 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	}
 	builds := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.kind AS "kind"`).
-		ColumnExpr(`va.name AS "variant"`).
-		Where("st.product_id = ?", productID).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."kind" AS "kind"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		Where(`"st"."product_id" = ?`, productID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE sr.target_id = tg.id AND sr.finished_at IS NOT NULL)`).
-		OrderExpr("st.name, va.name")
+			WHERE "sr"."target_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+		OrderExpr(`"st"."name", "va"."name"`)
 	if err := builds.Scan(ctx, &scanned); err != nil {
 		return nil, fmt.Errorf("read which builds have been scanned: %w", err)
 	}
@@ -200,8 +200,8 @@ func (s *Store) LatestRun(ctx context.Context, subject access.Subject,
 	}
 	var runs []Run
 	err = s.db.NewSelect().Model(&runs).
-		Where("target_id = ?", targetID).
-		Where("finished_at IS NOT NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"finished_at" IS NOT NULL`).
 		Order("id DESC").
 		Limit(1).
 		Scan(ctx)
@@ -242,18 +242,18 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	err = s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`c.name AS "name"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
 		// Matched as the component lookup matches a typed name: on the
 		// fold, with the producer's own spelling naming the one spelled so.
-		Where("c.name_folded = ?", graph.Folded(name)).
-		Where("f.visibility IN (?)", bun.List(visible)).
-		OrderExpr("c.version, c.purl, c.name").
+		Where(`"c"."name_folded" = ?`, graph.Folded(name)).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		OrderExpr(`"c"."version", "c"."purl", "c"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which versions carry this issue: %w", err)

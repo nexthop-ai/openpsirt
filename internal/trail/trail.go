@@ -382,10 +382,10 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if !over.Since.IsZero() {
-			q = q.Where("at >= ?", over.Since)
+			q = q.Where(`"at" >= ?`, over.Since)
 		}
 		if !over.Until.IsZero() {
-			q = q.Where("at < ?", over.Until)
+			q = q.Where(`"at" < ?`, over.Until)
 		}
 		return q
 	}
@@ -416,8 +416,8 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			prefix := OnProduct(name, "")
-			return q.Where("about = ?", name).
-				WhereOr(`(about LIKE ?`+database.LikeClause+` AND SUBSTR(about, 1, ?) = ?)`,
+			return q.Where(`"about" = ?`, name).
+				WhereOr(`("about" LIKE ?`+database.LikeClause+` AND SUBSTR("about", 1, ?) = ?)`,
 					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
 		})
 	}
@@ -439,7 +439,7 @@ func (s *Store) page(ctx context.Context, by access.Subject, kind Kind,
 	limit = database.AList.Of(limit)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if kind != "" {
-			q = q.Where("kind = ?", kind)
+			q = q.Where(`"kind" = ?`, kind)
 		}
 		return narrowing(q)
 	}

@@ -475,9 +475,9 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 
 		var open []Notification
 		if err := tx.NewSelect().Model(&open).
-			Where("person_id = ?", personID).
-			Where("kind = ?", kind).
-			Where("cleared_at IS NULL").
+			Where(`"person_id" = ?`, personID).
+			Where(`"kind" = ?`, kind).
+			Where(`"cleared_at" IS NULL`).
 			Scan(ctx); err != nil {
 			return fmt.Errorf("read what is already being said: %w", err)
 		}
@@ -723,9 +723,9 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 	limit = database.AList.Of(limit)
 
 	mine := func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where("person_id = ?", subject.ID).
-			Where("read_at IS NULL").
-			Where("cleared_at IS NULL")
+		q = q.Where(`"person_id" = ?`, subject.ID).
+			Where(`"read_at" IS NULL`).
+			Where(`"cleared_at" IS NULL`)
 		return readable(q, subject)
 	}
 
@@ -796,9 +796,9 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 		}
 	}
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		q = q.Where("private = ?", false)
+		q = q.Where(`"private" = ?`, false)
 		if len(private) > 0 {
-			q = q.WhereOr("product_id IN (?)", bun.List(private))
+			q = q.WhereOr(`"product_id" IN (?)`, bun.List(private))
 		}
 		return onCases(q, subject)
 	})
@@ -814,7 +814,7 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	for _, product := range subject.CaseProducts() {
 		for _, issue := range subject.Cases(product) {
-			q = q.WhereOr("(product_id = ? AND "+finding.FiledUnder(filed.Issue)+")", product, issue)
+			q = q.WhereOr(`("product_id" = ? AND `+finding.FiledUnder(filed.Issue)+")", product, issue)
 		}
 	}
 	return q
@@ -843,10 +843,10 @@ func inHeldProducts(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery
 	return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where("1 = 0")
 		if len(products) > 0 {
-			q = q.WhereOr("(private = ? AND product_id IN (?))", false, bun.List(products))
+			q = q.WhereOr(`("private" = ? AND "product_id" IN (?))`, false, bun.List(products))
 		}
 		if len(private) > 0 {
-			q = q.WhereOr("(private = ? AND product_id IN (?))", true, bun.List(private))
+			q = q.WhereOr(`("private" = ? AND "product_id" IN (?))`, true, bun.List(private))
 		}
 		return onCases(q, subject)
 	})
@@ -887,7 +887,7 @@ func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int
 	limit = database.AList.Of(limit)
 
 	theirs := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return inHeldProducts(q.Where("person_id = ?", personID), subject)
+		return inHeldProducts(q.Where(`"person_id" = ?`, personID), subject)
 	}
 	total, err := theirs(s.db.NewSelect().Model((*Notification)(nil))).Count(ctx)
 	if err != nil {
@@ -911,9 +911,9 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject, id int6
 		return access.Denied("acknowledge a notification")
 	}
 	res, err := s.db.NewUpdate().Model((*Notification)(nil)).
-		Set("read_at = ?", s.now()).
-		Where("id = ?", id).
-		Where("person_id = ?", subject.ID).
+		Set(`"read_at" = ?`, s.now()).
+		Where(`"id" = ?`, id).
+		Where(`"person_id" = ?`, subject.ID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("acknowledge: %w", err)
@@ -945,10 +945,10 @@ func (s *Store) AcknowledgeAll(ctx context.Context, subject access.Subject) (int
 		return 0, access.Denied("acknowledge notifications")
 	}
 	res, err := s.db.NewUpdate().Model((*Notification)(nil)).
-		Set("read_at = ?", s.now()).
-		Where("person_id = ?", subject.ID).
-		Where("read_at IS NULL").
-		Where("cleared_at IS NULL").
+		Set(`"read_at" = ?`, s.now()).
+		Where(`"person_id" = ?`, subject.ID).
+		Where(`"read_at" IS NULL`).
+		Where(`"cleared_at" IS NULL`).
 		Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("acknowledge everything: %w", err)

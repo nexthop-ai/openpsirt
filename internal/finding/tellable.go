@@ -126,12 +126,12 @@ func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 			// holds the findings where a merge absorbed it.
 			q := db.NewSelect().
 				TableExpr(`"vulnerability" AS "tv"`).
-				Join(`JOIN "finding" AS "f" ON f.vulnerability_id = tv.issue_id`).
-				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				ColumnExpr("DISTINCT tv.id").
-				Where("tv.id IN (?)", bun.List(batch)).
-				Where("st.product_id = ?", productID)
+				Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "tv"."issue_id"`).
+				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				ColumnExpr(`DISTINCT "tv"."id"`).
+				Where(`"tv"."id" IN (?)`, bun.List(batch)).
+				Where(`"st"."product_id" = ?`, productID)
 			if narrowed {
 				q = onlyReadable(q, subject, products, all)
 			}

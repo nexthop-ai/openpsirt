@@ -79,11 +79,11 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			// effect at once ends the embargo whatever is waiting, and what
 			// was waiting leaves the queue with nothing left to disclose.
 			waiting, err := tx.NewSelect().Model((*Movement)(nil)).
-				Where("product_id = ?", productID).
+				Where(`"product_id" = ?`, productID).
 				Where(FiledUnder(filed.Issue), vulnerabilityID).
-				Where("act = ?", Disclosure).
-				Where("needs_approval = ?", true).
-				Where("approved_at IS NULL").
+				Where(`"act" = ?`, Disclosure).
+				Where(`"needs_approval" = ?`, true).
+				Where(`"approved_at" IS NULL`).
 				Exists(ctx)
 			if err != nil {
 				return fmt.Errorf("read whether a disclosure is waiting: %w", err)
@@ -118,7 +118,7 @@ func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID 
 		TableExpr(`"finding" AS "f"`).
 		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
-		Where("f.visibility = ?", access.Private).
+		Where(`"f"."visibility" = ?`, access.Private).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether this issue is undisclosed: %w", err)
@@ -143,9 +143,9 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(access.PrivateCountAs("f.visibility", "places")).
-		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "public"`, access.Public).
-		ColumnExpr(`COALESCE(MAX(CASE WHEN f.visibility = ? AND f.closed_at IS NULL THEN f.disclose_at END), `+
-			`MAX(CASE WHEN f.visibility = ? THEN f.disclose_at END)) AS "ends"`,
+		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" = ? THEN 1 END) AS "public"`, access.Public).
+		ColumnExpr(`COALESCE(MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END), `+
+			`MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END)) AS "ends"`,
 			access.Private, access.Private).
 		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
@@ -176,10 +176,10 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 // ended. The movement just recorded keeps where it stood.
 func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) error {
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
-		Set("visibility = ?", access.Public).
-		Set("disclose_at = NULL").
+		Set(`"visibility" = ?`, access.Public).
+		Set(`"disclose_at" = NULL`).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
-		Where("visibility = ?", access.Private).
+		Where(`"visibility" = ?`, access.Private).
 		Where(inThisProduct, productID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("disclose the findings: %w", err)
@@ -219,21 +219,21 @@ func (s *Store) ToTell(ctx context.Context, subject access.Subject,
 	out := &Audience{}
 	err := s.db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = ?`, vulnerabilityID).
-		ColumnExpr("p.name").
-		ColumnExpr("v.identifier").
-		Where("p.id = ?", productID).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = ?`, vulnerabilityID).
+		ColumnExpr(`"p"."name"`).
+		ColumnExpr(`"v"."identifier"`).
+		Where(`"p"."id" = ?`, productID).
 		Scan(ctx, &out.Product, &out.Vulnerability)
 	if err != nil {
 		return nil, fmt.Errorf("read what was disclosed: %w", err)
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "person" AS "ps" ON ps.party_id = f.assigned_to`).
-		ColumnExpr("DISTINCT ps.id").
+		Join(`JOIN "person" AS "ps" ON "ps"."party_id" = "f"."assigned_to"`).
+		ColumnExpr(`DISTINCT "ps"."id"`).
 		Where(HeldAs("f.vulnerability_id"), vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
-		OrderExpr("ps.id").
+		OrderExpr(`"ps"."id"`).
 		Scan(ctx, &out.People)
 	if err != nil {
 		return nil, fmt.Errorf("read who holds this issue: %w", err)

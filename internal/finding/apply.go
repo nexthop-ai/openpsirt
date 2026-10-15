@@ -63,8 +63,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		// everything downstream assumes one. An ordinary row update is a lock
 		// every engine honors, so the second worker waits instead of racing.
 		if _, err := tx.NewUpdate().Table("target").
-			Set("last_run_id = ?", runID).
-			Where("id = ?", targetID).Exec(ctx); err != nil {
+			Set(`"last_run_id" = ?`, runID).
+			Where(`"id" = ?`, targetID).Exec(ctx); err != nil {
 			return fmt.Errorf("take the target: %w", err)
 		}
 
@@ -249,8 +249,8 @@ func (s *Store) readRun(ctx context.Context, tx bun.IDB, targetID, runID int64,
 	}
 	if err := tx.NewSelect().
 		TableExpr(`"scan_run" AS "r"`).
-		ColumnExpr("r.started_at").
-		Where("r.id = ?", runID).
+		ColumnExpr(`"r"."started_at"`).
+		Where(`"r"."id" = ?`, runID).
 		Scan(ctx, &run.startedAt); err != nil {
 		return nil, fmt.Errorf("read when this run started: %w", err)
 	}
@@ -454,9 +454,9 @@ func heldOpen(ctx context.Context, tx bun.IDB, targetID int64) (map[key]heldFind
 
 	var open []heldFinding
 	if err := tx.NewSelect().Model(&open).
-		Where("target_id = ?", targetID).
-		Where("kind = ?", Vulnerable).
-		Where("closed_at IS NULL").Scan(ctx); err != nil {
+		Where(`"target_id" = ?`, targetID).
+		Where(`"kind" = ?`, Vulnerable).
+		Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("read what is already open: %w", err)
 	}
 	held := make(map[key]heldFinding, len(open))
@@ -731,7 +731,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 		set:    func(*Finding, int64) {},
 		same:   func(was Finding, claimID int64) bool { return equalRef(was.SuppressedBy, &claimID) },
 		repoint: func(q *bun.UpdateQuery, claimID int64) *bun.UpdateQuery {
-			return q.Set("suppressed_by = ?", claimID).Set("claimed_by = ?", claimID)
+			return q.Set(`"suppressed_by" = ?`, claimID).Set(`"claimed_by" = ?`, claimID)
 		},
 		recording:  "record %d patched findings",
 		repointing: "point %d patched findings at their claim",
@@ -750,7 +750,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 		set:    func(f *Finding, lines string) { f.UnaffectedBy = lines },
 		same:   func(was Finding, lines string) bool { return was.UnaffectedBy == lines },
 		repoint: func(q *bun.UpdateQuery, lines string) *bun.UpdateQuery {
-			return q.Set("unaffected_by = ?", lines)
+			return q.Set(`"unaffected_by" = ?`, lines)
 		},
 		recording:  "record %d findings their records state are unaffected",
 		repointing: "point %d unaffected findings at their record's lines",
@@ -771,7 +771,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 			return was.StatedBy != nil && *was.StatedBy == statement
 		},
 		repoint: func(q *bun.UpdateQuery, statement int64) *bun.UpdateQuery {
-			return q.Set("stated_by = ?", statement)
+			return q.Set(`"stated_by" = ?`, statement)
 		},
 		recording:  "record %d findings their suppliers state are not affected",
 		repointing: "point %d disclaimed findings at their statement",
@@ -818,7 +818,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for key, ids := range byReason {
 		n, err := closeIDs(ctx, tx, ids, run.startedAt, run.runID, key.Reason,
 			func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Set("stated_by = NULL").Set("moved_to = ?", key.MovedTo)
+				return q.Set(`"stated_by" = NULL`).Set(`"moved_to" = ?`, key.MovedTo)
 			})
 		if err != nil {
 			return wrote, fmt.Errorf("close %d findings: %w", len(ids), err)
@@ -831,7 +831,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for lines, ids := range plan.clearing {
 		n, err := closeIDs(ctx, tx, ids, run.startedAt, run.runID, Unaffected,
 			func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Set("stated_by = NULL").Set("moved_to = ?", "").Set("unaffected_by = ?", lines)
+				return q.Set(`"stated_by" = NULL`).Set(`"moved_to" = ?`, "").Set(`"unaffected_by" = ?`, lines)
 			})
 		if err != nil {
 			return wrote, fmt.Errorf("close %d findings their records state are unaffected: %w", len(ids), err)
@@ -842,7 +842,7 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for statement, ids := range plan.disclaiming {
 		n, err := closeIDs(ctx, tx, ids, run.startedAt, run.runID, Disclaimed,
 			func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Set("moved_to = ?", "").Set("stated_by = ?", statement)
+				return q.Set(`"moved_to" = ?`, "").Set(`"stated_by" = ?`, statement)
 			})
 		if err != nil {
 			return wrote, fmt.Errorf("close %d findings their suppliers state are not affected: %w", len(ids), err)
@@ -853,8 +853,8 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	for claimID, ids := range plan.patching {
 		n, err := closeIDs(ctx, tx, ids, run.startedAt, run.runID, Patched,
 			func(q *bun.UpdateQuery) *bun.UpdateQuery {
-				return q.Set("stated_by = NULL").Set("moved_to = ?", "").
-					Set("suppressed_by = ?", claimID).Set("claimed_by = ?", claimID)
+				return q.Set(`"stated_by" = NULL`).Set(`"moved_to" = ?`, "").
+					Set(`"suppressed_by" = ?`, claimID).Set(`"claimed_by" = ?`, claimID)
 			})
 		if err != nil {
 			return wrote, fmt.Errorf("close %d patched findings: %w", len(ids), err)
@@ -920,7 +920,7 @@ func recordArrived[By comparable](ctx context.Context, tx bun.IDB, keys []key,
 	for by, ids := range repointing {
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := as.repoint(tx.NewUpdate().Model((*Finding)(nil)), by).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
@@ -947,10 +947,10 @@ func closeIDs(ctx context.Context, tx bun.IDB, ids []int64, startedAt time.Time,
 	matched := 0
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		res, err := rest(tx.NewUpdate().Model((*Finding)(nil)).
-			Set("closed_at = ?", startedAt).
-			Set("closed_run_id = ?", runID).
-			Set("closed_because = ?", reason)).
-			Where("id IN (?)", bun.List(batch)).Exec(ctx)
+			Set(`"closed_at" = ?`, startedAt).
+			Set(`"closed_run_id" = ?`, runID).
+			Set(`"closed_because" = ?`, reason)).
+			Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -985,11 +985,11 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		latest := func(grouping string) *bun.SelectQuery {
 			return db.NewSelect().
 				TableExpr(`"finding" AS "lf"`).
-				ColumnExpr("MAX(lf.id)").
-				Where("lf.target_id = ?", targetID).
-				Where("lf.kind = ?", Vulnerable).
-				Where("lf.closed_at IS NOT NULL").
-				Where("lf.vulnerability_id IN (?)", bun.List(batch)).
+				ColumnExpr(`MAX("lf"."id")`).
+				Where(`"lf"."target_id" = ?`, targetID).
+				Where(`"lf"."kind" = ?`, Vulnerable).
+				Where(`"lf"."closed_at" IS NOT NULL`).
+				Where(`"lf"."vulnerability_id" IN (?)`, bun.List(batch)).
 				GroupExpr(grouping)
 		}
 		var rows []Finding
@@ -999,17 +999,17 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			// The range again outside the two arms: a membership test under OR
 			// is never a semi-join on PostgreSQL or MySQL, so without it the
 			// read walks every finding in the deployment.
-			Where("target_id = ?", targetID).
-			Where("kind = ?", Vulnerable).
-			Where("closed_at IS NOT NULL").
-			Where("vulnerability_id IN (?)", bun.List(batch)).
+			Where(`"target_id" = ?`, targetID).
+			Where(`"kind" = ?`, Vulnerable).
+			Where(`"closed_at" IS NOT NULL`).
+			Where(`"vulnerability_id" IN (?)`, bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
-					WhereOr("id IN (?)", latest("lf.vulnerability_id, lf.component_id, lf.consumer_id")).
-					WhereOr("id IN (?)", latest("lf.vulnerability_id, lf.place_identity"))
+					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
+					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."place_identity"`))
 			}).
 			// Ascending, so the last row read at a place is its latest.
-			OrderExpr("id ASC").
+			OrderExpr(`"id" ASC`).
 			Scan(ctx)
 		if err != nil {
 			return err
@@ -1155,15 +1155,15 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			// on the issue, because the record belongs to one product and the
 			// issue is shared by all of them.
 			Join(standingExploitationHere, productID).
-			ColumnExpr(`v.id AS "id"`).
-			ColumnExpr(`COALESCE(v.severity, ?) AS "published"`, "").
-			ColumnExpr(`COALESCE(ir.severity, ?) AS "assessed"`, "").
-			ColumnExpr(`v.exploited AS "exploited"`).
-			ColumnExpr(`CASE WHEN eh.id IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
-			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-			ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
-			ColumnExpr(`v.exploited_on AS "exploited_on"`).
-			Where("v.id IN (?)", bun.List(batch)).
+			ColumnExpr(`"v"."id" AS "id"`).
+			ColumnExpr(`COALESCE("v"."severity", ?) AS "published"`, "").
+			ColumnExpr(`COALESCE("ir"."severity", ?) AS "assessed"`, "").
+			ColumnExpr(`"v"."exploited" AS "exploited"`).
+			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
+			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+			ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
+			ColumnExpr(`"v"."exploited_on" AS "exploited_on"`).
+			Where(`"v"."id" IN (?)`, bun.List(batch)).
 			Scan(ctx, &found)
 		rows = append(rows, found...)
 		return err
@@ -1236,9 +1236,9 @@ func shippedToCustomers(ctx context.Context, tx bun.IDB, targetID int64) (bool, 
 	var shipped bool
 	err := tx.NewSelect().
 		TableExpr(`"target" AS "t"`).
-		Join(`JOIN "variant" AS "v" ON v.id = t.variant_id`).
+		Join(`JOIN "variant" AS "v" ON "v"."id" = "t"."variant_id"`).
 		Column("v.customer_facing").
-		Where("t.id = ?", targetID).
+		Where(`"t"."id" = ?`, targetID).
 		Scan(ctx, &shipped)
 	if err != nil {
 		return false, fmt.Errorf("read whether this build reaches customers: %w", err)

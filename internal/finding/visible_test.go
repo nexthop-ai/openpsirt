@@ -44,12 +44,12 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 		// subquery of its own statement.
 		var hidden int64
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr("MIN(id)").Scan(t.Context(), &hidden); err != nil {
+			ColumnExpr(`MIN("id")`).Scan(t.Context(), &hidden); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("id = ?", hidden).Exec(t.Context()); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"id" = ?`, hidden).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -126,8 +126,8 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 		// places, and hiding one leaves it visible through another, which is
 		// correct and is what this counts.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("vulnerability_id = ?", f.issueID(t, "CVE-2026-1")).
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-1")).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

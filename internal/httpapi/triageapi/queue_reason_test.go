@@ -52,8 +52,8 @@ func TestAMissedFixDateFileSaysWhichDateWasMissed(t *testing.T) {
 		}
 		missed := time.Now().UTC().AddDate(0, 0, -3).Truncate(24 * time.Hour)
 		if _, err := r.DB.DB.NewUpdate().Table("claim").
-			Set("committed_to = ?", missed).
-			Where("outcome = ?", "patch-needed").Exec(t.Context()); err != nil {
+			Set(`"committed_to" = ?`, missed).
+			Where(`"outcome" = ?`, "patch-needed").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 

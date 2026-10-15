@@ -63,11 +63,11 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 
 	mine := func() *bun.SelectQuery {
 		q := s.yoursToReaffirm(subject).
-			ColumnExpr(`de.claim_id AS "claim_id"`).
-			ColumnExpr(`MAX(de.id) AS "newest"`).
-			GroupExpr("de.claim_id")
+			ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+			ColumnExpr(`MAX("de"."id") AS "newest"`).
+			GroupExpr(`"de"."claim_id"`)
 		if productID > 0 {
-			q = q.Where("de.product_id = ?", productID)
+			q = q.Where(`"de"."product_id" = ?`, productID)
 		}
 		return q
 	}
@@ -81,9 +81,9 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 
 	var latest []int64
 	if err := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("de.id").
-		Where("de.claim_id IN (?)", bun.List(page.Order)).
-		Where("de.state = ?", LapsedState)).
+		ColumnExpr(`"de"."id"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(page.Order)).
+		Where(`"de"."state" = ?`, LapsedState)).
 		Scan(ctx, &latest); err != nil {
 		return nil, 0, fmt.Errorf("read what is yours to re-affirm: %w", err)
 	}
@@ -180,13 +180,13 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
 	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Where("cl.proposed_by = ?", subject.ID).
-		Where("de.state = ?", LapsedState)).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dw" WHERE dw.claim_id = de.claim_id`+
-			` AND dw.state = ?)`, Withdrawn).
-		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dn" WHERE dn.claim_id = de.claim_id`+
-			` AND dn.state = ? AND `+outOfReach+`)`,
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Where(`"cl"."proposed_by" = ?`, subject.ID).
+		Where(`"de"."state" = ?`, LapsedState)).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dw" WHERE "dw"."claim_id" = "de"."claim_id"`+
+			` AND "dw"."state" = ?)`, Withdrawn).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dn" WHERE "dn"."claim_id" = "de"."claim_id"`+
+			` AND "dn"."state" = ? AND `+outOfReach+`)`,
 			append([]any{LapsedState}, reachArgs...)...)
 	return decidableBy(q, subject, "de")
 }
@@ -197,7 +197,7 @@ func (s *Store) Reaffirmable(ctx context.Context, subject access.Subject, claimI
 	if subject.Kind != access.Person {
 		return false, nil
 	}
-	found, err := s.yoursToReaffirm(subject).Where("de.claim_id = ?", claimID).Exists(ctx)
+	found, err := s.yoursToReaffirm(subject).Where(`"de"."claim_id" = ?`, claimID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether this is yours to re-affirm: %w", err)
 	}
@@ -217,14 +217,14 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 	}
 	var still []int64
 	if err := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("de.id").
-		Where("de.id IN (?)", bun.List(ids)).
+		ColumnExpr(`"de"."id"`).
+		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "f"`+
-			` JOIN "component" AS "c" ON c.id = f.component_id`+
-			` LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`+
-			` JOIN "target" AS "tg" ON tg.id = f.target_id`+
-			` JOIN "stream" AS "st" ON st.id = tg.stream_id`+
-			` WHERE st.product_id = de.product_id AND f.closed_at IS NULL`+
+			` JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`+
+			` LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`+
+			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
+			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
+			` WHERE "st"."product_id" = "de"."product_id" AND "f"."closed_at" IS NULL`+
 			` AND `+finding.DecisionFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`).
 		Scan(ctx, &still); err != nil {
 		return nil, fmt.Errorf("read which of these the code moved under: %w", err)

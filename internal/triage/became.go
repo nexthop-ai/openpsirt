@@ -114,10 +114,10 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 	// of claims and the count counts claims.
 	mine := func() *bun.SelectQuery {
 		q := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr(`de.claim_id AS "claim_id"`).
-			ColumnExpr(`MAX(de.id) AS "newest"`).
-			Where("de.proposed_by = ?", subject.ID).
-			GroupExpr("de.claim_id")
+			ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+			ColumnExpr(`MAX("de"."id") AS "newest"`).
+			Where(`"de"."proposed_by" = ?`, subject.ID).
+			GroupExpr(`"de"."claim_id"`)
 		return readableBy(q, subject, "de")
 	}
 
@@ -132,7 +132,7 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 
 	var agreements []Approval
 	if err := s.db.NewSelect().Model(&agreements).
-		Where("claim_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"claim_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read what was agreed to: %w", err)
 	}
 	agreed := map[int64][]Approval{}

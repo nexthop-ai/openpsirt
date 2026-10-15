@@ -427,9 +427,9 @@ func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, 
 	var rows []stale
 	err := r.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		Where("c.purl <> ''").
+		ColumnExpr(`"c"."id" AS "id"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		Where(`"c"."purl" <> ''`).
 		Where(carried).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return askableExcept(q, failing)
@@ -438,14 +438,14 @@ func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, 
 		// on whether we got an answer. A version we have goes stale in a day;
 		// a package the index has never heard of is left for a month.
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("c.latest_checked_at IS NULL").
-				WhereOr("c.latest_version IS NOT NULL AND c.latest_checked_at < ?",
+			return q.WhereOr(`"c"."latest_checked_at" IS NULL`).
+				WhereOr(`"c"."latest_version" IS NOT NULL AND "c"."latest_checked_at" < ?`,
 					r.Now().Add(-StaleAfter).UTC()).
-				WhereOr("c.latest_version IS NULL AND c.latest_checked_at < ?",
+				WhereOr(`"c"."latest_version" IS NULL AND "c"."latest_checked_at" < ?`,
 					r.Now().Add(-UnknownAfter).UTC())
 		}).
-		OrderExpr("c.latest_checked_at IS NULL DESC").
-		OrderExpr("c.latest_checked_at ASC").
+		OrderExpr(`"c"."latest_checked_at" IS NULL DESC`).
+		OrderExpr(`"c"."latest_checked_at" ASC`).
 		Limit(MostPerPass).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -485,7 +485,7 @@ func askableExcept(q *bun.SelectQuery, except map[string]bool) *bun.SelectQuery 
 		if except[each] {
 			continue
 		}
-		q = q.WhereOr("LOWER(c.purl) LIKE ?"+database.LikeClause,
+		q = q.WhereOr(`LOWER("c"."purl") LIKE ?`+database.LikeClause,
 			"pkg:"+database.LikeEscaped(each)+"/%")
 		some = true
 	}
@@ -505,8 +505,8 @@ func askableExcept(q *bun.SelectQuery, except map[string]bool) *bun.SelectQuery 
 func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	q := r.db.NewUpdate().
 		Table("component").
-		Set("latest_checked_at = ?", r.Now().UTC()).
-		Where("id = ?", id)
+		Set(`"latest_checked_at" = ?`, r.Now().UTC()).
+		Where(`"id" = ?`, id)
 	if latest.Version == "" {
 		// An empty answer records that we asked and leaves any previous answer
 		// alone. Overwriting it would let one 404 — which npm and crates.io
@@ -529,10 +529,10 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	// summary at all, so a package with a version and no summary is the
 	// ordinary case rather than a half-written row.
 	if summary := clip(latest.Summary, MostSummary); summary != "" {
-		q = q.Set("summary = ?", summary)
+		q = q.Set(`"summary" = ?`, summary)
 	}
 	if project := addressable(latest.Project); project != "" {
-		q = q.Set("project_url = ?", project)
+		q = q.Set(`"project_url" = ?`, project)
 	}
 	if latest.Released.IsZero() {
 		// A version with no date keeps the date it had while the version has
@@ -541,12 +541,12 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		// is still the release date of that version. Placed before the version
 		// is assigned, because two engines apply assignments in order and
 		// would otherwise compare against the new version.
-		q = q.Set("latest_released_at = CASE WHEN latest_version = ? "+
-			"THEN latest_released_at ELSE NULL END", latest.Version)
+		q = q.Set(`"latest_released_at" = CASE WHEN "latest_version" = ? `+
+			`THEN "latest_released_at" ELSE NULL END`, latest.Version)
 	} else {
-		q = q.Set("latest_released_at = ?", latest.Released.UTC())
+		q = q.Set(`"latest_released_at" = ?`, latest.Released.UTC())
 	}
-	q = q.Set("latest_version = ?", latest.Version)
+	q = q.Set(`"latest_version" = ?`, latest.Version)
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("record what upstream has released: %w", err)
 	}
@@ -567,12 +567,12 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 func (r *Refresher) forget(ctx context.Context, id int64) error {
 	_, err := r.db.NewUpdate().
 		Table("component").
-		Set("latest_checked_at = ?", r.Now().UTC()).
-		Set("latest_version = NULL").
-		Set("latest_released_at = NULL").
-		Set("summary = NULL").
-		Set("project_url = NULL").
-		Where("id = ?", id).
+		Set(`"latest_checked_at" = ?`, r.Now().UTC()).
+		Set(`"latest_version" = NULL`).
+		Set(`"latest_released_at" = NULL`).
+		Set(`"summary" = NULL`).
+		Set(`"project_url" = NULL`).
+		Where(`"id" = ?`, id).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("drop what an index said about a name of ours: %w", err)

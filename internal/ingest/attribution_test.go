@@ -121,11 +121,11 @@ func quietTarget(t *testing.T, s *ingest.Store, productID int64) int64 {
 	t.Helper()
 	var id int64
 	if err := s.DB().NewSelect().TableExpr("\"target\" AS \"tg\"").
-		Join("JOIN \"stream\" AS \"st\" ON st.id = tg.stream_id").
-		Join("JOIN \"variant\" AS \"v\" ON v.id = tg.variant_id").
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "v" ON "v"."id" = "tg"."variant_id"`).
 		Column("tg.id").
-		Where("st.product_id = ?", productID).
-		Where("v.name = ?", "mellanox").
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"v"."name" = ?`, "mellanox").
 		Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func file(t *testing.T, s *ingest.Store, target int64, hash string, at time.Time
 		t.Fatal(err)
 	}
 	if _, err := s.DB().NewUpdate().Model((*ingest.Scan)(nil)).
-		Set("received_at = ?", at).Where("id = ?", scan.ID).Exec(ctx); err != nil {
+		Set(`"received_at" = ?`, at).Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// The upload endpoint enqueues the read in the same transaction as the
@@ -287,7 +287,7 @@ func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
 			"arrived-first":  now.Add(-3 * time.Hour),
 		} {
 			if _, err := s.DB().NewUpdate().Model((*ingest.Scan)(nil)).
-				Set("received_at = ?", at).Where("content_hash = ?", hash).
+				Set(`"received_at" = ?`, at).Where(`"content_hash" = ?`, hash).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -364,7 +364,7 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 		target := quietTarget(t, s, ours)
 		var variant int64
 		if err := s.DB().NewSelect().TableExpr(`"target"`).Column("variant_id").
-			Where("id = ?", target).Scan(ctx, &variant); err != nil {
+			Where(`"id" = ?`, target).Scan(ctx, &variant); err != nil {
 			t.Fatal(err)
 		}
 		now := time.Now().UTC()
@@ -433,13 +433,13 @@ func TestARetriedReadThatDiedReadsAsFailedWhenNothingMarkedTheScan(t *testing.T)
 			}
 			var scanID int64
 			if err := s.DB().NewSelect().Model((*ingest.Scan)(nil)).Column("id").
-				Where("content_hash = ?", each.hash).Scan(ctx, &scanID); err != nil {
+				Where(`"content_hash" = ?`, each.hash).Scan(ctx, &scanID); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := s.DB().NewUpdate().Model((*queue.Job)(nil)).
-				Set("state = ?", queue.Dead).
-				Set("last_error = ?", lastError).
-				Where("reference = ?", strconv.FormatInt(scanID, 10)).
+				Set(`"state" = ?`, queue.Dead).
+				Set(`"last_error" = ?`, lastError).
+				Where(`"reference" = ?`, strconv.FormatInt(scanID, 10)).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -491,15 +491,15 @@ func TestARunIsNotAttributedToAnUploadThatFailedOrIsUnread(t *testing.T) {
 		var failed, reading int64
 		for hash, id := range map[string]*int64{"failed": &failed, "reading": &reading} {
 			if err := s.DB().NewSelect().Model((*ingest.Scan)(nil)).Column("id").
-				Where("content_hash = ?", hash).Scan(ctx, id); err != nil {
+				Where(`"content_hash" = ?`, hash).Scan(ctx, id); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if err := s.MarkFailed(ctx, failed, errors.New("unreadable")); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.DB().NewUpdate().TableExpr(`"job"`).Set("state = ?", queue.Pending).
-			Where("reference = ?", strconv.FormatInt(reading, 10)).Exec(ctx); err != nil {
+		if _, err := s.DB().NewUpdate().TableExpr(`"job"`).Set(`"state" = ?`, queue.Pending).
+			Where(`"reference" = ?`, strconv.FormatInt(reading, 10)).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

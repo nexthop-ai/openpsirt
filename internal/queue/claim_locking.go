@@ -43,11 +43,11 @@ func claimableID(ctx context.Context, tx bun.Tx, engine database.Engine, locking
 	// the count the claim itself incremented — and without the ceiling here,
 	// a job whose worker is killed every time is reclaimed for ever and the
 	// state that says so is never reached.
-	const base = `SELECT id FROM "job"
-		 WHERE kind = ?
-		   AND ((state = ? AND run_after <= ?)
-		    OR  (state = ? AND claimed_at < ? AND attempts < max_attempts))
-		 ORDER BY id
+	const base = `SELECT "id" FROM "job"
+		 WHERE "kind" = ?
+		   AND (("state" = ? AND "run_after" <= ?)
+		    OR  ("state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"))
+		 ORDER BY "id"
 		 LIMIT 1`
 
 	query := base

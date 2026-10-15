@@ -58,12 +58,12 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 			ClosedRunID   *int64  `bun:"closed_run_id"`
 		}
 		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS \"f\"").
-			ColumnExpr("f.closed_at AS \"closed_at\"").
-			ColumnExpr("f.closed_by AS \"closed_by\"").
-			ColumnExpr("COALESCE(f.closed_note, '') AS \"closed_note\"").
-			ColumnExpr("COALESCE(f.closed_because, '') AS \"closed_because\"").
-			ColumnExpr("f.closed_run_id AS \"closed_run_id\"").
-			Where("f.id = ?", row.ID).Scan(ctx, &closed); err != nil {
+			ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+			ColumnExpr(`"f"."closed_by" AS "closed_by"`).
+			ColumnExpr(`COALESCE("f"."closed_note", '') AS "closed_note"`).
+			ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
+			ColumnExpr(`"f"."closed_run_id" AS "closed_run_id"`).
+			Where(`"f"."id" = ?`, row.ID).Scan(ctx, &closed); err != nil {
 			t.Fatal(err)
 		}
 		if closed.ClosedAt == nil {
@@ -121,8 +121,8 @@ func TestAScannersFindingIsNotClosedByHand(t *testing.T) {
 		var open int
 		if err := f.db.DB.NewSelect().TableExpr("\"finding\" AS \"f\"").
 			ColumnExpr("COUNT(*)").
-			Where("f.vulnerability_id = ?", issueID).
-			Where("f.closed_at IS NULL").Scan(ctx, &open); err != nil {
+			Where(`"f"."vulnerability_id" = ?`, issueID).
+			Where(`"f"."closed_at" IS NULL`).Scan(ctx, &open); err != nil {
 			t.Fatal(err)
 		}
 		if open != 2 {
@@ -187,8 +187,8 @@ func TestClosingByHandSaysNothingOfWhatTheCallerMayNotRead(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-			Set("visibility = ?", access.Private).
-			Where("target_id = ?", other).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"target_id" = ?`, other).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -250,13 +250,13 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 			t.Helper()
 			q := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
 				ColumnExpr("COUNT(*)").
-				Where("target_id = ?", f.target).
-				Where("vulnerability_id = ?", rows[0].VulnerabilityID).
-				Where("kind = ?", kind)
+				Where(`"target_id" = ?`, f.target).
+				Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+				Where(`"kind" = ?`, kind)
 			if open {
-				q = q.Where("closed_at IS NULL")
+				q = q.Where(`"closed_at" IS NULL`)
 			} else {
-				q = q.Where("closed_at IS NOT NULL")
+				q = q.Where(`"closed_at" IS NOT NULL`)
 			}
 			var n int
 			if err := q.Scan(ctx, &n); err != nil {

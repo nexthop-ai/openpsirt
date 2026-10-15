@@ -265,7 +265,7 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 	// The folded column, folded the way it was stored, so an identifier
 	// typed with other capitals is the same issue.
 	err := s.db.NewSelect().Model(&issue).
-		Where("identifier_folded = ?", finding.FoldIdentifier(identifier)).
+		Where(`"identifier_folded" = ?`, finding.FoldIdentifier(identifier)).
 		Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, nil, database.FromRead(err, ErrNoSuchIssue,
@@ -277,7 +277,7 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		standing := issue.IssueID
 		issue = finding.Vulnerability{}
 		if err := s.db.NewSelect().Model(&issue).
-			Where("vu.id = ?", standing).Scan(ctx); err != nil {
+			Where(`"vu"."id" = ?`, standing).Scan(ctx); err != nil {
 			return nil, nil, fmt.Errorf("look up the issue %q merged into: %w", identifier, err)
 		}
 	}
@@ -288,13 +288,13 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 	// flaw with one discovery.
 	var row finding.Finding
 	err = s.db.NewSelect().Model(&row).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", issue.ID).
-		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
-		Where("f.kind = ?", finding.Entered).
-		OrderExpr("f.opened_at ASC, f.id ASC").
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, issue.ID).
+		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, productID))).
+		Where(`"f"."kind" = ?`, finding.Entered).
+		OrderExpr(`"f"."opened_at" ASC, "f"."id" ASC`).
 		Limit(1).Scan(ctx)
 	if err != nil && !database.IsNoRows(err) {
 		return nil, nil, fmt.Errorf("look up what we recorded about %q: %w", identifier, err)
@@ -325,11 +325,11 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 	productID, issueID int64) (bool, error) {
 
 	count, err := s.db.NewSelect().Model((*finding.Finding)(nil)).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", issueID).
-		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, issueID).
+		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, productID))).
 		Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("count where issue %d sits here: %w", issueID, err)
@@ -373,9 +373,9 @@ func isCVE(identifier string) bool {
 func (s *Store) namesOf(ctx context.Context, id int64) ([]string, error) {
 	var names []string
 	err := s.db.NewSelect().Model((*finding.Alias)(nil)).
-		ColumnExpr("va.identifier").
-		Where("va.vulnerability_id = ?", id).
-		OrderExpr("va.identifier").
+		ColumnExpr(`"va"."identifier"`).
+		Where(`"va"."vulnerability_id" = ?`, id).
+		OrderExpr(`"va"."identifier"`).
 		Scan(ctx, &names)
 	if err != nil {
 		return nil, fmt.Errorf("read what this issue is also called: %w", err)

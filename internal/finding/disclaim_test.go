@@ -369,7 +369,7 @@ func TestAPlaceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
 		}
 		var issueID int64
 		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-			Where("v.identifier = ?", inside).Scan(ctx, &issueID); err != nil {
+			Where(`"v"."identifier" = ?`, inside).Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
 		}
 		row := map[string]any{
@@ -476,7 +476,7 @@ func TestAStatementAboutAComponentInsideAProductIsEvidenceOnlyBeneathIt(t *testi
 			}
 			var componentID int64
 			if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
-				Where("c.purl = ?", zlib.Purl).Scan(ctx, &componentID); err != nil {
+				Where(`"c"."purl" = ?`, zlib.Purl).Scan(ctx, &componentID); err != nil {
 				t.Fatal(err)
 			}
 			got, err := f.store.SaidAbout(ctx, who, f.productID, interned[issue],
@@ -621,7 +621,7 @@ func TestAStatementAboutAPlatformNothingHereShipsIsEvidenceByPackage(t *testing.
 		}
 		var componentID int64
 		if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
-			Where("c.purl = ?", zlib.Purl).Scan(ctx, &componentID); err != nil {
+			Where(`"c"."purl" = ?`, zlib.Purl).Scan(ctx, &componentID); err != nil {
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, who, f.productID, interned[inside],
@@ -771,7 +771,7 @@ func TestAStatementAboutOneReleaseOfTheProductIsEvidenceOnAnother(t *testing.T) 
 		}
 		var componentID int64
 		if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
-			Where("c.purl = ?", zlib.Purl).Scan(ctx, &componentID); err != nil {
+			Where(`"c"."purl" = ?`, zlib.Purl).Scan(ctx, &componentID); err != nil {
 			t.Fatal(err)
 		}
 		said, err := f.store.SaidAbout(ctx, f.planner(t, access.PublicTriage), f.productID,
@@ -853,7 +853,7 @@ func TestRescanningADisclaimedBuildTouchesNoRow(t *testing.T) {
 		asked := &matchedStatements{}
 		f.db.AddQueryHook(asked)
 		f.reported(t, found(inside, zlib))
-		if count, matched := asked.matching(`UPDATE "finding" AS "f" SET stated_by = `); count != 0 {
+		if count, matched := asked.matching(`UPDATE "finding" AS "f" SET "stated_by" = `); count != 0 {
 			t.Errorf("a rescan rewrote the closed row: %d statements matching %d rows", count, matched)
 		}
 	})
@@ -942,7 +942,7 @@ func TestARevisionRepeatingAClaimKeepsItsRow(t *testing.T) {
 			t.Errorf("the revision recorded %d and set aside %d, want 2 and none", recorded, superseded)
 		}
 		var kept finding.Statement
-		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&kept).Where(`"ss"."id" = ?`, first).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if kept.Superseded != nil || kept.Digest != "sha256:second" {
@@ -969,8 +969,8 @@ func TestNoDeadlineComesBackToAPlaceTheSupplierAnswers(t *testing.T) {
 		answered("the scan")
 
 		issue := f.issueID(t, inside)
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set("exploited = ?", true).
-			Where("id = ?", issue).Exec(ctx); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"exploited" = ?`, true).
+			Where(`"id" = ?`, issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := finding.Reranked(ctx, f.db.DB, []int64{issue}, time.Now().UTC(), 0); err != nil {
@@ -1089,7 +1089,7 @@ func TestAClaimMovedToAnotherReleaseOfTheProductIsSetAside(t *testing.T) {
 			t.Fatalf("adding 4.10 set aside %d: %v", superseded, err)
 		}
 		var kept finding.Statement
-		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&kept).Where(`"ss"."id" = ?`, first).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if kept.Superseded != nil || kept.WithinAbout != "4.9" {
@@ -1102,7 +1102,7 @@ func TestAClaimMovedToAnotherReleaseOfTheProductIsSetAside(t *testing.T) {
 			[]finding.Statement{at("4.10"), at("4.11")}); err != nil || superseded != 1 {
 			t.Fatalf("moving 4.9 to 4.11 set aside %d: %v", superseded, err)
 		}
-		if err := f.db.DB.NewSelect().Model(&kept).Where("ss.id = ?", first).Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&kept).Where(`"ss"."id" = ?`, first).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if kept.Superseded == nil || kept.WithinAbout != "4.9" {

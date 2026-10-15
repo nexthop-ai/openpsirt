@@ -246,10 +246,10 @@ func TestANewFindingIsClockedByTheRatingInForce(t *testing.T) {
 		}
 		err := f.db.DB.NewSelect().
 			TableExpr("\"finding\" AS \"f\"").
-			Join("JOIN \"scan_run\" AS \"r\" ON r.id = f.opened_run_id").
-			ColumnExpr("f.due_at AS \"due_at\"").
-			ColumnExpr("r.started_at AS \"started_at\"").
-			Where("f.target_id = ?", other).
+			Join(`JOIN "scan_run" AS "r" ON "r"."id" = "f"."opened_run_id"`).
+			ColumnExpr(`"f"."due_at" AS "due_at"`).
+			ColumnExpr(`"r"."started_at" AS "started_at"`).
+			Where(`"f"."target_id" = ?`, other).
 			Scan(t.Context(), &rows)
 		if err != nil {
 			t.Fatal(err)
@@ -310,8 +310,8 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 
 		var still int
 		err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("kind = ?", finding.Entered).
-			Where("closed_at IS NULL").
+			Where(`"kind" = ?`, finding.Entered).
+			Where(`"closed_at" IS NULL`).
 			ColumnExpr("COUNT(*)").Scan(t.Context(), &still)
 		if err != nil {
 			t.Fatal(err)
@@ -327,8 +327,8 @@ func TestAScanDoesNotCloseWhatAPersonRecorded(t *testing.T) {
 		}
 		var scannedOpen int
 		err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("kind = ?", finding.Vulnerable).
-			Where("closed_at IS NULL").
+			Where(`"kind" = ?`, finding.Vulnerable).
+			Where(`"closed_at" IS NULL`).
 			ColumnExpr("COUNT(*)").Scan(t.Context(), &scannedOpen)
 		if err != nil {
 			t.Fatal(err)
@@ -382,7 +382,7 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 
 		var onTheTag []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&onTheTag).
-			Where("target_id = ?", tag).Where("closed_at IS NULL").
+			Where(`"target_id" = ?`, tag).Where(`"closed_at" IS NULL`).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -402,7 +402,7 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 		}
 		var onTheBranch []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&onTheBranch).
-			Where("target_id = ?", f.target).Where("closed_at IS NULL").
+			Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -488,11 +488,11 @@ func (f *fixture) urgencyIn(t *testing.T, target int64, identifier string) int64
 	var rank int64
 	err := f.db.DB.NewSelect().
 		TableExpr("\"finding\" AS \"f\"").
-		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
-		ColumnExpr("MAX(f.urgency)").
-		Where("v.identifier = ?", identifier).
-		Where("f.target_id = ?", target).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`MAX("f"."urgency")`).
+		Where(`"v"."identifier" = ?`, identifier).
+		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."closed_at" IS NULL`).
 		Scan(t.Context(), &rank)
 	if err != nil {
 		t.Fatalf("read where %s sits in build %d: %v", identifier, target, err)
@@ -611,7 +611,7 @@ func TestAScoreRisingDoesNotCarryAStaleEstimateWithIt(t *testing.T) {
 
 		var issue finding.Vulnerability
 		if err := f.db.DB.NewSelect().Model(&issue).
-			Where("identifier = ?", "CVE-2026-5").Scan(ctx); err != nil {
+			Where(`"identifier" = ?`, "CVE-2026-5").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if issue.LikelihoodPPM == nil || *issue.LikelihoodPPM != 50_000 {
@@ -664,7 +664,7 @@ func TestAnUndatedEstimateDoesNotWipeTheDayAStoredOneHas(t *testing.T) {
 
 		var issue finding.Vulnerability
 		if err := f.db.DB.NewSelect().Model(&issue).
-			Where("identifier = ?", "CVE-2026-6").Scan(ctx); err != nil {
+			Where(`"identifier" = ?`, "CVE-2026-6").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if issue.LikelihoodOn == nil {
@@ -723,7 +723,7 @@ func TestLearningSomethingIsExploitedDoesNotHandBackAClockNothingCouldMeet(t *te
 
 		var rows []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&rows).
-			Where("closed_at IS NULL").Scan(ctx); err != nil {
+			Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) == 0 {

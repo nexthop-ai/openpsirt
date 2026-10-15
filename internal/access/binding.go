@@ -200,7 +200,7 @@ func (s *Store) MapsProduct(ctx context.Context, names ...string) (bool, error) 
 		folded = append(folded, strings.ToLower(strings.TrimSpace(name)))
 	}
 	held, err := s.db.NewSelect().Model((*Binding)(nil)).
-		Where("product_name IN (?)", bun.List(folded)).Exists(ctx)
+		Where(`"product_name" IN (?)`, bun.List(folded)).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether a group mapping names a product: %w", err)
 	}
@@ -234,14 +234,14 @@ func unmap(ctx context.Context, db bun.IDB, mapping Mapping) error {
 	var q *bun.DeleteQuery
 	switch over, deployment := mapping.Over(); {
 	case deployment:
-		q = db.NewDelete().Model((*AdminBinding)(nil)).Where("grants = ?", over)
+		q = db.NewDelete().Model((*AdminBinding)(nil)).Where(`"grants" = ?`, over)
 	case mapping.Product == "":
-		q = db.NewDelete().Model((*EstateBinding)(nil)).Where("role = ?", mapping.Grants)
+		q = db.NewDelete().Model((*EstateBinding)(nil)).Where(`"role" = ?`, mapping.Grants)
 	default:
 		q = db.NewDelete().Model((*Binding)(nil)).
-			Where("product_name = ?", mapping.Product).Where("role = ?", mapping.Grants)
+			Where(`"product_name" = ?`, mapping.Product).Where(`"role" = ?`, mapping.Grants)
 	}
-	res, err := q.Where("group_name = ?", mapping.Group).Exec(ctx)
+	res, err := q.Where(`"group_name" = ?`, mapping.Group).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("unmap %s from %q: %w", mapping, mapping.Grants, err)
 	}
@@ -463,11 +463,11 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		person.Audits != audits || person.AuditsDerived != auditsDerived || auditsDerived {
 
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("is_admin = ?", effective).Set("admin_derived = ?", derived).
-			Set("admin_derived_at = ?", derivedAt).
-			Set("audits = ?", audits).Set("audits_derived = ?", auditsDerived).
-			Set("audits_derived_at = ?", auditsAt).
-			Where("id = ?", person.ID).Exec(ctx); err != nil {
+			Set(`"is_admin" = ?`, effective).Set(`"admin_derived" = ?`, derived).
+			Set(`"admin_derived_at" = ?`, derivedAt).
+			Set(`"audits" = ?`, audits).Set(`"audits_derived" = ?`, auditsDerived).
+			Set(`"audits_derived_at" = ?`, auditsAt).
+			Where(`"id" = ?`, person.ID).Exec(ctx); err != nil {
 			return nil, fmt.Errorf("record what %q holds over this deployment: %w",
 				person.Identity, err)
 		}
@@ -522,7 +522,7 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 
 	var everywhere []EstateBinding
 	if err := s.db.NewSelect().Model(&everywhere).
-		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
+		Where(`"group_name" IN (?)`, bun.List(named)).Scan(ctx); err != nil {
 		return nil, held{}, fmt.Errorf("read what these groups are bound to across every product: %w", err)
 	}
 	var deployment held
@@ -534,7 +534,7 @@ func (s *Store) rolesFor(ctx context.Context, groups []string) (map[int64][]Role
 
 	var over []AdminBinding
 	if err := s.db.NewSelect().Model(&over).
-		Where("group_name IN (?)", bun.List(named)).Scan(ctx); err != nil {
+		Where(`"group_name" IN (?)`, bun.List(named)).Scan(ctx); err != nil {
 		return nil, held{}, fmt.Errorf("read what these groups hold over this deployment: %w", err)
 	}
 	for _, binding := range over {
@@ -562,11 +562,11 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 	everywhere []Role) error {
 
 	if _, err := s.db.NewDelete().Model((*Grant)(nil)).
-		Where("person_id = ?", personID).Where("source = ?", Derived).Exec(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Exec(ctx); err != nil {
 		return fmt.Errorf("clear what was derived from groups: %w", err)
 	}
 	if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-		Where("person_id = ?", personID).Where("source = ?", Derived).Exec(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Exec(ctx); err != nil {
 		return fmt.Errorf("clear what was derived from groups across every product: %w", err)
 	}
 
@@ -625,35 +625,35 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 	switch mode {
 	case GroupBound:
 		if _, err := s.db.NewUpdate().Model((*Grant)(nil)).
-			Set("active = ?", false).
-			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			Set(`"active" = ?`, false).
+			Where(`"source" = ?`, Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("set aside the assigned roles: %w", err)
 		}
 		// Estate grants are assignments too, so they are set aside by the
 		// same act. Leaving them live would keep a role over every product
 		// standing in a deployment where nothing derives one.
 		if _, err := s.db.NewUpdate().Model((*EstateGrant)(nil)).
-			Set("active = ?", false).
-			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			Set(`"active" = ?`, false).
+			Where(`"source" = ?`, Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
 		}
 	case Direct:
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
-			Where("source = ?", Derived).Exec(ctx); err != nil {
+			Where(`"source" = ?`, Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived: %w", err)
 		}
 		if _, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-			Where("source = ?", Derived).Exec(ctx); err != nil {
+			Where(`"source" = ?`, Derived).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups derived across every product: %w", err)
 		}
 		if _, err := s.db.NewUpdate().Model((*Grant)(nil)).
-			Set("active = ?", true).
-			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			Set(`"active" = ?`, true).
+			Where(`"source" = ?`, Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("restore the assigned roles: %w", err)
 		}
 		if _, err := s.db.NewUpdate().Model((*EstateGrant)(nil)).
-			Set("active = ?", true).
-			Where("source = ?", Assigned).Exec(ctx); err != nil {
+			Set(`"active" = ?`, true).
+			Where(`"source" = ?`, Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("restore the assigned roles over every product: %w", err)
 		}
 		// Administration derived from a group goes with it — but only what a
@@ -666,13 +666,13 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 		// configuration keeps administration through is_bootstrap, which this
 		// does not touch.
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("is_admin = ?", false).
-			Where("admin_derived = ?", true).Exec(ctx); err != nil {
+			Set(`"is_admin" = ?`, false).
+			Where(`"admin_derived" = ?`, true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups administered: %w", err)
 		}
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("admin_derived = ?", false).
-			Where("admin_derived = ?", true).Exec(ctx); err != nil {
+			Set(`"admin_derived" = ?`, false).
+			Where(`"admin_derived" = ?`, true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups administered: %w", err)
 		}
 		// Auditing goes the same way and by the same rule: what a group gave
@@ -680,13 +680,13 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 		// bootstrap arm because configuration names an administrator and not
 		// an auditor — nobody is locked out by holding none of this.
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("audits = ?", false).
-			Where("audits_derived = ?", true).Exec(ctx); err != nil {
+			Set(`"audits" = ?`, false).
+			Where(`"audits_derived" = ?`, true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups audited: %w", err)
 		}
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
-			Set("audits_derived = ?", false).
-			Where("audits_derived = ?", true).Exec(ctx); err != nil {
+			Set(`"audits_derived" = ?`, false).
+			Where(`"audits_derived" = ?`, true).Exec(ctx); err != nil {
 			return fmt.Errorf("clear what groups audited: %w", err)
 		}
 	default:
@@ -716,8 +716,8 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	// deployment start with no group mapped to administration and nobody able
 	// to administer it, which is what this check exists to prevent.
 	bootstrapped, err := db.NewSelect().Model((*Account)(nil)).
-		Where("is_bootstrap = ?", true).
-		Where("deactivated_at IS NULL").Count(ctx)
+		Where(`"is_bootstrap" = ?`, true).
+		Where(`"deactivated_at" IS NULL`).Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read who was named as an administrator: %w", err)
 	}
@@ -731,7 +731,7 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 		// deployment whose only binding is an audit one is a deployment
 		// nobody can administer.
 		bound, err := db.NewSelect().Model((*AdminBinding)(nil)).
-			Where("grants = ?", Administers).Count(ctx)
+			Where(`"grants" = ?`, Administers).Count(ctx)
 		if err != nil {
 			return false, fmt.Errorf("read which groups administer: %w", err)
 		}
@@ -739,8 +739,8 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 	}
 
 	administrators, err := db.NewSelect().Model((*Account)(nil)).
-		Where("is_admin = ?", true).
-		Where("deactivated_at IS NULL").Count(ctx)
+		Where(`"is_admin" = ?`, true).
+		Where(`"deactivated_at" IS NULL`).Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read who administers: %w", err)
 	}
@@ -801,12 +801,12 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (N
 		within := s.over(db)
 		naming = Naming{}
 		leaving := db.NewSelect().Model((*Account)(nil)).Column("identity").
-			Where("is_bootstrap = ?", true).OrderExpr("identity")
+			Where(`"is_bootstrap" = ?`, true).OrderExpr(`"identity"`)
 		clearing := db.NewUpdate().Model((*Account)(nil)).
-			Set("is_bootstrap = ?", false).Where("is_bootstrap = ?", true)
+			Set(`"is_bootstrap" = ?`, false).Where(`"is_bootstrap" = ?`, true)
 		if len(named) > 0 {
-			leaving = leaving.Where("identity NOT IN (?)", bun.List(named))
-			clearing = clearing.Where("identity NOT IN (?)", bun.List(named))
+			leaving = leaving.Where(`"identity" NOT IN (?)`, bun.List(named))
+			clearing = clearing.Where(`"identity" NOT IN (?)`, bun.List(named))
 		}
 		if err := leaving.Scan(ctx, &naming.Unnamed); err != nil {
 			return fmt.Errorf("read who is no longer named as an administrator: %w", err)
@@ -842,9 +842,9 @@ func (s *Store) NameBootstrapAdmins(ctx context.Context, identities []string) (N
 			// calls: an administrator re-recording a departed colleague must
 			// not silently readmit them.
 			if _, err := db.NewUpdate().Model((*Account)(nil)).
-				Set("is_bootstrap = ?", true).
-				Set("deactivated_at = NULL").
-				Where("id = ?", person.ID).Exec(ctx); err != nil {
+				Set(`"is_bootstrap" = ?`, true).
+				Set(`"deactivated_at" = NULL`).
+				Where(`"id" = ?`, person.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("name %q as an administrator: %w", identity, err)
 			}
 		}

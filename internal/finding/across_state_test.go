@@ -54,9 +54,9 @@ func (f *fixture) acrossProducts(t *testing.T) acrossProducts {
 	// Undisclosed in the second product only, so a reader holding that
 	// product's disclosed findings alone is answered without it.
 	if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-		Set("visibility = ?", access.Private).
-		Where("target_id = ?", elsewhere).
-		Where("vulnerability_id = ?", f.issueID(t, "CVE-2026-2")).
+		Set(`"visibility" = ?`, access.Private).
+		Where(`"target_id" = ?`, elsewhere).
+		Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-2")).
 		Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

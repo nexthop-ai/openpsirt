@@ -38,7 +38,7 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 	db := bun.NewDB(sql.OpenDB(unconnected{}), sqlitedialect.New())
 	written := func(f Filter) string {
 		return f.narrow(db.NewSelect().TableExpr(`"finding" AS "f"`).
-			Column("f.vulnerability_id").GroupExpr("f.vulnerability_id")).String()
+			Column("f.vulnerability_id").GroupExpr(`"f"."vulnerability_id"`)).String()
 	}
 	base := Filter{ProductID: 1, Builds: 2, HeldBy: []int64{1}, TargetID: 1}
 	if strings.Contains(written(base), "HAVING") || base.asksOfGroups() {

@@ -34,8 +34,8 @@ func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
 		// Aged directly rather than through a clock: what is pinned is that
 		// the sweep reaches the table, not how a session is judged expired.
 		if _, err := db.DB.NewUpdate().Table("session").
-			Set("expires_at = ?", time.Now().UTC().Add(-time.Minute)).
-			Where("person_id = ?", person.ID).Exec(ctx); err != nil {
+			Set(`"expires_at" = ?`, time.Now().UTC().Add(-time.Minute)).
+			Where(`"person_id" = ?`, person.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		live, err := rights.StartSession(ctx, person.ID, time.Hour)

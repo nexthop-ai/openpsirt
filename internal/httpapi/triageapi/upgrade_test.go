@@ -303,9 +303,9 @@ func TestAPromiseStoresADecisionAtEveryPlaceItReports(t *testing.T) {
 
 		var places int
 		if err := r.DB.DB.NewSelect().
-			TableExpr(`(SELECT DISTINCT f.vulnerability_id, f.place_identity
-				FROM "finding" AS "f" JOIN "component" AS "c" ON c.id = f.component_id
-				WHERE c.name = ? AND f.closed_at IS NULL) AS "open_places"`, "linux-image").
+			TableExpr(`(SELECT DISTINCT "f"."vulnerability_id", "f"."place_identity"
+				FROM "finding" AS "f" JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
+				WHERE "c"."name" = ? AND "f"."closed_at" IS NULL) AS "open_places"`, "linux-image").
 			ColumnExpr("COUNT(*)").Scan(ctx, &places); err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +314,7 @@ func TestAPromiseStoresADecisionAtEveryPlaceItReports(t *testing.T) {
 			LiveKey *string `bun:"live_key"`
 		}
 		if err := r.DB.DB.NewSelect().Table("decision").Column("state", "live_key").
-			Where("claim_id = ?", done.ClaimID).Scan(ctx, &stored); err != nil {
+			Where(`"claim_id" = ?`, done.ClaimID).Scan(ctx, &stored); err != nil {
 			t.Fatal(err)
 		}
 		if places < 2 {

@@ -26,8 +26,8 @@ func TestABulkClaimRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 		ctx := t.Context()
 		// Published at 9.8, which is what the column holds.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
-			Set("score_centi = ?", 980).Set("severity = ?", "critical").
-			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			Set(`"score_centi" = ?`, 980).Set(`"severity" = ?`, "critical").
+			Where(`"id" = ?`, f.issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// Assessed as medium here.
@@ -58,7 +58,7 @@ func TestABulkClaimRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 
 		var written triage.Decision
 		if err := f.db.DB.NewSelect().Model(&written).
-			Where("id = ?", recorded[0]).Scan(ctx); err != nil {
+			Where(`"id" = ?`, recorded[0]).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		want := finding.SeverityScore("medium")

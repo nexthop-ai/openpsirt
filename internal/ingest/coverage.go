@@ -128,39 +128,39 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 	// exactly those rows.
 	query := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`st.id AS "stream_id"`).
-		ColumnExpr(`p.name AS "product"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`st.kind AS "stream_kind"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`tg.created_at AS "declared_at"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"st"."id" AS "stream_id"`).
+		ColumnExpr(`"p"."name" AS "product"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"st"."kind" AS "stream_kind"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		ColumnExpr(`"tg"."created_at" AS "declared_at"`).
 		// Out of use at any of the three levels. A build is a product, a
 		// release and a variant together, and retiring any one of them stops
 		// a scan being filed against it.
-		ColumnExpr(`(CASE WHEN p.retired_at IS NULL AND st.retired_at IS NULL `+
-			`AND va.retired_at IS NULL THEN ? ELSE ? END) AS "retired_from_use"`,
+		ColumnExpr(`(CASE WHEN "p"."retired_at" IS NULL AND "st"."retired_at" IS NULL `+
+			`AND "va"."retired_at" IS NULL THEN ? ELSE ? END) AS "retired_from_use"`,
 			false, true).
 		// Only a scan that could be read counts as having been heard from. A
 		// build whose upload is taken nightly and fails to parse nightly is
 		// the failure this report exists for, and counting the arrival drew
 		// it as perfectly quiet on the one report whose subject is that
 		// silence must not look like health.
-		ColumnExpr(`(SELECT MAX(sc.received_at) FROM "scan" AS "sc" `+
-			`WHERE sc.target_id = tg.id AND sc.status = ?) AS "last_seen"`, Accepted).
+		ColumnExpr(`(SELECT MAX("sc"."received_at") FROM "scan" AS "sc" `+
+			`WHERE "sc"."target_id" = "tg"."id" AND "sc"."status" = ?) AS "last_seen"`, Accepted).
 		// And whether anybody is trying. Quiet says nothing arrived; this says
 		// whether something arrived and was turned away, which is a different
 		// fault with a different person to tell — a pipeline nobody wired up,
 		// against one failing nightly and reporting success to its own log.
-		ColumnExpr(`(SELECT sr.at FROM "scan_refusal" AS "sr" ` +
-			`WHERE sr.target_id = tg.id) AS "last_refused"`).
-		ColumnExpr(`(SELECT sr.reason FROM "scan_refusal" AS "sr" ` +
-			`WHERE sr.target_id = tg.id) AS "refused_why"`)
+		ColumnExpr(`(SELECT "sr"."at" FROM "scan_refusal" AS "sr" ` +
+			`WHERE "sr"."target_id" = "tg"."id") AS "last_refused"`).
+		ColumnExpr(`(SELECT "sr"."reason" FROM "scan_refusal" AS "sr" ` +
+			`WHERE "sr"."target_id" = "tg"."id") AS "refused_why"`)
 	if !all {
-		query = query.Where("st.product_id IN (?)", bun.List(products))
+		query = query.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
 	query = scope.Narrow(query)
 

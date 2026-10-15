@@ -34,7 +34,7 @@ func TestARunEndedInBytesThatAreNotTextIsRecordedOnEveryEngine(t *testing.T) {
 			t.Fatalf("the end of a run quoting bytes that are not text was refused: %v", err)
 		}
 		var got finding.Run
-		if err := db.DB.NewSelect().Model(&got).Where("id = ?", run.ID).Scan(ctx); err != nil {
+		if err := db.DB.NewSelect().Model(&got).Where(`"id" = ?`, run.ID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if got.FinishedAt == nil {

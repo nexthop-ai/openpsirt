@@ -38,8 +38,8 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 		}{{"CVE-2026-1", "1.9", june}, {"CVE-2026-2", "1.10", march}} {
 			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("committed_to = ?", one.by).Set("upgrade_to = ?", one.to).
-				Where("id = ?", claim).Exec(ctx); err != nil {
+				Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
+				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.db.DB.NewInsert().Model(&map[string]any{
@@ -109,8 +109,8 @@ func TestThePromiseThatStandsNamesAVersionThenADateThenTheLatestThenTheLaterClai
 					t.Helper()
 					claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
 					if _, err := f.db.DB.NewUpdate().Table("claim").
-						Set("committed_to = ?", one.by).Set("upgrade_to = ?", one.to).
-						Where("id = ?", claim).Exec(ctx); err != nil {
+						Set(`"committed_to" = ?`, one.by).Set(`"upgrade_to" = ?`, one.to).
+						Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 						t.Fatal(err)
 					}
 					if _, err := f.db.DB.NewInsert().Model(&map[string]any{
@@ -172,8 +172,8 @@ func TestAPlaceUnderTwoPromisesIsCountedOnce(t *testing.T) {
 		for _, version := range []string{libnl.Version, "3.6.0"} {
 			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("committed_to = ?", june).Set("upgrade_to = ?", "3.9.0").
-				Where("id = ?", claim).Exec(ctx); err != nil {
+				Set(`"committed_to" = ?`, june).Set(`"upgrade_to" = ?`, "3.9.0").
+				Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.db.DB.NewInsert().Model(&map[string]any{

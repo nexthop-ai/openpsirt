@@ -567,8 +567,8 @@ func (s *Store) LastRecordsVersion(ctx context.Context, targetID int64) (string,
 	var runs []Run
 	err := s.db.NewSelect().Model(&runs).
 		Column("records_version").
-		Where("target_id = ?", targetID).
-		Where("records_version <> ?", "").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"records_version" <> ?`, "").
 		Order("id DESC").
 		Limit(1).
 		Scan(ctx)
@@ -611,10 +611,10 @@ func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersio
 		failure = cause.Error()
 	}
 	_, err := s.db.NewUpdate().Model((*Run)(nil)).
-		Set("finished_at = ?", done).Set("failure = ?", failure).
-		Set("caution = ?", caution).
-		Set("scanner_version = ?", version).Set("database_version = ?", databaseVersion).
-		Where("id = ?", runID).Exec(ctx)
+		Set(`"finished_at" = ?`, done).Set(`"failure" = ?`, failure).
+		Set(`"caution" = ?`, caution).
+		Set(`"scanner_version" = ?`, version).Set(`"database_version" = ?`, databaseVersion).
+		Where(`"id" = ?`, runID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the end of scan run %d: %w", runID, err)
 	}

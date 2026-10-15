@@ -127,7 +127,7 @@ func TestAnUpgradeClosesWithTheReason(t *testing.T) {
 
 		var closed []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&closed).
-			Where("closed_at IS NOT NULL").Scan(t.Context()); err != nil {
+			Where(`"closed_at" IS NOT NULL`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		for _, row := range closed {
@@ -156,7 +156,7 @@ func TestAComponentGoneAltogetherClosesAsRemoved(t *testing.T) {
 
 		var closed []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&closed).
-			Where("closed_at IS NOT NULL").Scan(t.Context()); err != nil {
+			Where(`"closed_at" IS NOT NULL`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if len(closed) != 2 {
@@ -473,8 +473,8 @@ func (f *fixture) issueScore(t *testing.T, name string) int {
 	var score int
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"vulnerability\" AS \"v\"").
-		ColumnExpr("COALESCE(v.score_centi, 0)").
-		Where("v.identifier = ?", name).
+		ColumnExpr(`COALESCE("v"."score_centi", 0)`).
+		Where(`"v"."identifier" = ?`, name).
 		Scan(t.Context(), &score); err != nil {
 		t.Fatal(err)
 	}
@@ -584,7 +584,7 @@ func (f *fixture) byState(t *testing.T) (closed, opened []finding.Finding) {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.NewSelect().Model(&rows).
-		Where("target_id = ?", f.target).Order("id").Scan(t.Context()); err != nil {
+		Where(`"target_id" = ?`, f.target).Order("id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	for _, row := range rows {

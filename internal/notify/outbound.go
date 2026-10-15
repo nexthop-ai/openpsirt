@@ -182,7 +182,7 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 	// A chat channel is carried by the chat sweep, which groups what it says.
 	var destinations []Outbound
 	if err := s.db.NewSelect().Model(&destinations).
-		Where("retired_at IS NULL").Where("platform = ?", Webhook).
+		Where(`"retired_at" IS NULL`).Where(`"platform" = ?`, Webhook).
 		OrderExpr(`"id" ASC`).Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read where things go: %w", err)
 	}
@@ -251,7 +251,7 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 func (s *Signal) window(ctx context.Context, to Outbound, limit int) ([]Notification, error) {
 	var rows []Notification
 	q := unsettled(s.db.NewSelect().Model(&rows), to).
-		OrderExpr("nt.created_at ASC, nt.id ASC").
+		OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
 		Limit(limit)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what there is to say: %w", err)
@@ -267,7 +267,7 @@ func unsettled(q *bun.SelectQuery, to Outbound) *bun.SelectQuery {
 		// Only what is still true or still unread is worth saying. A
 		// cleared condition is not news, and an event nobody has yet been
 		// told about outside is.
-		Where("nt.cleared_at IS NULL").
+		Where(`"nt"."cleared_at" IS NULL`).
 		// Settled here, asked the way the delivery is keyed. A delivery is
 		// unique on the destination and what was said, and what was said is a
 		// condition's own identity where it has one — so a condition opened
@@ -295,7 +295,7 @@ func unsettled(q *bun.SelectQuery, to Outbound) *bun.SelectQuery {
 	// one kind wedged behind two hundred rows of another exactly as a
 	// destination taking everything did.
 	if to.Kind != Everything {
-		q = q.Where("nt.kind = ?", to.Kind)
+		q = q.Where(`"nt"."kind" = ?`, to.Kind)
 	}
 	return q
 }
@@ -350,9 +350,9 @@ func (s *Signal) reopened(ctx context.Context, held Delivery, rowID int64,
 	}
 	if prior.ID != covering {
 		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("notification_id = ?", prior.ID).
-			Where("id = ?", held.ID).
-			Where("notification_id = ?", held.NotificationID).
+			Set(`"notification_id" = ?`, prior.ID).
+			Where(`"id" = ?`, held.ID).
+			Where(`"notification_id" = ?`, held.NotificationID).
 			Exec(ctx); err != nil {
 			return false, fmt.Errorf("hand a delivery to a row still holding its condition: %w", err)
 		}
@@ -365,14 +365,14 @@ func (s *Signal) retake(ctx context.Context, held Delivery, rowID int64,
 	now time.Time) (bool, error) {
 
 	res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-		Set("sent_at = NULL").
-		Set("attempts = 0").
-		Set("attempted_at = NULL").
-		Set("failed = ?", "").
-		Set("notification_id = ?", rowID).
-		Set("first_seen = ?", now).
-		Where("id = ?", held.ID).
-		Where("notification_id = ?", held.NotificationID).
+		Set(`"sent_at" = NULL`).
+		Set(`"attempts" = 0`).
+		Set(`"attempted_at" = NULL`).
+		Set(`"failed" = ?`, "").
+		Set(`"notification_id" = ?`, rowID).
+		Set(`"first_seen" = ?`, now).
+		Where(`"id" = ?`, held.ID).
+		Where(`"notification_id" = ?`, held.NotificationID).
 		Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("take a delivery again for a condition that returned: %w", err)
@@ -459,7 +459,7 @@ func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int6
 		// the row rather than by racing for it.
 		var held Delivery
 		if err := s.db.NewSelect().Model(&held).
-			Where("outbound_id = ?", to.ID).Where("about = ?", key).
+			Where(`"outbound_id" = ?`, to.ID).Where(`"about" = ?`, key).
 			Scan(ctx); err != nil {
 			// The row the index just refused, and it cannot be read. That is
 			// a fault rather than an answer: reported as one, not as a
@@ -487,11 +487,11 @@ func (s *Signal) claim(ctx context.Context, to Outbound, row Notification) (int6
 		// Repeats the count it read, so of two passes taking another attempt
 		// at once one does and the other finds it taken.
 		res, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("attempts = attempts + 1").
-			Set("attempted_at = ?", now).
-			Set("failed = ?", "").
-			Where("id = ?", held.ID).Where("sent_at IS NULL").
-			Where("attempts = ?", held.Attempts).
+			Set(`"attempts" = "attempts" + 1`).
+			Set(`"attempted_at" = ?`, now).
+			Set(`"failed" = ?`, "").
+			Where(`"id" = ?`, held.ID).Where(`"sent_at" IS NULL`).
+			Where(`"attempts" = ?`, held.Attempts).
 			Exec(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("take another attempt at a delivery: %w", err)
@@ -520,16 +520,16 @@ func (s *Signal) settle(ctx context.Context, to Outbound, claimed []int64, sendE
 		// refusing is a thing an operator has to be able to see, and the last
 		// reason is the only part of it that says anything.
 		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("failed = ?", trimTo(withoutTheAddress(sendErr, to.URL), mostOfAFailure)).
-			Where("id IN (?)", bun.List(claimed)).Exec(ctx); err != nil && s.logger != nil {
+			Set(`"failed" = ?`, trimTo(withoutTheAddress(sendErr, to.URL), mostOfAFailure)).
+			Where(`"id" IN (?)`, bun.List(claimed)).Exec(ctx); err != nil && s.logger != nil {
 			s.logger.Error("could not record why a destination refused", "error", err)
 		}
 		return nil
 	}
 	if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-		Set("sent_at = ?", s.now().UTC().Truncate(time.Microsecond)).
-		Set("failed = ?", "").
-		Where("id IN (?)", bun.List(claimed)).Exec(ctx); err != nil {
+		Set(`"sent_at" = ?`, s.now().UTC().Truncate(time.Microsecond)).
+		Set(`"failed" = ?`, "").
+		Where(`"id" IN (?)`, bun.List(claimed)).Exec(ctx); err != nil {
 		return fmt.Errorf("record that it went: %w", err)
 	}
 	return nil
@@ -708,7 +708,7 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 		ColumnExpr(`COALESCE("tm"."name", '') AS "team"`).
 		Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "ob"."product_id"`).
 		Join(`LEFT JOIN "team" AS "tm" ON "tm"."id" = "ob"."team_id"`).
-		Where("ob.retired_at IS NULL").OrderExpr("ob.name, ob.kind").Scan(ctx); err != nil {
+		Where(`"ob"."retired_at" IS NULL`).OrderExpr(`"ob"."name", "ob"."kind"`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read where things go: %w", err)
 	}
 	out := make([]Configured, 0, len(rows))
@@ -723,9 +723,9 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 			Failing int `bun:"failing"`
 		}
 		if err := s.db.NewSelect().Model((*Delivery)(nil)).
-			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NOT NULL THEN 1 ELSE 0 END) AS "sent"`).
-			ColumnExpr(`SUM(CASE WHEN od.sent_at IS NULL THEN 1 ELSE 0 END) AS "failing"`).
-			Where("od.outbound_id = ?", row.ID).
+			ColumnExpr(`SUM(CASE WHEN "od"."sent_at" IS NOT NULL THEN 1 ELSE 0 END) AS "sent"`).
+			ColumnExpr(`SUM(CASE WHEN "od"."sent_at" IS NULL THEN 1 ELSE 0 END) AS "failing"`).
+			Where(`"od"."outbound_id" = ?`, row.ID).
 			Scan(ctx, &counts); err != nil {
 			return nil, fmt.Errorf("read how it is doing: %w", err)
 		}
@@ -736,11 +736,11 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 		// went since answers with nothing, because the destination works.
 		var last []Delivery
 		if err := s.db.NewSelect().Model(&last).
-			Where("od.outbound_id = ?", row.ID).
+			Where(`"od"."outbound_id" = ?`, row.ID).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.WhereOr("od.sent_at IS NOT NULL").WhereOr("od.failed <> ''")
+				return q.WhereOr(`"od"."sent_at" IS NOT NULL`).WhereOr(`"od"."failed" <> ''`)
 			}).
-			OrderExpr("od.first_seen DESC, od.id DESC").
+			OrderExpr(`"od"."first_seen" DESC, "od"."id" DESC`).
 			Limit(1).
 			Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read why it last failed: %w", err)
@@ -819,22 +819,22 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	}
 
 	revive := s.db.NewUpdate().Model((*Outbound)(nil)).
-		Set("retired_at = ?", nil).
-		Set("display_name = ?", row.DisplayName).
-		Set("url = ?", row.URL).
-		Set("secret = ?", row.Secret).
-		Set("platform = ?", row.Platform).
-		Set("channel = ?", row.Channel).
-		Set("topic = ?", row.Topic).
-		Set("product_id = ?", row.ProductID).
-		Set("team_id = ?", row.TeamID).
-		Set("created_by = ?", row.CreatedBy).
-		Set("created_at = ?", row.CreatedAt).
-		Where("name = ?", row.Name).
-		Where("kind = ?", row.Kind).
-		Where("retired_at IS NOT NULL")
+		Set(`"retired_at" = ?`, nil).
+		Set(`"display_name" = ?`, row.DisplayName).
+		Set(`"url" = ?`, row.URL).
+		Set(`"secret" = ?`, row.Secret).
+		Set(`"platform" = ?`, row.Platform).
+		Set(`"channel" = ?`, row.Channel).
+		Set(`"topic" = ?`, row.Topic).
+		Set(`"product_id" = ?`, row.ProductID).
+		Set(`"team_id" = ?`, row.TeamID).
+		Set(`"created_by" = ?`, row.CreatedBy).
+		Set(`"created_at" = ?`, row.CreatedAt).
+		Where(`"name" = ?`, row.Name).
+		Where(`"kind" = ?`, row.Kind).
+		Where(`"retired_at" IS NOT NULL`)
 	readBack := s.db.NewSelect().Model(row).
-		Where("name = ?", row.Name).Where("kind = ?", row.Kind).Limit(1)
+		Where(`"name" = ?`, row.Name).Where(`"kind" = ?`, row.Kind).Limit(1)
 	if err := database.TakeUpAgain(ctx, revive, readBack, s.db.NewInsert().Model(row),
 		fmt.Errorf("%w: %q", ErrDestinationTaken, row.Name), "destination"); err != nil {
 		return nil, err
@@ -933,9 +933,9 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 		retired = nil
 		row := new(Outbound)
 		err := tx.NewSelect().Model(row).
-			Where("name = ?", DestinationKey(name)).
-			Where("kind = ?", DestinationKind(kind)).
-			Where("retired_at IS NULL").
+			Where(`"name" = ?`, DestinationKey(name)).
+			Where(`"kind" = ?`, DestinationKind(kind)).
+			Where(`"retired_at" IS NULL`).
 			Limit(1).Scan(ctx)
 		// A destination believed retired that was not goes on receiving every
 		// notification it takes, including about findings nobody has
@@ -949,9 +949,9 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 		}
 		at := s.now().UTC().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Outbound)(nil)).
-			Set("retired_at = ?", at).
-			Where("id = ?", row.ID).
-			Where("retired_at IS NULL").Exec(ctx)
+			Set(`"retired_at" = ?`, at).
+			Where(`"id" = ?`, row.ID).
+			Where(`"retired_at" IS NULL`).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("retire that destination: %w", err)
 		}

@@ -57,8 +57,8 @@ func TestWhatUpstreamCouldNotAnswerIsReachableAndSaysWhy(t *testing.T) {
 		// stored by its name alone so that a version on it does not give the
 		// product a new identity every night.
 		if _, err := r.DB.DB.NewUpdate().Table("scan").
-			Set("root_identifier = ?", "pkg:golang/github.com/other-corp/product@v2.0.0").
-			Where("content_hash = ?", "upstream-test").Exec(t.Context()); err != nil {
+			Set(`"root_identifier" = ?`, "pkg:golang/github.com/other-corp/product@v2.0.0").
+			Where(`"content_hash" = ?`, "upstream-test").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -67,13 +67,13 @@ func TestWhatUpstreamCouldNotAnswerIsReachableAndSaysWhy(t *testing.T) {
 		// and what this one asks is whether the answer can be read back.
 		asked := time.Now().UTC().Add(-time.Hour)
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("latest_checked_at = ?", asked).
-			Where("purl <> ?", "").Exec(t.Context()); err != nil {
+			Set(`"latest_checked_at" = ?`, asked).
+			Where(`"purl" <> ?`, "").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("latest_version = ?", "1.0.230").
-			Where("purl = ?", answered.Purl).Exec(t.Context()); err != nil {
+			Set(`"latest_version" = ?`, "1.0.230").
+			Where(`"purl" = ?`, answered.Purl).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -141,15 +141,15 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 			Components: []graph.Described{theirs},
 		}, nil)
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("latest_checked_at = ?", time.Now().UTC().Add(-time.Hour)).
-			Where("purl <> ?", "").Exec(t.Context()); err != nil {
+			Set(`"latest_checked_at" = ?`, time.Now().UTC().Add(-time.Hour)).
+			Where(`"purl" <> ?`, "").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
 		// The build's own declaration, which is a product's own name.
 		if _, err := r.DB.DB.NewUpdate().Table("scan").
-			Set("root_identifier = ?", "pkg:golang/github.com/unannounced-corp/product@v1").
-			Where("content_hash = ?", "upstream-narrowing").Exec(t.Context()); err != nil {
+			Set(`"root_identifier" = ?`, "pkg:golang/github.com/unannounced-corp/product@v1").
+			Where(`"content_hash" = ?`, "upstream-narrowing").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 

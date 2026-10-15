@@ -105,9 +105,9 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 
 		// Answering it clears the condition, with nobody dismissing anything.
 		if _, err := db.DB.NewUpdate().Model((*finding.FlawReport)(nil)).
-			Set("acknowledged_at = ?", time.Now().UTC().Truncate(time.Microsecond)).
-			Set("acknowledged_by = ?", answers.ID).
-			Where("id = ?", report.ID).Exec(ctx); err != nil {
+			Set(`"acknowledged_at" = ?`, time.Now().UTC().Truncate(time.Microsecond)).
+			Set(`"acknowledged_by" = ?`, answers.ID).
+			Where(`"id" = ?`, report.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, cleared, err := watch.Once(ctx); err != nil || cleared != 1 {

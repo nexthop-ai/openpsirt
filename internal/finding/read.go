@@ -64,7 +64,7 @@ func issuesNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]Vulner
 		// lookup for the page either way, and the row is already being read
 		// for the identifier beside it.
 		Column("id", "identifier", "severity", "description").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
 	for _, issue := range issues {
@@ -83,7 +83,7 @@ func componentsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]gr
 	var components []graph.Component
 	if err := db.NewSelect().Model(&components).
 		Column("id", "purl", "name", "version", "upstream_name", "upstream_version").
-		Where("id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these components are: %w", err)
 	}
 	for _, component := range components {

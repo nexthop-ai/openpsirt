@@ -98,7 +98,7 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	if query == nil {
 		return nil, nil
 	}
-	query = narrowToTerm(query.OrderExpr("p.identity").Limit(limit), term)
+	query = narrowToTerm(query.OrderExpr(`"p"."identity"`).Limit(limit), term)
 	// Narrowed here rather than in the caller, because a picker at a
 	// hundred people cannot fetch them all and filter in a browser — and
 	// the limit would cut the list before the term did, so the name
@@ -189,7 +189,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 	// reason the picker does it: the engines do not agree on what a
 	// case-insensitive comparison is.
 	var found []Mentionable
-	if err := query.Where("LOWER(p.identity) IN (?)", bun.List(wanted)).
+	if err := query.Where(`LOWER("p"."identity") IN (?)`, bun.List(wanted)).
 		Scan(ctx, &found); err != nil {
 		return nil, fmt.Errorf("read who may be told: %w", err)
 	}
@@ -210,8 +210,8 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 	}
 	return holdingAny(s.db.NewSelect().
 		TableExpr(`"person" AS "p"`).
-		ColumnExpr(`p.id AS "id"`).
-		ColumnExpr(`p.identity AS "identity"`).
-		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.identity) AS "name"`).
-		Where("p.deactivated_at IS NULL"), "p.id", enough, productID)
+		ColumnExpr(`"p"."id" AS "id"`).
+		ColumnExpr(`"p"."identity" AS "identity"`).
+		ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."identity") AS "name"`).
+		Where(`"p"."deactivated_at" IS NULL`), "p.id", enough, productID)
 }

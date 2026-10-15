@@ -160,8 +160,8 @@ func (s *Store) Mint(ctx context.Context, subject access.Subject, who publisher.
 		year := minted.Year()
 		var highest int
 		if err := tx.NewSelect().Model((*Advisory)(nil)).
-			ColumnExpr("COALESCE(MAX(mint_number), 0)").
-			Where("minted_year = ?", year).
+			ColumnExpr(`COALESCE(MAX("mint_number"), 0)`).
+			Where(`"minted_year" = ?`, year).
 			Scan(ctx, &highest); err != nil {
 			return err
 		}
@@ -216,7 +216,7 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"ad".*`).
 		ColumnExpr(`COALESCE("ae"."title", '') AS "title"`).
 		Join(`LEFT JOIN "advisory_edition" AS "ae" ON "ae"."id" = "ad"."edition_id"`).
-		Where("identifier_folded = ?", fold(identifier)).
+		Where(`"identifier_folded" = ?`, fold(identifier)).
 		Limit(1).Scan(ctx)
 	if err != nil {
 		return nil, database.FromRead(err, ErrNoSuchAdvisory,
@@ -229,10 +229,10 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
 		ColumnExpr(`COUNT(*) AS "live"`).
-		ColumnExpr(`SUM(CASE WHEN ac.product_id NOT IN (?) THEN 1 ELSE 0 END) AS "beyond"`,
+		ColumnExpr(`SUM(CASE WHEN "ac"."product_id" NOT IN (?) THEN 1 ELSE 0 END) AS "beyond"`,
 			bun.List(seen(subject))).
-		Where("ac.advisory_id = ?", row.ID).
-		Where("ac.removed_at IS NULL").
+		Where(`"ac"."advisory_id" = ?`, row.ID).
+		Where(`"ac"."removed_at" IS NULL`).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("check what advisory %q covers: %w", identifier, err)
 	}
@@ -243,7 +243,7 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 	// at its own visibility there: reading undisclosed work in a product does
 	// not reach a draft about its disclosed flaws.
 	whole, err := wholeIssues(s.db.NewSelect().TableExpr(`"advisory" AS "ad"`).
-		Where("ad.id = ?", row.ID), subject).Exists(ctx)
+		Where(`"ad"."id" = ?`, row.ID), subject).Exists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("check what advisory %q covers: %w", identifier, err)
 	}
@@ -326,8 +326,8 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		// refusal a caller can act on.
 		var held Cover
 		err := tx.NewSelect().Model(&held).
-			Where("advisory_id = ?", row.ID).
-			Where("product_id = ?", named.ID).
+			Where(`"advisory_id" = ?`, row.ID).
+			Where(`"product_id" = ?`, named.ID).
 			Where(finding.FiledUnder(filed.Issue), issue.ID).
 			Limit(1).Scan(ctx)
 		switch {
@@ -341,9 +341,9 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 			// it reads as what it is: on the advisory again, put there by
 			// whoever did that.
 			if _, err = tx.NewUpdate().Model((*Cover)(nil)).
-				Set("removed_at = NULL").Set("removed_by = NULL").
-				Set("added_at = ?", added).Set("added_by = ?", subject.ID).
-				Where("id = ?", held.ID).Exec(ctx); err != nil {
+				Set(`"removed_at" = NULL`).Set(`"removed_by" = NULL`).
+				Set(`"added_at" = ?`, added).Set(`"added_by" = ?`, subject.ID).
+				Where(`"id" = ?`, held.ID).Exec(ctx); err != nil {
 				return err
 			}
 			return reopen(ctx, tx, row, subject.ID, added)
@@ -403,12 +403,12 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		removed := s.now().UTC().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Cover)(nil)).
-			Set("removed_at = ?", removed).
-			Set("removed_by = ?", subject.ID).
-			Where("advisory_id = ?", row.ID).
-			Where("product_id = ?", named.ID).
+			Set(`"removed_at" = ?`, removed).
+			Set(`"removed_by" = ?`, subject.ID).
+			Where(`"advisory_id" = ?`, row.ID).
+			Where(`"product_id" = ?`, named.ID).
 			Where(finding.FiledUnder(filed.Issue), issue.ID).
-			Where("removed_at IS NULL").
+			Where(`"removed_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -488,25 +488,25 @@ func coveredBy(ctx context.Context, db bun.IDB, advisoryID int64) ([]Covered, er
 	var rows []Covered
 	err := db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
-		Join(`JOIN "product" AS "pd" ON pd.id = ac.product_id`).
+		Join(`JOIN "product" AS "pd" ON "pd"."id" = "ac"."product_id"`).
 		// Read as the issue the covered row stands for: a cover filed under
 		// an issue that merged into another covers the other, which is where
 		// the findings and the name a reader looks for are.
-		Join(`JOIN "vulnerability" AS "cv" ON cv.id = ac.vulnerability_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = cv.issue_id`).
-		ColumnExpr(`pd.name AS "product"`).
+		Join(`JOIN "vulnerability" AS "cv" ON "cv"."id" = "ac"."vulnerability_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "cv"."issue_id"`).
+		ColumnExpr(`"pd"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("pd")+` AS "product_name"`).
-		ColumnExpr(`pd.id AS "product_id"`).
-		ColumnExpr(`v.identifier AS "issue"`).
-		ColumnExpr(`v.id AS "issue_id"`).
-		ColumnExpr(`COALESCE(v.description, '') AS "summary"`).
-		ColumnExpr(`ac.added_at AS "added_at"`).
-		Where("ac.advisory_id = ?", advisoryID).
-		Where("ac.removed_at IS NULL").
+		ColumnExpr(`"pd"."id" AS "product_id"`).
+		ColumnExpr(`"v"."identifier" AS "issue"`).
+		ColumnExpr(`"v"."id" AS "issue_id"`).
+		ColumnExpr(`COALESCE("v"."description", '') AS "summary"`).
+		ColumnExpr(`"ac"."added_at" AS "added_at"`).
+		Where(`"ac"."advisory_id" = ?`, advisoryID).
+		Where(`"ac"."removed_at" IS NULL`).
 		// The order it was assembled in, which is the order somebody chose.
 		// Left to the engine, two documents generated from the same facts are
 		// different bytes.
-		OrderExpr("ac.added_at ASC, ac.id ASC").
+		OrderExpr(`"ac"."added_at" ASC, "ac"."id" ASC`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what an advisory covers: %w", err)
@@ -578,13 +578,13 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 	q := s.db.NewSelect().
 		TableExpr(`"advisory" AS "ad"`).
 		Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
-			WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL
-			  AND ac.product_id NOT IN (?))`, bun.List(seen(subject))).
+			WHERE "ac"."advisory_id" = "ad"."id" AND "ac"."removed_at" IS NULL
+			  AND "ac"."product_id" NOT IN (?))`, bun.List(seen(subject))).
 		// And one covering nothing is its minter's alone, for the reason
 		// reading one by name applies: covering nothing it satisfies every
 		// narrowing, and its title is prose somebody typed.
-		Where(`(ad.minted_by = ? OR EXISTS (SELECT 1 FROM "advisory_issue" AS "al"
-			WHERE al.advisory_id = ad.id AND al.removed_at IS NULL))`, subject.ID)
+		Where(`("ad"."minted_by" = ? OR EXISTS (SELECT 1 FROM "advisory_issue" AS "al"
+			WHERE "al"."advisory_id" = "ad"."id" AND "al"."removed_at" IS NULL))`, subject.ID)
 	// And every issue at a visibility they read in its product, which is
 	// what reading one by name asks as well.
 	q = wholeIssues(q, subject)
@@ -596,16 +596,16 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		// Any name of the issue the cover stands for, so an advisory
 		// covering a name that merged into another is found by either.
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ac2"
-			JOIN "vulnerability" AS "c2" ON c2.id = ac2.vulnerability_id
-			JOIN "vulnerability" AS "v2" ON v2.issue_id = c2.issue_id
-			WHERE ac2.advisory_id = ad.id AND ac2.removed_at IS NULL
-			  AND v2.identifier_folded = ?)`, fold(over.Vulnerability))
+			JOIN "vulnerability" AS "c2" ON "c2"."id" = "ac2"."vulnerability_id"
+			JOIN "vulnerability" AS "v2" ON "v2"."issue_id" = "c2"."issue_id"
+			WHERE "ac2"."advisory_id" = "ad"."id" AND "ac2"."removed_at" IS NULL
+			  AND "v2"."identifier_folded" = ?)`, fold(over.Vulnerability))
 	}
 	if over.Product != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ac3"
-			JOIN "product" AS "pd3" ON pd3.id = ac3.product_id
-			WHERE ac3.advisory_id = ad.id AND ac3.removed_at IS NULL
-			  AND pd3.name = ?)`, fold(over.Product))
+			JOIN "product" AS "pd3" ON "pd3"."id" = "ac3"."product_id"
+			WHERE "ac3"."advisory_id" = "ad"."id" AND "ac3"."removed_at" IS NULL
+			  AND "pd3"."name" = ?)`, fold(over.Product))
 	}
 
 	total, err := q.Clone().Count(ctx)
@@ -615,22 +615,22 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 
 	var rows []Listed
 	err = q.
-		ColumnExpr(`ad.identifier AS "identifier"`).
-		ColumnExpr(`COALESCE((SELECT ae2.title FROM "advisory_edition" AS "ae2"
-			WHERE ae2.id = ad.edition_id), '') AS "title"`).
+		ColumnExpr(`"ad"."identifier" AS "identifier"`).
+		ColumnExpr(`COALESCE((SELECT "ae2"."title" FROM "advisory_edition" AS "ae2"
+			WHERE "ae2"."id" = "ad"."edition_id"), '') AS "title"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_approval" AS "aa2"
-			WHERE aa2.edition_id = ad.edition_id AND aa2.withdrawn_at IS NULL) AS "agreed"`).
-		ColumnExpr(`ad.minted_at AS "minted_at"`).
+			WHERE "aa2"."edition_id" = "ad"."edition_id" AND "aa2"."withdrawn_at" IS NULL) AS "agreed"`).
+		ColumnExpr(`"ad"."minted_at" AS "minted_at"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_issue" AS "ai2"
-			WHERE ai2.advisory_id = ad.id AND ai2.removed_at IS NULL) AS "issues"`).
-		ColumnExpr(`(SELECT COUNT(DISTINCT ai3.product_id) FROM "advisory_issue" AS "ai3"
-			WHERE ai3.advisory_id = ad.id AND ai3.removed_at IS NULL) AS "products"`).
+			WHERE "ai2"."advisory_id" = "ad"."id" AND "ai2"."removed_at" IS NULL) AS "issues"`).
+		ColumnExpr(`(SELECT COUNT(DISTINCT "ai3"."product_id") FROM "advisory_issue" AS "ai3"
+			WHERE "ai3"."advisory_id" = "ad"."id" AND "ai3"."removed_at" IS NULL) AS "products"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_issuance" AS "ai4"
-			WHERE ai4.advisory_id = ad.id) AS "issuances"`).
+			WHERE "ai4"."advisory_id" = "ad"."id") AS "issuances"`).
 		// Newest first, and the identifier to break a tie: two minted in one
 		// microsecond would otherwise come back in whichever order the engine
 		// chose, and a page of them would not be stable between reads.
-		OrderExpr("ad.minted_at DESC, ad.identifier DESC").
+		OrderExpr(`"ad"."minted_at" DESC, "ad"."identifier" DESC`).
 		Limit(limit).Offset(offset).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -718,14 +718,14 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 	}
 	grouped := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`SUM(CASE WHEN f.closed_at IS NULL THEN 1 ELSE 0 END) AS "still_open"`).
-		Where("st.product_id = ?", named.ID).
-		Where("f.kind = ?", finding.Entered).
-		Where("f.visibility IN (?)", bun.List(access.Visible(subject, named.ID))).
-		GroupExpr("f.vulnerability_id")
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "still_open"`).
+		Where(`"st"."product_id" = ?`, named.ID).
+		Where(`"f"."kind" = ?`, finding.Entered).
+		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, named.ID))).
+		GroupExpr(`"f"."vulnerability_id"`)
 	var total int
 	if err := s.db.NewSelect().TableExpr(`(?) AS "recorded_flaw"`, grouped).
 		ColumnExpr("COUNT(*)").Scan(ctx, &total); err != nil {
@@ -734,11 +734,11 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 	var rows []Nameable
 	err = s.db.NewSelect().
 		TableExpr(`(?) AS "recorded_flaw"`, grouped).
-		Join(`JOIN "vulnerability" AS "vu" ON vu.id = recorded_flaw.vulnerability_id`).
-		ColumnExpr(`vu.identifier AS "identifier"`).
-		ColumnExpr(`COALESCE(vu.description, '') AS "summary"`).
+		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "recorded_flaw"."vulnerability_id"`).
+		ColumnExpr(`"vu"."identifier" AS "identifier"`).
+		ColumnExpr(`COALESCE("vu"."description", '') AS "summary"`).
 		ColumnExpr(`recorded_flaw.still_open AS "still_open"`).
-		OrderExpr("vu.identifier ASC").
+		OrderExpr(`"vu"."identifier" ASC`).
 		Limit(mostNameable).
 		Scan(ctx, &rows)
 	if err != nil {

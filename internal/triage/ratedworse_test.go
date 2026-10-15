@@ -28,8 +28,8 @@ func (f *fixture) openAt(t *testing.T, identity string) triage.Place {
 func (f *fixture) rateIssue(t *testing.T, centi int) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Table("vulnerability").
-		Set("score_centi = ?", centi).
-		Where("id = ?", f.issue).Exec(t.Context()); err != nil {
+		Set(`"score_centi" = ?`, centi).
+		Where(`"id" = ?`, f.issue).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -266,8 +266,8 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 			t.Fatal("the sibling was not written after the claim it stands beside")
 		}
 		if _, err := f.db.DB.NewUpdate().Table("decision").
-			Set("state = ?", triage.LapsedState).Set("ended_at = ?", time.Now().UTC()).
-			Set("live_key = NULL").Where("id = ?", first.ID).Exec(ctx); err != nil {
+			Set(`"state" = ?`, triage.LapsedState).Set(`"ended_at" = ?`, time.Now().UTC()).
+			Set(`"live_key" = NULL`).Where(`"id" = ?`, first.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -285,8 +285,8 @@ func TestASiblingClaimAtAnotherVersionReplacesNothing(t *testing.T) {
 // holdUnder moves a finding to another issue.
 func (f *fixture) holdUnder(t *testing.T, findingID, issue int64) {
 	t.Helper()
-	if _, err := f.db.DB.NewUpdate().Table("finding").Set("vulnerability_id = ?", issue).
-		Where("id = ?", findingID).Exec(t.Context()); err != nil {
+	if _, err := f.db.DB.NewUpdate().Table("finding").Set(`"vulnerability_id" = ?`, issue).
+		Where(`"id" = ?`, findingID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -322,8 +322,8 @@ func TestARiseLapsesAClaimUnderAMergedNameAtTheFindingsOfTheIssueItIsReadAs(t *t
 		// The name merges into the fixture's issue, which now holds the
 		// finding at the first place. The second place's finding is another
 		// issue's.
-		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set("issue_id = ?", f.issue).
-			Where("id = ?", filed).Exec(ctx); err != nil {
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").Set(`"issue_id" = ?`, f.issue).
+			Where(`"id" = ?`, filed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		f.holdUnder(t, held["merged"], f.issue)

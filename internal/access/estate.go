@@ -54,8 +54,8 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 			// success on one would tell an administrator they had granted
 			// something that does not exist.
 			n, err := s.db.NewSelect().Model((*EstateGrant)(nil)).
-				Where("person_id = ?", personID).Where("role = ?", role).
-				Where("active = ?", true).Count(ctx)
+				Where(`"person_id" = ?`, personID).Where(`"role" = ?`, role).
+				Where(`"active" = ?`, true).Count(ctx)
 			return n > 0, err
 		})
 	return err
@@ -73,7 +73,7 @@ func (s *Store) GrantEstateRole(ctx context.Context, personID int64, role Role) 
 // and anything still wanted is granted per product deliberately.
 func (s *Store) WithdrawEstateRole(ctx context.Context, personID int64, role Role) error {
 	res, err := s.db.NewDelete().Model((*EstateGrant)(nil)).
-		Where("person_id = ?", personID).Where("role = ?", role).Exec(ctx)
+		Where(`"person_id" = ?`, personID).Where(`"role" = ?`, role).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("withdraw %q across every product: %w", role, err)
 	}
@@ -85,7 +85,7 @@ func (s *Store) WithdrawEstateRole(ctx context.Context, personID int64, role Rol
 func (s *Store) EstateGrants(ctx context.Context, personID int64) ([]EstateGrant, error) {
 	var grants []EstateGrant
 	if err := s.db.NewSelect().Model(&grants).
-		Where("person_id = ?", personID).Order("role").Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Order("role").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what they hold everywhere: %w", err)
 	}
 	return grants, nil

@@ -141,7 +141,7 @@ func (s *Store) referencesTo(ctx context.Context,
 
 	var rows []finding.Reference
 	err := s.db.NewSelect().Model(&rows).
-		Where("vr.vulnerability_id = ?", issue.ID).
+		Where(`"vr"."vulnerability_id" = ?`, issue.ID).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read where this issue is written up: %w", err)
@@ -213,9 +213,9 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 
 	var credits []string
 	err := s.db.NewSelect().Model((*finding.FlawReport)(nil)).
-		ColumnExpr("fr.credit").
+		ColumnExpr(`"fr"."credit"`).
 		Where(finding.FiledUnder(filed.ReportIssue), issueID).
-		Where("fr.product_id = ?", productID).
+		Where(`"fr"."product_id" = ?`, productID).
 		Scan(ctx, &credits)
 	if err != nil {
 		return nil, fmt.Errorf("read who is credited for this: %w", err)
@@ -415,10 +415,10 @@ func (s *noFix) add(release, mitigation string) {
 func weaknessOf(ctx context.Context, db bun.IDB, issueID int64) (*Weakness, error) {
 	var held []string
 	if err := db.NewSelect().Model((*finding.Weakness)(nil)).
-		ColumnExpr("vw.cwe").
-		Where("vw.vulnerability_id = ?", issueID).
-		Where("vw.is_primary = ?", true).
-		OrderExpr("vw.cwe").
+		ColumnExpr(`"vw"."cwe"`).
+		Where(`"vw"."vulnerability_id" = ?`, issueID).
+		Where(`"vw"."is_primary" = ?`, true).
+		OrderExpr(`"vw"."cwe"`).
 		Limit(1).Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}

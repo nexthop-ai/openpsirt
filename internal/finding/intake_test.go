@@ -576,7 +576,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 		}
 		var reports int
 		if err := f.db.DB.NewSelect().TableExpr(`"flaw_report" AS "fr"`).
-			ColumnExpr("COUNT(*)").Where("fr.product_id = ?", f.productID).
+			ColumnExpr("COUNT(*)").Where(`"fr"."product_id" = ?`, f.productID).
 			Scan(t.Context(), &reports); err != nil {
 			t.Fatal(err)
 		}
@@ -585,7 +585,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 		}
 		var disclose *time.Time
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr("MIN(f.disclose_at)").Where("f.vulnerability_id = ?", issue).
+			ColumnExpr(`MIN("f"."disclose_at")`).Where(`"f"."vulnerability_id" = ?`, issue).
 			Scan(t.Context(), &disclose); err != nil {
 			t.Fatal(err)
 		}
@@ -629,7 +629,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 		}
 		disclose = nil
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr("MIN(f.disclose_at)").Where("f.vulnerability_id = ?", issue).
+			ColumnExpr(`MIN("f"."disclose_at")`).Where(`"f"."vulnerability_id" = ?`, issue).
 			Scan(t.Context(), &disclose); err != nil {
 			t.Fatal(err)
 		}

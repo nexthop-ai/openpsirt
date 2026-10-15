@@ -105,7 +105,7 @@ func TestALicenseReadFromAnElementReachesTheStoredComponent(t *testing.T) {
 		// component of the document.
 		var license string
 		if err := db.DB.NewSelect().TableExpr(`"component" AS "c"`).
-			ColumnExpr("COALESCE(c.license, '')").Where("c.name = ?", "hyper").
+			ColumnExpr(`COALESCE("c"."license", '')`).Where(`"c"."name" = ?`, "hyper").
 			Scan(ctx, &license); err != nil {
 			t.Fatal(err)
 		}

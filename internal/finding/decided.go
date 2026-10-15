@@ -97,12 +97,12 @@ func standsAs(product string, state decisionState) string {
 	// from outside it is the row's identifier, which is the shape the state
 	// filter's derived table already uses on all four engines.
 	return `EXISTS (SELECT 1 FROM "finding" AS "f2"
-			JOIN "component" AS "c" ON c.id = f2.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id
+			JOIN "component" AS "c" ON "c"."id" = "f2"."component_id"
+			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f2"."consumer_id"
 			JOIN (` + Decisions + `) ON ` + DecisionAtPlace("f2") + `
-			JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			WHERE f2.id = f.id
-			  AND de.product_id = ` + product + `
+			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			WHERE "f2"."id" = "f"."id"
+			  AND "de"."product_id" = ` + product + `
 			  AND ` + coversHere + state.condition + `)`
 }
 
@@ -116,7 +116,7 @@ func standsAs(product string, state decisionState) string {
 // checks.
 func decidedAs(product string, state decisionState) string {
 	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM ` + Decisions + `
-			JOIN "claim" AS "cl" ON cl.id = de.claim_id
+			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 			WHERE ` + DecisionAt(product) + `
 			  AND ` + coversHere + state.condition + `) THEN 1 ELSE 0 END) AS "` + state.alias + `"`
 }
@@ -138,7 +138,7 @@ func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionSt
 		decided = decided.ColumnExpr(`MAX(CASE WHEN `+strings.TrimPrefix(state.condition, " AND ")+
 			` THEN 1 ELSE 0 END) AS "`+state.alias+`"`, state.args...)
 	}
-	return decided.Where("de.product_id = ?", productID)
+	return decided.Where(`"de"."product_id" = ?`, productID)
 }
 
 // decisionsOutward is every open finding a decision covers, one row per
@@ -157,9 +157,9 @@ func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionSt
 // product once per row.
 func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
 	return decisionsOver(q, `"finding" AS "f2"`).
-		ColumnExpr(`f2.id AS "finding_id"`).
-		Where("f2.closed_at IS NULL").
-		GroupExpr("f2.id")
+		ColumnExpr(`"f2"."id" AS "finding_id"`).
+		Where(`"f2"."closed_at" IS NULL`).
+		GroupExpr(`"f2"."id"`)
 }
 
 // decisionsOver is every decision reaching a place read from source as "f2",
@@ -173,7 +173,7 @@ func decisionsOver(q *bun.SelectQuery, source string, args ...any) *bun.SelectQu
 		Join(DecisionIssue).
 		Join(`CROSS JOIN `+source, args...).
 		Where(DecisionAtPlace("f2")).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		Where(coversAsked)
 }
 
@@ -200,10 +200,10 @@ var coversAsked = func() string {
 	component, consumer := componentMatches, consumerMatches
 	covers := strings.NewReplacer(
 		component, `EXISTS (SELECT 1 FROM "component" AS "c"
-			WHERE c.id = f2.component_id AND `+component+`)`,
-		consumer, `((f2.consumer_id IS NULL AND COALESCE(de.consumer_upstream_version, '') = '')
+			WHERE "c"."id" = "f2"."component_id" AND `+component+`)`,
+		consumer, `(("f2"."consumer_id" IS NULL AND COALESCE("de"."consumer_upstream_version", '') = '')
 			OR EXISTS (SELECT 1 FROM "component" AS "uc"
-			WHERE uc.id = f2.consumer_id AND `+consumer+`))`,
+			WHERE "uc"."id" = "f2"."consumer_id" AND `+consumer+`))`,
 	).Replace(coversHere)
 	if strings.Count(covers, "EXISTS") != 2 {
 		panic("finding: KeyMatches no longer compares the versions coversAsked moves")

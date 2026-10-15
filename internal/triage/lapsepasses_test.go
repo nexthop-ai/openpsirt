@@ -22,7 +22,7 @@ import (
 type lapsableReads struct{ n atomic.Int64 }
 
 func (c *lapsableReads) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if strings.HasPrefix(e.Query, "SELECT de.id FROM") && strings.Contains(e.Query, "NOT EXISTS") {
+	if strings.HasPrefix(e.Query, `SELECT "de"."id" FROM`) && strings.Contains(e.Query, "NOT EXISTS") {
 		c.n.Add(1)
 	}
 	return ctx

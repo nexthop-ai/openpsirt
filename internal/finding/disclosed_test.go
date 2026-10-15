@@ -19,8 +19,8 @@ func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions in
 	t.Helper()
 	var err error
 	findings, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-		Where("vulnerability_id = ?", issue).
-		Where("visibility = ?", access.Private).Count(t.Context())
+		Where(`"vulnerability_id" = ?`, issue).
+		Where(`"visibility" = ?`, access.Private).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,8 +37,8 @@ func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions in
 func (f *fixture) dated(t *testing.T, issue int64, at time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("disclose_at = ?", at.UTC()).
-		Where("vulnerability_id = ?", issue).Exec(t.Context()); err != nil {
+		Set(`"disclose_at" = ?`, at.UTC()).
+		Where(`"vulnerability_id" = ?`, issue).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -56,7 +56,7 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 
 		var places []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&places).
-			Where("vulnerability_id = ?", issue).Order("id").Scan(ctx); err != nil {
+			Where(`"vulnerability_id" = ?`, issue).Order("id").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if len(places) == 0 {
@@ -64,8 +64,8 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 		}
 		// Closed, so the place disclosed is one no list of open work shows.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC()).
-			Where("id = ?", places[0].ID).Exec(ctx); err != nil {
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, places[0].ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		f.decided(t, who.ID, issue, places[0].PlaceIdentity, "proposed", "1.0", "")
@@ -246,7 +246,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		other := f.productOf(t, elsewhere)
 		var there finding.Finding
 		if err := f.db.DB.NewSelect().Model(&there).
-			Where("vulnerability_id = ?", issue).Limit(1).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" = ?`, issue).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		there.ID = 0
@@ -283,8 +283,8 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		}
 		var private int
 		private, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("target_id = ?", elsewhere).
-			Where("visibility = ?", access.Private).Count(ctx)
+			Where(`"target_id" = ?`, elsewhere).
+			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil || private != 1 {
 			t.Errorf("the other product's finding is undisclosed %d times (%v), want once", private, err)
 		}
@@ -342,7 +342,7 @@ func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
 		issue := f.embargoed(t, who)
 		var places []finding.Finding
 		if err := f.db.DB.NewSelect().Model(&places).
-			Where("vulnerability_id = ?", issue).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" = ?`, issue).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		closed := places[0]
@@ -358,9 +358,9 @@ func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("disclose_at = ?", now.Add(-time.Hour)).
-			Where("vulnerability_id = ?", issue).
-			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			Set(`"disclose_at" = ?`, now.Add(-time.Hour)).
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -392,8 +392,8 @@ func TestADisclosedIssueCarriesNoDateAndItsHistoryIsPublic(t *testing.T) {
 			t.Fatal(err)
 		}
 		dated, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			Where("vulnerability_id = ?", issue).
-			Where("disclose_at IS NOT NULL").Count(ctx)
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"disclose_at" IS NOT NULL`).Count(ctx)
 		if err != nil || dated != 0 {
 			t.Errorf("%d disclosed findings still carry a disclosure date (%v)", dated, err)
 		}

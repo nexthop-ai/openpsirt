@@ -727,7 +727,7 @@ func TestAKeysLastUseIsRewrittenOnlyOnceItIsStale(t *testing.T) {
 			t.Helper()
 			var used *time.Time
 			if err := f.db.DB.NewSelect().TableExpr(`"api_key"`).Column("last_used_at").
-				Where("id = ?", key.ID).Scan(ctx, &used); err != nil {
+				Where(`"id" = ?`, key.ID).Scan(ctx, &used); err != nil {
 				t.Fatal(err)
 			}
 			return used
@@ -740,8 +740,8 @@ func TestAKeysLastUseIsRewrittenOnlyOnceItIsStale(t *testing.T) {
 		}
 		set := func(at time.Time) {
 			t.Helper()
-			if _, err := f.db.DB.NewUpdate().TableExpr(`"api_key"`).Set("last_used_at = ?", at).
-				Where("id = ?", key.ID).Exec(ctx); err != nil {
+			if _, err := f.db.DB.NewUpdate().TableExpr(`"api_key"`).Set(`"last_used_at" = ?`, at).
+				Where(`"id" = ?`, key.ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -787,7 +787,7 @@ func TestTwoRecordingsOfOnePersonAtOnceBothSucceed(t *testing.T) {
 			t.Errorf("the first of two recordings at once answered %v", err)
 		}
 		recorded, err := db.DB.NewSelect().TableExpr(`"person"`).
-			Where("identity = ?", "someone@example.com").Count(ctx)
+			Where(`"identity" = ?`, "someone@example.com").Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -385,7 +385,7 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		// agreement to a claim's words, so it takes effect on all of them
 		// together or the act is half decided.
 		standing, err := r.DB.DB.NewSelect().Table("decision").
-			Where("claim_id = ?", restored.ClaimID).Where("state = ?", "approved").
+			Where(`"claim_id" = ?`, restored.ClaimID).Where(`"state" = ?`, "approved").
 			Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -396,7 +396,7 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		}
 		// And the agreement is recorded once, not once per row.
 		carried, err := r.DB.DB.NewSelect().Table("claim_approval").
-			Where("claim_id = ?", restored.ClaimID).Count(t.Context())
+			Where(`"claim_id" = ?`, restored.ClaimID).Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

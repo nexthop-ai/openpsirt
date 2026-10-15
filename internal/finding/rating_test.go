@@ -104,7 +104,7 @@ func TestAPublishedScoreIsStoredAsTheHundredthsItStates(t *testing.T) {
 		}
 		var row finding.Vulnerability
 		if err := db.DB.NewSelect().Model(&row).
-			Where("id = ?", filed["CVE-2026-6101"]).Scan(ctx); err != nil {
+			Where(`"id" = ?`, filed["CVE-2026-6101"]).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, each := range []struct {
@@ -137,7 +137,7 @@ func TestTheIssuesNumberIsTheNewestRatingWhole(t *testing.T) {
 			t.Helper()
 			var row finding.Vulnerability
 			if err := db.DB.NewSelect().Model(&row).
-				Where("identifier = ?", "CVE-2026-6102").Scan(ctx); err != nil {
+				Where(`"identifier" = ?`, "CVE-2026-6102").Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return row

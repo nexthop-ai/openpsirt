@@ -97,7 +97,7 @@ func TestSomethingUndisclosedReachesOnlyWhoMayReadIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
+			Set(`"visibility" = ?`, "private").
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -263,8 +263,8 @@ func TestHandingWorkOverDoesNotDiscloseItToTheRecipient(t *testing.T) {
 			t.Fatal(got.Body.String())
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", access.Private).
-			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -275,8 +275,8 @@ func TestHandingWorkOverDoesNotDiscloseItToTheRecipient(t *testing.T) {
 				got.Code, got.Body.String())
 		}
 		held, err := r.DB.DB.NewSelect().Table("finding").
-			Where("closed_at IS NULL").
-			Where(`assigned_to IN (SELECT party_id FROM "person" WHERE identity = ?)`,
+			Where(`"closed_at" IS NULL`).
+			Where(`"assigned_to" IN (SELECT "party_id" FROM "person" WHERE "identity" = ?)`,
 				"private-triage").Count(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -457,7 +457,7 @@ func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
 		}
 		var held []int64
 		if err := r.DB.DB.NewSelect().Table("finding").Column("assigned_to").
-			Where("assigned_to IS NOT NULL").Scan(ctx, &held); err != nil || len(held) == 0 {
+			Where(`"assigned_to" IS NOT NULL`).Scan(ctx, &held); err != nil || len(held) == 0 {
 			t.Fatalf("nothing was assigned to begin with: %v", err)
 		}
 		first := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/people/triager/deactivation", "")
@@ -470,7 +470,7 @@ func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
 
 		// What a hand-back that failed after the deactivation leaves behind.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_to = ?", held[0]).Where("closed_at IS NULL").Exec(ctx); err != nil {
+			Set(`"assigned_to" = ?`, held[0]).Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -490,7 +490,7 @@ func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
 				again.Already, again.Released)
 		}
 		still, err := r.DB.DB.NewSelect().Table("finding").
-			Where("assigned_to IS NOT NULL").Where("closed_at IS NULL").Count(ctx)
+			Where(`"assigned_to" IS NOT NULL`).Where(`"closed_at" IS NULL`).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}

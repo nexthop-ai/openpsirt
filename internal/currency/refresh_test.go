@@ -136,8 +136,8 @@ func read(t *testing.T, db *database.DB) map[string]stored {
 	var rows []stored
 	err := db.DB.NewSelect().
 		TableExpr("\"component\" AS \"c\"").
-		ColumnExpr("c.purl, c.latest_version, c.latest_released_at, c.latest_checked_at").
-		ColumnExpr("c.summary, c.project_url").
+		ColumnExpr(`"c"."purl", "c"."latest_version", "c"."latest_released_at", "c"."latest_checked_at"`).
+		ColumnExpr(`"c"."summary", "c"."project_url"`).
 		Scan(t.Context(), &rows)
 	if err != nil {
 		t.Fatalf("read components: %v", err)
@@ -514,7 +514,7 @@ func TestAVersionAnsweredWithNoDateKeepsTheDateItHad(t *testing.T) {
 		}, nil)
 		shipped := time.Date(2021, 2, 20, 0, 0, 0, 0, time.UTC)
 		if _, err := db.DB.NewUpdate().Table("component").
-			Set("latest_released_at = ?", shipped).Where("1 = 1").Exec(t.Context()); err != nil {
+			Set(`"latest_released_at" = ?`, shipped).Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -975,7 +975,7 @@ func carried(t *testing.T, w *fixture.World, root string, purls ...string) {
 	for _, purl := range purls {
 		var id int64
 		err := w.DB.DB.NewSelect().TableExpr(`"component" AS "c"`).
-			ColumnExpr("c.id").Where("c.purl = ?", purl).Scan(ctx, &id)
+			ColumnExpr(`"c"."id"`).Where(`"c"."purl" = ?`, purl).Scan(ctx, &id)
 		if err != nil {
 			t.Fatalf("find %s: %v", purl, err)
 		}

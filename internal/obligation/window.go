@@ -180,8 +180,8 @@ var ErrCountedFrom = refusal.New("another window in force counts from this one")
 // changes can pass through no row either one names.
 func holdWindows(ctx context.Context, tx bun.IDB) error {
 	if _, err := tx.NewUpdate().Model((*Window)(nil)).
-		Set("live_name = live_name").
-		Where("retired_at IS NULL").
+		Set(`"live_name" = "live_name"`).
+		Where(`"retired_at" IS NULL`).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("hold the windows in force: %w", err)
 	}
@@ -290,7 +290,7 @@ func (w Window) As(subject access.Subject) (Window, bool) {
 func (s *Store) inForce(ctx context.Context) ([]Window, error) {
 	var windows []Window
 	err := s.db.NewSelect().Model(&windows).
-		Where("ow.retired_at IS NULL").
+		Where(`"ow"."retired_at" IS NULL`).
 		Order("ow.length_hours ASC", "ow.id ASC").
 		Scan(ctx)
 	if err != nil {
@@ -325,7 +325,7 @@ func withFrom(ctx context.Context, db bun.IDB, windows []Window) ([]Window, erro
 	}
 	var named []Window
 	if err := db.NewSelect().Model(&named).Column("ow.id", "ow.name").
-		Where("ow.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"ow"."id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the windows others count from: %w", err)
 	}
 	names := make(map[int64]string, len(named))
@@ -369,7 +369,7 @@ func countsFrom(ctx context.Context, tx bun.IDB, self int64, from int64,
 		}
 		seen[at.ID] = true
 		next := new(Window)
-		if err := tx.NewSelect().Model(next).Where("ow.id = ?", *at.FromID).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(next).Where(`"ow"."id" = ?`, *at.FromID).Scan(ctx); err != nil {
 			return "", fmt.Errorf("read the window another counts from: %w", err)
 		}
 		at = next
@@ -382,7 +382,7 @@ func countsFrom(ctx context.Context, tx bun.IDB, self int64, from int64,
 func dependents(ctx context.Context, tx bun.IDB, id int64) ([]Window, error) {
 	var windows []Window
 	if err := tx.NewSelect().Model(&windows).
-		Where("ow.from_window_id = ?", id).Where("ow.retired_at IS NULL").
+		Where(`"ow"."from_window_id" = ?`, id).Where(`"ow"."retired_at" IS NULL`).
 		Order("ow.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the windows counting from a window: %w", err)
 	}
@@ -406,11 +406,11 @@ func withLimits(ctx context.Context, db bun.IDB, windows []Window) ([]Window, er
 	}
 	err := db.NewSelect().
 		TableExpr(`"obligation_window_product" AS "owp"`).
-		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
-		ColumnExpr(`owp.window_id AS "window_id"`).
-		ColumnExpr(`owp.product_id AS "product_id"`).
-		ColumnExpr(`p.name AS "product"`).
-		Where("owp.window_id IN (?)", bun.List(ids)).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "owp"."product_id"`).
+		ColumnExpr(`"owp"."window_id" AS "window_id"`).
+		ColumnExpr(`"owp"."product_id" AS "product_id"`).
+		ColumnExpr(`"p"."name" AS "product"`).
+		Where(`"owp"."window_id" IN (?)`, bun.List(ids)).
 		Order("p.name ASC").
 		Scan(ctx, &limits)
 	if err != nil {
@@ -460,9 +460,9 @@ func productsNamed(ctx context.Context, tx bun.IDB, names []string) ([]int64, []
 	}
 	if err := tx.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		ColumnExpr(`p.id AS "id"`).
-		ColumnExpr(`p.name AS "name"`).
-		Where("p.name IN (?)", bun.List(folded)).
+		ColumnExpr(`"p"."id" AS "id"`).
+		ColumnExpr(`"p"."name" AS "name"`).
+		Where(`"p"."name" IN (?)`, bun.List(folded)).
 		Order("p.name ASC").
 		Scan(ctx, &found); err != nil {
 		return nil, nil, fmt.Errorf("read the products a window names: %w", err)
@@ -486,7 +486,7 @@ func productsNamed(ctx context.Context, tx bun.IDB, names []string) ([]int64, []
 // limit replaces the products a window applies to.
 func limit(ctx context.Context, tx bun.IDB, windowID int64, products []int64) error {
 	if _, err := tx.NewDelete().Model((*WindowProduct)(nil)).
-		Where("window_id = ?", windowID).Exec(ctx); err != nil {
+		Where(`"window_id" = ?`, windowID).Exec(ctx); err != nil {
 		return fmt.Errorf("clear the products a window applies to: %w", err)
 	}
 	if len(products) == 0 {
@@ -615,17 +615,17 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 		}
 		live := typedname.Matching(said.Name)
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
-			Set("name = ?", said.Name).
-			Set("length_hours = ?", said.Hours).
-			Set("lead_hours = ?", said.LeadHours).
-			Set("live_name = ?", live).
-			Set("from_window_id = ?", said.From).
-			Set("from_fix = ?", said.FromFix).
-			Where("id = ?", id).
+			Set(`"name" = ?`, said.Name).
+			Set(`"length_hours" = ?`, said.Hours).
+			Set(`"lead_hours" = ?`, said.LeadHours).
+			Set(`"live_name" = ?`, live).
+			Set(`"from_window_id" = ?`, said.From).
+			Set(`"from_fix" = ?`, said.FromFix).
+			Where(`"id" = ?`, id).
 			// Still in force when this lands. A retirement committed since the
 			// read above leaves nothing to change, and a trail row saying it
 			// changed would be false.
-			Where("retired_at IS NULL").
+			Where(`"retired_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			if database.IsDuplicate(err) {
@@ -685,12 +685,12 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		}
 		window = &named[0]
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
-			Set("retired_at = ?", s.now().Truncate(time.Microsecond)).
-			Set("live_name = ?", nil).
-			Where("id = ?", id).
+			Set(`"retired_at" = ?`, s.now().Truncate(time.Microsecond)).
+			Set(`"live_name" = ?`, nil).
+			Where(`"id" = ?`, id).
 			// Still in force when this lands, so two retirements at once
 			// record one act rather than two.
-			Where("retired_at IS NULL").
+			Where(`"retired_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("retire a window: %w", err)
@@ -711,7 +711,7 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
 	window := new(Window)
 	if err := tx.NewSelect().Model(window).
-		Where("ow.id = ?", id).Where("ow.retired_at IS NULL").
+		Where(`"ow"."id" = ?`, id).Where(`"ow"."retired_at" IS NULL`).
 		Scan(ctx); err != nil {
 		if database.IsNoRows(err) {
 			return nil, ErrNoSuchWindow

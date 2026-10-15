@@ -27,13 +27,13 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 		// Agreed to as a medium, and the world re-rates it critical after the
 		// agreement: a higher band, which a rescoring within one is not.
 		if _, err := r.DB.DB.NewUpdate().Table("decision").
-			Set("severity_centi = ?", 550).
-			Where("claim_id = ?", claimed).Exec(t.Context()); err != nil {
+			Set(`"severity_centi" = ?`, 550).
+			Where(`"claim_id" = ?`, claimed).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
-			Set("score_centi = ?", 980).Set("severity = ?", "critical").
-			Where("identifier = ?", "CVE-2026-CURL1").Exec(t.Context()); err != nil {
+			Set(`"score_centi" = ?`, 980).Set(`"severity" = ?`, "critical").
+			Where(`"identifier" = ?`, "CVE-2026-CURL1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -56,7 +56,7 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 		}
 		// And every row of it waits, rather than the one that escalated.
 		waiting, err := r.DB.DB.NewSelect().Table("decision").
-			Where("claim_id = ?", restored.ClaimID).Where("state = ?", "proposed").
+			Where(`"claim_id" = ?`, restored.ClaimID).Where(`"state" = ?`, "proposed").
 			Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -167,7 +167,7 @@ func TestTwoLapsedRowsAtOnePlaceAreOneReAffirmation(t *testing.T) {
 		// is that the act reads one place out of two rows.
 		var rows []triage.Decision
 		if err := r.DB.DB.NewSelect().Model(&rows).
-			Where("de.claim_id = ?", claimed).Order("de.id ASC").Scan(ctx); err != nil {
+			Where(`"de"."claim_id" = ?`, claimed).Order("de.id ASC").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) == 0 {

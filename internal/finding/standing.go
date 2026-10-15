@@ -86,7 +86,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// out of the undecided figure while putting it in no other. Spelled
 	// through the same helper as the rest, so the version match is one
 	// expression.
-	anyClaim := decisionState{"any_claim", " AND de.state <> ?", []any{"withdrawn"}}
+	anyClaim := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{"withdrawn"}}
 	// One row per build, issue and component. The build rows count these
 	// directly, and the product's totals fold them again by issue and
 	// component, in one pass here. The table of decided places is most of the
@@ -96,11 +96,11 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// exploitation flag a maximum.
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// The flag rather than the urgency's top bands, which answer
 		// "some exploitation". This total is the feed's word about the
 		// world, and a product recorded as attacked here is a different
@@ -118,12 +118,12 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		AnyClaim        int        `bun:"any_claim"`
 		Approved        int        `bun:"approved_here"`
 	}
-	err = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`,
+	err = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`,
 		decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
 		Where(inThisProductAs("f.target_id"), productID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.target_id, f.vulnerability_id, f.component_id").
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &groups)
 	if err != nil {
 		return nil, whole, fmt.Errorf("read how this product's builds stand: %w", err)
@@ -201,12 +201,12 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
-		Where("tg.id IN (?)", bun.List(ids)).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		ColumnExpr(`"tg"."id" AS "target_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		Where(`"tg"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &named); err != nil {
 		return nil, whole, fmt.Errorf("read the builds of this product: %w", err)
 	}

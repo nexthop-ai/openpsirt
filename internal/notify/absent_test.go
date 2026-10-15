@@ -126,7 +126,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 			away.ID: long, idle.ID: long, here.ID: recent, admin.ID: recent,
 		} {
 			if _, err := db.DB.NewUpdate().Table("person").
-				Set("last_seen_at = ?", seen).Where("id = ?", who).Exec(ctx); err != nil {
+				Set(`"last_seen_at" = ?`, seen).Where(`"id" = ?`, who).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -196,8 +196,8 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		// They come back, and the condition clears itself — nobody dismisses
 		// it, which is what makes these conditions rather than events.
 		if _, err := db.DB.NewUpdate().Table("person").
-			Set("last_seen_at = ?", time.Now().UTC()).
-			Where("id = ?", away.ID).Exec(ctx); err != nil {
+			Set(`"last_seen_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, away.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, cleared, err := watch.Once(ctx); err != nil || cleared != 1 {
@@ -237,8 +237,8 @@ func TestAnAbsenceShorterThanADayIsSaidPlainly(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := db.DB.NewUpdate().Table("person").
-			Set("last_seen_at = ?", time.Now().UTC().Add(-13*time.Hour)).
-			Where("id = ?", away.ID).Exec(ctx); err != nil {
+			Set(`"last_seen_at" = ?`, time.Now().UTC().Add(-13*time.Hour)).
+			Where(`"id" = ?`, away.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		assignOne(t, w, away.PartyID)

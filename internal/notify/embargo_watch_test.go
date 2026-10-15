@@ -59,8 +59,8 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		target := w.Target
 		// New, so it is not also quiet — this test is about one condition.
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC()).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,15 +93,15 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		// And not held for them either, where the read's own narrowing would
 		// hide it: the sweep decides who is told.
 		if n, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
-			Where("person_id = ?", outsider.ID).Count(ctx); err != nil || n != 0 {
+			Where(`"person_id" = ?`, outsider.ID).Count(ctx); err != nil || n != 0 {
 			t.Errorf("somebody who may not read undisclosed work holds %d alerts (%v)", n, err)
 		}
 
 		// Moving the date answers it, and the alert goes without anybody
 		// dismissing anything — which is the whole reason this is a condition.
 		if _, err := db.DB.NewUpdate().Table("finding").
-			Set("disclose_at = ?", time.Now().UTC().Add(30*24*time.Hour)).
-			Where("kind = ?", finding.Entered).Exec(ctx); err != nil {
+			Set(`"disclose_at" = ?`, time.Now().UTC().Add(30*24*time.Hour)).
+			Where(`"kind" = ?`, finding.Entered).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		_, cleared, err := watch.Once(ctx)
@@ -177,8 +177,8 @@ func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
 		}
 		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC()).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		past := time.Now().UTC().Add(-24 * time.Hour)
@@ -251,8 +251,8 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 		}
 		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC()).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -277,8 +277,8 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 		// administrator nor holding it, so nothing else will ever hand them a
 		// list for this kind.
 		if _, err := db.DB.NewUpdate().Table("finding").
-			Set("assigned_to = ?", next.PartyID).
-			Where("kind = ?", finding.Entered).Exec(ctx); err != nil {
+			Set(`"assigned_to" = ?`, next.PartyID).
+			Where(`"kind" = ?`, finding.Entered).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, _, err := watch.Once(ctx); err != nil {

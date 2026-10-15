@@ -35,12 +35,12 @@ func (f *runFixture) scheduling(t *testing.T, replica string) *scanner.Schedule 
 func (f *runFixture) queued(t *testing.T) int {
 	t.Helper()
 	n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
-		Where("kind = ?", queue.Scan).
-		Where("reference = ?", strconv.FormatInt(f.target, 10)).
+		Where(`"kind" = ?`, queue.Scan).
+		Where(`"reference" = ?`, strconv.FormatInt(f.target, 10)).
 		// Wrapped, because two arguments to one placeholder binds the first
 		// and drops the second: this counted pending work alone, and every
 		// assertion built on it read a running job as an absent one.
-		Where("state IN (?)", bun.List([]queue.State{queue.Pending, queue.Running})).
+		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
 		Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -183,8 +183,8 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 		queuedFor := func(target int64) int {
 			t.Helper()
 			n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
-				Where("kind = ?", queue.Scan).
-				Where("reference = ?", strconv.FormatInt(target, 10)).
+				Where(`"kind" = ?`, queue.Scan).
+				Where(`"reference" = ?`, strconv.FormatInt(target, 10)).
 				Count(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -217,8 +217,8 @@ func TestABuildWithNoInventoryIsNotAskedFor(t *testing.T) {
 			t.Fatalf("asked for %d, want only the build that holds an inventory", asked)
 		}
 		n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
-			Where("kind = ?", queue.Scan).
-			Where("reference = ?", strconv.FormatInt(empty, 10)).
+			Where(`"kind" = ?`, queue.Scan).
+			Where(`"reference" = ?`, strconv.FormatInt(empty, 10)).
 			Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -283,7 +283,7 @@ func TestAReplicaThatStopsDoesNotHoldTheReScansForADay(t *testing.T) {
 			t.Fatal(err)
 		}
 		var held queue.Lease
-		if err := f.db.NewSelect().Model(&held).Where("name = ?", scanner.ScheduleLease).
+		if err := f.db.NewSelect().Model(&held).Where(`"name" = ?`, scanner.ScheduleLease).
 			Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -414,7 +414,7 @@ func TestTheScheduleAsksOnItsOwnAndReturnsWhenCancelled(t *testing.T) {
 
 		waitFor(t, func() bool {
 			n, err := f.db.DB.NewSelect().Model((*queue.Job)(nil)).
-				Where("kind = ?", queue.Scan).Count(ctx)
+				Where(`"kind" = ?`, queue.Scan).Count(ctx)
 			return err == nil && n > 0
 		}, "the schedule to ask for a scan on its own")
 

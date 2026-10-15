@@ -61,8 +61,8 @@ func (f *fixture) flawEnds(t *testing.T, issue int64) *time.Time {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("vulnerability_id = ?", issue).
-		Where("closed_at IS NULL").
+		Where(`"vulnerability_id" = ?`, issue).
+		Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -335,8 +335,8 @@ func TestADuplicateOfAScannedIssueStartsNoDate(t *testing.T) {
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHereShipped(t, who)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("vulnerability_id = ?", issue).Exec(t.Context()); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, issue).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-09-01"}))

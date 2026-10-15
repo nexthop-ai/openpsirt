@@ -56,7 +56,7 @@ func openNow(t *testing.T, db bun.IDB, personID int64, kind notify.Kind) map[str
 	t.Helper()
 	var rows []notify.Notification
 	if err := db.NewSelect().Model(&rows).
-		Where("person_id = ?", personID).Where("kind = ?", kind).Where("cleared_at IS NULL").
+		Where(`"person_id" = ?`, personID).Where(`"kind" = ?`, kind).Where(`"cleared_at" IS NULL`).
 		Scan(context.Background()); err != nil {
 		t.Fatal(err)
 	}

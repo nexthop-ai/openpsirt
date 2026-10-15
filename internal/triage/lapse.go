@@ -65,10 +65,10 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return db.NewSelect().
 			ColumnExpr("1").
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-			Where("f.target_id = ?", targetID).
-			Where("f.closed_at IS NULL").
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."closed_at" IS NULL`).
 			Where(finding.DecisionAtPlace("f"))
 	}
 
@@ -78,12 +78,12 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return db.NewSelect().
 			ColumnExpr("1").
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where("st.product_id = de.product_id").
-			Where("f.closed_at IS NULL").
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(`"st"."product_id" = "de"."product_id"`).
+			Where(`"f"."closed_at" IS NULL`).
 			Where(finding.DecisionAtPlace("f")).
 			Where(finding.VersionsMatch)
 	}
@@ -95,22 +95,22 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 	lapsable := func(db bun.IDB) *bun.SelectQuery {
 		return db.NewSelect().Model((*Decision)(nil)).
 			Join(finding.DecisionIssue).
-			ColumnExpr("de.id").
-			Where("de.state IN (?, ?)", Proposed, Approved).
+			ColumnExpr(`"de"."id"`).
+			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			// A claim about the match rather than about the version does not
 			// stop applying when the version moves. A bump does not make a
 			// wrong match right, and lapsing one would hand the same wrong
 			// match back at every point release.
 			Where(`NOT EXISTS (SELECT 1 FROM "claim" AS "lc"`+
-				` WHERE lc.id = de.claim_id AND lc.outcome = ?)`, Mismatched).
-			Where("de.product_id = (?)", db.NewSelect().
-				ColumnExpr("st.product_id").
+				` WHERE "lc"."id" = "de"."claim_id" AND "lc"."outcome" = ?)`, Mismatched).
+			Where(`"de"."product_id" = (?)`, db.NewSelect().
+				ColumnExpr(`"st"."product_id"`).
 				TableExpr(`"target" AS "tg"`).
-				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				Where("tg.id = ?", targetID)).
+				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Where(`"tg"."id" = ?`, targetID)).
 			Where("EXISTS (?)", openHere(db).Where("NOT ("+finding.VersionsMatch+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
-			OrderExpr("de.id").
+			OrderExpr(`"de"."id"`).
 			Limit(database.InBulk.Most)
 	}
 
@@ -159,10 +159,10 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			// identifiers are this pass's own, so nothing another sweep marked
 			// is in it.
 			if err := tx.NewSelect().Model((*Decision)(nil)).
-				ColumnExpr("de.id").
-				Where("de.id IN (?)", bun.List(ids)).
-				Where("de.state = ?", LapsedState).
-				Where("de.ended_at = ?", moment).
+				ColumnExpr(`"de"."id"`).
+				Where(`"de"."id" IN (?)`, bun.List(ids)).
+				Where(`"de"."state" = ?`, LapsedState).
+				Where(`"de"."ended_at" = ?`, moment).
 				Scan(ctx, &lapsed); err != nil {
 				return fmt.Errorf("read what lapsed: %w", err)
 			}
@@ -195,11 +195,11 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 // counted here as well.
 func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) (int64, error) {
 	result, err := tx.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", LapsedState).
-		Set("ended_at = ?", moment).
-		Set("live_key = ?", nil).
-		Where("de.id IN (?)", bun.List(ids)).
-		Where("de.state IN (?, ?)", Proposed, Approved).
+		Set(`"state" = ?`, LapsedState).
+		Set(`"ended_at" = ?`, moment).
+		Set(`"live_key" = ?`, nil).
+		Where(`"de"."id" IN (?)`, bun.List(ids)).
+		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 		Exec(ctx)
 	if err != nil {
 		return 0, err

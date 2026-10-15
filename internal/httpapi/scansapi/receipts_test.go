@@ -363,7 +363,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 				t.Fatalf("record upload %d: %v %v", sent, outcome, err)
 			}
 			if _, err := r.DB.DB.NewUpdate().Model((*ingest.Scan)(nil)).
-				Set("received_at = ?", at).Where("id = ?", scan.ID).
+				Set(`"received_at" = ?`, at).Where(`"id" = ?`, scan.ID).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -414,8 +414,8 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 			// The moment it ran, which decides the upload it answers and
 			// the one its numbers are reported against.
 			if _, err := r.DB.DB.NewUpdate().Model((*finding.Run)(nil)).
-				Set("started_at = ?", at.Add(-time.Minute)).Set("finished_at = ?", at).
-				Where("id = ?", run.ID).Exec(ctx); err != nil {
+				Set(`"started_at" = ?`, at.Add(-time.Minute)).Set(`"finished_at" = ?`, at).
+				Where(`"id" = ?`, run.ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

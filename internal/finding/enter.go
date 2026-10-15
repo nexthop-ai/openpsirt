@@ -300,8 +300,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if in.FromReport != "" {
 			reported = new(FlawReport)
 			err := tx.NewSelect().Model(reported).
-				Where("fr.reference = ?", foldReference(in.FromReport)).
-				Where("fr.product_id = ?", productID).
+				Where(`"fr"."reference" = ?`, foldReference(in.FromReport)).
+				Where(`"fr"."product_id" = ?`, productID).
 				Scan(ctx)
 			if database.IsNoRows(err) {
 				return ErrNoSuchReport
@@ -444,10 +444,10 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		var onClock []int64
 		if err := tx.NewSelect().
 			TableExpr(`"target" AS "tg"`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-			ColumnExpr("tg.id").
-			Where("tg.id IN (?)", bun.List(in.TargetIDs)).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+			ColumnExpr(`"tg"."id"`).
+			Where(`"tg"."id" IN (?)`, bun.List(in.TargetIDs)).
 			Where(clocked, clockedArgs...).
 			Scan(ctx, &onClock); err != nil {
 			return fmt.Errorf("read which builds carry deadlines: %w", err)
@@ -620,11 +620,11 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 	}
 	err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`c.id AS "id"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", true).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"c"."id" AS "id"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
 		Limit(1).
 		Scan(ctx, &root)
 	if database.IsNoRows(err) {
@@ -641,10 +641,10 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (bool, error) {
 	found, err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.component_id = ?", componentID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", true).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."component_id" = ?`, componentID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
 		Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("look up whether that is the build itself: %w", err)
@@ -787,8 +787,8 @@ func productNameOf(ctx context.Context, db bun.IDB, productID int64) (string, er
 	var name string
 	err := db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		ColumnExpr("p.name").
-		Where("p.id = ?", productID).
+		ColumnExpr(`"p"."name"`).
+		Where(`"p"."id" = ?`, productID).
 		Scan(ctx, &name)
 	if err != nil {
 		return "", fmt.Errorf("look up what product %d is called: %w", productID, err)
@@ -802,8 +802,8 @@ func (s *Store) ComponentName(ctx context.Context, componentID int64) (string, e
 	var name string
 	err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr("c.name").
-		Where("c.id = ?", componentID).
+		ColumnExpr(`"c"."name"`).
+		Where(`"c"."id" = ?`, componentID).
 		Scan(ctx, &name)
 	if err != nil {
 		return "", fmt.Errorf("look up what component %d is called: %w", componentID, err)

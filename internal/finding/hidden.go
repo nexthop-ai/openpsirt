@@ -44,8 +44,8 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		// all, and rated beneath the line. Both read the way
 		// Floor.narrow reads them, including the threshold that covers
 		// both bands.
-		rows = rows.Where("f.urgency < ?", int64(exploiting)).
-			Where("f.vulnerability_id IN (?)",
+		rows = rows.Where(`"f"."urgency" < ?`, int64(exploiting)).
+			Where(`"f"."vulnerability_id" IN (?)`,
 				rows.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, productID).
 					Column("v.id").

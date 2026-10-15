@@ -22,9 +22,9 @@ func TestTheIssueDocumentCountsOnlyTheJudgmentsInForceAsStanding(t *testing.T) {
 		place := r.Scanned(t)
 		taken, _ := r.DecidedAt(t, place)
 		if _, err := r.DB.DB.NewUpdate().Table("decision").
-			Set("state = ?", "withdrawn").Set("live_key = NULL").
-			Set("ended_at = ?", time.Now().UTC()).
-			Where("id = ?", taken).Exec(t.Context()); err != nil {
+			Set(`"state" = ?`, "withdrawn").Set(`"live_key" = NULL`).
+			Set(`"ended_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, taken).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		_, claim := r.DecidedAt(t, place)

@@ -107,7 +107,7 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 	// with a fetch by a non-secret key and a comparison in Go, which is a
 	// different design and would be stated as one.
 	key := new(Key)
-	err := s.db.NewSelect().Model(key).Where("secret_hash = ?", hashSecret(secret)).Scan(ctx)
+	err := s.db.NewSelect().Model(key).Where(`"secret_hash" = ?`, hashSecret(secret)).Scan(ctx)
 	if err != nil {
 		return Subject{}, database.FromRead(err, ErrDenied, "look up a key")
 	}
@@ -126,9 +126,9 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 // Revoke stops a key working, without removing what it did.
 func (s *Store) Revoke(ctx context.Context, keyID int64) error {
 	result, err := s.db.NewUpdate().Model((*Key)(nil)).
-		Set("revoked_at = ?", s.now().Truncate(time.Microsecond)).
-		Set("live_name = NULL").
-		Where("id = ?", keyID).Where("revoked_at IS NULL").Exec(ctx)
+		Set(`"revoked_at" = ?`, s.now().Truncate(time.Microsecond)).
+		Set(`"live_name" = NULL`).
+		Where(`"id" = ?`, keyID).Where(`"revoked_at" IS NULL`).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke key %d: %w", keyID, err)
 	}

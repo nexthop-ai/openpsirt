@@ -160,8 +160,8 @@ func TestAssigningByFilterIsRefusedWholeWhereAnyRowWouldBeDisclosedByIt(t *testi
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where("vulnerability_id IN (SELECT id FROM \"vulnerability\" WHERE identifier = ?)",
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL3").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -219,8 +219,8 @@ func TestAssigningByFilterToATeamNobodyOnWhichMayReadItIsRefused(t *testing.T) {
 			t.Errorf("a team of readers was handed %d disclosed findings, want 2", moved)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where("vulnerability_id IN (SELECT id FROM \"vulnerability\" WHERE identifier = ?)",
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL3").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)

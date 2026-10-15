@@ -203,7 +203,7 @@ func TestAWriteOnAnAdvisoryNeedsTheRoleOnEveryProductItCovers(t *testing.T) {
 		var mine, theirs int64
 		for name, into := range map[string]*int64{"mine": &mine, "theirs": &theirs} {
 			if err := r.DB.DB.NewSelect().Table("product").Column("id").
-				Where("name = ?", name).Scan(ctx, into); err != nil {
+				Where(`"name" = ?`, name).Scan(ctx, into); err != nil {
 				t.Fatal(err)
 			}
 		}

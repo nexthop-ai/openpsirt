@@ -341,7 +341,7 @@ func TestALaterMomentMovesTheDigestWithIt(t *testing.T) {
 				t.Fatal(err)
 			}
 			var held supplier.Source
-			if err := f.db.DB.NewSelect().Model(&held).Where("id = ?", row.ID).Scan(ctx); err != nil {
+			if err := f.db.DB.NewSelect().Model(&held).Where(`"id" = ?`, row.ID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if held.CaughtUpTo == nil || !held.CaughtUpTo.UTC().Equal(later) || held.CaughtUpMark != low {

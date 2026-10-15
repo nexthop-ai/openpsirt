@@ -58,8 +58,8 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		// it is new — and the threshold is measured from when it was declared
 		// precisely so that the two are told apart.
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -130,8 +130,8 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		}
 		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -139,8 +139,8 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		quietFor := func(who *access.Account) int {
 			t.Helper()
 			n, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
-				Where("person_id = ?", who.ID).Where("kind = ?", notify.BuildQuiet).
-				Where("cleared_at IS NULL").Count(ctx)
+				Where(`"person_id" = ?`, who.ID).Where(`"kind" = ?`, notify.BuildQuiet).
+				Where(`"cleared_at" IS NULL`).Count(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -244,8 +244,8 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 
 		// Answering it clears the alert, with nobody dismissing anything.
 		if _, err := db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC()).
-			Where("target_id = ?", released.ID).Exec(ctx); err != nil {
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, _, err := watch.Once(ctx); err != nil {
@@ -332,13 +332,13 @@ func asks(t *testing.T, db *database.DB, who *access.Account) access.Subject {
 func asksByID(t *testing.T, db *database.DB, who int64) access.Subject {
 	t.Helper()
 	var person access.Account
-	if err := db.DB.NewSelect().Model(&person).Where("id = ?", who).
+	if err := db.DB.NewSelect().Model(&person).Where(`"id" = ?`, who).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	var held []access.Grant
 	if err := db.DB.NewSelect().Model(&held).
-		Where("person_id = ?", who).Where("active = ?", true).
+		Where(`"person_id" = ?`, who).Where(`"active" = ?`, true).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -475,8 +475,8 @@ func TestAQuietBuildBeingRefusedSaysWhyItIsRefused(t *testing.T) {
 		admin := recordPerson(t, rights, "admin@example.com", true, product.ID, "")
 		target := w.Target
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
-			Where("id = ?", target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"id" = ?`, target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if err := ingest.NewStore(db.DB).Refused(ctx, access.Everything("the pipeline"),
@@ -505,8 +505,8 @@ func TestAnExploitedIssueOnAReleaseIsToldWhateverItsRating(t *testing.T) {
 
 		critical(t, db, released.ID, "CVE-2026-EXPLOITED", "high")
 		if _, err := db.DB.NewUpdate().Table("finding").
-			Set("urgency_exploited = ?", true).
-			Where("target_id = ?", released.ID).Exec(ctx); err != nil {
+			Set(`"urgency_exploited" = ?`, true).
+			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		sweep(t, db)
@@ -530,8 +530,8 @@ func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 
 		critical(t, db, released.ID, "CVE-2026-ANSWERED", "critical")
 		if _, err := db.DB.NewUpdate().Table("finding").
-			Set("stated_by = ?", 1).
-			Where("target_id = ?", released.ID).Exec(ctx); err != nil {
+			Set(`"stated_by" = ?`, 1).
+			Where(`"target_id" = ?`, released.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		sweep(t, db)

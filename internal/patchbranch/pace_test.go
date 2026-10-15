@@ -52,11 +52,11 @@ func TestProgressListsTheVisitUnderWayFirstWithHowFarItHasGot(t *testing.T) {
 		for _, change := range []struct {
 			table, set, repository, hash string
 		}{
-			{"patch_repository", "reached_at = NULL", "busy", ""},
-			{"patch_commit", "looked_at = NULL", "busy", busy.backport},
-			{"patch_commit", "looked_at = NULL", "later", later.fix},
-			{"patch_repository", "reached_at = NULL", "later", ""},
-			{"patch_repository", "fetched_at = NULL", "later", ""},
+			{"patch_repository", `"reached_at" = NULL`, "busy", ""},
+			{"patch_commit", `"looked_at" = NULL`, "busy", busy.backport},
+			{"patch_commit", `"looked_at" = NULL`, "later", later.fix},
+			{"patch_repository", `"reached_at" = NULL`, "later", ""},
+			{"patch_repository", `"fetched_at" = NULL`, "later", ""},
 		} {
 			update := db.DB.NewUpdate().Table(change.table).Set(change.set)
 			if change.hash == "" {

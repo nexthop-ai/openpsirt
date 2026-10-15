@@ -539,13 +539,13 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 
 		var open int
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr("COUNT(*)").Where("f.closed_at IS NULL").Scan(ctx, &open); err != nil {
+			ColumnExpr("COUNT(*)").Where(`"f"."closed_at" IS NULL`).Scan(ctx, &open); err != nil {
 			t.Fatal(err)
 		}
 		var fixable int
 		if err := db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr("COUNT(*)").Where("f.closed_at IS NULL").
-			Where("f.fixed_in IS NOT NULL").Where("f.fixed_in <> ?", "").
+			ColumnExpr("COUNT(*)").Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."fixed_in" IS NOT NULL`).Where(`"f"."fixed_in" <> ?`, "").
 			Scan(ctx, &fixable); err != nil {
 			t.Fatal(err)
 		}

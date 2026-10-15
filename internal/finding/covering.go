@@ -89,8 +89,8 @@ func WhollyCovered(q *bun.SelectQuery, productID int64,
 	visible []access.Visibility, reader Reader) *bun.SelectQuery {
 
 	return covered(q, productID, visible, reader).
-		Having("COUNT(cl.id) = COUNT(*)").
-		Having("COUNT(DISTINCT cl.outcome) = 1")
+		Having(`COUNT("cl"."id") = COUNT(*)`).
+		Having(`COUNT(DISTINCT "cl"."outcome") = 1`)
 }
 
 // covered joins each open finding of a grouped read to the approved, live
@@ -102,15 +102,15 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
 
 	return q.
 		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
-			AND de.state = 'approved'
-			AND de.live_key IS NOT NULL
-			AND de.visibility IN (?)
-			AND `+keyMatchesOn("de", `(SELECT mc.outcome FROM "claim" AS "mc"
-				WHERE mc.id = de.claim_id)`), productID, bun.List(visible)).
-		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id AND ` + coveringOutcomes(reader)).
-		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		ColumnExpr(`MIN(de.id) AS "decided_by"`).
-		Where("f.closed_at IS NULL")
+			AND "de"."state" = 'approved'
+			AND "de"."live_key" IS NOT NULL
+			AND "de"."visibility" IN (?)
+			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "claim" AS "mc"
+				WHERE "mc"."id" = "de"."claim_id")`), productID, bun.List(visible)).
+		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id" AND ` + coveringOutcomes(reader)).
+		ColumnExpr(`MIN("cl"."outcome") AS "outcome"`).
+		ColumnExpr(`MIN("de"."id") AS "decided_by"`).
+		Where(`"f"."closed_at" IS NULL`)
 }
 
 // Stated is what one decision claims, as a published statement repeats it.
@@ -142,14 +142,14 @@ func StatedBy(ctx context.Context, db bun.IDB, decisions []int64) (map[int64]Sta
 		Mitigation    string    `bun:"mitigation"`
 		ProposedAt    time.Time `bun:"proposed_at"`
 	}
-	where, args := database.InAnyOf("de.id", decisions)
+	where, args := database.InAnyOf(`"de"."id"`, decisions)
 	if err := db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`de.id AS "id"`).
-		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(cl.mitigation, '') AS "mitigation"`).
-		ColumnExpr(`de.proposed_at AS "proposed_at"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"de"."id" AS "id"`).
+		ColumnExpr(`COALESCE("cl"."justification", '') AS "justification"`).
+		ColumnExpr(`COALESCE("cl"."mitigation", '') AS "mitigation"`).
+		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
 		Where(where, args...).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what these claims say: %w", err)

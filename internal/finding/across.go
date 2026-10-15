@@ -252,12 +252,12 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // 22 s that way and 1.9 s as values. Statistics lag after every large scan,
 // until the server's own refresh reaches the table.
 func FoldsNamed(ctx context.Context, db bun.IDB, targets []int64, name, version string) ([]string, error) {
-	q := foldsNamed(db, targets, name).ColumnExpr("cn.fold_key").Distinct()
+	q := foldsNamed(db, targets, name).ColumnExpr(`"cn"."fold_key"`).Distinct()
 	if version = strings.TrimSpace(version); version != "" {
 		q = q.Where(sourceVersionOf+" = ?", version)
 	}
 	var folds []string
-	if err := q.OrderExpr("cn.fold_key").Scan(ctx, &folds); err != nil {
+	if err := q.OrderExpr(`"cn"."fold_key"`).Scan(ctx, &folds); err != nil {
 		return nil, fmt.Errorf("read what %q names in these builds: %w", strings.TrimSpace(name), err)
 	}
 	return folds, nil
@@ -269,14 +269,14 @@ var sourceVersionOf = upstreamVersionOf("cn")
 func foldsNamed(db bun.IDB, targets []int64, name string) *bun.SelectQuery {
 	q := db.NewSelect().
 		TableExpr(`"component" AS "cn"`).
-		Join(`JOIN "graph_node" AS "nn" ON nn.component_id = cn.id`).
-		Where("nn.target_id IN (?)", bun.List(targets)).
-		Where("nn.closed_scan_id IS NULL")
+		Join(`JOIN "graph_node" AS "nn" ON "nn"."component_id" = "cn"."id"`).
+		Where(`"nn"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"nn"."closed_scan_id" IS NULL`)
 	folded := graph.Folded(strings.TrimSpace(name))
 	if folded == "" {
 		return q.Where("1 = 0")
 	}
-	return q.Where("(cn.name_folded = ? OR cn.upstream_folded = ?)", folded, folded)
+	return q.Where(`("cn"."name_folded" = ? OR "cn"."upstream_folded" = ?)`, folded, folded)
 }
 
 // OneFoldNamed is FoldsNamed for an act that writes: where no version was
@@ -296,10 +296,10 @@ func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
 		Purl     string `bun:"purl"`
 	}
 	err := foldsNamed(db, targets, name).
-		ColumnExpr(`nn.target_id AS "target_id"`).
-		ColumnExpr(`cn.fold_key AS "fold_key"`).
+		ColumnExpr(`"nn"."target_id" AS "target_id"`).
+		ColumnExpr(`"cn"."fold_key" AS "fold_key"`).
 		ColumnExpr(sourceVersionOf+` AS "source_version"`).
-		ColumnExpr(`COALESCE(cn.purl, '') AS "purl"`).
+		ColumnExpr(`COALESCE("cn"."purl", '') AS "purl"`).
 		OrderExpr(`"source_version"`).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -411,9 +411,9 @@ func (s *Store) componentsOf(ctx context.Context, folds []string) (heldBy, error
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
+		ColumnExpr(`"c"."id" AS "id"`).
+		ColumnExpr(`"c"."fold_key" AS "fold_key"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -463,47 +463,47 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64, held heldBy
 	ids := held.ids()
 	pullers := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "ch" ON ch.id = e.child_id`).
-		ColumnExpr(`ch.target_id AS "target_id"`).
-		ColumnExpr(`ch.component_id AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT e.parent_id) AS "consumers"`).
-		Where("e.target_id IN (?)", bun.List(targets)).
-		Where("e.closed_scan_id IS NULL").
-		Where("e.parent_id <> e.child_id").
-		Where("ch.component_id IN (?)", bun.List(ids)).
-		GroupExpr("ch.target_id, ch.component_id")
+		Join(`JOIN "graph_node" AS "ch" ON "ch"."id" = "e"."child_id"`).
+		ColumnExpr(`"ch"."target_id" AS "target_id"`).
+		ColumnExpr(`"ch"."component_id" AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT "e"."parent_id") AS "consumers"`).
+		Where(`"e"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"e"."closed_scan_id" IS NULL`).
+		Where(`"e"."parent_id" <> "e"."child_id"`).
+		Where(`"ch"."component_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"ch"."target_id", "ch"."component_id"`)
 
 	var rows []packageRow
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`LEFT JOIN (?) AS "pl" ON "pl".target_id = n.target_id AND "pl".component_id = n.component_id`, pullers).
-		ColumnExpr(`n.target_id AS "target_id"`).
-		ColumnExpr(`n.component_id AS "component_id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "n"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`LEFT JOIN (?) AS "pl" ON "pl"."target_id" = "n"."target_id" AND "pl"."component_id" = "n"."component_id"`, pullers).
+		ColumnExpr(`"n"."target_id" AS "target_id"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`"c"."fold_key" AS "fold_key"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(SourceName+` AS "source"`).
 		ColumnExpr(SourceVersion+` AS "source_version"`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`COALESCE(c.purl, '') AS "purl"`).
-		ColumnExpr(`COALESCE(c.summary, '') AS "summary"`).
-		ColumnExpr(`COALESCE(c.project_url, '') AS "project_url"`).
-		ColumnExpr(`COALESCE(c.supplier, '') AS "supplier"`).
-		ColumnExpr(`COALESCE(c.license, '') AS "license"`).
-		ColumnExpr(`COALESCE(c.latest_version, '') AS "latest_version"`).
-		ColumnExpr(`c.latest_released_at AS "latest_released_at"`).
-		ColumnExpr(`c.first_seen_at AS "first_seen_at"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
+		ColumnExpr(`COALESCE("c"."summary", '') AS "summary"`).
+		ColumnExpr(`COALESCE("c"."project_url", '') AS "project_url"`).
+		ColumnExpr(`COALESCE("c"."supplier", '') AS "supplier"`).
+		ColumnExpr(`COALESCE("c"."license", '') AS "license"`).
+		ColumnExpr(`COALESCE("c"."latest_version", '') AS "latest_version"`).
+		ColumnExpr(`"c"."latest_released_at" AS "latest_released_at"`).
+		ColumnExpr(`"c"."first_seen_at" AS "first_seen_at"`).
 		ColumnExpr(`COALESCE("pl".consumers, 1) AS "consumers"`).
-		Where("n.target_id IN (?)", bun.List(targets)).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", false).
-		Where("n.component_id IN (?)", bun.List(ids)).
-		OrderExpr("st.name, va.name, c.name, c.version").
+		Where(`"n"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, false).
+		Where(`"n"."component_id" IN (?)`, bun.List(ids)).
+		OrderExpr(`"st"."name", "va"."name", "c"."name", "c"."version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read a source package across its builds: %w", err)
@@ -587,55 +587,55 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	// is one argument, and the rows underneath say where it lands.
 	ranked := s.db.NewSelect().
 		TableExpr(`"claim" AS "cl"`).
-		ColumnExpr(`cl.id AS "id"`).
-		ColumnExpr(promiseRank+` * ? + cl.id AS "promise"`, promiseSpan).
-		Where("cl.outcome = ?", OutcomeUpgradeNeeded)
+		ColumnExpr(`"cl"."id" AS "id"`).
+		ColumnExpr(promiseRank+` * ? + "cl"."id" AS "promise"`, promiseSpan).
+		Where(`"cl"."outcome" = ?`, OutcomeUpgradeNeeded)
 	// Every build here is in one product — the scope names it — so one bound
 	// identifier is the product a decision is correlated by. One row per
 	// issue and place, so a place under two promises is still one place.
 	promises := s.db.NewSelect().
 		TableExpr(Decisions).
-		Join(`JOIN (?) AS "rk" ON "rk".id = de.claim_id`, ranked).
-		ColumnExpr(`dv.issue_id AS "issue_id"`).
-		ColumnExpr(`de.place_identity AS "place_identity"`).
+		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."claim_id"`, ranked).
+		ColumnExpr(`"dv"."issue_id" AS "issue_id"`).
+		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
 		ColumnExpr(`MAX("rk".promise) AS "promise"`).
-		Where("de.product_id = ?", productID).
-		Where("de.live_key IS NOT NULL").
-		GroupExpr("dv.issue_id, de.place_identity")
+		Where(`"de"."product_id" = ?`, productID).
+		Where(`"de"."live_key" IS NOT NULL`).
+		GroupExpr(`"dv"."issue_id", "de"."place_identity"`)
 	folds, foldOf, foldArgs := held.folds(`"pf".component_id`)
 	perFix := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd".promise) AS "promise"`).
 		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd".issue_id`, `"pd".place_identity`, "f"), promises).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.component_id IN (?)", bun.List(ids)).
-		GroupExpr("f.target_id, f.component_id, f.vulnerability_id, f.fixed_in")
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"f"."target_id", "f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`)
 	// The fix an issue names across its fold, as the lowest and the highest
 	// string: equal where it names one. An empty string is no fix, and is
 	// left out of both.
 	perIssue := s.db.NewSelect().
 		TableExpr(`(?) AS "pf"`, perFix).
-		ColumnExpr(`"pf".target_id AS "target_id"`).
+		ColumnExpr(`"pf"."target_id" AS "target_id"`).
 		ColumnExpr(foldOf+` AS "fold"`, foldArgs...).
-		ColumnExpr(`"pf".vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"pf"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`SUM("pf".places) AS "places"`).
-		ColumnExpr(`MIN("pf".due_at) AS "due_at"`).
-		ColumnExpr(`MAX("pf".exploited) AS "exploited"`).
+		ColumnExpr(`MIN("pf"."due_at") AS "due_at"`).
+		ColumnExpr(`MAX("pf"."exploited") AS "exploited"`).
 		ColumnExpr(`MAX("pf".exploited_here) AS "exploited_here"`).
 		ColumnExpr(`MAX("pf".promise) AS "promise"`).
-		ColumnExpr(`MIN(CASE WHEN "pf".fixed_in <> '' THEN "pf".fixed_in END) AS "lo"`).
-		ColumnExpr(`MAX(CASE WHEN "pf".fixed_in <> '' THEN "pf".fixed_in END) AS "hi"`).
-		GroupExpr(`"pf".target_id, `+foldOf+`, "pf".vulnerability_id`, foldArgs...)
+		ColumnExpr(`MIN(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "lo"`).
+		ColumnExpr(`MAX(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "hi"`).
+		GroupExpr(`"pf"."target_id", `+foldOf+`, "pf"."vulnerability_id"`, foldArgs...)
 	// Whether the issue is on each binary, one column per binary, so each
 	// binary's own count rides the same pass. Read in a statement of its own
 	// it read the places again: 47 ms on PostgreSQL and 219 ms on SQLite for
@@ -649,7 +649,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		columns = nil
 	}
 	for j, id := range columns {
-		perIssue = perIssue.ColumnExpr(`MAX(CASE WHEN "pf".component_id = ? THEN 1 END) AS ?`,
+		perIssue = perIssue.ColumnExpr(`MAX(CASE WHEN "pf"."component_id" = ? THEN 1 END) AS ?`,
 			id, bun.Ident(fmt.Sprint("on_", j)))
 	}
 
@@ -677,20 +677,20 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		&exploited, &exploitedHere, &promised}
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "pi"`, perIssue).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = "pi".vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "pi"."vulnerability_id"`).
 		// This product's rating where it has stated one. Every build here is
 		// in one product — the scope names it — so one bound identifier
 		// answers for all of them.
 		Join(rating.Here, productID).
-		ColumnExpr(`"pi".target_id AS "target_id"`).
+		ColumnExpr(`"pi"."target_id" AS "target_id"`).
 		ColumnExpr(`"pi".fold AS "fold"`).
 		ColumnExpr(oneFix + ` AS "fixed_in"`).
 		ColumnExpr(severalOf + ` AS "several"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "band"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
 		ColumnExpr(`SUM("pi".places) AS "places"`).
-		ColumnExpr(`MIN("pi".due_at) AS "due_at"`).
-		ColumnExpr(`MAX("pi".exploited) AS "exploited"`).
+		ColumnExpr(`MIN("pi"."due_at") AS "due_at"`).
+		ColumnExpr(`MAX("pi"."exploited") AS "exploited"`).
 		ColumnExpr(`MAX("pi".exploited_here) AS "exploited_here"`).
 		ColumnExpr(`MAX("pi".promise) AS "promise"`)
 	for j := range columns {
@@ -698,7 +698,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		q = q.ColumnExpr(`COUNT("pi".?) AS ?`, column, column)
 		into = append(into, &onBinary[j])
 	}
-	err := q.GroupExpr(`"pi".target_id, "pi".fold, `+oneFix+`, `+severalOf+`, `+rating.EffectiveExpr).
+	err := q.GroupExpr(`"pi"."target_id", "pi".fold, `+oneFix+`, `+severalOf+`, `+rating.EffectiveExpr).
 		Scan(ctx, into...)
 	if err != nil {
 		return openFolds{}, fmt.Errorf("read what is open across a source package: %w", err)
@@ -803,13 +803,13 @@ func (s *Store) issuesOnEach(ctx context.Context, targets []int64, visible []acc
 	// where a distinct count over the places sorts them.
 	perIssue := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.component_id IN (?)", bun.List(ids)).
-		GroupExpr("f.target_id, f.component_id, f.vulnerability_id")
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`"f"."component_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"f"."target_id", "f"."component_id", "f"."vulnerability_id"`)
 	var rows []struct {
 		TargetID    int64 `bun:"target_id"`
 		ComponentID int64 `bun:"component_id"`
@@ -817,10 +817,10 @@ func (s *Store) issuesOnEach(ctx context.Context, targets []int64, visible []acc
 	}
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "oi"`, perIssue).
-		ColumnExpr(`"oi".target_id AS "target_id"`).
-		ColumnExpr(`"oi".component_id AS "component_id"`).
+		ColumnExpr(`"oi"."target_id" AS "target_id"`).
+		ColumnExpr(`"oi"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
-		GroupExpr(`"oi".target_id, "oi".component_id`).
+		GroupExpr(`"oi"."target_id", "oi"."component_id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is open on each binary: %w", err)
@@ -849,10 +849,10 @@ func (s *Store) promisesNamed(ctx context.Context, standing map[foldIn]int64) (m
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"claim" AS "cl"`).
-		ColumnExpr(`cl.id AS "id"`).
-		ColumnExpr(`cl.committed_to AS "committed_to"`).
-		ColumnExpr(`COALESCE(cl.upgrade_to, '') AS "upgrade_to"`).
-		Where("cl.id IN (?)", bun.List(claims)).
+		ColumnExpr(`"cl"."id" AS "id"`).
+		ColumnExpr(`"cl"."committed_to" AS "committed_to"`).
+		ColumnExpr(`COALESCE("cl"."upgrade_to", '') AS "upgrade_to"`).
+		Where(`"cl"."id" IN (?)`, bun.List(claims)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is already promised: %w", err)
@@ -898,18 +898,18 @@ func (s *Store) severalFixes(ctx context.Context, targets []int64, visible []acc
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		Where("f.component_id IN (?)", bun.List(held.ids())).
-		Where("f.vulnerability_id IN (?)", bun.List(issues)).
-		Where("f.fixed_in IS NOT NULL").
-		Where("f.fixed_in <> ?", "").
-		GroupExpr("f.target_id, f.component_id, f.vulnerability_id, f.fixed_in").
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`"f"."component_id" IN (?)`, bun.List(held.ids())).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(issues)).
+		Where(`"f"."fixed_in" IS NOT NULL`).
+		Where(`"f"."fixed_in" <> ?`, "").
+		GroupExpr(`"f"."target_id", "f"."component_id", "f"."vulnerability_id", "f"."fixed_in"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return fmt.Errorf("read the fixes an issue's binaries disagree about: %w", err)
@@ -956,18 +956,18 @@ func (s *Store) pullersAcross(ctx context.Context, targets []int64,
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "ch" ON ch.id = e.child_id`).
-		Join(`JOIN "component" AS "c" ON c.id = ch.component_id`).
-		Join(`JOIN "graph_node" AS "pn" ON pn.id = e.parent_id`).
-		Join(`JOIN "component" AS "pc" ON pc.id = pn.component_id`).
-		ColumnExpr(`ch.target_id AS "target_id"`).
-		ColumnExpr(`c.fold_key AS "fold_key"`).
-		ColumnExpr(`COUNT(DISTINCT e.parent_id) AS "consumers"`).
-		Where("e.target_id IN (?)", bun.List(targets)).
-		Where("e.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "ch" ON "ch"."id" = "e"."child_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "ch"."component_id"`).
+		Join(`JOIN "graph_node" AS "pn" ON "pn"."id" = "e"."parent_id"`).
+		Join(`JOIN "component" AS "pc" ON "pc"."id" = "pn"."component_id"`).
+		ColumnExpr(`"ch"."target_id" AS "target_id"`).
+		ColumnExpr(`"c"."fold_key" AS "fold_key"`).
+		ColumnExpr(`COUNT(DISTINCT "e"."parent_id") AS "consumers"`).
+		Where(`"e"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"e"."closed_scan_id" IS NULL`).
 		Where(FoldedOn+" IN (?)", bun.List(folds)).
-		Where("pc.fold_key <> c.fold_key").
-		GroupExpr("ch.target_id, c.fold_key").
+		Where(`"pc"."fold_key" <> "c"."fold_key"`).
+		GroupExpr(`"ch"."target_id", "c"."fold_key"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what pulls a source package in: %w", err)

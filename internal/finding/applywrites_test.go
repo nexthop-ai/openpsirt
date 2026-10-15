@@ -86,14 +86,14 @@ func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 	var rows []written
 	if err := f.db.DB.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`f.place_identity, f.urgency, f.urgency_exploited, f.urgency_shipped`).
-		ColumnExpr(`f.fix_state, f.fixed_in, f.fixed_at, f.matched, f.matched_from`).
-		ColumnExpr(`f.matched_in, f.matched_range, f.suppressed_by, f.stated_by, f.claimed_by`).
-		ColumnExpr(`f.exploited_learned_at`).
-		Where("f.target_id = ?", target).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"v"."identifier" AS "identifier"`).
+		ColumnExpr(`"f"."place_identity", "f"."urgency", "f"."urgency_exploited", "f"."urgency_shipped"`).
+		ColumnExpr(`"f"."fix_state", "f"."fixed_in", "f"."fixed_at", "f"."matched", "f"."matched_from"`).
+		ColumnExpr(`"f"."matched_in", "f"."matched_range", "f"."suppressed_by", "f"."stated_by", "f"."claimed_by"`).
+		ColumnExpr(`"f"."exploited_learned_at"`).
+		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."closed_at" IS NULL`).
 		Scan(t.Context(), &rows); err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 		defer asked.mu.Unlock()
 		n := 0
 		for _, each := range asked.sent {
-			if !strings.Contains(each.query, "MAX(lf.id)") {
+			if !strings.Contains(each.query, `MAX("lf"."id")`) {
 				continue
 			}
 			n++
@@ -265,7 +265,7 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 				t.Fatalf("the read has no outer condition ahead of its arms: %s", each.query)
 			}
 			outer := each.query[where:inner]
-			for _, part := range []string{"target_id = ", "kind = ", "closed_at IS NOT NULL", "vulnerability_id IN ("} {
+			for _, part := range []string{`"target_id" = `, `"kind" = `, `"closed_at" IS NOT NULL`, `"vulnerability_id" IN (`} {
 				if !strings.Contains(outer, part) {
 					t.Errorf("the outer read does not ask %q: %s", part, each.query)
 				}
@@ -343,9 +343,9 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 		if want := 2 * len(all); applied.Updated != want {
 			t.Fatalf("updated %d findings, want %d", applied.Updated, want)
 		}
-		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET likelihood_ppm = `)
-		ordered, orderedRows := asked.matching(`UPDATE "finding" AS "f" SET urgency = CASE id`)
-		reranked, rerankedRows := asked.matching(`UPDATE "finding" AS "f" SET urgency = (CASE WHEN`)
+		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET "likelihood_ppm" = `)
+		ordered, orderedRows := asked.matching(`UPDATE "finding" AS "f" SET "urgency" = CASE "id"`)
+		reranked, rerankedRows := asked.matching(`UPDATE "finding" AS "f" SET "urgency" = (CASE WHEN`)
 		// One statement for the dated estimates and one for the undated.
 		if estimates != 2 || estimated != int64(len(all)) {
 			t.Errorf("the estimates were %d statements matching %d issues, want 2 matching %d",
@@ -362,8 +362,8 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 
 		var rows []finding.Vulnerability
 		if err := f.db.DB.NewSelect().Model(&rows).
-			Where("vu.identifier LIKE ?", "CVE-2026-%DATED-%").
-			WhereOr("vu.identifier LIKE ?", "CVE-2026-DAY-%").Scan(ctx); err != nil {
+			Where(`"vu"."identifier" LIKE ?`, "CVE-2026-%DATED-%").
+			WhereOr(`"vu"."identifier" LIKE ?`, "CVE-2026-DAY-%").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if len(rows) != len(all) {

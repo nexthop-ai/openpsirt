@@ -144,7 +144,7 @@ func inAnotherProduct(t *testing.T, w *fixture.World, purl string) {
 	}
 	var id int64
 	err := w.DB.DB.NewSelect().TableExpr(`"component" AS "c"`).
-		ColumnExpr("c.id").Where("c.purl = ?", purl).Scan(ctx, &id)
+		ColumnExpr(`"c"."id"`).Where(`"c"."purl" = ?`, purl).Scan(ctx, &id)
 	if err != nil {
 		t.Fatalf("find %s: %v", purl, err)
 	}
@@ -170,7 +170,7 @@ func put(t *testing.T, w *fixture.World, purl string, checked *time.Time, versio
 func set(t *testing.T, w *fixture.World, purl string, version *string) {
 	t.Helper()
 	_, err := w.DB.DB.NewUpdate().Table("component").
-		Set("latest_version = ?", version).Where("purl = ?", purl).Exec(t.Context())
+		Set(`"latest_version" = ?`, version).Where(`"purl" = ?`, purl).Exec(t.Context())
 	if err != nil {
 		t.Fatalf("record an answer for %s: %v", purl, err)
 	}

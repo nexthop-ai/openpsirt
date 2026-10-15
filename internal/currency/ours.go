@@ -353,16 +353,16 @@ func rootOwners(ctx context.Context, db bun.IDB, products []int64,
 
 	q := db.NewSelect().
 		TableExpr(`"scan" AS "sc"`).
-		ColumnExpr(`sc.root_identifier AS "root_identifier"`).
-		Where("sc.root_identifier IS NOT NULL").
-		Where("sc.root_identifier <> ''").
-		GroupExpr("sc.root_identifier").
-		OrderExpr("MAX(sc.id) DESC").
+		ColumnExpr(`"sc"."root_identifier" AS "root_identifier"`).
+		Where(`"sc"."root_identifier" IS NOT NULL`).
+		Where(`"sc"."root_identifier" <> ''`).
+		GroupExpr(`"sc"."root_identifier"`).
+		OrderExpr(`MAX("sc"."id") DESC`).
 		Limit(MostRoots)
 	if !all {
-		q = q.Join(`JOIN "target" AS "tg" ON tg.id = sc.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Where("st.product_id IN (?)", bun.List(products))
+		q = q.Join(`JOIN "target" AS "tg" ON "tg"."id" = "sc"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
 	var declared []string
 	if err := q.Scan(ctx, &declared); err != nil {

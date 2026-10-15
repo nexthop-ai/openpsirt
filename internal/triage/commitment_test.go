@@ -113,7 +113,7 @@ func TestACommitmentIsStoredWithTheClaim(t *testing.T) {
 		// than it is written. The column holds a day.
 		var stored triage.Claim
 		if err := f.db.DB.NewSelect().Model(&stored).
-			Where("cl.id = ?", made.ClaimID).Scan(t.Context()); err != nil {
+			Where(`"cl"."id" = ?`, made.ClaimID).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if stored.CommittedTo == nil || stored.CommittedTo.Format(time.DateOnly) != by.Format(time.DateOnly) {

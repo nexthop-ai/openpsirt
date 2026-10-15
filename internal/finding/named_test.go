@@ -26,8 +26,8 @@ func builtFrom(name, version string) graph.Described {
 func rowOf(t *testing.T, f *fixture, component graph.Described) int64 {
 	t.Helper()
 	var id int64
-	if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr("c.id").
-		Where("c.identity = ?", component.Identity()).Scan(t.Context(), &id); err != nil {
+	if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."id"`).
+		Where(`"c"."identity" = ?`, component.Identity()).Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -40,8 +40,8 @@ func hide(t *testing.T, f *fixture, component graph.Described) {
 	t.Helper()
 	id := rowOf(t, f, component)
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("visibility = ?", access.Private).
-		Where("component_id = ?", id).Exec(t.Context()); err != nil {
+		Set(`"visibility" = ?`, access.Private).
+		Where(`"component_id" = ?`, id).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }

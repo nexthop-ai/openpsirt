@@ -17,8 +17,8 @@ func (f *fixture) namesOf(t *testing.T, id int64) []string {
 	t.Helper()
 	var names []string
 	if err := f.db.DB.NewSelect().TableExpr(`"vulnerability_alias" AS "va"`).
-		ColumnExpr("va.identifier").Where("va.vulnerability_id = ?", id).
-		OrderExpr("va.id ASC").Scan(t.Context(), &names); err != nil {
+		ColumnExpr(`"va"."identifier"`).Where(`"va"."vulnerability_id" = ?`, id).
+		OrderExpr(`"va"."id" ASC`).Scan(t.Context(), &names); err != nil {
 		t.Fatal(err)
 	}
 	return names

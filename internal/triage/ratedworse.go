@@ -94,16 +94,16 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 			}
 			var rows []int64
 			q := tx.NewSelect().TableExpr(finding.Decisions).
-				ColumnExpr("de.id").
-				Where("de.claim_id = ?", group.ClaimID).
-				Where("de.product_id = ?", group.ProductID).
-				Where("de.vulnerability_id = ?", group.VulnerabilityID).
-				Where("de.state IN (?, ?)", Proposed, Approved).
-				Where("de.live_key IS NOT NULL")
+				ColumnExpr(`"de"."id"`).
+				Where(`"de"."claim_id" = ?`, group.ClaimID).
+				Where(`"de"."product_id" = ?`, group.ProductID).
+				Where(`"de"."vulnerability_id" = ?`, group.VulnerabilityID).
+				Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+				Where(`"de"."live_key" IS NOT NULL`)
 			if group.Baseline == nil {
-				q = q.Where("de.severity_centi IS NULL")
+				q = q.Where(`"de"."severity_centi" IS NULL`)
 			} else {
-				q = q.Where("de.severity_centi = ?", *group.Baseline)
+				q = q.Where(`"de"."severity_centi" = ?`, *group.Baseline)
 			}
 			if err := q.Where(coversSomething).Scan(ctx, &rows); err != nil {
 				return fmt.Errorf("read what a severity rise outgrew: %w", err)
@@ -160,10 +160,10 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 // rescan of a build of 324,508 open findings with 133,549 decisions, against
 // 1.37 s for the same 2,858 groups compared directly.
 var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
-	` JOIN "component" AS "c" ON c.id = fc.component_id` +
-	` LEFT JOIN "component" AS "uc" ON uc.id = fc.consumer_id` +
-	` JOIN "target" AS "tgc" ON tgc.id = fc.target_id` +
-	` JOIN "stream" AS "stc" ON stc.id = tgc.stream_id` +
+	` JOIN "component" AS "c" ON "c"."id" = "fc"."component_id"` +
+	` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"` +
+	` JOIN "target" AS "tgc" ON "tgc"."id" = "fc"."target_id"` +
+	` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"` +
 	` WHERE stc.product_id = de.product_id AND fc.closed_at IS NULL` +
 	` AND ` + finding.DecisionAtPlace("fc") +
 	` AND ` + finding.VersionsMatch + `)`
@@ -188,33 +188,33 @@ type ratedWorseGroup struct {
 func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([]ratedWorseGroup, error) {
 	q := tx.NewSelect().
 		TableExpr(finding.Decisions).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		// Rated as the issue the decision is read as.
-		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		Join(rating.For(rating.OnDecision)).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`cl.justification AS "justification"`).
-		ColumnExpr(`de.severity_centi AS "baseline"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		Where("de.state IN (?, ?)", Proposed, Approved).
-		Where("de.live_key IS NOT NULL").
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`"de"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
+		ColumnExpr(`"cl"."justification" AS "justification"`).
+		ColumnExpr(`"de"."severity_centi" AS "baseline"`).
+		ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+		ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed"`).
+		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+		Where(`"de"."live_key" IS NOT NULL`).
 		Where(coversSomething).
-		GroupExpr("de.claim_id, de.product_id, de.vulnerability_id, cl.outcome, " +
-			"cl.justification, de.severity_centi, v.severity, ir.severity, v.score_centi")
+		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."vulnerability_id", "cl"."outcome", ` +
+			`"cl"."justification", "de"."severity_centi", "v"."severity", "ir"."severity", "v"."score_centi"`)
 	if where.ProductID > 0 {
-		q = q.Where("de.product_id = ?", where.ProductID)
+		q = q.Where(`"de"."product_id" = ?`, where.ProductID)
 	}
 	if len(where.Vulnerabilities) > 0 {
 		q = q.Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(where.Vulnerabilities))
 	}
 	if where.OpenIn > 0 {
-		q = q.Where(`dv.issue_id IN (SELECT "fo".vulnerability_id FROM "finding" AS "fo"`+
-			` WHERE "fo".target_id = ? AND "fo".closed_at IS NULL)`, where.OpenIn)
+		q = q.Where(`"dv"."issue_id" IN (SELECT "fo"."vulnerability_id" FROM "finding" AS "fo"`+
+			` WHERE "fo"."target_id" = ? AND "fo"."closed_at" IS NULL)`, where.OpenIn)
 	}
 	var groups []ratedWorseGroup
 	if err := q.Scan(ctx, &groups); err != nil {

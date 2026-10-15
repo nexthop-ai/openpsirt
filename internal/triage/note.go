@@ -155,7 +155,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	// nothing saying from what, which is worse than keeping no history
 	// because it looks like one.
 	if err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		if err := tx.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(note).Where(`"id" = ?`, noteID).Scan(ctx); err != nil {
 			return database.FromRead(err, ErrNoSuchNote, fmt.Sprintf("read note %d", noteID))
 		}
 		told, at, err := noteReach(ctx, tx, subject, note.ProductID, note.VulnerabilityID)
@@ -177,8 +177,8 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 		// second, and the loser retries against a database that has moved.
 		var highest int
 		if err := tx.NewSelect().Model((*WasNoted)(nil)).
-			ColumnExpr("COALESCE(MAX(ordinal), 0)").
-			Where("note_id = ?", noteID).Scan(ctx, &highest); err != nil {
+			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+			Where(`"note_id" = ?`, noteID).Scan(ctx, &highest); err != nil {
 			return err
 		}
 		// And what it says now, read here rather than carried in from the
@@ -187,7 +187,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 		// that landed in between became one nothing kept.
 		var was string
 		if err := tx.NewSelect().Model((*IssueNote)(nil)).
-			Column("body").Where("id = ?", noteID).Scan(ctx, &was); err != nil {
+			Column("body").Where(`"id" = ?`, noteID).Scan(ctx, &was); err != nil {
 			return err
 		}
 		if _, err := tx.NewInsert().Model(&WasNoted{
@@ -196,9 +196,9 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 			return fmt.Errorf("keep what it said before: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*IssueNote)(nil)).
-			Set("body = ?", body).
-			Set("edited_at = ?", edited).
-			Where("id = ?", noteID).Exec(ctx); err != nil {
+			Set(`"body" = ?`, body).
+			Set(`"edited_at" = ?`, edited).
+			Where(`"id" = ?`, noteID).Exec(ctx); err != nil {
 			return fmt.Errorf("change a note: %w", err)
 		}
 		// An edit can add a reference the first version did not have, and it
@@ -238,7 +238,7 @@ func (s *Store) Notes(ctx context.Context, subject access.Subject,
 		// Every note on the issue, including those written under an issue that
 		// merged into it.
 		Where(finding.FiledUnder(filed.Issue), vulnerabilityID).
-		Where("product_id = ?", productID).
+		Where(`"product_id" = ?`, productID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the notes on this issue: %w", err)
 	}
@@ -254,7 +254,7 @@ func (s *Store) EarlierNote(ctx context.Context, subject access.Subject,
 	noteID int64) ([]WasNoted, error) {
 
 	note := new(IssueNote)
-	if err := s.db.NewSelect().Model(note).Where("id = ?", noteID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(note).Where(`"id" = ?`, noteID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNoSuchNote, fmt.Sprintf("read note %d", noteID))
 	}
 	if _, err := s.Notes(ctx, subject, note.ProductID, note.VulnerabilityID); err != nil {
@@ -262,7 +262,7 @@ func (s *Store) EarlierNote(ctx context.Context, subject access.Subject,
 	}
 	var rows []WasNoted
 	if err := s.db.NewSelect().Model(&rows).
-		Where("note_id = ?", noteID).Order("ordinal").Scan(ctx); err != nil {
+		Where(`"note_id" = ?`, noteID).Order("ordinal").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what it said before: %w", err)
 	}
 	return rows, nil
@@ -284,12 +284,12 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 
 	hidden, err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("f.id").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"f"."id"`).
 		Where(finding.HeldAs("f.vulnerability_id"), vulnerabilityID).
-		Where("st.product_id = ?", productID).
-		Where("f.visibility = ?", access.Private).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."visibility" = ?`, access.Private).
 		Exists(ctx)
 	if err != nil {
 		return access.Public, fmt.Errorf("read whether this issue is announced here: %w", err)

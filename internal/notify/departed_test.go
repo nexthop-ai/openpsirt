@@ -41,8 +41,8 @@ func TestSomebodyWhoHasLeftIsToldNothing(t *testing.T) {
 		// A build declared a month ago and never scanned: a condition every
 		// administrator is told.
 		if _, err := db.DB.NewUpdate().Table("target").
-			Set("created_at = ?", time.Now().UTC().Add(-30*24*time.Hour)).
-			Where("id = ?", w.Target.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"id" = ?`, w.Target.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		watch := notify.NewWatch(db.DB, discard())
@@ -126,10 +126,10 @@ func TestTheDigestSkipsWhoeverHasLeftAndMovesOnFromWhatItCannotAssemble(t *testi
 				t.Fatal(err)
 			}
 			if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
-				Set("email = ?", identity).
-				Set("digest = ?", true).
-				Set("digest_unassigned = ?", true).
-				Where("id = ?", who.ID).Exec(ctx); err != nil {
+				Set(`"email" = ?`, identity).
+				Set(`"digest" = ?`, true).
+				Set(`"digest_unassigned" = ?`, true).
+				Where(`"id" = ?`, who.ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return who
@@ -143,14 +143,14 @@ func TestTheDigestSkipsWhoeverHasLeftAndMovesOnFromWhatItCannotAssemble(t *testi
 		// An identity stored with capitals no longer resolves as itself, so
 		// the digest cannot be read as its reader.
 		if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
-			Set("identity = ?", "Broken@Example.com").
-			Where("id = ?", broken.ID).Exec(ctx); err != nil {
+			Set(`"identity" = ?`, "Broken@Example.com").
+			Where(`"id" = ?`, broken.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// A first digest reports nothing, so give everybody a past one.
 		if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
-			Set("digest_sent_at = ?", time.Now().UTC().Add(-48*time.Hour)).
-			Where("digest = ?", true).Exec(ctx); err != nil {
+			Set(`"digest_sent_at" = ?`, time.Now().UTC().Add(-48*time.Hour)).
+			Where(`"digest" = ?`, true).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -188,7 +188,7 @@ func TestTheDigestSkipsWhoeverHasLeftAndMovesOnFromWhatItCannotAssemble(t *testi
 func open(t *testing.T, w *fixture.World, who *access.Account) int {
 	t.Helper()
 	n, err := w.DB.DB.NewSelect().Model((*notify.Notification)(nil)).
-		Where("person_id = ?", who.ID).Where("cleared_at IS NULL").Count(t.Context())
+		Where(`"person_id" = ?`, who.ID).Where(`"cleared_at" IS NULL`).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

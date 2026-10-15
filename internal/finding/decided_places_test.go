@@ -232,7 +232,7 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 			other:    now.AddDate(0, 0, -100),
 		} {
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-				Set("due_at = ?", due).Where("target_id = ?", target).Exec(ctx); err != nil {
+				Set(`"due_at" = ?`, due).Where(`"target_id" = ?`, target).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}

@@ -153,7 +153,7 @@ func (m Measuring) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // rather than what was done to the claims they wrote.
 func (m Measuring) by(q *bun.SelectQuery, person string) *bun.SelectQuery {
 	if len(m.Products) > 0 {
-		q = q.Where("de.product_id IN (?)", bun.List(m.Products))
+		q = q.Where(`"de"."product_id" IN (?)`, bun.List(m.Products))
 	}
 	if len(m.People) > 0 {
 		q = q.Where(person+" IN (?)", bun.List(m.People))
@@ -189,8 +189,8 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	// see; and moving either condition to WHERE would turn the outer join into
 	// an inner one and flatten the figures the LEFT JOIN is there to keep.
 	sameProduct := `AND EXISTS (SELECT 1 FROM "target" AS "tg"
-			JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE tg.id = f.target_id AND st.product_id = de.product_id)`
+			JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+			WHERE "tg"."id" = "f"."target_id" AND "st"."product_id" = "de"."product_id")`
 	mayRead, readArgs := readableFindingsOn(subject, "f", "de.product_id")
 	if mayRead != "" {
 		sameProduct += " AND " + mayRead
@@ -203,27 +203,27 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
 		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")+` `+sameProduct, readArgs...).
-		Join(`LEFT JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
+		Join(`LEFT JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// Rated as the product that made the decision rates it, which is the
 		// band every other surface groups this issue under. Read from the
 		// published word alone, a product that re-rated an issue measured its
 		// own turnaround under a severity nobody there uses.
 		Join(rating.For(rating.OnDecision)).
-		Join(`LEFT JOIN "claim_approval" AS "da" ON da.claim_id = de.claim_id
-			AND da.withdrawn_at IS NULL`).
+		Join(`LEFT JOIN "claim_approval" AS "da" ON "da"."claim_id" = "de"."claim_id"
+			AND "da"."withdrawn_at" IS NULL`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
-		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
-		ColumnExpr(`MIN(de.proposed_at) AS "proposed_at"`).
-		ColumnExpr(`MIN(da.approved_at) AS "approved_at"`).
-		Where("de.proposed_at < ?", until).
+		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
+		ColumnExpr(`MIN("de"."proposed_at") AS "proposed_at"`).
+		ColumnExpr(`MIN("da"."approved_at") AS "approved_at"`).
+		Where(`"de"."proposed_at" < ?`, until).
 		// One observation per claim and band. A claim writes a row per
 		// place and is agreed to once, so counted per row one claim over
 		// four hundred places is four hundred waits for one agreement.
-		GroupExpr("de.claim_id, " + rating.EffectiveExpr).
-		OrderExpr("MIN(de.proposed_at) DESC").
+		GroupExpr(`"de"."claim_id", ` + rating.EffectiveExpr).
+		OrderExpr(`MIN("de"."proposed_at") DESC`).
 		Limit(measuredAtMost + 1)
 	if !since.IsZero() {
-		q = q.Where("de.proposed_at >= ?", since)
+		q = q.Where(`"de"."proposed_at" >= ?`, since)
 	}
 	q = only.narrow(readableBy(q, subject, "de"))
 	if err := q.Scan(ctx, &rows); err != nil {
@@ -268,11 +268,11 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// Counted per claim: sending a claim back marks every row of it, and
 		// approving with exceptions moves the rows it returns into a claim of
 		// their own, so the distinct claims are the send-backs.
-		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
-		Where("de.sent_back_at IS NOT NULL").
-		Where("de.sent_back_at < ?", until)
+		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+		Where(`"de"."sent_back_at" IS NOT NULL`).
+		Where(`"de"."sent_back_at" < ?`, until)
 	if !since.IsZero() {
-		back = back.Where("de.sent_back_at >= ?", since)
+		back = back.Where(`"de"."sent_back_at" >= ?`, since)
 	}
 	if err := only.narrow(readableBy(back, subject, "de")).Scan(ctx, &out.SentBack); err != nil {
 		return Measures{}, fmt.Errorf("read how much came back: %w", err)
@@ -320,21 +320,21 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 	// claim writes a row per place and is one piece of work.
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
-			ColumnExpr(`de.proposed_by AS "person"`).
-			ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
-			Where("de.proposed_at < ?", until).
-			GroupExpr("de.proposed_by")
+			ColumnExpr(`"de"."proposed_by" AS "person"`).
+			ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+			Where(`"de"."proposed_at" < ?`, until).
+			GroupExpr(`"de"."proposed_by"`)
 		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Proposed }); err != nil {
 		return nil, err
 	}
 	if err := count(func() *bun.SelectQuery {
 		q := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
-			ColumnExpr(`de.proposed_by AS "person"`).
-			ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "number"`).
-			Where("de.state = ?", Withdrawn).
-			Where("de.proposed_at < ?", until).
-			GroupExpr("de.proposed_by")
+			ColumnExpr(`"de"."proposed_by" AS "person"`).
+			ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "number"`).
+			Where(`"de"."state" = ?`, Withdrawn).
+			Where(`"de"."proposed_at" < ?`, until).
+			GroupExpr(`"de"."proposed_by"`)
 		return only.narrow(readableBy(from(q, "de.proposed_at", since), subject, "de"))
 	}, func(w *Worked) *int { return &w.Withdrawn }); err != nil {
 		return nil, err
@@ -346,12 +346,12 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		// the claim it was given for: an approver agreeing to one argument
 		// covering forty-four places did one piece of work, not forty-four.
 		q := s.db.NewSelect().TableExpr(`"claim_approval" AS "da"`).
-			Join(`JOIN "decision" AS "de" ON de.claim_id = da.claim_id`).
-			ColumnExpr(`da.approved_by AS "person"`).
-			ColumnExpr(`COUNT(DISTINCT da.id) AS "number"`).
-			Where("da.withdrawn_at IS NULL").
-			Where("da.approved_at < ?", until).
-			GroupExpr("da.approved_by")
+			Join(`JOIN "decision" AS "de" ON "de"."claim_id" = "da"."claim_id"`).
+			ColumnExpr(`"da"."approved_by" AS "person"`).
+			ColumnExpr(`COUNT(DISTINCT "da"."id") AS "number"`).
+			Where(`"da"."withdrawn_at" IS NULL`).
+			Where(`"da"."approved_at" < ?`, until).
+			GroupExpr(`"da"."approved_by"`)
 		return only.by(readableBy(from(q, "da.approved_at", since), subject, "de"), "da.approved_by")
 	}, func(w *Worked) *int { return &w.Approved }); err != nil {
 		return nil, err
@@ -368,8 +368,8 @@ func (s *Store) throughput(ctx context.Context, subject access.Subject, only Mea
 		Identity string `bun:"identity"`
 	}
 	if err := s.db.NewSelect().TableExpr(`"person" AS "p"`).
-		ColumnExpr(`p.id AS "id"`).ColumnExpr(`p.identity AS "identity"`).
-		Where("p.id IN (?)", bun.List(ids)).
+		ColumnExpr(`"p"."id" AS "id"`).ColumnExpr(`"p"."identity" AS "identity"`).
+		Where(`"p"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &people); err != nil {
 		return nil, fmt.Errorf("read who did the work: %w", err)
 	}

@@ -116,7 +116,7 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Subject, *Ses
 	}
 	session := new(Session)
 	if err := s.db.NewSelect().Model(session).
-		Where("token_hash = ?", hashSecret(token)).Scan(ctx); err != nil {
+		Where(`"token_hash" = ?`, hashSecret(token)).Scan(ctx); err != nil {
 		return Subject{}, nil, database.FromRead(err, ErrDenied, "look up a session")
 	}
 	if !s.now().Before(session.ExpiresAt) {
@@ -124,7 +124,7 @@ func (s *Store) ResolveSession(ctx context.Context, token string) (Subject, *Ses
 	}
 
 	person := new(Account)
-	if err := s.db.NewSelect().Model(person).Where("id = ?", session.PersonID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(person).Where(`"id" = ?`, session.PersonID).Scan(ctx); err != nil {
 		return Subject{}, nil, database.FromRead(err, ErrDenied, "look up whose session this is")
 	}
 
@@ -161,7 +161,7 @@ func (session *Session) MatchesCSRF(presented string) bool {
 
 // EndSession signs one session out.
 func (s *Store) EndSession(ctx context.Context, id int64) error {
-	if _, err := s.db.NewDelete().Model((*Session)(nil)).Where("id = ?", id).Exec(ctx); err != nil {
+	if _, err := s.db.NewDelete().Model((*Session)(nil)).Where(`"id" = ?`, id).Exec(ctx); err != nil {
 		return fmt.Errorf("end a session: %w", err)
 	}
 	return nil
@@ -171,7 +171,7 @@ func (s *Store) EndSession(ctx context.Context, id int64) error {
 // off at once means for a person rather than for a browser.
 func (s *Store) EndSessionsFor(ctx context.Context, personID int64) error {
 	if _, err := s.db.NewDelete().Model((*Session)(nil)).
-		Where("person_id = ?", personID).Exec(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Exec(ctx); err != nil {
 		return fmt.Errorf("end the sessions of a person: %w", err)
 	}
 	return nil
@@ -182,7 +182,7 @@ func (s *Store) EndSessionsFor(ctx context.Context, personID int64) error {
 // with what is being tracked.
 func (s *Store) PurgeExpiredSessions(ctx context.Context) (int64, error) {
 	result, err := s.db.NewDelete().Model((*Session)(nil)).
-		Where("expires_at <= ?", s.now()).Exec(ctx)
+		Where(`"expires_at" <= ?`, s.now()).Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("clear expired sessions: %w", err)
 	}

@@ -156,16 +156,16 @@ func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 	update := tx.NewUpdate().Model((*Finding)(nil))
 	if m.described {
 		update = update.
-			Set("fix_state = ?", f.FixState).
-			Set("fixed_in = ?", f.FixedIn).
-			Set("fixed_at = ?", f.FixedAt).
-			Set("matched = ?", f.Matched).
-			Set("matched_from = ?", f.MatchedFrom).
-			Set("matched_in = ?", f.MatchedIn).
-			Set("matched_range = ?", f.MatchedRange).
-			Set("suppressed_by = ?", f.SuppressedBy).
-			Set("stated_by = ?", f.StatedBy).
-			Set("claimed_by = ?", f.ClaimedBy)
+			Set(`"fix_state" = ?`, f.FixState).
+			Set(`"fixed_in" = ?`, f.FixedIn).
+			Set(`"fixed_at" = ?`, f.FixedAt).
+			Set(`"matched" = ?`, f.Matched).
+			Set(`"matched_from" = ?`, f.MatchedFrom).
+			Set(`"matched_in" = ?`, f.MatchedIn).
+			Set(`"matched_range" = ?`, f.MatchedRange).
+			Set(`"suppressed_by" = ?`, f.SuppressedBy).
+			Set(`"stated_by" = ?`, f.StatedBy).
+			Set(`"claimed_by" = ?`, f.ClaimedBy)
 	}
 	if m.moved {
 		urgencies := make([]any, 0, 2*(last-first))
@@ -173,18 +173,18 @@ func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 			urgencies = append(urgencies, m.ids[i], m.urgencies[i])
 		}
 		update = update.
-			Set("urgency = CASE id"+strings.Repeat(" WHEN ? THEN ?", last-first)+" ELSE urgency END",
+			Set(`"urgency" = CASE "id"`+strings.Repeat(" WHEN ? THEN ?", last-first)+` ELSE "urgency" END`,
 				urgencies...).
-			Set("urgency_exploited = ?", f.RankExploited).
-			Set("urgency_shipped = ?", f.RankShipped)
+			Set(`"urgency_exploited" = ?`, f.RankExploited).
+			Set(`"urgency_shipped" = ?`, f.RankShipped)
 	}
 	if m.exploitationMoved {
 		// The moment, kept beside the deadline it produced. Every later
 		// recount counts from it, and nothing else on the row holds it.
-		update = update.Set("exploited_learned_at = ?", m.learned)
+		update = update.Set(`"exploited_learned_at" = ?`, m.learned)
 	}
 	if m.clockMoved {
-		update = update.Set("due_at = ?", f.DueAt)
+		update = update.Set(`"due_at" = ?`, f.DueAt)
 	}
-	return update.Where("id IN (?)", bun.List(m.ids[first:last]))
+	return update.Where(`"id" IN (?)`, bun.List(m.ids[first:last]))
 }

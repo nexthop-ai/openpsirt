@@ -93,8 +93,8 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 
 	var latest int64
 	if err := s.db.NewSelect().Model((*Revision)(nil)).
-		ColumnExpr("COALESCE(MAX(ordinal), 0)").
-		Where("claim_id = ?", claimID).Scan(ctx, &latest); err != nil {
+		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+		Where(`"claim_id" = ?`, claimID).Scan(ctx, &latest); err != nil {
 		return Revised{}, fmt.Errorf("read what has been said already: %w", err)
 	}
 	if latest == 0 {
@@ -123,10 +123,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	// forty-four returned that row to the queue and left the other forty-three
 	// saying the old thing under a claim that read as agreed.
 	if _, err := s.db.NewUpdate().Model((*Approval)(nil)).
-		Set("withdrawn_at = ?", now).
-		Set("withdrawn_by = ?", subject.ID).
-		Where("claim_id = ?", claimID).
-		Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
+		Set(`"withdrawn_at" = ?`, now).
+		Set(`"withdrawn_by" = ?`, subject.ID).
+		Where(`"claim_id" = ?`, claimID).
+		Where(`"withdrawn_at" IS NULL`).Exec(ctx); err != nil {
 		return Revised{}, fmt.Errorf("withdraw the approvals on what was revised: %w", err)
 	}
 	// Who agreed, read from the rows this revision withdrew rather than
@@ -137,8 +137,8 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		return Revised{}, err
 	}
 	if _, err := s.db.NewUpdate().Model((*Claim)(nil)).
-		Set("revision_id = ?", revision.ID).
-		Where("id = ?", claimID).Exec(ctx); err != nil {
+		Set(`"revision_id" = ?`, revision.ID).
+		Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
 		return Revised{}, fmt.Errorf("record a revision: %w", err)
 	}
 	claim.RevisionID = &revision.ID
@@ -170,16 +170,16 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		// is accepted, both approvable, with one silently governing.
 		key := liveKeyFor(places[i], claim.Outcome.StandsAtAnyVersion())
 		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
-			Set("state = ?", Proposed).
-			Set("live_key = ?", key).
+			Set(`"state" = ?`, Proposed).
+			Set(`"live_key" = ?`, key).
 			// Whatever was asked for has been answered, or at least responded
 			// to. Leaving the mark would keep the claim out of the approval
 			// queue forever, which is the failure that makes sending back
 			// unusable.
-			Set("sent_back_at = ?", nil).
+			Set(`"sent_back_at" = ?`, nil).
 			// Live again, so it has no moment it stopped applying.
-			Set("ended_at = ?", nil).
-			Where("id = ?", row.ID).Exec(ctx); err != nil {
+			Set(`"ended_at" = ?`, nil).
+			Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
 			// Another claim has taken the place since this one ended. The
 			// unique index is the only thing that can say so, for the reason
 			// proposing relies on it.
@@ -218,23 +218,23 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 		}
 		now := s.now().Truncate(time.Microsecond)
 		if _, err := tx.NewUpdate().Model((*Approval)(nil)).
-			Set("withdrawn_at = ?", now).
-			Set("withdrawn_by = ?", subject.ID).
-			Where("claim_id = ?", claimID).
-			Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
+			Set(`"withdrawn_at" = ?`, now).
+			Set(`"withdrawn_by" = ?`, subject.ID).
+			Where(`"claim_id" = ?`, claimID).
+			Where(`"withdrawn_at" IS NULL`).Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a claim: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
-			Set("state = ?", Withdrawn).
-			Set("ended_at = ?", now).
+			Set(`"state" = ?`, Withdrawn).
+			Set(`"ended_at" = ?`, now).
 			// Released, so the places are open to a fresh claim. A withdrawn
 			// claim is history, and history must not stop anybody deciding.
-			Set("live_key = ?", nil).
-			Where("claim_id = ?", claimID).
+			Set(`"live_key" = ?`, nil).
+			Where(`"claim_id" = ?`, claimID).
 			// A row that has already ended keeps its state and its end
 			// date: a lapse says when and why it stopped applying, and the
 			// claim then reads as partly lapsed rather than withdrawn.
-			Where("state IN (?)", bun.List([]State{Proposed, Approved})).
+			Where(`"state" IN (?)`, bun.List([]State{Proposed, Approved})).
 			Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a claim: %w", err)
 		}
@@ -310,10 +310,10 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	// undoing yours is not a way to take back somebody else's agreement.
 	var decisions []int64
 	covered := s.db.NewSelect().Model((*Approval)(nil)).
-		ColumnExpr("d.id").
-		Join(`JOIN "decision" AS "d" ON d.claim_id = da.claim_id`).
-		Where("da.batch = ?", batch).Where("da.withdrawn_at IS NULL").
-		Where("da.approved_by = ?", subject.ID)
+		ColumnExpr(`"d"."id"`).
+		Join(`JOIN "decision" AS "d" ON "d"."claim_id" = "da"."claim_id"`).
+		Where(`"da"."batch" = ?`, batch).Where(`"da"."withdrawn_at" IS NULL`).
+		Where(`"da"."approved_by" = ?`, subject.ID)
 	covered = approvableBy(covered, subject, "d")
 	if err := covered.Scan(ctx, &decisions); err != nil {
 		return Undone{}, fmt.Errorf("read what that approval covered: %w", err)
@@ -348,11 +348,11 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 	}
 
 	if _, err := s.db.NewUpdate().Model((*Approval)(nil)).
-		Set("withdrawn_at = ?", now).
-		Set("withdrawn_by = ?", subject.ID).
-		Where("batch = ?", batch).Where("withdrawn_at IS NULL").
-		Where("approved_by = ?", subject.ID).
-		Where("claim_id IN (?)", bun.List(claims)).Exec(ctx); err != nil {
+		Set(`"withdrawn_at" = ?`, now).
+		Set(`"withdrawn_by" = ?`, subject.ID).
+		Where(`"batch" = ?`, batch).Where(`"withdrawn_at" IS NULL`).
+		Where(`"approved_by" = ?`, subject.ID).
+		Where(`"claim_id" IN (?)`, bun.List(claims)).Exec(ctx); err != nil {
 		return Undone{}, fmt.Errorf("undo an approval: %w", err)
 	}
 	rows, err := s.returnToWaiting(ctx, claims)
@@ -377,15 +377,15 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 // conditions exclude rows the caller named.
 func (s *Store) returnToWaiting(ctx context.Context, claims []int64) (int64, error) {
 	res, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", Proposed).
+		Set(`"state" = ?`, Proposed).
 		// A claim sent back and then approved, with the approval later taken
 		// back, would otherwise be proposed, need approval, and sit in no
 		// queue at all.
-		Set("sent_back_at = ?", nil).
-		Where("de.claim_id IN (?)", bun.List(claims)).
-		Where("de.state = ?", Approved).
+		Set(`"sent_back_at" = ?`, nil).
+		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		Where(`"de"."state" = ?`, Approved).
 		Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "still" ` +
-			"WHERE still.claim_id = de.claim_id AND still.withdrawn_at IS NULL)").
+			`WHERE "still"."claim_id" = "de"."claim_id" AND "still"."withdrawn_at" IS NULL)`).
 		Exec(ctx)
 	if err != nil {
 		return 0, err
@@ -407,8 +407,8 @@ func (s *Store) wholeClaims(ctx context.Context, reached []int64) ([]int64, []in
 	}
 	if err := s.db.NewSelect().Model((*Decision)(nil)).
 		Column("id", "claim_id").
-		Where(`de.claim_id IN (SELECT "sibling".claim_id FROM "decision" AS "sibling"
-			WHERE "sibling".id IN (?))`, bun.List(reached)).
+		Where(`"de"."claim_id" IN (SELECT "sibling"."claim_id" FROM "decision" AS "sibling"
+			WHERE "sibling"."id" IN (?))`, bun.List(reached)).
 		Scan(ctx, &rows); err != nil {
 		return nil, nil, fmt.Errorf("read what that approval covered: %w", err)
 	}
@@ -449,12 +449,12 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 	}
 	var approvers []int64
 	if err := s.db.NewSelect().Model((*Approval)(nil)).
-		ColumnExpr("DISTINCT da.approved_by").
-		Where("da.claim_id = ?", claimID).
-		Where("da.withdrawn_at = ?", at).
-		Where("da.withdrawn_by = ?", subject.ID).
-		Where("da.approved_by <> ?", subject.ID).
-		OrderExpr("da.approved_by ASC").
+		ColumnExpr(`DISTINCT "da"."approved_by"`).
+		Where(`"da"."claim_id" = ?`, claimID).
+		Where(`"da"."withdrawn_at" = ?`, at).
+		Where(`"da"."withdrawn_by" = ?`, subject.ID).
+		Where(`"da"."approved_by" <> ?`, subject.ID).
+		OrderExpr(`"da"."approved_by" ASC`).
 		Scan(ctx, &approvers); err != nil {
 		return nil, fmt.Errorf("read who agreed to this: %w", err)
 	}
@@ -511,7 +511,7 @@ func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, erro
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).
 		Column("id", "proposed_by", "visibility", "product_id", "vulnerability_id").
-		Where("id IN (?)", bun.List(ids)).Order("id ASC").Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(ids)).Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who proposed these: %w", err)
 	}
 	at := map[int64]int{}
@@ -541,7 +541,7 @@ func (s *Store) authorOf(ctx context.Context, claim Claim) (int64, error) {
 	}
 	revision := new(Revision)
 	if err := s.db.NewSelect().Model(revision).
-		Where("id = ?", *claim.RevisionID).Scan(ctx); err != nil {
+		Where(`"id" = ?`, *claim.RevisionID).Scan(ctx); err != nil {
 		return 0, fmt.Errorf("read who wrote this: %w", err)
 	}
 	return revision.WrittenBy, nil
@@ -555,15 +555,15 @@ func (s *Store) authorOf(ctx context.Context, claim Claim) (int64, error) {
 // skips the control REQ-24 names.
 func (s *Store) secondPerson(ctx context.Context, claimID, approver int64) error {
 	ownWords, err := s.db.NewSelect().Model((*Revision)(nil)).
-		Where("dr.claim_id = ?", claimID).
-		Where("dr.written_by = ?", approver).
+		Where(`"dr"."claim_id" = ?`, claimID).
+		Where(`"dr"."written_by" = ?`, approver).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read who wrote this: %w", err)
 	}
 	ownRows, err := s.db.NewSelect().Model((*Decision)(nil)).
-		Where("de.claim_id = ?", claimID).
-		Where("de.proposed_by = ?", approver).
+		Where(`"de"."claim_id" = ?`, claimID).
+		Where(`"de"."proposed_by" = ?`, approver).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read who proposed this: %w", err)
@@ -591,13 +591,13 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	covered, err := s.db.NewSelect().
 		TableExpr(finding.Decisions).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Where("de.id IN (?)", bun.List(ids)).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Where(`"de"."id" IN (?)`, bun.List(ids)).
+		Where(`"f"."closed_at" IS NULL`).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", "st.product_id")).
 		Count(ctx)

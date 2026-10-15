@@ -81,9 +81,9 @@ func (s *Store) StandingAt(ctx context.Context, subject access.Subject, productI
 	// With the argument each row applies, which is the whole of what a reader
 	// is shown: the outcome, the justification, the dates.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
-		Where("de.product_id = ?", productID).
+		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
-		Where("de.live_key IN (?)", bun.List(keys)).
+		Where(`"de"."live_key" IN (?)`, bun.List(keys)).
 		Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what stands here: %w", err)
 	}
@@ -129,7 +129,7 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 
 	var claims []Claim
 	if err := s.db.NewSelect().Model(&claims).
-		Where("id IN (?)", bun.List(order)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(order)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the claims standing here: %w", err)
 	}
 	for _, claim := range claims {
@@ -143,7 +143,7 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 		// the author's own remarks are answers rather than requests.
 		var comments []Comment
 		if err := s.db.NewSelect().Model(&comments).
-			Where("claim_id IN (?)", bun.List(sentBack)).
+			Where(`"claim_id" IN (?)`, bun.List(sentBack)).
 			// Bounded. What is wanted is the newest comment on each claim
 			// that is with its author, and this read every comment ever
 			// written on every one of them to take one each — a claim people
@@ -215,10 +215,10 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	var rows []Decision
 	// With the argument each row applied, which is what is offered back.
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
-		Where("de.product_id = ?", productID).
+		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
-		Where("de.place_identity IN (?)", bun.List(places)).
-		Where("de.state IN (?, ?)", Withdrawn, LapsedState).
+		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"de"."state" IN (?, ?)`, Withdrawn, LapsedState).
 		// Bounded, newest first. This is the whole history of what was
 		// decided at these places and then stopped applying, which on a
 		// long-lived product is every judgment ever made there — and a screen
@@ -238,7 +238,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(claimsOf(rows))).
+		Where(`"claim_id" IN (?)`, bun.List(claimsOf(rows))).
 		Order("id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)
 	}
@@ -283,12 +283,12 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 	}
 	var rows []Decision
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
-		Where("de.product_id = ?", productID).
+		Where(`"de"."product_id" = ?`, productID).
 		Where("NOT ("+finding.FiledUnder(filed.DecisionIssue)+")", issueID).
-		Where("de.place_identity IN (?)", bun.List(places)).
-		Where("claim.outcome = ?", NotApplicable).
-		Where("de.state = ?", Approved).
-		Where("de.live_key IS NOT NULL").
+		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"claim"."outcome" = ?`, NotApplicable).
+		Where(`"de"."state" = ?`, Approved).
+		Where(`"de"."live_key" IS NOT NULL`).
 		// Bounded in the statement rather than in the loop below. Five are
 		// offered and every approved dismissal at these places crossed the
 		// wire to pick them — a component at sixty places in a deployment
@@ -319,13 +319,13 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		Issues  int   `bun:"issues"`
 	}
 	if err := readableBy(s.db.NewSelect().Model((*Decision)(nil)), subject, "de").
-		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		// Counted as the issues the rows are read as, so two names a report
 		// merged are one issue.
 		Join(finding.DecisionIssue).
-		ColumnExpr(`COUNT(DISTINCT dv.issue_id) AS "issues"`).
-		Where("de.claim_id IN (?)", bun.List(order)).
-		GroupExpr("de.claim_id").
+		ColumnExpr(`COUNT(DISTINCT "dv"."issue_id") AS "issues"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(order)).
+		GroupExpr(`"de"."claim_id"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read what those claims cover: %w", err)
 	}
@@ -390,11 +390,11 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 	}
 	var rows []Decision
 	if err := readableBy(s.db.NewSelect().Model(&rows).Relation("Claim"), subject, "de").
-		Where("de.product_id <> ?", productID).
+		Where(`"de"."product_id" <> ?`, productID).
 		Where(finding.FiledUnder(filed.DecisionIssue), issueID).
-		Where("de.place_identity IN (?)", bun.List(places)).
-		Where("de.state = ?", Approved).
-		Where("de.live_key IS NOT NULL").
+		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"de"."state" = ?`, Approved).
+		Where(`"de"."live_key" IS NOT NULL`).
 		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided about this elsewhere: %w", err)
 	}
@@ -447,7 +447,7 @@ func (s *Store) evidenceOf(ctx context.Context, subject access.Subject, rows []D
 	order, head := firstPerClaim(rows, similarOffered)
 	var claims []Claim
 	if err := s.db.NewSelect().Model(&claims).
-		Where("id IN (?)", bun.List(order)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(order)).Scan(ctx); err != nil {
 		return evidence{}, fmt.Errorf("%s: %w", readingClaims, err)
 	}
 	byID := make(map[int64]Claim, len(claims))
@@ -516,8 +516,8 @@ func (s *Store) standingApprovals(ctx context.Context, claimIDs []int64) (map[in
 	}
 	var approvals []Approval
 	if err := s.db.NewSelect().Model(&approvals).
-		Where("claim_id IN (?)", bun.List(claimIDs)).
-		Where("withdrawn_at IS NULL").
+		Where(`"claim_id" IN (?)`, bun.List(claimIDs)).
+		Where(`"withdrawn_at" IS NULL`).
 		Order("id DESC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read who agreed: %w", err)
 	}

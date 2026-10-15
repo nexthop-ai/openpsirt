@@ -358,8 +358,8 @@ func TestAFixedFlawIsOfferedToAnAdvisory(t *testing.T) {
 		}
 
 		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).
-			Set("closed_at = ?", time.Now().UTC()).
-			Where("kind = ?", "entered").Exec(t.Context()); err != nil {
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"kind" = ?`, "entered").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		var fixed offered

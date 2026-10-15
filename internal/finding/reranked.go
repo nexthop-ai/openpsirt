@@ -149,9 +149,9 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 			}
 			q := reranking(tx, productID,
 				"CASE vulnerability_id"+strings.Repeat(" WHEN ? THEN ?", len(batch))+" END", rests...).
-				Where("vulnerability_id IN (?)", bun.List(ids))
+				Where(`"vulnerability_id" IN (?)`, bun.List(ids))
 			if scanned != 0 {
-				q = q.Where("NOT (target_id = ? AND kind = ?)", scanned, Vulnerable)
+				q = q.Where(`NOT ("target_id" = ? AND "kind" = ?)`, scanned, Vulnerable)
 			}
 			if _, err := q.Exec(ctx); err != nil {
 				return fmt.Errorf("move these issues in the order: %w", err)
@@ -201,13 +201,13 @@ func issueSignals(ctx context.Context, tx bun.IDB, issues []int64) (map[int64]si
 		// is read apart, and Rating is what decides between them.
 		if err := tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
-			ColumnExpr(`v.id AS "id"`).
-			ColumnExpr(`COALESCE(v.exploited, ?) AS "exploited"`, false).
-			ColumnExpr(`v.exploited_on AS "exploited_on"`).
-			ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-			ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
-			Where("v.id IN (?)", bun.List(batch)).
+			ColumnExpr(`"v"."id" AS "id"`).
+			ColumnExpr(`COALESCE("v"."exploited", ?) AS "exploited"`, false).
+			ColumnExpr(`"v"."exploited_on" AS "exploited_on"`).
+			ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+			ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
+			Where(`"v"."id" IN (?)`, bun.List(batch)).
 			Scan(ctx, &rows); err != nil {
 			return err
 		}
@@ -235,16 +235,16 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 		}
 		q := tx.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-			ColumnExpr(`st.product_id AS "product_id"`).
-			Where("f.vulnerability_id IN (?)", bun.List(batch)).
-			Where("f.closed_at IS NULL").
-			GroupExpr("f.vulnerability_id, st.product_id").
-			OrderExpr("f.vulnerability_id, st.product_id")
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`"st"."product_id" AS "product_id"`).
+			Where(`"f"."vulnerability_id" IN (?)`, bun.List(batch)).
+			Where(`"f"."closed_at" IS NULL`).
+			GroupExpr(`"f"."vulnerability_id", "st"."product_id"`).
+			OrderExpr(`"f"."vulnerability_id", "st"."product_id"`)
 		if scanned != 0 {
-			q = q.Where("NOT (f.target_id = ? AND f.kind = ?)", scanned, Vulnerable)
+			q = q.Where(`NOT ("f"."target_id" = ? AND "f"."kind" = ?)`, scanned, Vulnerable)
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return err

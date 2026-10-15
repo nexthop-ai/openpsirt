@@ -163,7 +163,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		}
 		var issueID int64
 		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
-			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
+			Column("v.id").Where(`"v"."identifier" = ?`, "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
 		}
@@ -357,7 +357,7 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			t.Helper()
 			var open []finding.Finding
 			if err := f.db.DB.NewSelect().Model(&open).
-				Where("target_id = ?", target).Where("closed_at IS NULL").Scan(ctx); err != nil {
+				Where(`"target_id" = ?`, target).Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			evidence, err := f.store.Detail(ctx, who, target, open[0].VulnerabilityID, open[0].ComponentID)
@@ -436,7 +436,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		}
 		var issueID int64
 		if err := f.db.DB.NewSelect().TableExpr("\"vulnerability\" AS \"v\"").
-			Column("v.id").Where("v.identifier = ?", "CVE-2026-1").
+			Column("v.id").Where(`"v"."identifier" = ?`, "CVE-2026-1").
 			Scan(ctx, &issueID); err != nil {
 			t.Fatal(err)
 		}
@@ -445,7 +445,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		record := func(state string, live bool) {
 			t.Helper()
 			if _, err := f.db.DB.NewDelete().Table("decision").
-				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			row := map[string]any{
@@ -625,7 +625,7 @@ func claimSaying(t *testing.T, db *database.DB, personID int64, outcome string) 
 		t.Fatalf("record a claim: %v", err)
 	}
 	var id int64
-	if err := db.DB.NewSelect().TableExpr("\"claim\"").ColumnExpr("MAX(id)").Scan(ctx, &id); err != nil {
+	if err := db.DB.NewSelect().TableExpr("\"claim\"").ColumnExpr(`MAX("id")`).Scan(ctx, &id); err != nil {
 		t.Fatalf("read the claim back: %v", err)
 	}
 	return id
@@ -995,7 +995,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 		sentBack := func(productID int64, version string) {
 			t.Helper()
 			if _, err := f.db.DB.NewDelete().Table("decision").
-				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			row := map[string]any{

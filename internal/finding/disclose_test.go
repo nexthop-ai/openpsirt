@@ -251,8 +251,8 @@ func (f *fixture) endsAt(t *testing.T, issue int64) time.Time {
 	t.Helper()
 	var at time.Time
 	if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-		ColumnExpr("MAX(disclose_at)").
-		Where("vulnerability_id = ?", issue).Scan(t.Context(), &at); err != nil {
+		ColumnExpr(`MAX("disclose_at")`).
+		Where(`"vulnerability_id" = ?`, issue).Scan(t.Context(), &at); err != nil {
 		t.Fatal(err)
 	}
 	return at

@@ -36,7 +36,7 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 		standing := func() finding.Upgrade {
 			var row finding.Upgrade
 			if err := f.db.DB.NewSelect().Model(&row).
-				Where("target_id = ?", f.target).Scan(ctx); err != nil {
+				Where(`"target_id" = ?`, f.target).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			return row
@@ -87,7 +87,7 @@ func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 		owner := func(target int64) *int64 {
 			var rows []finding.Upgrade
 			if err := f.db.DB.NewSelect().Model(&rows).
-				Where("target_id = ?", target).Scan(ctx); err != nil {
+				Where(`"target_id" = ?`, target).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if len(rows) == 0 {

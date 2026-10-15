@@ -60,37 +60,37 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 
 	q := s.db.NewSelect().
 		TableExpr(`"advisory_issuance" AS "ai"`).
-		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
-		Join(`JOIN "person" AS "pe" ON pe.id = ai.issued_by`).
+		Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ai"."advisory_id"`).
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "ai"."issued_by"`).
 		// The title the document carried when it went out, not the one the
 		// advisory has now. A record of what was published says what was
 		// published.
-		Join(`JOIN "advisory_edition" AS "ae" ON ae.id = ai.edition_id`).
-		ColumnExpr(`ad.identifier AS "advisory"`).
-		ColumnExpr(`COALESCE(ae.title, '') AS "title"`).
-		ColumnExpr(`ai.ordinal AS "ordinal"`).
-		ColumnExpr(`ai.summary AS "summary"`).
-		ColumnExpr(`pe.identity AS "issued_by"`).
-		ColumnExpr(`ai.issued_at AS "issued_at"`).
-		ColumnExpr(`ai.digest AS "digest"`).
-		ColumnExpr(`ai.document AS "document"`).
+		Join(`JOIN "advisory_edition" AS "ae" ON "ae"."id" = "ai"."edition_id"`).
+		ColumnExpr(`"ad"."identifier" AS "advisory"`).
+		ColumnExpr(`COALESCE("ae"."title", '') AS "title"`).
+		ColumnExpr(`"ai"."ordinal" AS "ordinal"`).
+		ColumnExpr(`"ai"."summary" AS "summary"`).
+		ColumnExpr(`"pe"."identity" AS "issued_by"`).
+		ColumnExpr(`"ai"."issued_at" AS "issued_at"`).
+		ColumnExpr(`"ai"."digest" AS "digest"`).
+		ColumnExpr(`"ai"."document" AS "document"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_issue" AS "ai2"
-			WHERE ai2.advisory_id = ad.id AND ai2.removed_at IS NULL) AS "issues"`).
-		ColumnExpr(`(SELECT COUNT(DISTINCT ai3.product_id) FROM "advisory_issue" AS "ai3"
-			WHERE ai3.advisory_id = ad.id AND ai3.removed_at IS NULL) AS "products"`).
-		OrderExpr("ai.issued_at DESC, ai.id DESC")
+			WHERE "ai2"."advisory_id" = "ad"."id" AND "ai2"."removed_at" IS NULL) AS "issues"`).
+		ColumnExpr(`(SELECT COUNT(DISTINCT "ai3"."product_id") FROM "advisory_issue" AS "ai3"
+			WHERE "ai3"."advisory_id" = "ad"."id" AND "ai3"."removed_at" IS NULL) AS "products"`).
+		OrderExpr(`"ai"."issued_at" DESC, "ai"."id" DESC`)
 	if len(productIDs) > 0 {
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ai4"
-			WHERE ai4.advisory_id = ad.id AND ai4.removed_at IS NULL
-			  AND ai4.product_id IN (?))`, bun.List(productIDs))
+			WHERE "ai4"."advisory_id" = "ad"."id" AND "ai4"."removed_at" IS NULL
+			  AND "ai4"."product_id" IN (?))`, bun.List(productIDs))
 	}
 	// Either side, or neither: an unbounded side is the beginning or now,
 	// which is what a period's zero side means everywhere else here.
 	if !since.IsZero() {
-		q = q.Where("ai.issued_at >= ?", since)
+		q = q.Where(`"ai"."issued_at" >= ?`, since)
 	}
 	if !until.IsZero() {
-		q = q.Where("ai.issued_at < ?", until)
+		q = q.Where(`"ai"."issued_at" < ?`, until)
 	}
 
 	var rows []Went
@@ -192,20 +192,20 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	bound = append(bound, access.Private)
 	bound = append(bound, args...)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
-		WHERE ac.advisory_id = ad.id AND (`+covered+`) AND (NOT EXISTS (
+		WHERE "ac"."advisory_id" = "ad"."id" AND (`+covered+`) AND (NOT EXISTS (
 			SELECT 1 FROM `+finding.IssueFindings("f")+`
-			JOIN "target" AS "t" ON t.id = f.target_id
-			JOIN "stream" AS "st" ON st.id = t.stream_id
-			WHERE st.product_id = ac.product_id
-			  AND "si"."id" = ac.vulnerability_id
-			  AND f.kind = ?
+			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
+			JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"
+			WHERE "st"."product_id" = "ac"."product_id"
+			  AND "si"."id" = "ac"."vulnerability_id"
+			  AND "f"."kind" = ?
 			  AND `+where+`) OR EXISTS (
 			SELECT 1 FROM `+finding.IssueFindings("f")+`
-			JOIN "target" AS "t" ON t.id = f.target_id
-			JOIN "stream" AS "st" ON st.id = t.stream_id
-			WHERE st.product_id = ac.product_id
-			  AND "si"."id" = ac.vulnerability_id
-			  AND f.visibility = ?
+			JOIN "target" AS "t" ON "t"."id" = "f"."target_id"
+			JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"
+			WHERE "st"."product_id" = "ac"."product_id"
+			  AND "si"."id" = "ac"."vulnerability_id"
+			  AND "f"."visibility" = ?
 			  AND NOT (`+where+`))))`,
 		bound...)
 }
@@ -245,14 +245,14 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"advisory_issuance" AS "ai"`).
-		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
-		ColumnExpr(`ad.identifier AS "advisory"`).
-		ColumnExpr(`ai.ordinal AS "ordinal"`).
-		ColumnExpr(`ai.document AS "document"`).
-		Where("ai.document IS NOT NULL").
+		Join(`JOIN "advisory" AS "ad" ON "ad"."id" = "ai"."advisory_id"`).
+		ColumnExpr(`"ad"."identifier" AS "advisory"`).
+		ColumnExpr(`"ai"."ordinal" AS "ordinal"`).
+		ColumnExpr(`"ai"."document" AS "document"`).
+		Where(`"ai"."document" IS NOT NULL`).
 		// By name and then newest first, so that what is written is decided
 		// by the record rather than by the order an engine chose.
-		OrderExpr("ad.identifier ASC, ai.ordinal DESC")
+		OrderExpr(`"ad"."identifier" ASC, "ai"."ordinal" DESC`)
 
 	var rows []Sent
 	if err := narrowed(q, subject).Scan(ctx, &rows); err != nil {
@@ -276,10 +276,10 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error
 // in no document yet, for the reason its counterpart over a release gives.
 func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
-		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
-		Where("ac.product_id = ?", productID).
-		Where("ac.added_at <= ai.issued_at").
-		Where("(ac.removed_at IS NULL OR ac.removed_at > ai.issued_at)").
+		Join(`JOIN "advisory_issue" AS "ac" ON "ac"."advisory_id" = "ai"."advisory_id"`).
+		Where(`"ac"."product_id" = ?`, productID).
+		Where(`"ac"."added_at" <= "ai"."issued_at"`).
+		Where(`("ac"."removed_at" IS NULL OR "ac"."removed_at" > "ai"."issued_at")`).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether an advisory has gone out for this product: %w", err)
@@ -312,15 +312,15 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 // about the product exists to avoid.
 func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
-		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
-		Join(`JOIN "vulnerability" AS "acv" ON acv.id = ac.vulnerability_id`).
-		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = acv.issue_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where("tg.stream_id = ?", streamID).
+		Join(`JOIN "advisory_issue" AS "ac" ON "ac"."advisory_id" = "ai"."advisory_id"`).
+		Join(`JOIN "vulnerability" AS "acv" ON "acv"."id" = "ac"."vulnerability_id"`).
+		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "acv"."issue_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Where(`"tg"."stream_id" = ?`, streamID).
 		Where(`"st"."product_id" = "ac"."product_id"`).
-		Where("ac.added_at <= ai.issued_at").
-		Where("(ac.removed_at IS NULL OR ac.removed_at > ai.issued_at)").
+		Where(`"ac"."added_at" <= "ai"."issued_at"`).
+		Where(`("ac"."removed_at" IS NULL OR "ac"."removed_at" > "ai"."issued_at")`).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether an advisory has gone out for this release: %w", err)

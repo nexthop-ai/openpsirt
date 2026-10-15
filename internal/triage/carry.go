@@ -205,22 +205,22 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		TableExpr(`"decision" AS "de"`).
 		// The issue the decision is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
-		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
-		ColumnExpr(`de.place_identity AS "place_identity"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
+		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
+		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND `+finding.DecisionAtPlace("f")+` AND f.closed_at IS NULL), '')
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
 			AS "visibility"`, private, string(access.Private), string(access.Public), toTarget).
 		Apply(versionsOnLine(toTarget, "component_now", "consumer_now")).
 		// A line carried onto that was built once. It is a fact about the
 		// target rather than about the decision, and the rule that refuses a
 		// dated judgment on a tag reads it.
-		ColumnExpr(`(SELECT CASE WHEN st.kind = ? THEN 1 ELSE 0 END
-			FROM "target" AS "tg" JOIN "stream" AS "st" ON st.id = tg.stream_id
-			WHERE tg.id = ?) AS "on_tag"`, catalog.Tag, toTarget).
-		Where("de.id = ?", decisionID).
+		ColumnExpr(`(SELECT CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END
+			FROM "target" AS "tg" JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+			WHERE "tg"."id" = ?) AS "on_tag"`, catalog.Tag, toTarget).
+		Where(`"de"."id" = ?`, decisionID).
 		Scan(ctx, &row)
 	if err != nil {
 		return nil, fmt.Errorf("read where a carried judgment lands: %w", err)
@@ -246,9 +246,9 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
 	first := func(expr string) string {
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id
-			WHERE f.target_id = ? AND ` + finding.DecisionAtPlace("f") + ` AND f.closed_at IS NULL
+			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
+			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
+			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtPlace("f") + ` AND f.closed_at IS NULL
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
 	}
@@ -265,7 +265,7 @@ func (s *Store) oldClaim(ctx context.Context, decisionID int64) (*Claim, error) 
 	// With its argument, which is what is being carried: the row says where
 	// the old judgment landed, and the claim says what it was.
 	if err := s.db.NewSelect().Model(row).Relation("Claim").
-		Where("de.id = ?", decisionID).Scan(ctx); err != nil {
+		Where(`"de"."id" = ?`, decisionID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the judgment being carried: %w", err)
 	}
 	return row.Claim, nil
@@ -340,9 +340,9 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	var productID int64
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", toTarget).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id"`).
+		Where(`"tg"."id" = ?`, toTarget).
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}
@@ -380,44 +380,44 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		TableExpr(`"decision" AS "de"`).
 		// The issue each decision is read as, which is the one the new line holds.
 		Join(finding.DecisionIssue).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = dv.issue_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// The argument, which is where the outcome lives.
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
-		ColumnExpr(`de.id AS "decision_id"`).
-		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
-		ColumnExpr(`de.place_identity AS "place_identity"`).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`COALESCE(dr.body, '') AS "reasoning"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`LEFT JOIN "claim_revision" AS "dr" ON "dr"."id" = "cl"."revision_id"`).
+		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
+		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
+		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "was"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
+		ColumnExpr(`COALESCE("dr"."body", '') AS "reasoning"`).
 		// The new line's contents at that place, if anything.
-		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
-			JOIN "component" AS "c" ON c.id = f.component_id
-			WHERE f.target_id = ? AND `+finding.DecisionAtPlace("f")+` AND f.closed_at IS NULL), '')
+		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
+			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
 			AS "component"`, toTarget).
 		// Both versions, because a decision is keyed on both: a build whose
 		// consumer alone has moved is one the claim does not reach, and the
 		// finding surfaces unanswered.
 		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
-		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer_was"`).
+		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE f.target_id = ? AND `+finding.DecisionAtPlace("f")+` AND f.closed_at IS NULL)
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL)
 			AS "still_there"`, toTarget).
 		// The visibility the place lands at, read as placeOnLine reads it.
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE f.target_id = ? AND `+finding.DecisionAtPlace("f")+` AND f.closed_at IS NULL), '')
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
 			AS "landing"`, private, string(access.Private), string(access.Public), toTarget).
 		// A date it carries that has already gone by, either of them.
-		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
-			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
-		Where("de.live_key IS NOT NULL").
-		Where("de.product_id = ?", productID).
-		Where("de.visibility IN (?)", bun.List(readable)).
+		ColumnExpr(`(COALESCE("cl"."deferred_until", "cl"."committed_to") IS NOT NULL
+			AND COALESCE("cl"."deferred_until", "cl"."committed_to") <= ?) AS "ran_out"`, s.now()).
+		Where(`"de"."live_key" IS NOT NULL`).
+		Where(`"de"."product_id" = ?`, productID).
+		Where(`"de"."visibility" IN (?)`, bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE g.target_id = ? AND `+finding.DecisionAtPlace("g")+`)`, fromTarget).
+			WHERE "g"."target_id" = ? AND `+finding.DecisionAtPlace("g")+`)`, fromTarget).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a new line would inherit: %w", err)
@@ -517,13 +517,13 @@ func (s *Store) deferredSoFarAt(ctx context.Context, productID int64, places []a
 	var deferrals []Decision
 	if err := s.db.NewSelect().Model(&deferrals).Relation("Claim").
 		Column("vulnerability_id", "place_identity", "proposed_at", "state", "ended_at").
-		Where("de.product_id = ?", productID).
+		Where(`"de"."product_id" = ?`, productID).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
-		Where("de.place_identity IN (?)", bun.List(identities)).
-		Where("claim.outcome = ?", Deferred).
+		Where(`"de"."place_identity" IN (?)`, bun.List(identities)).
+		Where(`"claim"."outcome" = ?`, Deferred).
 		// Withdrawn and lapsed ones for the span they were in force, as the
 		// threshold counts them.
-		Where("claim.deferred_until IS NOT NULL").Scan(ctx); err != nil {
+		Where(`"claim"."deferred_until" IS NOT NULL`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read how long these have been put off: %w", err)
 	}
 	// Keyed by the issue each deferral is read as, which is how the places

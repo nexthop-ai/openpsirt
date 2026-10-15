@@ -105,16 +105,16 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		VariantID  int64  `bun:"variant_id"`
 		Status     string `bun:"status"`
 	}
-	where, args := database.InAnyOf("ag.approval_id", ids)
+	where, args := database.InAnyOf(`"ag"."approval_id"`, ids)
 	if err := s.db.NewSelect().
 		TableExpr(`"advisory_agreed_status" AS "ag"`).
-		Join(`JOIN "vulnerability" AS "sv" ON sv.id = ag.vulnerability_id`).
-		ColumnExpr(`ag.approval_id AS "approval_id"`).
-		ColumnExpr(`ag.product_id AS "product_id"`).
-		ColumnExpr(`sv.issue_id AS "issue_id"`).
-		ColumnExpr(`ag.stream_id AS "stream_id"`).
-		ColumnExpr(`ag.variant_id AS "variant_id"`).
-		ColumnExpr(`ag.status AS "status"`).
+		Join(`JOIN "vulnerability" AS "sv" ON "sv"."id" = "ag"."vulnerability_id"`).
+		ColumnExpr(`"ag"."approval_id" AS "approval_id"`).
+		ColumnExpr(`"ag"."product_id" AS "product_id"`).
+		ColumnExpr(`"sv"."issue_id" AS "issue_id"`).
+		ColumnExpr(`"ag"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"ag"."variant_id" AS "variant_id"`).
+		ColumnExpr(`"ag"."status" AS "status"`).
 		Where(where, args...).Scan(ctx, &saw); err != nil {
 		return nil, fmt.Errorf("read what the agreements saw: %w", err)
 	}
@@ -226,7 +226,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		on := []any{row.ID, named.ID, issue.ID, at.StreamID, at.VariantID}
 		var held []Override
 		if err := tx.NewSelect().Model(&held).Where(marks, on...).
-			OrderExpr("ao.id").Scan(ctx); err != nil {
+			OrderExpr(`"ao"."id"`).Scan(ctx); err != nil {
 			return err
 		}
 		standing := false
@@ -246,10 +246,10 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 			// marking at once both read it cleared, and the second must not
 			// open an edition for a change the first already made.
 			result, err := tx.NewUpdate().Model((*Override)(nil)).
-				Set("removed_at = NULL").Set("removed_by = NULL").
-				Set("set_at = ?", now).Set("set_by = ?", subject.ID).
-				Where("id = ?", revive.ID).
-				Where("removed_at IS NOT NULL").Exec(ctx)
+				Set(`"removed_at" = NULL`).Set(`"removed_by" = NULL`).
+				Set(`"set_at" = ?`, now).Set(`"set_by" = ?`, subject.ID).
+				Where(`"id" = ?`, revive.ID).
+				Where(`"removed_at" IS NOT NULL`).Exec(ctx)
 			if err != nil {
 				return err
 			}
@@ -273,9 +273,9 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		default:
 			// Counted for the reason reviving one is.
 			result, err := tx.NewUpdate().Model((*Override)(nil)).
-				Set("removed_at = ?", now).Set("removed_by = ?", subject.ID).
+				Set(`"removed_at" = ?`, now).Set(`"removed_by" = ?`, subject.ID).
 				Where(marks, on...).
-				Where("removed_at IS NULL").Exec(ctx)
+				Where(`"removed_at" IS NULL`).Exec(ctx)
 			if err != nil {
 				return err
 			}

@@ -103,23 +103,23 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 
 	q := db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`DISTINCT c.purl AS "purl"`).
-		ColumnExpr(`c.latest_checked_at AS "latest_checked_at"`).
-		Join(`JOIN "graph_node" AS "n" ON n.component_id = c.id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = n.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`DISTINCT "c"."purl" AS "purl"`).
+		ColumnExpr(`"c"."latest_checked_at" AS "latest_checked_at"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "n"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		// Still carried. A component that was in a build last year and is not
 		// now is not a name that would leave this deployment tonight. The
 		// same set the pass asks about, spelled as a join here because the
 		// product a node's build belongs to narrows the report.
-		Where("n.closed_scan_id IS NULL").
-		Where("c.purl <> ''").
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"c"."purl" <> ''`).
 		// Asked and answered with nothing. A component never reached is not
 		// unanswered, it is waiting — and reporting the backlog as though the
 		// indexes had failed on it would make the list useless on the first
 		// day, which is the day somebody reads it.
-		Where("c.latest_checked_at IS NOT NULL").
-		Where("c.latest_version IS NULL").
+		Where(`"c"."latest_checked_at" IS NOT NULL`).
+		Where(`"c"."latest_version" IS NULL`).
 		// Only what there is an index for. One spelling with the pass's own
 		// condition, because the report has to describe the same candidates
 		// the pass asks about.
@@ -127,12 +127,12 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		// Ordered before it is cut, so a deployment past the ceiling reads
 		// the same part of the list twice rather than whatever the engine
 		// happened to hand over.
-		OrderExpr("c.purl ASC").
+		OrderExpr(`"c"."purl" ASC`).
 		// One more than the ceiling, so reaching it is told apart from
 		// landing exactly on it.
 		Limit(mostExamined + 1)
 	if !all {
-		q = q.Where("st.product_id IN (?)", bun.List(products))
+		q = q.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}
 
 	var found []unanswered

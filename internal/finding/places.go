@@ -96,7 +96,7 @@ func componentsByID(ctx context.Context, db bun.IDB, targetID int64,
 	byID := map[int64]graph.Component{}
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []graph.Component
-		if err := db.NewSelect().Model(&rows).Where("id IN (?)", bun.List(batch)).Scan(ctx); err != nil {
+		if err := db.NewSelect().Model(&rows).Where(`"id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
 			return err
 		}
 		for _, row := range rows {
@@ -143,9 +143,9 @@ func withStated(ctx context.Context, db bun.IDB, targetID int64, byID map[int64]
 func openComponents(ctx context.Context, db bun.IDB, targetID int64) (inventory, error) {
 	var rows []graph.Component
 	err := db.NewSelect().Model(&rows).
-		Join(`JOIN "graph_node" AS "n" ON n.component_id = c.id`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
 		Scan(ctx)
 	if err != nil {
 		return inventory{}, fmt.Errorf("read what the variant contains: %w", err)
@@ -244,9 +244,9 @@ func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]str
 	}
 	if err := db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.name AS "name"`).
-		Where("c.id IN (?)", bun.List(wanted)).
+		ColumnExpr(`"c"."id" AS "id"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		Where(`"c"."id" IN (?)`, bun.List(wanted)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what pulls it in: %w", err)
 	}
@@ -269,18 +269,18 @@ func placeEdges(ctx context.Context, db bun.IDB, targetID, componentID int64) (c
 	}
 	err := db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "child" ON child.id = e.child_id`).
-		Join(`JOIN "graph_node" AS "parent" ON parent.id = e.parent_id`).
-		ColumnExpr(`child.component_id AS "child_component_id"`).
-		ColumnExpr(`parent.component_id AS "parent_component_id"`).
-		ColumnExpr(`parent.is_root AS "parent_is_root"`).
-		Where("e.target_id = ?", targetID).
-		Where("e.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "child" ON "child"."id" = "e"."child_id"`).
+		Join(`JOIN "graph_node" AS "parent" ON "parent"."id" = "e"."parent_id"`).
+		ColumnExpr(`"child"."component_id" AS "child_component_id"`).
+		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
+		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
+		Where(`"e"."target_id" = ?`, targetID).
+		Where(`"e"."closed_scan_id" IS NULL`).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if componentID == 0 {
 				return q
 			}
-			return q.Where("child.component_id = ?", componentID)
+			return q.Where(`"child"."component_id" = ?`, componentID)
 		}).
 		Scan(ctx, &edges)
 	if err != nil {

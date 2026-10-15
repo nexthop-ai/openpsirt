@@ -693,8 +693,8 @@ func SeedTheirs(t *testing.T, r *Reach) (disclosed, undisclosed string) {
 		t.Fatal(err)
 	}
 	if _, err := r.DB.DB.NewUpdate().Table("finding").
-		Set("visibility = ?", access.Private).
-		Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+		Set(`"visibility" = ?`, access.Private).
+		Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 			undisclosed).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

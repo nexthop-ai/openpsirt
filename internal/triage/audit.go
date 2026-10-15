@@ -113,14 +113,14 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 		// is read as: one filed under an issue that merged into it answers
 		// to the name that stands. Typed, so matched on the folded name.
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability" AS "iv"`+
-			` JOIN "vulnerability" AS "ik" ON ik.id = iv.issue_id`+
-			` WHERE iv.id = de.vulnerability_id AND ik.identifier_folded = ?)`,
+			` JOIN "vulnerability" AS "ik" ON "ik"."id" = "iv"."issue_id"`+
+			` WHERE "iv"."id" = "de"."vulnerability_id" AND "ik"."identifier_folded" = ?)`,
 			finding.FoldIdentifier(f.Issue))
 	}
 	if f.Component != "" {
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
-			` JOIN "component" AS "cc" ON cc.id = cf.component_id`+
-			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND cc.name_folded = ?)`,
+			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
+			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND "cc"."name_folded" = ?)`,
 			graph.Folded(f.Component))
 	}
 	// One build, with the build's own product required to be the one that
@@ -133,8 +133,8 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 	if f.TargetID != 0 {
 		mayRead, readArgs := readableFindingsOn(subject, "bf", "de.product_id")
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
-			JOIN "target" AS "bt" ON bt.id = bf.target_id
-			JOIN "stream" AS "bs" ON bs.id = bt.stream_id
+			JOIN "target" AS "bt" ON "bt"."id" = "bf"."target_id"
+			JOIN "stream" AS "bs" ON "bs"."id" = "bt"."stream_id"
 			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
 			  AND bf.target_id = ? AND bs.product_id = de.product_id`
 		args := []any{f.TargetID}
@@ -154,32 +154,32 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = readableBy(q, subject, "de")
 		if len(f.ProductIDs) > 0 {
-			q = q.Where("de.product_id IN (?)", bun.List(f.ProductIDs))
+			q = q.Where(`"de"."product_id" IN (?)`, bun.List(f.ProductIDs))
 		}
 		if len(f.Outcomes) > 0 {
 			// Asked of the claim, which is where what a judgment says lives.
 			q = q.Where(`EXISTS (SELECT 1 FROM "claim" AS "oc"`+
-				` WHERE oc.id = de.claim_id AND oc.outcome IN (?))`, bun.List(f.Outcomes))
+				` WHERE "oc"."id" = "de"."claim_id" AND "oc"."outcome" IN (?))`, bun.List(f.Outcomes))
 		}
 		if len(f.States) > 0 {
-			q = q.Where("de.state IN (?)", bun.List(f.States))
+			q = q.Where(`"de"."state" IN (?)`, bun.List(f.States))
 		}
 		// What applies now, which is the same condition Judged.Standing
 		// reports off a row: a claim still holding its key, agreed to or
 		// standing without needing agreement.
 		if f.InForce {
 			standing, held := finding.InForce()
-			q = q.Where("de.live_key IS NOT NULL").Where(standing, held...)
+			q = q.Where(`"de"."live_key" IS NOT NULL`).Where(standing, held...)
 		}
 		// The period is the proposal's date, not the approval's. A judgment
 		// belongs to when it was made; dating it by its agreement would move
 		// it out of the period it was argued in whenever an approval came
 		// late, which is the ordinary case.
 		if !from.IsZero() {
-			q = q.Where("de.proposed_at >= ?", from)
+			q = q.Where(`"de"."proposed_at" >= ?`, from)
 		}
 		if !to.IsZero() {
-			q = q.Where("de.proposed_at < ?", to)
+			q = q.Where(`"de"."proposed_at" < ?`, to)
 		}
 		// The exception report, and it is the one an auditor expects
 		// to come back empty of dismissals. Asked of the record — is
@@ -189,21 +189,21 @@ func auditedBy(subject access.Subject, f Filter, from, to time.Time) func(*bun.S
 		// it.
 		if f.Alone {
 			q = q.Where(`NOT EXISTS (SELECT 1 FROM "claim_approval" AS "ex"` +
-				` WHERE ex.claim_id = de.claim_id AND ex.withdrawn_at IS NULL` +
-				` AND ex.approved_by <> de.proposed_by)`)
+				` WHERE "ex"."claim_id" = "de"."claim_id" AND "ex"."withdrawn_at" IS NULL` +
+				` AND "ex"."approved_by" <> "de"."proposed_by")`)
 		}
 		if f.Proposer != "" {
 			q = q.Where(`EXISTS (SELECT 1 FROM "person" AS "pp"`+
-				` WHERE pp.id = de.proposed_by AND pp.identity = ?)`, f.Proposer)
+				` WHERE "pp"."id" = "de"."proposed_by" AND "pp"."identity" = ?)`, f.Proposer)
 		}
 		// An agreement that still stands. Somebody who agreed and then took it
 		// back did not approve this, and answering otherwise would make the
 		// withdrawal invisible to the one report that exists to find it.
 		if f.Approver != "" {
 			q = q.Where(`EXISTS (SELECT 1 FROM "claim_approval" AS "ap"`+
-				` JOIN "person" AS "ape" ON ape.id = ap.approved_by`+
-				` WHERE ap.claim_id = de.claim_id AND ap.withdrawn_at IS NULL`+
-				` AND ape.identity = ?)`, f.Approver)
+				` JOIN "person" AS "ape" ON "ape"."id" = "ap"."approved_by"`+
+				` WHERE "ap"."claim_id" = "de"."claim_id" AND "ap"."withdrawn_at" IS NULL`+
+				` AND "ape"."identity" = ?)`, f.Approver)
 		}
 		q = aboutTheSamePlaces(q, subject, f)
 		return q
@@ -317,7 +317,7 @@ func (s *Store) agreedAndNamed(ctx context.Context, claims, proposers []int64) (
 	var approvals []Approval
 	if len(claims) > 0 {
 		if err := s.db.NewSelect().Model(&approvals).
-			Where("claim_id IN (?)", bun.List(claims)).
+			Where(`"claim_id" IN (?)`, bun.List(claims)).
 			Order("claim_id ASC", "id ASC").Scan(ctx); err != nil {
 			return nil, nil, fmt.Errorf("read who agreed: %w", err)
 		}
@@ -365,8 +365,8 @@ func (s *Store) PeopleNamed(ctx context.Context, wanted []int64) (map[int64]stri
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"person" AS "p"`).
-		ColumnExpr(`p.id AS "id"`).ColumnExpr(`p.identity AS "identity"`).
-		Where("p.id IN (?)", bun.List(wanted)).Scan(ctx, &rows); err != nil {
+		ColumnExpr(`"p"."id" AS "id"`).ColumnExpr(`"p"."identity" AS "identity"`).
+		Where(`"p"."id" IN (?)`, bun.List(wanted)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read who these people are: %w", err)
 	}
 	named := make(map[int64]string, len(rows))
@@ -419,26 +419,26 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(finding.DecisionIssue).
-		Join(`JOIN "finding" AS "f" ON f.id = (
-			SELECT MIN(f2.id) FROM "finding" AS "f2"
-			JOIN "target" AS "tg2" ON tg2.id = f2.target_id
-			JOIN "stream" AS "st2" ON st2.id = tg2.stream_id
+		Join(`JOIN "finding" AS "f" ON "f"."id" = (
+			SELECT MIN("f2"."id") FROM "finding" AS "f2"
+			JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"
+			JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"
 			WHERE `+finding.DecisionAtPlace("f2")+`
-				AND st2.product_id = de.product_id)`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`de.id AS "decision_id"`).
-		ColumnExpr(`v.identifier AS "issue"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`COALESCE(uc.name, ?) AS "consumer"`, "").
-		ColumnExpr(`p.name AS "product"`).
+				AND "st2"."product_id" = "de"."product_id")`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"v"."identifier" AS "issue"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`COALESCE("uc"."name", ?) AS "consumer"`, "").
+		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
-		Where("de.id IN (?)", bun.List(keys)).
+		Where(`"de"."id" IN (?)`, bun.List(keys)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these judgments were about: %w", err)

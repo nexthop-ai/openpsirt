@@ -109,11 +109,11 @@ func TestOneActReAffirmsSeveralLapsedClaims(t *testing.T) {
 			// argument is not.
 			var was, now string
 			if err := r.DB.DB.NewSelect().Table("claim").Column("justification").
-				Where("id = ?", one.PreviousClaimID).Scan(t.Context(), &was); err != nil {
+				Where(`"id" = ?`, one.PreviousClaimID).Scan(t.Context(), &was); err != nil {
 				t.Fatal(err)
 			}
 			if err := r.DB.DB.NewSelect().Table("claim").Column("justification").
-				Where("id = ?", one.ClaimID).Scan(t.Context(), &now); err != nil {
+				Where(`"id" = ?`, one.ClaimID).Scan(t.Context(), &now); err != nil {
 				t.Fatal(err)
 			}
 			if now != was {
@@ -136,8 +136,8 @@ func TestASeverityRiseSendsBackOnlyTheClaimItBearsOn(t *testing.T) {
 			"vulnerable_code_cannot_be_controlled_by_adversary")
 		for _, issue := range []string{"CVE-2026-CURL1", "CVE-2026-CURL2"} {
 			if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
-				Set("score_centi = ?", 990).Set("severity = ?", "critical").
-				Where("identifier = ?", issue).Exec(t.Context()); err != nil {
+				Set(`"score_centi" = ?`, 990).Set(`"severity" = ?`, "critical").
+				Where(`"identifier" = ?`, issue).Exec(t.Context()); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -179,7 +179,7 @@ func TestReAffirmingManyRefusesAClaimSomebodyElseMade(t *testing.T) {
 			t.Errorf("the refusal does not name the issues: %s", body)
 		}
 		written, err := r.DB.DB.NewSelect().Table("decision").
-			Where("state <> ?", "lapsed").Count(t.Context())
+			Where(`"state" <> ?`, "lapsed").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -286,7 +286,7 @@ func TestAClaimLapsesWhenItsIssueIsRatedWorseHere(t *testing.T) {
 		for _, claim := range []int64{unreachable, absent} {
 			var state string
 			if err := r.DB.DB.NewSelect().Table("decision").Column("state").
-				Where("claim_id = ?", claim).Limit(1).Scan(t.Context(), &state); err != nil {
+				Where(`"claim_id" = ?`, claim).Limit(1).Scan(t.Context(), &state); err != nil {
 				t.Fatal(err)
 			}
 			states[claim] = state
@@ -359,9 +359,9 @@ func TestALapsedClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testi
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("decision").
-			Set("state = ?", "lapsed").Set("ended_at = ?", time.Now().UTC()).
-			Set("live_key = NULL").
-			Where("claim_id = ?", their.ClaimID).Exec(ctx); err != nil {
+			Set(`"state" = ?`, "lapsed").Set(`"ended_at" = ?`, time.Now().UTC()).
+			Set(`"live_key" = NULL`).
+			Where(`"claim_id" = ?`, their.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -385,8 +385,8 @@ func TestAgreeingARatingThatRaisesTheOneInForceLapsesAClaim(t *testing.T) {
 	// and can still be above the published score a claim was made against.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").Set("score_centi = ?", 500).
-			Where("identifier = ?", "CVE-2026-CURL1").Exec(t.Context()); err != nil {
+		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").Set(`"score_centi" = ?`, 500).
+			Where(`"identifier" = ?`, "CVE-2026-CURL1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		claim := r.AgreedAcrossTheFold(t, "CVE-2026-CURL1",
@@ -431,8 +431,8 @@ func TestReAffirmingAPromiseTakesNoCap(t *testing.T) {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 		var promise int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"claim" AS "cl"`).ColumnExpr("cl.id").
-			Where("cl.outcome = ?", "upgrade-needed").Limit(1).Scan(t.Context(), &promise); err != nil {
+		if err := r.DB.DB.NewSelect().TableExpr(`"claim" AS "cl"`).ColumnExpr(`"cl"."id"`).
+			Where(`"cl"."outcome" = ?`, "upgrade-needed").Limit(1).Scan(t.Context(), &promise); err != nil {
 			t.Fatal(err)
 		}
 		r.CurlMovedTo(t, "8.4.1")
@@ -476,8 +476,8 @@ func TestReAffirmingTakesTheReviewersLimitWhereAnyClaimGoesBack(t *testing.T) {
 		unreachable := r.AgreedAcrossTheFold(t, "CVE-2026-CURL2",
 			"vulnerable_code_cannot_be_controlled_by_adversary")
 		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
-			Set("score_centi = ?", 990).Set("severity = ?", "critical").
-			Where("identifier = ?", "CVE-2026-CURL2").Exec(t.Context()); err != nil {
+			Set(`"score_centi" = ?`, 990).Set(`"severity" = ?`, "critical").
+			Where(`"identifier" = ?`, "CVE-2026-CURL2").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		r.CurlMovedTo(t, "8.6.0")
@@ -503,7 +503,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		r.AgreedAt(t, place, `{"outcome":"deferred","deferred_until":"2030-01-01",`+
 			`"reasoning":"Held until the next point release."}`)
 		var previous int64
-		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("MAX(id)").
+		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr(`MAX("id")`).
 			Scan(ctx, &previous); err != nil {
 			t.Fatal(err)
 		}
@@ -511,13 +511,13 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		// The component moves, which lapses the deferral, and the release it
 		// sits in is a tag.
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("version = ?", "3.8.0-1").Set("upstream_version = ?", "3.8.0").
-			Where("name = ?", "libnl-3-200").Exec(ctx); err != nil {
+			Set(`"version" = ?`, "3.8.0-1").Set(`"upstream_version" = ?`, "3.8.0").
+			Where(`"name" = ?`, "libnl-3-200").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		var targets []int64
 		if err := r.DB.DB.NewSelect().TableExpr(`"target" AS "t"`).
-			ColumnExpr("t.id").Scan(ctx, &targets); err != nil {
+			ColumnExpr(`"t"."id"`).Scan(ctx, &targets); err != nil {
 			t.Fatal(err)
 		}
 		for _, target := range targets {
@@ -526,7 +526,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 			}
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("stream").
-			Set("kind = ?", catalog.Tag).Where("name = ?", "master").Exec(ctx); err != nil {
+			Set(`"kind" = ?`, catalog.Tag).Where(`"name" = ?`, "master").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

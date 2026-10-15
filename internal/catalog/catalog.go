@@ -270,11 +270,11 @@ func (s *Store) SetStreamEndOfLife(ctx context.Context, streamID int64, on *time
 // A date rather than a moment: a release goes out on a day, and the hour a
 // deployment happens to be asked is not part of the answer.
 func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time) error {
-	q := s.db.NewUpdate().Model((*Stream)(nil)).Where("id = ?", streamID)
+	q := s.db.NewUpdate().Model((*Stream)(nil)).Where(`"id" = ?`, streamID)
 	if on == nil {
-		q = q.Set("released_on = NULL")
+		q = q.Set(`"released_on" = NULL`)
 	} else {
-		q = q.Set("released_on = ?", on.UTC().Truncate(24*time.Hour))
+		q = q.Set(`"released_on" = ?`, on.UTC().Truncate(24*time.Hour))
 	}
 	res, err := q.Exec(ctx)
 	if err != nil {
@@ -306,7 +306,7 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool, error) {
 	var child Stream
 	if err := s.db.NewSelect().Model(&child).Column("kind", "product_id").
-		Where("id = ?", streamID).Scan(ctx); err != nil {
+		Where(`"id" = ?`, streamID).Scan(ctx); err != nil {
 		return false, missingOr(err, fmt.Sprintf("release %d", streamID),
 			fmt.Sprintf("look up what release %d is", streamID))
 	}
@@ -317,9 +317,9 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool,
 	// check and a write that are two statements are two moments, and what is
 	// being protected here is that a stated parent never changes.
 	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
-		Set("parent_id = ?", parent).
-		Where("id = ?", streamID).
-		Where("parent_id IS NULL").
+		Set(`"parent_id" = ?`, parent).
+		Where(`"id" = ?`, streamID).
+		Where(`"parent_id" IS NULL`).
 		Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("record what this release was cut from: %w", err)
@@ -331,7 +331,7 @@ func (s *Store) FillInParent(ctx context.Context, streamID, parent int64) (bool,
 	if n == 0 {
 		var stood *int64
 		if err := s.db.NewSelect().Model((*Stream)(nil)).Column("parent_id").
-			Where("id = ?", streamID).Scan(ctx, &stood); err != nil {
+			Where(`"id" = ?`, streamID).Scan(ctx, &stood); err != nil {
 			return false, missingOr(err, fmt.Sprintf("release %d", streamID),
 				fmt.Sprintf("read what release %d was cut from", streamID))
 		}
@@ -359,7 +359,7 @@ func (s *Store) validParent(ctx context.Context, childKind Kind, childID, produc
 	}
 	var from Stream
 	if err := s.db.NewSelect().Model(&from).Column("kind", "product_id").
-		Where("id = ?", parent).Scan(ctx); err != nil {
+		Where(`"id" = ?`, parent).Scan(ctx); err != nil {
 		return missingOr(err, fmt.Sprintf("release %d", parent),
 			fmt.Sprintf("look up what release %d is", parent))
 	}
@@ -373,14 +373,14 @@ func (s *Store) validParent(ctx context.Context, childKind Kind, childID, produc
 }
 
 func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.Time, what string) error {
-	q := s.db.NewUpdate().Model(model).Where("id = ?", id)
+	q := s.db.NewUpdate().Model(model).Where(`"id" = ?`, id)
 	if on == nil {
-		q = q.Set("eol_on = NULL")
+		q = q.Set(`"eol_on" = NULL`)
 	} else {
 		// Stored as a date rather than a moment. Support ends on a day, and
 		// keeping a time of day would make "past" depend on the hour a
 		// deployment happened to be asked.
-		q = q.Set("eol_on = ?", on.UTC().Truncate(24*time.Hour))
+		q = q.Set(`"eol_on" = ?`, on.UTC().Truncate(24*time.Hour))
 	}
 	res, err := q.Exec(ctx)
 	if err != nil {
@@ -401,7 +401,7 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 // not make one of them supported for longer than the other.
 func (s *Store) EndOfLifeForTarget(ctx context.Context, targetID int64) (EndOfLife, error) {
 	return s.endOfLife(ctx,
-		`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID,
+		`"s"."id" IN (SELECT "tg"."stream_id" FROM "target" AS "tg" WHERE "tg"."id" = ?)`, targetID,
 		"build", targetID)
 }
 
@@ -412,9 +412,9 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
-		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
-		ColumnExpr(`s.eol_on AS "stream_eol"`).
-		ColumnExpr(`p.eol_on AS "product_eol"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
+		ColumnExpr(`"s"."eol_on" AS "stream_eol"`).
+		ColumnExpr(`"p"."eol_on" AS "product_eol"`).
 		Where(where, arg).
 		Scan(ctx, &stated)
 	if err != nil {
@@ -439,8 +439,8 @@ func (s *Store) TargetMoves(ctx context.Context, targetID int64) (bool, error) {
 	var kind string
 	err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
-		ColumnExpr("s.kind").
-		Where(`s.id IN (SELECT tg.stream_id FROM "target" AS "tg" WHERE tg.id = ?)`, targetID).
+		ColumnExpr(`"s"."kind"`).
+		Where(`"s"."id" IN (SELECT "tg"."stream_id" FROM "target" AS "tg" WHERE "tg"."id" = ?)`, targetID).
 		Scan(ctx, &kind)
 	if err != nil {
 		if database.IsNoRows(err) {
@@ -460,8 +460,8 @@ func (s *Store) TagStreams(ctx context.Context) ([]int64, error) {
 	var ids []int64
 	if err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
-		ColumnExpr("s.id").
-		Where("s.kind = ?", Tag).Scan(ctx, &ids); err != nil {
+		ColumnExpr(`"s"."id"`).
+		Where(`"s"."kind" = ?`, Tag).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which releases were built once: %w", err)
 	}
 	return ids, nil
@@ -496,10 +496,10 @@ func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, err
 	var ids []int64
 	err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
-		Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
-		ColumnExpr("s.id").
+		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
+		ColumnExpr(`"s"."id"`).
 		Where(past, args...).
-		OrderExpr("s.id").
+		OrderExpr(`"s"."id"`).
 		Scan(ctx, &ids)
 	if err != nil {
 		return nil, fmt.Errorf("read which releases are out of support: %w", err)
@@ -600,18 +600,18 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 		}
 		q := s.db.NewSelect().
 			TableExpr(`"stream" AS "s"`).
-			Join(`JOIN "product" AS "p" ON p.id = s.product_id`).
-			ColumnExpr(`s.id AS "stream_id"`).
-			ColumnExpr(`s.name AS "stream"`).
-			ColumnExpr(`s.kind AS "kind"`).
-			ColumnExpr(`s.eol_on AS "own_eol"`).
-			ColumnExpr(`p.id AS "product_id"`).
-			ColumnExpr(`p.name AS "product"`).
-			ColumnExpr(`p.eol_on AS "product_eol"`).
-			Where("s.id IN (?)", bun.List(batch)).
-			OrderExpr("p.name, s.name")
+			Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
+			ColumnExpr(`"s"."id" AS "stream_id"`).
+			ColumnExpr(`"s"."name" AS "stream"`).
+			ColumnExpr(`"s"."kind" AS "kind"`).
+			ColumnExpr(`"s"."eol_on" AS "own_eol"`).
+			ColumnExpr(`"p"."id" AS "product_id"`).
+			ColumnExpr(`"p"."name" AS "product"`).
+			ColumnExpr(`"p"."eol_on" AS "product_eol"`).
+			Where(`"s"."id" IN (?)`, bun.List(batch)).
+			OrderExpr(`"p"."name", "s"."name"`)
 		if !all {
-			q = q.Where("s.product_id IN (?)", bun.List(products))
+			q = q.Where(`"s"."product_id" IN (?)`, bun.List(products))
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return fmt.Errorf("read the releases that are out of support: %w", err)
@@ -650,9 +650,9 @@ func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 	share, approvers *int) error {
 
 	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("pair_share = ?", share).
-		Set("pair_approvers = ?", approvers).
-		Where("id = ?", productID).
+		Set(`"pair_share" = ?`, share).
+		Set(`"pair_approvers" = ?`, approvers).
+		Where(`"id" = ?`, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record this product's thresholds for one pair: %w", err)
@@ -668,11 +668,11 @@ func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 // deployment the next time the deployment changed its mind, and nobody would
 // see that happen.
 func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string) error {
-	q := s.db.NewUpdate().Model((*Product)(nil)).Where("id = ?", productID)
+	q := s.db.NewUpdate().Model((*Product)(nil)).Where(`"id" = ?`, productID)
 	if word == "" {
-		q = q.Set("triage_floor = NULL")
+		q = q.Set(`"triage_floor" = NULL`)
 	} else {
-		q = q.Set("triage_floor = ?", word)
+		q = q.Set(`"triage_floor" = ?`, word)
 	}
 	res, err := q.Exec(ctx)
 	if err != nil {
@@ -684,7 +684,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 // ProductByName finds a product, or reports that it was never declared.
 func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error) {
 	p := new(Product)
-	err := s.db.NewSelect().Model(p).Where("name = ?", typedname.Matching(name)).Scan(ctx)
+	err := s.db.NewSelect().Model(p).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("product %q: %w", name, ErrNotFound)
@@ -727,7 +727,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 func (s *Store) StreamByName(ctx context.Context, productID int64, name string) (*Stream, error) {
 	st := new(Stream)
 	err := s.db.NewSelect().Model(st).
-		Where("product_id = ?", productID).Where("name = ?", typedname.Matching(name)).Scan(ctx)
+		Where(`"product_id" = ?`, productID).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
@@ -769,7 +769,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 func (s *Store) VariantByName(ctx context.Context, productID int64, name string) (*Variant, error) {
 	v := new(Variant)
 	err := s.db.NewSelect().Model(v).
-		Where("product_id = ?", productID).Where("name = ?", typedname.Matching(name)).Scan(ctx)
+		Where(`"product_id" = ?`, productID).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
@@ -876,7 +876,7 @@ func (s *Store) Locate(ctx context.Context, product, stream, variant string) (*N
 func (s *Store) TargetFor(ctx context.Context, streamID, variantID int64) (*Target, error) {
 	target := new(Target)
 	err := s.db.NewSelect().Model(target).
-		Where("stream_id = ?", streamID).Where("variant_id = ?", variantID).Scan(ctx)
+		Where(`"stream_id" = ?`, streamID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
 	if err == nil {
 		return target, nil
 	}
@@ -946,22 +946,22 @@ type Placement struct {
 // Describe reads back what a target is.
 func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error) {
 	var t Target
-	if err := s.db.NewSelect().Model(&t).Where("id = ?", targetID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&t).Where(`"id" = ?`, targetID).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("target %d", targetID),
 			fmt.Sprintf("look up target %d", targetID))
 	}
 	var v Variant
-	if err := s.db.NewSelect().Model(&v).Where("id = ?", t.VariantID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&v).Where(`"id" = ?`, t.VariantID).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("variant %d", t.VariantID),
 			fmt.Sprintf("look up the variant target %d is built as", targetID))
 	}
 	var st Stream
-	if err := s.db.NewSelect().Model(&st).Where("id = ?", t.StreamID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&st).Where(`"id" = ?`, t.StreamID).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("stream %d", t.StreamID),
 			fmt.Sprintf("look up the release target %d belongs to", targetID))
 	}
 	var p Product
-	if err := s.db.NewSelect().Model(&p).Where("id = ?", st.ProductID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&p).Where(`"id" = ?`, st.ProductID).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("product %d", st.ProductID),
 			fmt.Sprintf("look up the product release %d belongs to", st.ID))
 	}
@@ -981,7 +981,7 @@ func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error
 // list wants the name they declared rather than a number.
 func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 	p := new(Product)
-	if err := s.db.NewSelect().Model(p).Where("id = ?", id).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(p).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 		return nil, missingOr(err, fmt.Sprintf("product %d", id),
 			fmt.Sprintf("look up product %d", id))
 	}
@@ -995,7 +995,7 @@ func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 func (s *Store) ExistingTarget(ctx context.Context, streamID, variantID int64) (*Target, error) {
 	target := new(Target)
 	err := s.db.NewSelect().Model(target).
-		Where("stream_id = ?", streamID).Where("variant_id = ?", variantID).Scan(ctx)
+		Where(`"stream_id" = ?`, streamID).Where(`"variant_id" = ?`, variantID).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("nothing has been filed against this build: %w", ErrNotFound)

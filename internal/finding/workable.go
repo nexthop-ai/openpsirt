@@ -104,7 +104,7 @@ func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
 	q *bun.SelectQuery) (*bun.SelectQuery, error) {
 
 	if len(w.Kinds) == 1 {
-		q = q.Where("st.kind = ?", w.Kinds[0])
+		q = q.Where(`"st"."kind" = ?`, w.Kinds[0])
 	}
 	if len(w.Support) != 1 {
 		return q, nil
@@ -119,10 +119,10 @@ func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
 			// is an empty answer rather than an unnarrowed one.
 			return q.Where("1 = 0"), nil
 		}
-		return q.Where("st.id IN (?)", bun.List(past)), nil
+		return q.Where(`"st"."id" IN (?)`, bun.List(past)), nil
 	}
 	if len(past) > 0 {
-		q = q.Where("st.id NOT IN (?)", bun.List(past))
+		q = q.Where(`"st"."id" NOT IN (?)`, bun.List(past))
 	}
 	return q, nil
 }

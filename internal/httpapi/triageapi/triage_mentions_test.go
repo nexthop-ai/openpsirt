@@ -92,7 +92,7 @@ func TestBeingToldAboutWorkKeepsItOutOfTheDigest(t *testing.T) {
 			t.Fatal(err)
 		}
 		told, err := r.DB.DB.NewSelect().Model((*notify.Notification)(nil)).
-			Where("person_id = ?", reader.ID).Where("concerns <> ?", "").Count(t.Context())
+			Where(`"person_id" = ?`, reader.ID).Where(`"concerns" <> ?`, "").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

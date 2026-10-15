@@ -54,11 +54,11 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 	pairs := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible))
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	return s.kindsOf(ctx, pairs, `"pairs"."vulnerability_id", `+FoldedOn)
 }
 
@@ -77,12 +77,12 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 	pairs := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.closed_at IS NULL")
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."closed_at" IS NULL`)
 	return s.kindsOf(ctx, onlyReadable(pairs, subject, products, all),
 		`"pairs"."product_id", "pairs"."vulnerability_id", `+FoldedOn)
 }
@@ -102,8 +102,8 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 func (s *Store) kindsOf(ctx context.Context, pairs *bun.SelectQuery, grain string) ([]PackageKind, error) {
 	perRow := s.db.NewSelect().
 		TableExpr(`(?) AS "pairs"`, pairs).
-		Join(`JOIN "component" AS "c" ON c.id = "pairs"."component_id"`).
-		ColumnExpr(`MIN(c.purl) AS "purl"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "pairs"."component_id"`).
+		ColumnExpr(`MIN("c"."purl") AS "purl"`).
 		GroupExpr(grain)
 	var rows []struct {
 		Purl string `bun:"purl"`

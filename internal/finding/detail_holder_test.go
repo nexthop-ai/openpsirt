@@ -26,7 +26,7 @@ func TestAFindingsHolderIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 		party := func(identity string) int64 {
 			var id int64
 			if err := f.db.DB.NewSelect().Table("person").Column("party_id").
-				Where("identity = ?", identity).Scan(ctx, &id); err != nil {
+				Where(`"identity" = ?`, identity).Scan(ctx, &id); err != nil {
 				t.Fatal(err)
 			}
 			return id
@@ -37,9 +37,9 @@ func TestAFindingsHolderIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 		}
 		for i, holder := range []string{"someone", "somebody-else"} {
 			q := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set("assigned_to = ?", party(holder)).Where("id = ?", open[i].ID)
+				Set(`"assigned_to" = ?`, party(holder)).Where(`"id" = ?`, open[i].ID)
 			if i == 1 {
-				q = q.Set("visibility = ?", access.Private)
+				q = q.Set(`"visibility" = ?`, access.Private)
 			}
 			if _, err := q.Exec(ctx); err != nil {
 				t.Fatal(err)
@@ -80,9 +80,9 @@ func TestAFindingsRoutingRuleIsReadOffThePlacesItsReaderMayRead(t *testing.T) {
 				t.Fatal(err)
 			}
 			q := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-				Set("routed_by = ?", rule.ID).Where("id = ?", open[i].ID)
+				Set(`"routed_by" = ?`, rule.ID).Where(`"id" = ?`, open[i].ID)
 			if i == 1 {
-				q = q.Set("visibility = ?", access.Private)
+				q = q.Set(`"visibility" = ?`, access.Private)
 			}
 			if _, err := q.Exec(ctx); err != nil {
 				t.Fatal(err)

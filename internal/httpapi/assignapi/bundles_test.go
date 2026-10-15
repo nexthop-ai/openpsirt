@@ -277,8 +277,8 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 		// Nothing is declared done by hand: what has landed is what the scans
 		// stopped reporting. Closing the findings is what moves the number.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("closed_at = ?", time.Now().UTC()).
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL2").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -364,8 +364,8 @@ func TestABuildHasOneCommitmentPerFold(t *testing.T) {
 		// The two curl issues name different versions as their fix, which is
 		// what would split the plan in two if the version decided coverage.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("fixed_in = ?", "8.6.0-1").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"fixed_in" = ?`, "8.6.0-1").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL2").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -482,8 +482,8 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 		// Moved on the commitment rather than by asking the application to
 		// believe a different today: what lapses it is the date it named.
 		if _, err := r.DB.DB.NewUpdate().Table("upgrade").
-			Set("committed_to = ?", time.Now().UTC().AddDate(0, 0, -2)).
-			Where("committed_to IS NOT NULL").
+			Set(`"committed_to" = ?`, time.Now().UTC().AddDate(0, 0, -2)).
+			Where(`"committed_to" IS NOT NULL`).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -503,8 +503,8 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 
 		// Everything it covers gone is landed, whatever the date said.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("closed_at = ?", time.Now().UTC()).
-			Where("closed_at IS NULL").
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"closed_at" IS NULL`).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -778,8 +778,8 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 		// holding one from selecting far more than the box said — and this is
 		// the set a bulk judgment is then recorded against.
 		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
-			Set("description = ?", "A 100% reachable fault in the transfer driver.").
-			Where("identifier = ?", "CVE-2026-CURL1").Exec(ctx); err != nil {
+			Set(`"description" = ?`, "A 100% reachable fault in the transfer driver.").
+			Where(`"identifier" = ?`, "CVE-2026-CURL1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

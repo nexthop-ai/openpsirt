@@ -552,8 +552,8 @@ func TestFillingInAParentAfterLosingARaceIsNotReportedAsRecorded(t *testing.T) {
 		}
 
 		hook := &beforeFillingIn{run: func() {
-			if _, err := db.DB.NewUpdate().Table("stream").Set("parent_id = ?", other.ID).
-				Where("id = ?", tag.ID).Exec(context.Background()); err != nil {
+			if _, err := db.DB.NewUpdate().Table("stream").Set(`"parent_id" = ?`, other.ID).
+				Where(`"id" = ?`, tag.ID).Exec(context.Background()); err != nil {
 				t.Errorf("filling it in first: %v", err)
 			}
 		}}
@@ -575,7 +575,7 @@ type beforeFillingIn struct {
 }
 
 func (h *beforeFillingIn) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, "parent_id IS NULL") {
+	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, `"parent_id" IS NULL`) {
 		h.fired = true
 		h.run()
 	}

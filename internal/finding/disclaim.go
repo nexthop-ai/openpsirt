@@ -35,8 +35,8 @@ const NotArguedAway = "(f.suppressed_by IS NULL AND f.stated_by IS NULL)"
 // by identifier rather than by moment: a version moving closes the row before
 // and records the row after at one moment.
 const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
-	WHERE lt.target_id = f.target_id AND lt.vulnerability_id = f.vulnerability_id
-	  AND lt.place_identity = f.place_identity AND lt.id > f.id)`
+	WHERE "lt"."target_id" = "f"."target_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
+	  AND "lt"."place_identity" = "f"."place_identity" AND "lt"."id" > "f"."id")`
 
 // Decidable says a finding `f` is one somebody may decide about: open, or
 // closed by a supplier's statement and the latest row at its place. A person
@@ -97,10 +97,10 @@ func placing(ctx context.Context, db bun.IDB, targetID int64, inv inventory,
 	var roots []int64
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`n.component_id`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", true).
+		ColumnExpr(`"n"."component_id"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
 		Scan(ctx, &roots); err != nil {
 		return nil, fmt.Errorf("read the build's own component: %w", err)
 	}
@@ -227,19 +227,19 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	// Split and OR-ed rather than one list: a run reports thousands of issues,
 	// and a statement binding them all is refused by two of the four engines.
 	err := db.NewSelect().Model(&d.said).
-		Where("ss.product_id = ?", productID).
-		Where("ss.superseded_at IS NULL").
-		Where("ss.status = ?", string(sbom.NotAffected)).
+		Where(`"ss"."product_id" = ?`, productID).
+		Where(`"ss"."superseded_at" IS NULL`).
+		Where(`"ss"."status" = ?`, string(sbom.NotAffected)).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			for from := 0; from < len(names); from += database.BatchSize {
-				q = q.WhereOr("ss.vulnerability IN (?)",
+				q = q.WhereOr(`"ss"."vulnerability" IN (?)`,
 					bun.List(names[from:min(from+database.BatchSize, len(names))]))
 			}
 			return q
 		}).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("ss.placement = ? AND ss.within_about IS NOT NULL", PlacedInside).
-				WhereOr("ss.placement = ? AND ss.about <> ?", PlacedProduct, "")
+			return q.WhereOr(`"ss"."placement" = ? AND "ss"."within_about" IS NOT NULL`, PlacedInside).
+				WhereOr(`"ss"."placement" = ? AND "ss"."about" <> ?`, PlacedProduct, "")
 		}).
 		Order("ss.id").
 		Scan(ctx)
@@ -275,17 +275,17 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 		Consumer        string `bun:"consumer"`
 	}
 	standing, held := InForce()
-	issues, ids := database.InAnyOf("dv.issue_id", issueIDs)
+	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
 	err := db.NewSelect().
 		TableExpr(Decisions).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
-		ColumnExpr(`de.place_identity AS "place_identity"`).
-		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "component"`).
-		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer"`).
-		Where("de.product_id = ?", productID).
-		Where("cl.outcome = ?", OutcomeAffected).
-		Where("de.live_key IS NOT NULL").
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
+		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
+		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "component"`).
+		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer"`).
+		Where(`"de"."product_id" = ?`, productID).
+		Where(`"cl"."outcome" = ?`, OutcomeAffected).
+		Where(`"de"."live_key" IS NOT NULL`).
 		Where(standing, held...).
 		Where(issues, ids...).
 		Scan(ctx, &rows)

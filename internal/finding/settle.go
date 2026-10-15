@@ -104,13 +104,13 @@ func (v *Vulnerabilities) settleDecisions(ctx context.Context, kept, mergeID int
 	var live []liveDecision
 	if err := v.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr("de.id, de.product_id, de.vulnerability_id, de.place_identity").
-		ColumnExpr("de.component_upstream_version, de.consumer_upstream_version").
-		ColumnExpr("de.state, de.proposed_at, cl.outcome").
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"de"."id", "de"."product_id", "de"."vulnerability_id", "de"."place_identity"`).
+		ColumnExpr(`"de"."component_upstream_version", "de"."consumer_upstream_version"`).
+		ColumnExpr(`"de"."state", "de"."proposed_at", "cl"."outcome"`).
 		Where(FiledUnder(filed.DecisionIssue), kept).
-		Where("de.live_key IS NOT NULL").
-		OrderExpr("de.id").
+		Where(`"de"."live_key" IS NOT NULL`).
+		OrderExpr(`"de"."id"`).
 		Scan(ctx, &live); err != nil {
 		return fmt.Errorf("read what stands about the merged issue: %w", err)
 	}
@@ -245,7 +245,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 	gone := absorbed.ID
 	var rated []IssueRating
 	if err := v.db.NewSelect().Model(&rated).
-		Where("ir.vulnerability_id IN (?, ?)", kept, gone).
+		Where(`"ir"."vulnerability_id" IN (?, ?)`, kept, gone).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what the merged issues are rated: %w", err)
 	}
@@ -261,14 +261,14 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 		}
 		if keptRates[r.ProductID] {
 			if _, err := v.db.NewDelete().Model((*IssueRating)(nil)).
-				Where("id = ?", r.ID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, r.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("leave the kept issue's rating in force: %w", err)
 			}
 			continue
 		}
 		if _, err := v.db.NewUpdate().Model((*IssueRating)(nil)).
-			Set("vulnerability_id = ?", kept).
-			Where("id = ?", r.ID).Exec(ctx); err != nil {
+			Set(`"vulnerability_id" = ?`, kept).
+			Where(`"id" = ?`, r.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("carry a rating in force to the issue it rates: %w", err)
 		}
 		// Everything open against the issue in that product now ranks and is
@@ -286,7 +286,7 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 	// the same word said once.
 	var tags []Tag
 	if err := v.db.NewSelect().Model(&tags).
-		Where("ft.vulnerability_id IN (?, ?)", kept, gone).
+		Where(`"ft"."vulnerability_id" IN (?, ?)`, kept, gone).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what the merged issues are marked with: %w", err)
 	}
@@ -305,16 +305,16 @@ func (v *Vulnerabilities) settleRecords(ctx context.Context, kept int64, absorbe
 			continue
 		}
 		key := marked{t.ProductID, t.ComponentID, t.Tag}
-		q := v.db.NewUpdate().Model((*Tag)(nil)).Set("vulnerability_id = ?", kept)
+		q := v.db.NewUpdate().Model((*Tag)(nil)).Set(`"vulnerability_id" = ?`, kept)
 		if on[key] {
 			if _, err := v.db.NewDelete().Model((*Tag)(nil)).
-				Where("id = ?", t.ID).Exec(ctx); err != nil {
+				Where(`"id" = ?`, t.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("take off a mark the kept issue already has: %w", err)
 			}
 			continue
 		}
 		on[key] = true
-		if _, err := q.Where("id = ?", t.ID).Exec(ctx); err != nil {
+		if _, err := q.Where(`"id" = ?`, t.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("carry a mark to the issue it marks: %w", err)
 		}
 	}
@@ -361,7 +361,7 @@ func (v *Vulnerabilities) supersededBecause(ctx context.Context, kept int64,
 	var name string
 	if err := v.db.NewSelect().Model((*Vulnerability)(nil)).
 		Column("identifier").
-		Where("vu.id = ?", kept).
+		Where(`"vu"."id" = ?`, kept).
 		Scan(ctx, &name); err != nil {
 		return superseding{}, fmt.Errorf("read what the merged issue is called: %w", err)
 	}
@@ -376,8 +376,8 @@ func (v *Vulnerabilities) trailSuperseded(ctx context.Context, why superseding,
 
 	var product string
 	if err := v.db.NewSelect().TableExpr(`"product" AS "p"`).
-		ColumnExpr("p.name").
-		Where("p.id = ?", productID).
+		ColumnExpr(`"p"."name"`).
+		Where(`"p"."id" = ?`, productID).
 		Scan(ctx, &product); err != nil {
 		return fmt.Errorf("read which product a merge superseded a judgment in: %w", err)
 	}

@@ -35,11 +35,11 @@ func ShownExpr(alias string) string {
 func BuildNames(product, stream, variant string) func(*bun.SelectQuery) *bun.SelectQuery {
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
-			ColumnExpr(product + `.name AS "product"`).
+			ColumnExpr(product + `."name" AS "product"`).
 			ColumnExpr(ShownExpr(product) + ` AS "product_name"`).
-			ColumnExpr(stream + `.name AS "stream"`).
+			ColumnExpr(stream + `."name" AS "stream"`).
 			ColumnExpr(ShownExpr(stream) + ` AS "stream_name"`).
-			ColumnExpr(variant + `.name AS "variant"`).
+			ColumnExpr(variant + `."name" AS "variant"`).
 			ColumnExpr(ShownExpr(variant) + ` AS "variant_name"`)
 	}
 }

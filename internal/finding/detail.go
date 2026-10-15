@@ -412,10 +412,10 @@ func (s *Store) versionsOf(ctx context.Context, ids []int64) (map[int64]graph.St
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		Where("c.id IN (?)", bun.List(ids)).Scan(ctx, &rows); err != nil {
+		ColumnExpr(`"c"."id" AS "id"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		Where(`"c"."id" IN (?)`, bun.List(ids)).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what those ship at: %w", err)
 	}
 	out := make(map[int64]graph.Step, len(rows))
@@ -532,7 +532,7 @@ type evidenceRow struct {
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
 var standingHere = `FROM ` + Decisions + `
-	JOIN "claim" AS "cl" ON cl.id = de.claim_id
+	JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 	WHERE ` + DecisionAt("?") + `
 	  AND de.live_key IS NOT NULL
 	  AND ` + KeyMatches + `
@@ -560,27 +560,27 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	var rows []evidenceRow
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The supplier's statement answering this place on some routes, and
 		// the product it answers through.
-		Join(`LEFT JOIN "vex_statement" AS "sb" ON sb.id = f.stated_by`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`f.consumer_id AS "consumer_id"`).
+		Join(`LEFT JOIN "vex_statement" AS "sb" ON "sb"."id" = "f"."stated_by"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
 		// The package of the fold this place is. A fold covers every binary
 		// one source package was built at one version, so a place named only
 		// by its consumer would leave a reader unable to tell curl's from
 		// libcurl4t64's.
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
-		ColumnExpr(`f.disclose_at AS "disclose_at"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"f"."visibility" AS "visibility"`).
+		ColumnExpr(`"f"."disclose_at" AS "disclose_at"`).
 		// The moment it runs out, and the reason it does not where it has
 		// none. The list carries both and the finding's own screen carried
 		// neither, so somebody looking at the one row that matters had to go
 		// back to the list to find out when it was due.
-		ColumnExpr(`f.due_at AS "due_at"`).
+		ColumnExpr(`"f"."due_at" AS "due_at"`).
 		// A live claim standing at this place, whatever its state. Proposed
 		// and waiting counts: it is answered as far as the person looking at
 		// it is concerned, and showing it as untouched invites a second claim
@@ -599,34 +599,34 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// describe is a judgment about something that is not there. Taken as
 		// two independent minimums the two columns could name different rows,
 		// which is a claim identifier that belongs to another decision.
-		ColumnExpr(`(SELECT de.id `+standingHere+`) AS "decision"`, productID).
-		ColumnExpr(`(SELECT de.claim_id `+standingHere+`) AS "claim"`, productID).
-		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
-		ColumnExpr(`f.claimed_by AS "claimed_by"`).
-		ColumnExpr(`COALESCE(sb.publisher, '') AS "answered_by"`).
-		ColumnExpr(`COALESCE(sb.within, sb.component, '') AS "answered_in"`).
-		ColumnExpr(`f.urgency AS "urgency"`).
-		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
-		ColumnExpr(`f.fix_state AS "fix_state"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		ColumnExpr(`f.fixed_at AS "fixed_at"`).
-		ColumnExpr(`COALESCE(f.matched, '') AS "matched"`).
-		ColumnExpr(`COALESCE(f.matched_from, '') AS "matched_from"`).
-		ColumnExpr(`COALESCE(f.matched_in, '') AS "matched_in"`).
-		ColumnExpr(`COALESCE(f.matched_range, '') AS "matched_range"`).
-		ColumnExpr(`COALESCE(f.arrived_from, '') AS "arrived_from"`).
-		ColumnExpr(`f.kind AS "kind"`).
+		ColumnExpr(`(SELECT "de"."id" `+standingHere+`) AS "decision"`, productID).
+		ColumnExpr(`(SELECT "de"."claim_id" `+standingHere+`) AS "claim"`, productID).
+		ColumnExpr(`CASE WHEN "f"."suppressed_by" IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
+		ColumnExpr(`"f"."claimed_by" AS "claimed_by"`).
+		ColumnExpr(`COALESCE("sb"."publisher", '') AS "answered_by"`).
+		ColumnExpr(`COALESCE("sb"."within", "sb"."component", '') AS "answered_in"`).
+		ColumnExpr(`"f"."urgency" AS "urgency"`).
+		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
+		ColumnExpr(`COALESCE("f"."matched", '') AS "matched"`).
+		ColumnExpr(`COALESCE("f"."matched_from", '') AS "matched_from"`).
+		ColumnExpr(`COALESCE("f"."matched_in", '') AS "matched_in"`).
+		ColumnExpr(`COALESCE("f"."matched_range", '') AS "matched_range"`).
+		ColumnExpr(`COALESCE("f"."arrived_from", '') AS "arrived_from"`).
+		ColumnExpr(`"f"."kind" AS "kind"`).
 		// The first appearance of this place here, and the run that put it
 		// there . The run is the provenance of the finding, and it is
 		// the only thing that can answer which vulnerability database
 		// produced it.
-		ColumnExpr(`f.opened_at AS "opened_at"`).
-		ColumnExpr(`f.opened_run_id AS "opened_run_id"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"f"."opened_run_id" AS "opened_run_id"`).
 		// The places one judgment covers, so the screen a judgment is made from
 		// shows the whole of what it would answer: a form that recorded twelve
 		// places having shown six is a form nobody can trust.
 		Apply(inFoldOf(targetID, vulnerabilityID, componentID, visible)).
-		OrderExpr("f.urgency DESC, component, consumer").
+		OrderExpr(`"f"."urgency" DESC, "component", consumer`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where this sits: %w", err)
@@ -636,7 +636,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	var issue Vulnerability
-	if err := s.db.NewSelect().Model(&issue).Where("id = ?", vulnerabilityID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&issue).Where(`"id" = ?`, vulnerabilityID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this issue is: %w", err)
 	}
 	// This product's own rating, where somebody here has rated it. The screen
@@ -648,33 +648,33 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 	issue = issue.RatedIn(rated)
 	var component graph.Component
-	if err := s.db.NewSelect().Model(&component).Where("id = ?", componentID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&component).Where(`"id" = ?`, componentID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this component is: %w", err)
 	}
 
 	var aliases []Alias
 	if err := s.db.NewSelect().Model(&aliases).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
 		Order("identifier").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what else this issue is called: %w", err)
 	}
 	var references []Reference
 	if err := s.db.NewSelect().Model(&references).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
 		// Patches first: for somebody deciding whether to backport, the change
 		// itself is the answer and everything else is background.
-		OrderExpr("CASE WHEN kind = ? THEN 0 ELSE 1 END, url", Patch).
+		OrderExpr(`CASE WHEN "kind" = ? THEN 0 ELSE 1 END, "url"`, Patch).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read where this is written up: %w", err)
 	}
 
 	var weaknesses []Weakness
 	if err := s.db.NewSelect().Model(&weaknesses).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
 		// The root cause first, the same order the advisory states from. Two
 		// readers of one table answering differently is a screen and a
 		// published document disagreeing about the same issue.
-		OrderExpr("is_primary DESC, cwe").Scan(ctx); err != nil {
+		OrderExpr(`"is_primary" DESC, "cwe"`).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}
 
@@ -834,13 +834,13 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 		// Joined on the party a person is assignable as, which is what
 		// the assignment column holds. A team's queue names no person
 		// and answers empty here, which is what a queue is.
-		Join(`LEFT JOIN "person" AS "p" ON p.party_id = f.assigned_to`).
-		ColumnExpr(`p.identity AS "identity"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("p.identity"), componentID).
+		Join(`LEFT JOIN "person" AS "p" ON "p"."party_id" = "f"."assigned_to"`).
+		ColumnExpr(`"p"."identity" AS "identity"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"p"."identity"`), componentID).
 		Scan(ctx, &holders)
 	if err != nil {
 		return "", fmt.Errorf("read who is dealing with this: %w", err)
@@ -870,13 +870,13 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	}
 	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`LEFT JOIN "routing_rule" AS "rr" ON rr.id = f.routed_by`).
-		ColumnExpr(`rr.name AS "name"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("rr.name"), componentID).
+		Join(`LEFT JOIN "routing_rule" AS "rr" ON "rr"."id" = "f"."routed_by"`).
+		ColumnExpr(`"rr"."name" AS "name"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"rr"."name"`), componentID).
 		Scan(ctx, &named)
 	if err != nil {
 		return "", fmt.Errorf("read what placed this: %w", err)
@@ -894,7 +894,7 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 // must not do is invent a scanner nobody used.
 func (s *Store) measured(ctx context.Context, runID int64) (*Measured, error) {
 	var run Run
-	if err := s.db.NewSelect().Model(&run).Where("id = ?", runID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(&run).Where(`"id" = ?`, runID).Scan(ctx); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}

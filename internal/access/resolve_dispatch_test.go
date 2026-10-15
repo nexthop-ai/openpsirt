@@ -47,7 +47,7 @@ func TestASecretIsLookedUpOnlyInTheStoreItsPrefixNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.NewUpdate().Model((*access.Key)(nil)).
-			Set("secret_hash = ?", digest(tokenSecret)).Where("id = ?", shadow.ID).Exec(ctx); err != nil {
+			Set(`"secret_hash" = ?`, digest(tokenSecret)).Where(`"id" = ?`, shadow.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// A personal token whose stored digest is a pipeline key's.
@@ -60,7 +60,7 @@ func TestASecretIsLookedUpOnlyInTheStoreItsPrefixNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := f.db.NewUpdate().Model((*access.Token)(nil)).
-			Set("secret_hash = ?", digest(keySecret)).Where("id = ?", mirror.ID).Exec(ctx); err != nil {
+			Set(`"secret_hash" = ?`, digest(keySecret)).Where(`"id" = ?`, mirror.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

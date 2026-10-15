@@ -39,10 +39,10 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	}
 	err := tx.NewSelect().
 		TableExpr(`"target" AS "t"`).
-		Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
-		ColumnExpr(`sc.id AS "scan_id"`).
-		ColumnExpr(`COALESCE(sc.root_identifier, '') AS "root_identifier"`).
-		Where("t.id = ?", targetID).
+		Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
+		ColumnExpr(`"sc"."id" AS "scan_id"`).
+		ColumnExpr(`COALESCE("sc"."root_identifier", '') AS "root_identifier"`).
+		Where(`"t"."id" = ?`, targetID).
 		Scan(ctx, &build)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -61,10 +61,10 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	if rootBase != "" {
 		if holding, err = tx.NewSelect().
 			TableExpr(`"target" AS "t"`).
-			Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-			Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
-			Where("st.product_id = ?", productID).
-			Where("sc.root_identifier = ?", build.Root).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+			Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
+			Where(`"st"."product_id" = ?`, productID).
+			Where(`"sc"."root_identifier" = ?`, build.Root).
 			Count(ctx); err != nil {
 			return fmt.Errorf("read which builds hold the root: %w", err)
 		}
@@ -72,10 +72,10 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	if rootBase != "" && rootVersion != "" && holding == 1 {
 		var said []Statement
 		if err := withWords(tx.NewSelect().Model(&said)).
-			Where("ss.product_id = ?", productID).
-			Where("ss.superseded_at IS NULL").
-			Where("ss.placement = ?", PlacedInside).
-			Where("ss.within = ?", folded(nameOf(build.Root))).
+			Where(`"ss"."product_id" = ?`, productID).
+			Where(`"ss"."superseded_at" IS NULL`).
+			Where(`"ss"."placement" = ?`, PlacedInside).
+			Where(`"ss"."within" = ?`, folded(nameOf(build.Root))).
 			Order("ss.id").
 			Scan(ctx); err != nil {
 			return fmt.Errorf("read what is published about the build's root: %w", err)
@@ -106,9 +106,9 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 
 	var open []Claim
 	if err := tx.NewSelect().Model(&open).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
-		Where("origin = ?", Published).
+		Where(`"target_id" = ?`, targetID).
+		Where(`"closed_scan_id" IS NULL`).
+		Where(`"origin" = ?`, Published).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read the build's claims taken from published statements: %w", err)
 	}
@@ -137,8 +137,8 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, targetID int6
 	if len(closing) > 0 {
 		err := database.IDsInBatches(ctx, closing, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Claim)(nil)).
-				Set("closed_scan_id = ?", build.ScanID).
-				Where("id IN (?)", bun.List(batch)).Exec(ctx)
+				Set(`"closed_scan_id" = ?`, build.ScanID).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {

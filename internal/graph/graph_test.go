@@ -253,8 +253,8 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 		// The closed row is still there, stamped with the scan that ended it.
 		var closed []graph.Node
 		if err := f.db.DB.NewSelect().Model(&closed).
-			Where("target_id = ?", f.targetID).
-			Where("closed_scan_id IS NOT NULL").Scan(t.Context()); err != nil {
+			Where(`"target_id" = ?`, f.targetID).
+			Where(`"closed_scan_id" IS NOT NULL`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if len(closed) != 1 || *closed[0].ClosedScanID != second {
@@ -375,7 +375,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 		// Counted rather than read: the point is the statement that wrote
 		// them, not the rows.
 		supplied, err := f.db.DB.NewSelect().Model((*graph.Component)(nil)).
-			Where("supplier = ?", "Debian").Count(t.Context())
+			Where(`"supplier" = ?`, "Debian").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -640,7 +640,7 @@ func (f *fixture) componentNamed(t *testing.T, name string) int64 {
 	t.Helper()
 	var id int64
 	if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).
-		ColumnExpr("c.id").Where("c.name = ?", name).
+		ColumnExpr(`"c"."id"`).Where(`"c"."name" = ?`, name).
 		Limit(1).Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)
 	}
@@ -808,12 +808,12 @@ func openEdgeKinds(t *testing.T, f *fixture) map[string]string {
 	}
 	err := f.db.DB.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "n" ON n.id = e.child_id`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`e.kind AS "kind"`).
-		Where("e.target_id = ?", f.targetID).
-		Where("e.closed_scan_id IS NULL").
+		Join(`JOIN "graph_node" AS "n" ON "n"."id" = "e"."child_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"e"."kind" AS "kind"`).
+		Where(`"e"."target_id" = ?`, f.targetID).
+		Where(`"e"."closed_scan_id" IS NULL`).
 		Scan(t.Context(), &rows)
 	if err != nil {
 		t.Fatal(err)

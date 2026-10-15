@@ -24,8 +24,8 @@ import (
 func (f *fixture) seenAt(t *testing.T, runID int64, when time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Table("scan_run").
-		Set("started_at = ?", when.UTC().Truncate(time.Microsecond)).
-		Where("id = ?", runID).Exec(t.Context()); err != nil {
+		Set(`"started_at" = ?`, when.UTC().Truncate(time.Microsecond)).
+		Where(`"id" = ?`, runID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -306,7 +306,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		record := func(state string, needsApproval bool, outcome string, until *time.Time, version string) {
 			t.Helper()
 			if _, err := f.db.DB.NewDelete().Table("decision").
-				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			// The outcome and the date it defers to are the claim's: one act
@@ -314,8 +314,8 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 			claimID := claimSaying(t, f.db, somebody.ID, outcome)
 			if until != nil {
 				if _, err := f.db.DB.NewUpdate().TableExpr("\"claim\"").
-					Set("deferred_until = ?", until.UTC()).
-					Where("id = ?", claimID).Exec(ctx); err != nil {
+					Set(`"deferred_until" = ?`, until.UTC()).
+					Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
 					t.Fatalf("record when it defers to: %v", err)
 				}
 			}
@@ -382,8 +382,8 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 		sendBack := func() {
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr("\"decision\"").
-				Set("sent_back_at = ?", time.Now().UTC()).
-				Where("vulnerability_id = ?", issueID).Exec(ctx); err != nil {
+				Set(`"sent_back_at" = ?`, time.Now().UTC()).
+				Where(`"vulnerability_id" = ?`, issueID).Exec(ctx); err != nil {
 				t.Fatalf("send the claim back: %v", err)
 			}
 		}
@@ -431,10 +431,10 @@ func (f *fixture) deadline(t *testing.T, identifier string) time.Time {
 	var due time.Time
 	err := f.db.DB.NewSelect().
 		TableExpr("\"finding\" AS \"f\"").
-		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
-		ColumnExpr("f.due_at").
-		Where("v.identifier = ?", identifier).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."due_at"`).
+		Where(`"v"."identifier" = ?`, identifier).
+		Where(`"f"."closed_at" IS NULL`).
 		Limit(1).Scan(t.Context(), &due)
 	if err != nil {
 		t.Fatalf("read the stored deadline for %s: %v", identifier, err)
@@ -561,10 +561,10 @@ func (f *fixture) deadlineOrZero(t *testing.T, identifier string) time.Time {
 	var due *time.Time
 	err := f.db.DB.NewSelect().
 		TableExpr("\"finding\" AS \"f\"").
-		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
-		ColumnExpr("f.due_at").
-		Where("v.identifier = ?", identifier).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."due_at"`).
+		Where(`"v"."identifier" = ?`, identifier).
+		Where(`"f"."closed_at" IS NULL`).
 		Limit(1).Scan(t.Context(), &due)
 	if err != nil {
 		t.Fatalf("read the stored deadline for %s: %v", identifier, err)
@@ -582,11 +582,11 @@ func (f *fixture) deadlineIn(t *testing.T, target int64, identifier string) time
 	var due *time.Time
 	err := f.db.DB.NewSelect().
 		TableExpr("\"finding\" AS \"f\"").
-		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
-		ColumnExpr("f.due_at").
-		Where("v.identifier = ?", identifier).
-		Where("f.target_id = ?", target).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"f"."due_at"`).
+		Where(`"v"."identifier" = ?`, identifier).
+		Where(`"f"."target_id" = ?`, target).
+		Where(`"f"."closed_at" IS NULL`).
 		Limit(1).Scan(t.Context(), &due)
 	if err != nil {
 		t.Fatalf("read the stored deadline for %s: %v", identifier, err)
@@ -603,10 +603,10 @@ func (f *fixture) urgency(t *testing.T, identifier string) int64 {
 	var rank int64
 	err := f.db.DB.NewSelect().
 		TableExpr("\"finding\" AS \"f\"").
-		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
-		ColumnExpr("MAX(f.urgency)").
-		Where("v.identifier = ?", identifier).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`MAX("f"."urgency")`).
+		Where(`"v"."identifier" = ?`, identifier).
+		Where(`"f"."closed_at" IS NULL`).
 		Scan(t.Context(), &rank)
 	if err != nil {
 		t.Fatalf("read where %s sits: %v", identifier, err)
@@ -631,9 +631,9 @@ func (f *fixture) ratingsIn(t *testing.T, productID int64, identifier string) (s
 	err := f.db.DB.NewSelect().
 		TableExpr("\"vulnerability\" AS \"v\"").
 		Join(rating.Here, productID).
-		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-		ColumnExpr("COALESCE(ir.severity, '') AS \"assessed\"").
-		Where("v.identifier = ?", identifier).
+		ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+		ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed"`).
+		Where(`"v"."identifier" = ?`, identifier).
 		Scan(t.Context(), &row)
 	if err != nil {
 		t.Fatalf("read the ratings for %s: %v", identifier, err)
@@ -659,8 +659,8 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 	var id int64
 	err := f.db.DB.NewSelect().
 		TableExpr("\"vulnerability\" AS \"v\"").
-		ColumnExpr("v.id").
-		Where("v.identifier = ?", identifier).
+		ColumnExpr(`"v"."id"`).
+		Where(`"v"."identifier" = ?`, identifier).
 		Scan(t.Context(), &id)
 	if err != nil {
 		t.Fatalf("read what %s is: %v", identifier, err)
@@ -682,7 +682,7 @@ func (f *fixture) issue(t *testing.T, identifier string) int64 {
 // words on every engine.
 func (f *fixture) recorded(t *testing.T, id int64, identity string) {
 	t.Helper()
-	n, err := f.db.DB.NewSelect().Table("person").Where("id = ?", id).Count(t.Context())
+	n, err := f.db.DB.NewSelect().Table("person").Where(`"id" = ?`, id).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -759,7 +759,7 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 		}
 		var now time.Time
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr("due_at").Where("id = ?", entered.ID).
+			ColumnExpr(`"due_at"`).Where(`"id" = ?`, entered.ID).
 			Scan(t.Context(), &now); err != nil {
 			t.Fatal(err)
 		}
@@ -811,9 +811,9 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		clocked := func(target int64) int {
 			t.Helper()
 			n, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-				Where("target_id = ?", target).
-				Where("closed_at IS NULL").
-				Where("due_at IS NOT NULL").Count(ctx)
+				Where(`"target_id" = ?`, target).
+				Where(`"closed_at" IS NULL`).
+				Where(`"due_at" IS NOT NULL`).Count(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -829,8 +829,8 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 		// And a sweep takes one away that was written before the release was a
 		// tag, or before this rule was.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("due_at = ?", time.Now().UTC().AddDate(0, 0, 30)).
-			Where("target_id = ?", tag).Exec(ctx); err != nil {
+			Set(`"due_at" = ?`, time.Now().UTC().AddDate(0, 0, 30)).
+			Where(`"target_id" = ?`, tag).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
@@ -879,9 +879,9 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 				Truncate(time.Microsecond)
 			opened[each] = seen
 			if _, err := f.db.DB.NewUpdate().TableExpr("\"finding\" AS \"f\"").
-				Set("opened_at = ?", seen).
-				Where(`f.vulnerability_id IN (SELECT v.id FROM "vulnerability" AS "v"`+
-					` WHERE v.identifier = ?)`, each).
+				Set(`"opened_at" = ?`, seen).
+				Where(`"f"."vulnerability_id" IN (SELECT "v"."id" FROM "vulnerability" AS "v"`+
+					` WHERE "v"."identifier" = ?)`, each).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

@@ -386,7 +386,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 			t.Fatal(err)
 		}
 		var issue int64
-		if err := r.DB.DB.NewSelect().Table("vulnerability").ColumnExpr("id").
+		if err := r.DB.DB.NewSelect().Table("vulnerability").ColumnExpr(`"id"`).
 			Limit(1).Scan(t.Context(), &issue); err != nil {
 			t.Fatal(err)
 		}

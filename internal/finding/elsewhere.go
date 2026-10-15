@@ -176,30 +176,30 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`st.name AS "stream"`).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
-		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		ColumnExpr(`c.version AS "version"`).
+		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where("st.product_id = ?", at.ProductID).
-		Where("f.vulnerability_id = ?", at.VulnerabilityID).
-		Where("f.place_identity IN (?)", bun.List(identities)).
-		Where("f.closed_at IS NULL").
-		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.place_identity, f.target_id, st.name, st.display_name, va.name, va.display_name, "+
-			"c.version, "+
+		Where(`"st"."product_id" = ?`, at.ProductID).
+		Where(`"f"."vulnerability_id" = ?`, at.VulnerabilityID).
+		Where(`"f"."place_identity" IN (?)`, bun.List(identities)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		GroupExpr(`"f"."place_identity", "f"."target_id", "st"."name", "st"."display_name", "va"."name", "va"."display_name", `+
+			`"c"."version", `+
 			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
-		OrderExpr("st.name, va.name, c.version").
+		OrderExpr(`"st"."name", "va"."name", "c"."version"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return Reach{}, fmt.Errorf("look for the same issue elsewhere: %w", err)

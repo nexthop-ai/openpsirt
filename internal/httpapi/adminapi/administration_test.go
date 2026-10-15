@@ -256,7 +256,7 @@ func TestUnbindingReopensTheWindowTheDeploymentConfigured(t *testing.T) {
 		}
 		var until time.Time
 		if err := r.DB.DB.NewSelect().Table("person_identity").Column("claimable_until").
-			Where("username = ?", "reader").Scan(t.Context(), &until); err != nil {
+			Where(`"username" = ?`, "reader").Scan(t.Context(), &until); err != nil {
 			t.Fatal(err)
 		}
 		if latest := time.Now().Add(time.Hour + time.Minute); until.After(latest) {

@@ -29,7 +29,7 @@ func TestAnUndisclosedRecordsWordsReachNoReaderOfDisclosedWorkAlone(t *testing.T
 		issue, component := open[0].VulnerabilityID, open[0].ComponentID
 		const summary = "The management socket answers before anyone has authenticated."
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
-			Set("description = ?", summary).Where("id = ?", issue).Exec(ctx); err != nil {
+			Set(`"description" = ?`, summary).Where(`"id" = ?`, issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		const address = "https://example.com/advisories/socket"

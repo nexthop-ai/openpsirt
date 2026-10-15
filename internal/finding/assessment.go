@@ -156,8 +156,8 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 		// below that do want the effective rating are a join away.
 		err = tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
-			ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-			Where("v.id = ?", vulnerabilityID).
+			ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+			Where(`"v"."id" = ?`, vulnerabilityID).
 			Scan(ctx, &issue)
 		if err != nil {
 			return fmt.Errorf("read what was published about this: %w", err)
@@ -240,7 +240,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 	var agreed *Assessment
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		claim := new(Assessment)
-		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(claim).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			// A claim nobody may be told about and a claim that was never
 			// recorded answer alike, so an identifier cannot be walked.
 			return database.FromRead(err, ErrNoSuchAssessment, fmt.Sprintf("read assessment %d", id))
@@ -275,7 +275,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		// again against the claim as it now stands.
 		result, err := tx.NewUpdate().Model(claim).
 			Column("state", "decided_by", "decided_at").
-			WherePK().Where("state = ?", AssessmentProposed).Exec(ctx)
+			WherePK().Where(`"state" = ?`, AssessmentProposed).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("agree to the claim: %w", err)
 		}
@@ -307,7 +307,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 	claim := new(Assessment)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		*claim = Assessment{}
-		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(claim).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			return database.FromRead(err, ErrNoSuchAssessment, fmt.Sprintf("read assessment %d", id))
 		}
 		if !subject.TriagesIn(claim.ProductID) {
@@ -333,7 +333,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		claim.LiveVulnerabilityID = nil
 		result, err := tx.NewUpdate().Model(claim).
 			Column("state", "decided_by", "decided_at", "live_vulnerability_id").
-			WherePK().Where("state = ?", was).Exec(ctx)
+			WherePK().Where(`"state" = ?`, was).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("withdraw the claim: %w", err)
 		}
@@ -374,10 +374,10 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 		var left []string
 		if err := tx.NewSelect().Model((*Assessment)(nil)).
 			Column("severity").
-			Where("product_id = ?", productID).
+			Where(`"product_id" = ?`, productID).
 			Where(FiledUnder(filed.Issue), vulnerabilityID).
-			Where("state = ?", AssessmentLive).
-			OrderExpr("decided_at DESC, id DESC").Limit(1).
+			Where(`"state" = ?`, AssessmentLive).
+			OrderExpr(`"decided_at" DESC, "id" DESC`).Limit(1).
 			Scan(ctx, &left); err != nil {
 			return fmt.Errorf("read what else rates this here: %w", err)
 		}
@@ -387,8 +387,8 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 	}
 	if severity == "" {
 		if _, err := tx.NewDelete().Model((*IssueRating)(nil)).
-			Where("vulnerability_id = ?", vulnerabilityID).
-			Where("product_id = ?", productID).Exec(ctx); err != nil {
+			Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"product_id" = ?`, productID).Exec(ctx); err != nil {
 			return fmt.Errorf("take the rating out of force: %w", err)
 		}
 	} else {
@@ -404,16 +404,16 @@ func liveRating(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int6
 		// write writes against. The whole closure is retried, so a rival
 		// writer between the two re-runs it rather than being missed.
 		held, err := tx.NewSelect().Model((*IssueRating)(nil)).
-			Where("vulnerability_id = ?", vulnerabilityID).
-			Where("product_id = ?", productID).Count(ctx)
+			Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"product_id" = ?`, productID).Count(ctx)
 		if err != nil {
 			return fmt.Errorf("read what this product rates it now: %w", err)
 		}
 		if held > 0 {
 			_, err = tx.NewUpdate().Model((*IssueRating)(nil)).
-				Set("severity = ?", severity).
-				Where("vulnerability_id = ?", vulnerabilityID).
-				Where("product_id = ?", productID).Exec(ctx)
+				Set(`"severity" = ?`, severity).
+				Where(`"vulnerability_id" = ?`, vulnerabilityID).
+				Where(`"product_id" = ?`, productID).Exec(ctx)
 		} else {
 			_, err = tx.NewInsert().Model(&IssueRating{
 				VulnerabilityID: vulnerabilityID, ProductID: productID,
@@ -473,10 +473,10 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	// thing it must not be taken for here.
 	err := tx.NewSelect().
 		TableExpr(`"vulnerability" AS "v"`).
-		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
-		Where("v.id = ?", vulnerabilityID).
+		ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+		ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
+		Where(`"v"."id" = ?`, vulnerabilityID).
 		Scan(ctx, &issue)
 	if err != nil {
 		return fmt.Errorf("read what is published about this: %w", err)
@@ -494,7 +494,7 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	// Everything below the flags, packed by the same function that packs it
 	// at ingest.
 	_, err = reranking(tx, productID, "?", int64(inForce.rest())).
-		Where("vulnerability_id = ?", vulnerabilityID).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("move this issue in the order: %w", err)
@@ -519,11 +519,11 @@ func (r Rating) rest() Rank {
 func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.UpdateQuery {
 	return tx.NewUpdate().
 		Model((*Finding)(nil)).
-		Set("urgency = (CASE WHEN urgency_exploited_here THEN ? ELSE 0 END)"+
-			" + (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
-			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + "+rest,
+		Set(`"urgency" = (CASE WHEN "urgency_exploited_here" THEN ? ELSE 0 END)`+
+			` + (CASE WHEN "urgency_exploited" THEN ? ELSE 0 END)`+
+			` + (CASE WHEN "urgency_shipped" THEN ? ELSE 0 END) + `+rest,
 			append([]any{int64(exploitedHereBand), int64(exploitedBand), int64(shippedBand)}, args...)...).
-		Where("closed_at IS NULL").
+		Where(`"closed_at" IS NULL`).
 		// This product's findings alone. The number being written was worked
 		// out from this product's rating, and writing it over another
 		// product's rows is the deployment-wide rating arriving by the back
@@ -576,21 +576,21 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-		ColumnExpr(`f.id AS "id"`).
-		ColumnExpr(`f.kind AS "kind"`).
-		ColumnExpr(`f.urgency_exploited AS "urgency_exploited"`).
-		ColumnExpr(`f.opened_at AS "opened_at"`).
-		ColumnExpr(`f.fix_state AS "fix_state"`).
-		ColumnExpr(`f.fixed_at AS "fixed_at"`).
-		ColumnExpr(`f.due_at AS "due_at"`).
-		ColumnExpr(`f.stated_by AS "stated_by"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+		ColumnExpr(`"f"."id" AS "id"`).
+		ColumnExpr(`"f"."kind" AS "kind"`).
+		ColumnExpr(`"f"."urgency_exploited" AS "urgency_exploited"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
+		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
+		ColumnExpr(`"f"."due_at" AS "due_at"`).
+		ColumnExpr(`"f"."stated_by" AS "stated_by"`).
 		ColumnExpr(`CASE WHEN `+clocked+` THEN 1 ELSE 0 END AS "on_the_clock"`, clockedArgs...).
-		Where("f.vulnerability_id = ?", issue).
-		Where("f.closed_at IS NULL").
-		Where("f.urgency_exploited = ? OR f.exploited_learned_at > ?", false, known).
+		Where(`"f"."vulnerability_id" = ?`, issue).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."urgency_exploited" = ? OR "f"."exploited_learned_at" > ?`, false, known).
 		Scan(ctx, &rows); err != nil {
 		return false, fmt.Errorf("read what is learning this: %w", err)
 	}
@@ -633,16 +633,16 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		// refusal.
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			q := tx.NewUpdate().Model((*Finding)(nil)).
-				Set("urgency_exploited = ?", true).
-				Set("exploited_learned_at = ?", known).
-				Where("id IN (?)", bun.List(batch))
+				Set(`"urgency_exploited" = ?`, true).
+				Set(`"exploited_learned_at" = ?`, known).
+				Where(`"id" IN (?)`, bun.List(batch))
 			// Two spellings rather than a CASE choosing between NULL and a
 			// parameter, which leaves one engine with nothing to infer the
 			// column's type from.
 			if key.off {
-				q = q.Set("due_at = NULL")
+				q = q.Set(`"due_at" = NULL`)
 			} else {
-				q = q.Set("due_at = ?", key.due)
+				q = q.Set(`"due_at" = ?`, key.due)
 			}
 			_, err := q.Exec(ctx)
 			return err
@@ -708,35 +708,35 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(rating.Here, productID).
-		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
-		ColumnExpr(`f.opened_at AS "opened_at"`).
+		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
+		ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
 		// Grouped on the learning as well, because it is the base an
 		// exploited deadline is counted from: grouped without it, the
 		// recount fell back to the opening and moved every exploited
 		// deadline back to a date that was already in the past.
-		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
+		ColumnExpr(`"f"."exploited_learned_at" AS "learned_at"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		// And on what upstream has done, which is the other half of what a
 		// deadline is worked out from: whether there is a version to take at
 		// all, and when it arrived. Grouped without them, a recount answers
 		// from the rating alone and hands back a clock the scan path had
 		// taken off — on the very act the deadline exists to ask for.
-		ColumnExpr(`f.fix_state AS "fix_state"`).
-		ColumnExpr(`f.fixed_at AS "fixed_at"`).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = ?", productID).
+		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
+		ColumnExpr(`"f"."fixed_at" AS "fixed_at"`).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"st"."product_id" = ?`, productID).
 		Where(clocked, clockedArgs...).
 		// A recorded flaw is clocked by recountOwn, below.
-		Where("f.kind <> ?", Entered).
-		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, f.opened_at, "+
-			"f.exploited_learned_at, f.fix_state, f.fixed_at, "+rating.EffectiveExpr).
+		Where(`"f"."kind" <> ?`, Entered).
+		GroupExpr(`"f"."urgency_exploited", "f"."urgency_exploited_here", "f"."opened_at", `+
+			`"f"."exploited_learned_at", "f"."fix_state", "f"."fixed_at", `+rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -746,26 +746,26 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	for _, group := range groups {
 		q := tx.NewUpdate().
 			Model((*Finding)(nil)).
-			Where("vulnerability_id = ?", vulnerabilityID).
-			Where("closed_at IS NULL").
-			Where("urgency_exploited = ?", group.Exploited).
-			Where("urgency_exploited_here = ?", group.ExploitedHere).
-			Where("opened_at = ?", group.OpenedAt).
-			Where("kind <> ?", Entered).
+			Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"closed_at" IS NULL`).
+			Where(`"urgency_exploited" = ?`, group.Exploited).
+			Where(`"urgency_exploited_here" = ?`, group.ExploitedHere).
+			Where(`"opened_at" = ?`, group.OpenedAt).
+			Where(`"kind" <> ?`, Entered).
 			// A place a supplier answers on some routes carries no deadline.
-			Where("stated_by IS NULL").
+			Where(`"stated_by" IS NULL`).
 			Where(onClock, onClockArgs...)
 		if group.LearnedAt != nil {
-			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)
+			q = q.Where(`"exploited_learned_at" = ?`, *group.LearnedAt)
 		} else {
-			q = q.Where("exploited_learned_at IS NULL")
+			q = q.Where(`"exploited_learned_at" IS NULL`)
 		}
 		if group.FixedAt != nil {
-			q = q.Where("fixed_at = ?", *group.FixedAt)
+			q = q.Where(`"fixed_at" = ?`, *group.FixedAt)
 		} else {
-			q = q.Where("fixed_at IS NULL")
+			q = q.Where(`"fixed_at" IS NULL`)
 		}
-		q = q.Where("fix_state = ?", group.FixState)
+		q = q.Where(`"fix_state" = ?`, group.FixState)
 		// The one rule, asked here rather than restated. A recount that worked
 		// the deadline out its own way is a second policy nobody chose, and
 		// the two agreed only until one of them moved.
@@ -774,9 +774,9 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			group.LearnedAt, group.FixedAt,
 			windows.For(group.Exploited, group.Severity))
 		if due == nil || !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity) {
-			q = q.Set("due_at = NULL")
+			q = q.Set(`"due_at" = NULL`)
 		} else {
-			q = q.Set("due_at = ?", *due)
+			q = q.Set(`"due_at" = ?`, *due)
 		}
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("move this issue's deadline: %w", err)
@@ -785,10 +785,10 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	offClock, offClockArgs := clockedIn(productID, recountedAt, false)
 	if _, err := tx.NewUpdate().
 		Model((*Finding)(nil)).
-		Set("due_at = NULL").
-		Where("vulnerability_id = ?", vulnerabilityID).
-		Where("closed_at IS NULL").
-		Where("due_at IS NOT NULL").
+		Set(`"due_at" = NULL`).
+		Where(`"vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"closed_at" IS NULL`).
+		Where(`"due_at" IS NOT NULL`).
 		Where(offClock, offClockArgs...).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("take the deadline off what is not on the clock: %w", err)
@@ -839,10 +839,10 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 	// length of the page.
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if state != "" {
-			q = q.Where("state = ?", state)
+			q = q.Where(`"state" = ?`, state)
 		}
 		if productID != 0 {
-			q = q.Where("asm.product_id = ?", productID)
+			q = q.Where(`"asm"."product_id" = ?`, productID)
 		}
 		if !all {
 			// The row-by-row form of mayBeToldOfHere: a claim is shown where
@@ -851,10 +851,10 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
 				TableExpr(IssueFindings("f")).
-				Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-				Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-				Where(`"si"."id" = asm.vulnerability_id`).
-				Where("st.product_id = asm.product_id"),
+				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Where(`"si"."id" = "asm"."vulnerability_id"`).
+				Where(`"st"."product_id" = "asm"."product_id"`),
 				subject, products, all)
 			q = q.Where("EXISTS (?)", readable)
 		}
@@ -867,7 +867,7 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 	}
 	var claims []Assessment
 	if err := narrow(s.db.NewSelect().Model(&claims)).
-		OrderExpr("proposed_at DESC, id DESC").
+		OrderExpr(`"proposed_at" DESC, "id" DESC`).
 		Limit(limit).Offset(offset).
 		Scan(ctx); err != nil {
 		return nil, nil, 0, fmt.Errorf("read what we have said: %w", err)
@@ -939,7 +939,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	var claims []Assessment
 	if err := database.IDsInBatches(ctx, assessmentIDs, func(ctx context.Context, batch []int64) error {
 		var read []Assessment
-		if err := s.db.NewSelect().Model(&read).Where("id IN (?)", bun.List(batch)).
+		if err := s.db.NewSelect().Model(&read).Where(`"id" IN (?)`, bun.List(batch)).
 			Scan(ctx); err != nil {
 			return fmt.Errorf("read these assessments: %w", err)
 		}
@@ -1023,20 +1023,20 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		var read []group
 		q := s.db.NewSelect().
 			TableExpr(IssueFindings("f")).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(rating.For(rating.OnStream)).
 			ColumnExpr(`"si"."id" AS "filed"`).
-			ColumnExpr(`st.product_id AS "product_id"`).
-			ColumnExpr(`f.urgency_exploited AS "exploited"`).
-			ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
+			ColumnExpr(`"st"."product_id" AS "product_id"`).
+			ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
+			ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COUNT(*) AS "open"`).
 			Where(`"si"."id" IN (?)`, bun.List(batch)).
-			Where("f.closed_at IS NULL").
-			Where("st.product_id IN (?)", bun.List(ratedIn)).
-			GroupExpr(`"si"."id", st.product_id, f.urgency_exploited, f.urgency_exploited_here, ` +
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"st"."product_id" IN (?)`, bun.List(ratedIn)).
+			GroupExpr(`"si"."id", "st"."product_id", "f"."urgency_exploited", "f"."urgency_exploited_here", ` +
 				rating.EffectiveExpr)
 		// Narrowed across every product, not only the claim's: an approver
 		// holding one product is not told how many findings this issue has in

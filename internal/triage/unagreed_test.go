@@ -146,7 +146,7 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 	// assert it.
 	var gated bool
 	if err := f.db.DB.NewSelect().TableExpr(`"decision"`).
-		ColumnExpr("needs_approval").Where("claim_id = ?", decision.ClaimID).
+		ColumnExpr(`"needs_approval"`).Where(`"claim_id" = ?`, decision.ClaimID).
 		Limit(1).Scan(ctx, &gated); err != nil {
 		t.Fatalf("read whether the gate asked for a second person: %v", err)
 	}
@@ -178,8 +178,8 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 		// asks about: a decision in force suppresses a finding, and one still
 		// waiting suppresses nothing.
 		if _, err := f.db.DB.NewUpdate().Table("decision").
-			Set("state = ?", triage.Approved).
-			Where("claim_id = ?", decision.ClaimID).Exec(ctx); err != nil {
+			Set(`"state" = ?`, triage.Approved).
+			Where(`"claim_id" = ?`, decision.ClaimID).Exec(ctx); err != nil {
 			t.Fatalf("stand the decision: %v", err)
 		}
 	}
@@ -191,7 +191,7 @@ func revisionOf(t *testing.T, f *fixture, claimID int64) int64 {
 	t.Helper()
 	var revision int64
 	if err := f.db.DB.NewSelect().TableExpr(`"claim"`).
-		ColumnExpr("revision_id").Where("id = ?", claimID).
+		ColumnExpr(`"revision_id"`).Where(`"id" = ?`, claimID).
 		Scan(t.Context(), &revision); err != nil {
 		t.Fatalf("read which revision stands: %v", err)
 	}

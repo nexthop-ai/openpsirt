@@ -69,7 +69,7 @@ func TestADeferralIsNotCountedAsAFailure(t *testing.T) {
 
 		// Past its deadline and nobody has said anything: plainly late.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("due_at = ?", time.Now().UTC().AddDate(0, 0, -3)).
+			Set(`"due_at" = ?`, time.Now().UTC().AddDate(0, 0, -3)).
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +157,7 @@ func TestTheListFiltersOnWhenThingsHappened(t *testing.T) {
 		// And as an age, bounded on both sides: opened three days ago, it is
 		// under four days old and not under two.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("opened_at = ?", time.Now().UTC().AddDate(0, 0, -3)).
+			Set(`"opened_at" = ?`, time.Now().UTC().AddDate(0, 0, -3)).
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +238,7 @@ func TestTheRateCountsTheSameThingTheListDoes(t *testing.T) {
 		}
 
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("due_at = ?", time.Now().UTC().AddDate(0, 0, -3)).
+			Set(`"due_at" = ?`, time.Now().UTC().AddDate(0, 0, -3)).
 			Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -278,10 +278,10 @@ func TestARateCanBeAskedForAPeriod(t *testing.T) {
 		// still open, which is what the open half of the rate is about.
 		closed := time.Now().UTC().AddDate(0, 0, -400)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("closed_at = ?", closed).
-			Set("due_at = ?", closed.AddDate(0, 0, 7)).
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" `+
-				`WHERE identifier = ?)`, "CVE-2026-9999").
+			Set(`"closed_at" = ?`, closed).
+			Set(`"due_at" = ?`, closed.AddDate(0, 0, 7)).
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" `+
+				`WHERE "identifier" = ?)`, "CVE-2026-9999").
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

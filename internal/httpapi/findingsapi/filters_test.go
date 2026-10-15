@@ -218,7 +218,7 @@ func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		var issueID int64
 		if err := r.DB.DB.NewSelect().TableExpr("\"vulnerability\"").Column("id").
-			Where(`identifier = ?`, "CVE-2026-9999").
+			Where(`"identifier" = ?`, "CVE-2026-9999").
 			Scan(t.Context(), &issueID); err != nil {
 			t.Fatal(err)
 		}
@@ -387,17 +387,17 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 		// One issue reported with no answer at all, and one package fixed in
 		// one build and not in the other.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("fix_state = ?", "unknown").
-			Where(`vulnerability_id = (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"fix_state" = ?`, "unknown").
+			Where(`"vulnerability_id" = (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL3").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("fix_state = ?", "wont-fix").
-			Where(`vulnerability_id = (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"fix_state" = ?`, "wont-fix").
+			Where(`"vulnerability_id" = (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL1").
-			Where(`target_id = (SELECT MAX(target_id) FROM "finding")`).
+			Where(`"target_id" = (SELECT MAX("target_id") FROM "finding")`).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

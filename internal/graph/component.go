@@ -473,7 +473,7 @@ func (c *Components) byIdentities(ctx context.Context, identities []string) (map
 		var rows []Component
 		err := c.db.NewSelect().Model(&rows).
 			Column("id", "identity").
-			Where("identity IN (?)", bun.List(identities[start:end])).
+			Where(`"identity" IN (?)`, bun.List(identities[start:end])).
 			Scan(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("look up components: %w", err)
@@ -816,7 +816,7 @@ func (c *Components) fillBlank(ctx context.Context, column, what string,
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := c.db.NewUpdate().Model((*Component)(nil)).
 				Set("? = ?", bun.Ident(column), value).
-				Where("id IN (?)", bun.List(batch)).
+				Where(`"id" IN (?)`, bun.List(batch)).
 				Where("? IS NULL OR ? = ?", bun.Ident(column), bun.Ident(column), "").
 				Exec(ctx)
 			return err

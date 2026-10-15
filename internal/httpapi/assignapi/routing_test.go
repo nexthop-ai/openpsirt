@@ -328,9 +328,9 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 		var left int
 		if err := r.DB.DB.NewSelect().Table("finding").
 			ColumnExpr("COUNT(*)").
-			Where("assigned_to IS NULL").
-			Where("closed_at IS NULL").
-			Where(`component_id IN (SELECT id FROM "component" WHERE upstream_name = ?)`, "curl").
+			Where(`"assigned_to" IS NULL`).
+			Where(`"closed_at" IS NULL`).
+			Where(`"component_id" IN (SELECT "id" FROM "component" WHERE "upstream_name" = ?)`, "curl").
 			Scan(t.Context(), &left); err != nil {
 			t.Fatal(err)
 		}
@@ -378,7 +378,7 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 			t.Fatal("a full batch whose continuation could not be queued reported success")
 		}
 		done, err := r.DB.DB.NewSelect().Table("job").
-			Where("kind = ?", queue.Route).Where("state = ?", queue.Done).Count(ctx)
+			Where(`"kind" = ?`, queue.Route).Where(`"state" = ?`, queue.Done).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -492,9 +492,9 @@ func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing
 			var left int
 			if err := r.DB.DB.NewSelect().Table("finding").
 				ColumnExpr("COUNT(*)").
-				Where("assigned_to IS NULL").
-				Where("closed_at IS NULL").
-				Where(`component_id IN (SELECT id FROM "component" WHERE upstream_name = ?)`, "curl").
+				Where(`"assigned_to" IS NULL`).
+				Where(`"closed_at" IS NULL`).
+				Where(`"component_id" IN (SELECT "id" FROM "component" WHERE "upstream_name" = ?)`, "curl").
 				Scan(ctx, &left); err != nil {
 				return -1
 			}

@@ -201,8 +201,8 @@ func (s *Store) ReportBy(ctx context.Context, subject access.Subject,
 		// rather than the column being compared loosely. The engines default
 		// differently on that, and a folded value compares the same under
 		// any of them.
-		Where("fr.reference = ?", foldReference(reference)).
-		Where("fr.product_id = ?", productID).
+		Where(`"fr"."reference" = ?`, foldReference(reference)).
+		Where(`"fr"."product_id" = ?`, productID).
 		Scan(ctx)
 	switch {
 	case database.IsNoRows(err):
@@ -231,7 +231,7 @@ func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 	}
 	var rows []FlawReport
 	total, err := s.db.NewSelect().Model(&rows).
-		Where("fr.product_id = ?", productID).
+		Where(`"fr"."product_id" = ?`, productID).
 		// The identifier as well as the moment, because two reports recorded
 		// in the same microsecond are otherwise ordered by whatever the
 		// engine returned, and a page boundary falling between them repeats
@@ -326,16 +326,16 @@ func judgeReport(ctx context.Context, tx bun.IDB, reportID, vulnerabilityID, by 
 	now time.Time, doing string) error {
 
 	res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
-		Set("vulnerability_id = ?", vulnerabilityID).
-		Set("evaluated_at = ?", now).
-		Set("evaluated_by = ?", by).
-		Where("id = ?", reportID).
+		Set(`"vulnerability_id" = ?`, vulnerabilityID).
+		Set(`"evaluated_at" = ?`, now).
+		Set(`"evaluated_by" = ?`, by).
+		Where(`"id" = ?`, reportID).
 		// Whether it is still unjudged is asked here and nowhere else: a read
 		// before the write answers about a row that may have moved since.
-		Where("vulnerability_id IS NULL").
+		Where(`"vulnerability_id" IS NULL`).
 		// A report under a ruling is answered, or about to be. Accepting it as
 		// well would leave it two things at once.
-		Where("ruling_id IS NULL").
+		Where(`"ruling_id" IS NULL`).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("%s: %w", doing, err)
@@ -383,7 +383,7 @@ func mintReference(ctx context.Context, tx bun.IDB, draw drawing, product string
 func refuseIfReported(ctx context.Context, tx bun.IDB, vulnerabilityID, reportID int64) error {
 	held, err := tx.NewSelect().Model((*FlawReport)(nil)).
 		Where(FiledUnder(filed.ReportIssue), vulnerabilityID).
-		Where("fr.id <> ?", reportID).
+		Where(`"fr"."id" <> ?`, reportID).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether the issue has a report: %w", err)

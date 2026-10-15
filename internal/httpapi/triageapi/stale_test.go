@@ -121,8 +121,8 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		// proposed again, because what is being tested is the sweep's reading
 		// of the date and not the form that sets it.
 		if _, err := r.DB.DB.NewUpdate().Table("claim").
-			Set("deferred_until = ?", soon).
-			Where("id = ?", claim).Exec(t.Context()); err != nil {
+			Set(`"deferred_until" = ?`, soon).
+			Where(`"id" = ?`, claim).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -147,8 +147,8 @@ func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
 		// finding is back in the queue, which is a different thing to say.
 		gone := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
 		if _, err := r.DB.DB.NewUpdate().Table("claim").
-			Set("deferred_until = ?", gone).
-			Where("id = ?", claim).Exec(t.Context()); err != nil {
+			Set(`"deferred_until" = ?`, gone).
+			Where(`"id" = ?`, claim).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if told := r.Alerts(t, "triager", "deferral-ending"); len(told) != 0 {
@@ -179,8 +179,8 @@ func TestWorkSittingInATeamQueueIsSaidToTheTeam(t *testing.T) {
 			t.Fatalf("work routed a moment ago is reported as sitting: %v", told)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_at = ?", time.Now().UTC().Add(-5*24*time.Hour)).
-			Where("assigned_to IS NOT NULL").Exec(t.Context()); err != nil {
+			Set(`"assigned_at" = ?`, time.Now().UTC().Add(-5*24*time.Hour)).
+			Where(`"assigned_to" IS NOT NULL`).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -432,8 +432,8 @@ func TestAStandingConditionSaysWhatIsTrueNow(t *testing.T) {
 
 		hand(t, "CVE-2026-9999")
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_at = ?", time.Now().UTC().AddDate(0, 0, -30)).
-			Where("assigned_to IS NOT NULL").Exec(t.Context()); err != nil {
+			Set(`"assigned_at" = ?`, time.Now().UTC().AddDate(0, 0, -30)).
+			Where(`"assigned_to" IS NOT NULL`).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		first := r.Alerts(t, "triager", "queue-untaken")
@@ -444,8 +444,8 @@ func TestAStandingConditionSaysWhatIsTrueNow(t *testing.T) {
 		// A second piece arrives in the same queue and sits just as long.
 		hand(t, "CVE-2026-1000")
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("assigned_at = ?", time.Now().UTC().AddDate(0, 0, -30)).
-			Where("assigned_to IS NOT NULL").Exec(t.Context()); err != nil {
+			Set(`"assigned_at" = ?`, time.Now().UTC().AddDate(0, 0, -30)).
+			Where(`"assigned_to" IS NOT NULL`).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		second := r.Alerts(t, "triager", "queue-untaken")

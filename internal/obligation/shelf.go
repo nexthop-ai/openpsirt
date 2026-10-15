@@ -90,21 +90,21 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 	err := s.db.NewSelect().
 		Model((*triage.ExploitedHere)(nil)).
 		ColumnExpr("eh.*").
-		ColumnExpr(`v.identifier AS "issue"`).
-		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`"v"."identifier" AS "issue"`).
+		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		// Whether any finding of the issue in this product is undisclosed.
 		// As an integer rather than a boolean: the four engines spell a
 		// boolean three ways.
 		ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM `+finding.IssueFindings("f")+
-			` JOIN "target" AS "tg" ON tg.id = f.target_id`+
-			` JOIN "stream" AS "st" ON st.id = tg.stream_id`+
-			` WHERE "si"."id" = eh.vulnerability_id`+
-			` AND st.product_id = eh.product_id AND f.visibility = ?)`+
+			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
+			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
+			` WHERE "si"."id" = "eh"."vulnerability_id"`+
+			` AND "st"."product_id" = "eh"."product_id" AND "f"."visibility" = ?)`+
 			` THEN 1 ELSE 0 END AS "private"`, access.Private).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = eh.vulnerability_id`).
-		Join(`JOIN "product" AS "p" ON p.id = eh.product_id`).
-		Where("eh.cleared_at IS NULL").
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "eh"."vulnerability_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "eh"."product_id"`).
+		Where(`"eh"."cleared_at" IS NULL`).
 		Order("eh.known_at ASC", "eh.id ASC").
 		Scan(ctx, &rows)
 	if err != nil {

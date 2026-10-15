@@ -40,9 +40,9 @@ func (s *Store) RenameVariant(ctx context.Context, productID, variantID int64, n
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set("name = ?", typedname.Matching(name)).
-		Set("display_name = ?", name).
-		Where("id = ?", variantID).
+		Set(`"name" = ?`, typedname.Matching(name)).
+		Set(`"display_name" = ?`, name).
+		Where(`"id" = ?`, variantID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("rename variant %d: %w", variantID, err)
@@ -58,8 +58,8 @@ func (s *Store) RenameVariant(ctx context.Context, productID, variantID int64, n
 // be corrected at all.
 func (s *Store) SetVariantCustomerFacing(ctx context.Context, variantID int64, facing bool) error {
 	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set("customer_facing = ?", facing).
-		Where("id = ?", variantID).
+		Set(`"customer_facing" = ?`, facing).
+		Where(`"id" = ?`, variantID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record whether variant %d ships: %w", variantID, err)
@@ -106,8 +106,8 @@ func (s *Store) RenameProduct(ctx context.Context, productID int64, name string)
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("name = ?", typedname.Matching(name)).
-		Where("id = ?", productID).
+		Set(`"name" = ?`, typedname.Matching(name)).
+		Where(`"id" = ?`, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("rename product %d: %w", productID, err)
@@ -127,8 +127,8 @@ func (s *Store) SetProductDisplayName(ctx context.Context, productID int64, show
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("display_name = ?", shown).
-		Where("id = ?", productID).
+		Set(`"display_name" = ?`, shown).
+		Where(`"id" = ?`, productID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record what product %d is called: %w", productID, err)
@@ -169,9 +169,9 @@ func (s *Store) RenameStream(ctx context.Context, productID, streamID int64, nam
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
-		Set("name = ?", typedname.Matching(name)).
-		Set("display_name = ?", name).
-		Where("id = ?", streamID).
+		Set(`"name" = ?`, typedname.Matching(name)).
+		Set(`"display_name" = ?`, name).
+		Where(`"id" = ?`, streamID).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("rename release %d: %w", streamID, err)
@@ -212,9 +212,9 @@ func (s *Store) EveryProduct(ctx context.Context) ([]Product, error) {
 // both record having done it.
 func (s *Store) retire(ctx context.Context, model any, id int64, what string) error {
 	res, err := s.db.NewUpdate().Model(model).
-		Set("retired_at = ?", now()).
-		Where("id = ?", id).
-		Where("retired_at IS NULL").
+		Set(`"retired_at" = ?`, now()).
+		Where(`"id" = ?`, id).
+		Where(`"retired_at" IS NULL`).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("retire %s %d: %w", what, id, err)
@@ -229,9 +229,9 @@ func (s *Store) retire(ctx context.Context, model any, id int64, what string) er
 // and rows are never deleted, so nothing means another writer got there first.
 func (s *Store) restore(ctx context.Context, model any, id int64, what string) (bool, error) {
 	res, err := s.db.NewUpdate().Model(model).
-		Set("retired_at = NULL").
-		Where("id = ?", id).
-		Where("retired_at IS NOT NULL").
+		Set(`"retired_at" = NULL`).
+		Where(`"id" = ?`, id).
+		Where(`"retired_at" IS NOT NULL`).
 		Exec(ctx)
 	if err != nil {
 		return false, fmt.Errorf("bring %s %d back: %w", what, id, err)

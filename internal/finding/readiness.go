@@ -119,13 +119,13 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"stream" AS "st"`).
-		Join(`JOIN "target" AS "tg" ON tg.stream_id = st.id`).
-		ColumnExpr(`st.id AS "stream_id"`).
-		Where("st.parent_id = ?", streamID).
-		Where("tg.variant_id = ?", variantID).
+		Join(`JOIN "target" AS "tg" ON "tg"."stream_id" = "st"."id"`).
+		ColumnExpr(`"st"."id" AS "stream_id"`).
+		Where(`"st"."parent_id" = ?`, streamID).
+		Where(`"tg"."variant_id" = ?`, variantID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE sr.target_id = tg.id AND sr.finished_at IS NOT NULL)`).
-		OrderExpr("st.created_at DESC, st.id DESC").
+			WHERE "sr"."target_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+		OrderExpr(`"st"."created_at" DESC, "st"."id" DESC`).
 		Limit(1).
 		Scan(ctx, &release)
 	if err != nil && !database.IsNoRows(err) {
@@ -161,19 +161,19 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// issue's row once per place only to fold the copies away.
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = ?", productID).
-		Where("tg.stream_id = ?", streamID).
-		Where("tg.variant_id = ?", variantID).
-		GroupExpr("f.vulnerability_id, f.component_id")
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"tg"."stream_id" = ?`, streamID).
+		Where(`"tg"."variant_id" = ?`, variantID).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id"`)
 	pairs = floor.narrow(inOneProduct(pairs, subject, productID, all))
 	inner := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, pairs).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = grouped.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		Join(rating.Here, productID).
 		ColumnExpr(rating.BandExpr + ` AS "band"`)
 
@@ -202,15 +202,15 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	// pipeline running.
 	if err := s.db.NewSelect().
 		TableExpr(`"stream" AS "st"`).
-		Join(`JOIN "variant" AS "va" ON va.id = ?`, variantID).
-		Join(`LEFT JOIN "target" AS "tg" ON tg.stream_id = st.id AND tg.variant_id = va.id`).
-		ColumnExpr(`COALESCE(tg.id, 0) AS "target_id"`).
-		ColumnExpr(`st.name AS "stream"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = ?`, variantID).
+		Join(`LEFT JOIN "target" AS "tg" ON "tg"."stream_id" = "st"."id" AND "tg"."variant_id" = "va"."id"`).
+		ColumnExpr(`COALESCE("tg"."id", 0) AS "target_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "stream_name"`).
-		ColumnExpr(`st.kind AS "kind"`).
-		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`"st"."kind" AS "kind"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		Where("st.id = ?", streamID).
+		Where(`"st"."id" = ?`, streamID).
 		Limit(1).
 		Scan(ctx, standing); err != nil {
 		return nil, database.FromRead(err, catalog.ErrNotFound, "read what this build is called")
@@ -225,10 +225,10 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	var finished []time.Time
 	if err := s.db.NewSelect().
 		TableExpr(`"scan_run" AS "sr"`).
-		ColumnExpr("sr.finished_at").
-		Where("sr.target_id = ?", standing.TargetID).
-		Where("sr.finished_at IS NOT NULL").
-		OrderExpr("sr.finished_at DESC").
+		ColumnExpr(`"sr"."finished_at"`).
+		Where(`"sr"."target_id" = ?`, standing.TargetID).
+		Where(`"sr"."finished_at" IS NOT NULL`).
+		OrderExpr(`"sr"."finished_at" DESC`).
 		Limit(1).
 		Scan(ctx, &finished); err != nil {
 		return nil, fmt.Errorf("read when this build was last scanned: %w", err)

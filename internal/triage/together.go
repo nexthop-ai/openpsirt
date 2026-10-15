@@ -403,8 +403,8 @@ func (s *Store) leavingDecided(ctx context.Context, places []resolved) ([]resolv
 		chunk := keys[from:min(from+database.BatchSize, len(keys))]
 		var some []row
 		if err := s.db.NewSelect().Model((*Decision)(nil)).
-			ColumnExpr("de.id, de.live_key, de.state").
-			Where("de.live_key IN (?)", bun.List(chunk)).
+			ColumnExpr(`"de"."id", "de"."live_key", "de"."state"`).
+			Where(`"de"."live_key" IN (?)`, bun.List(chunk)).
 			Scan(ctx, &some); err != nil {
 			return nil, nil, fmt.Errorf("read what already stands: %w", err)
 		}
@@ -473,18 +473,18 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 	}
 	query := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// This product's rating of the issue, which is the rating in force
 		// here. The read spans products, so each row reads its own stream's.
 		Join(rating.For(rating.OnStream)).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 		// The three parts of a rating rather than the published score alone.
@@ -492,21 +492,21 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		// today's rating against, so storing the published number where this
 		// product has rated the issue lower left the comparison asking whether
 		// the severity had risen past a figure nobody was working to.
-		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed_severity"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
+		ColumnExpr(`COALESCE("v"."severity", '') AS "published_severity"`).
+		ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed_severity"`).
+		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
 		// A release built once, which decides what may be said
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
-		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
-		Where("f.target_id = ?", at.TargetID).
-		Where("f.component_id IN (?)", bun.List(fold)).
-		Where("f.closed_at IS NULL").
-		Where("f.vulnerability_id IN (?)", bun.List(at.VulnerabilityIDs)).
-		GroupExpr("st.product_id, f.vulnerability_id, f.place_identity, f.visibility, " +
-			"c.upstream_version, c.version, uc.upstream_version, uc.version, " +
-			"v.severity, ir.severity, v.score_centi").
-		OrderExpr("f.vulnerability_id, f.place_identity")
+		ColumnExpr(`MAX(CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
+		Where(`"f"."target_id" = ?`, at.TargetID).
+		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(at.VulnerabilityIDs)).
+		GroupExpr(`"st"."product_id", "f"."vulnerability_id", "f"."place_identity", "f"."visibility", ` +
+			`"c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version", ` +
+			`"v"."severity", "ir"."severity", "v"."score_centi"`).
+		OrderExpr(`"f"."vulnerability_id", "f"."place_identity"`)
 	if err := onlyDecidable(query, subject).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where these issues sit: %w", err)
 	}

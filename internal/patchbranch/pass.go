@@ -486,9 +486,9 @@ const renewTick = time.Minute
 // in it, most urgent first.
 func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgency) error {
 	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
-		Set("fetched_at = ?", p.Now().UTC()).
-		Set("failed = NULL").
-		Where("id = ?", c.repository.ID).Exec(ctx); err != nil {
+		Set(`"fetched_at" = ?`, p.Now().UTC()).
+		Set(`"failed" = NULL`).
+		Where(`"id" = ?`, c.repository.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("record that a visit began: %w", err)
 	}
 	held, stop := context.WithCancelCause(ctx)
@@ -609,7 +609,7 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 	return database.InTransaction(ctx, handle, func(ctx context.Context, tx bun.Tx) error {
 		now := p.Now().UTC()
 		if _, err := tx.NewDelete().Model((*branchRow)(nil)).
-			Where("commit_id = ?", id).Exec(ctx); err != nil {
+			Where(`"commit_id" = ?`, id).Exec(ctx); err != nil {
 			return fmt.Errorf("clear the branches a commit was on: %w", err)
 		}
 		if len(kept) > 0 {
@@ -618,10 +618,10 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 			}
 		}
 		if _, err := tx.NewUpdate().Model((*commitRow)(nil)).
-			Set("looked_at = ?", now).
-			Set("found = ?", found).
-			Set("branch_count = ?", count).
-			Where("id = ?", id).Exec(ctx); err != nil {
+			Set(`"looked_at" = ?`, now).
+			Set(`"found" = ?`, found).
+			Set(`"branch_count" = ?`, count).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return fmt.Errorf("record that a commit was looked up: %w", err)
 		}
 		return nil
@@ -634,20 +634,20 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 // when a visit last began and what stopped it — so a redeploy in the middle
 // of a retry leaves yesterday's failure standing rather than erasing it.
 func (p *Pass) finish(ctx context.Context, before repositoryRow, dir string, failed error) error {
-	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where("id = ?", before.ID)
+	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where(`"id" = ?`, before.ID)
 	switch {
 	case errors.Is(failed, errStopped):
-		update = update.Set("fetched_at = ?", utc(before.FetchedAt)).Set("failed = ?", before.Failed).
-			Set("ended_at = ?", utc(before.EndedAt))
+		update = update.Set(`"fetched_at" = ?`, utc(before.FetchedAt)).Set(`"failed" = ?`, before.Failed).
+			Set(`"ended_at" = ?`, utc(before.EndedAt))
 	case failed != nil:
-		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason)).
-			Set("ended_at = ?", p.Now().UTC())
+		update = update.Set(`"failed" = ?`, bound.HeadRunes(failed.Error(), MostReason)).
+			Set(`"ended_at" = ?`, p.Now().UTC())
 	default:
 		now := p.Now().UTC()
-		update = update.Set("failed = NULL").Set("reached_at = ?", now).Set("ended_at = ?", now)
+		update = update.Set(`"failed" = NULL`).Set(`"reached_at" = ?`, now).Set(`"ended_at" = ?`, now)
 	}
 	if dir != "" {
-		update = update.Set("held_bytes = ?", size(dir))
+		update = update.Set(`"held_bytes" = ?`, size(dir))
 	}
 	// Recorded on a context of its own: a visit stopped by shutdown still
 	// happened, and the report should not show it as running for ever.
@@ -680,7 +680,7 @@ func (p *Pass) forget(names []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
-		Set("held_bytes = NULL").
+		Set(`"held_bytes" = NULL`).
 		Where(`"url_identity" IN (?)`, bun.List(names)).Exec(ctx); err != nil {
 		p.logger.Warn("recording that repository copies were removed", "error", err)
 	}

@@ -436,8 +436,8 @@ func TestADeferralStopsStandingOnItsDate(t *testing.T) {
 		}
 		past := time.Now().UTC().Add(-time.Hour)
 		if _, err := f.db.DB.NewUpdate().Table("claim").
-			Set("deferred_until = ?", past).
-			Where("id = ?", ran.ClaimID).Exec(ctx); err != nil {
+			Set(`"deferred_until" = ?`, past).
+			Where(`"id" = ?`, ran.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if standing, _ := f.store.Applying(ctx, lapsedPlace); standing != nil {
@@ -918,7 +918,7 @@ func TestTwoPeopleProposingAtOnceProduceOneClaim(t *testing.T) {
 
 		var live int
 		if err := f.db.NewSelect().Model((*triage.Decision)(nil)).
-			Where("live_key IS NOT NULL").Scan(t.Context(), &live); err == nil && live > 1 {
+			Where(`"live_key" IS NOT NULL`).Scan(t.Context(), &live); err == nil && live > 1 {
 			t.Errorf("%d live claims cover one combination of code", live)
 		}
 	})

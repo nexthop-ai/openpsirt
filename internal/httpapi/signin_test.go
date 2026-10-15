@@ -369,7 +369,7 @@ func TestHowLongASignInLastsIsTheSettingAnAdministratorChanged(t *testing.T) {
 			ExpiresAt time.Time `bun:"expires_at"`
 		}
 		if err := r.db.DB.NewSelect().Table("session").
-			ColumnExpr("expires_at").Scan(t.Context(), &sessions); err != nil {
+			ColumnExpr(`"expires_at"`).Scan(t.Context(), &sessions); err != nil {
 			t.Fatal(err)
 		}
 		if len(sessions) != 1 {

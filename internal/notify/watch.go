@@ -288,16 +288,16 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	undisclosed, private := access.AnyPrivate("f.visibility")
 	err := findingsWith(w.db.NewSelect(), true).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
-		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) = 1 AS "exploited"`).
-		Where("st.kind = ?", catalog.Tag).
-		Where("f.closed_at IS NULL").
+		ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END) = 1 AS "exploited"`).
+		Where(`"st"."kind" = ?`, catalog.Tag).
+		Where(`"f"."closed_at" IS NULL`).
 		Where(finding.NotArguedAway).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("f.urgency_exploited = ?", true).
+			return q.WhereOr(`"f"."urgency_exploited" = ?`, true).
 				WhereOr(rating.BandExpr+" = ?", "critical")
 		}).
 		Where("NOT "+standing, args...).
-		GroupExpr("p.name, st.name, va.name, c.name, v.identifier, st.product_id, v.id").
+		GroupExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "v"."identifier", "st"."product_id", "v"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is critical on a release: %w", err)
@@ -463,10 +463,10 @@ func (w *Watch) beingTold(ctx context.Context, kind Kind) ([]int64, error) {
 	var people []int64
 	err := w.db.NewSelect().
 		TableExpr(`"notification" AS "n"`).
-		ColumnExpr("n.person_id").
-		Where("n.kind = ?", kind).
-		Where("n.cleared_at IS NULL").
-		GroupExpr("n.person_id").
+		ColumnExpr(`"n"."person_id"`).
+		Where(`"n"."kind" = ?`, kind).
+		Where(`"n"."cleared_at" IS NULL`).
+		GroupExpr(`"n"."person_id"`).
 		Scan(ctx, &people)
 	if err != nil {
 		return nil, fmt.Errorf("read who is being told about %s: %w", kind, err)
@@ -510,22 +510,22 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	held := w.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.assigned_to AS "person_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		Where("f.assigned_to IS NOT NULL").
-		Where("f.closed_at IS NULL")
+		ColumnExpr(`"f"."assigned_to" AS "person_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(`"f"."assigned_to" IS NOT NULL`).
+		Where(`"f"."closed_at" IS NULL`)
 
 	if err := w.db.NewSelect().
 		TableExpr(`"person" AS "p"`).
 		// Joined on the party a person is assignable as, because that
 		// is what the assignment column holds.
-		Join(`JOIN (?) AS "work" ON work.person_id = p.party_id`, held).
-		ColumnExpr(`p.id AS "id"`).
-		ColumnExpr(`p.identity AS "identity"`).
-		ColumnExpr(`COALESCE(p.display_name, '') AS "name"`).
-		ColumnExpr(`p.last_seen_at AS "last_seen_at"`).
-		ColumnExpr(`p.created_at AS "created_at"`).
+		Join(`JOIN (?) AS "work" ON "work"."person_id" = "p"."party_id"`, held).
+		ColumnExpr(`"p"."id" AS "id"`).
+		ColumnExpr(`"p"."identity" AS "identity"`).
+		ColumnExpr(`COALESCE("p"."display_name", '') AS "name"`).
+		ColumnExpr(`"p"."last_seen_at" AS "last_seen_at"`).
+		ColumnExpr(`"p"."created_at" AS "created_at"`).
 		ColumnExpr(`COUNT(*) AS "holding"`).
 		// Never signed in counts too — somebody granted a role and given work
 		// who has not arrived is exactly the case worth raising — but it is
@@ -537,11 +537,11 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 		// The same shape as a build declared and never scanned, which is
 		// measured from its declaration for exactly this reason.
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("p.last_seen_at IS NOT NULL AND p.last_seen_at < ?", since).
-				WhereOr("p.last_seen_at IS NULL AND p.created_at < ?", since)
+			return q.WhereOr(`"p"."last_seen_at" IS NOT NULL AND "p"."last_seen_at" < ?`, since).
+				WhereOr(`"p"."last_seen_at" IS NULL AND "p"."created_at" < ?`, since)
 		}).
-		GroupExpr("p.id, p.identity, p.display_name, p.last_seen_at, p.created_at").
-		OrderExpr("holding DESC, p.identity").
+		GroupExpr(`"p"."id", "p"."identity", "p"."display_name", "p"."last_seen_at", "p"."created_at"`).
+		OrderExpr(`holding DESC, "p"."identity"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read who is away and still holding work: %w", err)
 	}

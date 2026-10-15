@@ -53,8 +53,8 @@ func RatingsIn(ctx context.Context, db bun.IDB, products, issues []int64) (map[R
 	var rows []IssueRating
 	if err := db.NewSelect().Model(&rows).
 		Column("vulnerability_id", "product_id", "severity").
-		Where("product_id IN (?)", bun.List(products)).
-		Where("vulnerability_id IN (?)", bun.List(issues)).
+		Where(`"product_id" IN (?)`, bun.List(products)).
+		Where(`"vulnerability_id" IN (?)`, bun.List(issues)).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these products rate these issues: %w", err)
 	}
@@ -83,13 +83,13 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 	var products []int64
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
-		GroupExpr("st.product_id").
-		OrderExpr("st.product_id").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id"`).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
+		GroupExpr(`"st"."product_id"`).
+		OrderExpr(`"st"."product_id"`).
 		Scan(ctx, &products)
 	if err != nil {
 		return nil, fmt.Errorf("read which products hold this issue: %w", err)
@@ -103,9 +103,9 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 // Written as a condition on the target rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined
 // update the same way.
-const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS "tg"
-	JOIN "stream" AS "st" ON st.id = tg.stream_id
-	WHERE st.product_id = ?)`
+const inThisProduct = `"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
+	JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+	WHERE "st"."product_id" = ?)`
 
 // inThisProductAs is the same condition over a qualified column, for the reads
 // that alias the table they narrow.
@@ -113,7 +113,7 @@ const inThisProduct = `target_id IN (SELECT tg.id FROM "target" AS "tg"
 // Named rather than written out, so every read that narrows a target to a
 // product asks it in one spelling.
 func inThisProductAs(column string) string {
-	return column + ` IN (SELECT tg.id FROM "target" AS "tg"
-	JOIN "stream" AS "st" ON st.id = tg.stream_id
-	WHERE st.product_id = ?)`
+	return column + ` IN (SELECT "tg"."id" FROM "target" AS "tg"
+	JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+	WHERE "st"."product_id" = ?)`
 }

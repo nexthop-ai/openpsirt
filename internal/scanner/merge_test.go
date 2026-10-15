@@ -150,8 +150,8 @@ func (f *runFixture) decisionRows(t *testing.T) map[int64]recorded {
 	t.Helper()
 	var rows []recorded
 	if err := f.db.DB.NewSelect().TableExpr(`"decision" AS "de"`).
-		ColumnExpr("de.id, de.claim_id, de.vulnerability_id, de.place_identity").
-		ColumnExpr("de.state, de.proposed_by, de.proposed_at").
+		ColumnExpr(`"de"."id", "de"."claim_id", "de"."vulnerability_id", "de"."place_identity"`).
+		ColumnExpr(`"de"."state", "de"."proposed_by", "de"."proposed_at"`).
 		Scan(t.Context(), &rows); err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +509,7 @@ func TestAMergeMeetingTwoRatingsThatAgreeKeepsTheNewerAndTellsNobody(t *testing.
 		f.reporting(t, named(national, libnl), named(advisory, swss, national))
 
 		var rows []finding.Assessment
-		if err := f.db.DB.NewSelect().Model(&rows).OrderExpr("id").Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&rows).OrderExpr(`"id"`).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, row := range rows {
@@ -615,7 +615,7 @@ func (f *runFixture) openFindings(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id = ?", f.target).Where("closed_at IS NULL").
+		Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}

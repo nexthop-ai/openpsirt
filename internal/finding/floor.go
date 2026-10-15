@@ -235,8 +235,8 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// issues the line admits. So a query this narrows can stay on
 		// finding's covering index.
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("f.urgency >= ?", int64(exploiting)).
-				WhereOr("f.vulnerability_id IN (?)",
+			return q.WhereOr(`"f"."urgency" >= ?`, int64(exploiting)).
+				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 						Join(rating.Here, f.ProductID).
 						Column("v.id").
@@ -276,8 +276,8 @@ func FloorFor(ctx context.Context, db bun.IDB, productID int64) (Floor, error) {
 	}
 	err := db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		ColumnExpr("p.triage_floor").
-		Where("p.id = ?", productID).
+		ColumnExpr(`"p"."triage_floor"`).
+		Where(`"p"."id" = ?`, productID).
 		Scan(ctx, &stated)
 	if err != nil {
 		return Floor{}, fmt.Errorf("read what this product triages: %w", err)

@@ -18,9 +18,9 @@ func (s *Store) ProductOf(ctx context.Context, targetID int64) (int64, error) {
 	var productID int64
 	err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", targetID).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id"`).
+		Where(`"tg"."id" = ?`, targetID).
 		Scan(ctx, &productID)
 	if err != nil {
 		return 0, missingOr(err, fmt.Sprintf("build %d", targetID),

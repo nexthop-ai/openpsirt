@@ -106,32 +106,32 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		Join(`JOIN "product" AS "pr" ON pr.id = st.product_id`).
-		ColumnExpr(`de.id AS "decision_id"`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
+		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`de.product_id AS "product_id"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		Apply(catalog.BuildNames("pr", "st", "va")).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`f.consumer_id AS "consumer_id"`).
-		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
-		ColumnExpr(`f.fix_state AS "fix_state"`).
-		ColumnExpr(`f.fixed_in AS "fixed_in"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		Where("de.id IN (?)", bun.List(ids)).
-		Where("st.product_id = de.product_id").
-		Where("f.closed_at IS NULL").
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
+		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
+		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		Where(`"de"."id" IN (?)`, bun.List(ids)).
+		Where(`"st"."product_id" = "de"."product_id"`).
+		Where(`"f"."closed_at" IS NULL`).
 		Apply(readableFindingsBy(subject, "f", "st.product_id")).
-		OrderExpr("de.id, exact DESC, st.name, va.name, c.name").
+		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", "c"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these decisions are about: %w", err)
@@ -160,7 +160,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	var issues []finding.Vulnerability
 	if err := s.db.NewSelect().Model(&issues).
-		Where("id IN (?)", bun.List(wanted)).Scan(ctx); err != nil {
+		Where(`"id" IN (?)`, bun.List(wanted)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
 	// A flaw recorded where this reader may not read it wrote its summary
@@ -202,18 +202,18 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.vulnerability_id IN (?)", bun.List(wanted)).
-		Where("f.component_id IN (?)", bun.List(components)).
-		Where("f.closed_at IS NULL").
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(wanted)).
+		Where(`"f"."component_id" IN (?)`, bun.List(components)).
+		Where(`"f"."closed_at" IS NULL`).
 		Apply(readableFindingsBy(subject, "f", "st.product_id")).
-		GroupExpr("f.target_id, f.vulnerability_id, f.component_id").
+		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &counts); err != nil {
 		return nil, fmt.Errorf("count where these sit: %w", err)
 	}
@@ -244,25 +244,25 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`f.component_id AS "component_id"`).
-		ColumnExpr(`COUNT(DISTINCT f.place_identity) AS "decided"`).
-		Where("de.claim_id IN (?)", bun.List(claims)).
-		Where("de.live_key IS NOT NULL").
-		Where("st.product_id = de.product_id").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"f"."target_id" AS "target_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."place_identity") AS "decided"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(claims)).
+		Where(`"de"."live_key" IS NOT NULL`).
+		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
-		Where("f.target_id IN (?)", bun.List(targets)).
-		Where("f.component_id IN (?)", bun.List(components)).
-		Where("f.closed_at IS NULL").
+		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
+		Where(`"f"."component_id" IN (?)`, bun.List(components)).
+		Where(`"f"."closed_at" IS NULL`).
 		Apply(readableFindingsBy(subject, "f", "st.product_id")).
-		GroupExpr("de.claim_id, f.target_id, f.vulnerability_id, f.component_id").
+		GroupExpr(`"de"."claim_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &covered); err != nil {
 		return nil, fmt.Errorf("count what these claims cover: %w", err)
 	}

@@ -341,8 +341,8 @@ func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
 	out, args := notReadableWhere(subject, "dn")
 	var ids []int64
 	if err := s.db.NewSelect().TableExpr(`"decision" AS "dn"`).
-		ColumnExpr("DISTINCT dn.claim_id").
-		Where("dn.claim_id IN (?)", bun.List(claims)).
+		ColumnExpr(`DISTINCT "dn"."claim_id"`).
+		Where(`"dn"."claim_id" IN (?)`, bun.List(claims)).
 		Where(out, args...).
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which claims reach past what you may read: %w", err)

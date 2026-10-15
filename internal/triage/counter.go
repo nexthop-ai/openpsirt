@@ -89,14 +89,14 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 	}
 	elsewhere := s.db.NewSelect().Model((*Decision)(nil)).
 		Join(finding.DecisionIssue).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		ColumnExpr(`dv.issue_id AS "vulnerability_id"`).
-		ColumnExpr(`cl.outcome AS "outcome"`).
-		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."place_identity") AS "places"`).
 		Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(issues)).
-		Where("de.state = ?", Approved).
-		Where("de.live_key IS NOT NULL").
-		GroupExpr("dv.issue_id, cl.outcome")
+		Where(`"de"."state" = ?`, Approved).
+		Where(`"de"."live_key" IS NOT NULL`).
+		GroupExpr(`"dv"."issue_id", "cl"."outcome"`)
 	if err := readableBy(elsewhere, subject, "de").Scan(ctx, &agreed); err != nil {
 		return nil, fmt.Errorf("read what was decided about this elsewhere: %w", err)
 	}
@@ -118,16 +118,16 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 	}
 	undecided := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
-		Where("f.closed_at IS NULL").
-		Where("f.place_identity IN (?)", bun.List(places)).
-		Where("st.product_id IN (?)", bun.List(products)).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."place_identity" IN (?)`, bun.List(places)).
+		Where(`"st"."product_id" IN (?)`, bun.List(products)).
 		// The issue before the decision, and CROSS JOIN ... WHERE is what fixes
 		// that order on SQLite: the decision is then reached through its index
 		// on product, issue and place. Joined the other way, SQLite reads every
@@ -136,12 +136,12 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		// decisions, against 0.016 s this way.
 		Where(`NOT EXISTS (SELECT 1 FROM "vulnerability" AS "dv"
 			CROSS JOIN "decision" AS "de"
-			JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			WHERE de.vulnerability_id = dv.id
+			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
+			WHERE "de"."vulnerability_id" = "dv"."id"
 			  AND ` + finding.DecisionAt("st.product_id") + `
-			  AND de.live_key IS NOT NULL
+			  AND "de"."live_key" IS NOT NULL
 			  AND ` + finding.KeyMatches + `)`).
-		GroupExpr("st.product_id, f.place_identity")
+		GroupExpr(`"st"."product_id", "f"."place_identity"`)
 	if err := readableFindings(undecided, subject, "f", "st.product_id").
 		Scan(ctx, &open); err != nil {
 		return nil, fmt.Errorf("read what else is undecided there: %w", err)

@@ -91,14 +91,14 @@ func (l *Leases) takeIn(ctx context.Context, tx bun.Tx,
 	name, holder string, now time.Time, until time.Duration) (bool, error) {
 
 	res, err := tx.NewUpdate().Model((*Lease)(nil)).
-		Set("held_by = ?", holder).
-		Set("held_until = ?", now.Add(until)).
-		Where("name = ?", name).
+		Set(`"held_by" = ?`, holder).
+		Set(`"held_until" = ?`, now.Add(until)).
+		Where(`"name" = ?`, name).
 		WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
 			return u.
-				WhereOr("held_by IS NULL").
-				WhereOr("held_by = ?", holder).
-				WhereOr("held_until < ?", now)
+				WhereOr(`"held_by" IS NULL`).
+				WhereOr(`"held_by" = ?`, holder).
+				WhereOr(`"held_until" < ?`, now)
 		}).
 		Exec(ctx)
 	if err != nil {
@@ -157,10 +157,10 @@ func (l *Leases) Await(ctx context.Context, name, holder string, until, poll tim
 func (l *Leases) Release(ctx context.Context, name, holder string) error {
 	return database.InTransaction(ctx, l.db, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewUpdate().Model((*Lease)(nil)).
-			Set("held_by = NULL").
-			Set("held_until = NULL").
-			Where("name = ?", name).
-			Where("held_by = ?", holder).
+			Set(`"held_by" = NULL`).
+			Set(`"held_until" = NULL`).
+			Where(`"name" = ?`, name).
+			Where(`"held_by" = ?`, holder).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("hand back the lease on %s: %w", name, err)

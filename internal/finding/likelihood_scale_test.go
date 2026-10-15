@@ -64,7 +64,7 @@ func TestMeasureALikelihoodDay(t *testing.T) {
 			t.Fatal(err)
 		}
 		took := time.Since(start)
-		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET likelihood_ppm`)
+		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET "likelihood_ppm"`)
 		var ordered, reranked int
 		var orderedRows, rerankedRows int64
 		asked.mu.Lock()
@@ -72,7 +72,7 @@ func TestMeasureALikelihoodDay(t *testing.T) {
 			if !strings.HasPrefix(each.query, `UPDATE "finding" AS "f" SET `) {
 				continue
 			}
-			if strings.HasPrefix(each.query, `UPDATE "finding" AS "f" SET urgency = (CASE WHEN`) {
+			if strings.HasPrefix(each.query, `UPDATE "finding" AS "f" SET "urgency" = (CASE WHEN`) {
 				reranked++
 				rerankedRows += each.matched
 			} else {

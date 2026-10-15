@@ -106,8 +106,8 @@ func (s *Store) GrantRole(ctx context.Context, personID, productID int64, role R
 
 func (s *Store) holds(ctx context.Context, personID, productID int64, role Role) (bool, error) {
 	n, err := s.db.NewSelect().Model((*Grant)(nil)).
-		Where("person_id = ?", personID).Where("product_id = ?", productID).
-		Where("role = ?", role).Where("active = ?", true).Count(ctx)
+		Where(`"person_id" = ?`, personID).Where(`"product_id" = ?`, productID).
+		Where(`"role" = ?`, role).Where(`"active" = ?`, true).Count(ctx)
 	return n > 0, err
 }
 
@@ -144,7 +144,7 @@ func (s *Store) People(ctx context.Context) ([]Account, map[int64][]Grant, error
 func (s *Store) Grants(ctx context.Context, personID int64) ([]Grant, error) {
 	var grants []Grant
 	if err := s.db.NewSelect().Model(&grants).
-		Where("person_id = ?", personID).Order("product_id").Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Order("product_id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what they hold: %w", err)
 	}
 	return grants, nil
@@ -157,9 +157,9 @@ func (s *Store) Grants(ctx context.Context, personID int64) ([]Grant, error) {
 // by keeping a permission that no longer applies.
 func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Role) error {
 	res, err := s.db.NewDelete().Model((*Grant)(nil)).
-		Where("person_id = ?", personID).
-		Where("product_id = ?", productID).
-		Where("role = ?", role).Exec(ctx)
+		Where(`"person_id" = ?`, personID).
+		Where(`"product_id" = ?`, productID).
+		Where(`"role" = ?`, role).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("withdraw %q: %w", role, err)
 	}
@@ -193,8 +193,8 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	// every product is a role held here, so withdrawing their last per-product
 	// grant does not leave their work unreachable.
 	held, err := holdingAny(s.db.NewSelect().
-		TableExpr(`"person" AS "p"`).ColumnExpr("p.id").
-		Where("p.id = ?", personID), "p.id", Roles(), productID).Exists(ctx)
+		TableExpr(`"person" AS "p"`).ColumnExpr(`"p"."id"`).
+		Where(`"p"."id" = ?`, personID), "p.id", Roles(), productID).Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what they still hold: %w", err)
 	}

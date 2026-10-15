@@ -124,8 +124,8 @@ func TestAMentionOnUndisclosedWorkReachesNobodyWhoMayNotSeeIt(t *testing.T) {
 		// of what they read: a row about undisclosed work held for somebody
 		// who may not read it is one step from being shown.
 		held, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
-			Join(`JOIN "person" AS "p" ON p.id = n.person_id`).
-			Where("p.identity = ?", "reader").Where("n.kind = ?", "mentioned").Count(t.Context())
+			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
+			Where(`"p"."identity" = ?`, "reader").Where(`"n"."kind" = ?`, "mentioned").Count(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -196,7 +196,7 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, error) {
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
-		Where("secret_hash = ?", hashSecret(presented)).Scan(ctx); err != nil {
+		Where(`"secret_hash" = ?`, hashSecret(presented)).Scan(ctx); err != nil {
 		return Subject{}, database.FromRead(err, ErrDenied, "look up a token")
 	}
 	if token.RevokedAt != nil {
@@ -207,7 +207,7 @@ func (s *Store) ResolveToken(ctx context.Context, presented string) (Subject, er
 	}
 
 	person := new(Account)
-	if err := s.db.NewSelect().Model(person).Where("id = ?", token.PersonID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(person).Where(`"id" = ?`, token.PersonID).Scan(ctx); err != nil {
 		// The account is gone, so the token is too. A read that failed says
 		// nothing about either.
 		return Subject{}, database.FromRead(err, ErrDenied, "look up whose token this is")
@@ -306,7 +306,7 @@ var ErrTokenNamed = refusal.New("you already hold a token by that name that is n
 func (s *Store) Tokens(ctx context.Context, personID int64) ([]Token, error) {
 	var tokens []Token
 	if err := s.db.NewSelect().Model(&tokens).
-		Where("person_id = ?", personID).Order("name ASC").Scan(ctx); err != nil {
+		Where(`"person_id" = ?`, personID).Order("name ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the tokens: %w", err)
 	}
 	return tokens, nil
@@ -329,9 +329,9 @@ func (s *Store) AllTokens(ctx context.Context) ([]Token, error) {
 func (s *Store) RevokeToken(ctx context.Context, id int64) error {
 	revoked := s.now().Truncate(time.Microsecond)
 	result, err := s.db.NewUpdate().Model((*Token)(nil)).
-		Set("revoked_at = ?", revoked).
-		Set("live_name = NULL").
-		Where("id = ?", id).Where("revoked_at IS NULL").Exec(ctx)
+		Set(`"revoked_at" = ?`, revoked).
+		Set(`"live_name" = NULL`).
+		Where(`"id" = ?`, id).Where(`"revoked_at" IS NULL`).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("revoke a token: %w", err)
 	}
@@ -348,8 +348,8 @@ func (s *Store) TokenByName(ctx context.Context, personID int64, name string) (*
 	name = credentialNamed(name)
 	token := new(Token)
 	if err := s.db.NewSelect().Model(token).
-		Where("person_id = ?", personID).Where("name = ?", name).
-		OrderExpr("CASE WHEN live_name IS NULL THEN 1 ELSE 0 END, id DESC").
+		Where(`"person_id" = ?`, personID).Where(`"name" = ?`, name).
+		OrderExpr(`CASE WHEN "live_name" IS NULL THEN 1 ELSE 0 END, "id" DESC`).
 		Limit(1).Scan(ctx); err != nil {
 		return nil, database.FromRead(err,
 			fmt.Errorf("no token of yours is called %q: %w", name, ErrNoSuchToken),

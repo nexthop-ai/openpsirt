@@ -298,8 +298,8 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
 	if root != "" {
-		if _, err := r.DB.DB.NewUpdate().Table("scan").Set("root_identifier = ?", root).
-			Where("id = ?", scan.ID).Exec(ctx); err != nil {
+		if _, err := r.DB.DB.NewUpdate().Table("scan").Set(`"root_identifier" = ?`, root).
+			Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -148,9 +148,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// connection, which one engine tolerates and another refuses.
 		var highest int
 		if err := tx.NewSelect().Model((*Issuance)(nil)).
-			ColumnExpr("COALESCE(MAX(ordinal), 0)").
-			Where("target_id = ?", target.ID).
-			Where("kind = ?", kind).
+			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+			Where(`"target_id" = ?`, target.ID).
+			Where(`"kind" = ?`, kind).
 			Scan(ctx, &highest); err != nil {
 			return err
 		}
@@ -226,14 +226,14 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	var rows []Went
 	err = s.idb().NewSelect().
 		TableExpr(`"vex_issuance" AS "vi"`).
-		Join(`JOIN "person" AS "pe" ON pe.id = vi.issued_by`).
-		ColumnExpr(`vi.ordinal AS "ordinal"`).
-		ColumnExpr(`vi.digest AS "digest"`).
-		ColumnExpr(`pe.identity AS "issued_by"`).
-		ColumnExpr(`vi.issued_at AS "issued_at"`).
-		Where("vi.target_id = ?", target.ID).
-		Where("vi.kind = ?", kind).
-		OrderExpr("vi.ordinal ASC").
+		Join(`JOIN "person" AS "pe" ON "pe"."id" = "vi"."issued_by"`).
+		ColumnExpr(`"vi"."ordinal" AS "ordinal"`).
+		ColumnExpr(`"vi"."digest" AS "digest"`).
+		ColumnExpr(`"pe"."identity" AS "issued_by"`).
+		ColumnExpr(`"vi"."issued_at" AS "issued_at"`).
+		Where(`"vi"."target_id" = ?`, target.ID).
+		Where(`"vi"."kind" = ?`, kind).
+		OrderExpr(`"vi"."ordinal" ASC`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what has gone out: %w", err)
@@ -261,9 +261,9 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	var last string
 	err = s.idb().NewSelect().Model((*Issuance)(nil)).
 		Column("digest").
-		Where("target_id = ?", target.ID).
-		Where("kind = ?", kind).
-		OrderExpr("ordinal DESC").
+		Where(`"target_id" = ?`, target.ID).
+		Where(`"kind" = ?`, kind).
+		OrderExpr(`"ordinal" DESC`).
 		Limit(1).
 		Scan(ctx, &last)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -299,9 +299,9 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject,
 	var body string
 	err = s.idb().NewSelect().Model((*Issuance)(nil)).
 		Column("document").
-		Where("target_id = ?", target.ID).
-		Where("kind = ?", kind).
-		Where("ordinal = ?", ordinal).
+		Where(`"target_id" = ?`, target.ID).
+		Where(`"kind" = ?`, kind).
+		Where(`"ordinal" = ?`, ordinal).
 		Limit(1).
 		Scan(ctx, &body)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -326,9 +326,9 @@ var ErrNoSuchRevision = refusal.New("no document went out as that revision")
 func (s *Store) revision(ctx context.Context, targetID int64, kind Kind) (int, error) {
 	var highest int
 	err := s.idb().NewSelect().Model((*Issuance)(nil)).
-		ColumnExpr("COALESCE(MAX(ordinal), 0)").
-		Where("target_id = ?", targetID).
-		Where("kind = ?", kind).
+		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+		Where(`"target_id" = ?`, targetID).
+		Where(`"kind" = ?`, kind).
 		Scan(ctx, &highest)
 	if err != nil {
 		return 0, fmt.Errorf("read which revision this is: %w", err)
@@ -412,7 +412,7 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 
 func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
-		Join(`JOIN "target" AS "tg" ON tg.id = vi.target_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "vi"."target_id"`).
 		Where(where, id).
 		Exists(ctx)
 	if err != nil {
@@ -439,8 +439,8 @@ func stillNamed(ctx context.Context, tx bun.IDB, named *catalog.Named) error {
 		{(*catalog.Variant)(nil), named.VariantID, named.Variant},
 	} {
 		result, err := tx.NewUpdate().Model(level.model).
-			Set("name = name").
-			Where("id = ?", level.id).Where("name = ?", level.name).Exec(ctx)
+			Set(`"name" = "name"`).
+			Where(`"id" = ?`, level.id).Where(`"name" = ?`, level.name).Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("confirm what the build is called: %w", err)
 		}

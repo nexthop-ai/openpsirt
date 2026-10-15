@@ -247,8 +247,8 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 		}
 		if err := tx.NewSelect().Model((*FlawReport)(nil)).
 			Column("fr.id", "fr.reference").
-			Where("fr.product_id = ?", productID).
-			Where("fr.reference IN (?)", bun.List(named)).
+			Where(`"fr"."product_id" = ?`, productID).
+			Where(`"fr"."reference" IN (?)`, bun.List(named)).
 			Scan(ctx, &found); err != nil {
 			return fmt.Errorf("read the reports named: %w", err)
 		}
@@ -290,14 +290,14 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 		}
 
 		update := tx.NewUpdate().Model((*FlawReport)(nil)).
-			Set("ruling_id = ?", ruling.ID).
-			Where("id IN (?)", bun.List(ids)).
+			Set(`"ruling_id" = ?`, ruling.ID).
+			Where(`"id" IN (?)`, bun.List(ids)).
 			// Whether each is still unanswered is asked here, in the write,
 			// so two people ruling at once cannot both succeed.
-			Where("ruling_id IS NULL").
-			Where("vulnerability_id IS NULL")
+			Where(`"ruling_id" IS NULL`).
+			Where(`"vulnerability_id" IS NULL`)
 		if ruling.SettledAt != nil {
-			update = update.Set("evaluated_at = ?", now).Set("evaluated_by = ?", subject.ID)
+			update = update.Set(`"evaluated_at" = ?`, now).Set(`"evaluated_by" = ?`, subject.ID)
 		}
 		res, err := update.Exec(ctx)
 		if err != nil {
@@ -311,9 +311,9 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 			var held []string
 			if err := tx.NewSelect().Model((*FlawReport)(nil)).
 				Column("fr.reference").
-				Where("fr.id IN (?)", bun.List(ids)).
-				Where("fr.ruling_id IS NULL OR fr.ruling_id <> ?", ruling.ID).
-				OrderExpr("fr.reference").
+				Where(`"fr"."id" IN (?)`, bun.List(ids)).
+				Where(`"fr"."ruling_id" IS NULL OR "fr"."ruling_id" <> ?`, ruling.ID).
+				OrderExpr(`"fr"."reference"`).
 				Scan(ctx, &held); err != nil {
 				return fmt.Errorf("read which reports are already answered: %w", err)
 			}
@@ -364,22 +364,22 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	standing, held := InForce()
 	open, err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		ColumnExpr("f.id").
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("st.product_id = ?", productID).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		ColumnExpr(`"f"."id"`).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."closed_at" IS NULL`).
 		Where(NotArguedAway).
 		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
-			JOIN "claim" AS "cl" ON cl.id = de.claim_id
+			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"
 			WHERE `+DecisionAt("st.product_id")+`
-			  AND de.live_key IS NOT NULL
+			  AND "de"."live_key" IS NOT NULL
 			  AND `+KeyMatches+`
 			  AND `+standing+`
-			  AND cl.outcome IN (?))`, append(held, bun.List(Dismissing))...).
+			  AND "cl"."outcome" IN (?))`, append(held, bun.List(Dismissing))...).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether that issue is open here: %w", err)
@@ -443,12 +443,12 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 			return ErrOwnRuling
 		}
 		res, err := tx.NewUpdate().Model((*ReportRuling)(nil)).
-			Set("approved_by = ?", subject.ID).
-			Set("approved_at = ?", now).
-			Set("settled_at = ?", now).
-			Where("id = ?", rulingID).
-			Where("settled_at IS NULL").
-			Where("withdrawn_at IS NULL").
+			Set(`"approved_by" = ?`, subject.ID).
+			Set(`"approved_at" = ?`, now).
+			Set(`"settled_at" = ?`, now).
+			Where(`"id" = ?`, rulingID).
+			Where(`"settled_at" IS NULL`).
+			Where(`"withdrawn_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("approve a ruling: %w", err)
@@ -464,9 +464,9 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 		// did. Written now, so that a report waiting on a second person does
 		// not read as judged.
 		if _, err := tx.NewUpdate().Model((*FlawReport)(nil)).
-			Set("evaluated_at = ?", ruling.ProposedAt).
-			Set("evaluated_by = ?", ruling.ProposedBy).
-			Where("ruling_id = ?", rulingID).
+			Set(`"evaluated_at" = ?`, ruling.ProposedAt).
+			Set(`"evaluated_by" = ?`, ruling.ProposedBy).
+			Where(`"ruling_id" = ?`, rulingID).
 			Exec(ctx); err != nil {
 			return fmt.Errorf("record who judged those reports: %w", err)
 		}
@@ -506,10 +506,10 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 			return err
 		}
 		res, err := tx.NewUpdate().Model((*ReportRuling)(nil)).
-			Set("withdrawn_by = ?", subject.ID).
-			Set("withdrawn_at = ?", now).
-			Where("id = ?", rulingID).
-			Where("withdrawn_at IS NULL").
+			Set(`"withdrawn_by" = ?`, subject.ID).
+			Set(`"withdrawn_at" = ?`, now).
+			Where(`"id" = ?`, rulingID).
+			Where(`"withdrawn_at" IS NULL`).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("withdraw a ruling: %w", err)
@@ -522,10 +522,10 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 			return ErrWithdrawn
 		}
 		if _, err := tx.NewUpdate().Model((*FlawReport)(nil)).
-			Set("ruling_id = NULL").
-			Set("evaluated_at = NULL").
-			Set("evaluated_by = NULL").
-			Where("ruling_id = ?", rulingID).
+			Set(`"ruling_id" = NULL`).
+			Set(`"evaluated_at" = NULL`).
+			Set(`"evaluated_by" = NULL`).
+			Where(`"ruling_id" = ?`, rulingID).
 			Exec(ctx); err != nil {
 			return fmt.Errorf("return those reports to the inbox: %w", err)
 		}
@@ -543,8 +543,8 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 func rulingIn(ctx context.Context, db bun.IDB, productID, rulingID int64) (*ReportRuling, error) {
 	ruling := new(ReportRuling)
 	err := named(db.NewSelect().Model(ruling)).
-		Where("rr.id = ?", rulingID).
-		Where("rr.product_id = ?", productID).
+		Where(`"rr"."id" = ?`, rulingID).
+		Where(`"rr"."product_id" = ?`, productID).
 		Scan(ctx)
 	switch {
 	case database.IsNoRows(err):
@@ -578,8 +578,8 @@ func (s *Store) RulingBy(ctx context.Context, subject access.Subject,
 // named selects a ruling with the name of its product.
 func named(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.ColumnExpr("rr.*").
-		ColumnExpr(`p.name AS "product"`).
-		Join(`JOIN "product" AS "p" ON p.id = rr.product_id`)
+		ColumnExpr(`"p"."name" AS "product"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "rr"."product_id"`)
 }
 
 // RulingsIn is one product's rulings, newest first, with how many there are.
@@ -635,18 +635,18 @@ func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	}
 	var rows []ReportRuling
 	q := named(s.db.NewSelect().Model(&rows)).
-		Where("rr.product_id IN (?)", bun.List(products))
+		Where(`"rr"."product_id" IN (?)`, bun.List(products))
 	if asked.Waiting || asked.Approvable {
-		q = q.Where("rr.settled_at IS NULL").Where("rr.withdrawn_at IS NULL")
+		q = q.Where(`"rr"."settled_at" IS NULL`).Where(`"rr"."withdrawn_at" IS NULL`)
 	}
 	if asked.Approvable {
-		q = q.Where("rr.proposed_by <> ?", subject.ID)
+		q = q.Where(`"rr"."proposed_by" <> ?`, subject.ID)
 	}
 	if asked.Since != nil {
-		q = q.Where("rr.proposed_at >= ?", *asked.Since)
+		q = q.Where(`"rr"."proposed_at" >= ?`, *asked.Since)
 	}
 	if asked.Until != nil {
-		q = q.Where("rr.proposed_at < ?", *asked.Until)
+		q = q.Where(`"rr"."proposed_at" < ?`, *asked.Until)
 	}
 	total, err := q.Order("rr.proposed_at DESC", "rr.id DESC").
 		Limit(asked.Limit).Offset(asked.Offset).
@@ -700,11 +700,11 @@ func coveredBy(ctx context.Context, db bun.IDB, rulings []*ReportRuling) error {
 	}
 	if err := db.NewSelect().
 		TableExpr(`"report_ruled" AS "rd"`).
-		Join(`JOIN "flaw_report" AS "fr" ON fr.id = rd.flaw_report_id`).
-		ColumnExpr(`rd.ruling_id AS "ruling_id"`).
-		ColumnExpr(`fr.reference AS "reference"`).
-		Where("rd.ruling_id IN (?)", bun.List(ids)).
-		OrderExpr("fr.reference").
+		Join(`JOIN "flaw_report" AS "fr" ON "fr"."id" = "rd"."flaw_report_id"`).
+		ColumnExpr(`"rd"."ruling_id" AS "ruling_id"`).
+		ColumnExpr(`"fr"."reference" AS "reference"`).
+		Where(`"rd"."ruling_id" IN (?)`, bun.List(ids)).
+		OrderExpr(`"fr"."reference"`).
 		Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read which reports a ruling covers: %w", err)
 	}
@@ -737,7 +737,7 @@ func (s *Store) RulingsOf(ctx context.Context, reports []FlawReport) (map[int64]
 	}
 	var rows []ReportRuling
 	if err := s.db.NewSelect().Model(&rows).
-		Where("rr.id IN (?)", bun.List(ids)).
+		Where(`"rr"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what those reports were ruled: %w", err)
 	}
@@ -767,10 +767,10 @@ func (s *Store) DuplicatesOf(ctx context.Context, subject access.Subject,
 	}
 	var rows []FlawReport
 	if err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN "report_ruling" AS "rr" ON rr.id = fr.ruling_id`).
-		Where("fr.product_id = ?", productID).
-		Where("rr.disposition = ?", Duplicate).
-		Where("rr.duplicate_of = ?", vulnerabilityID).
+		Join(`JOIN "report_ruling" AS "rr" ON "rr"."id" = "fr"."ruling_id"`).
+		Where(`"fr"."product_id" = ?`, productID).
+		Where(`"rr"."disposition" = ?`, Duplicate).
+		Where(`"rr"."duplicate_of" = ?`, vulnerabilityID).
 		Order("fr.recorded_at DESC", "fr.id DESC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the duplicates of an issue: %w", err)

@@ -227,8 +227,8 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		// restate or withdraw.
 		var open []Claim
 		err := tx.NewSelect().Model(&open).
-			Where("target_id = ?", targetID).Where("closed_scan_id IS NULL").
-			Where("origin <> ?", Published).Scan(ctx)
+			Where(`"target_id" = ?`, targetID).Where(`"closed_scan_id" IS NULL`).
+			Where(`"origin" <> ?`, Published).Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what this build argued before: %w", err)
 		}
@@ -271,8 +271,8 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		if len(closing) > 0 {
 			err := database.IDsInBatches(ctx, closing, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Claim)(nil)).
-					Set("closed_scan_id = ?", scanID).
-					Where("id IN (?)", bun.List(batch)).Exec(ctx)
+					Set(`"closed_scan_id" = ?`, scanID).
+					Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 				return err
 			})
 			if err != nil {
@@ -309,11 +309,11 @@ func openClaims(ctx context.Context, db bun.IDB, targetID int64) ([]Claim, error
 	var rows []Claim
 	err := db.NewSelect().Model(&rows).
 		ColumnExpr("sup.*").
-		Join(`JOIN "target" AS "t" ON t.id = sup.target_id`).
-		Join(`JOIN "scan" AS "latest" ON latest.id = t.last_scan_id`).
-		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
-		ColumnExpr(`COALESCE(ss.restated_at, ss.uploaded_at, latest.received_at) AS "said"`).
-		Where("sup.target_id = ?", targetID).Where("sup.closed_scan_id IS NULL").
+		Join(`JOIN "target" AS "t" ON "t"."id" = "sup"."target_id"`).
+		Join(`JOIN "scan" AS "latest" ON "latest"."id" = "t"."last_scan_id"`).
+		Join(`LEFT JOIN "vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
+		ColumnExpr(`COALESCE("ss"."restated_at", "ss"."uploaded_at", "latest"."received_at") AS "said"`).
+		Where(`"sup"."target_id" = ?`, targetID).Where(`"sup"."closed_scan_id" IS NULL`).
 		Order("sup.id").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build argues: %w", err)
@@ -386,13 +386,13 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// What the build sent with its inventories. A claim taken from a
 		// document uploaded on its own is shown on the findings it covers,
 		// and it is held over no stretch of the build's own scans.
-		q = q.Where("sup.target_id = ?", targetID).Where("sup.origin <> ?", Published)
+		q = q.Where(`"sup"."target_id" = ?`, targetID).Where(`"sup"."origin" <> ?`, Published)
 		if name := strings.TrimSpace(component); name != "" {
 			// Matched on what the claim says it is about rather than on a
 			// component row, because a claim naming something this build does
 			// not carry is exactly the row somebody is looking for when they
 			// ask why a patch stopped working.
-			q = q.Where("sup.subject_folded = ?", graph.Folded(name))
+			q = q.Where(`"sup"."subject_folded" = ?`, graph.Folded(name))
 		}
 		return q
 	}
@@ -420,25 +420,25 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// The moment it was first said and the moment it stopped, read off the
 		// scans the interval is held against: the claim itself carries scan
 		// identifiers, and a screen needs moments.
-		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
-		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
+		Join(`JOIN "scan" AS "opened" ON "opened"."id" = "sup"."opened_scan_id"`).
+		Join(`LEFT JOIN "scan" AS "closed" ON "closed"."id" = "sup"."closed_scan_id"`).
 		Join(WordsJoin("sup")).
-		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
-		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
-		ColumnExpr(`COALESCE(sup.subject_version, '') AS "version"`).
-		ColumnExpr(`sup.status AS "status"`).
-		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
+		ColumnExpr(`"sup"."vulnerability" AS "vulnerability"`).
+		ColumnExpr(`COALESCE(NULLIF("sup"."subject_name", ''), "sup"."subject_purl") AS "subject"`).
+		ColumnExpr(`COALESCE("sup"."subject_version", '') AS "version"`).
+		ColumnExpr(`"sup"."status" AS "status"`).
+		ColumnExpr(`COALESCE("sup"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn + ` AS "statement"`).
-		ColumnExpr(`sup.origin AS "origin"`).
-		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
-		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
-		ColumnExpr(`COALESCE(sup.within_version, '') AS "within_version"`).
-		ColumnExpr(`opened.built_at AS "since"`).
-		ColumnExpr(`closed.built_at AS "until"`).
+		ColumnExpr(`"sup"."origin" AS "origin"`).
+		ColumnExpr(`COALESCE("sup"."within_purl", '') AS "within_purl"`).
+		ColumnExpr(`COALESCE("sup"."within_name", '') AS "within_name"`).
+		ColumnExpr(`COALESCE("sup"."within_version", '') AS "within_version"`).
+		ColumnExpr(`"opened"."built_at" AS "since"`).
+		ColumnExpr(`"closed"."built_at" AS "until"`).
 		// Anything still being said first, newest first within that: a claim
 		// that stopped is history and a claim that stands is the estate.
-		OrderExpr("CASE WHEN sup.closed_scan_id IS NULL THEN 0 ELSE 1 END, " +
-			"opened.built_at DESC, sup.id DESC").
+		OrderExpr(`CASE WHEN "sup"."closed_scan_id" IS NULL THEN 0 ELSE 1 END, ` +
+			`"opened"."built_at" DESC, "sup"."id" DESC`).
 		Limit(limit).Offset(offset)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what this build carries: %w", err)

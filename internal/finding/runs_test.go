@@ -268,9 +268,9 @@ func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 		// Closed findings are not offered: following one leads to a finding
 		// that is not there.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC()).
-			Set("closed_run_id = ?", f.run(t)).
-			Where("target_id = ?", f.target).Exec(t.Context()); err != nil {
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Set(`"closed_run_id" = ?`, f.run(t)).
+			Where(`"target_id" = ?`, f.target).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		closed, err := f.store.VersionsWithIssue(t.Context(), who, f.target, issue,
@@ -322,13 +322,13 @@ func (f *fixture) backdate(t *testing.T, runID int64, by time.Duration) {
 	t.Helper()
 	var started time.Time
 	if err := f.db.DB.NewSelect().TableExpr("\"scan_run\" AS \"r\"").
-		ColumnExpr("r.started_at").Where("r.id = ?", runID).
+		ColumnExpr(`"r"."started_at"`).Where(`"r"."id" = ?`, runID).
 		Scan(t.Context(), &started); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.DB.NewUpdate().TableExpr("\"scan_run\"").
-		Set("started_at = ?", started.Add(-by)).
-		Where("id = ?", runID).Exec(t.Context()); err != nil {
+		Set(`"started_at" = ?`, started.Add(-by)).
+		Where(`"id" = ?`, runID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -338,7 +338,7 @@ func (f *fixture) startedAt(t *testing.T, runID int64) time.Time {
 	t.Helper()
 	var started time.Time
 	if err := f.db.DB.NewSelect().TableExpr("\"scan_run\" AS \"r\"").
-		ColumnExpr("r.started_at").Where("r.id = ?", runID).
+		ColumnExpr(`"r"."started_at"`).Where(`"r"."id" = ?`, runID).
 		Scan(t.Context(), &started); err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +349,7 @@ func (f *fixture) startedAt(t *testing.T, runID int64) time.Time {
 func (f *fixture) assessment(t *testing.T, id int64) finding.Assessment {
 	t.Helper()
 	var held finding.Assessment
-	if err := f.db.DB.NewSelect().Model(&held).Where("id = ?", id).
+	if err := f.db.DB.NewSelect().Model(&held).Where(`"id" = ?`, id).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func (f *fixture) assessment(t *testing.T, id int64) finding.Assessment {
 func (f *fixture) liveAssessments(t *testing.T, vulnerabilityID int64) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().Model((*finding.Assessment)(nil)).
-		Where("live_vulnerability_id = ?", vulnerabilityID).Count(t.Context())
+		Where(`"live_vulnerability_id" = ?`, vulnerabilityID).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,9 +404,9 @@ func (f *fixture) productOf(t *testing.T, target int64) int64 {
 	var productID int64
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"target\" AS \"tg\"").
-		Join("JOIN \"stream\" AS \"st\" ON st.id = tg.stream_id").
-		ColumnExpr("st.product_id").
-		Where("tg.id = ?", target).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id"`).
+		Where(`"tg"."id" = ?`, target).
 		Scan(t.Context(), &productID); err != nil {
 		t.Fatal(err)
 	}
@@ -419,8 +419,8 @@ func (f *fixture) streamOf(t *testing.T, target int64) int64 {
 	var streamID int64
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"target\" AS \"tg\"").
-		ColumnExpr("tg.stream_id").
-		Where("tg.id = ?", target).
+		ColumnExpr(`"tg"."stream_id"`).
+		Where(`"tg"."id" = ?`, target).
 		Scan(t.Context(), &streamID); err != nil {
 		t.Fatal(err)
 	}
@@ -439,8 +439,8 @@ func (f *fixture) anotherVariant(t *testing.T, name string) int64 {
 	}
 	var streamID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"target\" AS \"tg\"").ColumnExpr("tg.stream_id").
-		Where("tg.id = ?", f.target).Scan(ctx, &streamID); err != nil {
+		TableExpr("\"target\" AS \"tg\"").ColumnExpr(`"tg"."stream_id"`).
+		Where(`"tg"."id" = ?`, f.target).Scan(ctx, &streamID); err != nil {
 		t.Fatal(err)
 	}
 	target, err := cat.TargetFor(ctx, streamID, variant.ID)
@@ -461,11 +461,11 @@ func (f *fixture) scopeOf(t *testing.T, targetID int64) finding.Scope {
 	}
 	if err := f.db.DB.NewSelect().
 		TableExpr("\"target\" AS \"tg\"").
-		Join("JOIN \"stream\" AS \"st\" ON st.id = tg.stream_id").
-		ColumnExpr("st.product_id AS \"product_id\"").
-		ColumnExpr("tg.stream_id AS \"stream_id\"").
-		ColumnExpr("tg.variant_id AS \"variant_id\"").
-		Where("tg.id = ?", targetID).Scan(t.Context(), &row); err != nil {
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"tg"."stream_id" AS "stream_id"`).
+		ColumnExpr(`"tg"."variant_id" AS "variant_id"`).
+		Where(`"tg"."id" = ?`, targetID).Scan(t.Context(), &row); err != nil {
 		t.Fatalf("look up build %d: %v", targetID, err)
 	}
 	return finding.Scope{
@@ -507,7 +507,7 @@ func TestARunThatWarnsWhileSucceedingKeepsWhatItSaid(t *testing.T) {
 		}
 
 		var kept finding.Run
-		if err := f.db.DB.NewSelect().Model(&kept).Where("id = ?", run).Scan(t.Context()); err != nil {
+		if err := f.db.DB.NewSelect().Model(&kept).Where(`"id" = ?`, run).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		if kept.Caution != said {
@@ -543,7 +543,7 @@ func TestARunsFailureKeepsTheScannersWordsAndHidesTheDatabases(t *testing.T) {
 				t.Fatal(err)
 			}
 			var kept finding.Run
-			if err := f.db.DB.NewSelect().Model(&kept).Where("id = ?", run).
+			if err := f.db.DB.NewSelect().Model(&kept).Where(`"id" = ?`, run).
 				Scan(t.Context()); err != nil {
 				t.Fatal(err)
 			}
@@ -580,8 +580,8 @@ func (f *fixture) backdateOpenings(t *testing.T, by time.Duration) {
 	t.Helper()
 	for _, row := range f.open(t) {
 		if _, err := f.db.DB.NewUpdate().TableExpr("\"finding\"").
-			Set("opened_at = ?", row.OpenedAt.Add(-by)).
-			Where("id = ?", row.ID).Exec(t.Context()); err != nil {
+			Set(`"opened_at" = ?`, row.OpenedAt.Add(-by)).
+			Where(`"id" = ?`, row.ID).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 	}

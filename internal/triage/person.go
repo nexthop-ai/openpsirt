@@ -53,7 +53,7 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	var out Record
 
 	proposed, err := s.db.NewSelect().Model((*Claim)(nil)).
-		Where("proposed_by = ?", personID).Count(ctx)
+		Where(`"proposed_by" = ?`, personID).Count(ctx)
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they proposed: %w", err)
 	}
@@ -61,22 +61,22 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	if proposed > 0 {
 		var at time.Time
 		if err := s.db.NewSelect().Model((*Claim)(nil)).
-			ColumnExpr("MAX(proposed_at)").
-			Where("proposed_by = ?", personID).Scan(ctx, &at); err != nil {
+			ColumnExpr(`MAX("proposed_at")`).
+			Where(`"proposed_by" = ?`, personID).Scan(ctx, &at); err != nil {
 			return Record{}, fmt.Errorf("read when they last proposed: %w", err)
 		}
 		out.LastProposedAt = &at
 	}
 
 	approved, err := s.db.NewSelect().Model((*Approval)(nil)).
-		Where("approved_by = ?", personID).Where("withdrawn_at IS NULL").Count(ctx)
+		Where(`"approved_by" = ?`, personID).Where(`"withdrawn_at" IS NULL`).Count(ctx)
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they agreed to: %w", err)
 	}
 	out.Approved = approved
 
 	withdrawn, err := s.db.NewSelect().Model((*Approval)(nil)).
-		Where("approved_by = ?", personID).Where("withdrawn_at IS NOT NULL").Count(ctx)
+		Where(`"approved_by" = ?`, personID).Where(`"withdrawn_at" IS NOT NULL`).Count(ctx)
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they took back: %w", err)
 	}
@@ -85,8 +85,8 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	if approved+withdrawn > 0 {
 		var at time.Time
 		if err := s.db.NewSelect().Model((*Approval)(nil)).
-			ColumnExpr("MAX(approved_at)").
-			Where("approved_by = ?", personID).Scan(ctx, &at); err != nil {
+			ColumnExpr(`MAX("approved_at")`).
+			Where(`"approved_by" = ?`, personID).Scan(ctx, &at); err != nil {
 			return Record{}, fmt.Errorf("read when they last agreed: %w", err)
 		}
 		out.LastApprovedAt = &at

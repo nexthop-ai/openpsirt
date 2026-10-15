@@ -360,8 +360,8 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			// row is taken first, as the graph's apply takes it, so a newer
 			// scan being applied has committed before this reads.
 			if _, err := tx.NewUpdate().Table("target").
-				Set("last_scan_id = last_scan_id").
-				Where("id = ?", scan.TargetID).Exec(ctx); err != nil {
+				Set(`"last_scan_id" = "last_scan_id"`).
+				Where(`"id" = ?`, scan.TargetID).Exec(ctx); err != nil {
 				return fmt.Errorf("take the build: %w", err)
 			}
 			newest, err := NewStore(tx).Newest(ctx, scan.TargetID)
@@ -376,7 +376,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			// the one the build last applied is not applied over it.
 			var last *int64
 			if err := tx.NewSelect().Table("target").Column("last_scan_id").
-				Where("id = ?", scan.TargetID).Scan(ctx, &last); err != nil {
+				Where(`"id" = ?`, scan.TargetID).Scan(ctx, &last); err != nil {
 				return fmt.Errorf("read what the build last applied: %w", err)
 			}
 			if last != nil && *last > scanID {
@@ -500,8 +500,8 @@ func (r *Reader) reinstate(ctx context.Context, reference string) error {
 	var shown int64
 	if err := r.db.NewSelect().
 		TableExpr(`"target" AS "t"`).
-		ColumnExpr("COALESCE(t.last_scan_id, 0)").
-		Where("t.id = ?", failed.TargetID).
+		ColumnExpr(`COALESCE("t"."last_scan_id", 0)`).
+		Where(`"t"."id" = ?`, failed.TargetID).
 		Scan(ctx, &shown); err != nil {
 		return fmt.Errorf("read what the build shows: %w", err)
 	}
@@ -510,9 +510,9 @@ func (r *Reader) reinstate(ctx context.Context, reference string) error {
 	}
 
 	pending, err := r.db.NewSelect().Model((*queue.Job)(nil)).
-		Where("kind = ?", queue.Parse).
-		Where("reference = ?", strconv.FormatInt(newest.ID, 10)).
-		Where("state IN (?)", bun.List([]queue.State{queue.Pending, queue.Running})).
+		Where(`"kind" = ?`, queue.Parse).
+		Where(`"reference" = ?`, strconv.FormatInt(newest.ID, 10)).
+		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
 		Count(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether the scan is still to be read: %w", err)

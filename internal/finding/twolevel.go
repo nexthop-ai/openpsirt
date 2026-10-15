@@ -133,7 +133,7 @@ func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.S
 	}
 	outer := db.NewSelect().
 		TableExpr(`(?) AS "f"`, inner).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`)
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`)
 	return f.narrowGroups(outer, overParts)
 }
 
@@ -175,9 +175,9 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	whole := apart
 	whole.decidedIssues = f.placedIssues
 	population := whole.narrowRows(rows).
-		ColumnExpr(`f.id AS "id"`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`f.consumer_id AS "consumer_id"`)
+		ColumnExpr(`"f"."id" AS "id"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`)
 	for _, key := range keys {
 		population = population.ColumnExpr(key.expr+` AS "`+key.name+`"`, key.args...)
 	}
@@ -192,7 +192,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	// 635 ms for the undecided page's grouping on PostgreSQL.
 	perPlace := f.comparesDecidedPlaces()
 	if perPlace {
-		places = places.GroupExpr("f2.id")
+		places = places.GroupExpr(`"f2"."id"`)
 	}
 	if f.decidedIssues != nil {
 		places = f.amongDecidedIssues(places, "dv.issue_id")
@@ -207,18 +207,18 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 		if !named {
 			panic("finding: a first level across products is keyed on the product")
 		}
-		places = places.Where("de.product_id = f2.product_id")
+		places = places.Where(`"de"."product_id" = "f2"."product_id"`)
 	} else {
-		places = places.Where("de.product_id = ?", f.ProductID)
+		places = places.Where(`"de"."product_id" = ?`, f.ProductID)
 	}
 	for _, key := range keys {
-		places = places.ColumnExpr(`f2.` + key.name + ` AS "` + key.name + `"`).GroupExpr("f2." + key.name)
+		places = places.ColumnExpr(`"f2"."` + key.name + `" AS "` + key.name + `"`).GroupExpr(`"f2"."` + key.name + `"`)
 	}
 	decided := places
 	if perPlace {
 		decided = db.NewSelect().TableExpr(`(?) AS "dp"`, places)
 		for _, key := range keys {
-			decided = decided.ColumnExpr(`dp.` + key.name).GroupExpr("dp." + key.name)
+			decided = decided.ColumnExpr(`"dp"."` + key.name + `"`).GroupExpr(`"dp"."` + key.name + `"`)
 		}
 		for _, flag := range decidedFlags {
 			decided = decided.ColumnExpr(`SUM(dp.` + flag + `) AS "` + flag + `"`)
@@ -238,7 +238,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	// column.
 	others := db.NewSelect().TableExpr(`(?) AS "d"`, decided)
 	for _, key := range keys {
-		others = others.ColumnExpr(`d.` + key.name + ` AS "` + key.name + `"`)
+		others = others.ColumnExpr(`"d"."` + key.name + `" AS "` + key.name + `"`)
 	}
 	for _, column := range columns {
 		none := "NULL"
@@ -254,7 +254,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	stacked := db.NewSelect().
 		TableExpr(`(SELECT * FROM (?) AS "parts" UNION ALL ?) AS "u"`, parts, others)
 	for _, key := range keys {
-		stacked = stacked.ColumnExpr(`u.` + key.name + ` AS "` + key.name + `"`).GroupExpr("u." + key.name)
+		stacked = stacked.ColumnExpr(`"u"."` + key.name + `" AS "` + key.name + `"`).GroupExpr(`"u"."` + key.name + `"`)
 	}
 	for _, column := range columns {
 		stacked = stacked.ColumnExpr(column.fold + `(u.` + column.name + `) AS "` + column.name + `"`)

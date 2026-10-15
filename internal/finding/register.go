@@ -134,7 +134,7 @@ func (s *Store) registerSize(ctx context.Context, subject access.Subject,
 	// Counted over the same statement the page reads, narrowing included:
 	// counted over the build instead, a filtered page said how many rows the
 	// build holds and every later offset was a page of a different list.
-	total, err := only.narrow(s.registerJoins(productID, narrow)).ColumnExpr("f.id").Count(ctx)
+	total, err := only.narrow(s.registerJoins(productID, narrow)).ColumnExpr(`"f"."id"`).Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count what this build holds: %w", err)
 	}
@@ -152,8 +152,8 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.TableExpr(`"finding" AS "f"`).
-			Where("f.target_id = ?", targetID).
-			Where("f.visibility IN (?)", bun.List(visible))
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	}, nil
 }
 
@@ -330,25 +330,25 @@ func (r Registering) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if len(r.Outcomes) > 0 {
 		// Asked of a judgment that is on the record, so a superseded claim's
 		// outcome does not answer for a place nothing stands at.
-		q = q.Where("("+onTheRecord+"COALESCE(cl.outcome, '') ELSE '' END) IN (?)",
+		q = q.Where("("+onTheRecord+`COALESCE("cl"."outcome", '') ELSE '' END) IN (?)`,
 			bun.List(r.Outcomes))
 	}
 	if r.Component != "" {
-		q = q.Where("c.name_folded = ?", graph.Folded(r.Component))
+		q = q.Where(`"c"."name_folded" = ?`, graph.Folded(r.Component))
 	}
 	if r.Issue != "" {
 		// Typed, so matched on the folded name the way the issue was stored.
-		q = q.Where("v.identifier_folded = ?", FoldIdentifier(r.Issue))
+		q = q.Where(`"v"."identifier_folded" = ?`, FoldIdentifier(r.Issue))
 	}
 	// Both sides asked for is both sides, which is the whole register.
 	if r.Open && !r.Closed {
-		q = q.Where("f.closed_at IS NULL")
+		q = q.Where(`"f"."closed_at" IS NULL`)
 	}
 	if r.Closed && !r.Open {
-		q = q.Where("f.closed_at IS NOT NULL")
+		q = q.Where(`"f"."closed_at" IS NOT NULL`)
 	}
 	if len(r.Because) > 0 {
-		q = q.Where("f.closed_because IN (?)", bun.List(r.Because))
+		q = q.Where(`"f"."closed_because" IN (?)`, bun.List(r.Because))
 	}
 	return q
 }
@@ -383,17 +383,17 @@ func (s *Store) registerJoins(productID int64,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) *bun.SelectQuery {
 
 	return narrow(s.db.NewSelect()).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The one decision on the record at the place, or none, filed under
 		// any issue read as the finding's.
 		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
 			AND `+onTheRecordHere, productID).
-		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id`)
+		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`)
 }
 
 // onTheRecordHere picks, among every decision row ever written at a place,
@@ -414,25 +414,25 @@ func (s *Store) registerJoins(productID int64,
 // otherwise the oldest.
 var onTheRecordHere = `((de.live_key IS NOT NULL AND ` + keyMatchesOn("de", outcomeOf("de")) + `
 	AND NOT EXISTS (SELECT 1 FROM "decision" AS "d3"
-		JOIN "vulnerability" AS "d3v" ON d3v.id = d3.vulnerability_id
-		WHERE d3.product_id = de.product_id
-		  AND d3v.issue_id = dv.issue_id
-		  AND d3.place_identity = de.place_identity
-		  AND d3.live_key IS NOT NULL
+		JOIN "vulnerability" AS "d3v" ON "d3v"."id" = "d3"."vulnerability_id"
+		WHERE "d3"."product_id" = "de"."product_id"
+		  AND "d3v"."issue_id" = "dv"."issue_id"
+		  AND "d3"."place_identity" = "de"."place_identity"
+		  AND "d3"."live_key" IS NOT NULL
 		  AND ` + keyMatchesOn("d3", outcomeOf("d3")) + `
 		  AND (` + rankOf("d3") + ` < ` + rankOf("de") + `
-		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND d3.id < de.id))))
-	OR (de.state = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
-		JOIN "vulnerability" AS "d2v" ON d2v.id = d2.vulnerability_id
-		WHERE d2.product_id = de.product_id
-		  AND d2v.issue_id = dv.issue_id
-		  AND d2.place_identity = de.place_identity
-		  AND ((d2.live_key IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
+		    OR (` + rankOf("d3") + ` = ` + rankOf("de") + ` AND "d3"."id" < "de"."id"))))
+	OR ("de"."state" = 'lapsed' AND NOT EXISTS (SELECT 1 FROM "decision" AS "d2"
+		JOIN "vulnerability" AS "d2v" ON "d2v"."id" = "d2"."vulnerability_id"
+		WHERE "d2"."product_id" = "de"."product_id"
+		  AND "d2v"."issue_id" = "dv"."issue_id"
+		  AND "d2"."place_identity" = "de"."place_identity"
+		  AND (("d2"."live_key" IS NOT NULL AND ` + keyMatchesOn("d2", outcomeOf("d2")) + `)
 		    OR (d2.state = 'lapsed' AND d2.id > de.id)))))`
 
 // outcomeOf is the outcome of a decision's claim, as a scalar.
 func outcomeOf(decision string) string {
-	return `(SELECT clr.outcome FROM "claim" AS "clr" WHERE clr.id = ` + decision + `.claim_id)`
+	return `(SELECT "clr"."outcome" FROM "claim" AS "clr" WHERE "clr"."id" = ` + decision + `.claim_id)`
 }
 
 // rankOf orders the live decisions at one place the way the finding's screen
@@ -457,62 +457,62 @@ func (s *Store) registerQuery(productID int64,
 		// A lapsed decision is on the record: who proposed and who approved
 		// it is what a compliance reader comes here for, and the findings list
 		// says "lapsed" about the same place.
-		Join(`LEFT JOIN "person" AS "pp" ON pp.id = de.proposed_by`).
+		Join(`LEFT JOIN "person" AS "pp" ON "pp"."id" = "de"."proposed_by"`).
 		// The supplier's statement answering the place, where one does.
-		Join(`LEFT JOIN "vex_statement" AS "sr" ON sr.id = f.stated_by`).
+		Join(`LEFT JOIN "vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
 		Join(WordsJoin("sr")).
-		ColumnExpr(`v.identifier AS "vulnerability"`).
+		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`f.place_identity AS "place_identity"`).
-		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
+		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
 		// A decision counts where it is live or where it lapsed. Lapsed is
 		// what happened to it and is part of the record; a superseded one is
 		// not, and reporting it would say a place is decided when it is not.
-		ColumnExpr(onTheRecord + `COALESCE(cl.outcome, '') ELSE '' END AS "outcome"`).
-		ColumnExpr(onTheRecord + `COALESCE(cl.justification, '') ELSE '' END AS "justification"`).
-		ColumnExpr(onTheRecord + `de.state ELSE '' END AS "decision_state"`).
-		ColumnExpr(onTheRecord + `COALESCE(pp.identity, '') ELSE '' END AS "proposed_by"`).
-		ColumnExpr(onTheRecord + `de.proposed_at ELSE NULL END AS "proposed_at"`).
+		ColumnExpr(onTheRecord + `COALESCE("cl"."outcome", '') ELSE '' END AS "outcome"`).
+		ColumnExpr(onTheRecord + `COALESCE("cl"."justification", '') ELSE '' END AS "justification"`).
+		ColumnExpr(onTheRecord + `"de"."state" ELSE '' END AS "decision_state"`).
+		ColumnExpr(onTheRecord + `COALESCE("pp"."identity", '') ELSE '' END AS "proposed_by"`).
+		ColumnExpr(onTheRecord + `"de"."proposed_at" ELSE NULL END AS "proposed_at"`).
 		// The agreement that put it in force, asked as a scalar rather than
 		// joined. Nothing makes an approval unique per decision — a second
 		// approver adds a row — and joined, each extra one multiplies the
 		// finding it belongs to on a page whose total counts findings, so the
 		// page holds fewer findings than it says and every later offset skips
 		// some of the register.
-		ColumnExpr(onTheRecord + `COALESCE((SELECT p2.identity FROM "claim_approval" AS "da2"
-			JOIN "person" AS "p2" ON p2.id = da2.approved_by
-			WHERE da2.claim_id = de.claim_id AND da2.withdrawn_at IS NULL
-			ORDER BY da2.approved_at, da2.id LIMIT 1), '') ELSE '' END AS "approved_by"`).
-		ColumnExpr(onTheRecord + `(SELECT MIN(da3.approved_at) FROM "claim_approval" AS "da3"
-			WHERE da3.claim_id = de.claim_id AND da3.withdrawn_at IS NULL)
+		ColumnExpr(onTheRecord + `COALESCE((SELECT "p2"."identity" FROM "claim_approval" AS "da2"
+			JOIN "person" AS "p2" ON "p2"."id" = "da2"."approved_by"
+			WHERE "da2"."claim_id" = "de"."claim_id" AND "da2"."withdrawn_at" IS NULL
+			ORDER BY "da2"."approved_at", "da2"."id" LIMIT 1), '') ELSE '' END AS "approved_by"`).
+		ColumnExpr(onTheRecord + `(SELECT MIN("da3"."approved_at") FROM "claim_approval" AS "da3"
+			WHERE "da3"."claim_id" = "de"."claim_id" AND "da3"."withdrawn_at" IS NULL)
 			ELSE NULL END AS "approved_at"`).
 		// And whether that agreement was carried rather than given. The same
 		// row the identity above comes from, ordered the same way, so the two
 		// cannot describe different approvals.
-		ColumnExpr(onTheRecord + `COALESCE((SELECT CASE WHEN da4.carried_from IS NULL THEN 0 ELSE 1 END
+		ColumnExpr(onTheRecord + `COALESCE((SELECT CASE WHEN "da4"."carried_from" IS NULL THEN 0 ELSE 1 END
 			FROM "claim_approval" AS "da4"
-			WHERE da4.claim_id = de.claim_id AND da4.withdrawn_at IS NULL
-			ORDER BY da4.approved_at, da4.id LIMIT 1), 0) ELSE 0 END AS "agreement_carried"`).
-		ColumnExpr(`f.opened_at AS "opened_at"`).
-		ColumnExpr(`f.closed_at AS "closed_at"`).
-		ColumnExpr(`f.due_at AS "due_at"`).
+			WHERE "da4"."claim_id" = "de"."claim_id" AND "da4"."withdrawn_at" IS NULL
+			ORDER BY "da4"."approved_at", "da4"."id" LIMIT 1), 0) ELSE 0 END AS "agreement_carried"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+		ColumnExpr(`"f"."due_at" AS "due_at"`).
 		// The reason it closed, in both the words the tool chose and the words
 		// a person typed. A closure with no reason was refused of whoever
 		// wrote it and then readable by nobody, so the refusal was a promise
 		// the tool did not keep.
-		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
-		ColumnExpr(`COALESCE(f.closed_note, '') AS "closed_note"`).
-		ColumnExpr(`COALESCE(f.unaffected_by, '') AS "unaffected_by"`).
-		ColumnExpr(`f.stated_by AS "stated_by"`).
-		ColumnExpr(`COALESCE(sr.publisher, '') AS "stated_who"`).
-		ColumnExpr(`COALESCE(sr.within, sr.component, '') AS "stated_in"`).
-		ColumnExpr(`COALESCE(sr.justification, '') AS "stated_why"`).
+		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
+		ColumnExpr(`COALESCE("f"."closed_note", '') AS "closed_note"`).
+		ColumnExpr(`COALESCE("f"."unaffected_by", '') AS "unaffected_by"`).
+		ColumnExpr(`"f"."stated_by" AS "stated_by"`).
+		ColumnExpr(`COALESCE("sr"."publisher", '') AS "stated_who"`).
+		ColumnExpr(`COALESCE("sr"."within", "sr"."component", '') AS "stated_in"`).
+		ColumnExpr(`COALESCE("sr"."justification", '') AS "stated_why"`).
 		ColumnExpr(WordsColumn + ` AS "stated_words"`).
-		ColumnExpr(`COALESCE(sr.document, '') AS "stated_file"`).
-		OrderExpr("v.identifier, c.name, f.place_identity")
+		ColumnExpr(`COALESCE("sr"."document", '') AS "stated_file"`).
+		OrderExpr(`"v"."identifier", "c"."name", "f"."place_identity"`)
 }
 
 // onTheRecord opens the case expression each of the decision's own columns is

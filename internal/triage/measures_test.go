@@ -18,8 +18,8 @@ import (
 func (f *fixture) opened(t *testing.T, findingID int64, when time.Time) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-		Set("opened_at = ?", when.Truncate(time.Microsecond)).
-		Where("id = ?", findingID).Exec(t.Context()); err != nil {
+		Set(`"opened_at" = ?`, when.Truncate(time.Microsecond)).
+		Where(`"id" = ?`, findingID).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }

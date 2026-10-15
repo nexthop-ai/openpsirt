@@ -84,9 +84,9 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		// carries, are both read here rather than handed in.
 		var rows []Finding
 		err := tx.NewSelect().Model(&rows).
-			Where("target_id = ?", targetID).
-			Where("vulnerability_id = ?", vulnerabilityID).
-			Where("closed_at IS NULL").
+			Where(`"target_id" = ?`, targetID).
+			Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"closed_at" IS NULL`).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what is open there: %w", err)
@@ -142,15 +142,15 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 
 		return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			result, err := tx.NewUpdate().Model((*Finding)(nil)).
-				Set("closed_at = ?", now).
-				Set("closed_by = ?", subject.ID).
-				Set("closed_note = ?", because).
-				Set("closed_because = ?", Fixed).
-				Where("id IN (?)", bun.List(batch)).
+				Set(`"closed_at" = ?`, now).
+				Set(`"closed_by" = ?`, subject.ID).
+				Set(`"closed_note" = ?`, because).
+				Set(`"closed_because" = ?`, Fixed).
+				Where(`"id" IN (?)`, bun.List(batch)).
 				// Still open, checked as the write happens. Two people closing
 				// the same thing at once is ordinary, and the second must not
 				// overwrite the first's reason with its own.
-				Where("closed_at IS NULL").
+				Where(`"closed_at" IS NULL`).
 				Exec(ctx)
 			if err != nil {
 				return fmt.Errorf("close %d findings: %w", len(batch), err)

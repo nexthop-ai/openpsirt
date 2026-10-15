@@ -133,7 +133,7 @@ func TestAPreviewShowsOnlyWhatTheAskerMayRead(t *testing.T) {
 		}
 		// Everything about this component is undisclosed.
 		if _, err := f.db.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", string(access.Private)).
+			Set(`"visibility" = ?`, string(access.Private)).
 			Where("1 = 1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

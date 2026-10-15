@@ -280,8 +280,8 @@ func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackRevivesTheRow(t *testing.T
 			By int64 `bun:"removed_by"`
 		}
 		if err := f.db.DB.NewSelect().TableExpr(`"advisory_issue" AS "ac"`).
-			ColumnExpr("ac.removed_by").
-			Where("ac.removed_at IS NOT NULL").
+			ColumnExpr(`"ac"."removed_by"`).
+			Where(`"ac"."removed_at" IS NOT NULL`).
 			Limit(1).Scan(t.Context(), &off); err != nil {
 			t.Fatalf("reading what it left behind: %v", err)
 		}

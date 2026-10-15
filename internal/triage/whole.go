@@ -105,12 +105,12 @@ type EndedPart struct {
 // may not see.
 func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64) (*Whole, error) {
 	claim := new(Claim)
-	if err := s.db.NewSelect().Model(claim).Where("id = ?", claimID).Scan(ctx); err != nil {
+	if err := s.db.NewSelect().Model(claim).Where(`"id" = ?`, claimID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read claim %d", claimID))
 	}
 	var rows []Decision
 	if err := s.db.NewSelect().Model(&rows).Relation("Claim").
-		Where("de.claim_id = ?", claimID).Order("de.id ASC").Scan(ctx); err != nil {
+		Where(`"de"."claim_id" = ?`, claimID).Order("de.id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what that claim covers: %w", err)
 	}
 	if len(rows) == 0 {
@@ -146,7 +146,7 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 
 	var agreements []Approval
 	if err := s.db.NewSelect().Model(&agreements).
-		Where("claim_id = ?", claimID).Scan(ctx); err != nil {
+		Where(`"claim_id" = ?`, claimID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was agreed to: %w", err)
 	}
 	whole.Happened, whole.When, whole.By = became(rows,
@@ -213,24 +213,24 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr("COUNT(DISTINCT "+finding.FoldedOn+`) AS "folds"`).
-		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
-		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
 		// A component nothing pulls in has no consumer to count distinctly,
 		// so the build itself is the one thing pulling it in.
-		ColumnExpr(`COALESCE(SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END), 0) AS "direct"`).
+		ColumnExpr(`COALESCE(SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END), 0) AS "direct"`).
 		ColumnExpr(`COUNT(*) AS "findings"`).
-		Where("de.claim_id = ?", claimID).
+		Where(`"de"."claim_id" = ?`, claimID).
 		// Live rows only: a row withdrawn or lapsed covers nothing, however
 		// well its versions still match.
-		Where("de.live_key IS NOT NULL").
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = de.product_id").
+		Where(`"de"."live_key" IS NOT NULL`).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 	if err := readableFindings(query, subject, "f", "st.product_id").
 		Scan(ctx, &counted); err != nil {
@@ -287,21 +287,21 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		// gives: SQLite otherwise starts from every finding.
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionFiledAt("de", "f")).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-		ColumnExpr(`de.state AS "state"`).
-		ColumnExpr(`MIN(st.display_name) AS "stream"`).
-		ColumnExpr(`MIN(va.display_name) AS "variant"`).
-		Where("de.claim_id = ?", claimID).
-		Where("de.state IN (?, ?)", Withdrawn, LapsedState).
-		Where("de.ended_at IS NOT NULL").
-		Where("st.product_id = de.product_id").
-		Where("f.opened_at <= de.ended_at").
-		Where("(f.closed_at IS NULL OR f.closed_at > de.ended_at)")
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		ColumnExpr(`"de"."state" AS "state"`).
+		ColumnExpr(`MIN("st"."display_name") AS "stream"`).
+		ColumnExpr(`MIN("va"."display_name") AS "variant"`).
+		Where(`"de"."claim_id" = ?`, claimID).
+		Where(`"de"."state" IN (?, ?)`, Withdrawn, LapsedState).
+		Where(`"de"."ended_at" IS NOT NULL`).
+		Where(`"st"."product_id" = "de"."product_id"`).
+		Where(`"f"."opened_at" <= "de"."ended_at"`).
+		Where(`("f"."closed_at" IS NULL OR "f"."closed_at" > "de"."ended_at")`)
 	if err := readableFindings(query, subject, "f", "st.product_id").
-		GroupExpr("de.state, st.name, va.name").
-		OrderExpr("de.state, st.name, va.name").
+		GroupExpr(`"de"."state", "st"."name", "va"."name"`).
+		OrderExpr(`"de"."state", "st"."name", "va"."name"`).
 		Scan(ctx, &reached); err != nil {
 		return nil, fmt.Errorf("read what that claim reached when it stopped: %w", err)
 	}

@@ -163,7 +163,7 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 	plain := func(s string) string { return strings.ReplaceAll(s, marker, "-YEAR-") }
 	var rows []finding.Vulnerability
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("vu.identifier LIKE ?", "%"+marker+"%").Scan(ctx); err != nil {
+		Where(`"vu"."identifier" LIKE ?`, "%"+marker+"%").Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
 	named := map[int64]string{}
@@ -185,7 +185,7 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 	if len(ids) > 0 {
 		var aliases []finding.Alias
 		if err := f.db.DB.NewSelect().Model(&aliases).
-			Where("vulnerability_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, alias := range aliases {
@@ -194,7 +194,7 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 		}
 		var ratings []finding.CVSS
 		if err := f.db.DB.NewSelect().Model(&ratings).
-			Where("vulnerability_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, rating := range ratings {
@@ -204,7 +204,7 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 		}
 		var weaknesses []finding.Weakness
 		if err := f.db.DB.NewSelect().Model(&weaknesses).
-			Where("vulnerability_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, weakness := range weaknesses {
@@ -213,7 +213,7 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 		}
 		var references []finding.Reference
 		if err := f.db.DB.NewSelect().Model(&references).
-			Where("vulnerability_id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+			Where(`"vulnerability_id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, reference := range references {
@@ -229,8 +229,8 @@ func (f *fixture) issueState(t *testing.T, year int) []string {
 func (f *fixture) identifierOf(t *testing.T, id int64) string {
 	t.Helper()
 	var identifier string
-	if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr("v.identifier").
-		Where("v.id = ?", id).Scan(t.Context(), &identifier); err != nil {
+	if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr(`"v"."identifier"`).
+		Where(`"v"."id" = ?`, id).Scan(t.Context(), &identifier); err != nil {
 		t.Fatal(err)
 	}
 	return identifier
@@ -348,8 +348,8 @@ func TestARepeatedReportIsInternedAsItsFirstCopyAsWellAsItsLast(t *testing.T) {
 			t.Fatal(err)
 		}
 		var severity string
-		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr("v.severity").
-			Where("v.id = ?", names["CVE-2026-9001"]).Scan(ctx, &severity); err != nil {
+		if err := f.db.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr(`"v"."severity"`).
+			Where(`"v"."id" = ?`, names["CVE-2026-9001"]).Scan(ctx, &severity); err != nil {
 			t.Fatal(err)
 		}
 		if severity != "low" {

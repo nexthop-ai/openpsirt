@@ -247,8 +247,8 @@ func supplierOf(t *testing.T, f *fixture, identity string) string {
 	var said string
 	err := f.db.DB.NewSelect().
 		TableExpr("\"component\" AS \"c\"").
-		ColumnExpr("COALESCE(c.supplier, '')").
-		Where("c.identity = ?", identity).
+		ColumnExpr(`COALESCE("c"."supplier", '')`).
+		Where(`"c"."identity" = ?`, identity).
 		Scan(t.Context(), &said)
 	if err != nil {
 		t.Fatalf("read the supplier: %v", err)
@@ -325,8 +325,8 @@ func licenseOf(t *testing.T, f *fixture, identity string) string {
 	var said string
 	err := f.db.DB.NewSelect().
 		TableExpr("\"component\" AS \"c\"").
-		ColumnExpr("COALESCE(c.license, '')").
-		Where("c.identity = ?", identity).
+		ColumnExpr(`COALESCE("c"."license", '')`).
+		Where(`"c"."identity" = ?`, identity).
 		Scan(t.Context(), &said)
 	if err != nil {
 		t.Fatalf("read the license: %v", err)
@@ -410,7 +410,7 @@ func identifiedBy(t *testing.T, f *fixture, identity string) graph.Component {
 	var row graph.Component
 	err := f.db.DB.NewSelect().Model(&row).
 		Column("purl", "cpe", "upstream_name", "upstream_folded", "fold_key").
-		Where("identity = ?", identity).
+		Where(`"identity" = ?`, identity).
 		Scan(t.Context())
 	if err != nil {
 		t.Fatalf("read the component: %v", err)

@@ -182,18 +182,18 @@ func moveClaimWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) e
 	for after := int64(0); ; {
 		var claims []claimRowV090
 		if err := tx.NewSelect().TableExpr(`"suppression" AS "sup"`).
-			ColumnExpr(`sup.id, sup.identity, sup.vulnerability, sup.status, sup.origin`).
-			ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
-			ColumnExpr(`COALESCE(sup.statement, '') AS "statement"`).
-			ColumnExpr(`COALESCE(sup.subject_purl, '') AS "subject_purl"`).
-			ColumnExpr(`COALESCE(sup.subject_name, '') AS "subject_name"`).
-			ColumnExpr(`COALESCE(sup.subject_version, '') AS "subject_version"`).
-			ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
-			ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
-			ColumnExpr(`COALESCE(sup.within_version, '') AS "within_version"`).
-			ColumnExpr(`sup.stated_by`).
-			Where("sup.id > ?", after).
-			OrderExpr("sup.id").Limit(pageV090).
+			ColumnExpr(`"sup"."id", "sup"."identity", "sup"."vulnerability", "sup"."status", "sup"."origin"`).
+			ColumnExpr(`COALESCE("sup"."justification", '') AS "justification"`).
+			ColumnExpr(`COALESCE("sup"."statement", '') AS "statement"`).
+			ColumnExpr(`COALESCE("sup"."subject_purl", '') AS "subject_purl"`).
+			ColumnExpr(`COALESCE("sup"."subject_name", '') AS "subject_name"`).
+			ColumnExpr(`COALESCE("sup"."subject_version", '') AS "subject_version"`).
+			ColumnExpr(`COALESCE("sup"."within_purl", '') AS "within_purl"`).
+			ColumnExpr(`COALESCE("sup"."within_name", '') AS "within_name"`).
+			ColumnExpr(`COALESCE("sup"."within_version", '') AS "within_version"`).
+			ColumnExpr(`"sup"."stated_by"`).
+			Where(`"sup"."id" > ?`, after).
+			OrderExpr(`"sup"."id"`).Limit(pageV090).
 			Scan(ctx, &claims); err != nil {
 			return fmt.Errorf("read the build claims: %w", err)
 		}
@@ -272,12 +272,12 @@ func moveStatementWordsV090(ctx context.Context, tx bun.Tx, held map[string]int6
 			Justification string `bun:"justification"`
 		}
 		if err := tx.NewSelect().TableExpr(`"vex_statement" AS "ss"`).
-			ColumnExpr(`ss.id, ss.about`).
-			ColumnExpr(`COALESCE(ss.statement, '') AS "statement"`).
-			ColumnExpr(`COALESCE(ss.within_about, '') AS "within_about"`).
-			ColumnExpr(`COALESCE(ss.justification, '') AS "justification"`).
-			Where("ss.id > ?", after).
-			OrderExpr("ss.id").Limit(pageV090).
+			ColumnExpr(`"ss"."id", "ss"."about"`).
+			ColumnExpr(`COALESCE("ss"."statement", '') AS "statement"`).
+			ColumnExpr(`COALESCE("ss"."within_about", '') AS "within_about"`).
+			ColumnExpr(`COALESCE("ss"."justification", '') AS "justification"`).
+			Where(`"ss"."id" > ?`, after).
+			OrderExpr(`"ss"."id"`).Limit(pageV090).
 			Scan(ctx, &said); err != nil {
 			return fmt.Errorf("read the supplier statements: %w", err)
 		}
@@ -329,9 +329,9 @@ func keyReferencesV090(ctx context.Context, tx bun.Tx) error {
 			Identity string `bun:"url_identity"`
 		}
 		if err := tx.NewSelect().TableExpr(`"vulnerability_reference" AS "vr"`).
-			ColumnExpr(`vr.id, vr.url, vr.url_identity`).
-			Where("vr.id > ?", after).
-			OrderExpr("vr.id").Limit(pageV090).
+			ColumnExpr(`"vr"."id", "vr"."url", "vr"."url_identity"`).
+			Where(`"vr"."id" > ?`, after).
+			OrderExpr(`"vr"."id"`).Limit(pageV090).
 			Scan(ctx, &references); err != nil {
 			return fmt.Errorf("read the references: %w", err)
 		}

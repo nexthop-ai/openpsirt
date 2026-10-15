@@ -94,9 +94,9 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 
 	grouped := func() *bun.SelectQuery {
 		return matching().
-			ColumnExpr(`de.claim_id AS "claim_id"`).
-			ColumnExpr(`MAX(de.id) AS "newest"`).
-			GroupExpr("de.claim_id")
+			ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+			ColumnExpr(`MAX("de"."id") AS "newest"`).
+			GroupExpr(`"de"."claim_id"`)
 	}
 	total, err := s.db.NewSelect().TableExpr(`(?) AS "page"`, grouped()).Count(ctx)
 	if err != nil {
@@ -130,15 +130,15 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 	}
 	if err := matching().
 		Join(finding.DecisionIssue).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
-		ColumnExpr(`COUNT(DISTINCT dv.issue_id) AS "issues"`).
-		ColumnExpr(`COUNT(DISTINCT de.place_identity) AS "places"`).
-		ColumnExpr(`COUNT(DISTINCT de.product_id) AS "products"`).
-		ColumnExpr(`MIN(de.id) AS "earliest"`).
-		ColumnExpr(`MIN(de.proposed_at) AS "proposed"`).
-		Where("de.claim_id IN (?)", bun.List(ids)).
-		GroupExpr("de.claim_id").Scan(ctx, &sizes); err != nil {
+		ColumnExpr(`COUNT(DISTINCT "dv"."issue_id") AS "issues"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."place_identity") AS "places"`).
+		ColumnExpr(`COUNT(DISTINCT "de"."product_id") AS "products"`).
+		ColumnExpr(`MIN("de"."id") AS "earliest"`).
+		ColumnExpr(`MIN("de"."proposed_at") AS "proposed"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"de"."claim_id"`).Scan(ctx, &sizes); err != nil {
 		return nil, 0, fmt.Errorf("count what each claim covers: %w", err)
 	}
 
@@ -148,11 +148,11 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		Decisions int   `bun:"decisions"`
 	}
 	if err := matching().
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`de.state AS "state"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`"de"."state" AS "state"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
-		Where("de.claim_id IN (?)", bun.List(ids)).
-		GroupExpr("de.claim_id").GroupExpr("de.state").Scan(ctx, &byState); err != nil {
+		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"de"."claim_id"`).GroupExpr(`"de"."state"`).Scan(ctx, &byState); err != nil {
 		return nil, 0, fmt.Errorf("count each claim's states: %w", err)
 	}
 
@@ -163,11 +163,11 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		Decisions int   `bun:"decisions"`
 	}
 	if err := matching().
-		ColumnExpr(`de.claim_id AS "claim_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "decisions"`).
-		Where("de.claim_id IN (?)", bun.List(ids)).
-		Where("de.live_key IS NOT NULL").Where(standing, held...).
-		GroupExpr("de.claim_id").Scan(ctx, &inForce); err != nil {
+		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		Where(`"de"."live_key" IS NOT NULL`).Where(standing, held...).
+		GroupExpr(`"de"."claim_id"`).Scan(ctx, &inForce); err != nil {
 		return nil, 0, fmt.Errorf("count what each claim still covers: %w", err)
 	}
 
@@ -177,13 +177,13 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 	components := matching().
 		Join(finding.DecisionIssue).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`COUNT(DISTINCT c.name_folded) AS "components"`).
-		Where("de.claim_id IN (?)", bun.List(ids)).
-		GroupExpr("de.claim_id")
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "de"."product_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
+		ColumnExpr(`COUNT(DISTINCT "c"."name_folded") AS "components"`).
+		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		GroupExpr(`"de"."claim_id"`)
 	components = readableFindings(components, subject, "f", "st.product_id")
 	var named []struct {
 		ClaimID    int64 `bun:"claim_id"`
@@ -195,7 +195,7 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 
 	var claims []Claim
 	if err := s.db.NewSelect().Model(&claims).
-		Where("cl.id IN (?)", bun.List(ids)).Scan(ctx); err != nil {
+		Where(`"cl"."id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read the claims in the record: %w", err)
 	}
 	proposers := make([]int64, 0, len(claims))

@@ -219,15 +219,15 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		}
 		return database.IDsInBatches(ctx, closing, func(ctx context.Context, batch []int64) error {
 			result, err := tx.NewUpdate().Model((*Finding)(nil)).
-				Set("closed_at = ?", now).
-				Set("closed_by = ?", subject.ID).
-				Set("closed_note = ?", because).
-				Set("closed_because = ?", Invalid).
-				Where("id IN (?)", bun.List(batch)).
+				Set(`"closed_at" = ?`, now).
+				Set(`"closed_by" = ?`, subject.ID).
+				Set(`"closed_note" = ?`, because).
+				Set(`"closed_because" = ?`, Invalid).
+				Where(`"id" IN (?)`, bun.List(batch)).
 				// Still open, checked as the write happens: two people editing
 				// the set at once is ordinary, and the second must not
 				// overwrite the first's reason.
-				Where("closed_at IS NULL").
+				Where(`"closed_at" IS NULL`).
 				Exec(ctx)
 			if err != nil {
 				return fmt.Errorf("take %d builds back out: %w", len(batch), err)
@@ -273,11 +273,11 @@ func openIn(targetID, vulnerabilityID, componentID int64, name string,
 func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) ([]Finding, error) {
 	var rows []Finding
 	err := db.NewSelect().Model(&rows).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		Where("st.product_id = ?", productID).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
 		Order("f.opened_at ASC", "f.id ASC").
 		Scan(ctx)
 	if err != nil {

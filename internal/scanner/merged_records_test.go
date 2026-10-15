@@ -20,7 +20,7 @@ func (f *runFixture) trailedByMerge(t *testing.T, kind trail.Kind, want int) {
 	t.Helper()
 	var rows []trail.Change
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("ac.kind = ?", kind).Scan(t.Context()); err != nil {
+		Where(`"ac"."kind" = ?`, kind).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if len(rows) != want {

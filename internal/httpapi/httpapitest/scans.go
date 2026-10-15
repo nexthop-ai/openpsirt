@@ -233,8 +233,8 @@ func (r *Reach) InventoryOf(t *testing.T, contents string) int64 {
 		t.Fatal(err)
 	}
 	var runID int64
-	if err := r.DB.DB.NewSelect().Table("scan_run").ColumnExpr("id").
-		Where("target_id = ?", target.ID).Order("id DESC").Limit(1).
+	if err := r.DB.DB.NewSelect().Table("scan_run").ColumnExpr(`"id"`).
+		Where(`"target_id" = ?`, target.ID).Order("id DESC").Limit(1).
 		Scan(ctx, &runID); err != nil {
 		t.Fatal(err)
 	}

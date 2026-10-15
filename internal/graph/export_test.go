@@ -10,8 +10,8 @@ import "context"
 func (s *Store) CurrentNodes(ctx context.Context, targetID int64) ([]Node, error) {
 	var nodes []Node
 	err := s.db.NewSelect().Model(&nodes).
-		Where("target_id = ?", targetID).
-		Where("closed_scan_id IS NULL").
+		Where(`"target_id" = ?`, targetID).
+		Where(`"closed_scan_id" IS NULL`).
 		Scan(ctx)
 	return nodes, err
 }

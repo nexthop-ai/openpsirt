@@ -88,7 +88,7 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 	// the name is free .
 	return database.Within(ctx, v.db, func(ctx context.Context, tx bun.IDB) error {
 		var issue Vulnerability
-		if err := tx.NewSelect().Model(&issue).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(&issue).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			return fmt.Errorf("read what this issue is: %w", err)
 		}
 
@@ -122,7 +122,7 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 		// tell those apart.
 		var held Alias
 		switch err := tx.NewSelect().Model(&held).
-			Where("identifier = ?", name).Scan(ctx); {
+			Where(`"identifier" = ?`, name).Scan(ctx); {
 		case database.IsNoRows(err):
 			if _, err := tx.NewInsert().Model(&Alias{
 				VulnerabilityID: id, Identifier: name,
@@ -140,9 +140,9 @@ func (v *Vulnerabilities) AlsoKnownAs(ctx context.Context, subject access.Subjec
 			return nil
 		}
 		if _, err := tx.NewUpdate().Model((*Vulnerability)(nil)).
-			Set("identifier = ?", name).
-			Set("identifier_folded = ?", FoldIdentifier(name)).
-			Where("id = ?", id).Exec(ctx); err != nil {
+			Set(`"identifier" = ?`, name).
+			Set(`"identifier_folded" = ?`, FoldIdentifier(name)).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			if database.IsDuplicate(err) {
 				return ErrNameTaken
 			}
@@ -173,7 +173,7 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 	err := database.Within(ctx, v.db, func(ctx context.Context, tx bun.IDB) error {
 		filedUnder = ""
 		var issue Vulnerability
-		if err := tx.NewSelect().Model(&issue).Where("id = ?", id).Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(&issue).Where(`"id" = ?`, id).Scan(ctx); err != nil {
 			return fmt.Errorf("read what this issue is: %w", err)
 		}
 		if err := triagesEverywhere(ctx, tx, subject, id); err != nil {
@@ -181,8 +181,8 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 		}
 		var held Alias
 		err := tx.NewSelect().Model(&held).
-			Where("va.identifier = ?", name).
-			Where("va.vulnerability_id = ?", id).Scan(ctx)
+			Where(`"va"."identifier" = ?`, name).
+			Where(`"va"."vulnerability_id" = ?`, id).Scan(ctx)
 		if err != nil {
 			return database.FromRead(err, ErrNoSuchName, "read the name")
 		}
@@ -193,7 +193,7 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 			return ErrNotByHand
 		}
 		if _, err := tx.NewDelete().Model((*Alias)(nil)).
-			Where("id = ?", held.ID).Exec(ctx); err != nil {
+			Where(`"id" = ?`, held.ID).Exec(ctx); err != nil {
 			return fmt.Errorf("remove the name %q: %w", name, err)
 		}
 		filedUnder = issue.Identifier
@@ -206,9 +206,9 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 		// was minted under.
 		var left []string
 		if err := tx.NewSelect().Model((*Alias)(nil)).
-			ColumnExpr("va.identifier").
-			Where("va.vulnerability_id = ?", id).
-			OrderExpr("va.id ASC").
+			ColumnExpr(`"va"."identifier"`).
+			Where(`"va"."vulnerability_id" = ?`, id).
+			OrderExpr(`"va"."id" ASC`).
 			Scan(ctx, &left); err != nil {
 			return fmt.Errorf("read what else it is called: %w", err)
 		}
@@ -217,9 +217,9 @@ func (v *Vulnerabilities) NoLongerKnownAs(ctx context.Context, subject access.Su
 		}
 		filedUnder = preferred(Named{Identifier: left[0], Aliases: left[1:]})
 		if _, err := tx.NewUpdate().Model((*Vulnerability)(nil)).
-			Set("identifier = ?", filedUnder).
-			Set("identifier_folded = ?", FoldIdentifier(filedUnder)).
-			Where("id = ?", id).Exec(ctx); err != nil {
+			Set(`"identifier" = ?`, filedUnder).
+			Set(`"identifier_folded" = ?`, FoldIdentifier(filedUnder)).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return fmt.Errorf("file it under %q: %w", filedUnder, err)
 		}
 		return nil
@@ -236,7 +236,7 @@ func recordedByHand(ctx context.Context, db bun.IDB, id int64) (bool, error) {
 	recorded, err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(HeldAs("f.vulnerability_id"), id).
-		Where("f.kind = ?", Entered).
+		Where(`"f"."kind" = ?`, Entered).
 		Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether this issue was recorded here: %w", err)
@@ -261,13 +261,13 @@ func triagesEverywhere(ctx context.Context, db bun.IDB, subject access.Subject,
 	}
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.visibility AS "visibility"`).
-		Where("f.vulnerability_id = ?", vulnerabilityID).
-		Where("f.closed_at IS NULL").
-		GroupExpr("st.product_id, f.visibility").
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."visibility" AS "visibility"`).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`).
+		GroupExpr(`"st"."product_id", "f"."visibility"`).
 		Scan(ctx, &reaches); err != nil {
 		return fmt.Errorf("read where this issue is open: %w", err)
 	}

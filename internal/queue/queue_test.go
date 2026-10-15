@@ -187,7 +187,7 @@ func TestWorkThatKeepsFailingIsSetAside(t *testing.T) {
 			t.Errorf("work was retried past its limit: %+v %v", job, err)
 		}
 		var state string
-		if err := db.QueryRowContext(ctx, "SELECT state FROM \"job\" WHERE reference = ?", "doomed").Scan(&state); err != nil {
+		if err := db.QueryRowContext(ctx, `SELECT "state" FROM "job" WHERE "reference" = ?`, "doomed").Scan(&state); err != nil {
 			t.Fatal(err)
 		}
 		if state != string(queue.Dead) {
@@ -353,7 +353,7 @@ func TestWorkWhoseWorkerKeepsDyingIsSetAside(t *testing.T) {
 		var state string
 		var reported sql.NullString
 		if err := db.QueryRowContext(ctx,
-			"SELECT state, last_error FROM \"job\" WHERE reference = ?", "kills-its-worker").
+			`SELECT "state", "last_error" FROM "job" WHERE "reference" = ?`, "kills-its-worker").
 			Scan(&state, &reported); err != nil {
 			t.Fatal(err)
 		}
@@ -526,7 +526,7 @@ func TestOnlyTheWorkerHoldingAJobMayFinishIt(t *testing.T) {
 		}
 		for _, job := range taken {
 			var row queue.Job
-			if err := db.DB.NewSelect().Model(&row).Where("id = ?", job.ID).Scan(ctx); err != nil {
+			if err := db.DB.NewSelect().Model(&row).Where(`"id" = ?`, job.ID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if row.State != queue.Running || row.ClaimedBy == nil || *row.ClaimedBy != "fresh" {

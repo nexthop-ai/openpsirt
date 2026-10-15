@@ -354,26 +354,26 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 			version = &moving
 		}
 		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
-			Set("upgrade_to = ?", version).
-			Set("committed_to = ?", when).
-			Where("id = ?", claimID).Exec(ctx); err != nil {
+			Set(`"upgrade_to" = ?`, version).
+			Set(`"committed_to" = ?`, when).
+			Where(`"id" = ?`, claimID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what was promised: %w", err)
 		}
 		// The commitments this claim wrote, moved with it. One row per build
 		// and fold, so changing the version a release is moving to is one
 		// update however many findings it covers.
 		if _, err := tx.NewUpdate().Table("upgrade").
-			Set("to_version = ?", moving).
-			Set("committed_to = ?", when).
-			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
+			Set(`"to_version" = ?`, moving).
+			Set(`"committed_to" = ?`, when).
+			Where(`"claim_id" = ?`, claimID).Exec(ctx); err != nil {
 			return fmt.Errorf("change what the releases are waiting on: %w", err)
 		}
 		// Written with the revision rather than after it, because the two are
 		// one act: a row back in the queue that still says it needs nobody is
 		// a row the queue does not list.
 		if _, err := tx.NewUpdate().Model((*Decision)(nil)).
-			Set("needs_approval = ?", gated).
-			Where("claim_id = ?", claimID).Exec(ctx); err != nil {
+			Set(`"needs_approval" = ?`, gated).
+			Where(`"claim_id" = ?`, claimID).Exec(ctx); err != nil {
 			return fmt.Errorf("record whether the changed promise needs agreement: %w", err)
 		}
 		// Last, because it is what returns the rows to the queue: an approver
@@ -412,8 +412,8 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 	var targets []int64
 	if claim.Outcome == UpgradeNeeded {
 		if err := tx.NewSelect().Table("upgrade").
-			ColumnExpr("DISTINCT target_id").
-			Where("claim_id = ?", claim.ID).Scan(ctx, &targets); err != nil {
+			ColumnExpr(`DISTINCT "target_id"`).
+			Where(`"claim_id" = ?`, claim.ID).Scan(ctx, &targets); err != nil {
 			return false, fmt.Errorf("read which releases this was promised for: %w", err)
 		}
 	} else if err := tx.NewSelect().
@@ -421,16 +421,16 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		Join(finding.DecisionIssue).
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionAtPlace("f")).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr("DISTINCT f.target_id").
-		Where("de.claim_id = ?", claim.ID).
-		Where("de.live_key IS NOT NULL").
-		Where("f.closed_at IS NULL").
-		Where("st.product_id = de.product_id").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`DISTINCT "f"."target_id"`).
+		Where(`"de"."claim_id" = ?`, claim.ID).
+		Where(`"de"."live_key" IS NOT NULL`).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
 		Scan(ctx, &targets); err != nil {
 		return false, fmt.Errorf("read which builds this promise covers: %w", err)

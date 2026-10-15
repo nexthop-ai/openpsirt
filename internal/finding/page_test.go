@@ -81,7 +81,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			Name string `bun:"name"`
 		}
 		if err := f.db.NewSelect().TableExpr("\"vulnerability\"").
-			ColumnExpr("id, identifier AS \"name\"").Scan(t.Context(), &named); err != nil {
+			ColumnExpr(`"id", "identifier" AS "name"`).Scan(t.Context(), &named); err != nil {
 			t.Fatal(err)
 		}
 		for _, n := range named {
@@ -89,7 +89,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 		}
 		named = nil
 		if err := f.db.NewSelect().TableExpr("\"component\"").
-			ColumnExpr("id, name").Scan(t.Context(), &named); err != nil {
+			ColumnExpr(`"id", "name"`).Scan(t.Context(), &named); err != nil {
 			t.Fatal(err)
 		}
 		components := map[int64]string{}
@@ -292,12 +292,12 @@ func TestOneUndisclosedPlaceMakesTheWholeGroupUndisclosed(t *testing.T) {
 		}
 		var hidden int64
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
-			ColumnExpr("MIN(id)").Scan(ctx, &hidden); err != nil {
+			ColumnExpr(`MIN("id")`).Scan(ctx, &hidden); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("id = ?", hidden).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"id" = ?`, hidden).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 

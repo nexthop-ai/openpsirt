@@ -525,7 +525,7 @@ func TestApprovingAClaimIsABoundedNumberOfStatementsHoweverLargeItIs(t *testing.
 		// Every row that was meant to be approved is, with its approval
 		// naming the revision it stands on and what it covered.
 		var approvals []triage.Approval
-		if err := f.db.DB.NewSelect().Model(&approvals).Where("batch = ?", "batch").Scan(ctx); err != nil {
+		if err := f.db.DB.NewSelect().Model(&approvals).Where(`"batch" = ?`, "batch").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// One approval, because one act is one argument: an approver reads
@@ -961,7 +961,7 @@ func TestAnUndoReportsWhatReturnedToWaitingRatherThanWhatWasConsidered(t *testin
 		// undo's own condition is written for, and the only way to reach it.
 		var given triage.Approval
 		if err := f.db.DB.NewSelect().Model(&given).
-			Where("claim_id = ?", claimed.ClaimID).Scan(ctx); err != nil {
+			Where(`"claim_id" = ?`, claimed.ClaimID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		also := triage.Approval{

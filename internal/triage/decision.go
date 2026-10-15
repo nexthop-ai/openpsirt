@@ -951,14 +951,14 @@ func (s *Store) disclosedSince(ctx context.Context, rows []Decision) error {
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-		ColumnExpr(`st.product_id AS "product_id"`).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
-		Where("st.product_id IN (?)", bun.List(keysOf(products))).
-		Where("f.vulnerability_id IN (?)", bun.List(keysOf(issues))).
-		GroupExpr("st.product_id, f.vulnerability_id").
+		Where(`"st"."product_id" IN (?)`, bun.List(keysOf(products))).
+		Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
+		GroupExpr(`"st"."product_id", "f"."vulnerability_id"`).
 		Scan(ctx, &held)
 	if err != nil {
 		return fmt.Errorf("read whether the issue is still undisclosed: %w", err)
@@ -993,8 +993,8 @@ func (s *Store) Undecided(ctx context.Context, places []Place) ([]Place, error) 
 	}
 	var standing []string
 	if err := s.db.NewSelect().Model((*Decision)(nil)).
-		ColumnExpr("de.live_key").
-		Where("de.live_key IN (?)", bun.List(keys)).
+		ColumnExpr(`"de"."live_key"`).
+		Where(`"de"."live_key" IN (?)`, bun.List(keys)).
 		Scan(ctx, &standing); err != nil {
 		return nil, fmt.Errorf("read what already stands: %w", err)
 	}
@@ -1021,7 +1021,7 @@ func (s *Store) Undecided(ctx context.Context, places []Place) ([]Place, error) 
 func (s *Store) liveAt(ctx context.Context, keys ...string) (*Decision, bool) {
 	standing := new(Decision)
 	if err := s.db.NewSelect().Model(standing).
-		Where("live_key IN (?)", bun.List(keys)).
+		Where(`"live_key" IN (?)`, bun.List(keys)).
 		// Deterministic, because two claims can stand at one place and the
 		// message names one of them.
 		Order("id").Limit(1).Scan(ctx); err != nil {
@@ -1043,7 +1043,7 @@ func (s *Store) reaching(ctx context.Context, subject access.Subject, decisionID
 	// With its argument: everything that reads a decision back reads what it
 	// said, and the row on its own carries only where it landed.
 	if err := s.db.NewSelect().Model(decision).Relation("Claim").
-		Where("de.id = ?", decisionID).Scan(ctx); err != nil {
+		Where(`"de"."id" = ?`, decisionID).Scan(ctx); err != nil {
 		// A decision somebody may not reach and one that does not exist get
 		// the same answer, so that guessing identifiers says nothing. A read
 		// that failed is neither, and says so.

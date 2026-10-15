@@ -113,7 +113,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	body string) (int64, error) {
 	comment := new(Comment)
 	if err := s.db.NewSelect().Model(comment).
-		Where("id = ?", commentID).Scan(ctx); err != nil {
+		Where(`"id" = ?`, commentID).Scan(ctx); err != nil {
 		// The bare sentinel for a comment that is not there, not a wrapped
 		// one. The identifier in the message is the difference a caller
 		// counts: "change comment 10000: not authorized" against "not
@@ -146,8 +146,8 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 		// second, and the loser retries against a database that has moved.
 		var highest int
 		if err := tx.NewSelect().Model((*WasSaid)(nil)).
-			ColumnExpr("COALESCE(MAX(ordinal), 0)").
-			Where("comment_id = ?", commentID).Scan(ctx, &highest); err != nil {
+			ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
+			Where(`"comment_id" = ?`, commentID).Scan(ctx, &highest); err != nil {
 			return err
 		}
 		// And what it says now, read here rather than carried in from
@@ -160,7 +160,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 		// looks like a history.
 		var was string
 		if err := tx.NewSelect().Model((*Comment)(nil)).
-			Column("body").Where("id = ?", commentID).Scan(ctx, &was); err != nil {
+			Column("body").Where(`"id" = ?`, commentID).Scan(ctx, &was); err != nil {
 			return err
 		}
 		if _, err := tx.NewInsert().Model(&WasSaid{
@@ -170,9 +170,9 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 			return fmt.Errorf("keep what it said before: %w", err)
 		}
 		if _, err := tx.NewUpdate().Model((*Comment)(nil)).
-			Set("body = ?", body).
-			Set("edited_at = ?", edited).
-			Where("id = ?", commentID).Exec(ctx); err != nil {
+			Set(`"body" = ?`, body).
+			Set(`"edited_at" = ?`, edited).
+			Where(`"id" = ?`, commentID).Exec(ctx); err != nil {
 			return fmt.Errorf("change a comment: %w", err)
 		}
 		// An edit can add a reference the first version did not have, and it
@@ -195,7 +195,7 @@ func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID 
 	}
 	var comments []Comment
 	if err := s.db.NewSelect().Model(&comments).
-		Where("claim_id = ?", claimID).
+		Where(`"claim_id" = ?`, claimID).
 		Order("id ASC").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the discussion: %w", err)
 	}
@@ -226,7 +226,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 
 	comment := new(Comment)
 	if err := s.db.NewSelect().Model(comment).
-		Where("id = ?", commentID).Scan(ctx); err != nil {
+		Where(`"id" = ?`, commentID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read comment %d", commentID))
 	}
 	if _, _, err := s.claimRows(ctx, subject, comment.ClaimID, readableOn); err != nil {
@@ -234,7 +234,7 @@ func (s *Store) Earlier(ctx context.Context, subject access.Subject,
 	}
 	var rows []WasSaid
 	if err := s.db.NewSelect().Model(&rows).
-		Where("comment_id = ?", commentID).Order("ordinal").Scan(ctx); err != nil {
+		Where(`"comment_id" = ?`, commentID).Order("ordinal").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what it said before: %w", err)
 	}
 	return rows, nil

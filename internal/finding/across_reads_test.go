@@ -60,7 +60,7 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 		later := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		sooner := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-			Set("due_at = ?", later).Where("target_id = ?", f.target).Exec(ctx); err != nil {
+			Set(`"due_at" = ?`, later).Where(`"target_id" = ?`, f.target).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// The soonest deadline sits on one band and the one exploited place
@@ -71,9 +71,9 @@ func TestASourcePackageCountsEachIssueOnceAndEveryPlaceAcrossItsBinaries(t *test
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
 				Set(column+" = ?", value).
-				Where("target_id = ?", f.target).
-				Where("vulnerability_id = ?", f.issueID(t, issue)).
-				Where("component_id = ?", rowOf(t, f, gnutls)).Exec(ctx); err != nil {
+				Where(`"target_id" = ?`, f.target).
+				Where(`"vulnerability_id" = ?`, f.issueID(t, issue)).
+				Where(`"component_id" = ?`, rowOf(t, f, gnutls)).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -232,8 +232,8 @@ func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T)
 			t.Helper()
 			claim := claimSaying(t, f.db, somebody.ID, "upgrade-needed")
 			if _, err := f.db.DB.NewUpdate().Table("claim").
-				Set("committed_to = ?", time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)).
-				Set("upgrade_to = ?", to).Where("id = ?", claim).Exec(ctx); err != nil {
+				Set(`"committed_to" = ?`, time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)).
+				Set(`"upgrade_to" = ?`, to).Where(`"id" = ?`, claim).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := f.db.DB.NewInsert().Model(&map[string]any{
@@ -356,10 +356,10 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 				continue
 			}
 			checked++
-			if strings.Contains(statement, "fold_key IN") || !strings.Contains(statement, "component_id IN (") {
+			if strings.Contains(statement, `fold_key" IN`) || !strings.Contains(statement, `component_id" IN (`) {
 				t.Errorf("a statement over the findings is not restricted by component:\n  %s", statement)
 			}
-			if strings.Contains(statement, `f.fixed_in AS "fixed_in"`) {
+			if strings.Contains(statement, `"f"."fixed_in" AS "fixed_in"`) {
 				fixes++
 				// Six places, four issues on one binary and two of them on
 				// the other, every one rated high and fixed in one version.

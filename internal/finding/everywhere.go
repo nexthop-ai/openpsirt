@@ -80,27 +80,27 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
-			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
-			Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-			Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-			Where("f.vulnerability_id = ?", vulnerabilityID).
-			Where("f.closed_at IS NULL")
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+			Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+			Where(`"f"."closed_at" IS NULL`)
 		return onlyReadable(q, subject, readable, all)
 	}
 
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "sightings"`, narrow(s.db.NewSelect()).
-			ColumnExpr("DISTINCT st.product_id, tg.id, f.component_id")).
+			ColumnExpr(`DISTINCT "st"."product_id", "tg"."id", "f"."component_id"`)).
 		Count(ctx)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("count where this issue sits: %w", err)
 	}
 	products, err := s.db.NewSelect().
 		TableExpr(`(?) AS "carrying"`, narrow(s.db.NewSelect()).
-			ColumnExpr("DISTINCT st.product_id")).
+			ColumnExpr(`DISTINCT "st"."product_id"`)).
 		Count(ctx)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("count the products carrying this issue: %w", err)
@@ -123,21 +123,21 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		FixedIn     string     `bun:"fixed_in"`
 	}
 	sightings := narrow(s.db.NewSelect()).
-		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
-		ColumnExpr(`st.name AS "stream"`).
-		ColumnExpr(`va.name AS "variant"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`MIN(c.version) AS "version"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`MIN("c"."version") AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(access.PrivateCountAs("f.visibility", "private")).
-		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
-		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
+		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
+		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// The version a fix arrived in, where any place knows one. Folded to
 		// the empty string first, a minimum answered "" whenever any place
 		// stated no version — which reads as no fix known, about a group where
 		// one is.
-		ColumnExpr(`COALESCE(MIN(NULLIF(f.fixed_in, '')), '') AS "fixed_in"`)
+		ColumnExpr(`COALESCE(MIN(NULLIF("f"."fixed_in", '')), '') AS "fixed_in"`)
 	// The decision state of each place, the same counts the findings list
 	// carries and by the same conditions, so the two agree about what
 	// "agreed" means. Nothing here asks whether a claim is with its author,
@@ -151,8 +151,8 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// ten. Folding them was wrong on its own terms too: the row carries
 		// one version and one fix version, and two versions of a name are two
 		// different pieces of work.
-		GroupExpr("p.name, p.display_name, st.name, va.name, c.name, c.id").
-		OrderExpr("p.name, st.name, va.name, c.name, c.id").
+		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."id"`).
+		OrderExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "c"."id"`).
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {

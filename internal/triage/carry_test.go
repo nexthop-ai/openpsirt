@@ -99,8 +99,8 @@ func TestACarriedPlaceTakesBothVersionsFromOneFinding(t *testing.T) {
 		}
 		var landed triage.Decision
 		if err := f.db.DB.NewSelect().Model(&landed).
-			Where("de.id <> ?", agreed.ID).
-			OrderExpr("de.id DESC").Limit(1).Scan(ctx); err != nil {
+			Where(`"de"."id" <> ?`, agreed.ID).
+			OrderExpr(`"de"."id" DESC`).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		component, consumer := "", ""
@@ -168,8 +168,8 @@ func TestAPromiseIsCarriedWithItsDateAndVersion(t *testing.T) {
 		}
 		var landed triage.Claim
 		if err := f.db.DB.NewSelect().Model(&landed).
-			Where("cl.id <> ?", promised.ClaimID).
-			OrderExpr("cl.id DESC").Limit(1).Scan(ctx); err != nil {
+			Where(`"cl"."id" <> ?`, promised.ClaimID).
+			OrderExpr(`"cl"."id" DESC`).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if landed.CommittedTo == nil || landed.CommittedTo.Format(time.DateOnly) != by.Format(time.DateOnly) {
@@ -276,8 +276,8 @@ func (f *fixture) alsoCarries(t *testing.T, issue int64, targets ...int64) {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id IN (?)", bun.List(targets)).
-		Where("vulnerability_id = ?", f.issue).Scan(t.Context()); err != nil {
+		Where(`"target_id" IN (?)`, bun.List(targets)).
+		Where(`"vulnerability_id" = ?`, f.issue).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	for _, row := range rows {
@@ -312,8 +312,8 @@ func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
 		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
 		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("visibility = ?", access.Private).
-			Where("target_id = ?", next).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"target_id" = ?`, next).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -332,7 +332,7 @@ func TestAJudgmentIsNotCarriedOntoAPlaceUndisclosedToItsCarrier(t *testing.T) {
 			t.Errorf("a judgment carried onto a place undisclosed to its carrier answered %v", err)
 		}
 		written, err := f.db.DB.NewSelect().Model((*triage.Decision)(nil)).
-			Where("visibility = ?", access.Private).Count(ctx)
+			Where(`"visibility" = ?`, access.Private).Count(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -468,8 +468,8 @@ func TestAJudgmentThatHasRunOutIsNotOfferedToANewLine(t *testing.T) {
 
 		// The date arrives, moved here rather than waited for.
 		if _, err := f.db.DB.NewUpdate().Table("claim").
-			Set("deferred_until = ?", time.Now().UTC().Add(-time.Hour)).
-			Where("id = ?", ran.ClaimID).Exec(ctx); err != nil {
+			Set(`"deferred_until" = ?`, time.Now().UTC().Add(-time.Hour)).
+			Where(`"id" = ?`, ran.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -506,7 +506,7 @@ func TestACarriedClaimRecordsHowBadTheIssueIsNow(t *testing.T) {
 		}
 		var baseline *int
 		if err := f.db.DB.NewSelect().Table("decision").Column("severity_centi").
-			Where("place_identity = ?", agreed.PlaceIdentity).Where("id <> ?", agreed.ID).
+			Where(`"place_identity" = ?`, agreed.PlaceIdentity).Where(`"id" <> ?`, agreed.ID).
 			Scan(ctx, &baseline); err != nil {
 			t.Fatal(err)
 		}

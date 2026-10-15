@@ -62,29 +62,29 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 		Publisher     string `bun:"publisher"`
 		Document      string `bun:"document"`
 	}
-	where, args := database.InAnyOf("sup.id", ids)
+	where, args := database.InAnyOf(`"sup"."id"`, ids)
 	if err := db.NewSelect().
 		TableExpr(`"suppression" AS "sup"`).
-		Join(`LEFT JOIN "vex_statement" AS "ss" ON ss.id = sup.stated_by`).
+		Join(`LEFT JOIN "vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		Join(WordsJoin("sup")).
-		ColumnExpr(`sup.id AS "id"`).
-		ColumnExpr(`sup.status AS "status"`).
-		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
+		ColumnExpr(`"sup"."id" AS "id"`).
+		ColumnExpr(`"sup"."status" AS "status"`).
+		ColumnExpr(`COALESCE("sup"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn+` AS "statement"`).
-		ColumnExpr(`sup.origin AS "origin"`).
-		ColumnExpr(`COALESCE(sup.subject_purl, '') AS "subject_purl"`).
-		ColumnExpr(`COALESCE(sup.subject_name, '') AS "subject_name"`).
-		ColumnExpr(`COALESCE(sup.subject_version, '') AS "subject_version"`).
-		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
-		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).
-		ColumnExpr(`COALESCE(sup.within_version, '') AS "within_version"`).
-		ColumnExpr(`COALESCE(ss.publisher, '') AS "publisher"`).
-		ColumnExpr(`COALESCE(ss.document, '') AS "document"`).
+		ColumnExpr(`"sup"."origin" AS "origin"`).
+		ColumnExpr(`COALESCE("sup"."subject_purl", '') AS "subject_purl"`).
+		ColumnExpr(`COALESCE("sup"."subject_name", '') AS "subject_name"`).
+		ColumnExpr(`COALESCE("sup"."subject_version", '') AS "subject_version"`).
+		ColumnExpr(`COALESCE("sup"."within_purl", '') AS "within_purl"`).
+		ColumnExpr(`COALESCE("sup"."within_name", '') AS "within_name"`).
+		ColumnExpr(`COALESCE("sup"."within_version", '') AS "within_version"`).
+		ColumnExpr(`COALESCE("ss"."publisher", '') AS "publisher"`).
+		ColumnExpr(`COALESCE("ss"."document", '') AS "document"`).
 		Where(where, args...).
 		// What the build still says. A place a supplier's statement closed
 		// keeps the claim it named when it closed, and the build may have
 		// withdrawn that claim since.
-		Where("sup.closed_scan_id IS NULL").
+		Where(`"sup"."closed_scan_id" IS NULL`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what the build says about this: %w", err)
 	}

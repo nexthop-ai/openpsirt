@@ -142,8 +142,8 @@ func (d *Documents) Write(ctx context.Context, scanID int64, kind Kind, ordinal 
 func (d *Documents) List(ctx context.Context, scanID int64) ([]Document, error) {
 	var docs []Document
 	err := d.db.NewSelect().Model(&docs).
-		Where("scan_id = ?", scanID).
-		Where("discarded_at IS NULL").
+		Where(`"scan_id" = ?`, scanID).
+		Where(`"discarded_at" IS NULL`).
 		Order("kind", "ordinal").
 		Scan(ctx)
 	if err != nil {
@@ -169,7 +169,7 @@ func (d *Documents) Sent(ctx context.Context, scanIDs []int64) (map[int64][]Docu
 	err := database.IDsInBatches(ctx, scanIDs, func(ctx context.Context, batch []int64) error {
 		var page []Document
 		if err := d.db.NewSelect().Model(&page).
-			Where("scan_id IN (?)", bun.List(batch)).
+			Where(`"scan_id" IN (?)`, bun.List(batch)).
 			Order("scan_id", "kind", "ordinal").
 			Scan(ctx); err != nil {
 			return err
@@ -231,9 +231,9 @@ func (d *Documents) Discard(ctx context.Context, scanID int64) error {
 			return err
 		}
 		if _, err := tx.NewUpdate().Model((*Document)(nil)).
-			Set("discarded_at = ?", asStored(d.now())).
-			Where("scan_id = ?", scanID).
-			Where("discarded_at IS NULL").Exec(ctx); err != nil {
+			Set(`"discarded_at" = ?`, asStored(d.now())).
+			Where(`"scan_id" = ?`, scanID).
+			Where(`"discarded_at" IS NULL`).Exec(ctx); err != nil {
 			return fmt.Errorf("record that the contents were let go: %w", err)
 		}
 		return nil
@@ -273,8 +273,8 @@ func (c *chunkReader) Read(p []byte) (int, error) {
 		}
 		var row chunk
 		err := c.db.NewSelect().Model(&row).
-			Where("document_id = ?", c.documentID).
-			Where("seq = ?", c.next).
+			Where(`"document_id" = ?`, c.documentID).
+			Where(`"seq" = ?`, c.next).
 			Limit(1).Scan(c.ctx)
 		switch {
 		case errors.Is(err, sql.ErrNoRows) && c.read < c.size:
@@ -306,9 +306,9 @@ func (d *Documents) sameInventory(ctx context.Context, scanID int64, hash string
 		return false, nil
 	}
 	held, err := d.db.NewSelect().Model((*Document)(nil)).
-		Where("scan_id = ?", scanID).
-		Where("kind = ?", InventoryKind).
-		Where("content_hash = ?", hash).
+		Where(`"scan_id" = ?`, scanID).
+		Where(`"kind" = ?`, InventoryKind).
+		Where(`"content_hash" = ?`, hash).
 		Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read what the inventory already held hashed to: %w", err)
@@ -334,7 +334,7 @@ func (d *Documents) Remove(ctx context.Context, scanID int64) error {
 		return err
 	}
 	if _, err := d.db.NewDelete().Model((*Document)(nil)).
-		Where("scan_id = ?", scanID).Exec(ctx); err != nil {
+		Where(`"scan_id" = ?`, scanID).Exec(ctx); err != nil {
 		return fmt.Errorf("remove what this scan arrived with: %w", err)
 	}
 	return nil
@@ -349,9 +349,9 @@ func deleteChunks(ctx context.Context, db bun.IDB, scanID int64, heldOnly bool,
 	var ids []int64
 	q := db.NewSelect().Model((*Document)(nil)).
 		Column("id").
-		Where("scan_id = ?", scanID)
+		Where(`"scan_id" = ?`, scanID)
 	if heldOnly {
-		q = q.Where("discarded_at IS NULL")
+		q = q.Where(`"discarded_at" IS NULL`)
 	}
 	if err := q.Scan(ctx, &ids); err != nil {
 		return false, fmt.Errorf("%s: %w", reading, err)
@@ -361,7 +361,7 @@ func deleteChunks(ctx context.Context, db bun.IDB, scanID int64, heldOnly bool,
 	}
 	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		_, err := db.NewDelete().Model((*chunk)(nil)).
-			Where("document_id IN (?)", bun.List(batch)).Exec(ctx)
+			Where(`"document_id" IN (?)`, bun.List(batch)).Exec(ctx)
 		return err
 	}); err != nil {
 		return false, fmt.Errorf("%s: %w", removing, err)
@@ -383,8 +383,8 @@ func deleteChunks(ctx context.Context, db bun.IDB, scanID int64, heldOnly bool,
 func (d *Documents) Held(ctx context.Context, scanID, documentID int64) (*Document, error) {
 	doc := new(Document)
 	err := d.db.NewSelect().Model(doc).
-		Where("id = ?", documentID).
-		Where("scan_id = ?", scanID).
+		Where(`"id" = ?`, documentID).
+		Where(`"scan_id" = ?`, scanID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoDocument

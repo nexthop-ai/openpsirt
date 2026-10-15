@@ -136,8 +136,8 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 		// ordinary row update, so every engine takes the lock and the second
 		// worker waits rather than racing.
 		if _, err := tx.NewUpdate().Table("target").
-			Set("last_scan_id = ?", scanID).
-			Where("id = ?", targetID).Exec(ctx); err != nil {
+			Set(`"last_scan_id" = ?`, scanID).
+			Where(`"id" = ?`, targetID).Exec(ctx); err != nil {
 			return fmt.Errorf("take the target: %w", err)
 		}
 
@@ -255,17 +255,17 @@ func (s *Store) CurrentComponents(ctx context.Context, targetID int64) ([]Descri
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`c.id AS "component_id"`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`n.upstream_name AS "upstream_name"`).
-		ColumnExpr(`n.upstream_version AS "upstream_version"`).
-		ColumnExpr(`n.purl AS "purl"`).
-		ColumnExpr(`n.cpe AS "cpe"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", false).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"c"."id" AS "component_id"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
+		ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+		ColumnExpr(`"n"."purl" AS "purl"`).
+		ColumnExpr(`"n"."cpe" AS "cpe"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a target contains: %w", err)
@@ -317,14 +317,14 @@ func (s *Store) Stated(ctx context.Context, targetID int64, componentIDs []int64
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`n.component_id AS "component_id"`).
-			ColumnExpr(`n.purl AS "purl"`).
-			ColumnExpr(`n.cpe AS "cpe"`).
-			ColumnExpr(`n.upstream_name AS "upstream_name"`).
-			ColumnExpr(`n.upstream_version AS "upstream_version"`).
-			Where("n.target_id = ?", targetID).
-			Where("n.component_id IN (?)", bun.List(batch)).
-			OrderExpr("n.opened_scan_id, n.id").
+			ColumnExpr(`"n"."component_id" AS "component_id"`).
+			ColumnExpr(`"n"."purl" AS "purl"`).
+			ColumnExpr(`"n"."cpe" AS "cpe"`).
+			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
+			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+			Where(`"n"."target_id" = ?`, targetID).
+			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
+			OrderExpr(`"n"."opened_scan_id", "n"."id"`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return err
@@ -382,24 +382,24 @@ func (s *Store) statedInProduct(ctx context.Context, targetID int64,
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`n.component_id AS "component_id"`).
-			ColumnExpr(`n.purl AS "purl"`).
-			ColumnExpr(`n.cpe AS "cpe"`).
-			ColumnExpr(`n.upstream_name AS "upstream_name"`).
-			ColumnExpr(`n.upstream_version AS "upstream_version"`).
+			ColumnExpr(`"n"."component_id" AS "component_id"`).
+			ColumnExpr(`"n"."purl" AS "purl"`).
+			ColumnExpr(`"n"."cpe" AS "cpe"`).
+			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
+			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
 			// By build first, which the node index leads with: a product
 			// has a handful of builds and the node table holds every
 			// product's history.
-			Where(`n.target_id IN (SELECT tg.id FROM "target" AS "tg"
-				JOIN "stream" AS "st" ON st.id = tg.stream_id
-				WHERE st.product_id = ? AND tg.id <> ?)`, productID, targetID).
-			Where("n.component_id IN (?)", bun.List(batch)).
+			Where(`"n"."target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
+				JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+				WHERE "st"."product_id" = ? AND "tg"."id" <> ?)`, productID, targetID).
+			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.Where("n.purl IS NOT NULL").
-					WhereOr("n.cpe IS NOT NULL").
-					WhereOr("n.upstream_name IS NOT NULL")
+				return q.Where(`"n"."purl" IS NOT NULL`).
+					WhereOr(`"n"."cpe" IS NOT NULL`).
+					WhereOr(`"n"."upstream_name" IS NOT NULL`)
 			}).
-			OrderExpr("n.opened_scan_id, n.id").
+			OrderExpr(`"n"."opened_scan_id", "n"."id"`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return err
@@ -548,26 +548,26 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 
 	query := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`c.id AS "id"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		ColumnExpr(`c.name AS "name"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"c"."id" AS "id"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
 		// A name somebody types is matched without regard to capitals,
 		// through the fold stored beside the name.
-		Where("c.name_folded = ?", Folded(name)).
-		OrderExpr("c.id")
+		Where(`"c"."name_folded" = ?`, Folded(name)).
+		OrderExpr(`"c"."id"`)
 	if version != "" {
-		query = query.Where("c.version = ?", version)
+		query = query.Where(`"c"."version" = ?`, version)
 	}
 	if ecosystem != "" {
 		// The ecosystem is escaped and the trailing "/%" is not: the first is
 		// a value somebody supplied and the second is the pattern this clause
 		// is. Unescaped, "_" matches any character, and one name resolves as
 		// another's component.
-		query = query.Where("LOWER(c.purl) LIKE ?"+database.LikeClause,
+		query = query.Where(`LOWER("c"."purl") LIKE ?`+database.LikeClause,
 			"pkg:"+database.LikeEscaped(strings.ToLower(ecosystem))+"/%")
 	}
 
@@ -801,10 +801,10 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	var rootID int64
 	err = s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr("n.component_id").
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		Where("n.is_root = ?", true).
+		ColumnExpr(`"n"."component_id"`).
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, true).
 		Limit(1).Scan(ctx, &rootID)
 	if database.IsNoRows(err) {
 		// Nothing has been applied to this build: every graph applied has a
@@ -816,9 +816,9 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 	}
 	loose, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "fn"`).
-		Where("fn.target_id = ?", targetID).
-		Where("fn.closed_scan_id IS NULL").
-		Where("fn.is_root = ?", false).
+		Where(`"fn"."target_id" = ?`, targetID).
+		Where(`"fn"."closed_scan_id" IS NULL`).
+		Where(`"fn"."is_root" = ?`, false).
 		Where(orphaned).
 		Exists(ctx)
 	if err != nil {
@@ -877,10 +877,10 @@ func (s *Store) describe(ctx context.Context, readable []access.Visibility, targ
 	// may not see.
 	err := openIssuesJoin(s.db.NewSelect().
 		TableExpr(`"component" AS "c"`), readable, targetID, nil).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
-		Where("c.id = ?", componentID).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
+		Where(`"c"."id" = ?`, componentID).
 		Scan(ctx, row)
 	// No row is a fault like any other: an open node references its component
 	// by foreign key.
@@ -906,18 +906,18 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 	edges := func() *bun.SelectQuery {
 		return s.db.NewSelect().
 			TableExpr(`"graph_edge" AS "e"`).
-			Join(`JOIN "graph_node" AS "nn" ON nn.id = e.`+near).
-			Join(`JOIN "graph_node" AS "fn" ON fn.id = e.`+far).
-			Where("e.target_id = ?", targetID).
-			Where("nn.component_id = ?", componentID).
-			Where("e.closed_scan_id IS NULL")
+			Join(`JOIN "graph_node" AS "nn" ON "nn"."id" = e.`+near).
+			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = e.`+far).
+			Where(`"e"."target_id" = ?`, targetID).
+			Where(`"nn"."component_id" = ?`, componentID).
+			Where(`"e"."closed_scan_id" IS NULL`)
 	}
 	// The neighbors first, so what is counted against each is counted for
 	// them alone. Counted for the whole build and joined, the step above the
 	// bench kernel groups the build's 325,389 open places for 45 parents
 	// carrying none: 32 ms, against 3 ms for the two statements.
 	var ids []int64
-	if err := edges().ColumnExpr("DISTINCT fn.component_id").Scan(ctx, &ids); err != nil {
+	if err := edges().ColumnExpr(`DISTINCT "fn"."component_id"`).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("walk the graph: %w", err)
 	}
 	if len(ids) == 0 {
@@ -940,17 +940,17 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 	targetID int64, only []int64) *bun.SelectQuery {
 
-	query = query.Join(`JOIN "component" AS "c" ON c.id = fn.component_id`)
+	query = query.Join(`JOIN "component" AS "c" ON "c"."id" = "fn"."component_id"`)
 	return childrenJoin(openIssuesJoin(query, readable, targetID, only), targetID, only).
-		ColumnExpr(`c.id AS "component_id"`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`"c"."id" AS "component_id"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
 		// kids.n and open.n are grouped on as well as selected. Each is one
 		// value per c.id and so adds nothing, but the engines that enforce
 		// the rule strictly will not take a column from a joined subquery on
 		// the strength of a primary key belonging to a different table.
-		GroupExpr("c.id, c.name, c.version, kids.n, open.n").
+		GroupExpr(`"c"."id", "c"."name", "c"."version", kids.n, open.n`).
 		// Anything that opens comes before anything that does not, and within
 		// each the most findings first.
 		//
@@ -961,7 +961,7 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
 		// The identifier last, so two components of one name keep one order.
-		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name, c.id")
+		OrderExpr(`CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, "c"."name", "c"."id"`)
 }
 
 // openIssuesJoin adds how many issues are open against each component "c" in
@@ -999,11 +999,11 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 	}
 	return query.
 		Join(`LEFT JOIN (SELECT g.cid AS "cid", COUNT(*) AS "n"
-			FROM (SELECT f.component_id AS "cid", f.vulnerability_id AS "vid"
+			FROM (SELECT "f"."component_id" AS "cid", "f"."vulnerability_id" AS "vid"
 			      FROM "finding" AS "f"
-			      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)`+within+`
-			      GROUP BY f.component_id, f.vulnerability_id) AS "g"
-			GROUP BY g.cid) AS "open" ON open.cid = c.id`, args...).
+			      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)`+within+`
+			      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
+			GROUP BY g.cid) AS "open" ON open.cid = "c"."id"`, args...).
 		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`)
 }
 
@@ -1028,11 +1028,11 @@ func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.Sel
 		within, args = " AND dp.component_id IN (?)", append(args, bun.List(only))
 	}
 	return query.
-		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
+		Join(`LEFT JOIN (SELECT "dp"."component_id" AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
-			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
-			WHERE d.target_id = ? AND d.closed_scan_id IS NULL`+within+`
-			GROUP BY dp.component_id) AS "kids" ON kids.cid = c.id`, args...).
+			JOIN "graph_node" AS "dp" ON "dp"."id" = "d"."parent_id"
+			WHERE "d"."target_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
+			GROUP BY "dp"."component_id") AS "kids" ON kids.cid = "c"."id"`, args...).
 		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`)
 }
 
@@ -1045,7 +1045,7 @@ func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.Sel
 // once per node, 7.28 s for 59,982 nodes against 45 ms on the index led by the
 // child.
 const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
-	WHERE pe.child_id = fn.id AND pe.closed_scan_id IS NULL)`
+	WHERE "pe"."child_id" = "fn"."id" AND "pe"."closed_scan_id" IS NULL)`
 
 // topLevel reads what the root pulls in and what nothing pulls in, as one
 // list in one statement: the two are read with the same per-build counts, and
@@ -1060,14 +1060,14 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 
 	var rows []Neighbor
 	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, targetID, nil).
-		Where("fn.target_id = ?", targetID).
-		Where("fn.closed_scan_id IS NULL").
-		Where("fn.is_root = ?", false).
+		Where(`"fn"."target_id" = ?`, targetID).
+		Where(`"fn"."closed_scan_id" IS NULL`).
+		Where(`"fn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where(orphaned).
 				WhereOr(`EXISTS (SELECT 1 FROM "graph_edge" AS "re"
-					JOIN "graph_node" AS "rn" ON rn.id = re.parent_id
-					WHERE re.child_id = fn.id AND re.closed_scan_id IS NULL AND rn.is_root = ?)`, true)
+					JOIN "graph_node" AS "rn" ON "rn"."id" = "re"."parent_id"
+					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL AND "rn"."is_root" = ?)`, true)
 		}).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -1184,19 +1184,19 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 	}
 	components, err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
+		Where(`"n"."target_id" = ?`, targetID).
+		Where(`"n"."closed_scan_id" IS NULL`).
 		// The build's own root is not one of its components, which is what the
 		// list beside this number says.
-		Where("n.is_root = ?", false).
+		Where(`"n"."is_root" = ?`, false).
 		Count(ctx)
 	if err != nil {
 		return Tally{}, fmt.Errorf("count what this build holds: %w", err)
 	}
 	edges, err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Where("e.target_id = ?", targetID).
-		Where("e.closed_scan_id IS NULL").
+		Where(`"e"."target_id" = ?`, targetID).
+		Where(`"e"."closed_scan_id" IS NULL`).
 		Count(ctx)
 	if err != nil {
 		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)
@@ -1251,24 +1251,24 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	// escaped as well as folded, so a term of "%" searches for a percent sign.
 	// The build's own root is not one of its components, which is what the
 	// count beside the list says.
-	matched := `(SELECT DISTINCT n.component_id AS "cid"
+	matched := `(SELECT DISTINCT "n"."component_id" AS "cid"
 		FROM "graph_node" AS "n"
-		JOIN "component" AS "m" ON m.id = n.component_id
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.is_root = ?
-		  AND m.name_folded LIKE ?` + database.LikeClause + `) AS "matched"`
+		JOIN "component" AS "m" ON "m"."id" = "n"."component_id"
+		WHERE "n"."target_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."is_root" = ?
+		  AND "m"."name_folded" LIKE ?` + database.LikeClause + `) AS "matched"`
 
 	var rows []Neighbor
 	query := s.db.NewSelect().
 		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
-		Join(`JOIN "component" AS "c" ON c.id = matched.cid`)
+		Join(`JOIN "component" AS "c" ON "c"."id" = matched.cid`)
 	err = childrenJoin(openIssuesJoin(query, readable, targetID, nil), targetID, nil).
-		ColumnExpr(`c.id AS "component_id"`).
-		ColumnExpr(`c.name AS "name"`).
-		ColumnExpr(`c.version AS "version"`).
-		ColumnExpr(`c.purl AS "purl"`).
+		ColumnExpr(`"c"."id" AS "component_id"`).
+		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(`"c"."purl" AS "purl"`).
 		// The identifier last, because a build ships one name at more than
 		// one version and the limit cuts by this order.
-		OrderExpr(`"findings" DESC, c.name, c.id`).
+		OrderExpr(`"findings" DESC, "c"."name", "c"."id"`).
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -1307,20 +1307,20 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "child" ON child.id = e.child_id`).
-		Join(`JOIN "graph_node" AS "parent" ON parent.id = e.parent_id`).
-		ColumnExpr(`child.component_id AS "child_component_id"`).
-		ColumnExpr(`parent.component_id AS "parent_component_id"`).
-		ColumnExpr(`parent.is_root AS "parent_is_root"`).
-		ColumnExpr(`e.kind AS "kind"`).
-		Where("e.target_id = ?", targetID).
-		Where("e.closed_scan_id IS NULL").
-		Where("e.kind <> ?", "").
-		Where("child.component_id IN (?)", bun.List(componentIDs)).
+		Join(`JOIN "graph_node" AS "child" ON "child"."id" = "e"."child_id"`).
+		Join(`JOIN "graph_node" AS "parent" ON "parent"."id" = "e"."parent_id"`).
+		ColumnExpr(`"child"."component_id" AS "child_component_id"`).
+		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
+		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
+		ColumnExpr(`"e"."kind" AS "kind"`).
+		Where(`"e"."target_id" = ?`, targetID).
+		Where(`"e"."closed_scan_id" IS NULL`).
+		Where(`"e"."kind" <> ?`, "").
+		Where(`"child"."component_id" IN (?)`, bun.List(componentIDs)).
 		// The earliest scan first, and within one scan the words in byte
 		// order, so the word kept below is the same on every engine and every
 		// read. One scan opens its edges in no particular order.
-		OrderExpr("e.opened_scan_id, e.kind, e.id").
+		OrderExpr(`"e"."opened_scan_id", "e"."kind", "e"."id"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what the producer called these dependencies: %w", err)

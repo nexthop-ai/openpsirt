@@ -149,8 +149,8 @@ func openFor(t *testing.T, db *database.DB, who int64, kind notify.Kind) []strin
 	t.Helper()
 	var rows []notify.Notification
 	if err := db.DB.NewSelect().Model(&rows).
-		Where("person_id = ?", who).Where("kind = ?", kind).
-		Where("cleared_at IS NULL").Scan(t.Context()); err != nil {
+		Where(`"person_id" = ?`, who).Where(`"kind" = ?`, kind).
+		Where(`"cleared_at" IS NULL`).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	bodies := make([]string, 0, len(rows))

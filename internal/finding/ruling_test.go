@@ -244,9 +244,9 @@ func TestADuplicateOfAnIssueThatIsNotOpenIsRefused(t *testing.T) {
 		}
 
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("closed_at = ?", time.Now().UTC()).
-			Set("closed_because = ?", finding.Upgraded).
-			Where("vulnerability_id = ?", issue).
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Set(`"closed_because" = ?`, finding.Upgraded).
+			Where(`"vulnerability_id" = ?`, issue).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

@@ -317,9 +317,9 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 //
 // A container image is stored with no version, and the identifier this build
 // stamped it with is its node's open image version, joined beside it.
-const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON gn.target_id = f.target_id
-			AND gn.component_id = f.component_id AND gn.closed_scan_id IS NULL
-		LEFT JOIN "image_version" AS "giv" ON giv.node_id = gn.id AND giv.closed_scan_id IS NULL`
+const nodeJoin = `LEFT JOIN "graph_node" AS "gn" ON "gn"."target_id" = "f"."target_id"
+			AND "gn"."component_id" = "f"."component_id" AND "gn"."closed_scan_id" IS NULL
+		LEFT JOIN "image_version" AS "giv" ON "giv"."node_id" = "gn"."id" AND "giv"."closed_scan_id" IS NULL`
 
 // document assembles what stands about one build, at the visibilities asked
 // for.
@@ -344,17 +344,17 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// build ships rather than everything the product has ever decided.
 	q := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(nodeJoin).
-		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`v.id AS "vulnerability_id"`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
-		Where("f.target_id = ?", target.ID).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
+		ColumnExpr(`"v"."identifier" AS "identifier"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
+		Where(`"f"."target_id" = ?`, target.ID).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		// The issue's key is grouped alongside its name so the aliases can be
 		// looked up per issue. Selecting it without grouping it is accepted by
 		// SQLite and refused by PostgreSQL, which is the whole reason a query
@@ -367,7 +367,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// grouping on those emitted the same claim twice — or, where the
 		// outcomes differed, two statements contradicting each other about one
 		// component.
-		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
+		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
 		Limit(s.carrying() + 1)
@@ -542,27 +542,27 @@ func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
 
 	return s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(nodeJoin).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		ColumnExpr(`v.id AS "vulnerability_id"`).
-		ColumnExpr(`v.identifier AS "identifier"`).
-		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`COALESCE(giv.purl, gn.purl, c.purl, '') AS "purl"`).
-		ColumnExpr(`MIN(f.id) AS "first"`).
-		Where("f.target_id = ?", targetID).
-		Where("f.closed_because = ?", because).
-		Where("f.visibility IN (?)", bun.List(visible)).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
+		ColumnExpr(`"v"."identifier" AS "identifier"`).
+		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
+		ColumnExpr(`MIN("f"."id") AS "first"`).
+		Where(`"f"."target_id" = ?`, targetID).
+		Where(`"f"."closed_because" = ?`, because).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(stillShips).
 		Where(noneOpenByNameAndPurl).
-		GroupExpr("v.id, v.identifier, c.name, giv.purl, gn.purl, c.purl").
+		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		Limit(s.carrying() + 1)
 }
 
 // stillShips says the component of a finding `f` is still in its build.
 const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
-	WHERE n.target_id = f.target_id AND n.component_id = f.component_id
-		AND n.closed_scan_id IS NULL)`
+	WHERE "n"."target_id" = "f"."target_id" AND "n"."component_id" = "f"."component_id"
+		AND "n"."closed_scan_id" IS NULL)`
 
 // noneOpenByNameAndPurl says no place of the issue in a finding `f`'s build is
 // open at a component `c` of the same name and package identifier.
@@ -571,10 +571,10 @@ const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
 // may be several components: one at a version a patch does not reach is
 // affected, and a statement naming both would say otherwise.
 const noneOpenByNameAndPurl = `NOT EXISTS (SELECT 1 FROM "finding" AS "o"
-	JOIN "component" AS "oc" ON oc.id = o.component_id
-	WHERE o.target_id = f.target_id AND o.vulnerability_id = f.vulnerability_id
-		AND o.closed_at IS NULL AND oc.name = c.name
-		AND COALESCE(oc.purl, '') = COALESCE(c.purl, ''))`
+	JOIN "component" AS "oc" ON "oc"."id" = "o"."component_id"
+	WHERE "o"."target_id" = "f"."target_id" AND "o"."vulnerability_id" = "f"."vulnerability_id"
+		AND "o"."closed_at" IS NULL AND "oc"."name" = "c"."name"
+		AND COALESCE("oc"."purl", '') = COALESCE("c"."purl", ''))`
 
 // fixedByPatch is an issue a patch the build declares has fixed in one
 // component.
@@ -610,8 +610,8 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		First           int64  `bun:"first"`
 	}
 	err := s.closedInBuild(targetID, visible, finding.Patched).
-		Join(`JOIN "suppression" AS "sup" ON sup.id = f.suppressed_by`).
-		Where("sup.closed_scan_id IS NULL").
+		Join(`JOIN "suppression" AS "sup" ON "sup"."id" = "f"."suppressed_by"`).
+		Where(`"sup"."closed_scan_id" IS NULL`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what the build's patches fix: %w", err)
@@ -628,11 +628,11 @@ func (s *Store) patched(ctx context.Context, targetID int64,
 		ID       int64     `bun:"id"`
 		ClosedAt time.Time `bun:"closed_at"`
 	}
-	where, args := database.InAnyOf("f.id", ids)
+	where, args := database.InAnyOf(`"f"."id"`, ids)
 	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`f.id AS "id"`).
-		ColumnExpr(`f.closed_at AS "closed_at"`).
+		ColumnExpr(`"f"."id" AS "id"`).
+		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
 		Where(where, args...).
 		Scan(ctx, &dated); err != nil {
 		return nil, fmt.Errorf("read when the build's patches were seen: %w", err)
@@ -721,8 +721,8 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		First           int64  `bun:"first"`
 	}
 	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
-		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
-		Where("ss.superseded_at IS NULL").
+		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
+		Where(`"ss"."superseded_at" IS NULL`).
 		// What the place holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
 		Where(finding.LatestAtItsPlace).
@@ -730,7 +730,7 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		// places of one component each spoke for their own product, and the
 		// format names the component once: credited to either, the document
 		// says one of them spoke for the other's.
-		Having("COUNT(DISTINCT f.stated_by) = 1").
+		Having(`COUNT(DISTINCT "f"."stated_by") = 1`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)
@@ -753,19 +753,19 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		Statement     string    `bun:"statement"`
 		Document      string    `bun:"document"`
 	}
-	where, args := database.InAnyOf("f.id", ids)
+	where, args := database.InAnyOf(`"f"."id"`, ids)
 	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
+		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Join(finding.WordsJoin("ss")).
-		ColumnExpr(`f.id AS "id"`).
-		ColumnExpr(`f.closed_at AS "closed_at"`).
-		ColumnExpr(`ss.publisher AS "publisher"`).
-		ColumnExpr(`COALESCE(ss.within, ss.component) AS "product"`).
-		ColumnExpr(`COALESCE(ss.within_about, ss.about) AS "version"`).
-		ColumnExpr(`COALESCE(ss.justification, '') AS "justification"`).
+		ColumnExpr(`"f"."id" AS "id"`).
+		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+		ColumnExpr(`"ss"."publisher" AS "publisher"`).
+		ColumnExpr(`COALESCE("ss"."within", "ss"."component") AS "product"`).
+		ColumnExpr(`COALESCE("ss"."within_about", "ss"."about") AS "version"`).
+		ColumnExpr(`COALESCE("ss"."justification", '') AS "justification"`).
 		ColumnExpr(finding.WordsColumn+` AS "statement"`).
-		ColumnExpr(`ss.document AS "document"`).
+		ColumnExpr(`"ss"."document" AS "document"`).
 		Where(where, args...).
 		Scan(ctx, &read); err != nil {
 		return nil, fmt.Errorf("read the statements that closed them: %w", err)
@@ -897,9 +897,9 @@ func (s *Store) rootOf(ctx context.Context, named *catalog.Named, targetID int64
 	var root string
 	err := s.idb().NewSelect().
 		TableExpr(`"target" AS "t"`).
-		Join(`JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
-		ColumnExpr(`COALESCE(sc.root_identifier, '')`).
-		Where("t.id = ?", targetID).
+		Join(`JOIN "scan" AS "sc" ON "sc"."id" = "t"."last_scan_id"`).
+		ColumnExpr(`COALESCE("sc"."root_identifier", '')`).
+		Where(`"t"."id" = ?`, targetID).
 		Scan(ctx, &root)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("read how the build names itself: %w", err)
@@ -929,19 +929,19 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 	// Split and OR-ed rather than one list. A build with a thousand agreed
 	// dismissals is a thousand identifiers here and a large one is far more,
 	// and a statement binding them all is refused by two of the four engines.
-	where, args := database.InAnyOf("va.vulnerability_id", issues)
+	where, args := database.InAnyOf(`"va"."vulnerability_id"`, issues)
 	err := s.idb().NewSelect().Model((*finding.Alias)(nil)).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = va.vulnerability_id`).
-		ColumnExpr(`va.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`va.identifier AS "identifier"`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "va"."vulnerability_id"`).
+		ColumnExpr(`"va"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"va"."identifier" AS "identifier"`).
 		Where(where, args...).
 		// The other names, so not the one the statement is already
 		// filed under. The alias table holds every name an issue
 		// answers to including its own, which is what makes identity
 		// span them ; a document repeating the primary in its own
 		// alias list says nothing and reads as a mistake.
-		Where("va.identifier <> v.identifier").
-		OrderExpr("va.identifier").
+		Where(`"va"."identifier" <> "v"."identifier"`).
+		OrderExpr(`"va"."identifier"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these issues are also called: %w", err)

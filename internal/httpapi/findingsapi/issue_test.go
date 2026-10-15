@@ -277,18 +277,18 @@ func TestAnIssueIsNotDescribedInTheWordsOfAFlawItsReaderMayNotRead(t *testing.T)
 			ID int64 `bun:"id"`
 		}
 		if err := r.DB.DB.NewSelect().TableExpr(`"vulnerability"`).Column("id").
-			Where("identifier = ?", "CVE-2026-9999").Scan(ctx, &issue); err != nil {
+			Where(`"identifier" = ?`, "CVE-2026-9999").Scan(ctx, &issue); err != nil {
 			t.Fatal(err)
 		}
 		const summary = "The management socket answers before anyone has authenticated."
 		if _, err := r.DB.DB.NewUpdate().TableExpr(`"vulnerability"`).
-			Set("description = ?", summary).Where("id = ?", issue.ID).Exec(ctx); err != nil {
+			Set(`"description" = ?`, summary).Where(`"id" = ?`, issue.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		// The record of it, undisclosed, beside the scanned finding.
 		var scanned finding.Finding
 		if err := r.DB.DB.NewSelect().Model(&scanned).
-			Where("f.vulnerability_id = ?", issue.ID).Limit(1).Scan(ctx); err != nil {
+			Where(`"f"."vulnerability_id" = ?`, issue.ID).Limit(1).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
 		recorded := scanned

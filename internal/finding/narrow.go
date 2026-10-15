@@ -436,12 +436,12 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 		return f.amongKept(db, f.ofRows().narrow(q), targets, visible)
 	}
 	kept := f.listed(db, targets, visible).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return f.ofRows().narrow(q.
-		Join(`JOIN "component" AS "ck" ON ck.id = f.component_id`).
-		Join(`JOIN (?) AS "kept" ON kept.vulnerability_id = f.vulnerability_id`+
-			` AND kept.fold = ck.fold_key`, kept))
+		Join(`JOIN "component" AS "ck" ON "ck"."id" = "f"."component_id"`).
+		Join(`JOIN (?) AS "kept" ON "kept"."vulnerability_id" = "f"."vulnerability_id"`+
+			` AND kept.fold = "ck"."fold_key"`, kept))
 }
 
 // keepsAfterGrouping is whether asListed restricts its query's groups rather
@@ -470,13 +470,13 @@ func (f Filter) amongKept(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	visible []access.Visibility) *bun.SelectQuery {
 
 	kept := f.listed(db, targets, visible).
-		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(FoldedOn + ` AS "fold"`)
 	return db.NewSelect().
 		TableExpr(`(?) AS "listed"`, q).
 		ColumnExpr(`"listed".*`).
-		Join(`JOIN "component" AS "ck" ON ck.id = listed.component_id`).
-		Where(`(listed.vulnerability_id, ck.fold_key) IN (?)`, kept)
+		Join(`JOIN "component" AS "ck" ON "ck"."id" = "listed"."component_id"`).
+		Where(`("listed"."vulnerability_id", "ck"."fold_key") IN (?)`, kept)
 }
 
 // listed is the groups the findings list holds under the filter, one issue at
@@ -554,7 +554,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			// product and low in another belongs to both answers.
 			q = q.Where(rating.EffectiveExpr+" IN (?)", bun.List(words))
 		} else {
-			q = q.Where("f.vulnerability_id IN (?)",
+			q = q.Where(`"f"."vulnerability_id" IN (?)`,
 				q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, f.ProductID).
 					Column("v.id").
@@ -564,7 +564,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// A component name somebody types is matched without regard to
 	// capitals, through the fold stored beside the name.
 	if names := trimmed(f.Components); len(names) > 0 {
-		q = q.Where("f.component_id IN (?)",
+		q = q.Where(`"f"."component_id" IN (?)`,
 			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
 	}
 	// Lowered on both sides rather than asked to compare loosely: the
@@ -578,19 +578,19 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// for a package name in practice.
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.
-				WhereOr("f.component_id IN (?)",
+				WhereOr(`"f"."component_id" IN (?)`,
 					componentsWhere(q, "c.name_folded LIKE ?"+database.LikeClause, like)).
-				WhereOr("f.vulnerability_id IN (?)",
+				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-						Where("LOWER(v.identifier) LIKE ?"+database.LikeClause, like)).
-				WhereOr("f.vulnerability_id IN (?)",
+						Where(`LOWER("v"."identifier") LIKE ?`+database.LikeClause, like)).
+				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability_alias" AS "va"`).
 						Column("va.vulnerability_id").
-						Where("LOWER(va.identifier) LIKE ?"+database.LikeClause, like))
+						Where(`LOWER("va"."identifier") LIKE ?`+database.LikeClause, like))
 		})
 	}
 	if names := trimmed(f.Exclude); len(names) > 0 {
-		q = q.Where("f.component_id NOT IN (?)",
+		q = q.Where(`"f"."component_id" NOT IN (?)`,
 			componentsWhere(q, "c.name_folded IN (?)", bun.List(foldedNames(names))))
 	}
 	if kinds := trimmed(f.Ecosystems); len(kinds) > 0 {
@@ -600,33 +600,33 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		where := q.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id")
 		where = where.WhereGroup(" AND ", func(g *bun.SelectQuery) *bun.SelectQuery {
 			for _, kind := range kinds {
-				g = g.WhereOr("LOWER(c.purl) LIKE ?"+database.LikeClause, "pkg:"+containsTerm(kind)+"/%")
+				g = g.WhereOr(`LOWER("c"."purl") LIKE ?`+database.LikeClause, "pkg:"+containsTerm(kind)+"/%")
 			}
 			return g
 		})
-		q = q.Where("f.component_id IN (?)", where)
+		q = q.Where(`"f"."component_id" IN (?)`, where)
 	}
 	// The producer's own name for it. Correlated on the build rather than bound
 	// to one, so the cross-product list can ask it too, and the leading column
 	// of the statement is the one the edge index leads with.
 	if words := trimmed(f.DeclaredAs); len(words) > 0 {
-		q = q.Where("f.component_id IN (?)",
+		q = q.Where(`"f"."component_id" IN (?)`,
 			q.NewSelect().
 				TableExpr(`"graph_edge" AS "ge"`).
-				Join(`JOIN "graph_node" AS "gch" ON gch.id = ge.child_id`).
-				ColumnExpr(`gch.component_id`).
-				Where("ge.target_id = f.target_id").
-				Where("ge.closed_scan_id IS NULL").
-				Where("ge.kind IN (?)", bun.List(words)))
+				Join(`JOIN "graph_node" AS "gch" ON "gch"."id" = "ge"."child_id"`).
+				ColumnExpr(`"gch"."component_id"`).
+				Where(`"ge"."target_id" = "f"."target_id"`).
+				Where(`"ge"."closed_scan_id" IS NULL`).
+				Where(`"ge"."kind" IN (?)`, bun.List(words)))
 	}
 	// The component holding it. A place records the one that pulls it in, so
 	// asking what is inside a container is asking for places whose consumer is
 	// that container — and what the build holds directly is the places with
 	// none.
 	if f.UnderTheBuild {
-		q = q.Where("f.consumer_id IS NULL")
+		q = q.Where(`"f"."consumer_id" IS NULL`)
 	} else if under := strings.TrimSpace(f.Under); under != "" {
-		q = q.Where("f.consumer_id IN (?)",
+		q = q.Where(`"f"."consumer_id" IN (?)`,
 			componentsWhere(q, "c.name_folded = ?", graph.Folded(under)))
 	}
 	// This product's own word on the issue, as against what was published. A
@@ -635,12 +635,12 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// on the product rather than on the issue alone.
 	if f.Reassessed {
 		if f.Across {
-			q = q.Where("ir.severity IS NOT NULL")
+			q = q.Where(`"ir"."severity" IS NOT NULL`)
 		} else {
-			q = q.Where("f.vulnerability_id IN (?)",
+			q = q.Where(`"f"."vulnerability_id" IN (?)`,
 				q.NewSelect().TableExpr(`"issue_rating" AS "ir"`).
 					Column("ir.vulnerability_id").
-					Where("ir.product_id = ?", f.ProductID))
+					Where(`"ir"."product_id" = ?`, f.ProductID))
 		}
 	}
 	// An uploaded VEX document's statement about this, matched the way a
@@ -663,26 +663,26 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// A row-level condition: a group is in the list when any of its places is
 	// covered by a claim saying what was asked.
 	if says := trimmed(f.BuildSays); len(says) > 0 {
-		q = q.Where(`f.claimed_by IN (SELECT sup.id FROM "suppression" AS "sup"
-			WHERE sup.status IN (?))`, bun.List(says))
+		q = q.Where(`"f"."claimed_by" IN (SELECT "sup"."id" FROM "suppression" AS "sup"
+			WHERE "sup"."status" IN (?))`, bun.List(says))
 	}
 	if f.OpenedByRun > 0 {
 		// A row-level condition rather than one over the group: a group is in
 		// the list when any of its places was opened by that run, which is
 		// what "what this run opened" means — one issue at a component can
 		// appear at a place this run found and at forty it did not.
-		q = q.Where("f.opened_run_id = ?", f.OpenedByRun)
+		q = q.Where(`"f"."opened_run_id" = ?`, f.OpenedByRun)
 	}
 	if f.ProposedAfter != nil {
 		where, args := f.product()
 		q = q.Where(`EXISTS (SELECT 1 FROM `+Decisions+`
 			WHERE `+DecisionAt(where)+`
-			  AND de.proposed_at > ?)`, append(args, *f.ProposedAfter)...)
+			  AND "de"."proposed_at" > ?)`, append(args, *f.ProposedAfter)...)
 	}
 	if f.LikelihoodAtLeast > 0 {
-		q = q.Where("f.vulnerability_id IN (?)",
+		q = q.Where(`"f"."vulnerability_id" IN (?)`,
 			q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
-				Where("COALESCE(v.likelihood_ppm, 0) >= ?", f.LikelihoodAtLeast))
+				Where(`COALESCE("v"."likelihood_ppm", 0) >= ?`, f.LikelihoodAtLeast))
 	}
 	if cwes := trimmed(f.Weaknesses); len(cwes) > 0 {
 		// One indexed lookup against the table that holds them. A
@@ -693,8 +693,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 			upper = append(upper, weakness.Canonical(cwe))
 		}
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability_weakness" AS "vw"
-			WHERE vw.vulnerability_id = f.vulnerability_id
-			  AND vw.cwe IN (?))`, bun.List(upper))
+			WHERE "vw"."vulnerability_id" = "f"."vulnerability_id"
+			  AND "vw"."cwe" IN (?))`, bun.List(upper))
 	}
 	if words := foldedTags(f.Tags); len(words) > 0 {
 		// A tag belongs to the fold, so a row carries a word put on any
@@ -705,19 +705,19 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// finding is about.
 		where, args := f.product()
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
-			JOIN "component" AS "ct" ON ct.id = ft.component_id
-			WHERE ft.product_id = `+where+`
-			  AND ft.vulnerability_id = f.vulnerability_id
-			  AND ct.fold_key = (SELECT c1.fold_key FROM "component" AS "c1"
-				WHERE c1.id = f.component_id)
-			  AND ft.tag IN (?)
+			JOIN "component" AS "ct" ON "ct"."id" = "ft"."component_id"
+			WHERE "ft"."product_id" = `+where+`
+			  AND "ft"."vulnerability_id" = "f"."vulnerability_id"
+			  AND "ct"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"
+				WHERE "c1"."id" = "f"."component_id")
+			  AND "ft"."tag" IN (?)
 			  AND EXISTS (SELECT 1 FROM "finding" AS "fv"
-				JOIN "target" AS "tv" ON tv.id = fv.target_id
-				JOIN "stream" AS "sv" ON sv.id = tv.stream_id
-				WHERE sv.product_id = ft.product_id
-				  AND fv.vulnerability_id = ft.vulnerability_id
-				  AND fv.component_id = ft.component_id
-				  AND fv.visibility = f.visibility))`, append(args, bun.List(words))...)
+				JOIN "target" AS "tv" ON "tv"."id" = "fv"."target_id"
+				JOIN "stream" AS "sv" ON "sv"."id" = "tv"."stream_id"
+				WHERE "sv"."product_id" = "ft"."product_id"
+				  AND "fv"."vulnerability_id" = "ft"."vulnerability_id"
+				  AND "fv"."component_id" = "ft"."component_id"
+				  AND "fv"."visibility" = "f"."visibility"))`, append(args, bun.List(words))...)
 	}
 	// Something a person recorded here rather than a scanner reporting it. Its
 	// own question rather than a shade of another: a recorded flaw is the only
@@ -725,9 +725,9 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// other way to list what has been recorded.
 	switch f.Origin {
 	case RecordedByHand:
-		q = q.Where("f.kind = ?", Entered)
+		q = q.Where(`"f"."kind" = ?`, Entered)
 	case ReportedByAScanner:
-		q = q.Where("f.kind <> ?", Entered)
+		q = q.Where(`"f"."kind" <> ?`, Entered)
 	}
 	if f.SentBack {
 		// The same condition the row's own count is computed from, so the
@@ -741,8 +741,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// or did not, so a group keeps the places that did.
 		where, args := f.product()
 		held := `EXISTS (SELECT 1 FROM "decision" AS "dc"
-			WHERE dc.claim_id = ?
-			  AND dc.product_id = ` + where + `
+			WHERE "dc"."claim_id" = ?
+			  AND "dc"."product_id" = ` + where + `
 			  AND ` + DecisionFiledAt("dc", "f")
 		asked := append([]any{f.Claim}, args...)
 		if states := trimmed(f.ClaimStates); len(states) > 0 {
@@ -755,7 +755,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
-		q = q.Where("f.component_id IN (?)", graph.Within(q.DB(), f.TargetID, *f.Beneath))
+		q = q.Where(`"f"."component_id" IN (?)`, graph.Within(q.DB(), f.TargetID, *f.Beneath))
 	}
 	q = f.byState(q)
 	if !f.BelowFloor {
@@ -784,7 +784,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		// and a fold covering a package with a fix and one without answered
 		// yes to this, no to fix_state=fixed and yes to fix_state=mixed:
 		// three answers to one question.
-		q = q.Having("MIN(f.fixed_in) IS NOT NULL AND MIN(f.fixed_in) <> ?"+
+		q = q.Having(`MIN("f"."fixed_in") IS NOT NULL AND MIN("f"."fixed_in") <> ?`+
 			" AND "+g.places()+" = "+g.withFix(), "")
 	}
 	if f.Unconfirmed {
@@ -793,7 +793,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		// and the applier writes that line to all of them — so they cannot
 		// disagree, and an aggregate guarding against it would be a condition
 		// nothing can make false.
-		q = q.Having("MIN(f.matched) = ?", ByIdentifier)
+		q = q.Having(`MIN("f"."matched") = ?`, ByIdentifier)
 	}
 	// The party dealing with it. Set for the whole group at once, so a group
 	// is held when its places are — asked as MIN and MAX rather than as one
@@ -805,23 +805,23 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	// list of nothing.
 	q = f.heldBy(q, g)
 	if f.OpenedAfter != nil {
-		q = q.Having("MIN(f.opened_at) > ?", *f.OpenedAfter)
+		q = q.Having(`MIN("f"."opened_at") > ?`, *f.OpenedAfter)
 	}
 	if f.ClosedAfter != nil {
 		// Closed rows are outside the list's own population, so this is the
 		// one filter that changes what the list is about rather than
 		// narrowing it. The caller says so by asking for it.
-		q = q.Having("MAX(f.closed_at) > ?", *f.ClosedAfter)
+		q = q.Having(`MAX("f"."closed_at") > ?`, *f.ClosedAfter)
 	}
 	if f.OpenedBefore != nil {
 		// The oldest place decides: a group open here for a month with one
 		// place added yesterday has been somebody's problem for a month.
-		q = q.Having("MIN(f.opened_at) < ?", *f.OpenedBefore)
+		q = q.Having(`MIN("f"."opened_at") < ?`, *f.OpenedBefore)
 	}
 	if f.Overdue {
-		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", f.at())
+		q = q.Having(`MIN("f"."due_at") IS NOT NULL AND MIN("f"."due_at") < ?`, f.at())
 	} else if f.DueBefore != nil {
-		q = q.Having("MIN(f.due_at) IS NOT NULL AND MIN(f.due_at) < ?", *f.DueBefore)
+		q = q.Having(`MIN("f"."due_at") IS NOT NULL AND MIN("f"."due_at") < ?`, *f.DueBefore)
 	}
 	q = f.whatUpstreamDid(q, g)
 	// The places a promised upgrade covers, or the ones none does. A condition
@@ -840,7 +840,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	// than over every build there is: "differs" is a statement about what is
 	// being looked at.
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
-		q = q.Having("COUNT(DISTINCT f.target_id) < ?", f.Builds)
+		q = q.Having(`COUNT(DISTINCT "f"."target_id") < ?`, f.Builds)
 	}
 	return f.statesHaving(q, g)
 }
@@ -868,7 +868,7 @@ func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, 
 // Spelled as a scalar subquery, which is how the other five lookups of this
 // shape here are written, rather than as a join correlated outward from
 // inside a subquery.
-const onThisRowsBranch = `(SELECT tg0.stream_id FROM "target" AS "tg0"` +
+const onThisRowsBranch = `(SELECT "tg0"."stream_id" FROM "target" AS "tg0"` +
 	` WHERE tg0.id = f.target_id)`
 
 // acrossVariants keeps rows by how the variants of a branch share them.
@@ -896,13 +896,13 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 	// build is added by the caller.
 	heldElsewhere := func() *bun.SelectQuery {
 		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
-			Join(`JOIN "component" AS "c2" ON c2.id = f2.component_id`).
+			Join(`JOIN "component" AS "c2" ON "c2"."id" = "f2"."component_id"`).
 			ColumnExpr("1").
-			Where("f2.vulnerability_id = f.vulnerability_id").
-			Where(`c2.fold_key = (SELECT c1.fold_key FROM "component" AS "c1"`+
-				` WHERE c1.id = f.component_id)`).
-			Where("f2.closed_at IS NULL").
-			Where("f2.visibility IN (?)", bun.List(f.Visible))
+			Where(`"f2"."vulnerability_id" = "f"."vulnerability_id"`).
+			Where(`"c2"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"`+
+				` WHERE "c1"."id" = "f"."component_id")`).
+			Where(`"f2"."closed_at" IS NULL`).
+			Where(`"f2"."visibility" IN (?)`, bun.List(f.Visible))
 	}
 	switch f.AcrossVariants {
 	case OnlyThisVariant:
@@ -913,17 +913,17 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where("1 = 0")
 		}
 		others := q.NewSelect().TableExpr(`"target" AS "tg2"`).
-			ColumnExpr("tg2.id").
-			Where("tg2.stream_id = "+onThisRowsBranch).
-			Where("tg2.variant_id <> ?", *f.VariantID)
+			ColumnExpr(`"tg2"."id"`).
+			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
+			Where(`"tg2"."variant_id" <> ?`, *f.VariantID)
 		return q.Where("NOT EXISTS (?)", heldElsewhere().
-			Where("f2.target_id IN (?)", others))
+			Where(`"f2"."target_id" IN (?)`, others))
 	case EveryVariant:
 		// No build on the row's own branch lacks it.
 		lacking := q.NewSelect().TableExpr(`"target" AS "tg2"`).
-			ColumnExpr("tg2.id").
-			Where("tg2.stream_id = "+onThisRowsBranch).
-			Where("NOT EXISTS (?)", heldElsewhere().Where("f2.target_id = tg2.id"))
+			ColumnExpr(`"tg2"."id"`).
+			Where(`"tg2"."stream_id" = `+onThisRowsBranch).
+			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."target_id" = "tg2"."id"`))
 		return q.Where("NOT EXISTS (?)", lacking)
 	}
 	return q
@@ -1057,13 +1057,13 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 			about = append(about, bun.List(saidIt))
 		}
 		narrowing := strings.Join(asked, " AND ")
-		alone := narrowing + ` AND (ss.within IS NULL OR NOT EXISTS (SELECT 1
+		alone := narrowing + ` AND ("ss"."within" IS NULL OR NOT EXISTS (SELECT 1
 			FROM "component" AS "pc"
-			JOIN "graph_node" AS "pn" ON pn.component_id = pc.id
-			JOIN "target" AS "pt" ON pt.id = pn.target_id
-			JOIN "stream" AS "ps" ON ps.id = pt.stream_id
-			WHERE ps.product_id = ss.product_id AND pn.closed_scan_id IS NULL
-			  AND pc.name_folded = ss.within))`
+			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"
+			JOIN "target" AS "pt" ON "pt"."id" = "pn"."target_id"
+			JOIN "stream" AS "ps" ON "ps"."id" = "pt"."stream_id"
+			WHERE "ps"."product_id" = "ss"."product_id" AND "pn"."closed_scan_id" IS NULL
+			  AND "pc"."name_folded" = "ss"."within"))`
 
 		// The issue under its own name, and under every other name it
 		// goes by: which identifier a publisher chose says nothing
@@ -1078,17 +1078,17 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// LOWERon the issue's side the plan scanned the whole
 		// vulnerability table, and the whole alias table, once per
 		// statement.
-		pairs := `(SELECT ss.product_id AS "product_id", vc.id AS "component_id",
-			vv.issue_id AS "vulnerability_id"
+		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."id" AS "component_id",
+			"vv"."issue_id" AS "vulnerability_id"
 			FROM "vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON vc.name_folded = ss.component
-			JOIN "vulnerability" AS "vv" ON vv.identifier_folded = ss.vulnerability
+			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
+			JOIN "vulnerability" AS "vv" ON "vv"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `
 			UNION
-			SELECT ss.product_id, vc.id, vl.vulnerability_id
+			SELECT "ss"."product_id", "vc"."id", "vl"."vulnerability_id"
 			FROM "vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON vc.name_folded = ss.component
-			JOIN "vulnerability_alias" AS "vl" ON vl.identifier_folded = ss.vulnerability
+			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
+			JOIN "vulnerability_alias" AS "vl" ON "vl"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `)`
 
 		where, args := f.product()
@@ -1096,18 +1096,18 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		joined = append(joined, about...)
 		joined = append(joined, about...)
 		joined = append(joined, args...)
-		q = q.Join("LEFT JOIN "+pairs+` AS "vx" ON vx.component_id = f.component_id`+
-			" AND vx.vulnerability_id = f.vulnerability_id"+
+		q = q.Join("LEFT JOIN "+pairs+` AS "vx" ON "vx"."component_id" = "f"."component_id"`+
+			` AND "vx"."vulnerability_id" = "f"."vulnerability_id"`+
 			// Correlated on the row's own product where the list spans them,
 			// so a statement in one product cannot answer for a finding in
 			// another.
-			" AND vx.product_id = "+where, joined...).
+			` AND "vx"."product_id" = `+where, joined...).
 			// The union is distinct on the pair, so the join adds at most one
 			// row to a finding. A statement the run answered a finding with
 			// is in the finding's own product, because the run reads that
 			// product's statements and no other's.
-			Where(`(vx.component_id IS NOT NULL OR f.stated_by IN
-				(SELECT ss.id FROM "vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
+			Where(`("vx"."component_id" IS NOT NULL OR "f"."stated_by" IN
+				(SELECT "ss"."id" FROM "vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
 	}
 	return q
 }

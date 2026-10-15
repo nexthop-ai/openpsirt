@@ -70,7 +70,7 @@ func madeOnOf(ctx context.Context, db bun.IDB, claims []int64) (map[int64][]int6
 		return out, nil
 	}
 	var rows []MadeOn
-	where, args := database.InAnyOf("cb.claim_id", claims)
+	where, args := database.InAnyOf(`"cb"."claim_id"`, claims)
 	if err := db.NewSelect().Model(&rows).Where(where, args...).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the builds a claim was made on: %w", err)
 	}

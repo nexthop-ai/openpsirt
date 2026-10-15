@@ -47,8 +47,8 @@ func TestManyIssuesAreToldOfAsEachOneWouldBe(t *testing.T) {
 			ids[name] = id
 		}
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-			Set("visibility = ?", access.Private).
-			Where("vulnerability_id = ?", ids["CVE-2026-2"]).Exec(ctx); err != nil {
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, ids["CVE-2026-2"]).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -78,8 +78,8 @@ func TestManyIssuesAreToldOfAsEachOneWouldBe(t *testing.T) {
 		// never reaches.
 		collaborator := reader.OnCases(map[int64][]int64{f.productID: {ids["CVE-2026-2"]}})
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
-			Set("issue_id = ?", ids["CVE-2026-1"]).
-			Where("id = ?", ids["CVE-2026-3"]).Exec(ctx); err != nil {
+			Set(`"issue_id" = ?`, ids["CVE-2026-1"]).
+			Where(`"id" = ?`, ids["CVE-2026-3"]).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		for _, c := range []struct {

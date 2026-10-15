@@ -83,20 +83,20 @@ func TestASweepLeavesAloneWhoeverHasNothingToHearOrClear(t *testing.T) {
 			t.Fatal(err)
 		}
 		if n := asked.containing(`FROM "notification" AS "nt"`,
-			fmt.Sprintf("(person_id = %d)", tm.admin.ID)); n == 0 {
+			fmt.Sprintf(`"person_id" = %d)`, tm.admin.ID)); n == 0 {
 			t.Fatal("the sweep did not reconcile the administrator, so this checked nothing")
 		}
 		for _, kind := range []notify.Kind{notify.DisclosureDue, notify.DisclosureNear,
 			notify.BuildQuiet, notify.HoldingAbsent, notify.VulnerabilityDataStale,
 			notify.RiskUnagreed, notify.PairsConcentrated, notify.SupplierSilent} {
 			if n := asked.containing(`FROM "notification" AS "nt"`,
-				fmt.Sprintf("(person_id = %d)", quiet.ID), fmt.Sprintf("'%s'", kind)); n != 0 {
+				fmt.Sprintf(`"person_id" = %d)`, quiet.ID), fmt.Sprintf("'%s'", kind)); n != 0 {
 				t.Errorf("an administrator holding nothing was reconciled %d times on %s", n, kind)
 			}
 		}
 		for name, person := range tm.people {
 			if n := asked.containing(`FROM "notification" AS "nt"`,
-				fmt.Sprintf("(person_id = %d)", person.ID)); n != 0 {
+				fmt.Sprintf(`"person_id" = %d)`, person.ID)); n != 0 {
 				t.Errorf("%s holds nothing and was reconciled %d times", name, n)
 			}
 		}

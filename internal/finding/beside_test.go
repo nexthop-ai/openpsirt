@@ -89,9 +89,9 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 		hold := func(component graph.Described, by int64) {
 			t.Helper()
 			if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-				Set("assigned_to = ?", by).
-				Where("vulnerability_id = ?", f.issueID(t, "CVE-2026-FOLD")).
-				Where("component_id = (SELECT id FROM \"component\" WHERE purl = ?)", component.Purl).
+				Set(`"assigned_to" = ?`, by).
+				Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-FOLD")).
+				Where(`"component_id" = (SELECT "id" FROM "component" WHERE "purl" = ?)`, component.Purl).
 				Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +156,7 @@ func TestUndecidedReadsTheDecidedPlacesOfEveryIssueADecisionMarks(t *testing.T) 
 		}
 		absorbed := f.issueID(t, "GHSA-aaaa-bbbb-cccc")
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
-			Set("issue_id = ?", f.issueID(t, "CVE-2026-MERGED")).Where("id = ?", absorbed).Exec(ctx); err != nil {
+			Set(`"issue_id" = ?`, f.issueID(t, "CVE-2026-MERGED")).Where(`"id" = ?`, absorbed).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		by := f.somebodyElse(t)

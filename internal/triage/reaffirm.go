@@ -94,7 +94,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	// the row says where the earlier judgment landed, and the claim says what
 	// it was.
 	if err := s.db.NewSelect().Model(previous).Relation("Claim").
-		Where("de.id = ?", r.PreviousID).Scan(ctx); err != nil {
+		Where(`"de"."id" = ?`, r.PreviousID).Scan(ctx); err != nil {
 		return nil, database.FromRead(err, ErrNotTheirs, fmt.Sprintf("read decision %d", r.PreviousID))
 	}
 	// Authorized against the row, not against what the caller said about it.
@@ -131,7 +131,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	// since: the rule the list of what is yours to re-affirm holds. A
 	// decision still standing carried its agreement to whatever place it was
 	// re-made at, and a second person never saw the new one.
-	reaffirmable, err := s.yoursToReaffirm(subject).Where("de.id = ?", previous.ID).Exists(ctx)
+	reaffirmable, err := s.yoursToReaffirm(subject).Where(`"de"."id" = ?`, previous.ID).Exists(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read whether that decision is yours to re-affirm: %w", err)
 	}
@@ -245,12 +245,12 @@ func (s *Store) severityOf(ctx context.Context, productID, vulnerabilityID int64
 	// the published word and the product's rating to the issue kept.
 	if err := s.db.NewSelect().
 		TableExpr(`"vulnerability" AS "sv"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = sv.issue_id`).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "sv"."issue_id"`).
 		Join(rating.Here, productID).
-		ColumnExpr(`COALESCE(v.severity, '') AS "published"`).
-		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed"`).
-		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		Where("sv.id = ?", vulnerabilityID).Scan(ctx, &issue); err != nil {
+		ColumnExpr(`COALESCE("v"."severity", '') AS "published"`).
+		ColumnExpr(`COALESCE("ir"."severity", '') AS "assessed"`).
+		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+		Where(`"sv"."id" = ?`, vulnerabilityID).Scan(ctx, &issue); err != nil {
 		return 0, fmt.Errorf("read how bad this is now: %w", err)
 	}
 	return finding.Rating{
@@ -322,9 +322,9 @@ func turnsOnSeverity(claim Claim) bool {
 func (s *Store) approvalToCarry(ctx context.Context, claimID, notBy int64) (*Approval, error) {
 	var found []Approval
 	if err := s.db.NewSelect().Model(&found).
-		Where("claim_id = ?", claimID).
-		Where("withdrawn_at IS NULL").
-		Where("approved_by <> ?", notBy).
+		Where(`"claim_id" = ?`, claimID).
+		Where(`"withdrawn_at" IS NULL`).
+		Where(`"approved_by" <> ?`, notBy).
 		Order("id DESC").Limit(1).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what agreed to that: %w", err)
 	}

@@ -81,8 +81,8 @@ func TestAFixIsNotNamedOnARecordClearedAtTheSameTime(t *testing.T) {
 		}
 		var acts []trail.Change
 		if err := f.db.DB.NewSelect().Model(&acts).
-			Where("ac.kind = ?", trail.ExploitedHere).
-			OrderExpr("ac.id").Scan(t.Context()); err != nil {
+			Where(`"ac"."kind" = ?`, trail.ExploitedHere).
+			OrderExpr(`"ac"."id"`).Scan(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		naming, clearing := -1, -1

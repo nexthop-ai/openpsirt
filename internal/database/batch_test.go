@@ -118,7 +118,7 @@ func TestAnInsertReadingNothingBackStoresWhatItIsGiven(t *testing.T) {
 		}
 		read := func(prefix string) []issueRow {
 			var stored []issueRow
-			if err := db.NewSelect().Model(&stored).Where("identifier LIKE ?", prefix+"-%").
+			if err := db.NewSelect().Model(&stored).Where(`"identifier" LIKE ?`, prefix+"-%").
 				Order("identifier").Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -213,7 +213,7 @@ func TestAKeyedInsertCarriesTheIdentifiersTheDatabaseStored(t *testing.T) {
 				t.Fatal(err)
 			}
 			var stored []issueRow
-			if err := conn.NewSelect().Model(&stored).Where("identifier LIKE ?", prefix+"-%").
+			if err := conn.NewSelect().Model(&stored).Where(`"identifier" LIKE ?`, prefix+"-%").
 				Scan(ctx); err != nil {
 				t.Fatal(err)
 			}

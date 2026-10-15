@@ -198,10 +198,10 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 		// wrote one; what leaves this deployment by mail or webhook is
 		// composed from the row.
 		written, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
-			Join(`JOIN "person" AS "p" ON p.id = n.person_id`).
-			Where("p.identity = ?", "triager").
-			Where("n.kind = ?", "obligation-open").
-			Where("n.cleared_at IS NULL").
+			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
+			Where(`"p"."identity" = ?`, "triager").
+			Where(`"n"."kind" = ?`, "obligation-open").
+			Where(`"n"."cleared_at" IS NULL`).
 			Count(t.Context())
 		if err != nil {
 			t.Fatal(err)

@@ -206,8 +206,8 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		// On the decisions, for the reason decidedBeside gives.
 		decided = f.amongDecidedIssues(decided, "dv.issue_id")
 	}
-	decided = decided.Where("de.product_id = ?", f.ProductID)
-	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = f.id`, decided)
+	decided = decided.Where(`"de"."product_id" = ?`, f.ProductID)
+	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`, decided)
 }
 
 // asksDecided is whether any condition the filter asks of a group reads the
@@ -258,18 +258,18 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		// all. Both are the same question and have to be the same condition.
 		// A proposal that needs nobody is in force rather than waiting, and
 		// counts with the agreed ones, as the row's own counts do.
-		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.needs_approval = ? AND de.live_key IS NOT NULL`+
+		ColumnExpr(`MAX(CASE WHEN "de"."state" = ? AND "de"."needs_approval" = ? AND "de"."live_key" IS NOT NULL`+
 			` THEN 1 ELSE 0 END) AS "waiting"`, proposed, true).
-		ColumnExpr(`MAX(CASE WHEN `+standingHere+` AND de.live_key IS NOT NULL`+
+		ColumnExpr(`MAX(CASE WHEN `+standingHere+` AND "de"."live_key" IS NOT NULL`+
 			` THEN 1 ELSE 0 END) AS "approved"`, inForce...).
-		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
+		ColumnExpr(`MAX(CASE WHEN "de"."state" = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
 		// A promise to upgrade standing over this place. Counted only for the
 		// claim that currently stands, like "approved" above: a promise that
 		// was withdrawn is not one, and a finding it covered is unplanned
 		// again with nothing to clean up. That is the whole argument for
 		// deriving this rather than writing a tag.
-		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
-			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
+		ColumnExpr(`MAX(CASE WHEN "de"."live_key" IS NOT NULL AND `+standingHere+
+			` AND "cl"."outcome" = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), OutcomeUpgradeNeeded)...).
 		// The kind of judgment standing here, counted only for the claim that
 		// currently stands: a dismissal withdrawn eighteen months ago must not
@@ -277,8 +277,8 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		// — and neither must one still waiting for a second person, or asking
 		// what has been dismissed answers with what somebody has merely
 		// proposed dismissing.
-		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
-			` AND cl.outcome IN (?) THEN 1 ELSE 0 END) AS "this_outcome"`,
+		ColumnExpr(`MAX(CASE WHEN "de"."live_key" IS NOT NULL AND `+standingHere+
+			` AND "cl"."outcome" IN (?) THEN 1 ELSE 0 END) AS "this_outcome"`,
 			append(append([]any{}, inForce...), bun.List(outcomes))...)
 }
 
@@ -353,17 +353,17 @@ func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products [
 		}
 		// Every flag flagColumns computes needs one of the two: lapsed is the
 		// state, and the rest require the key.
-		needed, args, into = "(de.state = ? OR de.live_key IS NOT NULL)", []any{"lapsed"}, &filter.placedIssues
+		needed, args, into = `("de"."state" = ? OR "de"."live_key" IS NOT NULL)`, []any{"lapsed"}, &filter.placedIssues
 	}
 	q := s.db.NewSelect().TableExpr(Decisions).
-		ColumnExpr("dv.issue_id").Distinct().
+		ColumnExpr(`"dv"."issue_id"`).Distinct().
 		Where(needed, args...)
 	if !all {
 		if len(products) == 0 {
 			*into = []int64{}
 			return nil
 		}
-		q = q.Where("de.product_id IN (?)", bun.List(products))
+		q = q.Where(`"de"."product_id" IN (?)`, bun.List(products))
 	}
 	issues := []int64{}
 	if err := q.Scan(ctx, &issues); err != nil {

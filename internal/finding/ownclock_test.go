@@ -16,8 +16,8 @@ func (f *fixture) rowsOf(t *testing.T, identifier string) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("vulnerability_id = ?", f.issueID(t, identifier)).
-		Where("closed_at IS NULL").
+		Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
+		Where(`"closed_at" IS NULL`).
 		Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +68,8 @@ func TestAFlawNobodyHasRatedHasNoDeadlineUntilItIsRated(t *testing.T) {
 
 		// Written down three weeks ago, and rated now.
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("opened_at = ?", time.Now().UTC().AddDate(0, 0, -21)).
-			Where("vulnerability_id = ?", f.issueID(t, identifier)).
+			Set(`"opened_at" = ?`, time.Now().UTC().AddDate(0, 0, -21)).
+			Where(`"vulnerability_id" = ?`, f.issueID(t, identifier)).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -145,8 +145,8 @@ func TestRatingAFlawAgainDoesNotRestartItsClock(t *testing.T) {
 		}
 		rated := time.Now().UTC().AddDate(0, 0, -40).Truncate(time.Microsecond)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("rated_at = ?", rated).
-			Where("vulnerability_id = ?", issue).
+			Set(`"rated_at" = ?`, rated).
+			Where(`"vulnerability_id" = ?`, issue).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -294,8 +294,8 @@ func TestABuildAddedToAFlawKeepsTheClockItAlreadyHas(t *testing.T) {
 		}
 		rated := time.Now().UTC().AddDate(0, 0, -40).Truncate(time.Microsecond)
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
-			Set("rated_at = ?", rated).
-			Where("vulnerability_id = ?", rows[0].VulnerabilityID).
+			Set(`"rated_at" = ?`, rated).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
 			Exec(ctx); err != nil {
 			t.Fatal(err)
 		}

@@ -218,7 +218,7 @@ func (f *fixture) openClaims(t *testing.T) []finding.Claim {
 	t.Helper()
 	var rows []finding.Claim
 	if err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id = ?", f.target).Where("closed_scan_id IS NULL").
+		Where(`"target_id" = ?`, f.target).Where(`"closed_scan_id" IS NULL`).
 		Order("id").Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func (f *fixture) every(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id = ?", f.target).Order("id").Scan(t.Context())
+		Where(`"target_id" = ?`, f.target).Order("id").Scan(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func (f *fixture) open(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding
 	err := f.db.DB.NewSelect().Model(&rows).
-		Where("target_id = ?", f.target).Where("closed_at IS NULL").Scan(t.Context())
+		Where(`"target_id" = ?`, f.target).Where(`"closed_at" IS NULL`).Scan(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

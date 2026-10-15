@@ -20,8 +20,8 @@ import (
 func holdEverything(t *testing.T, f *fixture, party int64) {
 	t.Helper()
 	if _, err := f.db.DB.NewUpdate().Table("finding").
-		Set("assigned_to = ?", party).
-		Where("target_id = ?", f.targetID).
+		Set(`"assigned_to" = ?`, party).
+		Where(`"target_id" = ?`, f.targetID).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

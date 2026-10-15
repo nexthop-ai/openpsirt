@@ -585,7 +585,7 @@ func rivalAfterRead(t *testing.T, f *fixture, read, write string, rival func() e
 func trailed(t *testing.T, f *fixture, name string) int {
 	t.Helper()
 	n, err := f.db.DB.NewSelect().TableExpr(`"admin_change"`).
-		Where("about = ?", "Obligation window "+name).Count(t.Context())
+		Where(`"about" = ?`, "Obligation window "+name).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -652,7 +652,7 @@ func TestANoticeAboutAnUndisclosedIssueIsRefusedToWhoMayNotReadIt(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		record := f.attacked(t)
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
-			Set("visibility = ?", access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
+			Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		_, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",

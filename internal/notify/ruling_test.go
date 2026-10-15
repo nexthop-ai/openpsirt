@@ -70,8 +70,8 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		}
 		// Older than a claim may wait.
 		if _, err := db.DB.NewUpdate().Model((*finding.ReportRuling)(nil)).
-			Set("proposed_at = ?", time.Now().UTC().Add(-8*24*time.Hour)).
-			Where("id = ?", ruling.ID).Exec(ctx); err != nil {
+			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-8*24*time.Hour)).
+			Where(`"id" = ?`, ruling.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -128,8 +128,8 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 			t.Fatal(err)
 		}
 		if _, err := db.DB.NewUpdate().Model((*finding.ReportRuling)(nil)).
-			Set("proposed_at = ?", time.Now().UTC().Add(-8*24*time.Hour)).
-			Where("id = ?", taken.ID).Exec(ctx); err != nil {
+			Set(`"proposed_at" = ?`, time.Now().UTC().Add(-8*24*time.Hour)).
+			Where(`"id" = ?`, taken.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := store.WithdrawRuling(ctx, proposing, product.ID, taken.ID); err != nil {
