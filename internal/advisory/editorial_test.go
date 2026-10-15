@@ -235,6 +235,23 @@ func TestTheDocumentSaysWhereItIsInItsLifeRatherThanWhetherItIsEmbargoed(t *test
 				t.Errorf("%s the document says %q, want %q",
 					when, doc.Document.Tracking.Status, want)
 			}
+			// And the list says the same, from the counts it reads.
+			rows, _, err := f.store.List(ctx, f.who, advisory.Covering{}, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			listed := false
+			for _, row := range rows {
+				if row.Identifier == named {
+					listed = true
+					if row.Status() != want {
+						t.Errorf("%s the list says %q, want %q", when, row.Status(), want)
+					}
+				}
+			}
+			if !listed {
+				t.Errorf("%s the list does not hold %s", when, named)
+			}
 		}
 
 		says(t, "with nobody agreeing and nothing published", "draft")
