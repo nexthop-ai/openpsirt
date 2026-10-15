@@ -224,7 +224,7 @@ type Planned struct {
 	// By is the date the promise named, where a judgment promised one. Read
 	// from the commitment, which is the record a release plan is kept in.
 	By *time.Time
-	// HeldBy is the party carrying it, where one party carries all of what is
+	// HeldBy is what the party carrying it is called, where one party carries all of what is
 	// still open under it. A bump split between two people is nobody's, and
 	// saying it is somebody's would hand them work that is half theirs.
 	HeldBy string
@@ -467,13 +467,18 @@ func (s *Store) holders(ctx context.Context, planned []Planned, held map[string]
 	if len(parties) == 0 {
 		return nil
 	}
-	named, err := s.partiesNamed(ctx, parties)
+	ids := make([]int64, 0, len(parties))
+	for id := range parties {
+		ids = append(ids, id)
+	}
+	// A person or a team, named the way every other screen names a holder.
+	named, err := access.NewStore(s.db).WhoHolds(ctx, ids)
 	if err != nil {
 		return err
 	}
 	for i := range planned {
 		if who := held[planned[i].Fold].party; who != nil {
-			planned[i].HeldBy = named[*who]
+			planned[i].HeldBy = named[*who].Name
 		}
 	}
 	return nil
@@ -498,53 +503,6 @@ func upgradeStanding(one Planned, now time.Time) UpgradeState {
 		return UpgradeLapsed
 	}
 	return UpgradePlanned
-}
-
-// partiesNamed is what to call each of these parties: a person by the identity
-// they sign in as, a team by its name.
-//
-// Both, because the column holds a party and a team is a perfectly good holder
-// of work — a lookup that knew only people would report a team's upgrade as
-// held by nobody, which is the opposite of what it is.
-func (s *Store) partiesNamed(ctx context.Context, parties map[int64]bool) (map[int64]string, error) {
-	ids := make([]int64, 0, len(parties))
-	for id := range parties {
-		ids = append(ids, id)
-	}
-	var rows []struct {
-		PartyID int64  `bun:"party_id"`
-		Name    string `bun:"name"`
-	}
-	err := s.db.NewSelect().
-		TableExpr(`"person" AS "p"`).
-		ColumnExpr(`p.party_id AS "party_id"`).
-		ColumnExpr(`p.identity AS "name"`).
-		Where("p.party_id IN (?)", bun.List(ids)).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("read who is carrying it: %w", err)
-	}
-	named := make(map[int64]string, len(ids))
-	for _, row := range rows {
-		named[row.PartyID] = row.Name
-	}
-	var teams []struct {
-		PartyID int64  `bun:"party_id"`
-		Name    string `bun:"name"`
-	}
-	err = s.db.NewSelect().
-		TableExpr(`"team" AS "t"`).
-		ColumnExpr(`t.party_id AS "party_id"`).
-		ColumnExpr(`t.name AS "name"`).
-		Where("t.party_id IN (?)", bun.List(ids)).
-		Scan(ctx, &teams)
-	if err != nil {
-		return nil, fmt.Errorf("read which team is carrying it: %w", err)
-	}
-	for _, row := range teams {
-		named[row.PartyID] = row.Name
-	}
-	return named, nil
 }
 
 // foldOf reads what a component folds to, and the version it is at.

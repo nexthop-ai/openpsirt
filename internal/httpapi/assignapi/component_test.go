@@ -69,8 +69,8 @@ func TestAnUpgradeIsHandedToWhoeverCarriesIt(t *testing.T) {
 		}
 		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades",
 			&waiting)
-		if len(waiting.Items) != 1 || waiting.Items[0].HeldBy != "platform" {
-			t.Errorf("the plan says it is carried by %+v, want the team", waiting.Items)
+		if len(waiting.Items) != 1 || waiting.Items[0].HeldBy != "Platform" {
+			t.Errorf("the plan says it is carried by %+v, want the team by its display name", waiting.Items)
 		}
 	})
 }
