@@ -637,11 +637,11 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				TableExpr(`"finding" AS "f"`).
 				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-				ColumnExpr(`"f"."`+start.column+`"`).
+				ColumnExpr(string(database.Column(s.db, "f."+start.column))).
 				Where(`"f"."closed_at" IS NULL`).
 				Where(`"st"."product_id" = ?`, productID).
 				Where(start.from(`"f".`), start.args...).
-				GroupExpr(`"f"."`+start.column+`"`).
+				GroupExpr(string(database.Column(s.db, "f."+start.column))).
 				Scan(ctx, &moments)
 			if err != nil {
 				return changed, fmt.Errorf("read when the clock started on what is open: %w", err)
@@ -660,13 +660,13 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				for _, each := range bands {
 					for first := 0; first < len(moments); first += database.BatchSize {
 						chunk := moments[first:min(first+database.BatchSize, len(moments))]
-						said, args := whenOpened(`"`+start.column+`"`, chunk, each.window)
+						said, args := whenOpened(string(database.Column(s.db, start.column)), chunk, each.window)
 						query := s.db.NewUpdate().
 							Model((*Finding)(nil)).
 							Set(`"due_at" = `+database.AsTimestamp(s.db, said), args...).
 							Where(`"id" > ?`, from).
 							Where(`"id" <= ?`, from+recomputeSlice).
-							Where(`"`+start.column+`" IN (?)`, bun.List(chunk)).
+							Where(string(database.Column(s.db, start.column))+` IN (?)`, bun.List(chunk)).
 							Where(start.from(""), start.args...).
 							Where(`"closed_at" IS NULL`).
 							Where(`"kind" <> ?`, Entered).

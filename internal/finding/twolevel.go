@@ -5,6 +5,8 @@ package finding
 
 import (
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // The findings list's groups in two levels.
@@ -149,6 +151,7 @@ func (f Filter) folded(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.S
 // groups can no longer be read from finding's covering index: 1,067 ms against
 // 575 ms for a build's unsettled work on PostgreSQL with 133,549 decisions.
 func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey) *bun.SelectQuery {
+	col := func(name string) string { return string(database.Column(db, name)) }
 	apart := f
 	apart.decidedApart = true
 	columns := append(append([]partColumn{}, headColumns...), apart.partialColumns()...)
@@ -212,16 +215,16 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 		places = places.Where(`"de"."product_id" = ?`, f.ProductID)
 	}
 	for _, key := range keys {
-		places = places.ColumnExpr(`"f2"."` + key.name + `" AS "` + key.name + `"`).GroupExpr(`"f2"."` + key.name + `"`)
+		places = places.ColumnExpr(col("f2."+key.name) + ` AS "` + key.name + `"`).GroupExpr(col("f2." + key.name))
 	}
 	decided := places
 	if perPlace {
 		decided = db.NewSelect().TableExpr(`(?) AS "dp"`, places)
 		for _, key := range keys {
-			decided = decided.ColumnExpr(`"dp"."` + key.name + `"`).GroupExpr(`"dp"."` + key.name + `"`)
+			decided = decided.ColumnExpr(col("dp." + key.name)).GroupExpr(col("dp." + key.name))
 		}
 		for _, flag := range decidedFlags {
-			decided = decided.ColumnExpr(`SUM(dp.` + flag + `) AS "` + flag + `"`)
+			decided = decided.ColumnExpr(`SUM(` + col("dp."+flag) + `) AS "` + flag + `"`)
 		}
 	}
 
@@ -238,7 +241,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	// column.
 	others := db.NewSelect().TableExpr(`(?) AS "d"`, decided)
 	for _, key := range keys {
-		others = others.ColumnExpr(`"d"."` + key.name + `" AS "` + key.name + `"`)
+		others = others.ColumnExpr(col("d."+key.name) + ` AS "` + key.name + `"`)
 	}
 	for _, column := range columns {
 		none := "NULL"
@@ -249,18 +252,18 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	}
 	for _, flag := range decidedFlags {
 		parts = parts.ColumnExpr(`0 AS "` + flag + `"`)
-		others = others.ColumnExpr(`d.` + flag + ` AS "` + flag + `"`)
+		others = others.ColumnExpr(col("d."+flag) + ` AS "` + flag + `"`)
 	}
 	stacked := db.NewSelect().
 		TableExpr(`(SELECT * FROM (?) AS "parts" UNION ALL ?) AS "u"`, parts, others)
 	for _, key := range keys {
-		stacked = stacked.ColumnExpr(`"u"."` + key.name + `" AS "` + key.name + `"`).GroupExpr(`"u"."` + key.name + `"`)
+		stacked = stacked.ColumnExpr(col("u."+key.name) + ` AS "` + key.name + `"`).GroupExpr(col("u." + key.name))
 	}
 	for _, column := range columns {
-		stacked = stacked.ColumnExpr(column.fold + `(u.` + column.name + `) AS "` + column.name + `"`)
+		stacked = stacked.ColumnExpr(column.fold + `(` + col("u."+column.name) + `) AS "` + column.name + `"`)
 	}
 	for _, flag := range decidedFlags {
-		stacked = stacked.ColumnExpr(`SUM(u.` + flag + `) AS "` + flag + `"`)
+		stacked = stacked.ColumnExpr(`SUM(` + col("u."+flag) + `) AS "` + flag + `"`)
 	}
 	// A decided group always has places in the partial groups, because both
 	// read the same population; a group with none is not one the list holds.
