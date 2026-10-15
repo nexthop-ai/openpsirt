@@ -382,14 +382,7 @@ type Over struct {
 func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over Over,
 	limit, offset int) ([]Change, int, error) {
 
-	if err := readable(by); err != nil {
-		return nil, 0, err
-	}
-	limit = database.AList.Of(limit)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
-		if kind != "" {
-			q = q.Where("kind = ?", kind)
-		}
 		if !over.Since.IsZero() {
 			q = q.Where("at >= ?", over.Since)
 		}
@@ -398,7 +391,7 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 		}
 		return q
 	}
-	return s.page(ctx, narrow, limit, offset, "what has been changed")
+	return s.page(ctx, by, kind, narrow, limit, offset, "what has been changed")
 }
 
 // About reads the trail for one subject of a change, newest first.
@@ -422,6 +415,26 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name string,
 	limit, offset int) ([]Change, int, error) {
 
+	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			prefix := OnProduct(name, "")
+			return q.Where("about = ?", name).
+				WhereOr(`(about LIKE ?`+database.LikeClause+` AND SUBSTR(about, 1, ?) = ?)`,
+					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
+		})
+	}
+	return s.page(ctx, by, kind, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
+}
+
+// page is one page of the trail under a narrowing, newest first, with how many
+// the narrowing holds in all. what names the reading, for its errors.
+//
+// Every read of the trail comes through here, so who may read it, how long a
+// page may be and the kind filter are each asked once.
+func (s *Store) page(ctx context.Context, by access.Subject, kind Kind,
+	narrowing func(*bun.SelectQuery) *bun.SelectQuery,
+	limit, offset int, what string) ([]Change, int, error) {
+
 	if err := readable(by); err != nil {
 		return nil, 0, err
 	}
@@ -430,21 +443,8 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 		if kind != "" {
 			q = q.Where("kind = ?", kind)
 		}
-		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			prefix := OnProduct(name, "")
-			return q.Where("about = ?", name).
-				WhereOr(`(about LIKE ?`+database.LikeClause+` AND SUBSTR(about, 1, ?) = ?)`,
-					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
-		})
+		return narrowing(q)
 	}
-	return s.page(ctx, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
-}
-
-// page is one page of the trail under a narrowing, newest first, with how many
-// the narrowing holds in all. what names the reading, for its errors.
-func (s *Store) page(ctx context.Context, narrow func(*bun.SelectQuery) *bun.SelectQuery,
-	limit, offset int, what string) ([]Change, int, error) {
-
 	total, err := narrow(s.db.NewSelect().Model((*Change)(nil))).Count(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("count %s: %w", what, err)
