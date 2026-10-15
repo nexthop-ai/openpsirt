@@ -931,3 +931,35 @@ func TestDrawingOnlyNamesSpokenForStopsAndSaysSo(t *testing.T) {
 		}
 	})
 }
+
+// A tag carries no deadline, so a flaw recorded on one is written off the
+// clock, as a recount leaves it, while the same flaw on a moving line is due.
+func TestAFlawRecordedOnATagCarriesNoDeadline(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		cut := f.anotherBuild(t, "v2")
+		f.shippedTo(t, cut, through(libnl))
+
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
+			finding.Entering{
+				TargetIDs: []int64{f.target, cut},
+				Component: libnl.Name, Severity: "high",
+				Summary: "The parser accepts a message it should refuse.",
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("recorded %d findings, want one per build", len(rows))
+		}
+		for _, row := range rows {
+			switch {
+			case row.TargetID == cut && row.DueAt != nil:
+				t.Errorf("the flaw recorded on a tag is due %v, want no deadline", row.DueAt)
+			case row.TargetID == f.target && row.DueAt == nil:
+				t.Error("the flaw recorded on a moving line carries no deadline")
+			}
+		}
+	})
+}

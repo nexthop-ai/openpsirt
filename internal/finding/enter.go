@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -439,11 +440,31 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
+		// The builds that carry deadlines at all. A tag and a release past
+		// end of life do not, and a recount leaves their flaws off the clock,
+		// so a flaw recorded on one is written off it.
+		clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
+		var onClock []int64
+		if err := tx.NewSelect().
+			TableExpr(`"target" AS "tg"`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
+			ColumnExpr("tg.id").
+			Where("tg.id IN (?)", bun.List(in.TargetIDs)).
+			Where(clocked, clockedArgs...).
+			Scan(ctx, &onClock); err != nil {
+			return fmt.Errorf("read which builds carry deadlines: %w", err)
+		}
+		carriesDeadlines := make(map[int64]bool, len(onClock))
+		for _, id := range onClock {
+			carriesDeadlines[id] = true
+		}
 
 		// One row per place in every build, all pointing at the one issue.
-		// Every one of them gets the same embargo, rank and deadline: they
-		// are the same flaw, and a deadline that differed per build would be
-		// the tool deciding that one release matters more.
+		// Every one of them gets the same embargo, rank and deadline, except
+		// that a build carrying no deadlines gets none: they are the same
+		// flaw, and a deadline that differed per build would be the tool
+		// deciding that one release matters more.
 		rows = make([]Finding, 0, len(places))
 		for _, place := range places {
 			row := Finding{
@@ -490,8 +511,10 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				rated := now
 				row.RatedAt = &rated
 			}
-			row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
-				false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
+			if carriesDeadlines[place.target] {
+				row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
+					false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
+			}
 			rows = append(rows, row)
 		}
 		if err := database.InBatches(ctx, tx, rows); err != nil {
