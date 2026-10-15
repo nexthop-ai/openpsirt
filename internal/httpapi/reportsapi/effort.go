@@ -109,10 +109,9 @@ func measuring(ctx context.Context, in core.Deps, subject access.Subject,
 	}
 	if team != "" {
 		rights := access.NewStore(in.DB.DB)
-		found, err := rights.TeamByName(ctx, team)
+		found, err := core.TeamNamed(ctx, in.Logger, rights, team)
 		if err != nil {
-			return only, core.Absent(in.Logger, err, "that team could not be looked up",
-				func() error { return huma.Error404NotFound("no such team") })
+			return only, err
 		}
 		members, err := rights.MembersOf(ctx, found.ID)
 		if err != nil {

@@ -47,21 +47,12 @@ func registerRetained(api huma.API, in core.Deps) {
 		Scan     int64  `path:"scan" doc:"The upload, as the receipt names it"`
 		Document int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
-		subject, err := core.Requester(ctx)
+		// Resolved the way the receipts list resolves the build: somebody
+		// brought into a case is answered as a stranger is, and a branch or
+		// a variant the product does not declare is named as the part that
+		// is missing.
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
-			return nil, err
-		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, err
-		}
-		// A case grant resolves the build's names and reaches one issue, not
-		// what the build holds: somebody brought into a case is answered as
-		// a build that does not resolve is.
-		if !subject.Sees(named.ProductID) {
-			return nil, core.NoSuchProduct()
-		}
-		if err := core.PipelineReaches(subject, named); err != nil {
 			return nil, err
 		}
 		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
