@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { remember } from "../app/scope";
 import { useQueries } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { useReleaseVariants, useStreams } from "../api/catalog";
+import { useReleaseVariants, useStreamsResolving } from "../api/catalog";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -32,7 +32,9 @@ import {
 // No overdue section. A tag never changes, so nothing on it has a deadline
 // to miss.
 export function Release({ product, stream }: { product: string; stream: string }) {
-  const streams = useStreams(product);
+  // Retired lines included: a retired tag is still the release it was, and
+  // its address opens here.
+  const streams = useStreamsResolving(product);
   const built = useReleaseVariants(true, product, stream);
 
   const rows = streams.data?.items ?? [];
@@ -58,7 +60,11 @@ export function Release({ product, stream }: { product: string; stream: string }
   // The release before this one: the newest tag that went out earlier. Cut
   // from the same branch where both say, because a comparison across two
   // branches is two pieces of software rather than one moving.
-  const previous = beforeThis(rows, here);
+  // A retired tag is not offered as the one before: nothing offers it.
+  const previous = beforeThis(
+    rows.filter((row) => !row.retired),
+    here,
+  );
 
   if (streams.isPending || built.isPending) return <Loading />;
   if (streams.isError) {
@@ -107,6 +113,15 @@ export function Release({ product, stream }: { product: string; stream: string }
           {here.end_of_life && <> · support ends {here.end_of_life}</>}
         </p>
       </div>
+
+      {/* Nothing lists a retired release, so this page is reached by a link
+          somebody kept. Unmarked it reads as a release in use. */}
+      {here.retired && (
+        <div className="alert info" style={{ marginBottom: 14 }}>
+          <strong>Retired</strong>
+          <span>No scan is accepted for it. What is here stays.</span>
+        </div>
+      )}
 
       <section className="panel">
         <h3>The variants</h3>

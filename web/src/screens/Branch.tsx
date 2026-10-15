@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { useStreamsResolving } from "../api/catalog";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Variants } from "./Variants";
@@ -23,19 +21,10 @@ import { Release } from "./Release";
 // catalog says so, and a naming convention is a rule nobody agreed to.
 export function Branch() {
   const { product = "", stream = "" } = useParams();
-  // Retired releases included, and keyed apart from the offered list because
-  // of it. This resolves a name somebody arrived with rather than offering a
-  // choice, and a retired tag missing from the answer falls through to the
-  // branch view — which is the one thing this screen exists to prevent.
-  const streams = useQuery({
-    queryKey: ["streams", product, "retired"],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/streams", {
-          params: { path: { product }, query: { retired: true } },
-        }),
-      ),
-  });
+  // Retired releases included. A retired tag missing from the answer falls
+  // through to the branch view, which is the one thing this screen exists to
+  // prevent.
+  const streams = useStreamsResolving(product);
 
   if (streams.isPending) return <Loading />;
   // Nothing is dispatched on a read that failed. This screen exists to stop a

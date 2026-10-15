@@ -64,6 +64,22 @@ export function useStreams(
   });
 }
 
+// One product's branches and tags, retired ones included. This resolves a
+// name somebody arrived with rather than offering a choice, so a retired line
+// is an answer here; it is keyed apart from the offered list because of it.
+export function useStreamsResolving(product: string): UseQueryResult<{ items: Stream[] | null }> {
+  return useQuery({
+    queryKey: ["streams", product, "retired"],
+    enabled: !!product,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/streams", {
+          params: { path: { product }, query: { retired: true } },
+        }),
+      ),
+  });
+}
+
 // What one product is built as, by name. Nothing is asked until a product is
 // named.
 export function useProductVariants(
