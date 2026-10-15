@@ -236,6 +236,8 @@ func TestACredentialNeverLeavesThePackage(t *testing.T) {
 		{"an opaque URL", "postgres:app:s3cret@127.0.0.1:1/x", "s3cret"},
 		{"a number sign in a password parameter", "postgres://127.0.0.1:1?password=s3cr#t", "s3cr"},
 		{"an at sign in a password parameter", "postgres://127.0.0.1:1/x?password=ab@cd%zz", "cd"},
+		{"an at sign in a secret parameter the driver does not mask",
+			"postgres://127.0.0.1:1/x?token=ab@cd%zz", "cd%zz"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			target, err := ParseURL(c.raw)

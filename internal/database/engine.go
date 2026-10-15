@@ -485,7 +485,8 @@ func secretsOf(u *url.URL) []string {
 		if !redact.Secret(key) {
 			continue
 		}
-		add(value)
+		// The PostgreSQL driver is handed the value with each "@" escaped.
+		add(value, strings.ReplaceAll(value, "@", "%40"))
 		if decoded, err := url.QueryUnescape(value); err == nil {
 			add(decoded)
 		}

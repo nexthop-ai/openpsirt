@@ -245,13 +245,12 @@ func mandatoryTransport(target Target, getenv func(string) string) (string, erro
 	if query != "" {
 		pairs = strings.Split(query, "&")
 	}
-	// The PostgreSQL driver reads the query through the URL parser, which
-	// decodes each key and drops a pair it cannot read. A dropped pair is a
-	// mode nobody can judge, so it is refused rather than left to the
-	// driver's default.
+	// The PostgreSQL driver decodes each key, and a pair the URL parser cannot
+	// read holds a mode nobody can judge, so it is refused here, naming the
+	// setting, before the driver refuses it in its own words.
 	if target.Engine == Postgres {
 		if _, err := url.ParseQuery(query); err != nil {
-			return "", fmt.Errorf("%s is set and %s has a query pair the driver drops, "+
+			return "", fmt.Errorf("%s is set and %s has a query pair that cannot be read, "+
 				"so the transport it asks for cannot be judged: percent-encode it",
 				RequiredEncryption, target.Redacted)
 		}
