@@ -147,7 +147,12 @@ func TestASeverityRiseSendsBackOnlyTheClaimItBearsOn(t *testing.T) {
 		if code != http.StatusCreated {
 			t.Fatalf("re-affirming the selection answered %d: %s", code, body)
 		}
+		if len(out.Claims) != 2 {
+			t.Fatalf("re-affirming two claims answered %d: %s", len(out.Claims), body)
+		}
+		seen := map[int64]bool{}
 		for _, one := range out.Claims {
+			seen[one.PreviousClaimID] = true
 			switch one.PreviousClaimID {
 			case absent:
 				if one.Waiting {
@@ -158,6 +163,9 @@ func TestASeverityRiseSendsBackOnlyTheClaimItBearsOn(t *testing.T) {
 					t.Error("a claim that the code is unreachable stood after a severity rise")
 				}
 			}
+		}
+		if !seen[absent] || !seen[unreachable] {
+			t.Errorf("the answer does not name both claims it replaced: %s", body)
 		}
 	})
 }

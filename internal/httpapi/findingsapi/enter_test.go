@@ -481,10 +481,15 @@ func TestASummaryOfNothingButSpacesIsTheCallersToFix(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/findings",
-			`{"summary":"   ","severity":"high"}`)
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"   ","severity":"high"}`)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a summary of spaces answered %d, want it named as the caller's to fix: %s",
 				got.Code, got.Body.String())
+		}
+		// The store's own sentence, so a refusal of the request's shape
+		// cannot stand in for it.
+		if !strings.Contains(got.Body.String(), "has to say what the flaw is") {
+			t.Errorf("a summary of spaces was not refused by the store: %s", got.Body.String())
 		}
 	})
 }

@@ -7,11 +7,16 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
+
+// agreedThenWithdrawn is an agreement cell naming who agreed, when, and when
+// it was taken back, in that order.
+var agreedThenWithdrawn = regexp.MustCompile(`^reviewer \d{4}-\d{2}-\d{2}T\S+ withdrawn \d{4}-\d{2}-\d{2}T`)
 
 // TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement is two of what a
 // release sign-off and an audit each asked for and could not get.
@@ -93,8 +98,9 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			t.Errorf("the file does not carry the agreement that was taken back: %q", said)
 		}
 		// With a date, which is the other half: an agreement with no date is
-		// not evidence of when the control held.
-		if !strings.Contains(said, "20") {
+		// not evidence of when the control held. The withdrawal carries a
+		// date of its own, so the agreement's is the one before it.
+		if !agreedThenWithdrawn.MatchString(said) {
 			t.Errorf("the file carries no date for the agreement: %q", said)
 		}
 		// And who agrees now stays who agrees now.

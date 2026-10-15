@@ -224,7 +224,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 		var whole struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
-				PlaceIdentity string `json:"place_identity"`
+				Place         string `json:"place"`
 			} `json:"items"`
 			Total int `json:"total"`
 		}
@@ -235,7 +235,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 		}
 		seen := map[string]bool{}
 		for _, row := range whole.Items {
-			key := row.Vulnerability + " " + row.PlaceIdentity
+			key := row.Vulnerability + " " + row.Place
 			if seen[key] {
 				t.Errorf("the register lists %q twice", key)
 			}
