@@ -499,6 +499,9 @@ export function Findings() {
   });
   useEffect(() => {
     function key(event: KeyboardEvent) {
+      // A key a control on the page has already answered is that control's: an
+      // arrow opening a filter's list does not also move the cursor.
+      if (event.defaultPrevented) return;
       const { rows, cursor, peeking, at: addressOf } = live.current;
       const means = meansFor(event, typingIn(document.activeElement));
       if (means === null) return;

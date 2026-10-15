@@ -87,3 +87,52 @@ describe("the filters narrowing the findings list", () => {
     expect(query().get("sent_back")).toBeNull();
   });
 });
+
+describe("the findings list's keys", () => {
+  const row = {
+    product: "sonic",
+    stream: "master",
+    variant: "broadcom",
+    vulnerability: "CVE-2026-1",
+    component: "openssl",
+    version: "3.0.0",
+  };
+
+  async function drawRows() {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: me };
+      if (path === "/v1/findings")
+        return { data: { items: [row, { ...row, version: "3.0.1" }], total: 2 } };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Findings />, "/findings", "/findings"));
+    await settle();
+  }
+
+  const at = () => mount.host().querySelector("#findingRows tr.at")?.getAttribute("data-i");
+  const press = (on: Element | Document, key: string) =>
+    act(() => {
+      on.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    });
+
+  it("moves the cursor on an arrow nothing else answers", async () => {
+    await drawRows();
+    press(document, "ArrowDown");
+    expect(at()).toBe("0");
+  });
+
+  // Verified by dropping the handler's check of a key already answered: the
+  // cursor lands on the first row and the test fails.
+  it("leaves the cursor alone when a filter's list opens on an arrow", async () => {
+    await drawRows();
+    act(() => chip("More filters")?.click());
+    await settle();
+    const trigger = mount.host().querySelector<HTMLButtonElement>("button.choicesat");
+    if (!trigger) throw new Error("no filter list in the panel");
+    trigger.focus();
+    press(trigger, "ArrowDown");
+    await settle();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(at()).toBeUndefined();
+  });
+});
