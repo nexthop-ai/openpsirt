@@ -44,7 +44,7 @@ curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
 The SBOM and the VEX document go in one request.
 
 ```bash
-curl -X POST \
+curl --retry 5 -X POST \
   "$OPENPSIRT/v1/products/sonic/streams/202605.1/variants/broadcom/scans" \
   -H "Authorization: Bearer $OPENPSIRT_KEY" \
   -F "inventory=@sonic-202605.1.cdx.json" \
@@ -69,7 +69,7 @@ variants of one release, is evidence rather than either build's claim. Send
 those with their SBOMs.
 
 ```bash
-curl -X POST \
+curl --retry 5 -X POST \
   "$OPENPSIRT/v1/products/sonic/vex-statements?publisher=vendor-202605.1-broadcom" \
   -H "Origin: $OPENPSIRT" \
   -F "statements=@sonic-202605.1.openvex.json"

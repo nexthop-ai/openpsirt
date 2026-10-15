@@ -86,7 +86,7 @@ grant of its own.
 Your build already produces an SBOM. Send it.
 
 ```bash
-curl -X POST \
+curl --retry 5 -X POST \
   "$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans" \
   -H "Authorization: Bearer $OPENPSIRT_KEY" \
   -F "inventory=@sbom.cdx.json"
@@ -102,6 +102,11 @@ response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.
 
+A 503 means the server is already reading as many uploads as it takes at
+once. Send the same request again after the number of seconds in its
+`Retry-After` header. `curl --retry` does this, so a matrix of builds finishing
+together each gets its turn rather than failing its step.
+
 ### GitHub Actions
 
 ```yaml
@@ -110,7 +115,7 @@ green scan.
     OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
     OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
   run: |
-    curl --fail-with-body -X POST \
+    curl --fail-with-body --retry 5 -X POST \
       "$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans" \
       -H "Authorization: Bearer $OPENPSIRT_KEY" \
       -F "inventory=@sbom.cdx.json"
@@ -127,7 +132,7 @@ send-inventory:
   image: curlimages/curl:latest
   script:
     - |
-      curl --fail-with-body -X POST \
+      curl --fail-with-body --retry 5 -X POST \
         "$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans" \
         -H "Authorization: Bearer $OPENPSIRT_KEY" \
         -F "inventory=@sbom.cdx.json"
