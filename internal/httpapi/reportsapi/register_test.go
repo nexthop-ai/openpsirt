@@ -412,3 +412,54 @@ func TestTheRegisterNarrows(t *testing.T) {
 		}
 	})
 }
+
+// The register file's "stated by" cell carries the supplier's statement
+// that answers a place: who said it, about which product, on what grounds
+// and in what words, as the register's list reports them.
+func TestTheRegisterFileSaysWhichSupplierAnsweredAPlace(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", httpapitest.AcmeSays(t)); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+
+		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		var listed struct {
+			Items []struct {
+				Stated *struct {
+					Publisher     string `json:"publisher"`
+					Product       string `json:"product"`
+					Justification string `json:"justification"`
+					Statement     string `json:"statement"`
+				} `json:"stated"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", at+"?closed_because=disclaimed", &listed)
+		if len(listed.Items) != 1 || listed.Items[0].Stated == nil {
+			t.Fatalf("the register lists %+v closed by a supplier", listed.Items)
+		}
+		said := listed.Items[0].Stated
+		if said.Justification == "" || said.Statement == "" {
+			t.Fatalf("the supplier's statement reads %+v, want grounds and words", said)
+		}
+		want := said.Publisher + ", " + said.Product + ": " + said.Justification + ". " + said.Statement
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+			at+".csv?closed_because=disclaimed", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := httpapitest.RowsUnder(lines)
+		column := httpapitest.IndexOf(body[0], "stated by")
+		if column < 0 || len(body) != 2 {
+			t.Fatalf("the file has %d rows and columns %v", len(body)-1, body[0])
+		}
+		if body[1][column] != want || !strings.HasPrefix(want, "acme, acme-y: ") {
+			t.Errorf("the file's stated by is %q, want %q", body[1][column], want)
+		}
+	})
+}

@@ -41,3 +41,26 @@ func TestTheIssueDocumentCountsOnlyTheJudgmentsInForceAsStanding(t *testing.T) {
 		}
 	})
 }
+
+// Each place in the issue document says where the judgment there stands: one
+// that lapsed when the code moved no longer stands, and one nobody judged
+// says nobody has.
+func TestTheIssueDocumentSaysWhereEachPlacesJudgmentStands(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		r.AgreedThenLapsed(t)
+		for issue, want := range map[string]string{
+			"CVE-2026-CURL1": "— the judgment here no longer stands",
+			"CVE-2026-CURL2": "— nobody has said",
+		} {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+				"/v1/issues/"+issue+"/document", "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("the document of %s answered %d: %s", issue, got.Code, got.Body.String())
+			}
+			if !strings.Contains(got.Body.String(), want) {
+				t.Errorf("the document of %s does not say %q:\n%s", issue, want, got.Body.String())
+			}
+		}
+	})
+}
