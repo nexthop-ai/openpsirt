@@ -181,6 +181,32 @@ func TestAWindowOfNoLengthIsRefusedRatherThanStored(t *testing.T) {
 	})
 }
 
+func TestAWarningOfNoLeadIsRefusedRatherThanStored(t *testing.T) {
+	// A lead of none would put the warning at the end itself, where it says
+	// nothing the end does not.
+	each(t, func(t *testing.T, f *fixture) {
+		for _, lead := range []int{0, -1} {
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+				Name: "Notice", Hours: 24, LeadHours: ptr(lead),
+			}); err == nil {
+				t.Errorf("a window warning %d hours before its end was declared", lead)
+			}
+		}
+	})
+}
+
+func TestAWarningAtOrBeforeTheWindowOpensIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		for _, lead := range []int{24, 25} {
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, obligation.WindowSaid{
+				Name: "Notice", Hours: 24, LeadHours: ptr(lead),
+			}); err == nil {
+				t.Errorf("a window of 24 hours warning %d hours before its end was declared", lead)
+			}
+		}
+	})
+}
+
 func TestAWindowNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 	// Two windows in force under one name would leave a notice naming either
 	// ambiguous. A retired one gives its name back.
@@ -762,7 +788,10 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 			t.Fatal(err)
 		}
 		limited, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
-			Name: "Early warning", Hours: 24, Products: []string{world.ProductName},
+			// One product named twice, differently capitalized, is one
+			// product: stored twice it would be a duplicate key.
+			Name: "Early warning", Hours: 24,
+			Products: []string{world.ProductName, strings.ToUpper(world.ProductName)},
 		})
 		if err != nil {
 			t.Fatal(err)
