@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -11,15 +12,14 @@ import (
 	"testing"
 )
 
-// This gate reads every name a query invents and checks it against what the
-// four engines actually reserve. It had no test, and its consumer is an exit
-// code — so a detection that stopped seeing anything would read exactly like a
-// tree with nothing wrong in it.
+// This gate reads the names a query writes and the names a migration
+// declares. Its consumer is an exit code, so a detection that stopped seeing
+// anything reads exactly like a tree with nothing wrong in it.
 
 func TestCommentsAreNotReadAsSQL(t *testing.T) {
 	// The comments beside a schema are the reason the schema is legible, and
-	// they are full of the words an engine reserves. Read as identifiers they
-	// reported fifty names, none of which was one.
+	// they are full of the words an engine reserves, none of which is an
+	// identifier.
 	for _, c := range []struct {
 		what   string
 		text   string
@@ -85,10 +85,8 @@ func TestAConcatenatedClauseIsOneString(t *testing.T) {
 }
 
 func TestATableIsReportedOnlyWhereItIsWrittenBare(t *testing.T) {
-	// Aliases were quoted everywhere and tables were not, in the same clause
-	// and often on the same line. The alias pattern cannot see a table at all
-	// — a table is declared rather than invented — so nothing outside the
-	// migrations looked at one.
+	// The alias pattern cannot see a table at all — a table is declared
+	// rather than invented — so the table pass reads every literal for one.
 	schema := map[string]bool{"finding": true, "component": true}
 	for _, c := range []struct {
 		what string
@@ -126,10 +124,9 @@ func TestATableIsReportedOnlyWhereItIsWrittenBare(t *testing.T) {
 }
 
 func TestAClauseBuiltInAVariableIsRead(t *testing.T) {
-	// The three clauses this could not see were assembled a line before they
-	// were handed over: literal() reads what is written at the call and
-	// returns nothing for a variable, so the fragment nobody had read was
-	// exactly the one nothing checked.
+	// A clause assembled a line before it is handed over is read too:
+	// literal() reads what is written at the call and returns nothing for a
+	// variable.
 	const source = `package x
 
 func q() {
@@ -150,7 +147,7 @@ func q() {
 	if !ok {
 		t.Fatal("the fixture's first declaration is not a function")
 	}
-	pieces := assembled(fn, map[token.Pos]bool{})
+	pieces := assembled(fn, map[token.Pos]bool{}, nil)
 	if got := pieces["where"]; !strings.Contains(got, "FROM finding") ||
 		!strings.Contains(got, "FROM component") {
 		t.Errorf("a variable built in two statements read as %q", got)
@@ -166,7 +163,7 @@ func q() {
 		t.Fatal("the fixture's first statement is not an assignment")
 	}
 	written := assign.Rhs[0].Pos()
-	if got := assembled(fn, map[token.Pos]bool{written: true})["where"]; strings.Contains(got, "FROM finding") {
+	if got := assembled(fn, map[token.Pos]bool{written: true}, nil)["where"]; strings.Contains(got, "FROM finding") {
 		t.Errorf("a statement already read was read again: %q", got)
 	}
 
@@ -193,9 +190,8 @@ func q() {
 func TestWhatIsReadAsAStatementAtAll(t *testing.T) {
 	// The alias half is applied only to a literal this recognizes as SQL,
 	// because "as" is a word in nearly every English sentence in this
-	// repository — a version that read them reported eighteen names, every
-	// one of them prose. The marker is a quoted table, which appears in a
-	// query and not in a sentence.
+	// repository. The marker is a quoted table, which appears in a query and
+	// not in a sentence.
 	//
 	// The table half deliberately does not wait for it: a query whose tables
 	// are all bare carries no marker, and that is the query nothing was
@@ -214,5 +210,147 @@ func TestWhatIsReadAsAStatementAtAll(t *testing.T) {
 		if got := statement.MatchString(c.text); got != c.want {
 			t.Errorf("%s: read as a statement=%v, want %v", c.what, got, c.want)
 		}
+	}
+}
+
+func TestTheColumnsAMigrationDeclaresAreRead(t *testing.T) {
+	// A definition's type is concatenated in from the engine's spelling, so
+	// the literal holding a column's name ends after it. A quoted name inside
+	// an index or a constraint is a reference rather than a declaration.
+	const source = "package migrations\n\nfunc tables(t *types) []string {\n" +
+		"\treturn []string{\n" +
+		"\t\t`CREATE TABLE \"widget\" (\n\t\t\t\"id\"   ` + t.id + `,\n" +
+		"\t\t\t-- \"commented\" is prose\n" +
+		"\t\t\t\"size_bytes\" ` + t.count + ` NOT NULL,\n" +
+		"\t\t\tCONSTRAINT \"widget_fk\" FOREIGN KEY (\"owner_id\") REFERENCES \"person\"(\"id\")\n\t\t)`,\n" +
+		"\t\t`CREATE INDEX \"widget_by\" ON \"widget\" (\"made_at\", \"size_bytes\")`,\n" +
+		"\t\t`ALTER TABLE \"widget\" ADD COLUMN \"colour\" TEXT NULL`,\n" +
+		"\t}\n}\n"
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/database/migrate/migrations/widget.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns := map[string]bool{}
+	columnsDeclared("internal/database/migrate/migrations/widget.go", file, columns)
+	for _, want := range []string{"id", "size_bytes", "colour"} {
+		if !columns[want] {
+			t.Errorf("%q was not read as a declared column: %v", want, columns)
+		}
+	}
+	for _, not := range []string{"commented", "owner_id", "made_at", "widget", "person"} {
+		if columns[not] {
+			t.Errorf("%q was read as a declared column", not)
+		}
+	}
+
+	elsewhere := map[string]bool{}
+	columnsDeclared("internal/widget/widget.go", file, elsewhere)
+	columnsDeclared("internal/database/migrate/migrations/widget_test.go", file, elsewhere)
+	if len(elsewhere) != 0 {
+		t.Errorf("a file that is not a migration declared %v", elsewhere)
+	}
+}
+
+func TestADeclaredColumnIsReportedOnlyWhereItIsWrittenBare(t *testing.T) {
+	columns := map[string]bool{
+		"id": true, "name": true, "vulnerability_id": true, "by": true, "text": true, "count": true,
+	}
+	for _, c := range []struct {
+		what string
+		text string
+		want []string
+	}{
+		{"a bare column", `id = ?`, []string{`"id"`}},
+		{"a column qualified by a bare alias", `f.vulnerability_id = ?`, []string{`"f"."vulnerability_id"`}},
+		{"a column qualified by a quoted alias", `"f".id = ?`, []string{`"f"."id"`}},
+		{"a column qualified by the model's alias", `?TableAlias.id = ?`, []string{`?TableAlias."id"`}},
+		{"a column whose qualifier the code supplies", `.id = ?`, []string{`"id"`}},
+		{"several in one clause", `name = ? AND f.id <> ?`, []string{`"name"`, `"f"."id"`}},
+		{"a column inside a function's arguments", `lower(name) = ?`, []string{`"name"`}},
+		{"a quoted column", `"id" = ?`, nil},
+		{"a quoted qualified column", `"f"."id" = ?`, nil},
+		{"a string constant", `"name" = 'id'`, nil},
+		{"a backquoted name", "`id` = ?", nil},
+		{"a keyword in capitals", `ORDER BY "id"`, nil},
+		{"a function of a column's name", `count(*) AS "n"`, nil},
+		{"a cast", `"id"::text`, nil},
+		{"a word nothing declares", `ledger = ?`, nil},
+		{"a qualifier", `name.x = ?`, nil},
+		{"a number running into a word", `1e5 = ?`, nil},
+	} {
+		var got []string
+		for _, one := range bareColumns(c.text, columns) {
+			got = append(got, one.quoted())
+		}
+		if strings.Join(got, " ") != strings.Join(c.want, " ") {
+			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+		}
+	}
+}
+
+func TestColumnsAreReadInTheQueryAndNotInItsValues(t *testing.T) {
+	const source = `package x
+
+import "strings"
+
+const listed = "SELECT id FROM \"finding\""
+
+func q(parts []string) {
+	db.Where("name = ?", "name")
+	db.ExecContext(ctx, "UPDATE \"finding\" SET \"name\" = ? WHERE id = ?", "id", 1)
+	db.NewRaw(listed)
+	parts = append(parts, "the name")
+	strings.Join(parts, "\n")
+	query.Set("name", "id")
+	db.Set("name = ?", "id")
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/x/x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns := map[string]bool{"id": true, "name": true}
+	bad, examined := checkFile(fset, "internal/x/x.go", file, map[string]bool{"finding": true}, columns, nil)
+	var got []string
+	for _, one := range ordered(bad) {
+		got = append(got, fmt.Sprintf("%d:%s", one.line, one.column))
+	}
+	want := []string{`5:"id"`, `8:"name"`, `9:"id"`, `14:"name"`}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("reported %v, want %v", got, want)
+	}
+	if examined == 0 {
+		t.Error("the queries were not counted as read")
+	}
+}
+
+func TestAColumnTheBuilderQuotesIsNotReadInAnAssembledQuery(t *testing.T) {
+	// The builder quotes what Column and Order are given, so quoting it in
+	// the literal as well quotes it twice. One variable holding a subquery
+	// and then a clause is read as both.
+	const source = `package x
+
+func q() {
+	where := db.NewSelect().TableExpr("\"component\" AS \"c\"").Column("c.id").Order("name")
+	db.Where("? IS NOT NULL", where)
+	where = "c.purl = ?"
+	db.Where(where)
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/x/x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns := map[string]bool{"id": true, "name": true, "purl": true}
+	bad, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{"component": true}, columns, nil)
+	var got []string
+	for _, one := range ordered(bad) {
+		got = append(got, one.column)
+	}
+	if strings.Join(got, " ") != `"c"."purl"` {
+		t.Errorf("reported %v, want only the column in the clause", got)
 	}
 }

@@ -22,10 +22,13 @@ func tablesDeclared(path string, body []byte, schema map[string]bool) {
 }
 
 // checkFile reports every name one parsed source file writes wrongly: a bare
-// name a query invents, a bare table a query names, a reserved word a
-// migration declares, and a reserved alias a struct tag declares.
-func checkFile(fset *token.FileSet, path string, file *ast.File, schema, reserved map[string]bool) []found {
-	var bad []found
+// name a query invents, a bare table or declared column a query names, a
+// reserved word a migration declares, and a reserved alias a struct tag
+// declares. It also answers how many pieces of SQL it read for columns.
+func checkFile(fset *token.FileSet, path string, file *ast.File,
+	schema, columns, reserved map[string]bool) (bad []found, examined int) {
+	packages := importedNames(file)
+
 	// The data-definition half. Read from the string literals in a migration
 	// rather than from the file, because the prose beside them is full of the
 	// same words — and with the SQL comments inside those strings taken off
@@ -69,6 +72,8 @@ func checkFile(fset *token.FileSet, path string, file *ast.File, schema, reserve
 		for _, match := range invented.FindAllStringSubmatch(text, -1) {
 			bad = append(bad, found{word: match[1], file: path, line: at, bare: true})
 		}
+		examined++
+		bad = append(bad, unquotedColumns(text, columns, path, at)...)
 		return true
 	})
 
@@ -153,18 +158,40 @@ func checkFile(fset *token.FileSet, path string, file *ast.File, schema, reserve
 				}
 			}
 		}
+		// Columns are read in the argument holding the SQL alone: the others
+		// are values, and a value is free to be a word the schema has a
+		// column of.
+		if arg := queryArgument(call, named.Sel.Name, packages); arg != nil {
+			// A Set that assigns nothing is a map's, a header's or a query
+			// string's: the builder's always writes "column = value".
+			parts := piecesOf(fset, arg)
+			if named.Sel.Name == "Set" && !strings.Contains(joined(parts), "=") {
+				parts = nil
+			}
+			if len(parts) > 0 {
+				examined++
+				text := withoutSQLComments(joined(parts))
+				for _, bare := range bareColumns(text, columns) {
+					one, whole := pieceAt(parts, bare.start, bare.end)
+					if whole && seen[one.pos] {
+						continue
+					}
+					bad = append(bad, found{word: bare.word, file: path, line: one.line, bare: true, column: bare.quoted()})
+				}
+			}
+		}
 		return true
 	})
 	// A clause handed over as a variable rather than written at the call.
 	// literal() reads what it can see and returns nothing for the rest, so a
-	// fragment assembled a line earlier was skipped in silence — which is
-	// precisely the fragment nobody has read.
+	// fragment assembled a line earlier is read from the variable.
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok || fn.Body == nil {
 			continue
 		}
-		pieces := assembled(fn, seen)
+		pieces := assembled(fn, seen, nil)
+		quoted := assembled(fn, seen, quotedByBuilder)
 		ast.Inspect(fn.Body, func(node ast.Node) bool {
 			call, ok := node.(*ast.CallExpr)
 			if !ok {
@@ -190,10 +217,19 @@ func checkFile(fset *token.FileSet, path string, file *ast.File, schema, reserve
 					bad = append(bad, unquotedTables(text, schema, path, at)...)
 				}
 			}
+			if arg := queryArgument(call, method.Sel.Name, packages); arg != nil {
+				if _, _, readable := literal(fset, arg); !readable {
+					if text, ok := quoted[assembledFrom(arg)]; ok {
+						examined++
+						bad = append(bad, unquotedColumns(withoutSQLComments(text), columns, path,
+							fset.Position(arg.Pos()).Line)...)
+					}
+				}
+			}
 			return true
 		})
 	}
-	return bad
+	return bad, examined
 }
 
 // A piece is one string literal of an argument written as a concatenation,

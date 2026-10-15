@@ -717,7 +717,7 @@ each be stored with every backslash doubled, and doubled again on every edit.
 Taking the name out keeps the rest of an operator's mode, and a server that
 sets it still starts.
 
-The gate reads three places. `AS <word>` is the syntax for inventing a name,
+The gate reads more than the syntax for inventing a name. `AS <word>` is that syntax,
 and matching that alone leaves a table renamed in a migration, which names no
 alias, and a table alias declared in a model's own struct tag both invisible.
 An alias of `as` — a word all four engines reserve — works only because the
@@ -740,6 +740,16 @@ reserved yet passes — and MySQL 8.0 reserved `rank`, `groups`, `lead` and
 property than the rule it is meant to enforce. A quoted name does not match the
 pattern at all, so every hit is by construction an unquoted one and the fix is
 one pair of quotes.
+
+A table the migrations declare and a column they declare are checked the same
+way, wherever a query writes them: in a statement, in the SQL argument of a
+builder method, and in a clause assembled in a variable and handed to one. A
+column is checked alone and after a qualifier, and the fix for a qualified one
+quotes both halves. A column is recognized by name and by case: every keyword
+here is written in capitals and every declared name in lower case, so
+`ORDER BY` is not a column named `by`. A word followed by a parenthesis is a
+function, and the arguments after a builder method's SQL are values, which are
+free to be a word the schema has a column of.
 
 The schema sweep reads a table's and an index's declaration: a name after a
 keyword that always precedes one, and a name where a column belongs in the

@@ -11,18 +11,21 @@
 // PostgreSQL, and the day somebody writes `AS usage` the suite is green on
 // three engines and a production deployment on the fourth stops answering.
 //
-// An invented name is reported for being bare, not for being reserved.
-// This checked the word against a list of 321 the four engines reserve, which
-// is a strictly weaker property than the rule it was the enforcement of —
-// AGENTS.md says every identifier is quoted, including the names a query
-// invents. A list somebody typed goes stale the first time an engine reserves
-// a word: MySQL 8.0 added `rank`, `groups`, `lead` and `cume_dist`, and
-// nothing refreshes it. A quoted alias does not match the pattern at all, so
-// a hit here is by construction an unquoted name and the fix is one pair of
+// A name a query writes is reported for being bare rather than for being
+// reserved. Checking a word against the list the engines reserve is a weaker
+// property than the rule, which is that every identifier is quoted, and the
+// list goes stale the first time an engine reserves a word: MySQL 8.0 added
+// `rank`, `groups`, `lead` and `cume_dist`. A quoted name does not match at
+// all, so a hit is by construction an unquoted name and the fix is one pair of
 // quotes.
 //
-// It found 1,418 of them against 34 already quoted, so no reader could tell
-// which was the convention.
+// | Pass | Reads | Reports |
+// |---|---|---|
+// | Invented names | `AS <word>` in a statement or a builder argument | an alias or an output name written bare |
+// | Tables | a table after FROM, JOIN, INTO or UPDATE, or opening a table expression | a table the migrations declare, written bare |
+// | Declared columns | a statement, the SQL argument of a builder method, and a clause built in a variable and handed to one | a column the migrations declare, written bare, alone or after a qualifier |
+// | Definitions | the migrations' data-definition literals | a declared name that collides with a word an engine reserves |
+// | Model aliases | a struct tag's alias | an alias that collides with a word an engine reserves |
 //
 // A name that is not in a literal stays invisible to it. An alias
 // assembled from two pieces — `"… AS " + state.alias` — is invisible to
@@ -36,10 +39,13 @@
 // are declared, and the question there is whether a declared name collides
 // with a reserved word — which is what the list is for.
 //
-// Only the names this code invents. A column that exists in the schema is
-// not an invented name: it was declared in a migration, which every engine has
-// already accepted, and quoting or renaming those is a different job. What
-// this reads is `AS <word>`, which is exactly the syntax for making one up.
+// A declared column is recognized by name: the migrations declare every
+// column this schema has, and a lower-case word in a query that names one is
+// that column. Keywords are written in capitals here, which is what keeps
+// `ORDER BY` from reading as a column called "by". A word followed by a
+// parenthesis is a function, a word followed by a dot is a qualifier, and the
+// arguments after a builder method's SQL are values, which are free to be a
+// word the schema has a column of.
 //
 // Deliberately crude, like the two gates beside it: it reads the source as
 // text rather than parsing SQL, because SQL is what is inside the strings and
@@ -68,15 +74,14 @@ var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 
 // statement recognizes a string literal as SQL wherever it is written.
 //
-// Reading only the arguments of the builder's own methods missed every query
-// held in a const, returned by a helper, or handed to the raw-query
-// constructor — about thirty bare names, while the gate printed an all-clear.
+// A query held in a const, returned by a helper, or handed to the raw-query
+// constructor is read as well as the arguments of the builder's own methods.
 // A query's home is not what makes it a query.
 //
 // `FROM "` or `JOIN "` is the marker because every table in this schema is
-// quoted, so it appears in SQL and not in prose. Matching the bare keywords
-// instead reported sixty-odd English sentences: an API description saying "as
-// a" after the word "from" is not an alias.
+// quoted, so it appears in SQL and not in prose. The bare keywords match
+// English: an API description saying "as a" after the word "from" is not an
+// alias.
 var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 
 // declared matches a bare schema identifier in data-definition language.
@@ -109,10 +114,8 @@ var creating = regexp.MustCompile(`(?i)\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s
 // INTO or UPDATE, or opening a table expression that goes on to alias it.
 //
 // The alias pattern above sees only the names a query invents. A table is
-// declared rather than invented, and outside the migrations nothing looked at
-// one: they were written bare in four hundred and eighty-eight places and
-// quoted in a handful, so no reader could tell which was the convention and a
-// table whose name an engine reserves would be refused by that engine alone.
+// declared rather than invented, and a table whose name an engine reserves,
+// written bare, is refused by that engine alone.
 var named = regexp.MustCompile(`(?i)\b(?:FROM|JOIN|INTO|UPDATE)\s+("?)([A-Za-z_][A-Za-z0-9_]*)`)
 
 // opening matches a table expression, which names its table and then aliases
@@ -135,11 +138,10 @@ var naming = map[string]bool{"TableExpr": true, "Table": true, "ModelTableExpr":
 // aliased matches the table alias a model declares in its struct tag.
 //
 // Read because a tag is where an alias is written for most of this codebase's
-// queries, and the walk below sees only call arguments: the settings table
-// was aliased `as`, which all four engines reserve. It works only because the
-// library quotes what a tag declares — a property of the library rather than
-// of this code — and the first raw expression naming that alias is a syntax
-// error on every one of the four.
+// queries, and the walk below sees only call arguments. A reserved alias in a
+// tag works only because the library quotes what a tag declares — a property
+// of the library rather than of this code — and the first raw expression
+// naming that alias is a syntax error on every engine reserving it.
 var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
 
 // writing is the query builder's methods that take SQL as text.
@@ -151,8 +153,7 @@ var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
 // alternative is a type checker in a program whose whole job is to grep.
 //
 // Naming them is what keeps prose out. Nearly every English sentence in this
-// repository contains the word "as", and a check that read doc comments
-// reported eighteen names, every one of them a word in a sentence.
+// repository contains the word "as", and a doc comment is not SQL.
 var writing = map[string]bool{
 	"TableExpr": true, "ColumnExpr": true, "GroupExpr": true, "OrderExpr": true,
 	"Having": true, "Where": true, "Join": true, "JoinOn": true,
@@ -171,6 +172,9 @@ type found struct {
 	// table says the name is one the schema declares rather than one the
 	// query invents, which is a different sentence to fix it by.
 	table bool
+	// column is a declared column written bare, as it reads quoted, and
+	// empty for every other finding.
+	column string
 }
 
 func main() {
@@ -187,12 +191,22 @@ func main() {
 		reserved[word] = true
 	}
 
-	// The objects the migrations made, read first, because the check below
-	// tells a table from a keyword by asking whether this schema has one of
-	// that name.
+	// The tables and columns the migrations made, read first, because the
+	// check below tells a schema name from a keyword by asking whether this
+	// schema has one of that name.
 	schema := map[string]bool{}
+	columns := map[string]bool{}
+	fset := token.NewFileSet()
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
 		tablesDeclared(path, body, schema)
+		if !strings.Contains(path, "database/migrate/migrations/") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, body, 0)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		columnsDeclared(path, file, columns)
 		return nil
 	})
 	if err != nil {
@@ -200,12 +214,16 @@ func main() {
 		os.Exit(2)
 	}
 	if len(schema) == 0 {
-		fmt.Fprintln(os.Stderr, "the migrations declare no tables, so half of this would check nothing")
+		fmt.Fprintln(os.Stderr, "the migrations declare no tables, so the table pass would check nothing")
+		os.Exit(2)
+	}
+	if len(columns) == 0 {
+		fmt.Fprintln(os.Stderr, "the migrations declare no columns, so the column pass would check nothing")
 		os.Exit(2)
 	}
 
 	var bad []found
-	fset := token.NewFileSet()
+	queries := 0
 	// web holds the interface, which writes no SQL: it asks this server.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
 		// This checker's own tests are written out of what it reports: a bare
@@ -218,22 +236,34 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		bad = append(bad, checkFile(fset, path, file, schema, reserved)...)
+		hits, examined := checkFile(fset, path, file, schema, columns, reserved)
+		bad = append(bad, hits...)
+		queries += examined
 		return nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+	if queries == 0 {
+		fmt.Fprintln(os.Stderr, "no query was read, so the column pass checked nothing")
+		os.Exit(2)
+	}
 
 	if len(bad) == 0 {
 		fmt.Printf("every name a query invents in a literal is quoted, every table "+
-			"one names is quoted, and no name a migration declares collides with a "+
-			"word any of the four engines reserves (%d words checked over %d files, "+
-			"%d tables)\n", len(reservedWords()), read, len(schema))
+			"and declared column one names is quoted, and no name a migration "+
+			"declares collides with a word any of the four engines reserves (%d words "+
+			"checked over %d files, %d tables, %d columns, %d queries)\n",
+			len(reservedWords()), read, len(schema), len(columns), queries)
 		return
 	}
 	for _, one := range ordered(bad) {
+		if one.column != "" {
+			fmt.Fprintf(os.Stderr, "%s:%d: the column %q is written bare. "+
+				"Quote it: %s\n", one.file, one.line, one.word, one.column)
+			continue
+		}
 		if one.table {
 			fmt.Fprintf(os.Stderr, "%s:%d: the table %q is named bare. "+
 				"Quote it: %q\n", one.file, one.line, one.word, one.word)
@@ -280,13 +310,21 @@ func assembledFrom(arg ast.Expr) string {
 //
 // Everything the statement pass has already read is left out, so a clause
 // written whole and then handed over as a variable is one defect and not two.
-func assembled(fn *ast.FuncDecl, seen map[token.Pos]bool) map[string]string {
+//
+// A call to a method named in quoting is not read: the builder quotes its
+// argument itself.
+func assembled(fn *ast.FuncDecl, seen map[token.Pos]bool, quoting map[string]bool) map[string]string {
 	pieces := map[string]string{}
 	keep := func(name string, from ast.Expr) {
 		if name == "" || from == nil {
 			return
 		}
 		ast.Inspect(from, func(node ast.Node) bool {
+			if call, ok := node.(*ast.CallExpr); ok {
+				if method, ok := call.Fun.(*ast.SelectorExpr); ok && quoting[method.Sel.Name] {
+					return false
+				}
+			}
 			lit, ok := node.(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
 				return true
@@ -378,8 +416,7 @@ func bareTables(text string, schema map[string]bool) []bareTable {
 //
 // The comments beside a schema are the reason the schema is legible, and they
 // are full of the words an engine reserves — "the table exists", "on and
-// over" — so reading them as identifiers reported fifty names, none of which
-// was one.
+// over" — none of which is an identifier.
 func withoutSQLComments(text string) string {
 	var kept strings.Builder
 	for line := range strings.SplitSeq(text, "\n") {
