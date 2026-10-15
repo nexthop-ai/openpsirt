@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // onRecord is what is held about the issues a run of reports names, read in a
@@ -404,7 +405,7 @@ func unclassified(held []Weakness, cwes []string, primary string) bool {
 			return true
 		}
 	}
-	primary = strings.ToUpper(strings.TrimSpace(primary))
+	primary = weakness.Canonical(primary)
 	if primary == "" {
 		return false
 	}

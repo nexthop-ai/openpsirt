@@ -4,15 +4,11 @@
 package weakness_test
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
-
-// identifier is the shape the standard states a weakness under.
-var identifier = regexp.MustCompile(`^CWE-[1-9][0-9]{0,5}$`)
 
 func TestTheCatalogWasReadAndEveryNameItGaveIsUsable(t *testing.T) {
 	// A generated file nothing looks at is a file that can be empty, or half
@@ -34,7 +30,7 @@ func TestEveryNameIsStatedUnderAnIdentifierTheStandardAccepts(t *testing.T) {
 	checked := 0
 	for id, name := range weakness.All() {
 		checked++
-		if !identifier.MatchString(id) {
+		if !weakness.Shape.MatchString(id) {
 			t.Errorf("%q is not an identifier the standard accepts", id)
 		}
 		if name == "" {

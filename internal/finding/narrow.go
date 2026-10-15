@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // Filter narrows what is open before it is paged.
@@ -689,7 +690,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// bare LIKE answers CWE-79 for a search for CWE-7.
 		upper := make([]string, 0, len(cwes))
 		for _, cwe := range cwes {
-			upper = append(upper, strings.ToUpper(strings.TrimSpace(cwe)))
+			upper = append(upper, weakness.Canonical(cwe))
 		}
 		q = q.Where(`EXISTS (SELECT 1 FROM "vulnerability_weakness" AS "vw"
 			WHERE vw.vulnerability_id = f.vulnerability_id

@@ -143,11 +143,10 @@ func shortOf(id string) (string, bool) {
 // Of is one identifier under both of its names, either of them empty where
 // its list does not hold it.
 //
-// Taken as it was recorded — trimmed and upper-cased, which is the form a
-// finding holds — so a lookup and the record agree about what is the same
-// identifier.
+// Taken in the form a finding holds it, so a lookup and the record agree about
+// what is the same identifier.
 func Of(id string) Named {
-	clean := strings.ToUpper(strings.TrimSpace(id))
+	clean := Canonical(id)
 	name, _ := Name(clean)
 	short, _ := shortOf(clean)
 	return Named{ID: clean, Name: name, Short: short}

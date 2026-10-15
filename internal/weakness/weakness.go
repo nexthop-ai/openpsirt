@@ -23,6 +23,21 @@
 // both, and the screen chooses.
 package weakness
 
+import (
+	"regexp"
+	"strings"
+)
+
+// Shape is the shape the standard states a weakness identifier under: CWE- and
+// a number from one.
+var Shape = regexp.MustCompile(`^CWE-[1-9][0-9]{0,5}$`)
+
+// Canonical is an identifier in the form a finding holds it: trimmed and
+// upper-cased. Every reader and writer of a weakness identifier takes it in
+// this form, so a lookup, a filter and the record agree about what is the same
+// identifier.
+func Canonical(id string) string { return strings.ToUpper(strings.TrimSpace(id)) }
+
 // Name is what the catalog calls this identifier, and whether it knows it.
 //
 // Not known is a real answer. The catalog carries categories and views

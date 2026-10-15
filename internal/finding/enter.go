@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // Entering is a flaw somebody is recording in what this deployment ships.
@@ -141,9 +141,6 @@ const MostWeaknesses = 16
 var ErrNotAWeakness = refusal.Errorf("a flaw states at most %d weaknesses, each written as CWE- "+
 	"and a number, such as CWE-125", MostWeaknesses)
 
-// weaknessID is the shape of a weakness identifier: CWE- and a number from one.
-var weaknessID = regexp.MustCompile(`^CWE-[1-9][0-9]{0,5}$`)
-
 // ErrTooManyPlaces says one recording would open more findings than this
 // deployment allows one action to write.
 //
@@ -238,7 +235,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		return nil, "", ErrNotAWeakness
 	}
 	for _, kind := range kinds {
-		if !weaknessID.MatchString(kind) {
+		if !weakness.Shape.MatchString(kind) {
 			return nil, "", ErrNotAWeakness
 		}
 	}
@@ -846,7 +843,7 @@ func cleaned(in []string) []string {
 	out := make([]string, 0, len(in))
 	seen := map[string]bool{}
 	for _, one := range in {
-		one = strings.ToUpper(strings.TrimSpace(one))
+		one = weakness.Canonical(one)
 		if one == "" || seen[one] {
 			continue
 		}

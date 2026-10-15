@@ -23,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // Grype runs the scanner of that name.
@@ -561,7 +562,7 @@ func weaknesses(cwes []struct {
 }) (named []string, primary string) {
 	seen := map[string]bool{}
 	for _, entry := range cwes {
-		name := strings.ToUpper(strings.TrimSpace(entry.CWE))
+		name := weakness.Canonical(entry.CWE)
 		if name == "" {
 			continue
 		}
