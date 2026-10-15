@@ -135,12 +135,9 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 			// Read whole above, so a page is a slice of what is already in
 			// hand rather than the same query run again per two hundred.
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-				if offset >= len(rows) {
+				page := core.Window(rows, limit, offset)
+				if len(page) == 0 {
 					return nil, nil
-				}
-				page := rows[offset:]
-				if len(page) > limit {
-					page = page[:limit]
 				}
 				written := make([][]string, 0, len(page))
 				for _, row := range page {

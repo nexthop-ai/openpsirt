@@ -352,12 +352,9 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 				"declared_at", "by", "held_by", "state", "claim",
 			},
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-				if offset >= len(rows) {
+				page := core.Window(rows, limit, offset)
+				if len(page) == 0 {
 					return nil, nil
-				}
-				page := rows[offset:]
-				if len(page) > limit {
-					page = page[:limit]
 				}
 				written := make([][]string, 0, len(page))
 				for _, row := range page {

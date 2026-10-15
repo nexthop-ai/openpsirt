@@ -80,9 +80,7 @@ func registerPatchBranches(api huma.API, in core.Deps) {
 		out.Body.Looked, out.Body.Found = totals.Looked, totals.Found
 		out.Body.HeldBytes = totals.HeldBytes
 		out.Body.Total = len(repositories)
-		start := min(input.Offset, len(repositories))
-		end := min(start+input.Limit, len(repositories))
-		for _, one := range repositories[start:end] {
+		for _, one := range core.Window(repositories, input.Limit, input.Offset) {
 			body := PatchRepositoryBody{
 				URL: one.URL, Host: one.Host, State: core.RepositoryState(one.State),
 				Position: one.Position, Step: core.VisitStep(one.Step), VisitLooked: one.VisitLooked,

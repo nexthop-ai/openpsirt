@@ -115,11 +115,7 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 		narrowed := onlyReason(listed, string(input.Reason))
 		out.Body.Total = len(narrowed)
 		out.Body.Items = []UnmatchedBody{}
-		// The window is worked out without adding the two: an offset near the
-		// largest integer wraps negative when the limit is added to it.
-		start := min(input.Offset, len(narrowed))
-		end := start + min(input.Limit, len(narrowed)-start)
-		for _, one := range narrowed[start:end] {
+		for _, one := range core.Window(narrowed, input.Limit, input.Offset) {
 			out.Body.Items = append(out.Body.Items, UnmatchedBody{
 				Name: one.Name, Version: one.Version, Purl: one.Purl, CPE: one.CPE,
 				Ecosystem: graph.EcosystemOf(one.Purl), Namespace: graph.NamespaceOf(one.Purl),
