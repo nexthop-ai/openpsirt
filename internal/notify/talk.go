@@ -425,9 +425,9 @@ func (t *Talk) settleDirect(ctx context.Context, platform string, rows []noting,
 	case sendErr == nil:
 		q = q.Set("sent_at = ?", t.now().UTC().Truncate(time.Microsecond)).Set("failed = ?", "")
 	case givenUp:
-		q = q.Set("attempts = ?", tries).Set("failed = ?", trimTo(sendErr.Error(), 400))
+		q = q.Set("attempts = ?", tries).Set("failed = ?", trimTo(sendErr.Error(), mostOfAFailure))
 	default:
-		q = q.Set("failed = ?", trimTo(sendErr.Error(), 400))
+		q = q.Set("failed = ?", trimTo(sendErr.Error(), mostOfAFailure))
 	}
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("record how a direct message went: %w", err)

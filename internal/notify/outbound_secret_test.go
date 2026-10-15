@@ -72,11 +72,11 @@ func TestAFailureOutsideASCIIIsStillStorableOnceItIsBounded(t *testing.T) {
 	// land on a boundary and pass whatever the code does.
 	for offset := range 4 {
 		text := strings.Repeat("x", offset) + strings.Repeat("é", 400)
-		stored := trimTo(text, 400)
+		stored := trimTo(text, mostOfAFailure)
 		if !utf8.ValidString(stored) {
 			t.Fatalf("at offset %d the stored failure is not valid UTF-8: %q", offset, stored)
 		}
-		if len(stored) > 400 {
+		if len(stored) > mostOfAFailure {
 			t.Fatalf("at offset %d the stored failure is %d bytes", offset, len(stored))
 		}
 	}

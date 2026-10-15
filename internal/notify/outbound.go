@@ -524,7 +524,7 @@ func (s *Signal) settle(ctx context.Context, to Outbound, claimed []int64, sendE
 		// refusing is a thing an operator has to be able to see, and the last
 		// reason is the only part of it that says anything.
 		if _, err := s.db.NewUpdate().Model((*Delivery)(nil)).
-			Set("failed = ?", trimTo(withoutTheAddress(sendErr, to.URL), 400)).
+			Set("failed = ?", trimTo(withoutTheAddress(sendErr, to.URL), mostOfAFailure)).
 			Where("id IN (?)", bun.List(claimed)).Exec(ctx); err != nil && s.logger != nil {
 			s.logger.Error("could not record why a destination refused", "error", err)
 		}
@@ -632,6 +632,10 @@ func chatText(text, link string) string {
 	}
 	return chatMarkup.Replace(strings.Join(lines, "\n"))
 }
+
+// mostOfAFailure is how many bytes of a failed delivery's reason are
+// stored, for every channel.
+const mostOfAFailure = 400
 
 // trimTo bounds what is stored of a failure.
 func trimTo(text string, most int) string { return bound.Head(text, most) }
