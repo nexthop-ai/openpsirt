@@ -1210,20 +1210,79 @@ func chatPlatforms(cfg config.Config, logger *slog.Logger) []notify.Chat {
 }
 
 // noteStoreInTheClear says what a plaintext object store costs, at every start
-// rather than once at the moment somebody configured it. The address a browser
-// is redirected to carries its own authorization, so anybody on the path
-// between them and the store may fetch the file it names.
+// rather than once at the moment somebody configured it. Each store names its
+// own cost in clear. An attachment is handed over as a redirect to an address
+// that carries its own authorization, so anybody on the path between a browser
+// and the store may fetch the file it names. A published advisory is written
+// across that path, so anybody on it may change what the public reads.
 //
 // Its own function so that a test can watch it happen. Reached through the
 // store's own report rather than through the setting, because what matters is
 // the endpoint that was accepted rather than the intent that admitted it, and
 // the endpoint it names has had any password taken out of it.
-func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
+func noteStoreInTheClear(bucket *attach.Bucket, clear string, logger *slog.Logger) {
 	if !bucket.InTheClear() {
 		return
 	}
-	logger.Warn("attachment links cross the network in the clear",
-		"endpoint", bucket.Endpoint())
+	logger.Warn(clear, "endpoint", bucket.Endpoint())
+}
+
+// storeKind is what tells one configured store from the other: the settings it
+// is refused under, the words its errors and its plaintext warning use, and how
+// its local directory is opened.
+type storeKind struct {
+	// names are the settings an object store refusal names.
+	names attach.SettingNames
+	// what names the store in an error about its object store. An object
+	// store's refusal reads the same for either of the two it backs.
+	what string
+	// dir is the setting that names the local directory. The local store
+	// says "file directory" for either of the two it backs, so an operator
+	// who has pointed this at a mount they cannot write is sent to the
+	// setting they typed.
+	dir string
+	// clear is the warning a plaintext object store is logged with.
+	clear string
+	// local opens the directory on this machine, or answers nil for none.
+	local func(string) (*attach.Files, error)
+}
+
+// openStore opens one configured store: its object store where a bucket is
+// named, its directory on this machine otherwise, and nothing where neither
+// is. The bucket wins where both are set. Every error names the store, and a
+// bucket reached in the clear is warned about whichever store it backs.
+//
+// The store is asked to answer now rather than at its first use. A store that
+// does not answer is a configuration mistake, and the moment to report one is
+// while whoever made it is still watching the logs.
+//
+// Where there is no store the answer is an untyped nil, so that a caller
+// testing it against nil sees no store rather than a nil directory.
+func openStore(ctx context.Context, s config.Store, kind storeKind,
+	logger *slog.Logger) (attach.Storage, error) {
+
+	bucket, err := attach.NewBucket(ctx, bucketOf(s, kind.names))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", kind.what, err)
+	}
+	if bucket != nil {
+		if err := bucket.Reachable(ctx); err != nil {
+			return nil, fmt.Errorf("%s: %w", kind.what, err)
+		}
+		noteStoreInTheClear(bucket, kind.clear, logger)
+		return bucket, nil
+	}
+	local, err := kind.local(s.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", kind.dir, s.Dir, err)
+	}
+	if local == nil {
+		return nil, nil
+	}
+	if err := local.Reachable(ctx); err != nil {
+		return nil, fmt.Errorf("%s %s: %w", kind.dir, s.Dir, err)
+	}
+	return local, nil
 }
 
 // directoryStore is where the published advisory directory is written, or
@@ -1246,45 +1305,29 @@ func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
 func directoryStore(ctx context.Context, cfg config.Config,
 	logger *slog.Logger) (*directory.Store, error) {
 
-	bucket, err := attach.NewBucket(ctx, bucketOf(cfg.Directory, attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
-		AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
-		Key:       "OPENPSIRT_DIRECTORY_KEY",
-		Secret:    "OPENPSIRT_DIRECTORY_SECRET",
-		Token:     "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
-	}))
-	// Named as this store's, because an object store's refusal reads the
-	// same for either of the two it backs.
-	if err != nil {
-		return nil, fmt.Errorf("the published advisory directory's object store: %w", err)
-	}
-	if bucket != nil {
-		// Asked now rather than at the first pass. A bucket that does not
-		// answer is a configuration mistake, and the moment to report one is
-		// while whoever made it is still watching the logs.
-		if err := bucket.Reachable(ctx); err != nil {
-			return nil, fmt.Errorf("the published advisory directory's object store: %w", err)
-		}
+	files, err := openStore(ctx, cfg.Directory, storeKind{
+		names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+			AllowHTTP: "OPENPSIRT_DIRECTORY_ALLOW_HTTP",
+			Key:       "OPENPSIRT_DIRECTORY_KEY",
+			Secret:    "OPENPSIRT_DIRECTORY_SECRET",
+			Token:     "OPENPSIRT_DIRECTORY_SESSION_TOKEN",
+		},
+		what:  "the published advisory directory's object store",
+		dir:   "OPENPSIRT_DIRECTORY_DIR",
+		clear: "published advisories are written across the network in the clear",
+		local: attach.NewServedFiles,
+	}, logger)
+	switch files.(type) {
+	case nil:
+		return nil, err
+	case *attach.Bucket:
 		logger.Info("published advisories are written to an object store",
 			"bucket", cfg.Directory.Bucket)
-		return directory.Published(bucket), nil
+	default:
+		logger.Info("published advisories are written to a directory on this machine",
+			"directory", cfg.Directory.Dir)
 	}
-	local, err := attach.NewServedFiles(cfg.Directory.Dir)
-	// Named with the setting the operator typed. The store says "file
-	// directory" for either of the two it backs, so an operator who has just
-	// pointed this at a mount they cannot write would otherwise go and check
-	// attachment settings that are fine.
-	if err != nil {
-		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.Directory.Dir, err)
-	}
-	if local == nil {
-		return nil, nil
-	}
-	if err := local.Reachable(ctx); err != nil {
-		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.Directory.Dir, err)
-	}
-	logger.Info("published advisories are written to a directory on this machine",
-		"directory", cfg.Directory.Dir)
-	return directory.Published(local), nil
+	return directory.Published(files), nil
 }
 
 // bucketOf is the object store one configured store names, refusing under the
@@ -1301,44 +1344,32 @@ func bucketOf(s config.Store, names attach.SettingNames) attach.BucketConfig {
 // attachmentStore is where attachments go, or nothing where an operator
 // configured nowhere.
 //
-// The bucket wins where both are set. The local directory is the development
-// backend — one process and one disk — and a deployment that named a bucket
-// meant the bucket.
+// The local directory is the development backend — one process and one disk
+// — and a deployment that named a bucket meant the bucket.
 func attachmentStore(ctx context.Context, cfg config.Config, logger *slog.Logger) (attach.Storage, error) {
-	bucket, err := attach.NewBucket(ctx, bucketOf(cfg.Attachments, attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
-		AllowHTTP: "OPENPSIRT_ATTACHMENT_ALLOW_HTTP",
-		Key:       "OPENPSIRT_ATTACHMENT_KEY",
-		Secret:    "OPENPSIRT_ATTACHMENT_SECRET",
-		Token:     "OPENPSIRT_ATTACHMENT_SESSION_TOKEN",
-	}))
-	if err != nil {
+	files, err := openStore(ctx, cfg.Attachments, storeKind{
+		names: attach.SettingNames{ //nolint:gosec // G101: the names of settings, not their values
+			AllowHTTP: "OPENPSIRT_ATTACHMENT_ALLOW_HTTP",
+			Key:       "OPENPSIRT_ATTACHMENT_KEY",
+			Secret:    "OPENPSIRT_ATTACHMENT_SECRET",
+			Token:     "OPENPSIRT_ATTACHMENT_SESSION_TOKEN",
+		},
+		what:  "the attachment object store",
+		dir:   "OPENPSIRT_ATTACHMENT_DIR",
+		clear: "attachment links cross the network in the clear",
+		local: attach.NewFiles,
+	}, logger)
+	switch files.(type) {
+	case nil:
 		return nil, err
-	}
-	if bucket != nil {
-		// Asked now rather than at somebody's first upload. A bucket that does
-		// not answer is a configuration mistake, and the moment to report one
-		// is while whoever made it is still watching the logs.
-		if err := bucket.Reachable(ctx); err != nil {
-			return nil, err
-		}
-		noteStoreInTheClear(bucket, logger)
+	case *attach.Bucket:
 		logger.Info("attachments are held in an object store", "bucket", cfg.Attachments.Bucket)
-		return bucket, nil
+	default:
+		// Said plainly, because it is the backend that is not a production
+		// option: one process and one disk, and two replicas would disagree
+		// about what exists.
+		logger.Warn("attachments are held on this machine's disk, which is for development",
+			"directory", cfg.Attachments.Dir)
 	}
-	local, err := attach.NewFiles(cfg.Attachments.Dir)
-	if err != nil {
-		return nil, err
-	}
-	if local == nil {
-		return nil, nil
-	}
-	if err := local.Reachable(ctx); err != nil {
-		return nil, err
-	}
-	// Said plainly, because it is the backend that is not a production
-	// option: one process and one disk, and two replicas would disagree about
-	// what exists.
-	logger.Warn("attachments are held on this machine's disk, which is for development",
-		"directory", cfg.Attachments.Dir)
-	return local, nil
+	return files, nil
 }

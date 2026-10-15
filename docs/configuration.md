@@ -706,6 +706,14 @@ Use a store of its own rather than the one attachments are in. Every file here
 is served to anybody who asks, and every attachment is authorized before it is
 handed over — one destination would have to be both.
 
+`OPENPSIRT_DIRECTORY_ALLOW_HTTP` is told at every start, the way the attachment
+setting is, because anybody on the path to the store may change what the
+public reads:
+
+```
+WARN published advisories are written across the network in the clear endpoint=http://minio.internal:9000
+```
+
 Only a document that may travel is written. An advisory covering a flaw nobody
 outside has been told about carries TLP:RED, and the directory is the freely
 accessible half of the standard's distribution, so those are held back and

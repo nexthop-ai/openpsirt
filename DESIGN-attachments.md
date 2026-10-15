@@ -162,6 +162,7 @@ An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 | Neither the refusal nor the notice repeats a password | An endpoint may carry credentials, and a notice at every start would otherwise write them to the log at every start |
 | An endpoint carrying credentials is split before anything is given the address | The name and password are handed over as credentials, which is what makes the signing well-defined, and the address the client is given carries nothing to leak by any route. What a person is shown and what the client uses stop being two strings that can drift |
 | An upload to a plaintext store sends its payload unsigned, with a checksum only where the operation requires one | An upload is streamed through its digests and cannot be rewound, and over plain HTTP the client would otherwise hash or checksum the body before sending it, which a stream refuses. Over https a trailing checksum covers a stream and nothing changes |
+| The published directory's object store is held to the same rules, and told at every start in words of its own | Its files are public, and what crosses the path is the write: anybody on it may change what the public reads |
 | Distinct from serving this application without TLS | That one is cookies on the way in, this one a file on the way out, and a deployment can want either without the other |
 
 ## Delivery

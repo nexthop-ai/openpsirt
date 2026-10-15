@@ -7,6 +7,10 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -65,7 +69,8 @@ func TestAPlaintextStoreSaysSoAtEveryStart(t *testing.T) {
 				t.Fatalf("%q was refused: %v", each.endpoint, err)
 			}
 			var said bytes.Buffer
-			noteStoreInTheClear(bucket, slog.New(slog.NewTextHandler(&said, nil)))
+			noteStoreInTheClear(bucket, "attachment links cross the network in the clear",
+				slog.New(slog.NewTextHandler(&said, nil)))
 			warned := strings.Contains(said.String(), "cross the network in the clear")
 			if warned != each.warned {
 				t.Fatalf("warned %v, wanted %v: %s", warned, each.warned, said.String())
@@ -75,6 +80,88 @@ func TestAPlaintextStoreSaysSoAtEveryStart(t *testing.T) {
 			}
 			if each.omits != "" && strings.Contains(said.String(), each.omits) {
 				t.Fatalf("the warning carries a password: %s", said.String())
+			}
+		})
+	}
+}
+
+// Both stores warn about a bucket reached across a network in the clear, each
+// in its own words. The attachment store and the published directory are
+// opened by one path, and this pins that the warning is on it for both.
+//
+// The store is reached through the unspecified address, which connects to
+// this machine and is not a loopback address, so the bucket counts as across a
+// network while the test needs none. A system that does not connect there
+// skips rather than fails.
+func TestEveryStoreWarnsAboutABucketInTheClear(t *testing.T) {
+	store := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer store.Close()
+	port := strconv.Itoa(store.Listener.Addr().(*net.TCPAddr).Port)
+	if probe, err := net.Dial("tcp", "0.0.0.0:"+port); err != nil {
+		t.Skipf("the unspecified address does not reach this machine here: %v", err)
+	} else {
+		_ = probe.Close()
+	}
+	endpoint := "http://0.0.0.0:" + port
+	in := config.Store{Endpoint: endpoint, Bucket: "files", Region: "us-east-1",
+		Key: "key", Secret: "secret", PathStyle: true, AllowHTTP: true}
+
+	for _, each := range []struct {
+		name string
+		open func(context.Context, *slog.Logger) (any, error)
+		says string
+	}{
+		{"attachments", func(ctx context.Context, logger *slog.Logger) (any, error) {
+			return attachmentStore(ctx, config.Config{Attachments: in}, logger)
+		}, "attachment links cross the network in the clear"},
+		{"published directory", func(ctx context.Context, logger *slog.Logger) (any, error) {
+			return directoryStore(ctx, config.Config{Directory: in}, logger)
+		}, "published advisories are written across the network in the clear"},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			var said bytes.Buffer
+			if _, err := each.open(t.Context(), slog.New(slog.NewTextHandler(&said, nil))); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(said.String(), each.says) {
+				t.Fatalf("a bucket in the clear was opened without the warning: %s", said.String())
+			}
+		})
+	}
+}
+
+// Every error opening a store names the store it is about, because an object
+// store's refusal reads the same for either of the two it backs.
+func TestEveryStoreErrorNamesItsStore(t *testing.T) {
+	gone := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer gone.Close()
+	in := config.Store{Endpoint: gone.URL, Bucket: "files", Region: "us-east-1",
+		Key: "key", Secret: "secret", PathStyle: true}
+	for _, each := range []struct {
+		name string
+		open func() error
+		says string
+	}{
+		{"attachments", func() error {
+			_, err := attachmentStore(t.Context(), config.Config{Attachments: in}, discard())
+			return err
+		}, "the attachment object store"},
+		{"published directory", func() error {
+			_, err := directoryStore(t.Context(), config.Config{Directory: in}, discard())
+			return err
+		}, "the published advisory directory's object store"},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			err := each.open()
+			if err == nil {
+				t.Fatal("a store that refuses every request was accepted")
+			}
+			if !strings.Contains(err.Error(), each.says) {
+				t.Fatalf("the error does not name its store: %v", err)
 			}
 		})
 	}
