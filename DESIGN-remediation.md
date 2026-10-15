@@ -861,7 +861,7 @@ writes them (REQ-63).
 
 | File | |
 |---|---|
-| `provider-metadata.json` | Who this publisher is, where the documents are, and whether aggregators may list and mirror them. The publisher is the object every listed document carries, built by the same rule. The supplier reader follows this directory, which a test checks |
+| `provider-metadata.json` | Who this publisher is, where the documents are, and whether aggregators may list and mirror them. The publisher is the object every listed document carries, built by the same rule. The supplier reader follows this directory, which a test checks. It reads only the fields it uses, under the names this directory writes, so a publisher's misshaped field it does not use leaves the listing readable |
 | `<year>/<name>.json` | One document per advisory. The year is the one the document states the flaw was recorded in, so a document revised in January does not move; the name is the tracking identifier under the standard's rule, lower-cased first and then every sequence outside letters, digits, a plus and a hyphen replaced by one underscore |
 | `<year>/<name>.json.sha256` | The hash of the delivered bytes, the value first and the filename after it, which is both what the standard asks for and what the ordinary command-line checker reads |
 | `index.txt` | Every document's path, one per line |

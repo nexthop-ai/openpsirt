@@ -66,7 +66,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
 | `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
 | `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
-| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, which the directory writes and the supplier reader reads. See `DESIGN-remediation.md` |
+| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, which the directory writes. The supplier reader reads the fields it uses under the names these declare. See `DESIGN-remediation.md` |
 | `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `DESIGN-ingest.md` |
 | `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `DESIGN-findings.md` § CVE record ranges and `DESIGN-ingest.md` § CVE records |
 | `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `DESIGN-findings.md` |

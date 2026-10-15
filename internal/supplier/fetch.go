@@ -24,7 +24,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -358,7 +357,7 @@ type listing struct {
 func (f *Fetcher) listings(ctx context.Context, client *http.Client,
 	address string) ([]listing, error) {
 
-	var described csaf.ProviderMetadata
+	var described providerMetadata
 	if err := f.json(ctx, client, address, &described); err != nil {
 		return nil, fmt.Errorf("read what that publisher offers: %w", err)
 	}
@@ -523,7 +522,7 @@ func (f *Fetcher) entries(ctx context.Context, client *http.Client,
 func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 	address string) ([]entry, error) {
 
-	var feed csaf.Feed
+	var feed rolieFeed
 	if err := f.json(ctx, client, address, &feed); err != nil {
 		return nil, err
 	}
@@ -576,7 +575,7 @@ func stampOf(said string) (time.Time, error) {
 // One per algorithm is all the comparison can use, and a count bounded by the
 // algorithms is what keeps an entry naming thousands of them from holding one
 // document past the lease.
-func sumsIn(one csaf.Entry) []string {
+func sumsIn(one feedEntry) []string {
 	byKind := make([]string, len(algorithms))
 	for _, link := range one.Links {
 		href := strings.TrimSpace(link.Href)
@@ -659,7 +658,7 @@ func listable(address string) bool {
 // The content source first and the self link second. The standard asks for
 // both and real feeds carry both, and where a publisher carries only one it is
 // as often the one as the other.
-func documentIn(one csaf.Entry) string {
+func documentIn(one feedEntry) string {
 	if address := strings.TrimSpace(one.Content.Source); address != "" {
 		return address
 	}
