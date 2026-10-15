@@ -50,6 +50,12 @@ func probeTable(t *testing.T) string {
 }
 
 func TestMigrationsApplyOnEveryEngine(t *testing.T) {
+	// The harness hands over a database it has already migrated, so the Up
+	// here is a second run: the one every instance makes at startup, and the
+	// one a rolling restart's second pod makes. It has to succeed, and the
+	// version it leaves has to be the one this build expects, which is what
+	// makes it a no-op rather than an error. Applying migrations to an empty
+	// database is what the harness itself does for every test.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		if err := schema.Up(ctx, db, quiet()); err != nil {
@@ -100,33 +106,5 @@ func TestMigrationsApplyOnEveryEngine(t *testing.T) {
 			t.Errorf("timestamp read back as %v, wrote %v", updated.UTC(), want)
 		}
 		t.Logf("%s: schema version %d", db.Server.Engine, version)
-	})
-}
-
-func TestMigrationsAreIdempotent(t *testing.T) {
-	// Every instance runs migrations at startup. A second run must be a no-op
-	// rather than an error, or a rolling restart fails on the second pod.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("first run: %v", err)
-		}
-		// Checked, because two discarded errors are two zeros and a pair of
-		// zeros compares equal: idempotency then "holds" in a test that read
-		// no version at all.
-		first, err := schema.Version(ctx, db)
-		if err != nil {
-			t.Fatalf("read the version after the first run: %v", err)
-		}
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("second run: %v", err)
-		}
-		second, err := schema.Version(ctx, db)
-		if err != nil {
-			t.Fatalf("read the version after the second run: %v", err)
-		}
-		if first != second {
-			t.Errorf("version moved on a second run: %d then %d", first, second)
-		}
 	})
 }
