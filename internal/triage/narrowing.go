@@ -149,16 +149,8 @@ func readableFindings(query *bun.SelectQuery, subject access.Subject, finding, p
 // which is never true, so the outer join quietly becomes an inner one. The
 // empty string means the subject reads everywhere and there is nothing to add.
 func readableFindingsOn(subject access.Subject, finding, product string) (string, []any) {
-	if subject.Kind != access.Person {
-		return "1 = 0", nil
-	}
-	products, all := subject.Products()
-	if all {
-		return "", nil
-	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(product, finding+".visibility", both, public, private)
-	return orBrought(subject, where, args, product, finding+".vulnerability_id")
+	return visibleCondition(subject, product, finding+".visibility", finding+".vulnerability_id",
+		readable, onCases)
 }
 
 // orBrought widens a narrowing by the cases this subject was brought into: one
@@ -192,21 +184,9 @@ func orBrought(subject access.Subject, where string, args []any,
 // stream, the visibility on the finding — and narrowedBy takes one alias for
 // both.
 func onlyDecidable(query *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
-	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
-	}
-	products, all := subject.Products()
-	if all {
-		if unnarrowedMay(subject, mayDecide) {
-			return query
-		}
-		return query.Where("1 = 0")
-	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
-		return mayDecide(subject, id, v)
-	})
-	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
-	return query.Where(where, args...)
+	where, args := visibleCondition(subject, "st.product_id", "f.visibility", "f.vulnerability_id",
+		mayDecide, withoutCases)
+	return narrowedOn(query, where, args)
 }
 
 // mayDecideOn is the same question about one named issue, which is what a
@@ -250,6 +230,9 @@ func readableOn(subject access.Subject, productID, vulnerabilityID int64,
 	return false
 }
 
+// Whether a narrowing also lets through the cases somebody was brought into.
+// Named rather than a bare boolean, because which of the two a narrowing is
+// decides whether a collaborator can approve.
 const (
 	onCases      = true
 	withoutCases = false
@@ -268,32 +251,68 @@ const (
 // The products are bound as values. They come from the subject's own grants
 // rather than from anything typed, so writing them into the statement would be
 // safe today and would be the shape somebody copies later when the list does
-// come from outside. Whether a narrowing also lets through the cases somebody
-// was brought into . Named rather than a bare boolean at two call sites,
-// because which of the two a narrowing is decides whether a collaborator can
-// approve.
+// come from outside.
 func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	allowed func(access.Subject, int64, access.Visibility) bool, cases bool) *bun.SelectQuery {
 
+	where, args := visibleCondition(subject, column+".product_id", column+".visibility",
+		column+".vulnerability_id", allowed, cases)
+	return narrowedOn(query, where, args)
+}
+
+// narrowedOn applies a condition visibleCondition built, where it asks
+// anything.
+func narrowedOn(query *bun.SelectQuery, where string, args []any) *bun.SelectQuery {
+	if where == "" {
+		return query
+	}
+	return query.Where(where, args...)
+}
+
+// visibleCondition is the condition a row meets where a subject passes one
+// rule, with the values it binds: per product and per visibility, read from
+// the columns named, widened where cases is set by the cases the subject was
+// brought into, asked of the issue column named.
+//
+// It is "1 = 0" for a subject that is not a person, and empty where every row
+// passes, which only the deployment's own subject reaches and only for a rule
+// it passes.
+//
+// The one spelling of the rule as SQL, for every narrowing here and every
+// complement of one. A copy that drifts is a disclosure, so none is kept.
+func visibleCondition(subject access.Subject, product, visibility, vulnerability string,
+	allowed func(access.Subject, int64, access.Visibility) bool, cases bool) (string, []any) {
+
 	if subject.Kind != access.Person {
-		return query.Where("1 = 0")
+		return "1 = 0", nil
 	}
 	products, all := subject.Products()
 	if all {
 		if unnarrowedMay(subject, allowed) {
-			return query
+			return "", nil
 		}
-		return query.Where("1 = 0")
+		return "1 = 0", nil
 	}
-
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return allowed(subject, id, v)
 	})
-	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
+	where, args := access.VisibleWhere(product, visibility, both, public, private)
 	if cases {
-		where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
+		where, args = orBrought(subject, where, args, product, vulnerability)
 	}
-	return query.Where(where, args...)
+	return where, args
+}
+
+// negated is the complement of a condition visibleCondition built. Neither
+// column it reads is ever null, so negating it is exact.
+func negated(where string, args []any) (string, []any) {
+	switch where {
+	case "":
+		return "1 = 0", nil
+	case "1 = 0":
+		return "1 = 1", nil
+	}
+	return "NOT (" + where + ")", args
 }
 
 // unnarrowedMay reports whether the deployment's own subject passes a rule. It
@@ -337,66 +356,24 @@ func (s *Store) partlyHidden(ctx context.Context, subject access.Subject,
 // notReadableWhere is the condition a decision row meets where the subject may
 // not read it, cases included — the complement of readableBy.
 func notReadableWhere(subject access.Subject, column string) (string, []any) {
-	if subject.Kind != access.Person {
-		return "1 = 1", nil
-	}
-	products, all := subject.Products()
-	if all {
-		return "1 = 0", nil
-	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
-		return readable(subject, id, v)
-	})
-	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
-	where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
-	// Neither column is ever null, so negating it is exact.
-	return "NOT (" + where + ")", args
+	return negated(visibleCondition(subject, column+".product_id", column+".visibility",
+		column+".vulnerability_id", readable, onCases))
 }
 
 // notApprovableWhere is the condition a decision row meets where the subject
 // may not agree to it — the complement of approvableBy, for asking whether a
 // claim has any row outside what the reader may act on.
 func notApprovableWhere(subject access.Subject, column string) (string, []any) {
-	if subject.Kind != access.Person {
-		return "1 = 1", nil
-	}
-	products, all := subject.Products()
-	if all {
-		if unnarrowedMay(subject, mayApprove) {
-			return "1 = 0", nil
-		}
-		return "1 = 1", nil
-	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
-		return mayApprove(subject, id, v)
-	})
-	// The complement of the same condition. Neither column is ever null, so
-	// negating it is exact.
-	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
-	return "NOT (" + where + ")", args
+	return negated(visibleCondition(subject, column+".product_id", column+".visibility",
+		column+".vulnerability_id", mayApprove, withoutCases))
 }
 
 // notDecidableWhere is the condition a decision row meets where the subject
 // may not argue about it, cases included — the complement of decidableBy, for
 // asking whether a claim has any row out of the subject's reach.
 func notDecidableWhere(subject access.Subject, column string) (string, []any) {
-	if subject.Kind != access.Person {
-		return "1 = 1", nil
-	}
-	products, all := subject.Products()
-	if all {
-		if unnarrowedMay(subject, mayDecide) {
-			return "1 = 0", nil
-		}
-		return "1 = 1", nil
-	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
-		return mayDecide(subject, id, v)
-	})
-	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
-	where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
-	// Neither column is ever null, so negating it is exact.
-	return "NOT (" + where + ")", args
+	return negated(visibleCondition(subject, column+".product_id", column+".visibility",
+		column+".vulnerability_id", mayDecide, onCases))
 }
 
 // readableFindingsBy is readableFindings as a step a chained statement
