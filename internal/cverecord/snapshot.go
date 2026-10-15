@@ -121,8 +121,12 @@ func trimmed(id string) string {
 	return id
 }
 
-// Write writes a snapshot, and refuses records a snapshot cannot hold.
+// Write writes a snapshot, and refuses records a snapshot cannot hold and a
+// moment of none, which reading a snapshot refuses.
 func Write(w io.Writer, taken time.Time, from string, records []Record) error {
+	if taken.IsZero() {
+		return errors.New("the CVE records carry no time they were updated, so the snapshot cannot say when it was taken")
+	}
 	head, err := json.Marshal(header{Format: format, Taken: taken.UTC(), From: from, Records: len(records)})
 	if err != nil {
 		return err

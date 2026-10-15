@@ -1115,7 +1115,7 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 
 | Rule | Reason |
 |---|---|
-| Writing a snapshot refuses what reading one refuses | A snapshot no scan can read stalls every scan, and the fetcher, finding it unreadable, fetches and writes it again every hour |
+| Writing a snapshot refuses what reading one refuses, a snapshot with no moment included | A snapshot no scan can read stalls every scan, and the fetcher, finding it unreadable, fetches and writes it again every hour |
 | What an archive keeps is counted against the snapshot's bounds as it is read | What it keeps is held in memory until it is written |
 | A build past a bound fails before the rename | The snapshot held stays the last one that could be read, and the failure is logged |
 

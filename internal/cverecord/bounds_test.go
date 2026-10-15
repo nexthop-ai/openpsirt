@@ -477,3 +477,38 @@ func TestADownloadLargerThanTheBoundIsRefusedAndRemoved(t *testing.T) {
 		return err
 	}, cverecord.IsTooLarge)
 }
+
+func TestAnArchiveWhoseRecordsCarryNoUpdateTimeLeavesTheSnapshotHeld(t *testing.T) {
+	// A record's update time is optional, and a snapshot that cannot say
+	// when it was taken is one reading refuses, so it is never written over
+	// the last good one.
+	dir := t.TempDir()
+	first := listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
+	})
+	if err := cverecord.Build(first, dir, "first"); err != nil {
+		t.Fatal(err)
+	}
+	undated, err := json.Marshal(map[string]any{
+		"cveMetadata": map[string]any{"cveId": "CVE-2026-43465", "state": "PUBLISHED"},
+		"containers":  map[string]any{"cna": map[string]any{"affected": []any{kernelEntry}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := listArchive(t, map[string][]byte{"CVE-2026-43465.json": undated})
+	if err := cverecord.Build(second, dir, "second"); err == nil {
+		t.Fatal("an archive whose records carry no update time was built")
+	}
+	held, err := cverecord.NewHeld(dir).Current()
+	if err != nil || held.Len() != 1 {
+		t.Fatalf("the snapshot held is %v, %v; want the first build's", held, err)
+	}
+}
+
+func TestASnapshotWithNoMomentIsNotWritten(t *testing.T) {
+	var buf bytes.Buffer
+	if err := cverecord.Write(&buf, time.Time{}, "", records(1)); err == nil {
+		t.Error("a snapshot with no moment was written")
+	}
+}
