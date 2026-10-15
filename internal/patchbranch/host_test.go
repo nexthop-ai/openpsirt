@@ -42,40 +42,55 @@ func passOn(t *testing.T, db *database.DB, projects map[string]upstream) *patchb
 }
 
 func TestAHostPastItsShareOfThePassWaitsBehindEveryOtherHost(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		first, second, other := project(t), project(t), project(t)
-		pass := passOn(t, db, map[string]upstream{
-			slowRepository("first"): first, slowRepository("second"): second,
-			repositoryOf("other"): other,
+	// The share is counted from when each visit began to when the visit
+	// recorded that it ended, and a visit that failed held the pass as long
+	// as one that reached the repository.
+	for name, reaches := range map[string]bool{"Reached": true, "Failed": false} {
+		t.Run(name, func(t *testing.T) {
+			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				first, second, other := project(t), project(t), project(t)
+				if !reaches {
+					first.dir = t.TempDir()
+				}
+				pass := passOn(t, db, map[string]upstream{
+					slowRepository("first"): first, slowRepository("second"): second,
+					repositoryOf("other"): other,
+				})
+				issue(t, db, "CVE-2025-0101", "critical", slowLink("first", first.fix))
+				if visited, err := pass.Once(ctx); err != nil || visited != slowRepository("first") {
+					t.Fatalf("visited %q, %v", visited, err)
+				}
+				repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if failed := len(repositories) == 1 && repositories[0].State == patchbranch.Failed; failed == reaches {
+					t.Fatalf("the first visit is reported as %+v", repositories)
+				}
+				// The visit began longer ago than the host's share. When it
+				// ended is what the visit recorded.
+				if _, err := db.DB.NewRaw(`UPDATE "patch_repository" SET "fetched_at" = ? WHERE "url" = ?`,
+					time.Now().UTC().Add(-patchbranch.HostShare-time.Hour),
+					slowRepository("first")).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				issue(t, db, "CVE-2025-0102", "critical", slowLink("second", second.fix))
+				issue(t, db, "CVE-2025-0103", "low", link("other", other.fix))
+				visited, err := pass.Once(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if visited != repositoryOf("other") {
+					t.Errorf("visited %q, want the low on a host that has not had its share", visited)
+				}
+				if visited, err = pass.Once(ctx); err != nil || visited != slowRepository("second") {
+					t.Errorf("then visited %q, %v; want the host past its share once nothing else is due",
+						visited, err)
+				}
+			})
 		})
-		issue(t, db, "CVE-2025-0101", "critical", slowLink("first", first.fix))
-		if visited, err := pass.Once(ctx); err != nil || visited != slowRepository("first") {
-			t.Fatalf("visited %q, %v", visited, err)
-		}
-		// The visit held the pass for more than the host's share, and ended a
-		// minute ago.
-		now := time.Now().UTC()
-		if _, err := db.DB.NewRaw(`UPDATE "patch_repository" SET "fetched_at" = ?, "ended_at" = ? WHERE "url" = ?`,
-			now.Add(-patchbranch.HostShare-time.Hour), now.Add(-time.Minute),
-			slowRepository("first")).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		issue(t, db, "CVE-2025-0102", "critical", slowLink("second", second.fix))
-		issue(t, db, "CVE-2025-0103", "low", link("other", other.fix))
-		visited, err := pass.Once(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if visited != repositoryOf("other") {
-			t.Errorf("visited %q, want the low on a host that has not had its share", visited)
-		}
-		if visited, err = pass.Once(ctx); err != nil || visited != slowRepository("second") {
-			t.Errorf("then visited %q, %v; want the host past its share once nothing else is due",
-				visited, err)
-		}
-
-	})
+	}
 }
 
 func TestARemoteErrorInBytesThatAreNotTextIsRecordedAndWaitsADay(t *testing.T) {
