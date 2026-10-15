@@ -20,6 +20,9 @@ function Row() {
         <tr className="row opens" onClick={opener("/target")}>
           <td data-part="plain">
             <span data-part="text">plain words</span>
+            <span data-part="handled" onClick={(event) => event.preventDefault()}>
+              handled
+            </span>
           </td>
           <td data-part="linkcell">
             <Link data-part="other" to="/elsewhere">
@@ -112,6 +115,18 @@ describe("a row that opens its target", () => {
     click("[data-part=text]", { metaKey: true });
     click("[data-part=text]", { shiftKey: true });
     click("[data-part=text]", { button: 1 });
+    expect(location()).toBe("/list");
+  });
+
+  it("leaves a click with the option key held to the browser", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=text]", { altKey: true });
+    expect(location()).toBe("/list");
+  });
+
+  it("leaves a click something inside the row already handled", () => {
+    mount.render(screen(<Row />, "/list"));
+    click("[data-part=handled]");
     expect(location()).toBe("/list");
   });
 
