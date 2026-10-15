@@ -148,15 +148,9 @@ func TypeOf(head []byte) string {
 // so this exists only so that a disposition header cannot be made to carry a
 // directory, a quote or a line break out to a browser.
 func SafeName(name string) string {
-	name = filepath.Base(strings.TrimSpace(name))
+	name = Visible(filepath.Base(strings.TrimSpace(name)))
 	name = strings.Map(func(r rune) rune {
-		switch {
-		case unicode.IsControl(r), unicode.Is(unicode.Cf, r):
-			// Control characters, and the format characters that reorder or
-			// hide text: a right-to-left override before "fdp.exe" shows a
-			// program as a document.
-			return -1
-		case r == '"', r == '\\', r == '/':
+		if r == '"' || r == '\\' || r == '/' {
 			return '_'
 		}
 		return r
@@ -167,8 +161,20 @@ func SafeName(name string) string {
 	// Bounded so that a name cannot make a header enormous. The digits are
 	// arbitrary; what matters is that there is a limit — and that the cut
 	// falls between characters, because the name is stored as well as served
-	// and three engines of four refuse half a character.
+	// and half a character is stored as a replacement character.
 	return bound.Head(name, 120)
+}
+
+// Visible is a name with its control characters taken out, and the format
+// characters that reorder or hide text: a right-to-left override before
+// "fdp.exe" shows a program as a document.
+func Visible(name string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return -1
+		}
+		return r
+	}, name)
 }
 
 // Disposition is the header a file is served with.

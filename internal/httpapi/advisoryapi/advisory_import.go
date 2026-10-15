@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -105,7 +107,11 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		//
 		// Taken from the document rather than from the request, because a
 		// security advisory names its publisher and its own identifier and is
-		// not a conforming advisory without them.
+		// not a conforming advisory without them. Both are shown wherever the
+		// evidence is, so they are held without the characters that reorder
+		// or hide text.
+		advisory.Publisher = strings.TrimSpace(attach.Visible(advisory.Publisher))
+		advisory.Identifier = strings.TrimSpace(attach.Visible(advisory.Identifier))
 		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
 			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records",

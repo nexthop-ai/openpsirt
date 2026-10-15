@@ -249,3 +249,28 @@ func TestANameLongerThanTheRecordIsRefusedRatherThanShortened(t *testing.T) {
 		}
 	})
 }
+
+func TestASupplierAdvisoryNamesItselfWithoutCharactersThatReorderText(t *testing.T) {
+	// Who published an advisory and what they called it are the document's,
+	// and both are shown wherever the evidence is.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		document := strings.Replace(
+			httpapitest.SupplierAdvisory("EXSA-2026:\u202e1001", "fixed", "3.7.0"),
+			`"name": "Example Distribution"`, "\"name\": \"Example\u202e Distribution\"", 1)
+		got := r.Advised(t, "admin", "exsa.json", document)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		var taken struct {
+			Publisher  string `json:"publisher"`
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
+			t.Fatal(err)
+		}
+		if taken.Publisher != "Example Distribution" || taken.Identifier != "EXSA-2026:1001" {
+			t.Errorf("the upload reports %+v", taken)
+		}
+	})
+}

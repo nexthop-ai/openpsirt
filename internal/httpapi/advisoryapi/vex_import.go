@@ -168,9 +168,12 @@ func registerVexImport(api huma.API, in core.Deps) {
 		// The fallback is the name the client gave the file it uploaded, so
 		// the bound has to hold there too — that is the path with nothing
 		// else guarding it.
-		publisher := strings.TrimSpace(input.Publisher)
+		//
+		// Either way it is shown wherever the evidence is, so it is held
+		// without the characters that reorder or hide text.
+		publisher := strings.TrimSpace(attach.Visible(input.Publisher))
 		if publisher == "" {
-			publisher = strings.TrimSpace(file.Filename)
+			publisher = strings.TrimSpace(attach.Visible(file.Filename))
 		}
 		if utf8.RuneCountInString(publisher) > finding.MostPublisher {
 			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(

@@ -400,6 +400,38 @@ func TestWhoPublishedItIsBoundedRatherThanShortened(t *testing.T) {
 	})
 }
 
+func TestWhoPublishedItIsHeldWithoutCharactersThatReorderText(t *testing.T) {
+	// The publisher is shown wherever the evidence is, and a right-to-left
+	// override in it reads reversed there. The file name it falls back to is
+	// the client's, and so is the query parameter.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		document := `{"@context":"https://openvex.dev/ns/v0.2.0","@id":"https://example.test/vex/1",
+			"author":"Example","timestamp":"2026-09-01T00:00:00Z","version":1,
+			"statements":[{"vulnerability":{"name":"CVE-2026-9998"},"status":"not_affected",
+			  "justification":"vulnerable_code_not_present",
+			  "products":[{"@id":"pkg:deb/debian/libnl-3-200@3.7.0-0.2"}]}]}`
+		for _, each := range []struct{ query, file, want string }{
+			{"", "acme\u202enosj.vex", "acmenosj.vex"},
+			{"acme%E2%80%AE%07", "statements.json", "acme"},
+		} {
+			got := r.VexedAs(t, "admin", each.query, each.file, document)
+			if got.Code != http.StatusCreated {
+				t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+			}
+			var taken struct {
+				Publisher string `json:"publisher"`
+			}
+			if err := json.Unmarshal(got.Body.Bytes(), &taken); err != nil {
+				t.Fatal(err)
+			}
+			if taken.Publisher != each.want {
+				t.Errorf("the publisher recorded is %q, want %q", taken.Publisher, each.want)
+			}
+		}
+	})
+}
+
 func TestADocumentCutOffPartwayIsRefusedAsMalformed(t *testing.T) {
 	// A document ending inside a string is the sender's to fix, and the
 	// parser's to report in words.
