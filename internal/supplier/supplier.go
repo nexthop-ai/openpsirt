@@ -425,10 +425,11 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 // CaughtUp records how far a pass read without saying the supplier is done.
 //
 // For a pass that stopped at its bound rather than because there was nothing
-// left. The mark moves so the next wake starts after what was read, and the two
-// moments are left alone so the supplier stays due: the bound is per wake and
-// the interval is a day, so a publisher issuing more in a day than one pass
-// takes would otherwise fall further behind every day.
+// left. The mark moves so the next wake starts after what was read, and where
+// nothing failed the pass is recorded as reached and not failing. When it was
+// last tried is left alone, so the supplier stays due: the bound is per wake
+// and the interval is a day, so a publisher issuing more in a day than one
+// pass takes would otherwise fall further behind every day.
 //
 // A pass that read on while stepping over something it should not have had to
 // names it in failed, and the last read that worked stays where it was.

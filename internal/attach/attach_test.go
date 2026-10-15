@@ -816,10 +816,8 @@ func TestAFileAttachedWhileTheSweepRunsKeepsItsBytes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the sweep took a file text refers to: %v", err)
 		}
-		// Asked of the store rather than through Fetch, which for a file
-		// this size answers with an address and never opens anything — so a
-		// record standing over bytes that are gone reads as a working fetch
-		// until somebody follows the address.
+		// Asked of the storage rather than through the store, so what is
+		// checked is that the bytes behind the record are still there.
 		body, err := f.files.Open(ctx, found.ObjectKey)
 		if err != nil {
 			t.Fatalf("the record stands and its bytes are gone: %v", err)

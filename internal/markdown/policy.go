@@ -100,8 +100,9 @@ const Issue = "issue"
 //   - And `<https://example.com>` — the standard way to write a bare link —
 //     looks exactly like a markup tag to a pattern, so honest text is refused.
 //
-// Asking the parser removes the whole class. The check here is over what will
-// be rendered, because it is the same parse.
+// Asking the parser removes the whole class. The check runs over the server's
+// parse of the source; the browser renders with its own parser, and the
+// policy refuses what either would turn into markup.
 func inspect(source string) []Fault {
 	document := parser.Parser().Parse(text.NewReader([]byte(source)))
 	lines := newLineIndex(source)

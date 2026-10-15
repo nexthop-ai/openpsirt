@@ -25,7 +25,7 @@ import (
 //
 // A day. The question is whether upstream has released since a flaw was
 // disclosed, which is a thing that changes on the order of days, and asking
-// every hour would put a deployment's whole component list through four public
+// every hour would put a deployment's whole component list through the public
 // indexes for an answer that had not moved.
 const StaleAfter = 24 * time.Hour
 

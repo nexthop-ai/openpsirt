@@ -57,7 +57,7 @@ type Unanswered struct {
 // The classification is applied after the rows arrive, because it is a list of
 // names rather than anything a query can express, so the read has to be
 // bounded by something other than the page. Far above what the set can be on
-// any real estate — it is components in the four askable ecosystems that were
+// any real estate — it is components in the askable ecosystems that were
 // asked and came back with nothing, which is the private and vendored part of
 // an inventory rather than the whole of it — and the answer says when it was
 // reached rather than quietly reporting a count that is a floor.
