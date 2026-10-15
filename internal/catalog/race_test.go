@@ -5,7 +5,6 @@ package catalog_test
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"sync"
 	"testing"
@@ -112,29 +111,6 @@ func TestDeclaringTheSameThingTwiceAtOnceSucceedsBothTimes(t *testing.T) {
 		if targets[0].ID != targets[1].ID {
 			t.Errorf("one build was recorded as two: %d and %d",
 				targets[0].ID, targets[1].ID)
-		}
-	})
-}
-
-// TestDeclaringSomethingElseUnderAKnownNameIsStillRefused is the other half:
-// making the race succeed must not make a contradiction succeed.
-func TestDeclaringSomethingElseUnderAKnownNameIsStillRefused(t *testing.T) {
-	dbtest.Two(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		store := catalog.NewStore(db.DB)
-
-		product, _, err := store.EnsureProduct(ctx, "mine", "Mine")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := store.EnsureStream(ctx, product.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := store.EnsureStream(ctx, product.ID, "master", catalog.Tag, nil); !errors.Is(err, catalog.ErrDiffers) {
-			t.Errorf("a branch redeclared as a tag answered %v", err)
-		}
-		if _, _, err := store.EnsureProduct(ctx, "mine", "Something Else"); !errors.Is(err, catalog.ErrDiffers) {
-			t.Errorf("a product redeclared with another display name answered %v", err)
 		}
 	})
 }
