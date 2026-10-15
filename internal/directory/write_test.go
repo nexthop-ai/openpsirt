@@ -361,17 +361,29 @@ func TestAnUnmovedRecordIsNotWrittenAgain(t *testing.T) {
 	})
 }
 
-// With nothing that may be published, a pass writes nothing and says so.
+// With nothing that may be published, a pass writes nothing and says so. The
+// advisory went out, about a flaw still held back, so its document is marked
+// for nobody beyond the people it was sent to.
 func TestAPassWithEverythingHeldBackWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		identifier := f.recorded(t)
+		identifier := f.recordedAs(t, false)
 		named := f.minted(t, "A flaw in the recovery console")
 		if _, err := f.store.Add(t.Context(), f.who, named,
 			fixtures.ProductName, identifier); err != nil {
 			t.Fatal(err)
 		}
-		if written := f.write(t); !written.Unchanged || written.Documents != 0 {
-			t.Errorf("a pass with nothing to publish reported %+v", written)
+		if _, err := f.store.Approve(t.Context(), f.agrees, named); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Published."); err != nil {
+			t.Fatal(err)
+		}
+		written := f.write(t)
+		if written.Documents != 0 || written.Held != 1 {
+			t.Errorf("a pass with only a held-back advisory reported %+v, want it held", written)
+		}
+		if _, err := os.Stat(filepath.Join(f.where, "provider-metadata.json")); !os.IsNotExist(err) {
+			t.Error("a directory was described with nothing in it")
 		}
 	})
 }
@@ -629,10 +641,16 @@ func (f *fixture) mintedAs(t *testing.T, who publisher.Named, title string) stri
 // kind an advisory is written about.
 func (f *fixture) recorded(t *testing.T) string {
 	t.Helper()
+	return f.recordedAs(t, true)
+}
+
+// recordedAs is the same, disclosed or held back.
+func (f *fixture) recordedAs(t *testing.T, disclosed bool) string {
+	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
 		TargetIDs: []int64{f.target}, Component: carrier.Name, Severity: "high",
 		Summary:   "The management socket answers before anyone authenticated.",
-		Disclosed: true,
+		Disclosed: disclosed,
 	})
 	if err != nil {
 		t.Fatalf("recording a flaw: %v", err)
