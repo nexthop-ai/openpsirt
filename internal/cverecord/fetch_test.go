@@ -12,7 +12,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -114,6 +117,63 @@ func TestTheMidnightReleaseCarriesTheDayBeforesArchive(t *testing.T) {
 	snapshot, err := cverecord.NewHeld(dir).Current()
 	if err != nil || snapshot.Len() != 2 || snapshot.Version() != "2026-10-07T00:40:00Z" {
 		t.Errorf("held %d records taken %s, %v; want the day's two", snapshot.Len(), snapshot.Version(), err)
+	}
+}
+
+// redirecting stands in for a repository host whose download reaches its
+// archive through a chain of redirects, the given number long.
+func redirecting(t *testing.T, tag, name, archive string, redirects int) (*httptest.Server, *atomic.Bool) {
+	t.Helper()
+	var stored atomic.Bool
+	body, err := os.ReadFile(filepath.Clean(archive))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hop, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/hop/"))
+		switch {
+		case r.URL.Path == "/releases/latest":
+			http.Redirect(w, r, "/releases/tag/"+tag, http.StatusFound)
+		case r.URL.Path == "/releases/download/"+tag+"/"+name:
+			http.Redirect(w, r, "/hop/1", http.StatusFound)
+		case hop > 0 && hop < redirects-1:
+			http.Redirect(w, r, "/hop/"+strconv.Itoa(hop+1), http.StatusFound)
+		case hop > 0:
+			http.Redirect(w, r, "/stored", http.StatusFound)
+		case r.URL.Path == "/stored":
+			stored.Store(true)
+			_, _ = w.Write(body)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server, &stored
+}
+
+// A download is followed through three redirects and no further, so a host
+// answering with an endless chain does not hold the fetch.
+func TestADownloadFollowsThreeRedirectsAndNoMore(t *testing.T) {
+	const tag, name = "cve_2026-10-07_0000Z", "2026-10-06_all_CVEs_at_midnight.zip.zip"
+	archive := listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
+	})
+	for _, c := range []struct {
+		redirects int
+		reached   bool
+	}{{3, true}, {4, false}} {
+		server, stored := redirecting(t, tag, name, archive, c.redirects)
+		dir := t.TempDir()
+		replaced, err := fetcherFor(t, server, dir).Once(t.Context())
+		if c.reached && (err != nil || !replaced) {
+			t.Errorf("an archive %d redirects away: replaced %v, %v; want it read", c.redirects, replaced, err)
+		}
+		if !c.reached && err == nil {
+			t.Errorf("an archive %d redirects away was fetched with no error", c.redirects)
+		}
+		if stored.Load() != c.reached {
+			t.Errorf("an archive %d redirects away was reached: %v, want %v", c.redirects, stored.Load(), c.reached)
+		}
 	}
 }
 

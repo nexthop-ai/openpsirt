@@ -231,8 +231,8 @@ func (f *Fetcher) latest(ctx context.Context) (string, time.Time, error) {
 // download fetches an archive into the directory and names the file.
 //
 // The repository host answers a download with a redirect to the host that
-// stores it. The client follows none, so the one hop is taken here, and only
-// to a host this names.
+// stores it. The client follows none, so the hops are taken here, at most
+// three, and only to a host this names.
 func (f *Fetcher) download(ctx context.Context, address string) (string, error) {
 	resp, err := f.get(ctx, address)
 	for hop := 0; err == nil && hop < 3 && isRedirect(resp.StatusCode); hop++ {

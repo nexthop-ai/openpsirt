@@ -98,6 +98,11 @@ func TestALinkNamingNoOneCommitNamesNoRepository(t *testing.T) {
 		"https://github.com/mad%20ler/zlib/commit/" + full,
 		"ftp://github.com/madler/zlib/commit/" + full,
 		"https://github.com/commit/" + full,
+		// A host that is not a bare name or address, which a repository
+		// request would carry somewhere other than the name it shows.
+		"https://git_hub.com/madler/zlib/commit/" + full,
+		"https://github.com./madler/zlib/commit/" + full,
+		"https://[::1]/madler/zlib/commit/" + full,
 		"not an address",
 	} {
 		if got, ok := patchbranch.Parse(link); ok {
