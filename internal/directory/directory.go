@@ -311,8 +311,10 @@ type entry struct {
 // carry, how many were held back, and why each document that could not be read
 // back could not.
 //
-// A document that cannot be read is passed over the way one that may not
-// travel is: the revision before it is carried where that one may be.
+// A document that cannot be read leaves its advisory out of the directory, and
+// nothing older is carried in its place. Every revision has the same path, so
+// carrying the one before would write it over a revision that may already have
+// gone out, and put the lists back to that revision's release date.
 //
 // Walked per advisory rather than taking the newest of each outright. Whether
 // a document may be served is a property of the bytes, and an advisory whose
@@ -335,6 +337,7 @@ func publishable(sent []advisory.Sent) (out []entry, held int, unread []error) {
 		if err := json.Unmarshal([]byte(one.Document), &doc); err != nil {
 			unread = append(unread, fmt.Errorf(
 				"read what %s issuance %d published: %w", one.Advisory, one.Ordinal, err))
+			seen[one.Advisory] = true
 			continue
 		}
 		if !mayTravel(&doc) {
