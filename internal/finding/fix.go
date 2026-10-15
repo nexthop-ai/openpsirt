@@ -343,13 +343,12 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, targetID i
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read what is already committed: %w", err)
 	}
-	// The same promise stated again is accepted and changes nothing, whoever
-	// states it. The commitment stays with the claim that made it.
-	if standing.ToVersion == to && sameDate(standing.CommittedTo, by) {
-		return nil
-	}
-	// A commitment made by the same claim is that claim writing its own
-	// promise again, which is what revising it does.
+	// A commitment made by another claim is refused even where this one
+	// states the same version and date. Accepted, it stays with the claim
+	// that made it, and re-promising that claim moves this one's agreed date
+	// without this one's approver. A commitment made by the same claim is
+	// that claim writing its own promise again, which is what revising it
+	// does.
 	if standing.ClaimID != nil && (claimID == nil || *claimID != *standing.ClaimID) {
 		return refusal.Errorf(
 			"this release is committed to %s under claim %d: revise that claim rather than "+

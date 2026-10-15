@@ -68,7 +68,7 @@ func TestASecondClaimDoesNotMoveACommitmentAnotherClaimMade(t *testing.T) {
 // A second claim promising a bump of the same package for another build
 // leaves the first claim's commitment where it is: only the claim that made
 // a commitment withdraws it. The same promise stated again by a second claim
-// is accepted and changes nothing.
+// is refused.
 func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -110,15 +110,18 @@ func TestASecondClaimKeepsTheCommitmentsAnotherClaimMade(t *testing.T) {
 			t.Errorf("the second build's commitment is held by %v, want claim %d", got, second)
 		}
 
-		if err := commit("3.9.0", second, f.target, other); err != nil {
-			t.Errorf("the same promise stated again by a second claim: %v", err)
+		// The same promise stated again by a second claim is refused: its
+		// decisions would rest on a date only the first claim moves.
+		if err := commit("3.9.0", second, f.target, other); err == nil {
+			t.Error("a second claim restated a commitment another claim made, and was accepted")
 		}
 		if got := owner(f.target); got == nil || *got != first {
 			t.Errorf("restating the promise moved the commitment to %v, want claim %d", got, first)
 		}
 
 		// The claim that made a commitment still withdraws it by narrowing.
-		if err := commit("3.9.0", second, f.target); err != nil {
+		third := f.anotherBranch(t, "release-3")
+		if err := commit("3.9.0", second, third); err != nil {
 			t.Fatal(err)
 		}
 		if got := owner(other); got != nil {
