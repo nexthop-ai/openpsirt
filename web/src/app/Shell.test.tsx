@@ -46,10 +46,12 @@ describe("the top search", () => {
   it("searches components for a term no issue here answers to", async () => {
     const at = await searched("openssl", { data: { items: [], total: 0 } });
     expect(at).toContain("q=openssl");
+    expect(mount.host().textContent).not.toContain("could not be looked up");
   });
 
   it("stays put when the issue could not be read", async () => {
     const at = await searched("openssl", { status: 503 });
     expect(at).toBe("/start");
+    expect(mount.host().textContent).toContain("could not be looked up");
   });
 });
