@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useAfterClaim } from "../api/claims";
+import { useStreams } from "../api/catalog";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -23,15 +24,7 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
   const after = useAfterClaim();
 
   // The other lines of this product, to carry from.
-  const streams = useQuery({
-    queryKey: ["streams", at.product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/streams", {
-          params: { path: { product: at.product } },
-        }),
-      ),
-  });
+  const streams = useStreams(at.product);
 
   const preview = useQuery({
     queryKey: ["carried", at, from],
