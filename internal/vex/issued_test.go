@@ -114,8 +114,7 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 				t.Errorf("the rival issuance: %v", err)
 			}
 		}}
-		hooked := bun.NewDB(db.DB.DB, db.Dialect())
-		hooked.AddQueryHook(hook)
+		hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
 
 		recorded, err := vex.NewStore(hooked).Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours)
 		if err != nil {

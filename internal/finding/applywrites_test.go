@@ -246,7 +246,7 @@ func TestWhatClosedBeforeIsReadWithinTheBuildAndTheIssuesAsked(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
 			[]finding.Reported{found("CVE-2026-CLOSED", libnl)}); err != nil {
 			t.Fatal(err)
@@ -333,7 +333,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 		}
 
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		applied, err := f.store.Apply(ctx, f.target, f.run(t), report(true))
 		if err != nil {
 			t.Fatal(err)

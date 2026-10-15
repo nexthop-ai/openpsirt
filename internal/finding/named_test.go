@@ -211,7 +211,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
 
 		seen := &statements{}
-		f.db.AddQueryHook(seen)
+		f.hook(seen)
 		reached, err := f.store.PlacesOnComponentWithin(t.Context(), f.db.DB, who, f.productID,
 			[]int64{f.target}, "libcurl4t64", "")
 		if err != nil {

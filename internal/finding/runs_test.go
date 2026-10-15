@@ -48,7 +48,7 @@ func TestNamingAPageOfFindingsDoesNotCostAQueryPerRow(t *testing.T) {
 
 		read := func(limit int) (int, int64) {
 			counted := &counter{}
-			f.db.AddQueryHook(counted)
+			f.hook(counted)
 			groups, _, err := f.store.Groups(t.Context(), f.holding(t, access.PublicRead),
 				f.scope, limit, 0, finding.Filter{})
 			if err != nil {

@@ -557,7 +557,7 @@ func TestFillingInAParentAfterLosingARaceIsNotReportedAsRecorded(t *testing.T) {
 				t.Errorf("filling it in first: %v", err)
 			}
 		}}
-		db.AddQueryHook(hook)
+		store = catalog.NewStore(dbtest.Hooked(db, hook).DB)
 		if _, _, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID); !errors.Is(err, catalog.ErrDiffers) {
 			t.Errorf("filling in a branch after another was recorded answered %v", err)
 		}

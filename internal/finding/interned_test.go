@@ -383,7 +383,7 @@ func TestAnIssueReportedAtManyPackagesCostsWhatOnePackageDoes(t *testing.T) {
 				reported = append(reported, r)
 			}
 			asked := &matchedStatements{}
-			f.db.AddQueryHook(asked)
+			f.hook(asked)
 			if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
 				t.Fatal(err)
 			}
@@ -424,7 +424,7 @@ func TestRescanningAnUnchangedIssueWritesNothingAboutIt(t *testing.T) {
 			}
 		}
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{r}); err != nil {
 			t.Fatal(err)
 		}
@@ -456,7 +456,7 @@ func TestADescriptionAlreadyHeldIsNotWrittenAgain(t *testing.T) {
 		pointing := found("CVE-2026-DESCRIBED", swss)
 		pointing.Issue.References = []finding.Reference{{URL: "https://example.com/fix"}}
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		if _, err := f.store.Apply(ctx, f.target, f.run(t),
 			[]finding.Reported{pointing, described}); err != nil {
 			t.Fatal(err)

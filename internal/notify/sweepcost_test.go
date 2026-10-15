@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
@@ -77,8 +78,7 @@ func TestASweepLeavesAloneWhoeverHasNothingToHearOrClear(t *testing.T) {
 			t.Fatal(err)
 		}
 		asked := &sentQueries{}
-		w.DB.AddQueryHook(asked)
-		if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil))).
+		if _, _, err := notify.NewWatch(dbtest.Hooked(w.DB, asked).DB, slog.New(slog.NewTextHandler(io.Discard, nil))).
 			Once(ctx); err != nil {
 			t.Fatal(err)
 		}

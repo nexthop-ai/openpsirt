@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -297,6 +299,15 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		})
 	})
+}
+
+// hook makes hook watch every statement the fixture makes from here on, its
+// stores' included.
+func (f *fixture) hook(hook bun.QueryHook) {
+	f.db = dbtest.Hooked(f.db, hook)
+	f.store = finding.NewStore(f.db.DB)
+	f.graph = graph.NewStore(f.db.DB)
+	f.scans = ingest.NewStore(f.db.DB)
 }
 
 // planner is somebody who exists, holding triage on this fixture's product.

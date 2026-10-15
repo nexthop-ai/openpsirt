@@ -330,7 +330,7 @@ func TestASourcePackagesFindingsAreReadByComponentInOnePassOneRowPerFix(t *testi
 			t.Fatal(err)
 		}
 		seen := &returned{}
-		f.db.AddQueryHook(seen)
+		f.hook(seen)
 		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
 		if err != nil {
 			t.Fatal(err)

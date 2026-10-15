@@ -80,7 +80,7 @@ func TestAnUnseenProductIsRefusedBeforeTheIssueIsLookedUp(t *testing.T) {
 		pipeline := access.NewPipeline(1, "build", access.Scope{ProductID: f.product})
 
 		asked := &issueLookups{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 
 		for name, subject := range map[string]access.Subject{
 			"somebody holding nothing on it": elsewhere,

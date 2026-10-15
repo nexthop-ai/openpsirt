@@ -62,9 +62,8 @@ func TestMeasureASweepOpeningEveryWaitingClaim(t *testing.T) {
 			}
 			return out
 		}
-		store := notify.NewStore(db.DB)
 		sent := &counted{}
-		db.AddQueryHook(sent)
+		store := notify.NewStore(dbtest.Hooked(db, sent).DB)
 		phase := func(name string, holds []notify.Holds) time.Duration {
 			t.Helper()
 			sent.n = 0

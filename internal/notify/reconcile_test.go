@@ -109,9 +109,8 @@ func TestAReconcileWritesABatchAStatementHoweverManyConditionsMove(t *testing.T)
 		if err != nil {
 			t.Fatal(err)
 		}
-		store := notify.NewStore(w.DB.DB)
 		sent := &sentQueries{}
-		w.DB.AddQueryHook(sent)
+		store := notify.NewStore(dbtest.Hooked(w.DB, sent).DB)
 		reconcile := func(held []notify.Holds) (int, int) {
 			t.Helper()
 			sent.mu.Lock()

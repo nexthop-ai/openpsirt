@@ -851,7 +851,7 @@ func TestRescanningADisclaimedBuildTouchesNoRow(t *testing.T) {
 		f.acmeSays(t)
 		f.reported(t, found(inside, zlib))
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		f.reported(t, found(inside, zlib))
 		if count, matched := asked.matching(`UPDATE "finding" AS "f" SET "stated_by" = `); count != 0 {
 			t.Errorf("a rescan rewrote the closed row: %d statements matching %d rows", count, matched)

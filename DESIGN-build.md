@@ -463,10 +463,12 @@ template, opened through the connector that refuses the commit. Under the race
 detector, migrating a fresh file for it costs 1.3 s of processor time a test,
 and copying the template 0.06 s.
 
-Each test gets a query builder of its own over the shared pool. A test may add a
-query hook to count its statements, and a hook on a shared builder goes on
-firing in every later test — alongside that test's own writers, which the race
-detector reports.
+Each test gets a query builder of its own over the shared pool. A test counts
+or interrupts its statements through a copy of that builder carrying a query
+hook, and builds the stores under test on the copy. The builder it was given
+stays unhooked, because a hook on a shared builder goes on firing in every
+later test — alongside that test's own writers, which the race detector
+reports.
 
 A package whose tests start from the same rows declares them once, as a seeded
 template: a function that fills a migrated, empty database and returns what a

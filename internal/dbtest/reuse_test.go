@@ -178,11 +178,12 @@ func (h *hookCount) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.
 }
 func (h *hookCount) AfterQuery(context.Context, *bun.QueryEvent) {}
 
-// Every test in a binary shares one pool on a server, and a test may add a
-// query hook to the handle it was given. The hook belongs to that test alone:
-// a later test's statements reaching it would run the earlier test's code in
-// the later test, concurrently with whatever the later test does.
-func TestAQueryHookStaysWithTheTestThatAddedIt(t *testing.T) {
+// Every test in a binary shares one pool on a server, and a test watches what
+// it does through a hooked handle. The hook belongs to that handle alone: a
+// later test's statements reaching it would run the earlier test's code in
+// the later test, concurrently with whatever the later test does, and the
+// test's own unhooked statements reaching it would count what it set up.
+func TestAQueryHookStaysWithTheHandleItWasAddedTo(t *testing.T) {
 	Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := context.Background()
 		serverMu.Lock()
@@ -194,7 +195,7 @@ func TestAQueryHookStaysWithTheTestThatAddedIt(t *testing.T) {
 		}
 
 		hook := &hookCount{}
-		db.AddQueryHook(hook)
+		hooked := Hooked(db, hook)
 		if _, err := later.NewSelect().ColumnExpr("1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -202,6 +203,12 @@ func TestAQueryHookStaysWithTheTestThatAddedIt(t *testing.T) {
 			t.Errorf("a hook one test added saw %d statements another test made", n)
 		}
 		if _, err := db.NewSelect().ColumnExpr("1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := hook.n.Load(); n != 0 {
+			t.Errorf("the hook saw %d statements made through the handle it was not added to", n)
+		}
+		if _, err := hooked.NewSelect().ColumnExpr("1").Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if n := hook.n.Load(); n != 1 {

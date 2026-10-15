@@ -44,7 +44,6 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		ctx := t.Context()
 		w := world.New(t, db)
 		product, target := w.Product, w.Target
-		store := finding.NewStore(db.DB)
 		other := seedAcross(t, w)
 
 		// Decisions to read: an upgrade promised over ten packages, and one
@@ -135,7 +134,9 @@ func TestMeasureTheListAcrossProducts(t *testing.T) {
 		dbtest.SettleStatistics(t, db)
 
 		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
-		db.AddQueryHook(slow)
+		db = dbtest.Hooked(db, slow)
+		store := finding.NewStore(db.DB)
+		decisions = triage.NewStore(db.DB)
 
 		reader := access.NewPerson(person.ID+1, "a reader", false, map[int64][]access.Role{
 			product.ID: {access.PublicRead, access.PrivateRead},
@@ -265,7 +266,8 @@ func TestMeasurePlanningOverAKernel(t *testing.T) {
 		triager := access.NewPerson(person.ID, "triager", false,
 			map[int64][]access.Role{product.ID: {access.PublicTriage, access.PrivateTriage}}, 0)
 		slow := &slowStatements{t: t, over: time.Second, dir: os.Getenv("OPENPSIRT_MEASURE_SLOW")}
-		db.AddQueryHook(slow)
+		db = dbtest.Hooked(db, slow)
+		store = finding.NewStore(db.DB)
 
 		read := func(statistics string) {
 			t.Helper()

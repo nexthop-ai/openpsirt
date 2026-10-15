@@ -74,9 +74,6 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		w := world.New(t, db)
 		cat, product, branch, variant, target := w.Catalog, w.Product, w.Branch, w.Customer, w.Target
 
-		store := finding.NewStore(db.DB)
-		graphs := graph.NewStore(db.DB)
-		scans := ingest.NewStore(db.DB)
 		// Somebody granted reading on the one product these builds
 		// belong to. The narrowing is the ordinary one, which is what
 		// the common plan carries — an administrator is no longer a
@@ -92,7 +89,10 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// by dividing. A cost that is flat in rows and proportional to
 		// statements is paid per statement.
 		statements := &counting{}
-		db.AddQueryHook(statements)
+		db = dbtest.Hooked(db, statements)
+		store := finding.NewStore(db.DB)
+		graphs := graph.NewStore(db.DB)
+		scans := ingest.NewStore(db.DB)
 
 		built := time.Now().UTC().Add(-time.Duration(nights) * 24 * time.Hour)
 		seq := 0
@@ -599,10 +599,10 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 		w := world.New(t, db)
 		target := w.Target
 
+		statements := &counting{}
+		db = dbtest.Hooked(db, statements)
 		store := finding.NewStore(db.DB)
 		scans := ingest.NewStore(db.DB)
-		statements := &counting{}
-		db.AddQueryHook(statements)
 
 		steady := func(int) string { return "1.0" }
 		built := time.Now().UTC().Add(-96 * time.Hour)

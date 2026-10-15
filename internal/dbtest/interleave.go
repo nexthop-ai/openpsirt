@@ -67,8 +67,7 @@ func RivalAfterRead(t *testing.T, db *database.DB, read, write string, wait time
 		t.Skip("one connection: nothing lands between a read and a write")
 	}
 	hook := &afterRead{read: read, write: write, wait: wait, rival: rival, done: make(chan error, 1)}
-	hooked := bun.NewDB(db.DB.DB, db.Dialect())
-	hooked.AddQueryHook(hook)
+	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
 	var answer error
 	var waited sync.Once
 	finished := func() error {
@@ -129,6 +128,16 @@ func (h *afterRead) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.
 }
 
 func (h *afterRead) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// Hooked is db with hook watching every statement made through it, and
+// nothing made through db itself or through any other handle over the same
+// connections. A store under test is built on the handle this returns, which
+// is how the hook reaches what the store does.
+func Hooked(db *database.DB, hook bun.QueryHook) *database.DB {
+	hooked := *db
+	hooked.DB = db.WithQueryHook(hook)
+	return &hooked
+}
 
 // Fault makes one statement on a handle fail, by handing the driver a context
 // that has already ended. The failure carries context.Canceled, which is how a

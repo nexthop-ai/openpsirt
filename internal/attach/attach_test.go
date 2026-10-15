@@ -16,6 +16,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -67,6 +69,13 @@ func setUp(t *testing.T, db *database.DB) *fixture {
 	}
 	f.issue = f.anIssue(t, identity, access.Public)
 	return f
+}
+
+// hook makes hook watch every statement the fixture makes from here on, its
+// store's included.
+func (f *fixture) hook(hook bun.QueryHook) {
+	f.db = dbtest.Hooked(f.db, hook)
+	f.store = attach.NewStore(f.db.DB, f.files)
 }
 
 // anIssue records a vulnerability and one place it sits at, at a visibility.

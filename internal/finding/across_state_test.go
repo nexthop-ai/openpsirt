@@ -231,7 +231,7 @@ func TestTheStateFilterAcrossProductsStartsFromTheDecisions(t *testing.T) {
 		who := f.holdingIn(t, []int64{two.first, two.second}, access.PublicRead, access.PrivateRead)
 
 		seen := &statements{}
-		f.db.AddQueryHook(seen)
+		f.hook(seen)
 		if _, _, err := f.store.Anywhere(ctx, who, 50, 0, finding.Filter{
 			States: []finding.ClaimStanding{finding.StandingUndecided},
 		}); err != nil {

@@ -1082,7 +1082,7 @@ func TestWhatAgreeingWouldDoCostsNoMoreStatementsForMoreRatingsInAProduct(t *tes
 		// The first and third are in one product.
 		asked := func(ids []int64) int64 {
 			counted := &counter{}
-			f.db.AddQueryHook(counted)
+			f.hook(counted)
 			if _, err := f.store.WhatAgreeingWouldDo(t.Context(), who, ids); err != nil {
 				t.Fatal(err)
 			}

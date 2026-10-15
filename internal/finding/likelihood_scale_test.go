@@ -56,7 +56,7 @@ func TestMeasureALikelihoodDay(t *testing.T) {
 		}
 
 		asked := &matchedStatements{}
-		f.db.AddQueryHook(asked)
+		f.hook(asked)
 		run := f.run(t)
 		start := time.Now()
 		applied, err := f.store.Apply(ctx, f.target, run, report(&today, 1))

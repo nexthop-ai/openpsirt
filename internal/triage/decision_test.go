@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -162,6 +164,13 @@ func servers(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			triager: subject("proposer"), reviewer: subject("approver"), onlooker: subject("onlooker"),
 		})
 	})
+}
+
+// hook makes hook watch every statement the fixture makes from here on, its
+// store's included.
+func (f *fixture) hook(hook bun.QueryHook) {
+	f.db = dbtest.Hooked(f.db, hook)
+	f.store = triage.NewStore(f.db.DB)
 }
 
 func TestAClaimStandsOnlyOnceSomebodyHasAgreedToIt(t *testing.T) {

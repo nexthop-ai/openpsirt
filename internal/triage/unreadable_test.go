@@ -39,7 +39,7 @@ func TestAReadThatFailsIsNotAnsweredAsAbsent(t *testing.T) {
 		another.PlaceIdentity = "under-a"
 
 		fault := new(dbtest.Fault)
-		f.db.AddQueryHook(fault)
+		f.hook(fault)
 
 		for _, c := range []struct {
 			name, table string

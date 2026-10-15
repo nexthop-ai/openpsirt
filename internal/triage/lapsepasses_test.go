@@ -62,7 +62,7 @@ func TestASweepLapsingLessThanABatchReadsTheDecisionsOnce(t *testing.T) {
 			}
 		}
 		reads := &lapsableReads{}
-		f.db.AddQueryHook(reads)
+		f.hook(reads)
 		lapsed, err := f.store.Lapse(ctx, in.target)
 		if err != nil {
 			t.Fatal(err)

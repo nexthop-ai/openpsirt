@@ -505,7 +505,7 @@ func TestApprovingAClaimIsABoundedNumberOfStatementsHoweverLargeItIs(t *testing.
 		recorded := f.claimsMany(t, f.places(names...))
 
 		hook := &counting{}
-		f.db.AddQueryHook(hook)
+		f.hook(hook)
 		started := time.Now()
 		done, err := f.store.ApproveClaim(ctx, f.reviewer, recorded[0].ClaimID, "batch",
 			[]int64{recorded[0].ID, recorded[1].ID}, "These two are reachable.")
@@ -799,7 +799,7 @@ func TestRecordingAClaimIsABoundedNumberOfStatementsHoweverManyPlacesItCovers(t 
 		}
 
 		hook := &counting{}
-		f.db.AddQueryHook(hook)
+		f.hook(hook)
 		recorded, err := f.store.ProposeMany(t.Context(), f.triager, proposals)
 		if err != nil {
 			t.Fatal(err)
@@ -1033,7 +1033,7 @@ func TestHoldingRowsBackThatAnApprovalTookMovesNothing(t *testing.T) {
 				t.Errorf("agreeing: %v", err)
 			}
 		}}
-		f.db.AddQueryHook(hook)
+		f.hook(hook)
 		if _, err := f.store.Split(ctx, f.triager, recorded[0].ClaimID,
 			[]int64{recorded[2].ID}, "This one is reachable from the CLI."); err == nil {
 			t.Error("holding back a row approved meanwhile was reported as done")

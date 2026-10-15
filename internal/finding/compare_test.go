@@ -137,7 +137,7 @@ func TestWhyEveryFixedEntryWentIsReadWithoutAQueryEach(t *testing.T) {
 
 		who := f.holding(t, access.PublicRead)
 		count := &counter{}
-		f.db.AddQueryHook(count)
+		f.hook(count)
 		comparison, err := f.store.Compare(ctx, who, earlier, later, false)
 		if err != nil {
 			t.Fatal(err)
