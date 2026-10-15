@@ -610,7 +610,7 @@ func endHolder(ctx context.Context, killer *database.DB) error {
 		if err := killer.QueryRowContext(ctx, `SELECT "pid" FROM "pg_catalog"."pg_locks"
 			WHERE "locktype" = 'advisory' AND "granted" AND "pid" <> pg_backend_pid()
 			AND "database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
-			AND CAST("classid" AS BIGINT) = ? AND CAST("objid" AS BIGINT) = ? AND "objsubid" = 1`,
+			AND "classid"::bigint = ? AND "objid"::bigint = ? AND "objsubid" = 1`,
 			int64(lockID>>32), int64(lockID&0xffffffff)).Scan(&pid); err != nil {
 			return fmt.Errorf("find the holder: %w", err)
 		}

@@ -251,7 +251,7 @@ func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name 
 			JOIN "pg_catalog"."pg_stat_activity" AS "a" ON "a"."pid" = "l"."pid"
 			WHERE "l"."locktype" = 'advisory' AND "l"."granted"
 			AND "l"."database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
-			AND CAST("l"."classid" AS BIGINT) = $1 AND CAST("l"."objid" AS BIGINT) = $2 AND "l"."objsubid" = 1`,
+			AND "l"."classid"::bigint = $1 AND "l"."objid"::bigint = $2 AND "l"."objsubid" = 1`,
 			int64(lockID>>32), int64(lockID&0xffffffff)).Scan(&pid, &user, &application)
 		if err != nil {
 			return ""
@@ -340,7 +340,7 @@ func catalogQuery(engine database.Engine) (string, error) {
 	switch engine {
 	case database.Postgres:
 		return `SELECT 1 FROM "pg_catalog"."pg_class"
-			WHERE "oid" = to_regclass(CAST(? AS TEXT)) AND "relkind" = 'r'`, nil
+			WHERE "oid" = to_regclass(?::text) AND "relkind" = 'r'`, nil
 	case database.MySQL, database.MariaDB:
 		return `SELECT 1 FROM "information_schema"."TABLES"
 			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ?`, nil

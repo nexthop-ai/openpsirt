@@ -742,7 +742,7 @@ The schema sweep reads a table's and an index's declaration: a name after a
 keyword that always precedes one, and a name where a column belongs in the
 outermost parentheses. A statement of any other kind, a condition, and a clause
 after an index's column list are refused as unreadable rather than reported
-clean, so the first migration to write a view, a trigger, a check or a partial
+clean, so the first migration to write a sequence, a view, a trigger, a check or a partial
 index extends the sweep with it.
 
 The list of reserved words stays, for the other half. A name a migration

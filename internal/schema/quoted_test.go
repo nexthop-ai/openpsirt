@@ -114,8 +114,8 @@ func TestABareNameIsFoundWhereverTheSchemaWritesOne(t *testing.T) {
 		{`CREATE TABLE "finding" ("a" TEXT, CHECK ("a" = 'x' OR state IS NULL))`, true},
 		{`CREATE TABLE "finding" ("a" TEXT, CHECK ("a" = 'x'))`, true},
 		{`CREATE INDEX "finding_idx" ON "finding" ("a") WHERE closed_at IS NULL`, true},
-		{`CREATE VIEW "open" AS SELECT "a" FROM finding`, true},
-		{`CREATE TRIGGER "t" AFTER INSERT ON "finding" BEGIN UPDATE product SET "a" = 1; END`, true},
+		{`CREATE SEQUENCE "finding_seq" START WITH 1`, true},
+		{`CREATE TRIGGER "t" AFTER INSERT ON "finding" BEGIN UPDATE "product" SET "a" = 1; END`, true},
 	} {
 		if got := len(bareIn(c.statement)) > 0; got != c.bare {
 			t.Errorf("%s: reported bare = %v (%v), want %v", c.statement, got, bareIn(c.statement), c.bare)
