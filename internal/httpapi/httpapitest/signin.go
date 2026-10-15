@@ -12,9 +12,12 @@ import (
 // StubProvider stands in for a real one, so the paths that decide who gets in
 // can be tested without an identity provider to sign in to.
 type StubProvider struct {
-	Says   *signin.Identity
-	Fail   error
-	issuer string
+	Says *signin.Identity
+	// Fail is what Complete answers with, where it is set.
+	Fail error
+	// BeginFail is what Begin answers with, where it is set.
+	BeginFail error
+	issuer    string
 }
 
 func (s *StubProvider) Name() string { return "stub" }
@@ -30,6 +33,9 @@ func (s *StubProvider) Issuer() string {
 }
 
 func (s *StubProvider) Begin(_ context.Context, _ string) (string, signin.Pending, error) {
+	if s.BeginFail != nil {
+		return "", signin.Pending{}, s.BeginFail
+	}
 	return "https://provider.example/authorize", signin.Pending{
 		State: "the-state", Nonce: "the-nonce", Verifier: "the-verifier",
 	}, nil

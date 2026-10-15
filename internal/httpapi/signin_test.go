@@ -62,6 +62,20 @@ func twoSignIn(t *testing.T, fn func(t *testing.T, r *signInReach)) {
 
 func signInOn(t *testing.T, on httpapitest.Engines, fn func(t *testing.T, r *signInReach)) {
 	t.Helper()
+	signInWith(t, on, served{}, fn)
+}
+
+// served is how a sign-in test's deployment differs from the usual one.
+type served struct {
+	// overTLS serves the deployment as one behind TLS, so its cookies carry
+	// the `__Host-` prefix.
+	overTLS bool
+	// unaddressed leaves the deployment without the address it is served on.
+	unaddressed bool
+}
+
+func signInWith(t *testing.T, on httpapitest.Engines, how served, fn func(t *testing.T, r *signInReach)) {
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -105,19 +119,27 @@ func signInOn(t *testing.T, on httpapitest.Engines, fn func(t *testing.T, r *sig
 			provider: provider, rights: rights, db: db,
 			product: product.ID, mode: access.Direct,
 		}
+		// Plain HTTP unless the test says otherwise, so the cookies keep their
+		// bare names: a browser will not set a `__Host-` cookie without TLS,
+		// and a harness that prefixed them would be testing a shape no
+		// deployment of this configuration has.
+		plain := !how.overTLS
+		// Stated, because a provider compares the callback against what it
+		// was registered with, so it cannot be taken from the request.
+		base := "http://example.com"
+		if how.overTLS {
+			base = "https://example.com"
+		}
+		if how.unaddressed {
+			base = ""
+		}
 		handler, _ := httpapi.New(quiet, nil, core.Deps{
 			Mode: func(context.Context) access.Mode { return reach.mode },
 			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
-			// Plain HTTP, so the cookies keep their bare names: a browser
-			// will not set a `__Host-` cookie without TLS, and a harness
-			// that prefixed them here would be testing a shape no
-			// deployment of this configuration has.
-			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
+			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(plain),
 			Providers: map[string]signin.Provider{"stub": provider},
-			PlainHTTP: true,
-			// Stated, because a provider compares the callback against what
-			// it was registered with, so it cannot be taken from the request.
-			BaseURL: "http://example.com",
+			PlainHTTP: plain,
+			BaseURL:   base,
 		})
 		reach.handler = handler
 		fn(t, reach)
@@ -826,5 +848,99 @@ func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
 	}
 	if hasSession(rec.Result().Cookies()) {
 		t.Error("a sign-in over a lookup that failed was handed a session")
+	}
+}
+
+// Over TLS every cookie a sign-in sets is named for this host alone, and the
+// callback reads what the sign-in remembered only under that name: a sibling
+// host can write a bare-named cookie for this one, and not a `__Host-` one.
+func TestASignInOverTLSReadsOnlyACookieBoundToThisHost(t *testing.T) {
+	signInWith(t, dbtest.Two, served{overTLS: true}, func(t *testing.T, r *signInReach) {
+		start := httptest.NewRecorder()
+		r.handler.ServeHTTP(start, httptest.NewRequest(http.MethodGet, "https://example.com/v1/sign-in/stub", nil))
+		if start.Code != http.StatusFound {
+			t.Fatalf("starting a sign-in answered %d", start.Code)
+		}
+		var held *http.Cookie
+		for _, cookie := range start.Result().Cookies() {
+			if cookie.Name == "openpsirt_pending" {
+				t.Errorf("over TLS the sign-in set a cookie under its bare name")
+			}
+			if cookie.Name == "__Host-openpsirt_pending" {
+				held = cookie
+			}
+		}
+		if held == nil {
+			t.Fatal("over TLS nothing was remembered under the host-bound name")
+		}
+		if !held.Secure || held.Path != "/" || held.Domain != "" {
+			t.Errorf("a browser refuses a __Host- cookie set as %+v", held)
+		}
+
+		returned := func(name string) *httptest.ResponseRecorder {
+			req := httptest.NewRequest(http.MethodGet,
+				"https://example.com/v1/sign-in/stub/callback?state=the-state&code=a-code", nil)
+			req.Header.Set("Cookie", name+"="+held.Value)
+			rec := httptest.NewRecorder()
+			r.handler.ServeHTTP(rec, req)
+			return rec
+		}
+		if rec := returned("openpsirt_pending"); rec.Code != http.StatusUnauthorized {
+			t.Errorf("the sign-in completed from a bare-named cookie: %d", rec.Code)
+		}
+		rec := returned("__Host-openpsirt_pending")
+		if rec.Code != http.StatusFound {
+			t.Fatalf("the sign-in did not complete from the host-bound cookie: %d %s", rec.Code, rec.Body)
+		}
+		for _, cookie := range rec.Result().Cookies() {
+			if !strings.HasPrefix(cookie.Name, "__Host-") {
+				t.Errorf("over TLS the sign-in set %q, not bound to this host", cookie.Name)
+			}
+		}
+	})
+}
+
+// A sign-in that cannot start answers 500 in the same words whatever stopped
+// it, and sets nothing: what went wrong describes this deployment's
+// configuration, and the caller has proved nothing yet.
+func TestASignInThatCannotStartSaysNothingAboutWhy(t *testing.T) {
+	for _, c := range []struct {
+		what   string
+		how    served
+		fail   error
+		hidden string
+	}{
+		{"with no address it is served on", served{unaddressed: true}, nil, "address"},
+		{"with a provider that cannot begin", served{},
+			errors.New("the provider's discovery refused client a-secret"), "a-secret"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			signInWith(t, dbtest.Two, c.how, func(t *testing.T, r *signInReach) {
+				r.provider.BeginFail = c.fail
+				rec := httptest.NewRecorder()
+				r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+				if rec.Code != http.StatusInternalServerError {
+					t.Fatalf("answered %d, want 500", rec.Code)
+				}
+				if got := rec.Header().Get("Content-Type"); got != "application/problem+json" {
+					t.Errorf("answered as %q", got)
+				}
+				var problem struct {
+					Detail string `json:"detail"`
+				}
+				if err := json.Unmarshal(rec.Body.Bytes(), &problem); err != nil {
+					t.Fatal(err)
+				}
+				if problem.Detail != "something went wrong" {
+					t.Errorf("the answer reads %q", problem.Detail)
+				}
+				if strings.Contains(rec.Body.String(), c.hidden) {
+					t.Errorf("the answer repeats why: %s", rec.Body)
+				}
+				if cookies := rec.Result().Cookies(); len(cookies) != 0 {
+					t.Errorf("a sign-in that did not start set %v", cookies)
+				}
+			})
+		})
 	}
 }

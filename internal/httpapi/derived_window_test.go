@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,12 +19,9 @@ import (
 // a group derived resolves the way a sign-in's does, through the wiring the
 // process actually uses.
 //
-// The window was taken from the environment variable alone, once, at startup.
-// That is zero unless somebody exports it, and zero reads as "nothing is ever
-// stale" — so on a stock install the bound was inert and a group somebody left
-// went on granting roles through their token exactly as before. The test that
-// covered the bound built its own window and never went through this, so the
-// suite stayed green.
+// A window of zero reads as "nothing is ever stale", so a group somebody left
+// would go on granting roles through their token. The environment variable is
+// zero unless somebody exports it, so it cannot be the only source.
 func TestTheDerivedGrantWindowIsNeverNone(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -44,6 +42,21 @@ func TestTheDerivedGrantWindowIsNeverNone(t *testing.T) {
 			if got := httpapi.DerivedWindow(c.settings, c.configured)(ctx); got != c.want {
 				t.Errorf("%s bounds a derived grant at %v, want %v", c.what, got, c.want)
 			}
+		}
+
+		// A read that fails answers the window configured, or the built-in,
+		// and never none: a database that cannot answer must not leave a
+		// derived grant that never goes stale.
+		failing, cancel := context.WithCancel(ctx)
+		cancel()
+		if _, _, err := settings.Get(failing, setting.SessionLifetime); err == nil {
+			t.Fatal("a read on a cancelled context succeeded, so nothing here fails")
+		}
+		if got := httpapi.DerivedWindow(settings, 4*time.Hour)(failing); got != 4*time.Hour {
+			t.Errorf("a failed read started with 4h bounds a derived grant at %v", got)
+		}
+		if got := httpapi.DerivedWindow(settings, 0)(failing); got != access.DefaultSessionLifetime {
+			t.Errorf("a failed read on a stock install bounds a derived grant at %v", got)
 		}
 
 		// And the administrator's setting decides, per request rather than at
