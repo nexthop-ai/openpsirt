@@ -378,18 +378,15 @@ components:
           type: string
         caught_up_to:
           description: The newest moment in what they list that has been read
-          format: date-time
           type: string
         name:
           description: The name this supplier is configured under
           type: string
         read:
           description: When a read of this supplier last succeeded
-          format: date-time
           type: string
         tried:
           description: When this supplier was last tried
-          format: date-time
           type: string
         url:
           description: Where the supplier describes what they publish
@@ -898,6 +895,25 @@ components:
         - content_type
         - size
         - uploaded_at
+      type: object
+    AttachmentsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AttachmentsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/AttachmentBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     BecameBody:
       additionalProperties: false
@@ -2019,32 +2035,6 @@ components:
       required:
         - id
       type: object
-    CommentBody:
-      additionalProperties: false
-      properties:
-        body:
-          description: The comment text, in markdown
-          type: string
-        edited_at:
-          description: The moment the author last changed it, if they did
-          type: string
-        id:
-          format: int64
-          type: integer
-        written_at:
-          type: string
-        written_by:
-          description: The author, by sign-in identity
-          type: string
-        written_by_name:
-          description: Their display name, where it differs from their identity
-          type: string
-      required:
-        - id
-        - body
-        - written_by
-        - written_at
-      type: object
     ComparisonBody:
       additionalProperties: false
       properties:
@@ -2164,6 +2154,102 @@ components:
             - array
             - "null"
         total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyBundleBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyBundleBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/BundleBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyCarriedClaimBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyCarriedClaimBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/CarriedClaimBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyJudgedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyJudgedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/JudgedBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyJudgedClaimBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyJudgedClaimBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/JudgedClaimBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
           format: int64
           type: integer
       required:
@@ -3215,7 +3301,7 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: The latest moment one of them stopped
+          description: The latest moment one of them stopped. Absent where none of them says when
           type: string
         builds:
           description: Every build holding an open finding at one of those places at the moment its decision stopped, as stream and variant
@@ -3240,7 +3326,6 @@ components:
           type: string
       required:
         - state
-        - at
         - rows
         - places
         - builds
@@ -4170,7 +4255,6 @@ components:
           type: integer
         first_seen:
           description: The moment a scan of this deployment first reported the package
-          format: date-time
           type: string
         issues:
           description: Distinct vulnerabilities open against this binary alone
@@ -4187,7 +4271,6 @@ components:
           type: string
         newest_released_at:
           description: The date that version shipped, where the index said
-          format: date-time
           type: string
         newest_version:
           description: The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package
@@ -5206,118 +5289,6 @@ components:
         - items
         - total
       type: object
-    List-attachmentsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-attachmentsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/AttachmentBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
-      type: object
-    List-audit-claimsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-audit-claimsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/JudgedClaimBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-auditResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-auditResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/JudgedBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-carried-patchesResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-carried-patchesResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/CarriedClaimBody"
-          type:
-            - array
-            - "null"
-        total:
-          description: The total, so a page says what it is a page of
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-fix-bundlesResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-fix-bundlesResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/BundleBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
     List-issues-at-componentResponse:
       additionalProperties: false
       properties:
@@ -5354,25 +5325,6 @@ components:
         - findings
         - issue_limit
         - place_limit
-      type: object
-    List-report-attachmentsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-report-attachmentsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/AttachmentBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
       type: object
     List-set-aside-workResponse:
       additionalProperties: false
@@ -5549,28 +5501,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/CollaboratorBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodyCommentBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyCommentBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/CommentBody"
           type:
             - array
             - "null"
@@ -5813,28 +5743,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/NameableBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodyNoteBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyNoteBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/NoteBody"
           type:
             - array
             - "null"
@@ -6319,6 +6227,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/WasSaidBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyWrittenBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyWrittenBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/WrittenBody"
           type:
             - array
             - "null"
@@ -6818,32 +6748,6 @@ components:
           type: string
       required:
         - body
-      type: object
-    NoteBody:
-      additionalProperties: false
-      properties:
-        body:
-          description: The text, in markdown
-          type: string
-        edited_at:
-          description: The moment the author last changed it, where they have
-          type: string
-        id:
-          format: int64
-          type: integer
-        written_at:
-          type: string
-        written_by:
-          description: The author, by sign-in identity
-          type: string
-        written_by_name:
-          description: Their display name, where it differs from their identity
-          type: string
-      required:
-        - id
-        - body
-        - written_by
-        - written_at
       type: object
     NoteWritten:
       additionalProperties: false
@@ -7798,7 +7702,6 @@ components:
           type: object
         committed_to:
           description: The date the work promised here is due
-          format: date-time
           type: string
         consumers:
           description: The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted
@@ -7806,7 +7709,6 @@ components:
           type: integer
         due_at:
           description: The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees
-          format: date-time
           type: string
         ecosystem:
           description: The ecosystem the package identifiers name
@@ -8057,7 +7959,10 @@ components:
         from:
           type: string
         held_by:
-          description: The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's
+          description: The identity or team name of the party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's
+          type: string
+        held_by_name:
+          description: The carrying party's display name, where it differs from held_by
           type: string
         issues:
           description: "Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"
@@ -8899,7 +8804,6 @@ components:
       properties:
         moved_at:
           description: "The moment the snapshot last moved: the most recent time any snapshot was read for the first time"
-          format: date-time
           type: string
         stale:
           description: Whether it has gone the same span without moving that counts as stopped for the scanner's data
@@ -10166,7 +10070,6 @@ components:
           type: string
         stopped_at:
           description: The moment it was set aside
-          format: date-time
           type: string
       required:
         - id
@@ -10719,14 +10622,12 @@ components:
       properties:
         from:
           description: The build time of the first scan that stated it
-          format: date-time
           type: string
         purl:
           description: The package identifier as the build stated it, version and qualifiers included
           type: string
         until:
           description: The build time of the scan that stated something else. Absent while it is what the build states
-          format: date-time
           type: string
         version:
           description: The version as the build stated it, empty where it stated none
@@ -11714,7 +11615,6 @@ components:
           type: string
         moved_at:
           description: "The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
-          format: date-time
           type: string
         records:
           $ref: "#/components/schemas/RecordsDataBody"
@@ -12147,6 +12047,32 @@ components:
         - proposed
         - approved
         - withdrawn
+      type: object
+    WrittenBody:
+      additionalProperties: false
+      properties:
+        body:
+          description: The text, in markdown
+          type: string
+        edited_at:
+          description: The moment the author last changed it, where they have
+          type: string
+        id:
+          format: int64
+          type: integer
+        written_at:
+          type: string
+        written_by:
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where it differs from their identity
+          type: string
+      required:
+        - id
+        - body
+        - written_by
+        - written_at
       type: object
 info:
   description: |-
@@ -13476,7 +13402,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-auditResponse"
+                $ref: "#/components/schemas/CountedListBodyJudgedBody"
           description: OK
         default:
           content:
@@ -13806,7 +13732,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-audit-claimsResponse"
+                $ref: "#/components/schemas/CountedListBodyJudgedClaimBody"
           description: OK
         default:
           content:
@@ -13998,7 +13924,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyCommentBody"
+                $ref: "#/components/schemas/ListBodyWrittenBody"
           description: OK
         default:
           content:
@@ -21518,7 +21444,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-fix-bundlesResponse"
+                $ref: "#/components/schemas/CountedListBodyBundleBody"
           description: OK
         default:
           content:
@@ -21912,7 +21838,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-attachmentsResponse"
+                $ref: "#/components/schemas/AttachmentsOutputBody"
           description: OK
         default:
           content:
@@ -22562,7 +22488,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyNoteBody"
+                $ref: "#/components/schemas/ListBodyWrittenBody"
           description: OK
         default:
           content:
@@ -23363,7 +23289,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-report-attachmentsResponse"
+                $ref: "#/components/schemas/AttachmentsOutputBody"
           description: OK
         default:
           content:
@@ -24163,7 +24089,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-carried-patchesResponse"
+                $ref: "#/components/schemas/CountedListBodyCarriedClaimBody"
           description: OK
         default:
           content:
@@ -25224,15 +25150,19 @@ paths:
           required: true
           schema:
             type: string
-        - in: path
+        - description: The issue, by any name it is known under
+          in: path
           name: vulnerability
           required: true
           schema:
+            description: The issue, by any name it is known under
             type: string
-        - in: path
+        - description: The place, as the findings list gives it
+          in: path
           name: place
           required: true
           schema:
+            description: The place, as the findings list gives it
             type: string
       requestBody:
         content:
@@ -25288,15 +25218,19 @@ paths:
           required: true
           schema:
             type: string
-        - in: path
+        - description: The issue, by any name it is known under
+          in: path
           name: vulnerability
           required: true
           schema:
+            description: The issue, by any name it is known under
             type: string
-        - in: path
+        - description: The place, as the findings list gives it
+          in: path
           name: place
           required: true
           schema:
+            description: The place, as the findings list gives it
             type: string
       responses:
         "200":
