@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -39,7 +41,7 @@ func delta(t *testing.T, f *fixture, scanID int64) graph.Delta {
 func applied(t *testing.T, f *fixture, snap graph.Snapshot) int64 {
 	t.Helper()
 	scanID := f.scan(t)
-	if _, err := f.store.Apply(t.Context(), f.targetID, scanID, snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, scanID, snap); err != nil {
 		t.Fatal(err)
 	}
 	return scanID
@@ -327,7 +329,7 @@ func elsewhere(t *testing.T, f *fixture) int64 {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record a scan of the other build: outcome %v, err %v", outcome, err)
 	}
-	if _, err := f.store.Apply(ctx, target.ID, rec.ID, tree()); err != nil {
+	if _, err := fixtures.ApplyGraph(ctx, f.db, target.ID, rec.ID, tree()); err != nil {
 		t.Fatal(err)
 	}
 	return rec.ID

@@ -414,7 +414,7 @@ func seedAcross(t *testing.T, w *world.World) *catalog.Product {
 				})
 			}
 		}
-		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, snap); err != nil {
+		if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 		run, err := store.Begin(ctx, finding.Run{

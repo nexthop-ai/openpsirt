@@ -92,7 +92,7 @@ func TestAReportThatKnowsLessDoesNotLowerAFinding(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if !changedNothing(applied) {
 			t.Errorf("a report that knew less wrote %+v, want nothing", applied)
 		}
 		for _, row := range f.open(t) {

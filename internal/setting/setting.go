@@ -13,7 +13,6 @@ package setting
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -25,12 +24,9 @@ import (
 
 // Setting is one named value.
 type Setting struct {
-	// Aliased "st", not "as": all four engines reserve the second, and it
-	// worked only because the library quotes what a tag declares — a property
-	// of the library rather than of this code. The first raw expression
-	// naming the alias would have been a syntax error on every one of them,
-	// and the gate that checks invented names read call arguments rather than
-	// struct tags, so nothing could have said so.
+	// Aliased "st". All four engines reserve "as", so a raw expression
+	// naming that alias is a syntax error on every one of them, and only the
+	// library quoting what a tag declares keeps a tag naming it working.
 	bun.BaseModel `bun:"table:application_setting,alias:st"`
 
 	Name      string    `bun:"name,pk"`
@@ -119,7 +115,7 @@ const (
 	// on one request at a time. A bound rather than none, because a single
 	// action writing an unbounded number of rows is a denial of service
 	// somebody triggers by accident. An answer about many issues at once is
-	// bounded by the three settings below instead.
+	// bounded by the settings below instead.
 	//
 	// A promise to upgrade is not bounded by this, and by nothing else
 	// either. The distinction is reversibility rather than size: nothing
@@ -385,7 +381,7 @@ const DefaultTogetherCap = 2000
 
 // DefaultReviewIssues is how many issues a second person is asked to read in
 // one act where nobody has said. A kernel answer over 805 issues is five acts
-// at this, where counting places made it eighteen.
+// at this.
 const DefaultReviewIssues = 200
 
 // DefaultAgreedIssues is how many issues one re-confirmation of answers
@@ -395,9 +391,9 @@ const DefaultAgreedIssues = 2000
 // DefaultWriteCeiling is how many findings one such act may write where nobody
 // has said.
 //
-// Here rather than in the package that first needed it, because the packages
-// that read it cannot all see each other: recording a flaw bounds what it
-// opens, and a finding cannot import a triage decision. Measured writes of 243,950 rows commit in 8 to 24 seconds across
+// It lives here because the packages that read it cannot all see each other:
+// recording a flaw bounds what it opens, and a finding cannot import a triage
+// decision. Measured writes of 243,950 rows commit in 8 to 24 seconds across
 // the four engines, so this is well inside what a transaction bears.
 const DefaultWriteCeiling = 50000
 
@@ -432,7 +428,7 @@ const DefaultAttachmentQuota = 10 << 30
 // DefaultAttachmentShare is how much of that one person holds where nobody has
 // said.
 //
-// An eighth of the shipped total: a starting point rather than a
+// A tenth of the shipped total: a starting point rather than a
 // recommendation, like every other shipped number here. What it is for is that
 // one account cannot take the whole store, and a deployment where somebody
 // legitimately needs more says so.
@@ -444,10 +440,10 @@ const DefaultAttachmentShare = 1 << 30
 // A week: long enough that a nightly build missing one night is not an alert,
 // short enough that a pipeline switched off is noticed in the week it happened.
 //
-// It lives beside the name it defaults rather than in whichever package needed
-// it first, because two now do — the endpoint that answers what has been
-// scanned, and the pass that turns going quiet into something somebody is
-// told. Two copies of a default is two policies that agree until one moves.
+// It lives beside the name it defaults because more than one package reads
+// it: the endpoint that answers what has been scanned, and the pass that turns
+// going quiet into something somebody is told. Two copies of a default is two
+// policies that agree until one moves.
 const DefaultQuietAfter = 7 * 24 * time.Hour
 
 // DefaultVulnerabilityDataStaleAfter is how long the vulnerability data may go
@@ -595,38 +591,6 @@ func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
 	return row.Value, true, nil
 }
 
-// Set records a setting, whether or not anybody has set it before.
-//
-// Written as a read and then one of two writes rather than as one upsert
-// statement, because there is no portable spelling of an upsert: two of the
-// four engines want ON CONFLICT and the other two want ON DUPLICATE KEY UPDATE,
-// and engine-specific SQL is confined to migration data-definition and the
-// queue's locking.
-//
-// The read decides which write, and both writes say so if the read was already
-// out of date. A setting somebody has changed before is updated on the name and
-// on the value that was read, so a writer whose row has moved matches nothing
-// and goes again. A never-before-set one is inserted, and two administrators
-// setting it at once resolve against the primary key: one wins and the loser
-// goes round again, landing in the update arm. Either retry is a fresh
-// transaction for the reason SetIfAbsent's is — a read inside the transaction
-// whose insert failed sees nothing on two engines and is refused outright on a
-// third, and one inside a transaction whose snapshot is fixed answers with the
-// same stale value for ever.
-func (s *Store) Set(ctx context.Context, name, value string) error {
-	_, _, err := s.Change(ctx, name, value)
-	return err
-}
-
-// errMoved says the row changed between the read that answered what the
-// setting held and the write meant to replace it.
-//
-// The attempt goes out whole rather than reading again inside it, for the
-// reason SetIfAbsent's retry does: MySQL and MariaDB fixed the transaction's
-// snapshot at the opening select, so a second read there answers with the same
-// stale value however many times it is asked.
-var errMoved = errors.New("the setting moved between the read and the write")
-
 // Change records a setting and answers what it replaced.
 //
 // The value it replaced comes from the same transaction as the write, and the
@@ -648,44 +612,23 @@ var errMoved = errors.New("the setting moved between the read and the write")
 // A condition rather than a locking read, because SELECT ... FOR UPDATE is
 // spelled per engine and this works the same on all four.
 //
+// Written as a read and then one of two writes rather than as one upsert
+// statement, because there is no portable spelling of an upsert: two of the
+// four engines want ON CONFLICT and the other two want ON DUPLICATE KEY UPDATE.
+// A never-before-set setting is inserted, and two administrators setting it at
+// once resolve against the primary key. The loser of either race answers that
+// it should go again, and the attempt goes out whole: a read inside the
+// transaction whose insert failed sees nothing on two engines and is refused
+// outright on a third, and MySQL and MariaDB fix the transaction's snapshot at
+// the opening select, so a second read inside it answers with the same stale
+// value. Over a pooled handle the transaction helper takes it again; inside a
+// caller's transaction the race is the caller's to take again, with the other
+// half of its act.
+//
 // had distinguishes "it held nothing" from "it held the empty string", which
 // is the difference between a deployment that never tuned this and one that
 // cleared it.
-func (s *Store) Change(ctx context.Context, name, value string) (string, bool, error) {
-	// Inside somebody else's transaction — an administrator moving a setting,
-	// recorded in the same transaction as the act — the race is theirs to take
-	// again. Going again here would re-run against a transaction the failed
-	// statement has already poisoned, and would leave the other half of the
-	// act standing on a read that has moved.
-	if _, own := database.Handle(s.db); !own {
-		before, had, err := s.change(ctx, name, value)
-		if database.IsDuplicate(err) || errors.Is(err, errMoved) {
-			return "", false, fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
-		}
-		return before, had, err
-	}
-
-	// Bounded, rather than the "once more and no further" a collision on the
-	// primary key uses: the loser of that one lands in the update arm and is
-	// done, while a writer whose condition matched nothing can lose the row
-	// again to a third administrator moving the same setting. Bounded rather
-	// than looped, because contention nothing resolves has to be reported.
-	var err error
-	for attempt := 1; attempt <= database.Attempts; attempt++ {
-		var before string
-		var had bool
-		before, had, err = s.change(ctx, name, value)
-		if database.IsDuplicate(err) || errors.Is(err, errMoved) {
-			continue
-		}
-		return before, had, err
-	}
-	return "", false, fmt.Errorf("record the %q setting: gave up after %d attempts: %w",
-		name, database.Attempts, err)
-}
-
-// change is one attempt, letting a duplicate out for the caller to take again.
-func (s *Store) change(ctx context.Context, name, value string) (before string, had bool, err error) {
+func (s *Store) Change(ctx context.Context, name, value string) (before string, had bool, err error) {
 	// Inside one transaction, and retried whole. Written as two statements it
 	// could report success having stored nothing: the update matches no row,
 	// another writer inserts one, and a separate existence check then sees a
@@ -718,12 +661,10 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 		if !had {
 			row := &Setting{Name: name, Value: value, UpdatedAt: now}
 			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-				// Out whole, so the caller opens a new transaction whose read
-				// can see the row the winner committed. Left to fall through,
-				// one of two administrators setting a never-before-set value
-				// at once is handed a raw constraint violation.
+				// Out whole, so a new transaction's read can see the row the
+				// winner committed.
 				if database.IsDuplicate(err) {
-					return err
+					return fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
 				}
 				return fmt.Errorf("record the %q setting: %w", name, err)
 			}
@@ -747,7 +688,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 		if n == 0 {
-			return errMoved
+			return fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
 		}
 		return nil
 	})

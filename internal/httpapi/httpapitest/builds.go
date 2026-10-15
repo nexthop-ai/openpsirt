@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -53,7 +54,7 @@ func (r *Reach) ScannedShared(t *testing.T) {
 	a := graph.Described{Purl: "pkg:oci/docker-a@1", Name: "docker-a", Version: "1"}
 	b := graph.Described{Purl: "pkg:oci/docker-b@1", Name: "docker-b", Version: "1"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:       product,
 		Components: []graph.Described{a, b, lib},
 		Dependencies: []graph.Dependency{
@@ -110,7 +111,7 @@ func (r *Reach) AlsoIn(t *testing.T, variant string) {
 	}
 	root := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:         root,
 		Components:   []graph.Described{lib},
 		Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
@@ -199,7 +200,7 @@ func (r *Reach) ScannedAlso(t *testing.T, variant, version string) {
 	library := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@" + version, Name: "libnl-3-200", Version: version,
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:         product,
 		Components:   []graph.Described{library},
 		Dependencies: []graph.Dependency{{Parent: product, Child: library}},
@@ -260,7 +261,7 @@ func (r *Reach) ShipsTwice(t *testing.T) {
 	newer := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.9.0", Name: "libnl-3-200", Version: "3.9.0",
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:       product,
 		Components: []graph.Described{consumer, older, newer},
 		Dependencies: []graph.Dependency{
@@ -341,7 +342,7 @@ func (r *Reach) ScannedOneIssueAtTwoVersions(t *testing.T) {
 	for _, one := range shipped {
 		edges = append(edges, graph.Dependency{Parent: product, Child: one})
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root: product, Components: shipped, Dependencies: edges,
 	}); err != nil {
 		t.Fatal(err)
@@ -399,7 +400,7 @@ func (r *Reach) ScannedTag(t *testing.T, tag, version string) {
 	lib := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@" + version, Name: "libnl-3-200", Version: version,
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, made.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, graph.Snapshot{
 		Root: SeededRoot, Components: []graph.Described{lib},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: lib}},
 	}); err != nil {
@@ -443,7 +444,7 @@ func (r *Reach) AlsoScannedInto(t *testing.T, product, stream, variant string) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, made.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, graph.Snapshot{
 		Root:         SeededRoot,
 		Components:   []graph.Described{SeededLib},
 		Dependencies: []graph.Dependency{{Parent: SeededRoot, Child: SeededLib}},
@@ -565,7 +566,7 @@ func (r *Reach) siblingsIn(t *testing.T, variant string, also ...graph.Described
 	for _, one := range shipped {
 		edges = append(edges, graph.Dependency{Parent: product, Child: one})
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root: product, Components: shipped, Dependencies: edges,
 	}); err != nil {
 		t.Fatal(err)

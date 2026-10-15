@@ -12,9 +12,7 @@ finding.Store.TagsOn A helper over a narrowed read: the finding detail reads it 
 finding.Store.RulingsOf A helper over a narrowed read: the reports were read under their own authorization, and this reads their rulings.
 finding.Store.Unacknowledged A background pass: the stale watch reads every unanswered report and decides who hears of each.
 finding.Store.ApplyRules A background pass: the routing sweep places a product's open findings by its rules.
-finding.Store.RecordClaims A background pass: it records the claims a scan's inventory makes, for the deployment.
 finding.Store.Builds Not varying by reader: which builds a scope names. The scope's product was resolved for the caller first.
-finding.Store.BuildsWithin Not varying by reader: Builds against a handle the caller chooses.
 finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Store.RetiredWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Vulnerabilities.Intern A background pass: it files the issues a scan or an authorized recording names.
@@ -34,6 +32,5 @@ triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds
 graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
 graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
-graph.Store.Apply A background pass: it records a scan's graph against a build.
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
 graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.

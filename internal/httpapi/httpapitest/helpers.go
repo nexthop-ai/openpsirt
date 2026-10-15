@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -64,7 +65,7 @@ func (r *Reach) Scan(t *testing.T, hash string, snapshot graph.Snapshot,
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, made.ID, snapshot); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, made.ID, snapshot); err != nil {
 		t.Fatal(err)
 	}
 	findings := finding.NewStore(r.DB.DB)

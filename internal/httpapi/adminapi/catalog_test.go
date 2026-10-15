@@ -107,7 +107,7 @@ func catalogOn(t *testing.T, on httpapitest.Engines, fn func(t *testing.T, d *de
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		administrator, err := rights.Ensure(t.Context(), "admin", "Administrator", access.Stated(true), nil)
+		administrator, err := rights.Ensure(t.Context(), "admin", "Administrator", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

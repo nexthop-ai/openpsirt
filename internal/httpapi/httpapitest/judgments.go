@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -59,7 +60,7 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 	kernel := graph.Described{
 		Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10",
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:         product,
 		Components:   []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: product, Child: kernel}},
@@ -67,11 +68,11 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 		t.Fatal(err)
 	}
 
-	findings := finding.NewStore(r.DB.DB)
-	if _, err := findings.RecordClaims(ctx, target.ID, scan.ID, claims,
+	if _, err := fixture.RecordClaims(ctx, r.DB.DB, target.ID, scan.ID, claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 		t.Fatal(err)
 	}
+	findings := finding.NewStore(r.DB.DB)
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,

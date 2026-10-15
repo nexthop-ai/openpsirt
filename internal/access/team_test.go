@@ -16,7 +16,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 	// arrangement rather than a misconfiguration.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true), nil)
+		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,7 +102,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 func TestARetiredTeamStopsTakingWorkAndKeepsItsName(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		admin, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true), nil)
+		admin, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

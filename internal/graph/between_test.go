@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -25,7 +27,7 @@ func taggedBuild(t *testing.T, f *fixture) int64 {
 // appliedTo reads one inventory for any build.
 func appliedTo(t *testing.T, f *fixture, targetID int64, snap graph.Snapshot) {
 	t.Helper()
-	if _, err := f.store.Apply(t.Context(), targetID, f.scanOf(t, targetID), snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), f.db, targetID, f.scanOf(t, targetID), snap); err != nil {
 		t.Fatal(err)
 	}
 }

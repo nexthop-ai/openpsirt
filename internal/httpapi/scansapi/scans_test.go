@@ -556,7 +556,7 @@ func TestEveryDoorThatTurnsAnUploadAwayRecordsIt(t *testing.T) {
 			want: http.StatusConflict, said: "retired"},
 		{what: "a full backlog",
 			before: func(t *testing.T, f *httpapitest.IngestFixture) {
-				if err := setting.NewStore(f.DB.DB).Set(t.Context(), setting.QueueBacklog,
+				if _, _, err := setting.NewStore(f.DB.DB).Change(t.Context(), setting.QueueBacklog,
 					"1"); err != nil {
 					t.Fatal(err)
 				}

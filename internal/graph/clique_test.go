@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -39,7 +41,7 @@ func TestAClimbThroughComponentsThatAllDependOnEachOtherReadsEachEdgeOnce(t *tes
 			graph.Dependency{Parent: root, Child: x},
 			graph.Dependency{Parent: x, Child: y},
 			graph.Dependency{Parent: y, Child: clique[size-1]})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 

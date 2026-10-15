@@ -68,13 +68,7 @@ func (s Scope) Narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // about, is an empty list rather than a failure — the answer is that nothing
 // is open there.
 func (s *Store) Builds(ctx context.Context, scope Scope) ([]int64, error) {
-	return s.BuildsWithin(ctx, s.db, scope)
-}
-
-// BuildsWithin is Builds against a handle the caller chooses, so that a
-// transaction reads what it decides from inside itself.
-func (s *Store) BuildsWithin(ctx context.Context, db bun.IDB, scope Scope) ([]int64, error) {
-	return s.buildsIn(ctx, db, scope, Workable{})
+	return s.buildsIn(ctx, s.db, scope, Workable{})
 }
 
 // buildsWorking is Builds narrowed to the releases work can land in.

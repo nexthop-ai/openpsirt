@@ -32,10 +32,10 @@ func TestTwoWritesInOneInstantStillRecordTheSetting(t *testing.T) {
 		store := &Store{db: db.DB, now: func() time.Time { return frozen }}
 
 		ctx := t.Context()
-		if err := store.Set(ctx, SessionLifetime, "8h"); err != nil {
+		if _, _, err := store.Change(ctx, SessionLifetime, "8h"); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.Set(ctx, SessionLifetime, "8h"); err != nil {
+		if _, _, err := store.Change(ctx, SessionLifetime, "8h"); err != nil {
 			t.Fatalf("writing the same value at the same instant: %v", err)
 		}
 

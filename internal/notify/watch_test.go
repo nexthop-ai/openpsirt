@@ -33,7 +33,7 @@ func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,11 +122,11 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		first, err := rights.Ensure(ctx, "first@example.com", "First", access.Stated(true), nil)
+		first, err := rights.Ensure(ctx, "first@example.com", "First", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		second, err := rights.Ensure(ctx, "second@example.com", "Second", access.Stated(true), nil)
+		second, err := rights.Ensure(ctx, "second@example.com", "Second", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +157,7 @@ func TestAnAlertForAdministratorsClearsForWhoeverStopsBeingOne(t *testing.T) {
 		}
 
 		for _, demoted := range []*access.Account{first, second} {
-			if _, err := rights.Ensure(ctx, demoted.Identity, "", access.Stated(false), nil); err != nil {
+			if _, err := rights.Ensure(ctx, demoted.Identity, "", new(false), nil); err != nil {
 				t.Fatal(err)
 			}
 			if _, _, err := watch.Once(ctx); err != nil {
@@ -185,7 +185,7 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,7 +322,7 @@ func TestAnEmbargoAtTwoPlacesIsTwoAlertsEachLinkingItsOwn(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -459,7 +459,7 @@ func TestACriticalOnAReleaseTellsWhoeverMayActOnIt(t *testing.T) {
 func recordPerson(t *testing.T, rights *access.Store, identity string, admin bool,
 	productID int64, role access.Role) int64 {
 	t.Helper()
-	person, err := rights.Ensure(t.Context(), identity, "", access.Stated(admin), nil)
+	person, err := rights.Ensure(t.Context(), identity, "", new(admin), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,7 +567,7 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -642,7 +642,7 @@ func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testi
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -701,7 +701,7 @@ func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -757,7 +757,7 @@ func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testin
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -838,7 +838,7 @@ func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *t
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -950,7 +950,7 @@ func TestAVersionComingBackIsNotTheDataStandingStill(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -988,7 +988,7 @@ func TestTwoReplicasADataFetchApartDoNotAlternate(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1035,7 +1035,7 @@ func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1058,7 +1058,7 @@ func TestHowLongCountsAsStoppedIsASettingAndIsSaidInWords(t *testing.T) {
 			t.Fatalf("the shipped week raised %q about data eighteen hours old", body)
 		}
 
-		if err := setting.NewStore(db.DB).Set(ctx,
+		if _, _, err := setting.NewStore(db.DB).Change(ctx,
 			setting.VulnerabilityDataStaleAfter, "12h"); err != nil {
 			t.Fatal(err)
 		}

@@ -28,7 +28,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		db := w.DB
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +101,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 
 		// Read once each scan interval, so a fortnightly schedule is not a
 		// supplier going quiet after a week.
-		if err := setting.NewStore(db.DB).Set(ctx, setting.ScanEvery, "336h"); err != nil {
+		if _, _, err := setting.NewStore(db.DB).Change(ctx, setting.ScanEvery, "336h"); err != nil {
 			t.Fatal(err)
 		}
 		if told := heard(admin); len(told) != 0 {
@@ -110,7 +110,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 
 		// A retired product's suppliers are never read again, so their
 		// silence is not raised.
-		if err := setting.NewStore(db.DB).Set(ctx, setting.ScanEvery, "24h"); err != nil {
+		if _, _, err := setting.NewStore(db.DB).Change(ctx, setting.ScanEvery, "24h"); err != nil {
 			t.Fatal(err)
 		}
 		if told := heard(admin); len(told) == 0 {

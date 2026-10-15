@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -233,7 +234,7 @@ func (r *Reach) scannedUnder(t *testing.T, first, second graph.Described) {
 	library := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:       product,
 		Components: []graph.Described{first, second, library},
 		Dependencies: []graph.Dependency{
@@ -310,7 +311,7 @@ func (r *Reach) ScannedBeneathAProduct(t *testing.T, root string) {
 	library := graph.Described{
 		Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root:       product,
 		Components: []graph.Described{curl, libssh, app, library},
 		Dependencies: []graph.Dependency{

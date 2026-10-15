@@ -494,12 +494,6 @@ type Applied struct {
 	Displaced []Displaced
 }
 
-// Unchanged reports whether the run changed nothing.
-func (a Applied) Unchanged() bool {
-	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0 &&
-		a.Disclaimed == 0
-}
-
 // PlaceIdentity keys a component under the thing that pulled it in.
 //
 // Names only, never versions: a version in the key would lapse every decision

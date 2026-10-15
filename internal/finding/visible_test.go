@@ -18,6 +18,18 @@ import (
 // ask the store directly: a check that only a handler makes is a check the
 // next handler forgets.
 
+// openPlaces is how many places the findings list shows open in the
+// fixture's build to who.
+func (f *fixture) openPlaces(t *testing.T, who access.Subject) (int, error) {
+	t.Helper()
+	groups, _, err := f.store.Groups(t.Context(), who, f.scope, 100, 0, finding.Filter{})
+	places := 0
+	for _, g := range groups {
+		places += g.Places
+	}
+	return places, err
+}
+
 func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 	// Visibility on the query. The enforcement is on the query, so this tests
 	// the query rather than a handler that remembered to ask.
@@ -64,21 +76,16 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 			{"an administrator granted private reading", f.admin(t, access.PublicRead, access.PrivateRead), 2, false},
 			{"a pipeline", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID}), 0, true},
 		} {
-			rows, err := f.store.Open(t.Context(), c.who, f.target)
+			places, err := f.openPlaces(t, c.who)
 			switch {
 			case c.denied && !errors.Is(err, access.ErrDenied):
-				t.Errorf("%s was not refused: %d rows, %v", c.what, len(rows), err)
+				t.Errorf("%s was not refused: %d places, %v", c.what, places, err)
 			case c.denied:
 				continue
 			case err != nil:
 				t.Errorf("%s: %v", c.what, err)
-			case len(rows) != c.want:
-				t.Errorf("%s read %d findings, want %d", c.what, len(rows), c.want)
-			}
-			for _, row := range rows {
-				if !c.who.Reads(row.Visibility, f.productID) {
-					t.Errorf("%s read a %s finding", c.what, row.Visibility)
-				}
+			case places != c.want:
+				t.Errorf("%s read %d places, want %d", c.what, places, c.want)
 			}
 		}
 	})
@@ -95,7 +102,7 @@ func TestFindingsInAProductSomebodyHoldsNothingOnAreRefused(t *testing.T) {
 		elsewhere := access.NewPerson(1, "elsewhere", false,
 			map[int64][]access.Role{f.productID + 999: {access.PrivateRead}}, 0)
 
-		if _, err := f.store.Open(t.Context(), elsewhere, f.target); !errors.Is(err, access.ErrDenied) {
+		if _, err := f.openPlaces(t, elsewhere); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("reading another product's findings: %v", err)
 		}
 	})
@@ -231,7 +238,7 @@ func TestABuildsFindingsAreRefusedToWhoeverMayReadNoneOfThem(t *testing.T) {
 				ask  func(access.Subject) error
 			}{
 				{"what is open", func(s access.Subject) error {
-					_, err := f.store.Open(ctx, s, f.target)
+					_, err := f.openPlaces(t, s)
 					return err
 				}},
 				{"what each run changed", func(s access.Subject) error {

@@ -98,12 +98,6 @@ type Applied struct {
 	VersionsClosed int
 }
 
-// Unchanged reports whether the snapshot changed nothing.
-func (a Applied) Unchanged() bool {
-	return a.NodesOpened == 0 && a.NodesClosed == 0 && a.EdgesOpened == 0 && a.EdgesClosed == 0 &&
-		a.VersionsOpened == 0 && a.VersionsClosed == 0
-}
-
 // Store writes graphs.
 type Store struct {
 	db         bun.IDB
@@ -115,29 +109,17 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, components: NewComponents(db)}
 }
 
-// Apply records a scan's graph against a variant.
+// ApplyWithin records a scan's graph against a variant, inside a transaction
+// the caller opened.
 //
 // Only differences are written. A nightly rebuild that changed nothing writes
 // nothing at all — no rows, no history, no growth. That is what keeps the
 // stored volume tracking real change rather than the calendar, and it is
 // checked by a test rather than assumed.
 //
-// Everything happens in one transaction: a half-applied graph is
-// indistinguishable from components having been removed, which would close
-// findings that are still present.
-func (s *Store) Apply(ctx context.Context, targetID, scanID int64, snap Snapshot) (Applied, error) {
-	var applied Applied
-	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		var err error
-		applied, err = ApplyWithin(ctx, tx, targetID, scanID, snap)
-		return err
-	})
-	return applied, err
-}
-
-// ApplyWithin is the same, inside a transaction the caller opened.
-//
-// Ingest stores a graph, what the build argued about its own patches and what
+// A half-applied graph is indistinguishable from components having been
+// removed, which would close findings that are still present, so the whole
+// graph is one transaction. Ingest stores a graph, what the build argued about its own patches and what
 // the inventory was made of, and those three are one act: a graph applied
 // beside claims that were not recorded reads as a build that withdrew every
 // patch it carries, and reopens every finding they suppressed.

@@ -9,6 +9,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -35,7 +37,7 @@ func TestAStatementNamingManyComponentsStoresItsReasoningOnce(t *testing.T) {
 		for i := range named {
 			claim.Targets = append(claim.Targets, sbom.Target{Name: fmt.Sprintf("component-%d", i)})
 		}
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
@@ -75,7 +77,7 @@ func TestReasoningLongerThanTheBoundIsCutAndStored(t *testing.T) {
 		claim.Statement = said
 		claim.Justification = strings.Repeat("j", 500)
 		claim.Vulnerability = "CVE-2026-1" + strings.Repeat("9", 500)
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin); err != nil {
 			t.Fatalf("an over-long statement refused the scan: %v", err)
 		}
@@ -96,12 +98,12 @@ func TestReasoningLongerThanTheBoundIsCutAndStored(t *testing.T) {
 
 		// The same over-long document read again is the same claim.
 		f.shipped(t, twoConsumers())
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied.Opened != 0 || applied.Closed != 0 {
 			t.Errorf("re-sending an over-long statement wrote %+v", applied)
 		}
 	})
@@ -120,13 +122,13 @@ func TestAChangedExplanationIsANewClaim(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		claim := aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)
 		claim.Statement = "fixed by patch 0007"
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
 		claim.Statement = "fixed by patch 0008"
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin)
 		if err != nil {
 			t.Fatal(err)

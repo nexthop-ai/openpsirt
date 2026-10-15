@@ -26,7 +26,7 @@ func atClock(t *testing.T, db *database.DB, at *time.Time) (*Store, int64) {
 	// tests move is the clock, and a role grant would only add a table this
 	// package cannot reach without importing something that imports it back.
 	store := &Store{db: db.DB, now: func() time.Time { return *at }}
-	person, err := store.Ensure(t.Context(), "someone", "Someone", Stated(true), nil)
+	person, err := store.Ensure(t.Context(), "someone", "Someone", new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,15 +343,15 @@ func TestAMoveThatLostARaceIsTakenAgain(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.Ensure(ctx, "someone", "", Stated(false), Stated(true)); err != nil {
+		if _, err := store.Ensure(ctx, "someone", "", new(false), new(true)); err != nil {
 			t.Fatal(err)
 		}
 		for _, c := range []struct {
 			what          string
 			admin, audits *bool
 		}{
-			{"administration", Stated(false), nil},
-			{"auditing", nil, Stated(true)},
+			{"administration", new(false), nil},
+			{"auditing", nil, new(true)},
 		} {
 			copied := *stale
 			if err := store.move(ctx, &copied, c.admin, c.audits); !errors.Is(err, database.ErrGoAgain) {
@@ -410,10 +410,10 @@ func TestRestatingSaysWhatTheWriteMovedFrom(t *testing.T) {
 		store, _ := atClock(t, db, &at)
 
 		// Another administrator withdrew it first.
-		if _, err := store.Ensure(ctx, "someone", "", Stated(false), nil); err != nil {
+		if _, err := store.Ensure(ctx, "someone", "", new(false), nil); err != nil {
 			t.Fatal(err)
 		}
-		before, after, err := store.Restate(ctx, "someone", "", Stated(false), nil)
+		before, after, err := store.Restate(ctx, "someone", "", new(false), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -421,7 +421,7 @@ func TestRestatingSaysWhatTheWriteMovedFrom(t *testing.T) {
 			t.Errorf("a withdrawal somebody else made read as %v then %v", before.IsAdmin, after.IsAdmin)
 		}
 
-		before, after, err = store.Restate(ctx, "someone", "", Stated(true), nil)
+		before, after, err = store.Restate(ctx, "someone", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -22,11 +22,10 @@ import (
 // rather than hoping for it.
 //
 // Four goroutines with nothing holding them at the line race only if the
-// scheduler interleaves them, and nothing could tell a run that never collided
-// from one that collided and recovered. So a recovery broken on every server
-// engine — the read ran inside the transaction whose insert had just failed,
-// which sees nothing on MySQL and MariaDB and is refused outright on
-// PostgreSQL — passed locally and failed in CI.
+// scheduler interleaves them, and nothing tells a run that never collided from
+// one that collided and recovered. A recovery that reads inside the
+// transaction whose insert has just failed sees nothing on MySQL and MariaDB
+// and is refused outright on PostgreSQL, while SQLite answers correctly.
 //
 // Here every writer is held after its opening read until all of them have
 // taken one, so every loser reaches the duplicate arm on every run, and the
@@ -34,8 +33,7 @@ import (
 //
 // The servers only, because holding four transactions open is the whole
 // method: the harness holds SQLite to one connection, so the second writer
-// would wait for a connection the first is holding. It is also where the defect lived — the
-// broken version was correct on SQLite and wrong on all three servers.
+// would wait for a connection the first is holding.
 func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -124,10 +122,8 @@ func TestEveryReplicaThatLosesTheMintTakesTheWinnersKey(t *testing.T) {
 // interleave rather than hoping for it.
 //
 // Two goroutines with nothing holding them at the line collide only if the
-// scheduler puts both reads before either write, so the unforced version of
-// this in setting_test.go passes on most runs whatever the code does — which
-// is how a defect that writes a false trail row lived here, failing once in a
-// merge queue and nowhere else.
+// scheduler puts both reads before either write, so an unforced race passes on
+// most runs whatever the code does.
 //
 // Here both writers are held after the read that answers what the setting
 // held, so both have read the original when they are let go. One replaces it;
@@ -144,7 +140,7 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 
 		// Something to replace, written by a store with no seam on it so that
 		// seeding does not consume one.
-		if err := NewStore(db.DB).Set(ctx, TriageFloor, "critical"); err != nil {
+		if _, _, err := NewStore(db.DB).Change(ctx, TriageFloor, "critical"); err != nil {
 			t.Fatalf("the setting to be moved could not be recorded: %v", err)
 		}
 
@@ -265,7 +261,7 @@ func TestAWriterInsideACallersTransactionHandsTheLostRaceBack(t *testing.T) {
 		} {
 			dbtest.Reset(t, db)
 			if c.seeded {
-				if err := NewStore(db.DB).Set(ctx, TriageFloor, "critical"); err != nil {
+				if _, _, err := NewStore(db.DB).Change(ctx, TriageFloor, "critical"); err != nil {
 					t.Fatal(err)
 				}
 			}

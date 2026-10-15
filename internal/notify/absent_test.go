@@ -28,7 +28,7 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +100,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

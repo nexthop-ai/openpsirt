@@ -6,6 +6,8 @@ package graph_test
 import (
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -64,11 +66,11 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 				Dependencies: []graph.Dependency{{Parent: root, Child: busybox}},
 			}
 		}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t),
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t),
 			stating("alpine-3.24.1", "cpe:2.3:a:busybox:busybox:1.37.0")); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Apply(ctx, other, f.scanOf(t, other), stating("alpine-3.23.4", "")); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, other, f.scanOf(t, other), stating("alpine-3.23.4", "")); err != nil {
 			t.Fatal(err)
 		}
 		said := func(target int64) graph.Described {
@@ -95,12 +97,12 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 
 		// A distribution release moving under an unchanged version is written
 		// on the node, and opens and closes nothing.
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t),
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t),
 			stating("alpine-3.24.2", "cpe:2.3:a:busybox:busybox:1.37.0"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied != (graph.Applied{}) {
 			t.Errorf("restating an identifier opened or closed something: %+v", applied)
 		}
 		if got := said(f.targetID); got.Purl != "pkg:apk/alpine/busybox@1.37.0-r31?distro=alpine-3.24.2" {

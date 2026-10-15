@@ -90,7 +90,7 @@ func TestAWorkerThatOverrunsTheGraceFailsTheExit(t *testing.T) {
 func TestARoleModeThatCannotBeReadDerivesNothing(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		store := setting.NewStore(db.DB)
-		if err := store.Set(t.Context(), setting.RoleMode, string(access.GroupBound)); err != nil {
+		if _, _, err := store.Change(t.Context(), setting.RoleMode, string(access.GroupBound)); err != nil {
 			t.Fatal(err)
 		}
 		mode := roleMode(store)

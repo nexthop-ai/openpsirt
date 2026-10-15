@@ -6,12 +6,13 @@ package main
 import (
 	"go/parser"
 	"go/token"
+	"sort"
 	"testing"
 )
 
 // Exported code with no caller is a defect rather than spare capacity — a
 // store method nothing routes to, a renderer nothing renders with. This is the
-// gate AGENTS.md leans on for that, and it had no test.
+// gate AGENTS.md leans on for that.
 
 func TestTheNamesTheRuntimeCallsAreNotOrphans(t *testing.T) {
 	// A method satisfying a standard interface is reached by the runtime
@@ -56,11 +57,10 @@ func TestTheNamesTheRuntimeCallsAreNotOrphans(t *testing.T) {
 }
 
 func TestWhatCountsAsAnExportedDeclaration(t *testing.T) {
-	// Only functions were read, so a request type registered on no operation
-	// sat fully specified and unreachable — in neither the OpenAPI document
-	// nor the generated client, because nothing put it there. A type is the
-	// shape this gate is least able to be talked out of: it compiles, it reads
-	// as intent, and nothing calls it.
+	// A request type registered on no operation is fully specified and
+	// unreachable — in neither the OpenAPI document nor the generated client.
+	// A type is the shape this gate is least able to be talked out of: it
+	// compiles, it reads as intent, and nothing calls it.
 	for _, c := range []struct {
 		what   string
 		source string
@@ -107,15 +107,102 @@ func TestWhatCountsAsAnExportedDeclaration(t *testing.T) {
 }
 
 func TestAnOrphanIsReportedAndReadingNothingIsRefused(t *testing.T) {
-	declared := []decl{{"Used", "a.go", 3}, {"Alone", "a.go", 1}, {"String", "a.go", 2}}
-	got, err := orphansOf(declared, map[string]int{"Used": 2, "Alone": 1, "String": 1})
+	declared := []decl{{"p", "Used", "a.go", 3}, {"p", "Alone", "a.go", 1}, {"", "String", "a.go", 2}}
+	seen := newCounts()
+	seen.symbols[key{"p", "Used"}] = 2
+	seen.symbols[key{"p", "Alone"}] = 1
+	seen.names["String"] = 1
+	got, err := orphansOf(declared, seen)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(got) != 1 || got[0].name != "Alone" {
 		t.Errorf("reported %v, want only the symbol nothing else names", got)
 	}
-	if _, err := orphansOf(nil, map[string]int{}); err == nil {
+	if _, err := orphansOf(nil, newCounts()); err == nil {
 		t.Error("a walk that declared nothing was read as a clean tree")
+	}
+}
+
+// orphansIn runs the gate over sources keyed by path, as the walk hands them
+// over.
+func orphansIn(t *testing.T, sources map[string]string) []decl {
+	t.Helper()
+	fset := token.NewFileSet()
+	var declared []decl
+	seen := newCounts()
+	paths := make([]string, 0, len(sources))
+	for path := range sources {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		file, err := parser.ParseFile(fset, path, sources[path], 0)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		declared = append(declared, declaredIn(fset, path, file)...)
+		seen.add(path, file)
+	}
+	got, err := orphansOf(declared, seen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func TestANameAnotherPackageSharesDoesNotHideAnOrphan(t *testing.T) {
+	got := orphansIn(t, map[string]string{
+		"internal/a/a.go": "package a\n\nfunc Two() {}\n",
+		"internal/b/b.go": "package b\n\nfunc Two() {}\n",
+		"internal/c/c.go": "package c\n\nimport \"" + module + "/internal/b\"\n\nfunc use() { b.Two() }\n",
+	})
+	if len(got) != 1 || got[0].file != "internal/a/a.go" || got[0].name != "Two" {
+		t.Errorf("reported %v, want only the Two nothing calls", got)
+	}
+}
+
+func TestAQualifiedReferenceResolvesThroughItsImport(t *testing.T) {
+	for _, c := range []struct {
+		what   string
+		caller string
+	}{
+		{"an aliased import", "package c\n\nimport other \"" + module + "/internal/b\"\n\nfunc use() { other.Two() }\n"},
+		{"a dot import", "package c\n\nimport . \"" + module + "/internal/b\"\n\nfunc use() { Two() }\n"},
+		{"a bare name in the declaring package", ""},
+	} {
+		sources := map[string]string{
+			"internal/b/b.go": "package b\n\nfunc Two() {}\n",
+		}
+		if c.caller == "" {
+			sources["internal/b/use.go"] = "package b\n\nfunc use() { Two() }\n"
+		} else {
+			sources["internal/c/c.go"] = c.caller
+		}
+		if got := orphansIn(t, sources); len(got) != 0 {
+			t.Errorf("%s: reported %v, want the call to count", c.what, got)
+		}
+	}
+}
+
+func TestANameAnExternalTestPackageWritesBareIsItsOwn(t *testing.T) {
+	// An external test package declares its own names, so a bare Two there
+	// is not a call of the package it tests.
+	got := orphansIn(t, map[string]string{
+		"internal/b/b.go":      "package b\n\nfunc Two() {}\n",
+		"internal/b/b_test.go": "package b_test\n\nfunc Two() {}\n\nfunc use() { Two() }\n",
+	})
+	if len(got) != 1 || got[0].name != "Two" {
+		t.Errorf("reported %v, want the package's Two", got)
+	}
+}
+
+func TestAMethodIsMatchedByNameAlone(t *testing.T) {
+	got := orphansIn(t, map[string]string{
+		"internal/b/b.go": "package b\n\ntype T struct{}\n\nfunc (T) Run() {}\n\nfunc (T) Idle() {}\n\nvar V T\n",
+		"internal/c/c.go": "package c\n\nimport \"" + module + "/internal/b\"\n\nfunc use() { b.V.Run() }\n",
+	})
+	if len(got) != 1 || got[0].name != "Idle" {
+		t.Errorf("reported %v, want only the method nothing names", got)
 	}
 }

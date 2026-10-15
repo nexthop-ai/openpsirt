@@ -217,16 +217,6 @@ func coversNamed(named, version string, d graph.Described) bool {
 	return version == d.Version || version == d.UpstreamVersion
 }
 
-// Covers reports whether any of a claim's targets is the component described.
-func (s Suppression) Covers(d graph.Described) bool {
-	for _, t := range s.Targets {
-		if t.Covers(d) {
-			return true
-		}
-	}
-	return false
-}
-
 // GenericNamespaceAgrees reports whether a generic package identifier a claim
 // names and a component's identifier agree on the namespace.
 //

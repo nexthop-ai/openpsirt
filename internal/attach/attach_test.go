@@ -116,7 +116,7 @@ func (f *fixture) who(t *testing.T, roles ...access.Role) access.Subject {
 func (f *fixture) admin(t *testing.T) access.Subject {
 	t.Helper()
 	person, err := access.NewStore(f.db.DB).Ensure(t.Context(), "boss@example.com", "Boss",
-		access.Stated(true), nil)
+		new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

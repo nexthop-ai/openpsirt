@@ -262,7 +262,7 @@ func TestAnAdministratorAdministersRatherThanHoldingEveryRole(t *testing.T) {
 	// able to change everything.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Ensure(ctx, "admin", "Admin", access.Stated(true), nil); err != nil {
+		if _, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil); err != nil {
 			t.Fatal(err)
 		}
 		subject, err := f.store.Resolve(ctx, "admin")
@@ -466,7 +466,7 @@ func TestTheHeaderIsRefusedFromSomewhereUntrusted(t *testing.T) {
 	// have authenticated somebody.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

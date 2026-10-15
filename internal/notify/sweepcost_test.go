@@ -66,7 +66,7 @@ func TestASweepLeavesAloneWhoeverHasNothingToHearOrClear(t *testing.T) {
 		// condition of any kind every administrator hears about, so they
 		// have nothing to reconcile on any of them.
 		quiet, err := access.NewStore(w.DB.DB).Ensure(ctx, "quiet@example.com", "Quiet",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

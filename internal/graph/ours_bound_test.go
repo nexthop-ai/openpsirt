@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -49,7 +51,7 @@ func TestTheTreeSeenUpwardSaysWhenItIsIncomplete(t *testing.T) {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: lib})
 			hit(fmt.Sprintf("CVE-2026-%d", 10000+i), lib)
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)

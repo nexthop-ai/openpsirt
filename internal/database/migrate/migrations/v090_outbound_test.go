@@ -24,7 +24,7 @@ func TestAV080DatabaseFoldsItsDestinationNames(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v080)
-		who, err := access.NewStore(db.DB).Ensure(ctx, "admin", "", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "admin", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

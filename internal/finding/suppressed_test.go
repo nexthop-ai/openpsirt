@@ -6,6 +6,8 @@ package finding_test
 import (
 	"testing"
 
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -25,7 +27,7 @@ func TestAFindingTheBuildArguesDoesNotApplyIsMarkedNotDropped(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		scanID := f.lastScan
-		if _, err := f.store.RecordClaims(t.Context(), f.target, scanID,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, scanID,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
@@ -52,7 +54,7 @@ func TestAFindingTheBuildArguesDoesNotApplyIsMarkedNotDropped(t *testing.T) {
 func TestAClaimAboutSomethingElseLeavesAFindingAlone(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{
 				// Right component, different issue.
 				aClaim("CVE-2026-9", sbom.NotAffected, libnl, sbom.FromStatement),
@@ -77,7 +79,7 @@ func TestSayingItIsAffectedSuppressesNothing(t *testing.T) {
 	// it looked. That is information, not an answer.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.Affected, libnl, sbom.FromStatement)}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
@@ -98,21 +100,21 @@ func TestArguingTheSameThingAgainWritesNothing(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		claims := []sbom.Suppression{aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)}
 
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied.Opened != 0 || applied.Closed != 0 {
 			t.Errorf("re-arguing the same claims wrote %+v", applied)
 		}
 
 		// Withdrawing one closes it rather than deleting it: what a release
 		// argued is a question asked years later.
-		applied, err = f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, everyOrigin)
+		applied, err = world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,12 +139,12 @@ func TestAClaimAttachedToItsComponentWinsOverOneThatNamedIt(t *testing.T) {
 		// or fail depending on what a map felt like doing.
 		vague := aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)
 		precise := aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree)
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{vague}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{vague, precise}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +186,7 @@ func TestEveryStatusTheFormatDefinesCanBeStored(t *testing.T) {
 			claim.Justification = "vulnerable_code_cannot_be_controlled_by_adversary"
 			claims = append(claims, claim)
 		}
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin)
 		if err != nil {
 			t.Fatalf("recording every status the format defines: %v", err)
 		}
@@ -206,7 +208,7 @@ func TestAClaimThatReachedNothingIsCounted(t *testing.T) {
 		misses := aClaim("CVE-2026-2", sbom.NotAffected,
 			graph.Described{Purl: "pkg:generic/libnl3", Name: "libnl3"}, sbom.FromStatement)
 
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{reaches, misses}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
@@ -244,13 +246,13 @@ func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
 		carried := []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 		}
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, carried, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, carried, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 
 		// The next scan arrives in a format with nowhere to say it.
 		stated := map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: false}
-		applied, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, stated)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, stated)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -267,10 +269,10 @@ func TestAFormatThatCannotStateAClaimDoesNotWithdrawOne(t *testing.T) {
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnl, sbom.FromPedigree),
 			aClaim("CVE-2026-2", sbom.NotAffected, libnl, sbom.FromStatement),
 		}
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, spoken, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, spoken, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
-		applied, err = f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, stated)
+		applied, err = world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, stated)
 		if err != nil {
 			t.Fatal(err)
 		}

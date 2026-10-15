@@ -9,6 +9,8 @@ import (
 	"slices"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -18,7 +20,7 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 		loose := at("libfoo", "1.0")
 		// The root pulls in curl. zlib is pulled in by nothing and pulls in
 		// openssl, and libfoo is pulled in by nothing and pulls in nothing.
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib, openssl, loose},
 			Dependencies: []graph.Dependency{
@@ -70,7 +72,7 @@ func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 		ctx := t.Context()
 		bare := graph.Described{Purl: "pkg:generic/nginx@1.25", Name: "nginx", Version: "1.25"}
 		named := graph.Described{Purl: "pkg:generic/library/nginx@1.25", Name: "nginx", Version: "1.25"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{bare, named},
 			Dependencies: []graph.Dependency{
@@ -100,7 +102,7 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 	// count the same, so there this pins nothing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib},
 			Dependencies: []graph.Dependency{
@@ -129,7 +131,7 @@ func TestACycleInTheEdgesEndsTheWalkAndCountsOnce(t *testing.T) {
 func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, zlib},
 			Dependencies: []graph.Dependency{
@@ -164,7 +166,7 @@ func TestWhatNothingCanMatchIsCounted(t *testing.T) {
 		byName := graph.Described{Name: "bash", Version: "4.4.18-4.ph3"}
 		byPlatform := graph.Described{Name: "busybox", Version: "1.36",
 			CPE: "cpe:2.3:a:busybox:busybox:1.36:*:*:*:*:*:*:*"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{matched, byName, byPlatform},
 			Dependencies: []graph.Dependency{
@@ -191,7 +193,7 @@ func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
 		ctx := t.Context()
 		bare := graph.Described{Name: "gdbm", Version: "1.26-r6"}
 		named := graph.Described{Purl: "pkg:apk/wolfi/gdbm@1.26-r6", Name: "gdbm", Version: "1.26-r6"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{bare, named},
 			Dependencies: []graph.Dependency{
@@ -235,7 +237,7 @@ func TestAChainLongerThanAThousandIsWalkedToItsEnd(t *testing.T) {
 			deps = append(deps, graph.Dependency{Parent: parent, Child: chain[i]})
 			parent = chain[i]
 		}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root: root, Components: chain, Dependencies: deps,
 		}); err != nil {
 			t.Fatal(err)

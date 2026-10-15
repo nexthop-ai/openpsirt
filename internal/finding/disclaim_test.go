@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -159,7 +161,7 @@ func TestASuppliersStatementClosesTheFindingInsideItsProductAndNoOther(t *testin
 		}
 
 		again, _ := f.reported(t, found(inside, zlib))
-		if !again.Unchanged() {
+		if !changedNothing(again) {
 			t.Errorf("re-scanning wrote %+v", again)
 		}
 	})
@@ -399,7 +401,7 @@ func TestAStatementTheBuildsOwnPatchAlreadyAnswersClosesNothing(t *testing.T) {
 	// The build's word about its own code is asked first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, beside(acmeY))
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, []sbom.Suppression{{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 			Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 			Targets: []sbom.Target{{Purl: zlib.Purl}},
 		}}, everyOrigin); err != nil {
@@ -1002,7 +1004,7 @@ func TestEveryOtherClosureTakesTheSuppliersAnswerOffThePlace(t *testing.T) {
 			f.reported(t, r)
 		}},
 		{"the build patches it", func(t *testing.T, f *fixture) {
-			if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, []sbom.Suppression{{
+			if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{{
 				Vulnerability: inside, Status: sbom.AlreadyFixed, Origin: sbom.FromStatement,
 				Targets: []sbom.Target{{Purl: zlib.Purl}},
 			}}, everyOrigin); err != nil {

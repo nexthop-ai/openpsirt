@@ -24,7 +24,7 @@ func TestTheSweepClearsSessionsThatHaveRunOut(t *testing.T) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := rights.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

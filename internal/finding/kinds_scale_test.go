@@ -86,7 +86,7 @@ func TestMeasurePackageKindsOnARealImage(t *testing.T) {
 			t.Fatal(err)
 		}
 		snap := doc.Snapshot(graph.Described{Name: "sonic", Version: "1.0"})
-		if _, err := graph.NewStore(db.DB).Apply(ctx, w.Target.ID, scan.ID, snap); err != nil {
+		if _, err := world.ApplyGraph(ctx, db.DB, w.Target.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 

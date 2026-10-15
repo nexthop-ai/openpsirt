@@ -355,7 +355,7 @@ func TestHowLongASignInLastsIsTheSettingAnAdministratorChanged(t *testing.T) {
 	// value somebody sets that changes nothing is worse than not offering it.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		const chosen = 90 * time.Minute
-		if err := setting.NewStore(r.db.DB).Set(t.Context(),
+		if _, _, err := setting.NewStore(r.db.DB).Change(t.Context(),
 			setting.SessionLifetime, chosen.String()); err != nil {
 			t.Fatal(err)
 		}
@@ -775,7 +775,7 @@ func TestAVerifiedAddressIsRecordedInEitherMode(t *testing.T) {
 func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		for _, stored := range []string{"", "not base64!", "c2hvcnQ"} {
-			if err := setting.NewStore(r.db.DB).Set(t.Context(), setting.SignInKey, stored); err != nil {
+			if _, _, err := setting.NewStore(r.db.DB).Change(t.Context(), setting.SignInKey, stored); err != nil {
 				t.Fatal(err)
 			}
 			// A key that cannot be read is a fault here, so starting a sign-in

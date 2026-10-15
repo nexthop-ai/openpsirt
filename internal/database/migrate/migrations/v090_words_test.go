@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -176,12 +175,12 @@ func claimsAreMovedV090(t *testing.T, ctx context.Context, db *database.DB, w cl
 	}
 
 	// The next scan restating every claim finds each one held.
-	applied, err := finding.NewStore(db.DB).RecordClaims(ctx, w.declared.Target.ID, w.rec.ID, w.claims,
+	applied, err := world.RecordClaims(ctx, db.DB, w.declared.Target.ID, w.rec.ID, w.claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !applied.Unchanged() {
+	if applied.Opened != 0 || applied.Closed != 0 {
 		t.Errorf("the first scan after the upgrade wrote %+v, want every claim held", applied)
 	}
 

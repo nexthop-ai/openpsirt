@@ -98,10 +98,10 @@ func TestAClaimReachesTheVersionItNamesAndNoOther(t *testing.T) {
 		Purl: "pkg:rpm/example/libnl-3-200@3.6.0-1.el9", Name: "libnl-3-200",
 		Version: "3.6.0-1.el9",
 	}
-	if !fixed.Covers(named) {
+	if !coversAny(fixed, named) {
 		t.Error("the claim missed the version it was made about")
 	}
-	if fixed.Covers(older) {
+	if coversAny(fixed, older) {
 		t.Error("a claim about one version answered for another")
 	}
 }
@@ -214,10 +214,10 @@ func TestAVersionStatedAsABranchIsTheVersionTheClaimIsAbout(t *testing.T) {
 	}
 	at := graph.Described{Name: "WT776 Web Interface V4.17", Version: "4.17"}
 	elsewhere := graph.Described{Name: "WT776 Web Interface V4.17", Version: "4.20"}
-	if !got.Claims[0].Covers(at) {
+	if !coversAny(got.Claims[0], at) {
 		t.Error("the claim missed the version it was made about")
 	}
-	if got.Claims[0].Covers(elsewhere) {
+	if coversAny(got.Claims[0], elsewhere) {
 		t.Error("a claim about 4.17 answered for 4.20")
 	}
 }

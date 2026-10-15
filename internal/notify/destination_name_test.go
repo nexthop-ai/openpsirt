@@ -18,7 +18,7 @@ import (
 func TestADestinationNameIsMatchedWhateverItsCapitals(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

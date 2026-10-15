@@ -88,7 +88,7 @@ func TestRescanningWithNothingChangedWritesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if !changedNothing(applied) {
 			t.Errorf("an unchanged re-scan wrote %+v", applied)
 		}
 	})
@@ -257,7 +257,7 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 		if applied.Opened != 0 || applied.Closed != 0 {
 			t.Errorf("a fix appearing opened %d and closed %d findings", applied.Opened, applied.Closed)
 		}
-		if applied.Unchanged() {
+		if changedNothing(applied) {
 			t.Error("a fix appearing reported as no change at all")
 		}
 
@@ -272,7 +272,7 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if !changedNothing(applied) {
 			t.Errorf("an unchanged re-scan wrote %+v", applied)
 		}
 

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -44,7 +46,7 @@ func TestTheShortestWayDownIsTheOneShown(t *testing.T) {
 		snap := tree()
 		snap.Components = append(snap.Components, zlib, unplaced)
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		ids := map[string]int64{}
@@ -97,7 +99,7 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 				{Parent: a, Child: lib}, {Parent: b, Child: lib},
 			},
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
@@ -180,7 +182,7 @@ func TestAnIssueOnTwoComponentsBeneathOneCountsOnce(t *testing.T) {
 				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
 			},
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
@@ -241,7 +243,7 @@ func TestAStepCountsWhatEachNeighborCarriesAndPullsIn(t *testing.T) {
 				{Parent: root, Child: box}, {Parent: box, Child: one}, {Parent: box, Child: two},
 			},
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
@@ -290,7 +292,7 @@ func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 				{Parent: root, Child: a}, {Parent: a, Child: b}, {Parent: b, Child: a},
 			},
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		aID, _ := f.store.ComponentAs(t.Context(), f.targetID, "a", graph.Choice{})
@@ -334,7 +336,7 @@ func TestContainersAreOrderedByWhatIsInsideThem(t *testing.T) {
 				{Parent: quiet, Child: small}, {Parent: busy, Child: large},
 			},
 		}
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
@@ -388,7 +390,7 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 	// rating — so the number and its parts cannot disagree.
 	each(t, func(t *testing.T, f *fixture) {
 		box, lib := at("container-a", "1"), at("libshared", "1.0")
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{box, lib},
 			Dependencies: []graph.Dependency{
@@ -482,7 +484,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib := at("libshared", "1.0")
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root: root, Components: []graph.Described{lib},
 			Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
 		}); err != nil {

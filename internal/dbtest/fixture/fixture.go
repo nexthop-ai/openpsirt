@@ -99,15 +99,6 @@ func Each(t *testing.T, fn func(t *testing.T, w *World)) {
 	})
 }
 
-// Two runs fn against the seeded world on SQLite and PostgreSQL, as
-// dbtest.Two does.
-func Two(t *testing.T, fn func(t *testing.T, w *World)) {
-	t.Helper()
-	dbtest.Two(t, func(t *testing.T, db *database.DB) {
-		fn(t, New(t, db))
-	})
-}
-
 // New seeds the default world in db, which the harness hands over migrated
 // and empty.
 func New(t *testing.T, db *database.DB) *World {
@@ -150,7 +141,7 @@ func Declare(ctx context.Context, db *database.DB) (Declared, error) {
 		return Declared{}, fmt.Errorf("place %s as %s: %w", BranchName, CustomerVariant, err)
 	}
 	if d.Person, err = access.NewStore(db.DB).Ensure(ctx, PersonIdentity, PersonDisplayName,
-		access.Stated(false), nil); err != nil {
+		new(false), nil); err != nil {
 		return Declared{}, fmt.Errorf("declare %q: %w", PersonIdentity, err)
 	}
 	return d, nil
@@ -209,7 +200,7 @@ func (w *World) DeclarePerson(identity, displayName string, admin bool) *access.
 			"falls back to the identity, so a field answering the wrong one "+
 			"cannot be told from a field answering the right one", identity)
 	}
-	person, err := w.Access.Ensure(context.Background(), identity, displayName, access.Stated(admin), nil)
+	person, err := w.Access.Ensure(context.Background(), identity, displayName, new(admin), nil)
 	if err != nil {
 		w.t.Fatalf("declare %q: %v", identity, err)
 	}

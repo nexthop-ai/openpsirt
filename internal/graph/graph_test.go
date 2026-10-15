@@ -116,7 +116,7 @@ func tree() graph.Snapshot {
 
 func TestFirstSnapshotIsStored(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,15 +153,15 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 	// it along. On a real image that is thousands of rows for a build in which
 	// nothing happened.
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t),
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t),
 			rebuilt(tree(), "2.4.0-20260829.010101"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied != (graph.Applied{}) {
 			t.Errorf("a rebuild that changed only the product's own version wrote %+v", applied)
 		}
 	})
@@ -173,16 +173,16 @@ func TestARebuildThatOnlyMovedItsOwnVersionWritesNothing(t *testing.T) {
 // tracked for a year costs the same whether or not anything happened to it.
 func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		before := rowCounts(t, f)
 
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied != (graph.Applied{}) {
 			t.Errorf("an identical rebuild wrote %+v", applied)
 		}
 		if after := rowCounts(t, f); !maps.Equal(after, before) {
@@ -193,7 +193,7 @@ func TestAnUnchangedRebuildWritesNothing(t *testing.T) {
 
 func TestOnlyTheChangeIsWritten(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -202,7 +202,7 @@ func TestOnlyTheChangeIsWritten(t *testing.T) {
 		next.Components = append(next.Components, zlib)
 		next.Dependencies = append(next.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
 
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), next)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), next)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -219,7 +219,7 @@ func TestOnlyTheChangeIsWritten(t *testing.T) {
 func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		first := f.scan(t)
-		if _, err := f.store.Apply(t.Context(), f.targetID, first, tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, first, tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -234,7 +234,7 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 			},
 		}
 		second := f.scan(t)
-		applied, err := f.store.Apply(t.Context(), f.targetID, second, next)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, second, next)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -267,11 +267,11 @@ func TestAVersionBumpClosesTheOldComponent(t *testing.T) {
 // component table sized by the portfolio rather than by scans times variants.
 func TestAComponentIsSharedAcrossVariants(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		before := rowCounts(t, f)["component"]
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		if after := rowCounts(t, f)["component"]; after != before {
@@ -287,7 +287,7 @@ func TestADependencyOnAnUnlistedComponentIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		bad := tree()
 		bad.Dependencies = append(bad.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), bad); err == nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), bad); err == nil {
 			t.Fatal("an edge to an undescribed component was accepted")
 		}
 	})
@@ -302,7 +302,7 @@ func TestAComponentWithoutAVersionIsStillTracked(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		snap := tree()
 		snap.Components = append(snap.Components, graph.Described{Name: "mystery"})
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap)
 		if err != nil {
 			t.Fatalf("a component with no version was refused: %v", err)
 		}
@@ -317,7 +317,7 @@ func TestAComponentWithoutANameIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		bad := tree()
 		bad.Components = append(bad.Components, graph.Described{Version: "1.0"})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), bad); err == nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), bad); err == nil {
 			t.Fatal("a component with no name was accepted")
 		}
 	})
@@ -356,7 +356,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: c})
 		}
 
-		applied, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap)
 		if err != nil {
 			t.Fatalf("applying a graph larger than one statement: %v", err)
 		}
@@ -369,7 +369,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 		// the first scan carries it on the insert.
 		second := snap
 		second.Components = append([]graph.Described{}, snap.Components...)
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), second); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), second); err != nil {
 			t.Fatalf("applying a graph whose suppliers are filled in: %v", err)
 		}
 		// Counted rather than read: the point is the statement that wrote
@@ -386,7 +386,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 
 		// And closing them again, which names as many identifiers as opening
 		// wrote rows.
-		applied, err = f.store.Apply(t.Context(), f.targetID, f.scan(t), graph.Snapshot{Root: root})
+		applied, err = fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{Root: root})
 		if err != nil {
 			t.Fatalf("closing a graph larger than one statement: %v", err)
 		}
@@ -407,7 +407,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 		// is stored under — so the same row can be a child in one document
 		// and the root of the next.
 		base := graph.Described{Name: "base"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{base},
 			Dependencies: []graph.Dependency{{Parent: root, Child: base}},
@@ -416,7 +416,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 		}
 
 		// The next document is rooted at it instead.
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:         base,
 			Components:   []graph.Described{openssl},
 			Dependencies: []graph.Dependency{{Parent: base, Child: openssl}},
@@ -438,7 +438,7 @@ func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
 
 		// And the other way: rooted back at the product, the promoted
 		// component reads as a component again.
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:         root,
 			Components:   []graph.Described{base},
 			Dependencies: []graph.Dependency{{Parent: root, Child: base}},
@@ -467,7 +467,7 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 	// one higher than the rows below it on every build.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -522,7 +522,7 @@ func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: root, Child: zlib},
 			graph.Dependency{Parent: openssl, Child: libssl})
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 
@@ -579,7 +579,7 @@ func TestASearchHitCarriesWhatIsBeneathItAsTheTreeDoes(t *testing.T) {
 	// by the same bands, that browsing to it shows.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		f.opens(t, f.anIssue(t, "CVE-2026-UNDER"), f.componentNamed(t, openssl.Name), "under-curl")
@@ -611,7 +611,7 @@ func TestASearchDoesNotFindTheBuildItself(t *testing.T) {
 	// every other read of a build's contents says.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		found, err := f.store.Search(ctx, everyone(f), f.targetID, root.Name, 10)
@@ -678,7 +678,7 @@ func TestARefusalAroundAComponentDoesNotSayWhetherTheBuildHoldsIt(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// One name at two versions, which is what makes the answers differ.
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{curl, at(curl.Name, "8.5.0"), zlib},
 			Dependencies: []graph.Dependency{
@@ -729,7 +729,7 @@ func TestTwoNamesThatDifferInsideTheColumnAreTwoComponents(t *testing.T) {
 			t.Fatal("two names differing before the column's width share a fold key")
 		}
 
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{one, two},
 			Dependencies: []graph.Dependency{
@@ -759,7 +759,7 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 		scoped := tree()
 		scoped.Dependencies[0].Kind = "build"
 
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), scoped); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), scoped); err != nil {
 			t.Fatal(err)
 		}
 		kinds := openEdgeKinds(t, f)
@@ -775,7 +775,7 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 		// document says another is a record of what nobody sent.
 		relabelled := tree()
 		relabelled.Dependencies[0].Kind = "excluded"
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), relabelled)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), relabelled)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -788,11 +788,11 @@ func TestWhatAProducerCalledADependencyIsStoredWithTheEdge(t *testing.T) {
 
 		// And an unchanged rebuild is still unchanged, which is what keeps the
 		// stored volume tracking real change rather than the calendar.
-		again, err := f.store.Apply(ctx, f.targetID, f.scan(t), relabelled)
+		again, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), relabelled)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !again.Unchanged() {
+		if again != (graph.Applied{}) {
 			t.Errorf("a rebuild describing the same graph wrote %+v", again)
 		}
 	})
@@ -841,7 +841,7 @@ func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testi
 				scoped.Dependencies[i].Kind = "build"
 			}
 		}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), scoped); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), scoped); err != nil {
 			t.Fatal(err)
 		}
 

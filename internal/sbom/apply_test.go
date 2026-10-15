@@ -34,7 +34,6 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 		target := graph.Described{Name: "sonic", Version: "master"}
 
 		scans := ingest.NewStore(db.DB)
-		store := graph.NewStore(db.DB)
 		built := time.Now().UTC().Add(-24 * time.Hour)
 
 		record := func(hash string, at time.Time) int64 {
@@ -48,7 +47,7 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 			return rec.ID
 		}
 
-		applied, err := store.Apply(ctx, filedAgainst.ID, record("first", built), doc.Snapshot(target))
+		applied, err := world.ApplyGraph(ctx, db.DB, filedAgainst.ID, record("first", built), doc.Snapshot(target))
 		if err != nil {
 			t.Fatalf("apply: %v", err)
 		}
@@ -67,11 +66,11 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		applied, err = store.Apply(ctx, filedAgainst.ID, record("second", built.Add(time.Hour)), again.Snapshot(target))
+		applied, err = world.ApplyGraph(ctx, db.DB, filedAgainst.ID, record("second", built.Add(time.Hour)), again.Snapshot(target))
 		if err != nil {
 			t.Fatalf("re-apply: %v", err)
 		}
-		if !applied.Unchanged() {
+		if applied != (graph.Applied{}) {
 			t.Errorf("an unchanged build wrote %+v", applied)
 		}
 	})
@@ -97,7 +96,7 @@ func TestALicenseReadFromAnElementReachesTheStoredComponent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, rec.ID,
+		if _, err := world.ApplyGraph(ctx, db.DB, target.ID, rec.ID,
 			doc.Snapshot(graph.Described{Name: "app", Version: "main"})); err != nil {
 			t.Fatal(err)
 		}

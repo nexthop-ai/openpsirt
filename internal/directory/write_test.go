@@ -453,7 +453,6 @@ type fixture struct {
 	db      *bun.DB
 	store   *advisory.Store
 	finds   *finding.Store
-	graph   *graph.Store
 	scans   *ingest.Store
 	target  int64
 	product int64
@@ -482,7 +481,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		}
 		f := &fixture{
 			db: w.DB.DB, store: advisory.NewStore(w.DB.DB),
-			finds: finding.NewStore(w.DB.DB), graph: graph.NewStore(w.DB.DB),
+			finds: finding.NewStore(w.DB.DB),
 			scans: ingest.NewStore(w.DB.DB), target: w.Target.ID, product: w.Product.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, roles, 0),
 			agrees: access.NewPerson(second.ID, second.Identity, false,
@@ -654,7 +653,7 @@ func (f *fixture) shipped(t *testing.T) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := f.graph.Apply(ctx, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixtures.ApplyGraph(ctx, f.db, f.target, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{carrier},
 		Dependencies: []graph.Dependency{{Parent: root, Child: carrier}},
 	}); err != nil {

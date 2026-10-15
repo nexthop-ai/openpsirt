@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -20,7 +22,7 @@ import (
 func TestAWayDownIsRefusedToSomebodyWhoHoldsNothingOnTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree()); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree()); err != nil {
 			t.Fatal(err)
 		}
 		curl, err := f.store.ComponentAs(ctx, f.targetID, "curl", graph.Choice{})

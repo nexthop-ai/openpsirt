@@ -112,7 +112,7 @@ func TestACaseGrantReachesWhatSomebodyWasToldAboutThatIssueAndNoOther(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", access.Stated(true), nil)
+		granter, err := rights.Ensure(ctx, "granter@example.com", "Granter", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -198,7 +198,7 @@ func TestOnlyAnAdministratorReadsWhatSomebodyElseWasTold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", access.Stated(true), nil)
+		boss, err := rights.Ensure(ctx, "boss@example.com", "Boss", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,15 +260,15 @@ func TestAnAdministratorReadsAnotherPersonsFeedAtTheirOwnVisibility(t *testing.T
 		}
 		// Administrators holding nothing, public read, and private read on the
 		// product: the same flag, the same question, three different answers.
-		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", access.Stated(true), nil)
+		bare, err := rights.Ensure(ctx, "bare@example.com", "Bare", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		public, err := rights.Ensure(ctx, "public@example.com", "Public", access.Stated(true), nil)
+		public, err := rights.Ensure(ctx, "public@example.com", "Public", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", access.Stated(true), nil)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

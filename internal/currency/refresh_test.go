@@ -105,7 +105,7 @@ func seed(t *testing.T, db *database.DB, of []component,
 	// The pass is off unless a deployment turns it on, and `Once` enforces that
 	// on every component rather than trusting `Run` to have checked — a guard
 	// beside the work cannot be skipped by calling the work another way.
-	if err := setting.NewStore(db.DB).Set(ctx, setting.UpstreamCurrency, setting.On); err != nil {
+	if _, _, err := setting.NewStore(db.DB).Change(ctx, setting.UpstreamCurrency, setting.On); err != nil {
 		t.Fatalf("turn asking on: %v", err)
 	}
 	asked := &[]string{}
@@ -468,7 +468,7 @@ type stopping struct {
 
 func (s stopping) Latest(ctx context.Context, name string) (currency.Latest, error) {
 	*s.asked = append(*s.asked, name)
-	if err := s.settings.Set(ctx, setting.UpstreamCurrency, setting.Off); err != nil {
+	if _, _, err := s.settings.Change(ctx, setting.UpstreamCurrency, setting.Off); err != nil {
 		s.t.Fatalf("turn asking off: %v", err)
 	}
 	return currency.Latest{Version: "1.0.0"}, nil

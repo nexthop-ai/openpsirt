@@ -757,7 +757,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.WriteCeiling, "1"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.WriteCeiling, "1"); err != nil {
 			t.Fatal(err)
 		}
 

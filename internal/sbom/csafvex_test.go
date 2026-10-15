@@ -210,13 +210,13 @@ func TestAClaimNamingNoPackageIdentifierStillCoversWhatItNames(t *testing.T) {
 	elsewhere := graph.Described{
 		Purl: "pkg:deb/debian/thrift-compiler@0.14.1", Name: "thrift-compiler", Version: "0.14.1",
 	}
-	if !got[0].Covers(named) {
+	if !coversAny(got[0], named) {
 		t.Error("a claim naming a source tree missed the component of that name")
 	}
-	if !got[0].Covers(forked) {
+	if !coversAny(got[0], forked) {
 		t.Error("a claim naming a source tree missed a fork of it")
 	}
-	if got[0].Covers(elsewhere) {
+	if coversAny(got[0], elsewhere) {
 		t.Error("a claim naming a source tree reached a component that merely starts the same")
 	}
 }

@@ -181,7 +181,7 @@ func TestAScanReadIntoAFullBacklogIsStillApplied(t *testing.T) {
 	eachReader(t, func(t *testing.T, f *readerFixture) {
 		ctx := t.Context()
 		scanID := f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory)
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.QueueBacklog, "1"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.queue.Add(ctx, queue.Scan, "somebody else's build"); err != nil {

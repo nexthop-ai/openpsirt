@@ -535,7 +535,7 @@ func TestAnUnsetLimitIsTheDeploymentsSetting(t *testing.T) {
 		other.VulnerabilityID = second
 		also := f.agreed(t, other)
 
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.ReviewIssues, "1"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.ReviewIssues, "1"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Carry(ctx, f.triager, was, next, []int64{first.ID, also.ID},

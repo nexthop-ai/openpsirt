@@ -806,7 +806,7 @@ func TestTheBacklogLimitIsWhatAnAdministratorSet(t *testing.T) {
 			t.Fatalf("the shipped limit was not in force: %v", err)
 		}
 
-		if err := setting.NewStore(db.DB).Set(ctx, setting.QueueBacklog, "5"); err != nil {
+		if _, _, err := setting.NewStore(db.DB).Change(ctx, setting.QueueBacklog, "5"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := q.Add(ctx, queue.Parse, "room-now"); err != nil {

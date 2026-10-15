@@ -287,7 +287,7 @@ func (r *Reach) Inventoried(t *testing.T, variant, hash string, held map[string]
 		snap.Components = append(snap.Components, component)
 		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: top, Child: component})
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, snap); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, snap); err != nil {
 		t.Fatal(err)
 	}
 }

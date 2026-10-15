@@ -50,7 +50,7 @@ func TestTheDerivedGrantWindowIsNeverNone(t *testing.T) {
 		// startup: somebody shortening it to cut off a departed employee's
 		// tokens gets the shorter window without restarting anything.
 		window := httpapi.DerivedWindow(settings, 12*time.Hour)
-		if err := settings.Set(ctx, setting.SessionLifetime, "2h"); err != nil {
+		if _, _, err := settings.Change(ctx, setting.SessionLifetime, "2h"); err != nil {
 			t.Fatal(err)
 		}
 		if got := window(ctx); got != 2*time.Hour {

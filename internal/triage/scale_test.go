@@ -102,7 +102,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, snap); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(db.DB)

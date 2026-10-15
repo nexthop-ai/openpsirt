@@ -279,7 +279,7 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 			libnl := graph.Described{Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0"}
 			layerA := graph.Described{Purl: "pkg:oci/layer@sha256:aaa", Name: "layer", Version: "sha256:aaa"}
 			layerB := graph.Described{Purl: "pkg:oci/layer@sha256:bbb", Name: "layer", Version: "sha256:bbb"}
-			applied, err := graph.NewStore(db.DB).Apply(ctx, w.target, rec.ID, graph.Snapshot{
+			applied, err := world.ApplyGraph(ctx, db.DB, w.target, rec.ID, graph.Snapshot{
 				Root: root, Components: []graph.Described{image, gap, libnl, layerA, layerB},
 				Dependencies: []graph.Dependency{
 					{Parent: root, Child: image}, {Parent: image, Child: libnl}, {Parent: root, Child: gap},

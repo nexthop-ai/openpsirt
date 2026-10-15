@@ -34,11 +34,11 @@ func each(t *testing.T, fn func(t *testing.T, f *configured)) {
 
 		product := w.Product
 		rights := access.NewStore(db.DB)
-		boss, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		boss, err := rights.Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other, err := rights.Ensure(ctx, "sam@example.com", "Sam", access.Stated(false), nil)
+		other, err := rights.Ensure(ctx, "sam@example.com", "Sam", new(false), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

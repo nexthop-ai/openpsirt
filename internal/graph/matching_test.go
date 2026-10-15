@@ -6,6 +6,8 @@ package graph_test
 import (
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -70,7 +72,7 @@ func TestABuildListsWhatNothingCanMatchByReason(t *testing.T) {
 		for _, d := range held {
 			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: d})
 		}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		listed, total, err := f.store.Unmatched(ctx, everyone(f), f.targetID)

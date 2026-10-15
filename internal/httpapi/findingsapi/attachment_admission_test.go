@@ -98,7 +98,7 @@ func TestAnAttachmentOfExactlyTheSizeAcceptedIsTaken(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		const most = 4096
-		if err := setting.NewStore(r.DB.DB).Set(t.Context(), setting.AttachmentMaxSize,
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.AttachmentMaxSize,
 			strconv.Itoa(most)); err != nil {
 			t.Fatal(err)
 		}

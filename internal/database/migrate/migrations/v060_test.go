@@ -97,7 +97,7 @@ func TestAV050DatabaseUpgradesToV060(t *testing.T) {
 func seedV050Obligation(t *testing.T, ctx context.Context, db *database.DB) (window, notice int64) {
 	t.Helper()
 	at := time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
-	person, err := access.NewStore(db.DB).Ensure(ctx, "obligation-admin", "", access.Stated(true), nil)
+	person, err := access.NewStore(db.DB).Ensure(ctx, "obligation-admin", "", new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestAV050CredentialsNameInForceSurvivesTheUpgrade(t *testing.T) {
 		dbtest.MigrateTo(t, db, v050)
 		tables := []string{"api_key", "personal_token"}
 		at := time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
-		person, err := access.NewStore(db.DB).Ensure(ctx, "token-holder", "", access.Stated(true), nil)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "token-holder", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -83,7 +84,7 @@ func (f *runFixture) withInventory(t *testing.T, target int64, hash string) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := graph.NewStore(f.db.DB).Apply(ctx, target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, target, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, libnl},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
@@ -130,7 +131,7 @@ func TestABuildScannedRecentlyIsNotAskedForAgain(t *testing.T) {
 
 		// And it is asked for once the interval has passed, so the check above
 		// is an interval rather than a refusal to ask at all.
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.ScanEvery, "1ns"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.ScanEvery, "1ns"); err != nil {
 			t.Fatal(err)
 		}
 		asked, err = f.scheduling(t, "one").Once(ctx)

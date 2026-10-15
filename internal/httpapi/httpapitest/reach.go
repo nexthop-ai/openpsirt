@@ -19,12 +19,14 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
@@ -299,7 +301,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// from one publishing the identity, and a route that resolves the
 	// field it listed fails to find the label.
 	rights := access.NewStore(db.DB)
-	administrator, err := rights.Ensure(ctx, "admin", ShownAs("admin"), access.Stated(true), nil)
+	administrator, err := rights.Ensure(ctx, "admin", ShownAs("admin"), new(true), nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -311,7 +313,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// reading by administering — and the point of the pair is that
 	// the grant is visible in the same record as everybody else's
 	// rather than implied by the flag.
-	adminReader, err := rights.Ensure(ctx, "admin-reader", ShownAs("admin-reader"), access.Stated(true), nil)
+	adminReader, err := rights.Ensure(ctx, "admin-reader", ShownAs("admin-reader"), new(true), nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -327,7 +329,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// whole of what it is for is a reader of the deployment's own records
 	// who reaches no product, so the identity that tests it holds nothing
 	// else.
-	auditor, err := rights.Ensure(ctx, "auditor", ShownAs("auditor"), nil, access.Stated(true))
+	auditor, err := rights.Ensure(ctx, "auditor", ShownAs("auditor"), nil, new(true))
 	if err != nil {
 		return cast{}, err
 	}
@@ -667,7 +669,7 @@ func SeedTheirs(t *testing.T, r *Reach) (disclosed, undisclosed string) {
 	}
 	root := graph.Described{Purl: "pkg:deb/debian/theirs@1.0", Name: "theirs", Version: "1.0"}
 	lib := graph.Described{Purl: "pkg:deb/debian/libestate@2.1", Name: "libestate", Version: "2.1"}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{lib},
 		Dependencies: []graph.Dependency{{Parent: root, Child: lib}},
 	}); err != nil {

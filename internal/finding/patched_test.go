@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -21,7 +23,7 @@ import (
 func (f *fixture) claimed(t *testing.T, claims ...sbom.Suppression) {
 	t.Helper()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, claims, everyOrigin); err != nil {
+	if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, claims, everyOrigin); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -86,7 +88,7 @@ func TestAFindingFirstSeenAlreadyPatchedIsRecordedClosed(t *testing.T) {
 		if applied.Patched != 2 {
 			t.Errorf("patched %d, want 2", applied.Patched)
 		}
-		if applied.Unchanged() {
+		if changedNothing(applied) {
 			t.Error("a run that recorded two patched findings reads as having changed nothing")
 		}
 		rows := f.every(t)
@@ -109,7 +111,7 @@ func TestRescanningAPatchedBuildWritesNothing(t *testing.T) {
 		f.claimed(t, aPatch)
 		f.scanned(t)
 		applied, _ := f.scanned(t)
-		if !applied.Unchanged() {
+		if !changedNothing(applied) {
 			t.Errorf("re-scanning a patched build wrote %+v", applied)
 		}
 		if rows := f.every(t); len(rows) != 2 {
@@ -305,7 +307,7 @@ func TestAFindingWhosePatchWasDroppedInABumpSaysWhereItCameFrom(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, nil, everyOrigin); err != nil {
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, nil, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -332,7 +334,7 @@ func TestABumpOntoAPatchedVersionClosesAsPatched(t *testing.T) {
 		f.scanned(t)
 
 		f.shipped(t, movedTo(libnlNew))
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan, []sbom.Suppression{
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan, []sbom.Suppression{
 			aClaim("CVE-2026-1", sbom.AlreadyFixed, libnlNew, sbom.FromPedigree),
 		}, everyOrigin); err != nil {
 			t.Fatal(err)

@@ -75,7 +75,6 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 	world.Each(t, func(t *testing.T, w *world.World) {
 		ctx := t.Context()
 		scans := ingest.NewStore(w.DB.DB)
-		store := graph.NewStore(w.DB.DB)
 		built := time.Now().UTC().Add(-24 * time.Hour)
 		apply := func(body []byte, hash string, at time.Time) graph.Applied {
 			t.Helper()
@@ -89,7 +88,7 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 			if err != nil || outcome != ingest.Accept {
 				t.Fatalf("record: outcome %v, err %v", outcome, err)
 			}
-			applied, err := store.Apply(ctx, w.Target.ID, rec.ID, doc.Snapshot(graph.Described{Name: "sonic"}))
+			applied, err := world.ApplyGraph(ctx, w.DB.DB, w.Target.ID, rec.ID, doc.Snapshot(graph.Described{Name: "sonic"}))
 			if err != nil {
 				t.Fatal(err)
 			}

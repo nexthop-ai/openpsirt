@@ -103,7 +103,7 @@ func newRun(t *testing.T, w *fixture.World) *runFixture {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	_, err = graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+	_, err = fixture.ApplyGraph(ctx, db.DB, target.ID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, libnl},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: libnl},
@@ -171,7 +171,7 @@ func TestABuildHoldingNothingButItselfIsScannedWithoutTheScanner(t *testing.T) {
 		if err != nil || outcome != ingest.Accept {
 			t.Fatalf("record scan: %v %v", outcome, err)
 		}
-		if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID,
+		if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID,
 			graph.Snapshot{Root: root}); err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +263,7 @@ func TestScanningAgainWithTheSameAnswerWritesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !outcome.Applied.Unchanged() {
+		if !changedNothing(outcome.Applied) {
 			t.Errorf("a re-scan finding the same things wrote %+v", outcome.Applied)
 		}
 	})
@@ -347,7 +347,7 @@ func (f *runFixture) rebuilt(t *testing.T, library graph.Described) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{swss, library},
 		Dependencies: []graph.Dependency{
 			{Parent: root, Child: swss}, {Parent: swss, Child: library},
@@ -863,7 +863,7 @@ func (f *runFixture) kernelShipped(t *testing.T, version string) graph.Described
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record scan: %v %v", outcome, err)
 	}
-	if _, err := graph.NewStore(f.db.DB).Apply(ctx, f.target, scan.ID, graph.Snapshot{
+	if _, err := fixture.ApplyGraph(ctx, f.db.DB, f.target, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{kernel},
 		Dependencies: []graph.Dependency{{Parent: root, Child: kernel}},
 	}); err != nil {
@@ -967,4 +967,11 @@ func TestABuildNeverScannedWithASnapshotIsScannedWithoutOne(t *testing.T) {
 			t.Errorf("a build never narrowed was refused without a snapshot: %v", err)
 		}
 	})
+}
+
+// changedNothing is whether a run opened, closed, updated or closed by
+// statement nothing at all.
+func changedNothing(a finding.Applied) bool {
+	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0 &&
+		a.Disclaimed == 0
 }

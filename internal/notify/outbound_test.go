@@ -83,7 +83,7 @@ func webhookWorld(t *testing.T, db *database.DB, name, kind string) *webhook {
 func webhookAnswering(t *testing.T, db *database.DB, name, kind string, handler http.Handler) *webhook {
 	t.Helper()
 	ctx := t.Context()
-	admin, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+	admin, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -437,7 +437,7 @@ func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T)
 		ctx := t.Context()
 
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -553,7 +553,7 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 			if i > 0 {
 				var err error
 				who, err = rights.Ensure(ctx,
-					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
+					fmt.Sprintf("them-%d@example.com", i), "Them", new(true), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -635,7 +635,7 @@ func TestAConditionStillHeldBySomebodyElseIsNotCarriedAgain(t *testing.T) {
 		ctx := t.Context()
 		hook := webhookWorld(t, db, "chat", notify.Everything)
 		store, signal, ana := hook.store, hook.signal, hook.admin
-		ben, err := access.NewStore(db.DB).Ensure(ctx, "ben@example.com", "Ben", access.Stated(true), nil)
+		ben, err := access.NewStore(db.DB).Ensure(ctx, "ben@example.com", "Ben", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -746,7 +746,7 @@ func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
 			if i > 0 {
 				var err error
 				who, err = rights.Ensure(ctx,
-					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
+					fmt.Sprintf("them-%d@example.com", i), "Them", new(true), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -814,7 +814,7 @@ func TestACycleSendsOneBatchAcrossEveryDestination(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -858,7 +858,7 @@ func TestADestinationThatIsDownDoesNotStarveTheOthers(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -910,7 +910,7 @@ func TestADeliveryInFlightIsNotSentTwice(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

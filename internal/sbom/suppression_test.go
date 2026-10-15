@@ -89,7 +89,7 @@ func TestAPatchRecordsWhatItFixesAgainstTheComponentItIsOn(t *testing.T) {
 			frr = c
 		}
 	}
-	if !claim.Covers(frr) {
+	if !coversAny(claim, frr) {
 		t.Error("the claim does not cover the component it was read from")
 	}
 }
@@ -115,7 +115,7 @@ func TestQualifiersDoNotStopAClaimMatching(t *testing.T) {
 	shipped := graph.Described{
 		Purl: "pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64", Name: "frr", Version: "10.5.4-sonic-0",
 	}
-	if !got[0].Covers(shipped) {
+	if !coversAny(got[0], shipped) {
 		t.Error("a claim naming the package and version did not cover it")
 	}
 }
@@ -127,13 +127,13 @@ func TestAClaimWithoutAVersionCoversEveryVersion(t *testing.T) {
 	 "products": [{"@id": "pkg:deb/sonic/frr"}]}`))
 	for _, version := range []string{"10.5.4-sonic-0", "10.6.1-sonic-2"} {
 		shipped := graph.Described{Purl: "pkg:deb/sonic/frr@" + version + "?arch=amd64", Name: "frr", Version: version}
-		if !got[0].Covers(shipped) {
+		if !coversAny(got[0], shipped) {
 			t.Errorf("a claim about every version did not cover %s", version)
 		}
 	}
 	// It still says which package. A claim about one is not a claim about all.
 	other := graph.Described{Purl: "pkg:deb/debian/libc6@2.41", Name: "libc6", Version: "2.41"}
-	if got[0].Covers(other) {
+	if coversAny(got[0], other) {
 		t.Error("a claim about one package covered another")
 	}
 }
@@ -150,13 +150,13 @@ func TestAClaimAgainstASourceTreeIsAsGoodAsItsName(t *testing.T) {
 	}
 	elsewhere := graph.Described{Purl: "pkg:deb/debian/thrift-compiler@0.14.1", Name: "thrift-compiler", Version: "0.14.1"}
 
-	if !got[0].Covers(named) {
+	if !coversAny(got[0], named) {
 		t.Error("a claim about a source tree missed the component of that name")
 	}
-	if !got[0].Covers(forked) {
+	if !coversAny(got[0], forked) {
 		t.Error("a claim about a source tree missed a fork of it")
 	}
-	if got[0].Covers(elsewhere) {
+	if coversAny(got[0], elsewhere) {
 		t.Error("a claim about a source tree reached a component that merely starts the same")
 	}
 }
@@ -208,7 +208,7 @@ func TestAClaimMatchesThePackageHoweverEitherSideSpellsIt(t *testing.T) {
 	} {
 		got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
 		 "products": [{"@id": "`+tc.claim+`"}]}`))
-		if !got[0].Covers(graph.Described{Purl: tc.shipped, Name: "acl", Version: "2.3.2"}) {
+		if !coversAny(got[0], graph.Described{Purl: tc.shipped, Name: "acl", Version: "2.3.2"}) {
 			t.Errorf("a claim on %s missed %s", tc.claim, tc.shipped)
 		}
 	}
@@ -216,7 +216,7 @@ func TestAClaimMatchesThePackageHoweverEitherSideSpellsIt(t *testing.T) {
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
 	 "products": [{"@id": "pkg:deb/debian/acl@2.3.2-2+b1"}]}`))
 	for _, other := range []string{"pkg:deb/debian/acl@2.3.2-2%2Bb2", "pkg:deb/debian/attr@2.3.2-2%2Bb1"} {
-		if got[0].Covers(graph.Described{Purl: other}) {
+		if coversAny(got[0], graph.Described{Purl: other}) {
 			t.Errorf("a claim on acl 2.3.2-2+b1 covered %s", other)
 		}
 	}
@@ -227,10 +227,10 @@ func TestAClaimOnAVersionReachesAComponentStatingItOutsideTheIdentifier(t *testi
 	// names none.
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "fixed",
 	 "products": [{"@id": "pkg:deb/debian/libc6@2.41"}]}`))
-	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.41"}) {
+	if !coversAny(got[0], graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.41"}) {
 		t.Error("a claim on 2.41 missed a component whose version is stated beside its identifier")
 	}
-	if got[0].Covers(graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.36"}) {
+	if coversAny(got[0], graph.Described{Purl: "pkg:deb/debian/libc6", Version: "2.36"}) {
 		t.Error("a claim on 2.41 covered 2.36")
 	}
 }
@@ -280,10 +280,10 @@ func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
 	if len(got[0].Targets) != 1 {
 		t.Fatalf("the claim points at %+v", got[0].Targets)
 	}
-	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
+	if !coversAny(got[0], graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
 		t.Error("a claim about a component inside a product missed the component")
 	}
-	if got[0].Covers(graph.Described{Purl: "pkg:oci/image@sha256%3Aabc"}) {
+	if coversAny(got[0], graph.Described{Purl: "pkg:oci/image@sha256%3Aabc"}) {
 		t.Error("a claim about a component inside a product was read as a claim about the product")
 	}
 	if got := got[0].Targets[0].ComponentNamed(); got != "openssl" {
@@ -293,7 +293,7 @@ func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
 	// A product without subcomponents is the thing the statement is about.
 	alone := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
 	 "products": [{"@id": "pkg:deb/debian/openssl@3.0.14"}]}`))
-	if !alone[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14"}) {
+	if !coversAny(alone[0], graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14"}) {
 		t.Error("a claim about a product alone missed it")
 	}
 }
@@ -309,7 +309,7 @@ func TestASubcomponentNamedWithoutAPackageIdentifierCoversNothing(t *testing.T) 
 		{Name: "thrift-fork", UpstreamName: "thrift", Version: "0.20.0"},
 		{Purl: "pkg:oci/image@sha256%3Aabc"},
 	} {
-		if got[0].Covers(shipped) {
+		if coversAny(got[0], shipped) {
 			t.Errorf("a subcomponent named thrift covered %+v", shipped)
 		}
 	}
@@ -334,7 +334,7 @@ func TestThisDeploymentsOwnExportReadsBackAsClaimsAboutItsComponents(t *testing.
 	if len(got) != 1 || len(got[0].Targets) != 1 {
 		t.Fatalf("read back as %+v", got)
 	}
-	if !got[0].Covers(graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
+	if !coversAny(got[0], graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14?arch=amd64"}) {
 		t.Errorf("the exported claim points at %+v rather than the component", got[0].Targets)
 	}
 }
@@ -480,13 +480,13 @@ func TestAClaimAgainstOneVersionOfASourceTreeIsAboutThatVersion(t *testing.T) {
 		UpstreamName: "thrift", UpstreamVersion: "0.16.0",
 	}
 
-	if !got[0].Covers(stated) {
+	if !coversAny(got[0], stated) {
 		t.Error("a claim about one version missed that version")
 	}
-	if !got[0].Covers(derived) {
+	if !coversAny(got[0], derived) {
 		t.Error("a claim about one version of a source tree missed what was built from it")
 	}
-	if got[0].Covers(later) {
+	if coversAny(got[0], later) {
 		t.Error("a claim about one version covered another")
 	}
 }
@@ -586,4 +586,14 @@ func TestADocumentStatingBothVexFormatsIsRefused(t *testing.T) {
 	if !strings.Contains(err.Error(), "OpenVEX") || !strings.Contains(err.Error(), "CSAF") {
 		t.Errorf("the refusal does not name both formats it found: %v", err)
 	}
+}
+
+// coversAny is whether any of a claim's targets is the component described.
+func coversAny(s sbom.Suppression, d graph.Described) bool {
+	for _, t := range s.Targets {
+		if t.Covers(d) {
+			return true
+		}
+	}
+	return false
 }

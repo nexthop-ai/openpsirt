@@ -141,7 +141,7 @@ func TestOneActionIsOneClaimHoweverManyPlacesItCovers(t *testing.T) {
 func TestOneActionIsHeldToTheLimitTheDeploymentHasSet(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TogetherCap, "2"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TogetherCap, "2"); err != nil {
 			t.Fatal(err)
 		}
 		proposals := make([]triage.Proposal, 0, 3)
@@ -164,7 +164,7 @@ func TestOneActionIsHeldToTheLimitTheDeploymentHasSet(t *testing.T) {
 		if _, err := f.store.ApproveClaim(ctx, f.reviewer, recorded[0].ClaimID, "", nil, ""); err != nil {
 			t.Fatal(err)
 		}
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TogetherCap, "1"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TogetherCap, "1"); err != nil {
 			t.Fatal(err)
 		}
 		second := f.secondIssue(t)

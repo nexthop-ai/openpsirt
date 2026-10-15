@@ -32,9 +32,6 @@ type Sweeper struct {
 	queue  *queue.Queue
 	logger *slog.Logger
 	name   string
-	// batch is how many findings one job may place, where a test fixes it.
-	// Zero reads the deployment's own number as each pass begins.
-	batch int
 }
 
 // NewSweeper is the sweep as a deployment runs it, taking its bound from the
@@ -48,20 +45,6 @@ type Sweeper struct {
 // neither is a rebuild.
 func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name string) *Sweeper {
 	return &Sweeper{db: db, queue: q, logger: logger, name: name}
-}
-
-// NewSweeperOfSize is a sweeper with a batch of a given size, so that what a
-// batch does when it fills can be exercised against a handful of findings
-// rather than two thousand.
-func NewSweeperOfSize(db *database.DB, q *queue.Queue, logger *slog.Logger,
-	name string, batch int) *Sweeper {
-	if batch <= 0 {
-		// The same number the production path falls back to, named rather
-		// than typed again: the decision that a bulk write's cap is a setting
-		// was taken for that path and this fallback was left holding a copy.
-		batch = setting.DefaultRoutingBatch
-	}
-	return &Sweeper{db: db, queue: q, logger: logger, name: name, batch: batch}
 }
 
 // betweenSweeps is how often this looks where the caller says nothing. Short,
@@ -94,14 +77,10 @@ func (s *Sweeper) Once(ctx context.Context) (int, error) {
 	// number an administrator changes takes effect on the next pass rather
 	// than on the next restart. Read before anything is claimed, so a failure
 	// here leaves no job held until its claim goes stale.
-	batch := s.batch
-	if batch <= 0 {
-		var err error
-		batch, err = setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
-			setting.DefaultRoutingBatch)
-		if err != nil {
-			return 0, err
-		}
+	batch, err := setting.NewStore(s.db.DB).Count(ctx, setting.RoutingBatch,
+		setting.DefaultRoutingBatch)
+	if err != nil {
+		return 0, err
 	}
 
 	job, err := s.queue.Claim(ctx, s.name, queue.Route)

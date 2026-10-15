@@ -6,6 +6,8 @@ package graph_test
 import (
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -26,7 +28,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		snap.Components = append(snap.Components, zlib)
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)
@@ -139,7 +141,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		snap.Components = append(snap.Components, zlib)
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: openssl, Child: zlib})
-		if _, err := f.store.Apply(t.Context(), f.targetID, f.scan(t), snap); err != nil {
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.targetID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
 		findings := finding.NewStore(f.db.DB)

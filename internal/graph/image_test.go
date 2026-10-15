@@ -7,6 +7,8 @@ import (
 	"maps"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -103,7 +105,7 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 	// the one thing that moved, and it is recorded.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		first, err := f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa")))
+		first, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa")))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +118,7 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 		}
 		before := rowCounts(t, f)
 
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -158,11 +160,11 @@ func TestARebuiltImageKeepsItsNodeAndEdgesAndRecordsTheVersion(t *testing.T) {
 		}
 
 		// The same build again writes nothing.
-		applied, err = f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
+		applied, err = fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.2-bbb")))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !applied.Unchanged() {
+		if applied != (graph.Applied{}) {
 			t.Errorf("an identical rebuild wrote %+v", applied)
 		}
 	})
@@ -173,7 +175,7 @@ func TestAPackageMovingInsideARebuiltImageStillMoves(t *testing.T) {
 	// an image closes the old node and opens the new one as it always did.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
 		moved := imaged(image("docker-swss", "master.2-bbb"))
@@ -181,7 +183,7 @@ func TestAPackageMovingInsideARebuiltImageStillMoves(t *testing.T) {
 		moved.Components[2] = newer
 		moved.Dependencies[1].Child = newer
 		moved.Dependencies[3].Parent = newer
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), moved)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), moved)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,7 +213,7 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 				{Parent: a, Child: openssl},
 			},
 		}
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), snap)
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), snap)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +240,7 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 			Root: root, Components: []graph.Described{a, openssl},
 			Dependencies: []graph.Dependency{{Parent: root, Child: a}, {Parent: a, Child: openssl}},
 		}
-		applied, err = f.store.Apply(ctx, f.targetID, f.scan(t), alone)
+		applied, err = fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), alone)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -251,10 +253,10 @@ func TestTwoImagesOfOneNameInOneBuildKeepTheirVersions(t *testing.T) {
 func TestAnImageThatLeavesClosesItsVersion(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
-		applied, err := f.store.Apply(ctx, f.targetID, f.scan(t), tree())
+		applied, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), tree())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,7 +277,7 @@ func TestTheScannerIsGivenAnImageAsStored(t *testing.T) {
 	// identifier without a version.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), imaged(image("docker-swss", "master.1-aaa"))); err != nil {
 			t.Fatal(err)
 		}
 		held, err := f.store.CurrentComponents(ctx, f.targetID)

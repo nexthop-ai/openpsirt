@@ -23,7 +23,7 @@ func TestEveryReadOfABuildsDocumentAsksForDisclosedReading(t *testing.T) {
 		ctx := t.Context()
 		product := w.Product
 		person, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			access.Stated(false), nil)
+			new(false), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -586,10 +586,6 @@ func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, erro
 	return person, nil
 }
 
-// Stated is what Ensure is told about administration, where nothing at all
-// leaves it as it is.
-func Stated(admin bool) *bool { return &admin }
-
 // ErrNoSuchPerson is what an identity nobody here holds comes back as.
 //
 // A sentinel rather than a sentence, because whoever asked has to tell it from

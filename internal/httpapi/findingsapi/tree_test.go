@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -136,7 +137,7 @@ func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
 		product := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
 		old := graph.Described{Purl: "pkg:golang/stdlib@go1.24.9", Name: "stdlib", Version: "go1.24.9"}
 		newer := graph.Described{Purl: "pkg:golang/stdlib@go1.25.6", Name: "stdlib", Version: "go1.25.6"}
-		if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, graph.Snapshot{
 			Root:       product,
 			Components: []graph.Described{old, newer},
 			Dependencies: []graph.Dependency{

@@ -189,9 +189,6 @@ type Store struct {
 	now func() time.Time
 }
 
-// DB exposes the underlying handle for queries this package does not wrap.
-func (s *Store) DB() bun.IDB { return s.db }
-
 // NewStore returns a store over db.
 func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}

@@ -36,7 +36,7 @@ func aTeam(t *testing.T, w *fixture.World, names ...string) *team {
 	db := w.DB
 	ctx := t.Context()
 	rights := access.NewStore(db.DB)
-	admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+	admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

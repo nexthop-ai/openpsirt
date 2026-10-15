@@ -43,10 +43,10 @@ func TestSettingSomethingTwiceRecordsTheSecondValue(t *testing.T) {
 	// both arms.
 	eachSetting(t, func(t *testing.T, s *setting.Store) {
 		ctx := t.Context()
-		if err := s.Set(ctx, setting.SessionLifetime, "1h"); err != nil {
+		if _, _, err := s.Change(ctx, setting.SessionLifetime, "1h"); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Set(ctx, setting.SessionLifetime, "30m"); err != nil {
+		if _, _, err := s.Change(ctx, setting.SessionLifetime, "30m"); err != nil {
 			t.Fatal(err)
 		}
 		got, err := s.Duration(ctx, setting.SessionLifetime, 12*time.Hour)
@@ -65,7 +65,7 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 	eachSetting(t, func(t *testing.T, s *setting.Store) {
 		ctx := t.Context()
 		for _, bad := range []string{"soon", "", "-5m", "0"} {
-			if err := s.Set(ctx, setting.SessionLifetime, bad); err != nil {
+			if _, _, err := s.Change(ctx, setting.SessionLifetime, bad); err != nil {
 				t.Fatal(err)
 			}
 			got, err := s.Duration(ctx, setting.SessionLifetime, 12*time.Hour)
@@ -79,7 +79,7 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 		// A count the same way: nothing, or nothing positive, is the default.
 		// Read as written, a zero cap refuses every bulk act it bounds.
 		for _, bad := range []string{"lots", "", "-5", "0"} {
-			if err := s.Set(ctx, setting.TogetherCap, bad); err != nil {
+			if _, _, err := s.Change(ctx, setting.TogetherCap, bad); err != nil {
 				t.Fatal(err)
 			}
 			got, err := s.Count(ctx, setting.TogetherCap, 100)

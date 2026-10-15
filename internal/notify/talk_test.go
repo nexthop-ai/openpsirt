@@ -91,7 +91,7 @@ func eachChat(t *testing.T, fn func(t *testing.T, w *chatWorld)) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 		rights := access.NewStore(db.DB)
-		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

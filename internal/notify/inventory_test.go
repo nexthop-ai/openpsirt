@@ -31,7 +31,6 @@ type build struct {
 	world *fixtures.World
 	db    *database.DB
 	scans *ingest.Store
-	graph *graph.Store
 	// reader may read the product. watcher may not, and holds nothing
 	// anywhere.
 	reader, watcher *access.Account
@@ -48,7 +47,7 @@ func eachBuild(t *testing.T, fn func(t *testing.T, b *build)) {
 			t.Fatal(err)
 		}
 		fn(t, &build{
-			world: w, db: w.DB, scans: ingest.NewStore(w.DB.DB), graph: graph.NewStore(w.DB.DB),
+			world: w, db: w.DB, scans: ingest.NewStore(w.DB.DB),
 			reader: reader, watcher: watcher,
 			built: time.Now().UTC().Add(-48 * time.Hour),
 		})
@@ -79,7 +78,7 @@ func (b *build) holding(t *testing.T, names ...string) {
 	if err != nil || outcome != ingest.Accept {
 		t.Fatalf("record upload %d: outcome %v, err %v", b.seq, outcome, err)
 	}
-	if _, err := b.graph.Apply(t.Context(), b.world.Target.ID, rec.ID, snap); err != nil {
+	if _, err := fixtures.ApplyGraph(t.Context(), b.db, b.world.Target.ID, rec.ID, snap); err != nil {
 		t.Fatal(err)
 	}
 	notify.Movements(b.db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)))(
@@ -193,7 +192,7 @@ func TestTheDeploymentDecidesWhatItsShareIs(t *testing.T) {
 	// wants a twentieth of a build reported. Only the share moves, so only
 	// the share can be what let it through.
 	eachBuild(t, func(t *testing.T, b *build) {
-		if err := setting.NewStore(b.db.DB).Set(t.Context(), setting.DeltaShare, "5"); err != nil {
+		if _, _, err := setting.NewStore(b.db.DB).Change(t.Context(), setting.DeltaShare, "5"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -211,7 +210,7 @@ func TestTheDeploymentDecidesWhatIsTooFewToMention(t *testing.T) {
 	// The upload a small inventory leaves alone, under a deployment that
 	// wants two names reported. Only the floor moves.
 	eachBuild(t, func(t *testing.T, b *build) {
-		if err := setting.NewStore(b.db.DB).Set(t.Context(), setting.DeltaFloor, "2"); err != nil {
+		if _, _, err := setting.NewStore(b.db.DB).Change(t.Context(), setting.DeltaFloor, "2"); err != nil {
 			t.Fatal(err)
 		}
 

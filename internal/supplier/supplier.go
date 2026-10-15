@@ -126,9 +126,6 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// At fixes the clock, for a test that asks what happens at a given moment.
-func (s *Store) At(now func() time.Time) *Store { return &Store{db: s.db, now: now} }
-
 // Mark is the digest of an address, which is half of how far a source has been
 // read.
 //

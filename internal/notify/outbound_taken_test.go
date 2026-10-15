@@ -19,7 +19,7 @@ func TestADestinationNamedLikeOneInUseIsRefusedAsTaken(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +44,7 @@ func TestADestinationAddedAgainUnderARetiredNameKeepsItsRow(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -169,10 +169,8 @@ type ClaimsApplied struct {
 	Unstated int
 }
 
-// Unchanged reports whether a build argued exactly what it argued last time.
-func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 }
-
-// RecordClaims stores what a build argued, writing only the difference.
+// RecordClaimsWithin stores what a build argued, writing only the
+// difference, inside a transaction the caller opened.
 //
 // Kept as data rather than left in the document it arrived in: a nightly
 // scan's documents are discarded once read, the scan itself runs later, and it
@@ -188,17 +186,6 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // carried patches whether or not the patches are still carried, so a product
 // moving from one format to the other would otherwise close every claim it had
 // at once and reopen every finding they suppressed, with nothing saying why.
-func (s *Store) RecordClaims(ctx context.Context, targetID, scanID int64, claims []sbom.Suppression, stated map[sbom.Origin]bool) (ClaimsApplied, error) {
-	var applied ClaimsApplied
-	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		var err error
-		applied, err = RecordClaimsWithin(ctx, tx, targetID, scanID, claims, stated)
-		return err
-	})
-	return applied, err
-}
-
-// RecordClaimsWithin is the same, inside a transaction the caller opened.
 //
 // Ingest applies a graph and records what the build argued about its own
 // patches as one act: claims recorded without the graph, or a graph without

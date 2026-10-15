@@ -62,7 +62,7 @@ func TestThePickerOffersOnlyPeopleWhoMayRead(t *testing.T) {
 		sonic := f.products["sonic"]
 
 		// An administrator holding nothing on the product.
-		if _, err := f.store.Ensure(ctx, "boss", "Boss", access.Stated(true), nil); err != nil {
+		if _, err := f.store.Ensure(ctx, "boss", "Boss", new(true), nil); err != nil {
 			t.Fatal(err)
 		}
 		// A reader who is still here, and one who has left.

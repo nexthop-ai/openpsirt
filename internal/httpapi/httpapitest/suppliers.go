@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -81,15 +82,15 @@ func (r *Reach) ScannedInsideAcmeAt(t *testing.T, hash, version string, outsideT
 		snap.Dependencies = append(snap.Dependencies,
 			graph.Dependency{Parent: product, Child: curl}, graph.Dependency{Parent: curl, Child: zlib})
 	}
-	if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, scan.ID, snap); err != nil {
+	if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, scan.ID, snap); err != nil {
 		t.Fatal(err)
 	}
 
-	findings := finding.NewStore(r.DB.DB)
-	if _, err := findings.RecordClaims(ctx, target.ID, scan.ID, claims,
+	if _, err := fixture.RecordClaims(ctx, r.DB.DB, target.ID, scan.ID, claims,
 		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
 		t.Fatal(err)
 	}
+	findings := finding.NewStore(r.DB.DB)
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,

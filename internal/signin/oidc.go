@@ -57,7 +57,6 @@ type OIDCConfig struct {
 	Issuer       string
 	ClientID     string
 	ClientSecret string
-	Scopes       []string
 	// GroupsClaim names the claim carrying group membership. Empty means
 	// groups are never read, which is the right answer for a deployment
 	// assigning roles directly and the wrong one for a deployment about to
@@ -195,17 +194,12 @@ func NewOIDC(ctx context.Context, cfg OIDCConfig) (*OIDC, error) {
 		}
 	}
 
-	scopes := cfg.Scopes
-	if len(scopes) == 0 {
-		scopes = []string{oidc.ScopeOpenID, "profile", "email"}
-	}
-
 	return &OIDC{
 		name:   name,
 		issuer: strings.TrimRight(written, "/"),
 		config: oauth2.Config{
 			ClientID: cfg.ClientID, ClientSecret: cfg.ClientSecret,
-			Endpoint: endpoint, Scopes: scopes,
+			Endpoint: endpoint, Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
 		},
 		verifier:      provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}),
 		groupsClaim:   strings.TrimSpace(cfg.GroupsClaim),

@@ -427,7 +427,7 @@ func TestAuthorizingSomebodyAgainRestartsTheirWindow(t *testing.T) {
 	// that somebody can administer it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "alice", "Alice", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "alice", "Alice", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

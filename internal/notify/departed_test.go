@@ -22,11 +22,11 @@ func TestSomebodyWhoHasLeftIsToldNothing(t *testing.T) {
 		db := w.DB
 		ctx := t.Context()
 		rights := access.NewStore(db.DB)
-		staying, err := rights.Ensure(ctx, "staying@example.com", "Staying", access.Stated(true), nil)
+		staying, err := rights.Ensure(ctx, "staying@example.com", "Staying", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		leaving, err := rights.Ensure(ctx, "leaving@example.com", "Leaving", access.Stated(true), nil)
+		leaving, err := rights.Ensure(ctx, "leaving@example.com", "Leaving", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

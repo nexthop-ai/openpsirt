@@ -31,7 +31,7 @@ func TestALastRoleAndTheWorkHandedBackAreWithdrawnTogether(t *testing.T) {
 		t.Fatal(err)
 	}
 	rights := access.NewStore(handle.DB)
-	admin, err := rights.Ensure(ctx, "admin", "", access.Stated(true), nil)
+	admin, err := rights.Ensure(ctx, "admin", "", new(true), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

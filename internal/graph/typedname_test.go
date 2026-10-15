@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -20,7 +22,7 @@ func TestATypedComponentNameIsMatchedWithoutRegardToCapitals(t *testing.T) {
 		ctx := t.Context()
 		shouted := graph.Described{Purl: "pkg:generic/OpenSSL@3.0", Name: "OpenSSL", Version: "3.0"}
 		quiet := graph.Described{Purl: "pkg:generic/openssl@1.1", Name: "openssl", Version: "1.1"}
-		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), graph.Snapshot{
 			Root:       root,
 			Components: []graph.Described{zlib, shouted, quiet},
 			Dependencies: []graph.Dependency{

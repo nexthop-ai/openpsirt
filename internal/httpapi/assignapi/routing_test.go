@@ -310,8 +310,11 @@ func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 		}
 
 		work := queue.New(r.DB, queue.DefaultOptions())
-		sweeper := finding.NewSweeperOfSize(r.DB, work,
-			slog.New(slog.NewTextHandler(io.Discard, nil)), "test", 2)
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "2"); err != nil {
+			t.Fatal(err)
+		}
+		sweeper := finding.NewSweeper(r.DB, work,
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
 		for range 20 {
 			placed, err := sweeper.Once(t.Context())
 			if err != nil {
@@ -363,11 +366,14 @@ func TestASweepThatCannotQueueTheRestIsNotReportedFinished(t *testing.T) {
 		if _, err := work.Add(ctx, queue.Route, "another product"); err != nil {
 			t.Fatal(err)
 		}
-		if err := setting.NewStore(r.DB.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(ctx, setting.QueueBacklog, "1"); err != nil {
 			t.Fatal(err)
 		}
-		sweeper := finding.NewSweeperOfSize(r.DB, work,
-			slog.New(slog.NewTextHandler(io.Discard, nil)), "test", 1)
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "1"); err != nil {
+			t.Fatal(err)
+		}
+		sweeper := finding.NewSweeper(r.DB, work,
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
 		if _, err := sweeper.Once(ctx); err == nil {
 			t.Fatal("a full batch whose continuation could not be queued reported success")
 		}
@@ -396,7 +402,7 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 			"another product"); err != nil {
 			t.Fatal(err)
 		}
-		if err := setting.NewStore(r.DB.DB).Set(ctx, setting.QueueBacklog, "1"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(ctx, setting.QueueBacklog, "1"); err != nil {
 			t.Fatal(err)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
@@ -470,8 +476,11 @@ func TestTheSweeperWorksAWholeBacklogInOneWakeAndReturnsWhenCancelled(t *testing
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
 		work := queue.New(r.DB, queue.DefaultOptions())
-		sweeper := finding.NewSweeperOfSize(r.DB, work,
-			slog.New(slog.NewTextHandler(io.Discard, nil)), "test", 2)
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.RoutingBatch, "2"); err != nil {
+			t.Fatal(err)
+		}
+		sweeper := finding.NewSweeper(r.DB, work,
+			slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
 
 		returned := make(chan struct{})
 		go func() {

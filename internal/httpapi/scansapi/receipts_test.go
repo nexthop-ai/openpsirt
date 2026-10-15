@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -388,7 +389,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 		findings := finding.NewStore(r.DB.DB)
 		scan := func(t *testing.T, from int64, at time.Time) {
 			t.Helper()
-			if _, err := graph.NewStore(r.DB.DB).Apply(ctx, target.ID, from, graph.Snapshot{
+			if _, err := fixture.ApplyGraph(ctx, r.DB.DB, target.ID, from, graph.Snapshot{
 				Root:         product,
 				Components:   []graph.Described{library},
 				Dependencies: []graph.Dependency{{Parent: product, Child: library}},

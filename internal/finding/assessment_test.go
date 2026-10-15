@@ -303,7 +303,7 @@ func TestAnApproverIsToldWhatAgreeingTakesOffTheList(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		settings := setting.NewStore(f.db.DB)
-		if err := settings.Set(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := settings.Change(ctx, setting.TriageFloor, "medium"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -376,7 +376,7 @@ func TestWhatAgreeingWouldDoCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 	// undisclosed work.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
 			t.Fatal(err)
 		}
 		f.shipped(t, twoConsumers())
@@ -426,7 +426,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		products := catalog.NewStore(f.db.DB)
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.TriageFloor, "medium"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1011,7 +1011,7 @@ func TestARatingIsListedByWhatItsOwnIssueReachesAndNotByAnotherIssue(t *testing.
 func (f *fixture) pageOfRatings(t *testing.T) (access.Subject, []int64) {
 	t.Helper()
 	ctx := t.Context()
-	if err := setting.NewStore(f.db.DB).Set(ctx, setting.TriageFloor, "medium"); err != nil {
+	if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.TriageFloor, "medium"); err != nil {
 		t.Fatal(err)
 	}
 	f.shipped(t, twoConsumers())

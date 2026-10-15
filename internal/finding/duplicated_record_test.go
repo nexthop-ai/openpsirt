@@ -32,7 +32,7 @@ func TestWithdrawingADuplicateKeepsAnExtensionAgreedAfterIt(t *testing.T) {
 		}
 		// Everything after this is inside the threshold, so the rulings take
 		// effect and only the extension waits.
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.MovementThreshold, "87600h"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.MovementThreshold, "87600h"); err != nil {
 			t.Fatal(err)
 		}
 		f.duplicate(t, who, issue, f.claim(t, who, finding.Told{Received: "2026-05-25"}))

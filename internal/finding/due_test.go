@@ -550,7 +550,8 @@ func TestWhatIsRunningOutNarrowsToWhatIsSelected(t *testing.T) {
 // before a scan is applied.
 func (f *fixture) setting(t *testing.T, name, value string) error {
 	t.Helper()
-	return setting.NewStore(f.db.DB).Set(t.Context(), name, value)
+	_, _, err := setting.NewStore(f.db.DB).Change(t.Context(), name, value)
+	return err
 }
 
 // deadlineOrZero reads a stored deadline, or the zero time where there is

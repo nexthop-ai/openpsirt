@@ -304,7 +304,7 @@ func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 		ctx := t.Context()
 		// A deferral of ten days, and a deployment that gates anything past
 		// seven.
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.DeferralThreshold,
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.DeferralThreshold,
 			(7 * 24 * time.Hour).String()); err != nil {
 			t.Fatal(err)
 		}

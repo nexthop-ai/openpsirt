@@ -283,14 +283,14 @@ func shipping(t *testing.T, fn func(t *testing.T, f *ships)) {
 		held := graph.Described{
 			Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0",
 		}
-		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID, graph.Snapshot{
+		if _, err := fixture.ApplyGraph(ctx, db.DB, target.ID, scan.ID, graph.Snapshot{
 			Root: root, Components: []graph.Described{held},
 			Dependencies: []graph.Dependency{{Parent: root, Child: held}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

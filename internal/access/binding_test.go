@@ -145,7 +145,7 @@ func TestAGroupDoesNotRedeemALapsedAuthorization(t *testing.T) {
 	// an administrator wrote for somebody who never came.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		waiting, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		waiting, err := f.store.Ensure(ctx, "alice", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ func TestAGroupDoesNotHandOverAnAccountWithNoAuthorizationWaiting(t *testing.T) 
 	// mode.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		alice, err := f.store.Ensure(ctx, "alice", "", access.Stated(true), nil)
+		alice, err := f.store.Ensure(ctx, "alice", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -294,7 +294,7 @@ func TestAdministrationGrantedHereOutlivesBeingNamedInConfiguration(t *testing.T
 		if _, err := f.store.NameBootstrapAdmins(ctx, []string{"both"}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Ensure(ctx, "both", "", access.Stated(true), nil); err != nil {
+		if _, err := f.store.Ensure(ctx, "both", "", new(true), nil); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.NameBootstrapAdmins(ctx, nil); err != nil {
@@ -481,7 +481,7 @@ func TestASignInWhoseNameIsSomebodyElsesIsRefusedAsAStranger(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		bind(t, f, access.Mapping{Group: "platform-admins", Grants: string(access.Administers)})
-		anna, err := f.store.Ensure(ctx, "anna", "Anna", access.Stated(false), nil)
+		anna, err := f.store.Ensure(ctx, "anna", "Anna", new(false), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -511,7 +511,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// Promoted here, not by a group.
-		person, err := f.store.Ensure(ctx, "bob", "Bob", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "bob", "Bob", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

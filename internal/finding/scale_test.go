@@ -107,7 +107,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 				t.Fatal(err)
 			}
 			snap := shape(versionOf)
-			if _, err := graphs.Apply(ctx, target.ID, scan.ID, snap); err != nil {
+			if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, snap); err != nil {
 				t.Fatal(err)
 			}
 			run, err := store.Begin(ctx, finding.Run{
@@ -229,7 +229,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := graphs.Apply(ctx, beside.ID, scan.ID, shape(versionOf)); err != nil {
+		if _, err := world.ApplyGraph(ctx, db.DB, beside.ID, scan.ID, shape(versionOf)); err != nil {
 			t.Fatal(err)
 		}
 		run, err := store.Begin(ctx, finding.Run{
@@ -515,7 +515,7 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 			t.Fatal(err)
 		}
 		versionOf := func(int) string { return "1.0" }
-		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, scan.ID,
+		if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID,
 			shape(versionOf)); err != nil {
 			t.Fatal(err)
 		}
@@ -600,7 +600,6 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 		target := w.Target
 
 		store := finding.NewStore(db.DB)
-		graphs := graph.NewStore(db.DB)
 		scans := ingest.NewStore(db.DB)
 		statements := &counting{}
 		db.AddQueryHook(statements)
@@ -623,7 +622,7 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := graphs.Apply(ctx, target.ID, scan.ID, shape(steady)); err != nil {
+			if _, err := world.ApplyGraph(ctx, db.DB, target.ID, scan.ID, shape(steady)); err != nil {
 				t.Fatal(err)
 			}
 			run, err := store.Begin(ctx, finding.Run{

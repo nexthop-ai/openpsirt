@@ -104,7 +104,7 @@ func TestADeclaredLengthPastTheLimitIsRefusedUnread(t *testing.T) {
 
 func TestUploadsPastTheSimultaneousLimitAreAskedToSendAgain(t *testing.T) {
 	limitedIngest(t, sbom.Limits{}, func(t *testing.T, f *httpapitest.IngestFixture) {
-		if err := setting.NewStore(f.DB.DB).Set(t.Context(), setting.UploadsAtOnce, "1"); err != nil {
+		if _, _, err := setting.NewStore(f.DB.DB).Change(t.Context(), setting.UploadsAtOnce, "1"); err != nil {
 			t.Fatal(err)
 		}
 		inventory := httpapitest.Inventory(httpapitest.Nowish(), "libc6")

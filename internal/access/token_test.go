@@ -127,7 +127,7 @@ func TestATokenNarrowedToAProductCarriesNoAdministration(t *testing.T) {
 	// administered everything would not be narrowed at all.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestATokenNarrowedToRolesCarriesNoAdministration(t *testing.T) {
 	// narrowing by product above aside.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", access.Stated(true), access.Stated(true))
+		person, err := f.store.Ensure(ctx, "an-admin", "An Admin", new(true), new(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,7 +182,7 @@ func TestATokenHasToExpireAndCannotOutlastTheCeiling(t *testing.T) {
 	// A credential that never runs out is one nobody ever revokes.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -265,7 +265,7 @@ func TestANarrowedTokenDoesNotReadTheDeploymentsOwnRecords(t *testing.T) {
 	// that still read every person, grant and change would not be narrowed.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		auditor, err := f.store.Ensure(ctx, "an-auditor", "", nil, access.Stated(true))
+		auditor, err := f.store.Ensure(ctx, "an-auditor", "", nil, new(true))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,7 +304,7 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 	// An administrator's narrowed token would mint one carrying administration.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		boss, err := f.store.Ensure(ctx, "boss", "Boss", access.Stated(true), nil)
+		boss, err := f.store.Ensure(ctx, "boss", "Boss", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,7 +356,7 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 			t.Error("two keys were given one name in different capitals")
 		}
 
-		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,11 +374,11 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 func TestATokenNameIsStoredFoldedAndUniqueToItsOwner(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		other, err := f.store.Ensure(ctx, "someone-else", "", access.Stated(true), nil)
+		other, err := f.store.Ensure(ctx, "someone-else", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -433,7 +433,7 @@ func TestATokenDefaultsToWhateverTheCeilingAllows(t *testing.T) {
 	// them while naming a limit they never mentioned.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "Someone", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -765,7 +765,7 @@ func TestAWithdrawnKeysNameMayBeGivenAgain(t *testing.T) {
 func TestAWithdrawnTokensNameMayBeGivenAgain(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		person, err := f.store.Ensure(ctx, "someone", "", access.Stated(true), nil)
+		person, err := f.store.Ensure(ctx, "someone", "", new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

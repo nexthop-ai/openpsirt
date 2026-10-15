@@ -204,7 +204,7 @@ func TestAChatDestinationIsRefusedWhatItCouldNeverCarry(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
 		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
-			access.Stated(true), nil)
+			new(true), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
