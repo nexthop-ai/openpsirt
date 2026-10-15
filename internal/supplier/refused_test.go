@@ -164,9 +164,11 @@ func TestAListingRefusedEveryPassDoesNotStopTheOthers(t *testing.T) {
 	})
 }
 
-// A listing the publisher forbids is stepped over like one that is gone, and
-// counted so the supplier is recorded as failing.
-func TestAListingThePublisherForbidsIsCounted(t *testing.T) {
+// A listing the publisher forbids beside one that reads is stepped over like
+// one that is gone, and the supplier stays healthy. A directory carries no
+// label to leave a restricted one out by, so this is how a publisher with a
+// restricted label answers on every pass.
+func TestAForbiddenListingBesideAReadableOneLeavesTheSupplierHealthy(t *testing.T) {
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
@@ -179,9 +181,41 @@ func TestAListingThePublisherForbidsIsCounted(t *testing.T) {
 		if err != nil {
 			t.Fatalf("a forbidden listing stopped the supplier: %v", err)
 		}
-		if took.Documents != 1 || took.Barred != 1 ||
-			!strings.Contains(took.BarredBy, "/restricted.json") {
-			t.Errorf("read %+v, want the other listing read and the forbidden one counted", took)
+		if took.Documents != 1 || took.Barred != 0 {
+			t.Errorf("read %+v, want the other listing read and the supplier healthy", took)
+		}
+	})
+}
+
+// A supplier none of whose listings can be read fails, forbidden or not.
+func TestASupplierWhoseEveryListingIsForbiddenFails(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.failing["/feed.json"] = http.StatusForbidden
+
+		if took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p)); err == nil {
+			t.Fatalf("a supplier with nothing readable reported success: %+v", took)
+		}
+	})
+}
+
+// A listing whose address cannot be made into a request is refused the same
+// way on every pass, so it is stepped over and the listing beside it is read.
+func TestAListingAddressThatMakesNoRequestDoesNotStopTheOthers(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-50.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0050", "libnl-3-200", "3.7.1", "CVE-2026-5210"))
+		p.feeds = []string{"/%zz"}
+
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatalf("a listing address that makes no request stopped the supplier: %v", err)
+		}
+		if took.Documents != 1 {
+			t.Errorf("read %+v, want the document the other listing names", took)
 		}
 	})
 }

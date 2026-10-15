@@ -129,7 +129,7 @@ type Taken struct {
 	// not match theirs.
 	Checked    int
 	Mismatched int
-	// Barred is how many documents and listings the publisher refused to
+	// Barred is how many documents the publisher refused to
 	// hand over at all, answering that the request was not authorized or was
 	// forbidden, and BarredBy what the last of them answered. They are
 	// stepped over like any other refused document, and the supplier is
@@ -369,7 +369,7 @@ func (f *Fetcher) listings(ctx context.Context, client *http.Client,
 					!travels[strings.ToUpper(strings.TrimSpace(feed.TLPLabel))] {
 					continue
 				}
-				out = append(out, listing{address: feed.URL, feed: true})
+				out = append(out, listing{address: strings.TrimSpace(feed.URL), feed: true})
 			}
 			continue
 		}
@@ -418,7 +418,12 @@ func (f *Fetcher) kept(ctx context.Context) (bool, error) {
 //
 // A listing refused the same way on every pass is stepped over rather than
 // failing the supplier: a publisher serves one per label, and a label refused
-// today is not a reason to read none of the others. A listing that could not be
+// today is not a reason to read none of the others. One answering "not
+// authorized" or "forbidden" is stepped over without marking the supplier
+// failed. A directory carries no label to leave a restricted one out by, so
+// one refused beside a readable one is the ordinary shape of a publisher with
+// a restricted label, and it answers that way on every pass. A supplier none
+// of whose listings could be read fails. A listing that could not be
 // reached holds the mark. The mark is shared by every listing, so moved on the
 // strength of the others it passes everything the unreached one listed before
 // it, and those entries are never read.
@@ -450,9 +455,6 @@ func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing
 		switch {
 		case err == nil:
 		case errors.As(err, &stepped), steppedOver(err):
-			if stepped.barred {
-				took.bar(one.address, err)
-			}
 			refused = err
 			continue
 		default:
@@ -1001,9 +1003,12 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string,
 	most int64) ([]byte, error) {
 
+	// An address that cannot be made into a request is refused the same way on
+	// every pass, so it is a document or listing that cannot be read rather
+	// than a publisher that cannot be reached.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
-		return nil, err
+		return nil, unreadable{err: err}
 	}
 	res, err := client.Do(req)
 	if err != nil {
