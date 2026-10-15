@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -133,6 +134,9 @@ type Signal struct {
 	leases  *queue.Leases
 	replica string
 	now     func() time.Time
+	// turn counts cycles, and picks which destination a cycle offers its
+	// budget to first.
+	turn atomic.Uint64
 }
 
 // NewSignal returns the sweep over db.
@@ -178,7 +182,8 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 	// A chat channel is carried by the chat sweep, which groups what it says.
 	var destinations []Outbound
 	if err := s.db.NewSelect().Model(&destinations).
-		Where("retired_at IS NULL").Where("platform = ?", Webhook).Scan(ctx); err != nil {
+		Where("retired_at IS NULL").Where("platform = ?", Webhook).
+		OrderExpr(`"id" ASC`).Scan(ctx); err != nil {
 		return 0, 0, fmt.Errorf("read where things go: %w", err)
 	}
 	if len(destinations) == 0 {
@@ -187,28 +192,37 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 		return 0, 0, nil
 	}
 
-	// One budget of requests for the whole cycle, shared by every
-	// destination, so the lease sized for one batch of requests covers the
-	// cycle. A deployment with many destinations drains more slowly, which is
-	// the price of never having a second replica take the lease while this
-	// one is still sending.
+	// One budget of requests for the whole cycle, so the lease sized for one
+	// batch of requests covers the cycle. A deployment with many destinations
+	// drains more slowly, which is the price of never having a second replica
+	// take the lease while this one is still sending.
+	//
+	// Each destination is offered an equal part of what is left, and what one
+	// leaves unspent passes to the ones after it. A destination that refuses
+	// or hangs on every request spends its own part and no more, so the ones
+	// after it are still served every cycle. The first destination moves on
+	// by one each cycle, so a part rounded down to nothing does not land on
+	// the same destinations every time.
 	budget := sweepBatch
-	for _, destination := range destinations {
+	first := int(s.turn.Add(1)-1) % len(destinations)
+	for i := range destinations {
 		if budget <= 0 {
 			break
 		}
+		destination := destinations[(first+i)%len(destinations)]
+		share := max(1, budget/(len(destinations)-i))
 		// Read per destination and only what this one has not settled.
 		//
 		// An event row is never cleared, because only a condition is, so a
 		// window asking only for uncleared rows fills with the oldest events
 		// and stops advancing without an error. The per-row delivery
 		// predicate is what makes it advance, as it does for the mail sweep.
-		rows, err := s.window(ctx, destination, budget)
+		rows, err := s.window(ctx, destination, share)
 		if err != nil {
 			return sent, failed, err
 		}
 		for _, row := range rows {
-			if budget <= 0 {
+			if share <= 0 {
 				break
 			}
 			done, err := s.deliver(ctx, destination, row)
@@ -218,9 +232,11 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 			case done == delivered:
 				sent++
 				budget--
+				share--
 			case done == refused:
 				failed++
 				budget--
+				share--
 			}
 		}
 	}

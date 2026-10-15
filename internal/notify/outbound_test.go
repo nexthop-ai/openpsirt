@@ -852,6 +852,58 @@ func TestACycleSendsOneBatchAcrossEveryDestination(t *testing.T) {
 	})
 }
 
+// A destination that refuses every request spends its own part of a cycle and
+// no more, so a destination configured after it is still served every cycle.
+func TestADestinationThatIsDownDoesNotStarveTheOthers(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		down := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		defer down.Close()
+		up := &took{}
+		healthy := httptest.NewTLSServer(http.HandlerFunc(up.handle))
+		defer healthy.Close()
+		store := notify.NewStore(db.DB)
+		// The one that is down is configured first, so it is the one a
+		// budget spent in table order reaches first.
+		for _, to := range []struct{ name, url string }{{"down", down.URL}, {"up", healthy.URL}} {
+			if _, err := store.AddDestination(ctx, asks(t, db, who), notify.Destination{
+				Name: to.name, Kind: string(notify.Everything), URL: to.url, Secret: sharedSecret,
+			}, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for i := range notify.SweepBatch {
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.Assigned, Body: fmt.Sprintf("backlog %d", i), Link: "/x",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		// Both servers share one certificate authority, so one client
+		// trusts either.
+		notify.TrustForTest(signal, down.Client())
+		for cycle := range 2 {
+			before := up.count()
+			sent, failed, err := signal.Once(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := up.count() - before; got < notify.SweepBatch/2 {
+				t.Errorf("cycle %d sent the healthy destination %d requests (sent %d, failed %d), want at least half of %d",
+					cycle, got, sent, failed, notify.SweepBatch)
+			}
+		}
+	})
+}
+
 // An attempt still being made is not made again beside it. One that failed,
 // or whose sender stopped part way, is taken again.
 func TestADeliveryInFlightIsNotSentTwice(t *testing.T) {
