@@ -189,7 +189,8 @@ func Build(archive, dir, from string) ([]error, error) {
 
 // Report logs the records a build left out because they could not be read:
 // how many, and the first of them. A snapshot built past them narrows nothing
-// on their strength, and the list is what tells an operator which.
+// on their strength, and the first of them is what tells an operator where to
+// look.
 func Report(logger *slog.Logger, skipped []error) {
 	if len(skipped) == 0 {
 		return
