@@ -44,6 +44,18 @@ export default tseslint.config(
           message:
             "Key this table on the generated union for the word it labels, or say why its keys are an open set.",
         },
+        {
+          selector:
+            "TSSatisfiesExpression[expression.type='ObjectExpression'][expression.properties.length>0] > TSTypeReference[typeName.name='Record'] > TSTypeParameterInstantiation > TSStringKeyword:first-child",
+          message:
+            "Key this table on the generated union for the word it labels, or say why its keys are an open set.",
+        },
+        {
+          selector:
+            "VariableDeclarator[init.type='ObjectExpression'][init.properties.length>0] > Identifier > TSTypeAnnotation > TSTypeReference[typeName.name='Partial'] > TSTypeParameterInstantiation > TSTypeReference[typeName.name='Record'] > TSTypeParameterInstantiation > TSStringKeyword:first-child",
+          message:
+            "Key this table on the generated union for the word it labels, or say why its keys are an open set.",
+        },
       ],
     },
   },

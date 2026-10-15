@@ -47,6 +47,7 @@ export const SORTS = {
   EPSS: "epss",
   Covers: "places",
   Due: "deadline",
+  // eslint-disable-next-line no-restricted-syntax -- Keyed on this interface's own column headers.
 } satisfies Record<string, SortWord>;
 
 // Every order, by the word a reader picks it by.

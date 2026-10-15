@@ -139,7 +139,7 @@ the result differs from what is committed — the generated types say a list may
 
 | Rule | |
 |---|---|
-| A table of words over a word the server sends is keyed on the generated union | A word the server adds is then a compile error in the table until it has words, rather than the bare token on screen. A lint refuses a string-keyed table written as a literal in the screens, and a table over an open set — a package kind, a keyboard key, this interface's own names — says why beside it |
+| A table of words over a word the server sends is keyed on the generated union | A word the server adds is then a compile error in the table until it has words, rather than the bare token on screen. A lint refuses a literal table in the screens declared or checked as keyed on any string, whole or partial; a table typed by an index signature is not caught. A table over an open set — a package kind, a keyboard key, this interface's own names — says why beside it |
 | A read is declared once and asked through its hook | One read declared at two sites is one cache entry under two sets of conditions, and an invalidation written against one key misses a read declared under another. The catalog's products, branches and variants, one release's variants, where an issue sits, a claim's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so that what changes them reaches every screen showing them |
 | A download or document link is built from the generated paths | A file, a document or an attachment is fetched by the browser rather than through the client, so its address is built by the one link builder over the generated paths: the path is a key of the document, each placeholder is required, named as the path names it and escaped as a segment, and a placeholder left without a value is refused rather than sent as its own name |
 
@@ -224,7 +224,7 @@ take the word.
 |---|---|
 | A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
 | A claim is drawn in the color of what it does | Warm where it hides risk, which is every outcome but affected, and green where it does not. An outcome with no color of its own draws as the neutral base, the color of a claim that hides nothing; a web test fails on an outcome the client names that the stylesheet does not color |
-| A claim's card carries a stripe for where it stands, the same on the claim page and the finding screen | Pending while a second person is needed or the claim is still argued; in force once agreed, or while proposed where nothing waits on a second person; lapsed once it stopped applying. A withdrawn claim carries none: its proposer ended it, which is neither standing nor lapsing. One mapping serves both screens |
+| A claim's card carries a stripe for where it stands, the same on the claim page and the finding screen | Pending while a second person is needed or the claim is still argued; in force once agreed, or while proposed where nothing waits on a second person; lapsed once it stopped applying. A withdrawn claim carries none: its proposer ended it, which is neither standing nor lapsing. The chip says whether a claim is finished, so a withdrawn or sent-back claim reads lapsed there; the stripe says whether it is in force, so a sent-back claim, still argued, reads pending. One mapping serves both screens |
 
 ## The shell
 
