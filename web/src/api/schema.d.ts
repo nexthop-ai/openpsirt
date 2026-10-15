@@ -4571,7 +4571,7 @@ export interface paths {
          *
          *     The release is the newest one cut from this branch, built the same way, that has been scanned here — a branch built for one chip beside a release built for another compares two different pieces of software and reads as a regression somebody then goes looking for.
          *
-         *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer. A build declared and not yet built answers with zeroes, no `last_scanned_at`, and `why` saying nothing has been scanned there yet.
+         *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer. A build nothing has scanned, declared and never built or with every upload refused, answers with zeroes, no `last_scanned_at`, and `why` saying nothing has been scanned there yet.
          *
          *     Counted as issues at components at or above the deployment's line, which `floor` names.
          *

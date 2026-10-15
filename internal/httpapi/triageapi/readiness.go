@@ -103,7 +103,8 @@ func registerReadiness(api huma.API, in core.Deps) {
 			"build pipeline. Where there is nothing to compare against, `shipped` is absent " +
 			"and `why` says what is missing rather than reporting zeroes, because a release " +
 			"that shipped clean and a release nobody scanned are not the same answer. A build " +
-			"declared and not yet built answers with zeroes, no `last_scanned_at`, and `why` " +
+			"nothing has scanned, declared and never built or with every upload refused, " +
+			"answers with zeroes, no `last_scanned_at`, and `why` " +
 			"saying nothing has been scanned there yet.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.\n\n" +

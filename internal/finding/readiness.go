@@ -77,8 +77,8 @@ const NothingScannedYet = "nothing has been scanned here yet"
 // reads as a regression somebody then goes looking for.
 //
 // The release is the latest one cut from this branch that we have scanned.
-// A tag declared and never built has no counts, and answering with zeroes
-// would report a clean release that does not exist.
+// A build nothing has scanned has no counts, and answering with zeroes would
+// report a clean release that does not exist.
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	productID, streamID, variantID int64) (*Readiness, error) {
 
@@ -95,9 +95,10 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	out := &Readiness{Now: *here, Floor: floor}
-	if here.TargetID == 0 {
-		// Declared and not built. An answer rather than a refusal, and not
-		// zeroes alone, which read as a build that was scanned and is clean.
+	if here.TargetID == 0 || here.LastScanned == nil {
+		// Declared and not scanned: never built, or built and every upload
+		// refused. An answer rather than a refusal, and not zeroes alone,
+		// which read as a build that was scanned and is clean.
 		out.Why = NothingScannedYet
 		return out, nil
 	}
