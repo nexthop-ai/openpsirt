@@ -181,7 +181,7 @@ func scoreFour(vector string, given map[string]string) (*Scored, error) {
 		score = macroScore(given)
 	}
 	return &Scored{
-		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: bandOf(score),
+		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: BandOf(score),
 	}, nil
 }
 

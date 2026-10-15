@@ -214,7 +214,7 @@ func scoreThree(vector string, given map[string]string) (*Scored, error) {
 		score = roundUp(math.Min(raw, 10))
 	}
 	return &Scored{
-		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: bandOf(score),
+		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: BandOf(score),
 	}, nil
 }
 
@@ -236,7 +236,7 @@ func roundUp(x float64) float64 {
 // zero, then the four rated words the published scale names.
 func Bands() []string { return []string{"none", "low", "medium", "high", "critical"} }
 
-// bandOf is the word a score falls in, by the published bands.
+// BandOf is the word a score falls in, by the published bands.
 //
 // One ladder for every scheme here. The bands are the same five words over the
 // same five ranges in version 3 and version 4, which is what makes a list
@@ -244,7 +244,7 @@ func Bands() []string { return []string{"none", "low", "medium", "high", "critic
 // are both high. The numbers underneath are not comparable — the schemes
 // weigh reachability and impact differently — so the scheme travels with the
 // score wherever one is shown.
-func bandOf(score float64) string {
+func BandOf(score float64) string {
 	switch {
 	case score == 0:
 		return "none"

@@ -3,7 +3,12 @@
 
 package finding
 
-import "time"
+import (
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
+)
 
 // Rank is how urgent a finding is, as one number that sorts.
 //
@@ -218,22 +223,15 @@ func bounded(value, limit int) int {
 // SeverityWord turns a score back into the band it falls in, for the places
 // that hold a number and have to show a word.
 //
-// The bands the scoring standard defines. A score of zero means nothing rated
-// it, which is reported as nothing rather than as a low — an unrated finding
-// is not a mild one, and saying "low" about it is a claim nobody made.
+// The bands the scoring standard defines, as the scorer bands a score. A
+// score of zero means nothing rated it, which is reported as nothing rather
+// than as a low — an unrated finding is not a mild one, and saying "low" about
+// it is a claim nobody made.
 func SeverityWord(centi int) string {
-	switch {
-	case centi <= 0:
+	if centi <= 0 {
 		return ""
-	case centi >= 900:
-		return "critical"
-	case centi >= 700:
-		return "high"
-	case centi >= 400:
-		return "medium"
-	default:
-		return "low"
 	}
+	return cvss.BandOf(float64(centi) / 100)
 }
 
 // SeverityScore turns a severity word into a score, for the reports that give
@@ -243,22 +241,23 @@ func SeverityWord(centi int) string {
 // that a finding rated only in words does not sort below everything rated at
 // all. The values are the midpoints of the bands the scoring standard defines,
 // which is the least arbitrary reading available.
+//
+// Read through the fold, so a word the fold puts in a band scores as that
+// band — "negligible" and "none" as lows — and a word it does not recognize
+// scores nothing rather than the middle band it is clocked at.
 func SeverityScore(word string) int {
-	switch word {
+	band, recognized := rating.Folded(word)
+	if !recognized {
+		return 0
+	}
+	switch band {
 	case "critical":
 		return 950
 	case "high":
 		return 800
-	case "medium":
-		return 550
-	// "negligible" and "none" are words a scanner reports and no band holds.
-	// The fold has already decided they are lows, everywhere a query asks —
-	// so the Go side answers the same rather than giving them a score of
-	// their own, which ranked them above unrated and below every low, and
-	// turned back into "low" anywhere a stored number became a word again.
-	case "low", "negligible", "none":
+	case "low":
 		return 300
 	default:
-		return 0
+		return 550
 	}
 }

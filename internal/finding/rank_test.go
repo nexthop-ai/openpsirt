@@ -190,3 +190,19 @@ func TestTheSeverityOrderingAndItsInverseAgree(t *testing.T) {
 		t.Error("the ordering in SQL does not put what it does not recognize below every band")
 	}
 }
+
+// A score in hundredths on a band's lower edge is in that band, and one a
+// hundredth below it is in the band beneath, as the scorer bands a score.
+func TestAScoreOnABandsEdgeIsCalledByThatBand(t *testing.T) {
+	for _, c := range []struct {
+		centi int
+		word  string
+	}{
+		{0, ""}, {-1, ""}, {1, "low"}, {399, "low"}, {400, "medium"}, {699, "medium"},
+		{700, "high"}, {899, "high"}, {900, "critical"}, {1000, "critical"},
+	} {
+		if got := finding.SeverityWord(c.centi); got != c.word {
+			t.Errorf("a score of %d is called %q, want %q", c.centi, got, c.word)
+		}
+	}
+}

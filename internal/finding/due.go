@@ -106,12 +106,12 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 	if exploited {
 		return w.Exploited
 	}
-	switch severity {
+	switch Band(severity) {
 	case "critical":
 		return w.Critical
 	case "high":
 		return w.High
-	case "low", "negligible", "none":
+	case "low":
 		return w.Low
 	default:
 		return w.Medium

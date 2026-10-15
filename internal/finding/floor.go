@@ -121,16 +121,9 @@ func BandOf(word string) string {
 	return strings.ToLower(strings.TrimSpace(word))
 }
 
-// Band folds a severity word the same way rating.BandExpr does.
+// Band folds a severity word the way rating.BandExpr does.
 func Band(severity string) string {
-	switch severity {
-	case "critical", "high":
-		return severity
-	case "low", "negligible", "none":
-		return "low"
-	default:
-		return "medium"
-	}
+	return rating.Fold(severity)
 }
 
 // NoFloor is the line that hides nothing, and what a deployment starts with. A

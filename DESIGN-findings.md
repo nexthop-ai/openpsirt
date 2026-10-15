@@ -1835,6 +1835,14 @@ and the mapping back to a word is an index into the same list. The `ELSE` is
 the caller's: a cross-product page needs an unrecognized rating to compare
 below every band, so that the sentinel for "no line" does.
 
+| Fold | Rule |
+|---|---|
+| One table of words to bands | Critical and high stay, `low`, `negligible` and `none` are low, `medium` is medium, and every other word, the empty one included, is medium: an unrated issue is unknown rather than harmless |
+| The SQL is generated from it | The expression every query bands a rating with is built from the table, and a test evaluates it on every engine against the table for every recordable word, the empty word, `unknown` and a capitalized word with a leading space |
+| The Go readers read through it | The band a finding is drawn and clocked in, the deadline window, and the score that stands in for a word with no number. A word the table does not recognize scores nothing rather than the middle band it is clocked at |
+| A score's band is the scorer's | A stored score turned back into a word is banded by the scoring package's own thresholds, so the two cannot disagree at an edge |
+| The interface reads one ladder | The floors are the bands reversed and the recordable words are the bands and the two beneath low; the gate refusing a second copy of the ladder reads its words from the same file |
+
 ## The rating in force
 
 What a finding's severity *is* has one rule: this product's word where it has

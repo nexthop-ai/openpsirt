@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { laddersIn, laddersOutside, listsIn, groupsIn } from "./one-ladder.mjs";
+import { laddersIn, laddersOutside, listsIn, groupsIn, rungsOf } from "./one-ladder.mjs";
 
 // This gate refuses a second copy of the severity ladder. It is wired as
 // `npm run ladder` and its only consumer is an exit code, which cannot tell a
@@ -230,5 +230,18 @@ describe("the files a copy is looked for in", () => {
 
   it("leaves the ladder's own file alone", () => {
     expect(laddersOutside({ "ui/severities.ts": ladder })).toEqual({ found: [], looked: 0 });
+  });
+});
+
+describe("the rungs it looks for", () => {
+  it("reads them from the ladder's home rather than a copy of its own", () => {
+    const rungs = rungsOf(`export const BANDS = ["critical", "high"] as const;
+export const ROLLED = [...BANDS, "unrated"] as const;
+export const BELOW_LOW = ["negligible"] as const;`);
+    expect([...rungs]).toEqual(["critical", "high", "unrated", "negligible"]);
+  });
+
+  it("refuses a home that no longer declares one of the lists", () => {
+    expect(() => rungsOf(`export const BANDS = ["critical"] as const;`)).toThrow(/ROLLED/);
   });
 });

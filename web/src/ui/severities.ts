@@ -20,13 +20,20 @@ export const ROLLED = [...BANDS, "unrated"] as const;
 // FLOORS is the same four least-first, which is how a threshold is offered —
 // a floor is picked by asking "at least this bad", and a list running downward
 // asks it backwards.
-export const FLOORS = ["low", "medium", "high", "critical"] as const;
+export const FLOORS: readonly Band[] = [...BANDS].reverse();
+
+// BELOW_LOW is the two words a scanner reports that rank beneath every band
+// and are still a rating: somebody looked and said it is not worth much. The
+// server puts both in the low band — `rating.Fold` says so, and the query and
+// the score read through it — so this says the same rather than a second
+// thing.
+export const BELOW_LOW = ["negligible", "none"] as const;
 
 // RECORDABLE is every word somebody may type when they record a flaw by hand.
-// Wider than the bands by the two a scanner reports and nobody ranks:
-// "negligible" and "none" are answers, and they rank below every band, so
-// they survive no floor at all.
-export const RECORDABLE = [...BANDS, "negligible", "none"] as const;
+// Wider than the bands by the two a scanner reports and nobody ranks: those
+// are answers, and they rank below every band, so they survive no floor at
+// all.
+export const RECORDABLE = [...BANDS, ...BELOW_LOW] as const;
 
 // THE_LINE is what a triage floor may be set to: the four, least first, with
 // "everything" in front for the deployment that keeps all of it. The word is
@@ -58,12 +65,6 @@ export const COLORS: Record<Band, string> = {
 export function isBand(word: string): word is Band {
   return (BANDS as readonly string[]).includes(word);
 }
-
-// BELOW_LOW is the two words a scanner reports that rank beneath every band
-// and are still a rating: somebody looked and said it is not worth much. The
-// server puts both in the low band — `rating.BandExpr` and `SeverityScore`
-// both say so — so this says the same rather than a second thing.
-export const BELOW_LOW = ["negligible", "none"] as const;
 
 // bandOf is the band a rating is drawn in: one of the four, or "unrated".
 //

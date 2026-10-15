@@ -18,6 +18,8 @@
 // put in force. What lives here is only the spelling a query needs.
 package rating
 
+import "sort"
+
 // On is where a query finds the product it is asking about.
 //
 // The spellings are named rather than passed as text. A placeholder cannot
@@ -51,9 +53,9 @@ const (
 // Left, because most issues are rated by nobody and those are the rows every
 // list is mostly made of.
 //
-// Every caller already joined the vulnerability, because that is where the
-// rating used to be. So this swaps a column for a join rather than adding one
-// where none existed.
+// A join rather than a column, because the rating is per product and an issue
+// is one row for every product; the published word stays on the vulnerability
+// every caller already joins.
 func For(product On) string {
 	return `LEFT JOIN "issue_rating" AS "ir" ON ir.vulnerability_id = v.id` +
 		` AND ir.product_id = ` + string(product)
@@ -66,17 +68,13 @@ func For(product On) string {
 var Here = For(onBound)
 
 // BandExpr is the rating a finding is judged by, folded to one of the four
-// words that rank.
+// words that rank, as Fold folds it.
 //
-// Spelled once, and used by both the line and the deadline, because they were
-// briefly two rules reading the same fact and they disagreed: the deadline
+// Spelled once, and used by both the line and the deadline: the deadline
 // treats an unrated issue as a medium, on the grounds that unknown is not
-// harmless, while the line was treating it as below everything. On a real
-// image that was 91,040 findings rated "unknown" dropping out of the
-// working list *and* off any clock, which is the opposite of what an unknown
-// rating should cause. Every bug in this project's identity and expiry rules
-// came from letting one fact into two rules; this is that lesson arriving in a
-// third place. This product's where it has stated one, the published one
+// harmless, and a line treating it as below everything drops it out of the
+// working list and off any clock at once — 91,040 findings rated "unknown" on
+// one real image. This product's where it has stated one, the published one
 // otherwise: being able to say a published rating is wrong is pointless if
 // everything that ranks and filters then ignores us.
 //
@@ -85,11 +83,55 @@ var Here = For(onBound)
 // without the join does not compile on any of the four engines, which is the
 // failure being chosen — the alternative is a query that silently answers for
 // the wrong product.
-const BandExpr = `CASE
-	WHEN COALESCE(ir.severity, v.severity, '') = 'critical' THEN 'critical'
-	WHEN COALESCE(ir.severity, v.severity, '') = 'high' THEN 'high'
-	WHEN COALESCE(ir.severity, v.severity, '') IN ('low', 'negligible', 'none') THEN 'low'
-	ELSE 'medium' END`
+//
+// Generated from the fold rather than written beside it, so the SQL and the Go
+// cannot come to disagree about a word; a test evaluates it on every engine
+// against Fold.
+var BandExpr = func() string {
+	words := make([]string, 0, len(folds))
+	for word := range folds {
+		words = append(words, word)
+	}
+	sort.Strings(words)
+	said := "CASE " + EffectiveExpr
+	for _, word := range words {
+		if folds[word] != Unfolded {
+			said += " WHEN '" + word + "' THEN '" + folds[word] + "'"
+		}
+	}
+	return said + " ELSE '" + Unfolded + "' END"
+}()
+
+// Unfolded is the band a word folds to where the fold names no other: the
+// middle one, because an unrated issue is unknown rather than harmless.
+const Unfolded = "medium"
+
+// folds is the band each recognized severity word falls in. The two words a
+// scanner reports beneath low are answers, and they rank in the low band.
+var folds = map[string]string{
+	"critical":   "critical",
+	"high":       "high",
+	"medium":     "medium",
+	"low":        "low",
+	"negligible": "low",
+	"none":       "low",
+}
+
+// Fold is the band a severity word falls in, and the middle band for a word
+// the fold does not recognize, as BandExpr reads it.
+func Fold(word string) string {
+	band, _ := Folded(word)
+	return band
+}
+
+// Folded is Fold, and whether the word is one the fold recognizes rather than
+// one it puts in the middle band for being unknown.
+func Folded(word string) (string, bool) {
+	if band, ok := folds[word]; ok {
+		return band, true
+	}
+	return Unfolded, false
+}
 
 // EffectiveExpr is the rating in force in one product, as a word.
 const EffectiveExpr = `COALESCE(ir.severity, v.severity, '')`

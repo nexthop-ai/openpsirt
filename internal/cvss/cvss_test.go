@@ -27,10 +27,16 @@ func TestAVectorIsScoredTheWayThePublishedFormulaScoresIt(t *testing.T) {
 		{"CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N", 550, "medium"},
 		{"CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N", 470, "medium"},
 		{"CVSS:3.1/AV:P/AC:H/PR:H/UI:R/S:U/C:N/I:N/A:N", 0, "none"},
-		// The two bands nothing reached. The six scores above are 9.8, 9.1,
-		// 5.5, 4.7, 0.0 and 9.8, so nothing landed in [7.0, 9.0) or in
-		// (0.0, 4.0) and neither arm of the band had ever run — while the
-		// band is what decides a finding's deadline window.
+		// Scope changed, at each weight privileges take there. Unchanged, a
+		// low privilege weighs 0.62 and a high one 0.27; changed, 0.68 and
+		// 0.50, and a high one read at the unchanged weight scores 7.9 high
+		// rather than 9.1 critical. With none required the raw score passes
+		// ten and is capped there, which rounding up leaves at exactly 10.0.
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H", 1000, "critical"},
+		{"CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:H/A:H", 990, "critical"},
+		{"CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:H", 910, "critical"},
+		// The bands the rows around these do not reach, [7.0, 9.0) and
+		// (0.0, 4.0). The band is what decides a finding's deadline window.
 		//
 		// 6.42 × 0.56 impact plus 8.22 × 0.85 × 0.77 × 0.85 × 0.85
 		// exploitability is 7.482, which rounds up to 7.5.

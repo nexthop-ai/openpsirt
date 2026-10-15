@@ -21,16 +21,24 @@ import { sourceFiles, SRC } from "./parsed.mjs";
 // Where the ladder is allowed to be written down, relative to src/.
 const HOME = path.join("ui", "severities.ts");
 
-const RUNGS = new Set([
-  "critical",
-  "high",
-  "medium",
-  "low",
-  "unrated",
-  "unknown",
-  "negligible",
-  "none",
-]);
+// rungsOf is the words the ladder's home writes down, read from its text: the
+// bands, the word a count folds everything unrated into, and the two words
+// beneath low. Read rather than restated, so a rung added there is a rung this
+// looks for.
+export function rungsOf(text) {
+  const rungs = new Set();
+  for (const name of ["BANDS", "ROLLED", "BELOW_LOW"]) {
+    const declared = text.match(new RegExp(`export const ${name}\\b[^=]*=\\s*\\[([^\\]]*)\\]`));
+    if (!declared) throw new Error(`${HOME} no longer declares ${name} as a list`);
+    for (const word of declared[1].matchAll(/["']([^"'\n]*)["']/g))
+      rungs.add(word[1].toLowerCase());
+  }
+  return rungs;
+}
+
+// The rungs, and "unknown", which is the word a scanner reports for a rating
+// nobody gave and which the ladder folds into unrated rather than holding.
+const RUNGS = new Set([...rungsOf(readFileSync(path.join(SRC, HOME), "utf8")), "unknown"]);
 
 // Every array literal of string literals in a file, as the words it holds.
 // Read with a regular expression rather than parsed: a literal list of quoted
