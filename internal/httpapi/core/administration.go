@@ -28,15 +28,14 @@ type Administering struct {
 	Access  func(bun.IDB) *access.Store
 	Catalog func(bun.IDB) *catalog.Store
 	Logger  *slog.Logger
-	// Findings is the store the withdrawal of somebody's last role on a
-	// product runs against: their work goes back to the unassigned list
-	// rather than staying where nobody can reach it. Nil where this process
-	// has no database, and then nothing is released.
+	// Findings says whether work is handed back to the unassigned list when
+	// somebody can no longer reach it, rather than staying where nobody can.
+	// Nil where this process has no database, and then nothing is released.
 	//
-	// Over the pooled handle rather than the act's transaction: handing work
-	// back is a consequence of the withdrawal rather than part of it, and it
-	// is bounded by how much that person was holding rather than by the
-	// request.
+	// The withdrawal of somebody's last role on a product hands back inside
+	// its own transaction, over a store built on it, and reads this only as
+	// whether to. A deactivation hands back over this store, on the pooled
+	// handle, once the deactivation has committed.
 	Findings func() *finding.Store
 	// Settings is where the window an unredeemed authorization stays
 	// redeemable for is read. Nil where this process has no database, and

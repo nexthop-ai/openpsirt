@@ -334,8 +334,8 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		}
 		// Handed back for the reason losing a last role hands work back: work
 		// held by somebody who is gone is work nobody is doing, and it does
-		// not look like it. Outside the act, like the release a withdrawal
-		// does, because it is bounded by how much they were holding.
+		// not look like it. Outside the act, because it is bounded by how much
+		// they were holding.
 		//
 		// On a repeat as well. The hand-back runs after the deactivation has
 		// committed, so a failure here leaves work held by somebody who has
