@@ -129,4 +129,43 @@ describe("the access screen", () => {
     const labels = [...mount.host().querySelectorAll("button")].map((one) => one.textContent);
     expect(labels).not.toContain("Unbind");
   });
+
+  // A source of roles that could not be read is treated as one that assigns
+  // them, because a direct grant made under it is overwritten at the next
+  // sign-in.
+  it("locks managing and withdrawing roles while the source of roles cannot be read", async () => {
+    deployment({ "/v1/roles/mode": { status: 503 } });
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const manage = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Manage",
+    );
+    expect(manage?.disabled).toBe(true);
+    expect(manage?.title).toBe("The source of roles could not be read");
+    expect(mount.host().querySelector('[title="Withdraw this role"]')).toBeNull();
+  });
+
+  it("locks managing roles that provider groups assign", async () => {
+    deployment({ "/v1/roles/mode": { data: { mode: "group-bound" } } });
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const manage = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Manage",
+    );
+    expect(manage?.disabled).toBe(true);
+    expect(manage?.title).toBe("Roles come from provider groups and would be overwritten");
+  });
+
+  it("opens the grant grid for one person where roles are granted here", async () => {
+    deployment();
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const manage = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Manage",
+    );
+    expect(manage?.disabled).toBe(false);
+    await act(async () => manage?.click());
+    await settle();
+    expect(mount.host().querySelector(".permgrid")).not.toBeNull();
+  });
 });

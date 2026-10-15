@@ -6,6 +6,7 @@ import type { Who } from "../app/session";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Claim } from "./Claim";
 import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
+import { only } from "../test/fill";
 
 const mount = mounted();
 
@@ -90,5 +91,63 @@ describe("the stripe on a claim's page", () => {
     const card = mount.host().querySelector(".card.standing");
     expect(card?.classList.contains("approved")).toBe(true);
     expect(card?.classList.contains("pending")).toBe(false);
+  });
+});
+
+describe("the answer a second person gives", () => {
+  // The claim waits on somebody who agrees to public findings in sonic.
+  function waiting(proposedBy: string, undisclosed = false) {
+    return {
+      claim: { id: 4, proposed_by: proposedBy },
+      place: { product: "sonic", vulnerability: "CVE-2026-1" },
+      argument: { outcome: "not-applicable" },
+      happened: "waiting",
+      undisclosed,
+      issues: 1,
+      places: 1,
+      age_days: 1,
+    };
+  }
+
+  async function drawn(claim: object, who: Who) {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: who };
+      if (path === "/v1/claims/{id}") return { data: claim };
+      return { data: { items: [], total: 0 } };
+    });
+    const sent = accept(() => ({ data: {} }));
+    mount.render(screen(<Claim who={who} />, "/claims/4", "/claims/:id"));
+    await settle();
+    return sent;
+  }
+
+  const BO: Who = {
+    ...ANA,
+    identity: "bo",
+    name: "Bo",
+    reach: [{ product: "sonic", agrees_public: true }] as unknown as Who["reach"],
+  };
+  const agree = () =>
+    Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Agree",
+    );
+
+  it("offers the proposer no Agree, whatever they hold", async () => {
+    await drawn(waiting("bo"), BO);
+    expect(agree()).toBeUndefined();
+  });
+
+  it("offers somebody else who may agree an Agree, and sends it for this claim", async () => {
+    const sent = await drawn(waiting("ana"), BO);
+    await act(async () => agree()?.click());
+    await settle();
+    const [path, init] = only(sent);
+    expect(path).toBe("/v1/claims/{id}/approval");
+    expect(init.params?.path).toEqual({ id: 4 });
+  });
+
+  it("offers no Agree on an undisclosed claim to somebody who agrees only to public ones", async () => {
+    await drawn(waiting("ana", true), BO);
+    expect(agree()).toBeUndefined();
   });
 });
