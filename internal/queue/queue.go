@@ -604,9 +604,14 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 		// of the row rather than assumed: work that is finished is finished,
 		// and reporting a lost claim for it would have the caller record a
 		// failure against a job that succeeded.
+		// A read that failed is returned for the retry helper, and is not
+		// taken for an answer about the claim.
 		ending := new(Job)
 		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
-			return ErrNoLongerHeld
+			if database.IsNoRows(err) {
+				return ErrNoLongerHeld
+			}
+			return fmt.Errorf("read job %d after its claim matched nothing: %w", id, err)
 		}
 		if ending.State == Done {
 			return nil
@@ -707,7 +712,10 @@ func (q *Queue) Postpone(ctx context.Context, id int64, worker string, after tim
 		// refused. Asked of the row rather than assumed, as Succeed asks.
 		ending := new(Job)
 		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
-			return lost
+			if database.IsNoRows(err) {
+				return lost
+			}
+			return fmt.Errorf("read job %d after a refused commit: %w", id, err)
 		}
 		if ending.State == Pending && ending.ClaimedBy == nil &&
 			ending.LastError != nil && *ending.LastError == said {
@@ -848,7 +856,10 @@ func (q *Queue) Requeue(ctx context.Context, id int64) error {
 		// as never put back.
 		ending := new(Job)
 		if err := tx.NewSelect().Model(ending).Where("id = ?", id).Scan(ctx); err != nil {
-			return ErrNotSetAside
+			if database.IsNoRows(err) {
+				return ErrNotSetAside
+			}
+			return fmt.Errorf("read job %d after a refused commit: %w", id, err)
 		}
 		if ending.State != Dead {
 			return nil
