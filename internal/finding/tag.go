@@ -162,7 +162,7 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
-		Where(inThisProductAs("f.target_id"), productID).
+		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible))
 	if err := InTheFoldOf(q, componentID).

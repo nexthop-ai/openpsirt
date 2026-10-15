@@ -66,7 +66,7 @@ func TestQuietAfterIsAWholeNumberOfDays(t *testing.T) {
 				t.Errorf("quiet after %s answered %d, want 422: %s", value, got.Code, got.Body.String())
 			}
 		}
-		if err := setting.NewStore(r.DB.DB).Set(t.Context(), setting.QuietAfter, "12h"); err != nil {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.QuietAfter, "12h"); err != nil {
 			t.Fatal(err)
 		}
 		var scanning struct {

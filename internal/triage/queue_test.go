@@ -406,7 +406,7 @@ func TestTheQueuesTotalAskedAloneIsThePagesTotal(t *testing.T) {
 func TestAPartDayThresholdIsReadAsTheWholeDayTheFormIsTold(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		if err := setting.NewStore(f.db.DB).Set(ctx, setting.DeferralThreshold, "12h"); err != nil {
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.DeferralThreshold, "12h"); err != nil {
 			t.Fatal(err)
 		}
 		threshold, err := triage.DeferralThreshold(ctx, f.db.DB)

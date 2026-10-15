@@ -304,7 +304,7 @@ func TestABuildsSourceTreeClaimCoversABinaryAnotherProductDescribedFirst(t *test
 
 		claim := aClaim("CVE-2026-1", sbom.NotAffected, stated, sbom.FromStatement)
 		claim.Targets = []sbom.Target{{Name: "openssl"}}
-		if _, err := f.store.RecordClaims(t.Context(), f.target, f.lastScan,
+		if _, err := world.RecordClaims(t.Context(), f.db, f.target, f.lastScan,
 			[]sbom.Suppression{claim}, everyOrigin); err != nil {
 			t.Fatal(err)
 		}
