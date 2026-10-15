@@ -573,14 +573,15 @@ function Search({ at }: { at: Scoped }) {
           })
           .then((answer) => {
             setLooking(false);
-            if (answer.data) {
+            if (answer.data && answer.data.total > 0) {
               navigate(issueAt(term));
               return;
             }
-            // Only a 404 means nobody here carries it. A 500 or a 503 is a
-            // question that was never answered, and treating it as an absence
-            // is a wrong answer with a right answer's confidence.
-            if (answer.response.status !== 404) {
+            // The route answers an issue nobody here carries with an empty
+            // list, so only a missing answer is a read that did not happen. A
+            // 500 or a 503 treated as an absence is a wrong answer with a right
+            // answer's confidence.
+            if (!answer.data) {
               setUnread(true);
               return;
             }

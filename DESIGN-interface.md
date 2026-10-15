@@ -1693,6 +1693,7 @@ chosen (REQ-64).
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
 | It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. Returning without navigating anywhere leaves the box looking live and swallowing what was typed |
 | A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
+| A term resolves to an issue when the issue's read holds a row | That read answers an issue nobody here carries with an empty list, so an empty answer is a component search and only an unanswered read stops at the box |
 | The findings list's box holds the term the list applies | Whatever takes the term out of the address — its chip, clearing the filters, a saved filter, Back — empties the box as well, or Enter there puts back a search the reader thought was gone |
 
 ## A person's own page
