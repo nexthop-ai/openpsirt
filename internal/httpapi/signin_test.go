@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -988,4 +990,70 @@ func TestASignInThatCannotStartSaysNothingAboutWhy(t *testing.T) {
 			})
 		})
 	}
+}
+
+// windowFault fails the read of how long a sign-in lasts and nothing else.
+type windowFault struct{ fired bool }
+
+func (f *windowFault) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if f.fired || !strings.Contains(e.Query, setting.SessionLifetime) {
+		return ctx
+	}
+	f.fired = true
+	failed, cancel := context.WithCancel(ctx)
+	cancel()
+	return failed
+}
+
+func (f *windowFault) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A sign-in whose session window could not be read is a fault too, answered
+// in the words every fault is answered in and with no session handed over.
+// The match succeeds and the pending sign-in is read, so what fails is the
+// read of the window after them.
+func TestASignInWhoseWindowCouldNotBeReadSaysNothingAboutWhy(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		fault := &windowFault{}
+		handle := dbtest.Hooked(db, fault)
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
+		rights := access.NewStore(handle.DB)
+		product, err := catalog.NewStore(handle.DB).DeclareProduct(t.Context(), "mine", "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		granted, err := rights.Ensure(t.Context(), "granted", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.Claim(t.Context(), granted.ID, "granted"); err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(t.Context(), granted.ID, product.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		handler, _ := httpapi.New(quiet, nil, core.Deps{
+			Mode: func(context.Context) access.Mode { return access.Direct },
+			DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
+			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
+			Providers: map[string]signin.Provider{"stub": provider},
+			PlainHTTP: true,
+			BaseURL:   "http://example.com",
+		})
+		rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+		if !fault.fired {
+			t.Fatal("the window was never read, so this checked nothing")
+		}
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("a sign-in whose window could not be read answered %d, want 500: %s",
+				rec.Code, rec.Body.String())
+		}
+		if !strings.Contains(rec.Body.String(), "something went wrong") ||
+			strings.Contains(rec.Body.String(), "lasts") {
+			t.Errorf("the fault said more than that something went wrong: %s", rec.Body.String())
+		}
+		if hasSession(rec.Result().Cookies()) {
+			t.Error("a sign-in whose window could not be read was handed a session")
+		}
+	})
 }
