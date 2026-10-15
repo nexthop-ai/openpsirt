@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+// flock is the system call that takes the lock, a variable so a test can make it
+// fail the way a broken file system does.
+var flock = syscall.Flock
+
 // lockFile takes an exclusive advisory lock on path, waiting up to wait.
 //
 // Tried rather than blocked on, in a loop, for the same reason the other two
@@ -26,10 +30,6 @@ import (
 // go stale. The file is left behind deliberately — removing it would race with
 // the next process opening it, and an empty file beside the database costs
 // nothing.
-// flock is the system call that takes the lock, a variable so a test can make it
-// fail the way a broken file system does.
-var flock = syscall.Flock
-
 func lockFile(ctx context.Context, path string, wait time.Duration) (unlock, error) {
 	file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
