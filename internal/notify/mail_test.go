@@ -5,30 +5,43 @@ package notify
 
 import (
 	"bufio"
+	"crypto/tls"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 )
 
-// plainServer is an SMTP server that offers no STARTTLS and accepts whatever
-// it is sent, recording each command and the message it was given.
+// plainServer is an SMTP server that accepts whatever it is sent, recording
+// each command and the message it was given. It offers STARTTLS where it has a
+// certificate to secure the connection with, and none otherwise.
 type plainServer struct {
-	addr string
+	addr   string
+	secure *tls.Config
 
 	mu       sync.Mutex
 	commands []string
-	data     string
+	// clear is how many of the commands arrived before the connection was
+	// secured.
+	clear int
+	data  string
 }
 
 func servePlain(t *testing.T) *plainServer {
+	t.Helper()
+	return serveSMTP(t, nil)
+}
+
+func serveSMTP(t *testing.T, secure *tls.Config) *plainServer {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = listener.Close() })
-	s := &plainServer{addr: listener.Addr().String()}
+	s := &plainServer{addr: listener.Addr().String(), secure: secure}
 	go func() {
 		for {
 			conn, err := listener.Accept()
@@ -46,6 +59,7 @@ func (s *plainServer) converse(conn net.Conn) {
 	in := bufio.NewReader(conn)
 	say := func(line string) { _, _ = conn.Write([]byte(line + "\r\n")) }
 	say("220 plain.test ESMTP")
+	secured := false
 	for {
 		line, err := in.ReadString('\n')
 		if err != nil {
@@ -54,13 +68,25 @@ func (s *plainServer) converse(conn net.Conn) {
 		line = strings.TrimRight(line, "\r\n")
 		s.mu.Lock()
 		s.commands = append(s.commands, line)
+		if !secured {
+			s.clear = len(s.commands)
+		}
 		s.mu.Unlock()
 		verb := strings.ToUpper(strings.SplitN(line, " ", 2)[0])
 		switch verb {
 		case "EHLO":
-			// Offers authentication and no way to secure the connection.
 			say("250-plain.test")
+			if s.secure != nil && !secured {
+				say("250-STARTTLS")
+			}
 			say("250 AUTH PLAIN")
+		case "STARTTLS":
+			say("220 go ahead")
+			wrapped := tls.Server(conn, s.secure)
+			if err := wrapped.Handshake(); err != nil {
+				return
+			}
+			conn, in, secured = wrapped, bufio.NewReader(wrapped), true
 		case "AUTH":
 			say("235 accepted")
 		case "DATA":
@@ -93,6 +119,49 @@ func (s *plainServer) sent() ([]string, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]string(nil), s.commands...), s.data
+}
+
+// sentInTheClear is the commands that arrived before the connection was
+// secured.
+func (s *plainServer) sentInTheClear() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.commands[:s.clear]...)
+}
+
+// Credentials go to a server only once STARTTLS has secured the connection,
+// and the message follows over the same secured connection.
+//
+// Verified by skipping the StartTLS call in Send: the credentials and the
+// message then arrive in the clear.
+func TestAPasswordIsSentOnlyAfterSTARTTLS(t *testing.T) {
+	// A certificate for 127.0.0.1, and the pool that trusts it.
+	issuer := httptest.NewTLSServer(nil)
+	defer issuer.Close()
+	server := serveSMTP(t, &tls.Config{Certificates: issuer.TLS.Certificates, MinVersion: tls.VersionTLS12})
+
+	mail := NewMail(server.addr, "psirt@example.test", "psirt", "hunter2")
+	mail.roots = issuer.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs
+	if err := mail.Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"}); err != nil {
+		t.Fatalf("sending over a server offering STARTTLS: %v", err)
+	}
+	commands, data := server.sent()
+	authenticated := false
+	for _, command := range commands {
+		authenticated = authenticated || strings.HasPrefix(strings.ToUpper(command), "AUTH")
+	}
+	if !authenticated {
+		t.Errorf("the configured credentials were never sent: %q", commands)
+	}
+	for _, command := range server.sentInTheClear() {
+		verb := strings.ToUpper(strings.SplitN(command, " ", 2)[0])
+		if verb != "EHLO" && verb != "STARTTLS" {
+			t.Errorf("%q was sent before the connection was secured", command)
+		}
+	}
+	if !strings.HasPrefix(data, "From: psirt@example.test\r\n") {
+		t.Errorf("the message delivered opens %q", data)
+	}
 }
 
 // A password is not sent over a connection nothing secured. A server that

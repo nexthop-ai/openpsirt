@@ -331,6 +331,37 @@ func TestADestinationTakesOnlyItsOwnKind(t *testing.T) {
 	})
 }
 
+// A destination answering with a redirect is not followed. The signed body
+// goes to the address an administrator configured and nowhere else, however
+// that address answers.
+func TestARedirectingDestinationIsNotFollowed(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		elsewhere := &took{}
+		second := httptest.NewTLSServer(http.HandlerFunc(elsewhere.handle))
+		defer second.Close()
+		hook := webhookAnswering(t, db, "chat", notify.Everything,
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, second.URL, http.StatusFound)
+			}))
+		if err := hook.store.Tell(ctx, notify.Telling{
+			PersonID: hook.admin.ID, Kind: notify.Assigned, Body: "yours", Link: "/x",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		sent, failed, err := hook.signal.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent != 0 || failed != 1 {
+			t.Errorf("a redirecting destination sent %d and failed %d, want one failed", sent, failed)
+		}
+		if got := elsewhere.count(); got != 0 {
+			t.Errorf("the address a redirect named received %d requests", got)
+		}
+	})
+}
+
 func TestNothingLeavesOverPlainHTTP(t *testing.T) {
 	// The body is signed and not encrypted, and what it carries is what
 	// somebody is being told about a vulnerability.

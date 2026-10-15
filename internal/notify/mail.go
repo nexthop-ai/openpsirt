@@ -6,6 +6,7 @@ package notify
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"mime"
 	"net"
@@ -51,6 +52,9 @@ type Mail struct {
 	// server that accepts a connection and then says nothing holds the sweep
 	// for as long as it likes, and the sweep is what carries everything else.
 	timeout time.Duration
+	// roots is what the server's certificate is checked against once the
+	// connection is secured. Nil is the system's.
+	roots *x509.CertPool
 }
 
 // NewMail returns a channel over the SMTP server at addr, or nil where the
@@ -112,7 +116,7 @@ func (m *Mail) Send(ctx context.Context, to string, message Message) error {
 
 	secured := false
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err := client.StartTLS(&tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}); err != nil {
+		if err := client.StartTLS(&tls.Config{ServerName: host, RootCAs: m.roots, MinVersion: tls.VersionTLS12}); err != nil {
 			return fmt.Errorf("secure the connection to the mail server: %w", err)
 		}
 		secured = true
