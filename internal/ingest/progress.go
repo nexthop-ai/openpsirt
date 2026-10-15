@@ -141,11 +141,11 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 
 	var scans []Scan
 	if err := sent(s.db.NewSelect().Model(&scans)).
-		Order("id DESC").Limit(limit).Offset(offset).Scan(ctx); err != nil {
+		Order("id DESC").Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, 0, err
 	}
 	if len(scans) == 0 {
-		return nil, total, nil
+		return nil, int(total), nil
 	}
 
 	// The read job carries the outcome of parsing, and it is kept after it
@@ -220,7 +220,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		}
 		receipts = append(receipts, receipt)
 	}
-	return receipts, total, nil
+	return receipts, int(total), nil
 }
 
 // progressOf folds a scan, the job that read it and the target's latest

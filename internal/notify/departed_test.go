@@ -192,7 +192,7 @@ func open(t *testing.T, w *fixture.World, who *access.Account) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 // textLogger writes what a sweep logs into out.

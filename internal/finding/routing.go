@@ -257,7 +257,7 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
 		Where(inThisProduct, productID).
-		Limit(room)
+		Limit(int64(room))
 	if rule.Upstream != "" {
 		page = bySource(page, rule.Upstream)
 	}
@@ -447,7 +447,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		Join(`JOIN "component" AS "cn" ON "cn"."id" = "f"."component_id"`).
 		ColumnExpr(`DISTINCT "cn"."name" AS "name"`).
 		OrderExpr(`"cn"."name"`).
-		Limit(sample))
+		Limit(int64(sample)))
 	if err != nil {
 		return Catches{}, err
 	}
@@ -463,9 +463,11 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, err
 	}
-	if found.Total, err = s.db.NewSelect().TableExpr(`(?) AS "names"`, distinct).Count(ctx); err != nil {
+	total, err := s.db.NewSelect().TableExpr(`(?) AS "names"`, distinct).Count(ctx)
+	if err != nil {
 		return Catches{}, fmt.Errorf("count what that would match: %w", err)
 	}
+	found.Total = int(total)
 
 	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -477,7 +479,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what that would match: %w", err)
 	}
-	found.Work = work
+	found.Work = int(work)
 
 	unheld, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -490,7 +492,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return Catches{}, fmt.Errorf("count what nobody holds: %w", err)
 	}
-	found.Unheld = free
+	found.Unheld = int(free)
 	return found, nil
 }
 
@@ -534,7 +536,7 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 			// constant: a store built with a smaller reach that truncates at
 			// the shipped number never trips its own refusal, and applies a
 			// rule to part of what it names.
-			Limit(s.reaching()+1).
+			Limit(int64(s.reaching())+1).
 			Scan(ctx, &roots); err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}

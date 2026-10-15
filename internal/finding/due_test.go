@@ -817,7 +817,7 @@ func TestAFindingOnATagCarriesNoDeadline(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return n
+			return int(n)
 		}
 		if clocked(tag) != 0 {
 			t.Errorf("%d findings on a tag carry a deadline", clocked(tag))

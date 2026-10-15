@@ -33,7 +33,7 @@ func TestAJudgmentCoversThePlacesItNamesAndRefusesOneTheFindingIsNotAt(t *testin
 			if err != nil {
 				t.Fatal(err)
 			}
-			return n
+			return int(n)
 		}
 
 		var one struct {

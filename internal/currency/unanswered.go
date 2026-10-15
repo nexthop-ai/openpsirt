@@ -130,7 +130,7 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		OrderExpr(`"c"."purl" ASC`).
 		// One more than the ceiling, so reaching it is told apart from
 		// landing exactly on it.
-		Limit(mostExamined + 1)
+		Limit(int64(mostExamined + 1))
 	if !all {
 		q = q.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}

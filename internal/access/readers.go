@@ -98,7 +98,7 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	if query == nil {
 		return nil, nil
 	}
-	query = narrowToTerm(query.OrderExpr(`"p"."identity"`).Limit(limit), term)
+	query = narrowToTerm(query.OrderExpr(`"p"."identity"`).Limit(int64(limit)), term)
 	// Narrowed here rather than in the caller, because a picker at a
 	// hundred people cannot fetch them all and filter in a browser — and
 	// the limit would cut the list before the term did, so the name
@@ -153,7 +153,7 @@ func (s *Store) CountWhoCanRead(ctx context.Context, subject Subject, productID 
 	if err != nil {
 		return 0, fmt.Errorf("count who may be mentioned: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // ReadersNamed resolves these sign-in identities to the people among them who

@@ -107,11 +107,11 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		Newest  int64 `bun:"newest"`
 	}
 	if err := grouped().OrderExpr(`"newest" DESC`).
-		Limit(limit).Offset(offset).Scan(ctx, &page); err != nil {
+		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &page); err != nil {
 		return nil, 0, fmt.Errorf("read the claims in the record: %w", err)
 	}
 	if len(page) == 0 {
-		return nil, total, nil
+		return nil, int(total), nil
 	}
 	ids := make([]int64, 0, len(page))
 	for _, row := range page {
@@ -272,5 +272,5 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 			out = append(out, *entry)
 		}
 	}
-	return out, total, nil
+	return out, int(total), nil
 }

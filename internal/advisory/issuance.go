@@ -399,7 +399,7 @@ func (s *Store) issuances(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, fmt.Errorf("check what advisory %q has named: %w", row.Identifier, err)
 	}
-	if readable != len(rows) {
+	if readable != int64(len(rows)) {
 		return nil, ErrNoSuchAdvisory
 	}
 	return rows, nil

@@ -1208,7 +1208,7 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return Tally{}, err
 	}
-	return Tally{Components: components, Edges: edges, Unmatched: unmatched}, nil
+	return Tally{Components: int(components), Edges: int(edges), Unmatched: unmatched}, nil
 }
 
 // Tally is how much a build's graph holds.
@@ -1269,7 +1269,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		// The identifier last, because a build ships one name at more than
 		// one version and the limit cuts by this order.
 		OrderExpr(`"findings" DESC, "c"."name", "c"."id"`).
-		Limit(limit).
+		Limit(int64(limit)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("search the build: %w", err)

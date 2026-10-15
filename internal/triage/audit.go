@@ -218,7 +218,7 @@ func (s *Store) AuditCount(ctx context.Context, subject access.Subject, f Filter
 	if err != nil {
 		return 0, fmt.Errorf("count the judgments made: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // Audit returns the judgments made in a period, newest first, with everything
@@ -241,11 +241,11 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 
 	var decisions []Decision
 	if err := narrow(s.db.NewSelect().Model(&decisions)).Relation("Claim").
-		Order("de.id DESC").Limit(limit).Offset(offset).Scan(ctx); err != nil {
+		Order("de.id DESC").Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read the judgments made: %w", err)
 	}
 	if len(decisions) == 0 {
-		return nil, total, nil
+		return nil, int(total), nil
 	}
 
 	reasoning, err := s.currentReasoning(ctx, decisions)
@@ -281,7 +281,7 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		}
 		out = append(out, row)
 	}
-	return out, total, nil
+	return out, int(total), nil
 }
 
 // withholdPartReasoning drops the reasoning of each decision whose claim holds a

@@ -148,7 +148,7 @@ func (s *Store) groupByClaim(ctx context.Context, subject access.Subject, rows [
 			// that is with its author, and this read every comment ever
 			// written on every one of them to take one each — a claim people
 			// have argued over is a conversation, and a page holds many.
-			Order("id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
+			Order("id DESC").Limit(int64(database.InBulk.Most)).Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read why this was sent back: %w", err)
 		}
 		for _, comment := range comments {
@@ -223,7 +223,7 @@ func (s *Store) EarlierAt(ctx context.Context, subject access.Subject, productID
 		// decided at these places and then stopped applying, which on a
 		// long-lived product is every judgment ever made there — and a screen
 		// reads the recent ones.
-		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
+		Order("de.id DESC").Limit(int64(database.InBulk.Most)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided here before: %w", err)
 	}
 	if len(rows) == 0 {
@@ -295,7 +295,7 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 		// that has been triaging for a while is a page of rows read to keep
 		// five. The ceiling is generous because the five are picked per
 		// claim and a claim writes a row per place.
-		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
+		Order("de.id DESC").Limit(int64(database.InBulk.Most)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was argued about other issues here: %w", err)
 	}
 	if len(rows) == 0 {
@@ -395,7 +395,7 @@ func (s *Store) DecidedElsewhere(ctx context.Context, subject access.Subject, pr
 		Where(`"de"."place_identity" IN (?)`, bun.List(places)).
 		Where(`"de"."state" = ?`, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
-		Order("de.id DESC").Limit(database.InBulk.Most).Scan(ctx); err != nil {
+		Order("de.id DESC").Limit(int64(database.InBulk.Most)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what was decided about this elsewhere: %w", err)
 	}
 	if len(rows) == 0 {

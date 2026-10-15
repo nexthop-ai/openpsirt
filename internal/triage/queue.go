@@ -115,7 +115,7 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return 0, fmt.Errorf("count what is waiting here: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // waitingClaims is the claims with a row waiting for the reason the filter

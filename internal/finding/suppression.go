@@ -439,7 +439,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// that stopped is history and a claim that stands is the estate.
 		OrderExpr(`CASE WHEN "sup"."closed_scan_id" IS NULL THEN 0 ELSE 1 END, ` +
 			`"opened"."built_at" DESC, "sup"."id" DESC`).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what this build carries: %w", err)
 	}
@@ -460,5 +460,5 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 			Suppresses: sbom.Status(row.Status).Suppresses(),
 		})
 	}
-	return out, total, nil
+	return out, int(total), nil
 }

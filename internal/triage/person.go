@@ -57,7 +57,7 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they proposed: %w", err)
 	}
-	out.Proposed = proposed
+	out.Proposed = int(proposed)
 	if proposed > 0 {
 		var at time.Time
 		if err := s.db.NewSelect().Model((*Claim)(nil)).
@@ -73,14 +73,14 @@ func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID i
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they agreed to: %w", err)
 	}
-	out.Approved = approved
+	out.Approved = int(approved)
 
 	withdrawn, err := s.db.NewSelect().Model((*Approval)(nil)).
 		Where(`"approved_by" = ?`, personID).Where(`"withdrawn_at" IS NOT NULL`).Count(ctx)
 	if err != nil {
 		return Record{}, fmt.Errorf("count what they took back: %w", err)
 	}
-	out.Withdrawn = withdrawn
+	out.Withdrawn = int(withdrawn)
 
 	if approved+withdrawn > 0 {
 		var at time.Time

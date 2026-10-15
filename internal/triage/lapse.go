@@ -111,7 +111,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Where("EXISTS (?)", openHere(db).Where("NOT ("+finding.VersionsMatch+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
 			OrderExpr(`"de"."id"`).
-			Limit(database.InBulk.Most)
+			Limit(int64(database.InBulk.Most))
 	}
 
 	db, err := s.pool()

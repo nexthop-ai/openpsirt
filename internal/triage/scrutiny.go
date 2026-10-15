@@ -168,7 +168,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(standing, held...).
 		Where(standingAlone).
 		GroupExpr(`"cl"."outcome"`).
-		Limit(room)).Scan(ctx, &alone)
+		Limit(int64(room))).Scan(ctx, &alone)
 	if err != nil {
 		return nil, fmt.Errorf("count what stands with one person behind it: %w", err)
 	}
@@ -204,7 +204,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"ap"."batch", "pe"."identity"`).
 		OrderExpr("written DESC").
-		Limit(room)).Scan(ctx, &bulk)
+		Limit(int64(room))).Scan(ctx, &bulk)
 	if err != nil {
 		return nil, fmt.Errorf("read which agreements were given in bulk: %w", err)
 	}
@@ -239,7 +239,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		Where(`"ap"."withdrawn_at" IS NULL`).
 		GroupExpr(`"pr"."identity", "ape"."identity"`).
 		OrderExpr("written DESC").
-		Limit(room)).Scan(ctx, &pairs)
+		Limit(int64(room))).Scan(ctx, &pairs)
 	if err != nil {
 		return nil, fmt.Errorf("read who agrees with whom: %w", err)
 	}
@@ -257,7 +257,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, fmt.Errorf("count what standing agreements cover: %w", err)
 	}
-	out.Agreed = agreed
+	out.Agreed = int(agreed)
 	for _, row := range pairs {
 		out.Pairs = append(out.Pairs, Pairing{
 			Proposer: row.Proposer, Approver: row.Approver,
@@ -312,7 +312,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 			` WHERE "ad"."id" = "ap"."approved_by" AND ("ad"."is_admin" = ? OR "ad"."is_bootstrap" = ?))`, true, true).
 		GroupExpr(`"de"."claim_id", "pe"."identity", "pd"."name", "cl"."outcome"`).
 		OrderExpr("written DESC").
-		Limit(room)).Scan(ctx, &lapsed)
+		Limit(int64(room))).Scan(ctx, &lapsed)
 	if err != nil {
 		return nil, fmt.Errorf("read which approvers have lost the right: %w", err)
 	}

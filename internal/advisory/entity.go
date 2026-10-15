@@ -631,12 +631,12 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		// microsecond would otherwise come back in whichever order the engine
 		// chose, and a page of them would not be stable between reads.
 		OrderExpr(`"ad"."minted_at" DESC, "ad"."identifier" DESC`).
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read the advisories: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // editing reads what an edit to one issue of one product on an advisory acts

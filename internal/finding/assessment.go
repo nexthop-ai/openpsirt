@@ -868,7 +868,7 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 	var claims []Assessment
 	if err := narrow(s.db.NewSelect().Model(&claims)).
 		OrderExpr(`"proposed_at" DESC, "id" DESC`).
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx); err != nil {
 		return nil, nil, 0, fmt.Errorf("read what we have said: %w", err)
 	}
@@ -881,7 +881,7 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	return claims, named, total, nil
+	return claims, named, int(total), nil
 }
 
 // Consequence is what agreeing to a milder rating would do, beyond moving

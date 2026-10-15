@@ -185,7 +185,7 @@ func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, erro
 		// this kind's own ceiling. Bounded as a list somebody pages through,
 		// "all of them" past that list's ceiling takes its default instead,
 		// and every team past the default reads as no team.
-		Limit(database.InBulk.Of(limit))
+		Limit(int64(database.InBulk.Of(limit)))
 	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams there are: %w", err)
 	}
@@ -225,7 +225,7 @@ func (s *Store) CountTeams(ctx context.Context, term string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("count which teams there are: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // narrowTeams is the team listing's own matching, spelled once so the listing

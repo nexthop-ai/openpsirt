@@ -15,7 +15,7 @@ import (
 
 // undisclosed counts the findings and the decisions of one issue that are
 // still undisclosed, closed places included.
-func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions int) {
+func (f *fixture) undisclosed(t *testing.T, issue int64) (findings, decisions int64) {
 	t.Helper()
 	var err error
 	findings, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
@@ -84,7 +84,7 @@ func TestDisclosingMakesTheWholeRecordPublic(t *testing.T) {
 			f.productID, issue, "Because."); err == nil {
 			t.Error("somebody holding only public triage disclosed an issue")
 		}
-		if n, d := f.undisclosed(t, issue); n != len(places) || d != 1 {
+		if n, d := f.undisclosed(t, issue); n != int64(len(places)) || d != 1 {
 			t.Fatalf("a refused disclosure changed something: %d findings, %d decisions undisclosed", n, d)
 		}
 
@@ -281,7 +281,7 @@ func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T)
 		if _, err := f.store.Disclose(ctx, who, f.productID, issue, "Published here."); err != nil {
 			t.Fatal(err)
 		}
-		var private int
+		var private int64
 		private, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
 			Where(`"target_id" = ?`, elsewhere).
 			Where(`"visibility" = ?`, access.Private).Count(ctx)

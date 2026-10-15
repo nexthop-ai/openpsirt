@@ -331,7 +331,7 @@ func rowCounts(t *testing.T, f *fixture) map[string]int {
 		if err != nil {
 			t.Fatalf("count %s: %v", table, err)
 		}
-		counts[table] = n
+		counts[table] = int(n)
 	}
 	return counts
 }

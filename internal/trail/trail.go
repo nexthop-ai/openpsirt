@@ -450,12 +450,12 @@ func (s *Store) page(ctx context.Context, by access.Subject, kind Kind,
 	var changes []Change
 	err = narrow(s.db.NewSelect().Model(&changes)).
 		Order("at DESC", "id DESC").
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read %s: %w", what, err)
 	}
-	return changes, total, nil
+	return changes, int(total), nil
 }
 
 // readable refuses a subject that holds nothing over this deployment.

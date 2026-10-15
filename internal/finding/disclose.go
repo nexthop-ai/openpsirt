@@ -173,11 +173,11 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 	}
 
 	var rows []Embargoed
-	if err := query.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+	if err := query.Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what is approaching disclosure: %w", err)
 	}
 	if len(rows) == 0 {
-		return rows, total, nil
+		return rows, int(total), nil
 	}
 	if err := s.whereEmbargoed(ctx, approaching, rows); err != nil {
 		return nil, 0, err
@@ -195,7 +195,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 			rows[i].Summary = ""
 		}
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // whereEmbargoed fills in the builds and components each row sits in, read
@@ -921,7 +921,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, fmt.Errorf("count which embargoes are waiting to be moved: %w", err)
 	}
-	if err := query.Limit(limit).Offset(offset).Scan(ctx, &rows); err != nil {
+	if err := query.Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read which embargoes are waiting to be moved: %w", err)
 	}
 	out := make([]Waiting, 0, len(rows))
@@ -931,5 +931,5 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 			Vulnerability: row.Vulnerability,
 		})
 	}
-	return out, total, nil
+	return out, int(total), nil
 }

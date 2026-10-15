@@ -61,7 +61,7 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if waiting != len(restored.Decisions) {
+		if waiting != int64(len(restored.Decisions)) {
 			t.Errorf("%d of %d rows wait, want all of them",
 				waiting, len(restored.Decisions))
 		}

@@ -29,7 +29,7 @@ func TestAPersonUploadsOnlyWhereTheyTriage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return n
+			return int(n)
 		}
 		before := scans()
 		if code := send("reader"); code != http.StatusForbidden {

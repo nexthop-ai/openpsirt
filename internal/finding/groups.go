@@ -775,7 +775,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// therefore the thing to look at first. What somebody with an
 		// hour needs at the top is what is being exploited.
 		OrderExpr(sorted).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 	if err := page.Scan(ctx, &heads); err != nil {
 		return nil, 0, fmt.Errorf("read what is open: %w", err)
 	}
@@ -810,9 +810,10 @@ func (s *Store) foldGroups(targets []int64, visible []access.Visibility, filter 
 
 // countGroups counts the groups a grouped statement produces.
 func (s *Store) countGroups(ctx context.Context, grouped *bun.SelectQuery) (int, error) {
-	return s.db.NewSelect().
+	n, err := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, grouped.ColumnExpr(`"f"."vulnerability_id"`)).
 		Count(ctx)
+	return int(n), err
 }
 
 // paged reads a grouped statement as a page, each row carrying as "total"

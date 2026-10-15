@@ -366,7 +366,7 @@ func (f *fixture) liveAssessments(t *testing.T, vulnerabilityID int64) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 // vulnerability names one of a run of issues, zero-padded so the order a test

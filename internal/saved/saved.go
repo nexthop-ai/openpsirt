@@ -299,7 +299,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		if err != nil {
 			return err
 		}
-		if held >= cap {
+		if held >= int64(cap) {
 			return refusal.Errorf("you are keeping %d saved filters, which is the "+
 				"limit: forget one before keeping another", held)
 		}
@@ -360,11 +360,11 @@ func (s *Store) SavedFilters(ctx context.Context, personID int64,
 	var kept []Filter
 	total, err := s.db.NewSelect().Model(&kept).
 		Where(`"person_id" = ?`, personID).
-		Order("name").Limit(cap).ScanAndCount(ctx)
+		Order("name").Limit(int64(cap)).ScanAndCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what you have kept: %w", err)
 	}
-	return kept, total, nil
+	return kept, int(total), nil
 }
 
 // ForgetFilter drops one of somebody's own.

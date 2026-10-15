@@ -604,5 +604,5 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	if err != nil {
 		return 0, fmt.Errorf("count what this covers: %w", err)
 	}
-	return covered, nil
+	return int(covered), nil
 }

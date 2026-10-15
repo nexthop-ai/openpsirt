@@ -143,7 +143,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		// an order that ties lets an engine's top-N sort repeat one row and
 		// skip the other across pages.
 		OrderExpr(`claims DESC, decisions DESC, "component", "de"."product_id"`).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read where the work went: %w", err)
 	}
@@ -160,5 +160,5 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	if err != nil {
 		return nil, 0, fmt.Errorf("count where the work went: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }

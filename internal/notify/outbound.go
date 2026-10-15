@@ -253,7 +253,7 @@ func (s *Signal) window(ctx context.Context, to Outbound, limit int) ([]Notifica
 	var rows []Notification
 	q := unsettled(s.db.NewSelect().Model(&rows), to).
 		OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
-		Limit(limit)
+		Limit(int64(limit))
 	if err := q.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what there is to say: %w", err)
 	}

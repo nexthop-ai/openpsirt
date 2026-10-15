@@ -555,7 +555,7 @@ func (f *readerFixture) jobsFor(t *testing.T, scanID int64) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
@@ -983,7 +983,7 @@ func TestASubmissionTakenAgainIsAppliedUnderANewerScanThanAnyBefore(t *testing.T
 			t.Fatalf("Tuesday was not applied on the retake: %+v %v", result, err)
 		}
 
-		var inverted int
+		var inverted int64
 		inverted, err = f.db.DB.NewSelect().Model((*graph.Node)(nil)).
 			Where(`"target_id" = ?`, f.branch).
 			Where(`"closed_scan_id" IS NOT NULL`).

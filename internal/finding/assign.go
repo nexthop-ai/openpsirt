@@ -654,7 +654,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		ColumnExpr(`0 AS "overdue"`).
 		GroupExpr(`"work"."person_id"`).
 		OrderExpr(`open DESC, "person_id"`).
-		Limit(database.InBulk.Most).
+		Limit(int64(database.InBulk.Most)).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read who is holding what: %w", err)
 	}
@@ -949,7 +949,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id"`).
 		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", "f"."component_id", "st"."product_id"`).
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read what nobody is dealing with: %w", err)
@@ -958,13 +958,15 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	if len(heads) > 0 {
 		total = heads[0].Total
 	} else {
-		if total, err = s.db.NewSelect().
+		counted, err := s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
 				ColumnExpr(`"f"."vulnerability_id"`).
 				GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id"`)).
-			Count(ctx); err != nil {
+			Count(ctx)
+		if err != nil {
 			return nil, 0, fmt.Errorf("count what nobody is dealing with: %w", err)
 		}
+		total = int(counted)
 	}
 
 	issues := make([]int64, 0, len(heads))

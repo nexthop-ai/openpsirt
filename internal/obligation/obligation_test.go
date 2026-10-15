@@ -589,7 +589,7 @@ func trailed(t *testing.T, f *fixture, name string) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 // Two retirements at once record one act. The second either waits for the

@@ -106,7 +106,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(`"f"."vulnerability_id"`).
 		OrderExpr(`MAX("f"."urgency") DESC, "f"."vulnerability_id"`).
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("read what is open against this component: %w", err)
@@ -119,12 +119,14 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		// emits its own count(*) and the expression never reaches the
 		// statement, so the total counted places while the list counts
 		// issues.
-		if total, err = s.db.NewSelect().
+		counted, err := s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
 				ColumnExpr(`"f"."vulnerability_id"`).GroupExpr(`"f"."vulnerability_id"`)).
-			Count(ctx); err != nil {
+			Count(ctx)
+		if err != nil {
 			return nil, 0, 0, fmt.Errorf("count what is open against this component: %w", err)
 		}
+		total = int(counted)
 	}
 	issues := make([]int64, 0, len(heads))
 	for _, head := range heads {
@@ -216,7 +218,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			at = append(at, place)
 		}
 	}
-	return at, total, reaching, nil
+	return at, total, int(reaching), nil
 }
 
 // placesOf reads every place a set of issues occupies at one component.
@@ -406,7 +408,7 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 	if err != nil {
 		return Narrowing{}, fmt.Errorf("count what that narrowing reaches: %w", err)
 	}
-	return Narrowing{Contains: contains, Matched: matched, Named: named}, nil
+	return Narrowing{Contains: contains, Matched: int(matched), Named: named}, nil
 }
 
 // describedAs is the issues whose description this subject may read and holds

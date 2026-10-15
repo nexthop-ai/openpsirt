@@ -370,7 +370,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		// One more than the ceiling, so that reaching it is distinguishable
 		// from landing on it exactly.
-		Limit(s.carrying() + 1)
+		Limit(int64(s.carrying() + 1))
 	// Every open place agreed, and agreed the same way.
 	err := finding.WhollyCovered(q, named.ProductID, visible, finding.ForStatements).Scan(ctx, &rows)
 	if err != nil {
@@ -556,7 +556,7 @@ func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
 		Where(stillShips).
 		Where(noneOpenByNameAndPurl).
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
-		Limit(s.carrying() + 1)
+		Limit(int64(s.carrying() + 1))
 }
 
 // stillShips says the component of a finding `f` is still in its build.

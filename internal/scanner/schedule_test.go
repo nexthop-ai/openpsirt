@@ -45,7 +45,7 @@ func (f *runFixture) queued(t *testing.T) int {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return n
+	return int(n)
 }
 
 // ranJustNow records a finished scan run against the fixture's build, which is
@@ -189,7 +189,7 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			return n
+			return int(n)
 		}
 		if n := queuedFor(tenth); n != 1 {
 			t.Errorf("%d scans are queued for build %d, want the one that was already there", n, tenth)

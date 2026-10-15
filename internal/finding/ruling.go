@@ -649,7 +649,7 @@ func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 		q = q.Where(`"rr"."proposed_at" < ?`, *asked.Until)
 	}
 	total, err := q.Order("rr.proposed_at DESC", "rr.id DESC").
-		Limit(asked.Limit).Offset(asked.Offset).
+		Limit(int64(asked.Limit)).Offset(int64(asked.Offset)).
 		ScanAndCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read the rulings on reports: %w", err)
@@ -661,7 +661,7 @@ func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	if err := coveredBy(ctx, s.db, page); err != nil {
 		return nil, 0, err
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // reportProducts is the products this subject may read reports in, kept to

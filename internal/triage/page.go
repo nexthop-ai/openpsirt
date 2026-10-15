@@ -83,7 +83,7 @@ func (s *Store) claimsOn(ctx context.Context, claims func() *bun.SelectQuery,
 		Total   int   `bun:"total"`
 	}
 	if err := claims().ColumnExpr(`COUNT(*) OVER () AS "total"`).OrderExpr("newest DESC").
-		Limit(limit).Offset(offset).Scan(ctx, &page); err != nil {
+		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &page); err != nil {
 		return out, fmt.Errorf("read %s: %w", what, err)
 	}
 	if len(page) == 0 {
@@ -118,7 +118,7 @@ func (s *Store) countClaims(ctx context.Context, claims func() *bun.SelectQuery,
 	if err != nil {
 		return 0, fmt.Errorf("count %s: %w", what, err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // claimSizes is, for each claim, the earliest row of it the subject may read

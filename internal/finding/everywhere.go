@@ -153,7 +153,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// different pieces of work.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."id"`).
 		OrderExpr(`"p"."name", "st"."name", "va"."name", "c"."name", "c"."id"`).
-		Limit(limit).
+		Limit(int64(limit)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("read where this issue sits: %w", err)
@@ -188,5 +188,5 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		}
 		return a.Component < b.Component
 	})
-	return out, total, products, nil
+	return out, int(total), int(products), nil
 }

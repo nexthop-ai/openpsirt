@@ -736,10 +736,10 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 	var rows []Notification
 	if err := mine(s.db.NewSelect().Model(&rows)).
 		Order("created_at DESC", "id DESC").
-		Limit(limit).Offset(offset).Scan(ctx); err != nil {
+		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read what is waiting: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // readable narrows a read of this table to what the subject may see now.
@@ -896,10 +896,10 @@ func (s *Store) ToldTo(ctx context.Context, subject access.Subject, personID int
 	var rows []Notification
 	if err := theirs(s.db.NewSelect().Model(&rows)).
 		Order("created_at DESC", "id DESC").
-		Limit(limit).Offset(offset).Scan(ctx); err != nil {
+		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx); err != nil {
 		return nil, 0, fmt.Errorf("read what they were told: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // Acknowledge marks one of somebody's notifications read.

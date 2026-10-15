@@ -208,7 +208,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	if err != nil {
 		return nil, fmt.Errorf("count what opened: %w", err)
 	}
-	out.Opened = count
+	out.Opened = int(count)
 
 	aging, err := s.aging(ctx, subject, products, all, scope, now)
 	if err != nil {

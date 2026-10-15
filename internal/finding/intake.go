@@ -237,12 +237,12 @@ func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 		// engine returned, and a page boundary falling between them repeats
 		// one row and drops another.
 		Order("fr.recorded_at DESC", "fr.id DESC").
-		Limit(limit).Offset(offset).
+		Limit(int64(limit)).Offset(int64(offset)).
 		ScanAndCount(ctx)
 	if err != nil {
 		return nil, 0, fmt.Errorf("read a product's reports: %w", err)
 	}
-	return rows, total, nil
+	return rows, int(total), nil
 }
 
 // AcknowledgeReport records that somebody answered the reporter of one

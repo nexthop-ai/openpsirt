@@ -483,7 +483,7 @@ func TestAnAdvisoryAboutNothingThisProductShipsIsNotRecorded(t *testing.T) {
 		if took.Recorded != 0 {
 			t.Fatalf("%d claims about something nothing ships were recorded", took.Recorded)
 		}
-		var held int
+		var held int64
 		if held, err = f.db.DB.NewSelect().Model((*finding.Statement)(nil)).Count(ctx); err != nil {
 			t.Fatal(err)
 		}

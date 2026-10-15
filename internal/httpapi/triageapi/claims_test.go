@@ -390,7 +390,7 @@ func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if standing != len(restored.Decisions) {
+		if standing != int64(len(restored.Decisions)) {
 			t.Errorf("%d of %d re-affirmed rows stand, want all of them",
 				standing, len(restored.Decisions))
 		}

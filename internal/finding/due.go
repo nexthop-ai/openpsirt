@@ -428,7 +428,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// grouping: a merge refiles the gone issue's findings with their flag
 		// as it was, so one component in one build can hold a group of each.
 		OrderExpr(`due, "v"."identifier", "c"."name", "f"."target_id", "c"."version", "f"."component_id", "f"."urgency_exploited" DESC`).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 
 	var late []Late
 	if err := query.Scan(ctx, &late); err != nil {
@@ -458,7 +458,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		if err != nil {
 			return nil, 0, fmt.Errorf("count what is running out of time: %w", err)
 		}
-		total = count
+		total = int(count)
 	}
 	return late, total, nil
 }

@@ -135,7 +135,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		// through the allowlist above: the key selects a stored expression
 		// and the direction selects one of two words written there.
 		OrderExpr(bundleSorted(filter)).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 	if err := page.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what one bump would close: %w", err)
 	}
@@ -202,7 +202,7 @@ func (s *Store) countBumps(ctx context.Context, targets []int64,
 	if err != nil {
 		return 0, fmt.Errorf("count what the bumps are: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // bumps is the fix-bundle list's grouping in two levels. The first groups the
@@ -405,7 +405,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		// answer, and refusing to answer it sends them back to a list of six
 		// thousand rows to find out.
 		OrderExpr(componentOrder(filter)).
-		Limit(limit).Offset(offset)
+		Limit(int64(limit)).Offset(int64(offset))
 	if err = page.Scan(ctx, &rows); err != nil {
 		return nil, 0, fmt.Errorf("read what is open by component: %w", err)
 	}
@@ -480,7 +480,7 @@ func (s *Store) countByComponent(ctx context.Context, targets []int64,
 	if err != nil {
 		return 0, fmt.Errorf("count what is open by component: %w", err)
 	}
-	return total, nil
+	return int(total), nil
 }
 
 // byComponent is the by-component view's grouping in two levels: the open
