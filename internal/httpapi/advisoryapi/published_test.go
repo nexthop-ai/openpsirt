@@ -9,10 +9,17 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
 )
 
-func published(t *testing.T, r *httpapitest.Reach, who string) []reportsapi.WentBody {
+// went is a row of the published list, read as a client reads it: the fields
+// asserted here, by their names on the wire.
+type went struct {
+	Advisory string `json:"advisory"`
+	Ordinal  int    `json:"ordinal"`
+	Digest   string `json:"digest"`
+}
+
+func published(t *testing.T, r *httpapitest.Reach, who string) []went {
 	t.Helper()
 	got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/advisories/published", "")
 	if got.Code != http.StatusOK {
@@ -20,7 +27,7 @@ func published(t *testing.T, r *httpapitest.Reach, who string) []reportsapi.Went
 			who, got.Code, got.Body.String())
 	}
 	var out struct {
-		Items []reportsapi.WentBody `json:"items"`
+		Items []went `json:"items"`
 	}
 	if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
 		t.Fatalf("it is not JSON: %v (%s)", err, got.Body.String())

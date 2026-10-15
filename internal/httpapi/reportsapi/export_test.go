@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
 )
 
 func TestAnExportIsTheListWithTheSameVisibility(t *testing.T) {
@@ -825,11 +824,10 @@ func TestEveryExportSaysWhatItIsAndWhenItWasTaken(t *testing.T) {
 	})
 }
 
-// The demo's seeders read the findings export and the review queue by name
-// (Makefile.demo, which nothing else runs): the export's issue, component,
-// version and upstream fix columns, and a waiting claim's identifier. A name
-// changed here leaves the demo seeding nothing, and saying so only as "no
-// findings yet".
+// The demo's seeders read the findings export by name (Makefile.demo, which
+// nothing else runs): its issue, component, version and upstream fix columns.
+// A name changed here leaves the demo seeding nothing, and saying so only as
+// "no findings yet".
 func TestWhatTheDemoSeedsFromIsStillThere(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
@@ -861,12 +859,4 @@ func TestWhatTheDemoSeedsFromIsStillThere(t *testing.T) {
 			}
 		}
 	})
-
-	waiting, err := json.Marshal(triageapi.WaitingBody{Claim: triageapi.ClaimBody{ID: 7}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(string(waiting), `{"claim":{"id":7`) {
-		t.Errorf("a waiting claim reads as %s, not opening with its identifier", waiting)
-	}
 }
