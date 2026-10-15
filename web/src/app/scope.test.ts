@@ -16,7 +16,7 @@ import {
 const BUILD = "/products/sonic/streams/master/variants/broadcom";
 
 describe("which screens need a whole build", () => {
-  it("keeps the five that are about a way down", () => {
+  it("keeps the screens that are about a way down", () => {
     // Each of these exists for one build and no other, because there is no
     // dependency graph across branches.
     expect(needsBuild(`${BUILD}/dependencies`)).toBe(true);

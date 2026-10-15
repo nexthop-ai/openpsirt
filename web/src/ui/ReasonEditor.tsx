@@ -12,29 +12,20 @@ import { restore } from "../app/drafts";
 // The words a claim rests on, and the two things that can be done to them.
 //
 // One control with one set of consequences, drawn by the claim's own screen
-// and by the finding it was made about. It was written twice, and the two
-// copies had already drifted: one said revising returns "the claim" to the
-// review queue and the other "the decision", and the claim is what returns.
-// The authorization divergence the review found lives in exactly this block
-// too — so the gate is decided by whoever draws it, once, and passed in.
+// and by the finding it was made about. Whether Revise and Withdraw are
+// offered is decided here, from the claim's state, so both screens offer the
+// same acts to the same person about the same claim.
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
+
 // The words that are finished, and so have nothing left to revise or withdraw.
 //
-// Said as what is over rather than as what is open, because the two screens
-// that draw this control reach the claim by different routes and had each
-// written their own list of the open words: one allowed waiting, sent back,
-// undone and approved, and the other only proposed and approved — so a claim
-// an approver agreed to in part and set aside in part offered Revise and
-// Withdraw on one screen and neither on the other, to the same person about
-// the same claim. A word neither list had thought of belongs with the open
-// ones, which is the direction a missing case should fall.
+// Said as what is over rather than as what is open, so a word this list does
+// not name falls with the open ones, which is the direction a missing case
+// should fall.
 const FINISHED = new Set(["withdrawn", "lapsed"]);
 
-// revisable reports whether a claim in this state may still be revised or
-// withdrawn. The words are the ones the record uses for what became of a
-// claim, and the ones the API reports as a decision's state.
 // The text a revision opens with: the draft left from an earlier attempt,
 // where there is one, and the standing reasoning otherwise. The editor
 // restores a draft only over an empty field, so opening on the standing text
@@ -43,6 +34,9 @@ export function revisionStart(draftKey: string, reasoning: string): string {
   return restore(draftKey) || reasoning;
 }
 
+// revisable reports whether a claim in this state may still be revised or
+// withdrawn. The words are the ones the record uses for what became of a
+// claim, and the ones the API reports as a decision's state.
 export function revisable(state: string): boolean {
   return state !== "" && !FINISHED.has(state);
 }

@@ -61,7 +61,7 @@ export function blockingPath(at: Parameters<typeof findingsPath>[0]): string {
   return findingsPath(at, true, asked);
 }
 
-// One home page, assembled from what this person holds. Five figures that
+// One home page, assembled from what this person holds. The figures that
 // follow the scope, each with what it would say without one beside it, then the
 // work — what is pending, what is in progress, what lapsed — then the trends,
 // then the system's own state. Somebody opening this most days wants the size
@@ -368,9 +368,9 @@ function reading(now: number, shipped: number, release: string): string {
   return `${now} critical now against ${shipped} in ${release} — ${shipped - now} fewer than last shipped.`;
 }
 
-// The five figures. Each names what it counts, because the picker narrows them
-// — a tile reading "all products" while a product is picked describes the one
-// thing it is not showing.
+// The figures over the work. Each names what it counts, because the picker
+// narrows them — a tile reading "all products" while a product is picked
+// describes the one thing it is not showing.
 //
 // Each carries what it would say without the scope, so the difference the
 // selection makes is on screen rather than inferred. Unscoped the twin is not

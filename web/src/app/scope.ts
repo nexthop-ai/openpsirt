@@ -49,8 +49,8 @@ export type Scoped = { product?: string; stream?: string; variant?: string };
 
 // A screen at this path that needs a whole build.
 //
-// Five of them do, and their data exists for one build and no other: each is
-// about a way down, and there is no dependency graph across branches. So the
+// Their data exists for one build and no other: each is about a way down, and
+// there is no dependency graph across branches. So the
 // picker cannot go partial while somebody is standing on one — the levels that
 // would say "all" are disabled there and say why, rather than accepting the
 // choice and moving somebody somewhere it makes sense, which turns a filter

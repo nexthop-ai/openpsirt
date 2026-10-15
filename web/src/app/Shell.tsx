@@ -231,16 +231,11 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
         <Group name="scope" label={scope} shut={shut} onToggle={toggleGroup} />
         {!shut.has("scope") && (
           <>
-            {/* Three entries here open on one build and no other. Without one
-              picked they decline rather than opening on a scope that means
-              nothing, and say why. Findings is not one of them: it answers for
-              whatever is selected and needs only a product. */}
-            {/* One entry, because there is one list. It answers for whatever the
-              picker has selected and for every product a reader can see when
-              nothing is — so a second entry above meant one screen with two
-              doors, and the door down here was dead whenever no product was
-              picked. It needs nothing: it is the one screen in this group that
-              does not. */}
+            {/* An entry that opens on one build declines while none is picked,
+              rather than opening on a scope that means nothing, and says why.
+              Findings needs nothing: it answers for whatever the picker has
+              selected, and for every product a reader can see when nothing
+              is. */}
             <Rail
               to={findingsPath({ product, stream, variant })}
               icon="bug"
@@ -286,11 +281,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 }
               />
             )}
-            {/* Recording a flaw is an act rather than a place, so it opens a
-              drawer instead of going anywhere — the same shape as Upload. It
-              lives here rather than on the findings list because it is not a
-              sub-action of reading one: a flaw nobody has reported is exactly
-              what is *not* in that list. */}
             {/* Its own screen rather than an action on the findings list: what is
               being recorded is precisely what is *not* in that list, and it asks
               more than a control beside a table has room for. It needs no
