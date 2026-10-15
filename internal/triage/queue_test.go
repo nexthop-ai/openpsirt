@@ -121,15 +121,15 @@ func TestDeferringRepeatedlyStopsBeingShort(t *testing.T) {
 		const threshold = 30 * 24 * time.Hour
 		nearly := 29 * 24 * time.Hour
 
-		asking := func() triage.Proposal {
-			until := time.Now().UTC().Add(nearly)
+		asking := func(span time.Duration) triage.Proposal {
+			until := time.Now().UTC().Add(span)
 			return triage.Proposal{
 				Place: f.at(), Outcome: triage.Deferred, DeferredUntil: &until,
 				Reasoning: "Still not this sprint.", By: f.proposer,
 			}
 		}
 
-		first := asking()
+		first := asking(nearly)
 		needs, err := f.store.NeedsApproval(ctx, first, threshold)
 		if err != nil {
 			t.Fatal(err)
@@ -141,14 +141,24 @@ func TestDeferringRepeatedlyStopsBeingShort(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// The second one asks for another twenty-nine days on a finding
-		// already put off for twenty-nine, which is fifty-eight.
-		needs, err = f.store.NeedsApproval(ctx, asking(), threshold)
+		// The second one asks for another twenty-nine days past the first,
+		// on a finding already put off for twenty-nine, which is fifty-eight.
+		needs, err = f.store.NeedsApproval(ctx, asking(2*nearly), threshold)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !needs {
 			t.Error("deferring twice for just under the threshold stayed unapproved")
+		}
+
+		// Asking again for days the first already holds puts the finding off
+		// for no longer than it is, so the stretch the two share counts once.
+		needs, err = f.store.NeedsApproval(ctx, asking(nearly/2), threshold)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if needs {
+			t.Error("a deferral inside one still in force was counted on top of it")
 		}
 	})
 }

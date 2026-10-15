@@ -86,6 +86,14 @@ func (s *Store) deferredSoFar(ctx context.Context, decisions []Decision) (map[in
 // deferredSoFarAs is deferredSoFar over the deferrals a narrowing admits.
 func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 	narrow func(*bun.SelectQuery) *bun.SelectQuery) (map[int64]time.Duration, error) {
+	return s.deferredWith(ctx, decisions, narrow, nil)
+}
+
+// deferredWith is deferredSoFarAs with a stretch being asked for added to
+// each decision's place, keyed by the decision. A stretch overlapping one
+// already held is counted once with it, as two recorded ones are.
+func (s *Store) deferredWith(ctx context.Context, decisions []Decision,
+	narrow func(*bun.SelectQuery) *bun.SelectQuery, asking map[int64]span) (map[int64]time.Duration, error) {
 	totals := make(map[int64]time.Duration, len(decisions))
 	if len(decisions) == 0 {
 		return totals, nil
@@ -155,8 +163,12 @@ func (s *Store) deferredSoFarAs(ctx context.Context, decisions []Decision,
 		}
 	}
 	for _, decision := range decisions {
-		totals[decision.ID] = held.total(place{decision.ProductID,
-			issueOf[decision.VulnerabilityID], decision.PlaceIdentity})
+		key := place{decision.ProductID, issueOf[decision.VulnerabilityID], decision.PlaceIdentity}
+		if more, ok := asking[decision.ID]; ok {
+			totals[decision.ID] = spans[place]{key: append(slices.Clone(held[key]), more)}.total(key)
+			continue
+		}
+		totals[decision.ID] = held.total(key)
 	}
 	return totals, nil
 }
@@ -366,25 +378,26 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 		return true, nil
 	}
 
-	asking := time.Duration(0)
+	// The stretch asked for, from this store's own clock, like every other
+	// time decision here. A date already past asks for no time at all, so a
+	// back-dated deferral adds nothing and subtracts nothing.
+	asking := map[int64]span{}
 	if p.DeferredUntil != nil {
-		// Measured from this store's own clock, like every other time decision
-		// here, and never negative. A date already past asks for no time at
-		// all; letting it come out negative would let a back-dated deferral
-		// subtract from what a finding has already been postponed for and slip
-		// under the threshold.
-		if span := p.DeferredUntil.Sub(s.now()); span > 0 {
-			asking = span
+		now := s.now()
+		if p.DeferredUntil.After(now) {
+			asking[-1] = span{from: now, to: *p.DeferredUntil}
 		}
 	}
 
-	// The postponements already asked for about this same place.
-	already, err := s.DeferredSoFar(ctx, Decision{
-		ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
+	// Merged with the postponements already asked for about this same place,
+	// so a stretch this deferral shares with one still in force is counted
+	// once.
+	total, err := s.deferredWith(ctx, []Decision{{
+		ID: -1, ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
 		PlaceIdentity: p.Place.PlaceIdentity,
-	})
+	}}, func(q *bun.SelectQuery) *bun.SelectQuery { return q }, asking)
 	if err != nil {
 		return false, err
 	}
-	return already+asking >= threshold, nil
+	return total[-1] >= threshold, nil
 }
