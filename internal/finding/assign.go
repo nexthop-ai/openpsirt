@@ -139,6 +139,17 @@ func mayMove(subject access.Subject, productID int64, to *int64, dispatches bool
 	return nil
 }
 
+// mayHandOver refuses deciding who deals with findings in a product to a
+// subject who does not triage there, and answers whether they may dispatch:
+// put work on somebody else, or take what somebody else holds.
+func mayHandOver(subject access.Subject, productID int64) (dispatches bool, err error) {
+	if !subject.TriagesIn(productID) {
+		return false, access.Denied(fmt.Sprintf(
+			"decide who deals with findings in product %d", productID))
+	}
+	return subject.Holds(access.Assigner, productID), nil
+}
+
 // triagedIn is the visibilities this subject triages in one product.
 func triagedIn(subject access.Subject, productID int64) []access.Visibility {
 	var triaged []access.Visibility
@@ -164,11 +175,10 @@ func triagedIn(subject access.Subject, productID int64) []access.Visibility {
 func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.Subject,
 	productID int64, work [][2]int64, to *int64) (int64, error) {
 
-	if !subject.TriagesIn(productID) {
-		return 0, access.Denied(fmt.Sprintf(
-			"decide who deals with findings in product %d", productID))
+	dispatches, err := mayHandOver(subject, productID)
+	if err != nil {
+		return 0, err
 	}
-	dispatches := subject.Holds(access.Assigner, productID)
 	var moved int64
 	for _, each := range work {
 		n, err := s.moveWork(ctx, tx, subject, productID, each[0], each[1], to,
@@ -243,15 +253,15 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// otherwise need somebody's attention before anybody could start.
 	// Putting work on somebody else, or taking what they are holding, is a
 	// different act and asks for the right that names it.
-	if !subject.TriagesIn(productID) {
-		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
-	}
-	// This caller's right to put work on somebody else, or to take what
-	// somebody else holds. Where they may not, the rule is carried into the
-	// write below rather than checked before it: a check and a write that are
-	// two statements are two moments, and a colleague's assignment landing
+	//
+	// Where the caller may not dispatch, the rule is carried into the write
+	// below rather than checked before it: a check and a write that are two
+	// statements are two moments, and a colleague's assignment landing
 	// between them is all it takes to reassign what the rule just refused.
-	dispatches := subject.Holds(access.Assigner, productID)
+	dispatches, err := mayHandOver(subject, productID)
+	if err != nil {
+		return 0, false, err
+	}
 	if err := mayMove(subject, productID, to, dispatches); err != nil {
 		return 0, false, err
 	}

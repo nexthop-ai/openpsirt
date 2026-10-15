@@ -12,7 +12,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -182,21 +181,8 @@ func recordSeen(ctx context.Context, tx bun.Tx, subject access.Subject,
 func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	advisory, product, identifier, stream, variant string, affected bool) error {
 
-	row, err := s.byName(ctx, subject, advisory)
-	if err != nil {
-		return err
-	}
-	if err := s.mayWrite(ctx, subject, row, "mark a release affected"); err != nil {
-		return err
-	}
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
-	if err != nil {
-		return err
-	}
-	if !triages(subject, named.ID) {
-		return ErrNoSuchIssue
-	}
-	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
+	row, named, issue, err := s.editing(ctx, subject, advisory, product, identifier,
+		"mark a release affected")
 	if err != nil {
 		return err
 	}

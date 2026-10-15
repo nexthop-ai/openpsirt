@@ -89,14 +89,8 @@ type Bundle struct {
 func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]Bundle, int, error) {
 
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	if len(targets) == 0 {
-		return nil, 0, nil
-	}
-	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(targets) == 0 {
 		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
@@ -124,7 +118,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 
 	page := s.bumps(targets, visible, filter).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
-		Join(rating.Here, productID).
+		Join(rating.Here, filter.ProductID).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(PerFold(SourceName) + ` AS "upstream"`).
 		ColumnExpr(PerFold(SourceVersion) + ` AS "shipped"`).
@@ -174,14 +168,27 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 func (s *Store) CountBundles(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
 	if err != nil || len(targets) == 0 {
 		return 0, err
 	}
-	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
-		return 0, err
-	}
 	return s.countBumps(ctx, targets, visible, filter)
+}
+
+// listedIn authorizes a grouped list and resolves the builds it covers, then
+// narrows the filter to the issues decided in its product. No builds is an
+// empty list, and nothing more is read.
+func (s *Store) listedIn(ctx context.Context, subject access.Subject, scope Scope,
+	filter *Filter) ([]access.Visibility, []int64, error) {
+
+	productID, visible, targets, err := s.inScope(ctx, subject, scope, filter)
+	if err != nil || len(targets) == 0 {
+		return nil, nil, err
+	}
+	if err := s.decidedIssuesFor(ctx, filter, []int64{productID}, false); err != nil {
+		return nil, nil, err
+	}
+	return visible, targets, nil
 }
 
 func (s *Store) countBumps(ctx context.Context, targets []int64,
@@ -355,14 +362,8 @@ func (s *Store) namesIn(ctx context.Context, targets []int64, visible []access.V
 func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int, filter Filter) ([]ComponentGroup, int, error) {
 
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
-	if err != nil {
-		return nil, 0, err
-	}
-	if len(targets) == 0 {
-		return nil, 0, nil
-	}
-	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
+	if err != nil || len(targets) == 0 {
 		return nil, 0, err
 	}
 	limit = database.AList.Of(limit)
@@ -462,11 +463,8 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 func (s *Store) CountComponentGroups(ctx context.Context, subject access.Subject, scope Scope,
 	filter Filter) (int, error) {
 
-	productID, visible, targets, err := s.inScope(ctx, subject, scope, &filter)
+	visible, targets, err := s.listedIn(ctx, subject, scope, &filter)
 	if err != nil || len(targets) == 0 {
-		return 0, err
-	}
-	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
 		return 0, err
 	}
 	return s.countByComponent(ctx, targets, visible, filter)

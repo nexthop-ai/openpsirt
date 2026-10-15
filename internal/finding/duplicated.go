@@ -203,16 +203,7 @@ func waitsAsShortening(ctx context.Context, db bun.IDB, moved *Movement) (bool, 
 	if moved.Was == nil {
 		return false, nil
 	}
-	threshold, err := setting.NewStore(db).Duration(ctx,
-		setting.MovementThreshold, setting.DefaultMovementThreshold)
-	if err != nil {
-		return false, err
-	}
-	already, err := movedBy(ctx, db, moved.ProductID, moved.VulnerabilityID)
-	if err != nil {
-		return false, err
-	}
-	return threshold <= 0 || already+moved.Distance() >= threshold, nil
+	return needsSecondPerson(ctx, db, moved.ProductID, moved.VulnerabilityID, moved.Distance())
 }
 
 // duplicateUndated puts a flaw's embargo back where the movements still

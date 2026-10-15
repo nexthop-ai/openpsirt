@@ -306,32 +306,13 @@ func fold(identifier string) string {
 func (s *Store) Add(ctx context.Context, subject access.Subject,
 	advisory, product, identifier string) (*Covered, error) {
 
-	row, err := s.byName(ctx, subject, advisory)
-	if err != nil {
-		return nil, err
-	}
 	// Naming a flaw opens an edition and takes back every agreement standing
 	// on the advisory, which is a change to what it says about every product
-	// it covers. Asked before the product in the request is resolved,
-	// because a refusal here is about the advisory rather than about a name.
-	if err := s.mayWrite(ctx, subject, row, "name a flaw on an advisory"); err != nil {
-		return nil, err
-	}
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
-	if err != nil {
-		return nil, err
-	}
-	// Authorized before the identifier is resolved, so a name nobody holds
-	// and a name somebody holds come back the same way.
-	//
-	// And the triage role on this product as well as on the ones it already
-	// covers. Naming a flaw is what puts it into a document published about
-	// that product, so somebody who triages one product and only reads
-	// another would otherwise publish about the second.
-	if !triages(subject, named.ID) {
-		return nil, ErrNoSuchIssue
-	}
-	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
+	// it covers. And it puts the flaw into a document published about that
+	// product, so somebody who triages one product and only reads another
+	// would otherwise publish about the second.
+	row, named, issue, err := s.editing(ctx, subject, advisory, product, identifier,
+		"name a flaw on an advisory")
 	if err != nil {
 		return nil, err
 	}
@@ -410,26 +391,12 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 func (s *Store) Drop(ctx context.Context, subject access.Subject,
 	advisory, product, identifier string) error {
 
-	row, err := s.byName(ctx, subject, advisory)
-	if err != nil {
-		return err
-	}
-	// The same rule adding one asks for, and for the same reason: taking a
+	// The same rules adding one asks for, and for the same reasons: taking a
 	// flaw off opens an edition and takes back every agreement standing on
-	// the advisory.
-	if err := s.mayWrite(ctx, subject, row, "take a flaw off an advisory"); err != nil {
-		return err
-	}
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
-	if err != nil {
-		return err
-	}
-	// Taking a flaw back off a document about a product is as much a
+	// the advisory, and taking it off a document about a product is as much a
 	// statement about that product as putting it on was.
-	if !triages(subject, named.ID) {
-		return ErrNoSuchIssue
-	}
-	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
+	row, named, issue, err := s.editing(ctx, subject, advisory, product, identifier,
+		"take a flaw off an advisory")
 	if err != nil {
 		return err
 	}
@@ -670,6 +637,39 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		return nil, 0, fmt.Errorf("read the advisories: %w", err)
 	}
 	return rows, total, nil
+}
+
+// editing reads what an edit to one issue of one product on an advisory acts
+// on: the advisory, the product and the issue.
+//
+// Each is authorized before the next name is resolved. The right to write the
+// advisory is asked before the product is resolved, because a refusal there
+// is about the advisory rather than about a name; the triage role on the
+// product before the issue is resolved, so a name nobody holds and a name
+// somebody holds come back the same way. What names the act, for the
+// refusal.
+func (s *Store) editing(ctx context.Context, subject access.Subject,
+	advisory, product, identifier, what string) (*Advisory, *catalog.Product, *finding.Vulnerability, error) {
+
+	row, err := s.byName(ctx, subject, advisory)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := s.mayWrite(ctx, subject, row, what); err != nil {
+		return nil, nil, nil, err
+	}
+	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !triages(subject, named.ID) {
+		return nil, nil, nil, ErrNoSuchIssue
+	}
+	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return row, named, issue, nil
 }
 
 // triages reports whether this subject may decide things about one product.

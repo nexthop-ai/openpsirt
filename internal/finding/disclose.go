@@ -474,19 +474,8 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 	if act != Extension && act != Shortening {
 		return nil, refusal.Errorf("a disclosure date is moved later or brought forward")
 	}
-	if !subject.Triages(access.Private, productID) {
-		return nil, access.Denied(
-			fmt.Sprintf("move a disclosure date in product %d", productID))
-	}
-	if subject.ID == 0 {
-		return nil, access.Denied("move a disclosure date without being anybody")
-	}
-	if strings.TrimSpace(reason) == "" {
-		return nil, Unreasoned{Said: "say why the embargo is being moved"}
-	}
-	// The submission policy, run before the text is stored. This row is
-	// append-only and is read back into a disclosure record.
-	if err := markdown.Check(reason); err != nil {
+	if err := mayMoveEmbargo(subject, productID, reason, "move a disclosure date",
+		"say why the embargo is being moved"); err != nil {
 		return nil, err
 	}
 
@@ -508,21 +497,15 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 			return wrongWay(act)
 		}
 
-		threshold, err := setting.NewStore(tx).Duration(ctx,
-			setting.MovementThreshold, setting.DefaultMovementThreshold)
-		if err != nil {
-			return err
-		}
-		already, err := movedBy(ctx, tx, productID, vulnerabilityID)
-		if err != nil {
-			return err
-		}
 		asked := &Movement{
 			VulnerabilityID: vulnerabilityID, ProductID: productID,
 			Act: act, Was: &was, Until: &until, Reason: reason,
 			AskedBy: subject.ID, AskedAt: now,
 		}
-		asked.NeedsApproval = threshold <= 0 || already+asked.Distance() >= threshold
+		if asked.NeedsApproval, err = needsSecondPerson(ctx, tx, productID, vulnerabilityID,
+			asked.Distance()); err != nil {
+			return err
+		}
 		out = asked
 		// ApprovedAt is unset on every path to here, so nothing clears it.
 		if _, err := tx.NewInsert().Model(out).Exec(ctx); err != nil {
@@ -539,6 +522,43 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 		return nil, err
 	}
 	return out, nil
+}
+
+// mayMoveEmbargo refuses a request to move an embargo's end that the subject
+// may not make, or that gives no reason. Doing names the act, and why is what
+// to say where the reason is missing.
+//
+// The reason is checked against the submission policy before it is stored: a
+// movement is append-only and is read back into a disclosure record.
+func mayMoveEmbargo(subject access.Subject, productID int64, reason, doing, why string) error {
+	if !subject.Triages(access.Private, productID) {
+		return access.Denied(fmt.Sprintf("%s in product %d", doing, productID))
+	}
+	if subject.ID == 0 {
+		return access.Denied(doing + " without being anybody")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return Unreasoned{Said: why}
+	}
+	return markdown.Check(reason)
+}
+
+// needsSecondPerson reports whether moving an embargo's end this far needs
+// somebody else to agree: everything the embargo has already been moved by,
+// plus this distance, reaches the threshold.
+func needsSecondPerson(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
+	distance time.Duration) (bool, error) {
+
+	threshold, err := setting.NewStore(db).Duration(ctx,
+		setting.MovementThreshold, setting.DefaultMovementThreshold)
+	if err != nil {
+		return false, err
+	}
+	already, err := movedBy(ctx, db, productID, vulnerabilityID)
+	if err != nil {
+		return false, err
+	}
+	return already+distance >= threshold, nil
 }
 
 // endsAt reads where an embargo ends now.

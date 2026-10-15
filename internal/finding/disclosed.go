@@ -6,7 +6,6 @@ package finding
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -14,9 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
-	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // ErrDisclosed says the issue is already public in this product.
@@ -45,18 +42,9 @@ var ErrDisclosureWaiting = refusal.New("a disclosure of that issue is already wa
 func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64, reason string) (*Movement, error) {
 
-	if !subject.Triages(access.Private, productID) {
-		return nil, access.Denied(fmt.Sprintf("disclose an issue in product %d", productID))
-	}
-	if subject.ID == 0 {
-		return nil, access.Denied("disclose an issue without being anybody")
-	}
-	if strings.TrimSpace(reason) == "" {
-		return nil, Unreasoned{Said: "say why the issue is being disclosed"}
-	}
-	// The submission policy, run before the text is stored. The row is
-	// append-only and becomes public with the rest of the record.
-	if err := markdown.Check(reason); err != nil {
+	// The row is append-only and becomes public with the rest of the record.
+	if err := mayMoveEmbargo(subject, productID, reason, "disclose an issue",
+		"say why the issue is being disclosed"); err != nil {
 		return nil, err
 	}
 
@@ -81,16 +69,10 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			asked.Was = ends
 		default:
 			asked.Was = ends
-			threshold, err := setting.NewStore(tx).Duration(ctx,
-				setting.MovementThreshold, setting.DefaultMovementThreshold)
-			if err != nil {
+			if asked.NeedsApproval, err = needsSecondPerson(ctx, tx, productID, vulnerabilityID,
+				asked.Distance()); err != nil {
 				return err
 			}
-			already, err := movedBy(ctx, tx, productID, vulnerabilityID)
-			if err != nil {
-				return err
-			}
-			asked.NeedsApproval = threshold <= 0 || already+asked.Distance() >= threshold
 		}
 		if asked.NeedsApproval {
 			// Refused only where this one would wait too. One that takes

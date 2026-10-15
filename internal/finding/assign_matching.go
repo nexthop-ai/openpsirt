@@ -76,11 +76,10 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		if err != nil {
 			return err
 		}
-		if !subject.TriagesIn(productID) {
-			return access.Denied(fmt.Sprintf(
-				"decide who deals with findings in product %d", productID))
+		dispatches, err := mayHandOver(subject, productID)
+		if err != nil {
+			return err
 		}
-		dispatches := subject.Holds(access.Assigner, productID)
 		// Refused before anything is read, by the rule moveWhere holds, so a
 		// hand-off nobody may make is refused whether or not anything matches.
 		if err := mayMove(subject, productID, to, dispatches); err != nil {
