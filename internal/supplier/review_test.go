@@ -236,6 +236,41 @@ func TestAFeedEntryNamingItsDocumentRelativelyIsRead(t *testing.T) {
 	})
 }
 
+func TestAFeedEntryNamingItsDocumentOnlyByItsSelfLinkIsRead(t *testing.T) {
+	// A publisher carrying only the self link is as common as one carrying
+	// only the content source, and the relation is matched without regard to
+	// capitals.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.override = func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/.well-known/csaf/provider-metadata.json":
+				_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
+					p.server.URL+"/csaf/feed.json")
+			case "/csaf/feed.json":
+				_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[`+
+					`{"updated":"2026-09-20T00:00:00Z","link":[{"rel":"self","href":%q}]},`+
+					`{"updated":"2026-09-21T00:00:00Z","link":[{"rel":"SELF","href":%q}]}]}}`,
+					p.server.URL+"/csaf/2026/EL-35.json", p.server.URL+"/csaf/2026/EL-36.json")
+			case "/csaf/2026/EL-35.json":
+				_, _ = fmt.Fprint(w, advisory("EL-2026-0035", "libnl-3-200", "3.7.1", "CVE-2026-5001"))
+			case "/csaf/2026/EL-36.json":
+				_, _ = fmt.Fprint(w, advisory("EL-2026-0036", "libnl-3-200", "3.7.1", "CVE-2026-5002"))
+			default:
+				http.NotFound(w, r)
+			}
+		}
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Documents != 2 || took.Recorded != 2 {
+			t.Errorf("documents named only by a self link were not read: %+v", took)
+		}
+	})
+}
+
 func TestAPublisherThatCannotBeReachedHoldsTheMark(t *testing.T) {
 	// The other half of the rule above: a refusal about the publisher rather
 	// than about one document leaves everything behind the mark unseen, so the
