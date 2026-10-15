@@ -819,15 +819,15 @@ func newLogger(cfg config.Config, w *os.File) *slog.Logger {
 
 // passes is what runs beside the server.
 //
-// Two of them may be absent because the thing they work on is not configured:
-// the mail sender where no channel is, and the attachment sweeper where no
-// store is. The rest always run. Guarding all of them read as though any could
-// be missing, and made the reader open a package per pass to find out that
-// most of the guards could never be false.
+// Some of them may be absent because what they work on is not configured:
+// the mail sender, the chat sender, the attachment sweeper, the published
+// directory writer and the CVE record fetcher. The rest always run, and only
+// the ones that may be absent are guarded, so a guard is a condition that can
+// be false.
 //
-// Grouped rather than passed one at a time. Twelve parameters is past what a
-// call site can be read at, and they divide cleanly into what to serve and
-// what to run beside it — this is the second half.
+// Grouped rather than passed one at a time. A call site with a parameter per
+// pass cannot be read, and they divide cleanly into what to serve and what to
+// run beside it — this is the second half.
 type passes struct {
 	reader   *ingest.Reader
 	runner   *scanner.Runner
@@ -902,9 +902,12 @@ func (p passes) loops() []loop {
 		{"route unheld work to teams", p.routing.Run, readInterval},
 		{"set aside work whose worker died", p.undertaker.Run, 0},
 	}
-	// And the two a deployment may not have. NewPost answers nil where no
-	// mail channel is configured and NewKeeper where no attachment store is,
-	// so these two guards are the ones that say something.
+	// And the ones a deployment may not have, each nil where what it works
+	// on is not configured: NewPost where no mail channel is, the chat sender
+	// where no platform is, NewKeeper where no attachment store is,
+	// directory.New where no address or no store for it is, and the CVE
+	// record fetcher where the deployment keeps the snapshot itself. These
+	// guards are the ones that say something.
 	if p.post != nil {
 		all = append(all, loop{"send mail", p.post.Run, 0})
 	}
@@ -914,13 +917,9 @@ func (p passes) loops() []loop {
 	if p.keeper != nil {
 		all = append(all, loop{"sweep unattached files", p.keeper.Run, 0})
 	}
-	// And the third: directory.New answers nil where no address or no store
-	// for it is configured.
 	if p.publish != nil {
 		all = append(all, loop{"write the published advisory directory", p.publish.Run, 0})
 	}
-	// And the CVE record fetcher, nil where the deployment keeps
-	// the snapshot itself.
 	if p.records != nil {
 		all = append(all, loop{"fetch the CVE records", p.records.Run, 0})
 	}

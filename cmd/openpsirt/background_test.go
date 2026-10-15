@@ -11,70 +11,82 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/attach"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
+	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
 // The passes a deployment runs beside the server, and the ones it does not.
 //
-// Ten loops were each guarded against a nil constructor result, and the doc
-// comment above them said any of the ten might be absent because the thing it
-// works on is not configured. Four of those guards could never be false — the
-// constructors behind them return a value unconditionally — and three further
-// passes were started with no guard at all, and were not the optional ones. So
-// a reader working out which passes a deployment actually runs had to open six
-// packages to find out that the answer was almost always "all of them".
-//
 // Held to here rather than left to reading, and without starting anything: the
 // methods are taken as values, which a nil receiver allows because nothing
 // calls them.
 
+// alwaysRuns is every pass a deployment runs whatever is configured.
+var alwaysRuns = []string{
+	"read what arrived",
+	"scan what arrived",
+	"schedule rescans",
+	"ask upstream what is current",
+	"read what suppliers publish",
+	"look up the branches patches are on",
+	"watch for quiet builds",
+	"send what is owed outward",
+	"route unheld work to teams",
+	"set aside work whose worker died",
+}
+
+// optional is every pass that runs only where what it works on is configured.
+var optional = []string{
+	"send mail",
+	"send what is owed to chat",
+	"sweep unattached files",
+	"write the published advisory directory",
+	"fetch the CVE records",
+}
+
 func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
-	// Mail and attachment storage are what a deployment may not have, and
-	// everything else runs whatever is configured.
 	running := named((passes{}).loops())
-	for _, want := range []string{
-		"read what arrived",
-		"scan what arrived",
-		"schedule rescans",
-		"ask upstream what is current",
-		"read what suppliers publish",
-		"look up the branches patches are on",
-		"watch for quiet builds",
-		"send what is owed outward",
-		"route unheld work to teams",
-		"set aside work whose worker died",
-	} {
+	for _, want := range alwaysRuns {
 		if !running[want] {
 			t.Errorf("%q does not run in a deployment with nothing configured", want)
 		}
 	}
-	for _, absent := range []string{"send mail", "sweep unattached files"} {
+	for _, absent := range optional {
 		if running[absent] {
 			t.Errorf("%q runs with nothing configured to do it with", absent)
 		}
 	}
-	if len(running) != 10 {
-		t.Errorf("a deployment with nothing configured runs %d passes, want 10: %v",
-			len(running), keysOf(running))
+	if len(running) != len(alwaysRuns) {
+		t.Errorf("a deployment with nothing configured runs %d passes, want %d: %v",
+			len(running), len(alwaysRuns), keysOf(running))
 	}
 }
 
-func TestMailAndAttachmentSweepingRunWhenTheyAreConfigured(t *testing.T) {
-	// The two that are absent above, present here — which is what makes the
-	// count above a statement about configuration rather than about nil.
-	configured := passes{
-		post:   &notify.Post{},
-		keeper: &attach.Keeper{},
+// everythingConfigured is the passes of a deployment that configured every
+// optional one.
+func everythingConfigured() passes {
+	return passes{
+		post:    &notify.Post{},
+		talk:    &notify.Talk{},
+		keeper:  &attach.Keeper{},
+		publish: &directory.Writer{},
+		records: &cverecord.Fetcher{},
 	}
-	running := named(configured.loops())
-	for _, want := range []string{"send mail", "sweep unattached files"} {
+}
+
+func TestEveryOptionalPassRunsWhereItIsConfigured(t *testing.T) {
+	// The ones that are absent above, present here — which is what makes the
+	// test above a statement about configuration rather than about nil.
+	running := named(everythingConfigured().loops())
+	for _, want := range append(append([]string{}, alwaysRuns...), optional...) {
 		if !running[want] {
 			t.Errorf("%q does not run where it is configured", want)
 		}
 	}
-	if len(running) != 12 {
-		t.Errorf("a deployment with everything configured runs %d passes, want 12: %v",
-			len(running), keysOf(running))
+	if want := len(alwaysRuns) + len(optional); len(running) != want {
+		t.Errorf("a deployment with everything configured runs %d passes, want %d: %v",
+			len(running), want, keysOf(running))
 	}
 }
 
@@ -82,7 +94,7 @@ func TestEveryPassSaysWhatItIsAndHowOftenItRuns(t *testing.T) {
 	// A pass added to the struct and left out of the list is one that stops
 	// running with nothing saying so, and an unnamed one is a line in a
 	// failure message that names nothing.
-	for _, one := range (passes{}).loops() {
+	for _, one := range everythingConfigured().loops() {
 		if one.what == "" {
 			t.Error("a pass runs under no name")
 		}
