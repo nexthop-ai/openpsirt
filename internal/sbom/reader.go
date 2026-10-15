@@ -182,7 +182,7 @@ type reader struct {
 func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 	lim = lim.OrDefault()
 	return &reader{
-		b:          newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth),
+		b:          newBounded(r, lim.MaxBytes, lim.MaxDepth),
 		lim:        lim,
 		headerOnly: headerOnly,
 		fired:      map[int]bool{},

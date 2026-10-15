@@ -34,10 +34,10 @@ const suppressionNamespace = "openvex.dev/ns"
 // parsers rather than one per distribution's own format.
 func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	lim = lim.OrDefault()
-	b := newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth)
+	b := newBounded(r, lim.MaxBytes, lim.MaxDepth)
 	v := &suppressions{b: b, lim: lim}
 	if err := v.read(); err != nil {
-		return nil, refusal.Errorf("reading suppressions: %w", err)
+		return nil, b.refused("reading suppressions", err)
 	}
 	if err := b.end(); err != nil {
 		return nil, refusal.Errorf("reading suppressions: %w", err)

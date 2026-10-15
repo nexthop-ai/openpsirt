@@ -165,7 +165,8 @@ A connection that could not be made or was cut short is read from the
 network's and each driver's own error for it. The document parser states a
 file ending inside a value in its own words, because the error it would
 otherwise return is the one a driver returns for a connection cut short, and a
-truncated upload is the sender's to fix. A failed upload's receipt carries the
+truncated upload is the sender's to fix. A read that fails beneath the parser is
+a fault, whatever error it ends with. A failed upload's receipt carries the
 refusal's sentence where its cause is a refusal, and a fixed sentence
 otherwise, including where the job reading it died before it could say why. A
 failed scan run's receipt carries the scanner's own words, which are what tell

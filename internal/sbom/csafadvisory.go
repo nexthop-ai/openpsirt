@@ -54,7 +54,7 @@ type Advisory struct {
 // their own flaws as claims about what a build ships.
 func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 	lim = lim.OrDefault()
-	b := newBounded(&capped{r: r, left: lim.MaxBytes}, lim.MaxDepth)
+	b := newBounded(r, lim.MaxBytes, lim.MaxDepth)
 	read := newCSAF(b, lim)
 	read.profile = advisoryProfile
 	err := b.object(func(key string) error {
@@ -69,11 +69,11 @@ func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 		err = b.end()
 	}
 	if err != nil {
-		return Advisory{}, refusal.Errorf("reading an advisory: %w", err)
+		return Advisory{}, b.refused("reading an advisory", err)
 	}
 	claims, err := read.finish()
 	if err != nil {
-		return Advisory{}, refusal.Errorf("reading an advisory: %w", err)
+		return Advisory{}, b.refused("reading an advisory", err)
 	}
 	if strings.TrimSpace(read.publisher) == "" {
 		return Advisory{}, refusal.Errorf("reading an advisory: it names no publisher, and " +

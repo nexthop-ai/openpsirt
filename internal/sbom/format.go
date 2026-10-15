@@ -106,7 +106,7 @@ func (c *reader) read() error {
 		err = c.b.end()
 	}
 	if err != nil {
-		return refusal.Errorf("reading scan file: %w", err)
+		return c.b.refused("reading scan file", err)
 	}
 	if err := c.checkFormat(); err != nil {
 		return err

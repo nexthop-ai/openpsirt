@@ -203,7 +203,10 @@ A document is read back one part at a time rather than in one snapshot, so one
 released while it is read runs out of parts before its size. The stream then
 ends in an error rather than cleanly: the background reader fails the read
 instead of parsing part of a document as all of it, and a download already
-answered 200 ends short of the length it declared and is logged.
+answered 200 ends short of the length it declared and is logged. The error is a
+fault, and the parser passes a failed read beneath it through as one, so the
+producer's receipt carries the fixed sentence rather than a refusal of bytes
+that arrived whole.
 
 ## Scan application
 
