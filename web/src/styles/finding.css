@@ -1,0 +1,608 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The finding detail: its two columns, the reach and the matches, and the
+   history and thread under them. */
+
+/* ---------- detail ---------- */
+
+.detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--gap-room);
+}
+/* The description, above both columns. A paragraph of a vulnerability
+   description is prose, and prose in a 380-pixel column is four words to a
+   line. */
+.described {
+  margin-bottom: var(--gap-room);
+}
+.described p {
+  max-width: 90ch;
+}
+/* The evidence and the act are stacked. Somebody weighs the evidence and then
+   acts, and the page runs in that order; beside the form, the facts would be
+   read in a 380-pixel column. */
+.evidence + .acting {
+  margin-top: var(--gap-room);
+}
+/* The column a finding's acts and a decision's form stand in, with the
+   editor's height reserved so a preview does not shift what is under it. */
+.acting,
+.deciding {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.acting {
+  min-width: 0;
+}
+.acting .card,
+.deciding .card {
+  margin: 0;
+}
+.acting textarea,
+.acting .rendered,
+.deciding textarea,
+.deciding .rendered {
+  min-height: 210px;
+}
+.acting .writing {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(200px, 1fr);
+  gap: var(--gap-room);
+  align-items: start;
+}
+@media (width <= 900px) {
+  .acting .writing {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Two columns at most. The blocks are read rather than scanned, and at three
+   or four across the eye has to find where each one starts, with a long
+   description beside two short panels and nothing lining up. */
+.evidence {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 22px;
+  align-items: start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+@media (width <= 900px) {
+  .evidence {
+    grid-template-columns: 1fr;
+  }
+}
+.evblock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  margin-bottom: 14px;
+}
+.evblock h4 {
+  margin: 0;
+}
+.evblock p {
+  margin: 0;
+}
+.scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-room);
+}
+.score .n {
+  font-size: var(--step-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  display: block;
+  line-height: 1.1;
+}
+.score .l {
+  /* A tile may say more than one thing under its number — what a score is on
+     and who published it, what an estimate means and the day it is about —
+     and side by side they ran into each other as one word. */
+  display: block;
+}
+.refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+}
+.refs li {
+  display: flex;
+  gap: var(--gap);
+  align-items: baseline;
+  font-size: var(--step--1);
+}
+.refs .kind {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.refs .kind.patch {
+  background: var(--ok-wash);
+  color: var(--ok);
+  border-color: transparent;
+}
+.refs a {
+  color: var(--accent);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.refs a:hover {
+  text-decoration: underline;
+}
+.refs .ref {
+  min-width: 0;
+}
+/* On a line of their own under the link: a commit address is long, and names
+   wrapped beside it read as a column of fragments. */
+.refs .branches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--gap);
+}
+
+.deciding {
+  margin-top: 18px;
+}
+
+.shortfall {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  border: 1px solid var(--warn-line);
+  background: var(--warn-bg);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.shortfall .icon {
+  font-size: 15px;
+  line-height: 1.2;
+  flex: none;
+  color: var(--sev-high);
+}
+.shortfall h4 {
+  margin: 0 0 3px;
+  font-size: var(--step-0);
+  font-weight: 600;
+  color: var(--sev-high);
+}
+.shortfall p {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.shortfall .ladder {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  font-size: var(--step--1);
+  flex-wrap: wrap;
+}
+.shortfall .ladder .v {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0 6px;
+  background: var(--surface);
+  font-family: var(--mono);
+}
+.shortfall .ladder .v.was {
+  color: var(--muted);
+}
+.shortfall .ladder .v.now {
+  border-color: var(--sev-high);
+  color: var(--sev-high);
+  font-weight: 600;
+}
+.shortfall .ladder .v.need {
+  border-color: var(--ok);
+  color: var(--ok);
+  font-weight: 600;
+}
+.shortfall .ladder .arrow {
+  color: var(--faint);
+}
+
+.ourview {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin: 10px 0;
+}
+.ourview .pair {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ourview .theirs {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.ourview .ours {
+  color: var(--sev-low);
+  font-weight: 600;
+}
+
+.tree {
+  font-size: var(--step--1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* One line, always. A row that wraps at depth six is a row whose counts have
+   moved, and the counts are what the screen is read for — so the name gives up
+   its tail instead, which is the part a reader has already matched. */
+.tree .node {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: default;
+}
+.tree .node > button.id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree .node .ver,
+.tree .node .repeat {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 1 auto;
+}
+/* The control that opens what else is known about a component. Its own name
+   rather than the findings list's `peek`: that one is a bordered box that
+   opens a row in place, and two controls sharing a class is two controls that
+   change together by accident.
+
+   Faint until the row is under the pointer — on every row at once it is a
+   column of dots down a screen whose job is the names — but never hidden,
+   because a control that is not there until a pointer arrives is a control
+   nobody reaches from a keyboard. */
+.tree .node .look {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--faint);
+  opacity: 0.35;
+}
+.tree .node:hover .look {
+  opacity: 1;
+  color: var(--ink);
+}
+.tree .node .look:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+.tree .node.here {
+  background: var(--raised);
+  font-weight: 600;
+}
+.tree .node .ver {
+  color: var(--faint);
+  font-family: var(--mono);
+}
+/* A row with something under it is told from one without at a glance, by two
+   things at once. At this size the triangle and the dot are the same mark in
+   two shades, so the control is also half again the size of the
+   punctuation. The line-height is pinned so the larger glyph
+   does not push the row taller than its neighbors. */
+.tree .rule {
+  color: var(--line-strong);
+  width: 15px;
+  display: inline-block;
+  text-align: center;
+  flex: none;
+  font-size: 11px;
+  line-height: 1;
+}
+/* The marker that opens a row is a button, so it takes the reset a button
+   needs to keep looking like punctuation — and a focus ring, because it is
+   reached from a keyboard and something reachable that shows nothing when it
+   is reached is reachable in name only. */
+.tree button.rule {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.tree .rule.has {
+  color: var(--ink);
+  font-size: 16px;
+}
+.tree button.rule:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+.tree .node.openable {
+  cursor: pointer;
+}
+.tree .node.openable:hover {
+  background: var(--raised);
+}
+/* What the number beside it is made of, worst first. A count of five thousand
+   says nothing about whether any of it matters, and this is the screen whose
+   whole job is saying which branch is worth opening. Only the bands that are
+   there: a row of zeros is noise. */
+/* A column, not a run of pills after the name. One automatic margin, and a
+   width that does not depend on how many of the bands a row has, puts every
+   band of every row in the same place; a second automatic margin splits the
+   slack and starts the strip wherever the name ends. */
+.strip {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  width: 202px;
+  flex: none;
+}
+/* One bar across a fixed column rather than a chip per band. Widths are the
+   counts, so the shape says where the weight is before a number is read; the
+   column's own width is what makes the bars comparable down a page of rows at
+   six different depths, which is the one thing they are for. The numbers are
+   on the title, because a legend per row says the same thing every row. */
+.strip > .sevbar {
+  width: 100%;
+}
+/* The count sits after the strip and is the same width whatever it holds, so
+   the strip's own left edge does not move with it. A row with no bands still
+   lines up: the strip is there, empty, holding the column open. */
+.tree .count {
+  margin-left: 7px;
+  min-width: 52px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 7px;
+  flex: none;
+}
+.tree .count.hot {
+  color: var(--sev-exploited);
+  border-color: var(--sev-exploited);
+}
+.tree .count.none {
+  color: var(--faint);
+  border-style: dashed;
+}
+.tree .more {
+  color: var(--accent);
+  font-size: var(--step--1);
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 3px 6px;
+  text-align: left;
+  font-family: inherit;
+}
+.tree .more:hover {
+  text-decoration: underline;
+}
+.tree .repeat {
+  font-size: 10.5px;
+  color: var(--faint);
+  border: 1px dashed var(--line-strong);
+  border-radius: 3px;
+  padding: 0 4px;
+  flex: none;
+}
+.treehead {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* ---------- reach / tiers / matches ---------- */
+
+.reach {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tier {
+  border-left: 3px solid var(--line-strong);
+  padding: 10px 12px;
+  background: var(--raised);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.tier + .tier {
+  margin-top: 7px;
+}
+.tier.auto {
+  border-left-color: var(--ok);
+}
+.tier > header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap);
+  margin-bottom: 5px;
+}
+.tier h5 {
+  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+.tier .n {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.tier .said {
+  font-size: var(--step--1);
+  color: var(--muted);
+  margin: 0;
+}
+.match {
+  display: flex;
+  gap: var(--gap);
+  align-items: flex-start;
+  padding: 6px 0;
+  font-size: var(--step--1);
+}
+.match + .match {
+  border-top: 1px solid var(--line);
+}
+.match input {
+  margin: 3px 0 0;
+  flex: none;
+}
+.match .note {
+  color: var(--muted);
+}
+
+/* ---------- history, thread ---------- */
+
+.history {
+  display: flex;
+  flex-direction: column;
+}
+.version {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--gap-wide);
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.version:first-child {
+  border-top: 0;
+}
+.version .stamp {
+  font-size: var(--step--1);
+  color: var(--faint);
+}
+.version .stamp b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+.version .words {
+  font-size: var(--step--1);
+  max-width: 78ch;
+  padding: 9px 11px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.version.agreed .words {
+  background: var(--ok-wash);
+}
+.version .tagline {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+  font-size: var(--step--1);
+}
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-wide);
+}
+.said2 {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: var(--gap-loose);
+}
+.said2 .bubble {
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  font-size: var(--step--1);
+  max-width: 78ch;
+}
+.said2 .bubble p {
+  margin: 0 0 7px;
+}
+.said2 .bubble p:last-child {
+  margin: 0;
+}
+.said2 .meta {
+  display: flex;
+  gap: var(--gap);
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: var(--step--1);
+  margin-bottom: 3px;
+}
+.said2 .meta b {
+  font-weight: 600;
+}
+.said2 .meta .when {
+  color: var(--faint);
+}
+.said2 .meta .edited {
+  color: var(--faint);
+  font-style: italic;
+}
+.who2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  font-size: var(--step--1);
+}
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  flex: none;
+}
+.avatar.none {
+  background: var(--line-strong);
+  color: var(--muted);
+}
+.due {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.due.over {
+  color: var(--sev-exploited);
+}
+.due.soon {
+  color: var(--sev-high);
+}
+.due.fine {
+  color: var(--muted);
+  font-weight: 400;
+}

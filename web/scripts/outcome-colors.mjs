@@ -39,6 +39,6 @@ export function uncolored(outcomes, arms) {
 export function sweep() {
   const root = join(import.meta.dirname, "..", "src");
   const outcomes = outcomesIn(readFileSync(join(root, "api", "schema.d.ts"), "utf8"));
-  const arms = armsIn(readFileSync(join(root, "styles", "parts.css"), "utf8"));
+  const arms = armsIn(readFileSync(join(root, "styles", "states.css"), "utf8"));
   return { outcomes, missing: uncolored(outcomes, arms) };
 }

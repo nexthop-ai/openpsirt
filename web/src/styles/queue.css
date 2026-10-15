@@ -1,0 +1,98 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The review queue. */
+
+/* ---------- review queue ---------- */
+
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-wide);
+}
+/* What a pending card says at the top and what it offers at the bottom: the
+   head names the issue and who asked, the foot holds the one control. Spacing
+   only — putting either on one line is a change to how the card reads and
+   wants somebody looking at it. */
+.cardhead {
+  margin-bottom: 9px;
+}
+.cardfoot {
+  margin-top: 12px;
+}
+.qcard {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  position: relative;
+}
+.qcard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+.qcard.returning::before {
+  background: var(--sev-high);
+}
+.qcard.lapsedcard::before {
+  background: var(--sev-medium);
+}
+.qcard > header {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+/* The box that puts one claim into a bulk action. Colored like every other
+   control here and left at the size the browser draws it. */
+.qpick {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.qcard .why {
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  font-size: var(--step--1);
+}
+.qcard .why p {
+  margin: 0 0 7px;
+}
+.qcard .why p:last-child {
+  margin: 0;
+}
+.qmeta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.qmeta b {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.batchbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-loose);
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: var(--radius-lg);
+  font-size: var(--step--1);
+}
+.batchbar .spacer {
+  flex: 1;
+}

@@ -28,9 +28,26 @@
    before any rule, so this file holds no rules at all. */
 @import "./styles/tokens.css";
 @import "./styles/frame.css";
+/* The parts every screen is built from: a panel, a table, a form, a chip, a
+   filter bar. Nothing in these belongs to one screen, which is what makes
+   them the files to check before inventing a shape. */
+@import "./styles/panels.css";
+@import "./styles/states.css";
+@import "./styles/filters.css";
+@import "./styles/tables.css";
+@import "./styles/forms.css";
+@import "./styles/findings-filters.css";
 @import "./styles/parts.css";
 @import "./styles/charts.css";
 @import "./styles/overlay.css";
+/* Shapes that belong to one screen, and the pieces that only appear inside
+   one. A shape many screens draw is in the parts above, the charts are in
+   charts.css and the drawer in overlay.css. */
+@import "./styles/finding.css";
+@import "./styles/queue.css";
+@import "./styles/compare.css";
+@import "./styles/phone.css";
+@import "./styles/decisions.css";
 @import "./styles/screens.css";
 @import "./styles/narrow.css";
 /* Last, and the reason this order is stated rather than assumed: what prints

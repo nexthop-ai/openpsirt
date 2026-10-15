@@ -1,0 +1,332 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* A decision's screens: the queue at the grain of a decision, the guided
+   review of other builds, and the finding after a decision is recorded. */
+
+/* ---------- the queue at the grain of a decision ---------- */
+
+.reachrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  font-size: var(--step--1);
+}
+.reachrow .r {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--pill);
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+.reachrow .r b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.reachrow .r.auto {
+  border-color: var(--ok-line);
+  background: var(--ok-wash);
+}
+.reachrow .r.ask {
+  border-color: var(--warn-line);
+  background: var(--warn-wash);
+}
+.bulkmark {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.qcard.bulkclaim::before {
+  background: var(--accent);
+}
+.qcard.extension::before {
+  background: var(--ok);
+}
+.qcard.extension .state.waiting {
+  --c: var(--ok);
+}
+.outliers {
+  border: 1px solid var(--warn-line);
+  background: var(--warn-bg);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.outliers > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+}
+.outliers h5 {
+  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--sev-high);
+}
+.ostats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-tight);
+  margin-bottom: 10px;
+}
+.ostats .o {
+  font-size: var(--step--1);
+  padding: 2px 9px;
+  border-radius: var(--pill);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--muted);
+}
+.ostats .o b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ostats .o.bad {
+  border-color: var(--sev-exploited);
+  color: var(--sev-exploited);
+}
+.ostats .o.bad b {
+  color: var(--sev-exploited);
+}
+/* Its own name rather than a word another component styles: a modifier whose
+   bare rule draws a box hands that box to the pill. */
+.ostats .o.hot {
+  border-color: var(--sev-high);
+  color: var(--sev-high);
+}
+.ostats .o.hot b {
+  color: var(--sev-high);
+}
+/* The color alone: the shorthand resets the background image with it, and the
+   shade on a clipped edge is drawn as one. */
+.outliers .tablewrap {
+  background-color: var(--surface);
+}
+
+/* ---------- other builds: the guided review ---------- */
+
+.revprog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-hair);
+  margin-bottom: 4px;
+}
+.revprog span {
+  font-size: 10.5px;
+  padding: 2px 9px;
+  border-radius: var(--pill);
+  border: 1px solid var(--line);
+  color: var(--faint);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.revprog span.done {
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+.revprog span.on {
+  border-color: var(--ink);
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.revcard {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 10px 12px;
+  background: var(--raised);
+}
+.revcard h5 {
+  margin: 0 0 4px;
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+.revcard p {
+  margin: 0;
+  font-size: var(--step--1);
+}
+.revcard p + p {
+  margin-top: 6px;
+}
+.revcard.auto {
+  border-left-color: var(--ok);
+}
+.revcard.ask {
+  border-left-color: var(--sev-high);
+}
+.revcard.off {
+  border-left-color: var(--line-strong);
+  opacity: 0.85;
+}
+.revlist {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--step--1);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sheet > footer .btn.ghost kbd.onbtn {
+  color: inherit;
+}
+
+/* ---------- the finding after a decision is recorded ---------- */
+
+.card.standing {
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+.card.standing.pending {
+  border-left-color: var(--wait);
+}
+.card.standing.approved {
+  border-left-color: var(--ok);
+}
+.card.standing.lapsed {
+  border-left-color: var(--sev-high);
+}
+/* The conversation about a decision, at the foot of its card. */
+.standing .within {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.standing .within h4 {
+  margin: 0 0 8px;
+  font-size: var(--step-0);
+  font-weight: 600;
+}
+.dhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+}
+.dhead h3 {
+  margin: 0;
+}
+.dgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 18px;
+}
+.dgrid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.dgrid .v {
+  font-size: var(--step--1);
+}
+.dgrid .v.mono {
+  font-family: var(--mono);
+}
+.standing .why,
+.claim .why {
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: var(--step--1);
+  max-width: 78ch;
+}
+/* The claim page reads its reasoning; the finding screen toggles the same
+   block against an editor and reserves that height. */
+.claim .why {
+  min-height: 0;
+}
+.standing .why p,
+.claim .why p {
+  margin: 0 0 8px;
+}
+.standing .why p:last-child,
+.claim .why p:last-child {
+  margin: 0;
+}
+.standing .why pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 0 0 8px;
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.timeline li {
+  display: grid;
+  grid-template-columns: 84px 24px minmax(0, 1fr);
+  gap: var(--gap-loose);
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+}
+.timeline li:first-child {
+  border-top: 0;
+}
+.timeline .when {
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.timeline .avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+.timeline.past {
+  opacity: 0.8;
+}
+
+.priors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-loose);
+}
+.prior {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  opacity: 0.92;
+}
+.prior > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight);
+  font-size: var(--step--1);
+}
+.prior .why {
+  background: var(--raised);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: var(--step--1);
+  max-width: 78ch;
+}
+.prior .why p {
+  margin: 0;
+}
+.prior .actions {
+  margin-top: 8px;
+}

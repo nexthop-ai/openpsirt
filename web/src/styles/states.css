@@ -1,0 +1,529 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* How a severity, a state, an outcome or a tag is drawn, wherever it
+   appears. */
+
+/* ---------- severity, state, tags ---------- */
+
+/* A dot and a word, with no fill behind them. The band's color is carried by
+   both, and a tinted pill on every row of a fifty-row list is fifty patches
+   of color competing with the one column that is read first. */
+.sev {
+  --c: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--c);
+  white-space: nowrap;
+}
+.sev::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c);
+  flex: none;
+}
+.sev.exploited {
+  --c: var(--sev-exploited);
+}
+/* One arm per band, for the chip, the bar and the key alike, so a band is
+   colored in one place. Unrated has an arm of its own: on the neutral base a
+   badge reading "Unrated" draws as a low. */
+.sev.critical,
+.sevbar > i.critical,
+.sevkey > span > i.critical {
+  --c: var(--sev-critical);
+}
+.sev.high,
+.sevbar > i.high,
+.sevkey > span > i.high {
+  --c: var(--sev-high);
+}
+.sev.medium,
+.sevbar > i.medium,
+.sevkey > span > i.medium {
+  --c: var(--sev-medium);
+}
+.sev.low,
+.sevbar > i.low,
+.sevkey > span > i.low {
+  --c: var(--sev-low);
+}
+.sev.unrated,
+.sevbar > i.unrated,
+.sevkey > span > i.unrated {
+  --c: var(--sev-unrated);
+}
+
+.kev {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-hair);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sev-exploited);
+  box-shadow: inset 0 0 0 1px var(--sev-exploited);
+  vertical-align: 1px;
+}
+/* The feed's flag is the outline and the record kept here is the fill. The
+   record is the rarer fact and the one a person attested about this product,
+   so it is the louder badge; the feed's flag lands on many rows at once and
+   says nothing about whether this product was attacked. One color for both,
+   so they read as the same kind of fact, and the fill tells them apart. */
+.kev.here {
+  background: var(--sev-exploited);
+  color: var(--on-exploited);
+  box-shadow: none;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  --c: var(--muted);
+  color: var(--c);
+  background: color-mix(in oklab, var(--c) 12%, transparent);
+}
+.state.open {
+  --c: var(--muted);
+}
+.state.waiting {
+  --c: var(--wait);
+}
+.state.agreed {
+  --c: var(--ok);
+}
+.state.lapsed {
+  --c: var(--sev-high);
+}
+/* Something that was asked for and has been done: scanned, met. Without an arm
+   of its own it inherited .state's muted default, so a build that *is* being
+   scanned read in exactly the grey a build nobody has ever scanned reads in. */
+.state.closed {
+  --c: var(--ok);
+}
+/* Something wrong that somebody should look at: failing, stopped, failed. */
+.state.bad {
+  --c: var(--sev-critical);
+}
+/* Not wrong yet, and close to it: a queue at its limit. */
+.state.warn {
+  --c: var(--wait);
+}
+
+/* A word standing in for a value that is missing in a way somebody should act
+   on. "never", where every other row in the column carries a date: the page
+   exists to show that a product reads as clean when part of it was never
+   looked at, so the word cannot be the same grey as an ordinary absence. */
+.alertish {
+  color: var(--wait);
+  font-weight: 600;
+}
+
+/* What a claim is claiming, on the review queue's card.
+   The outcome is what an approver is agreeing to, so it is a mark of its own
+   rather than a clause in the line naming where the finding lives. Colored by
+   what it does: dismissals hide risk and read as the warm end, a deferral is
+   time, and "affected" is agreement with the world. */
+.claimed {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--gap-tight);
+  font-size: 11.5px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  --c: var(--muted);
+  color: var(--c);
+  background: color-mix(in oklab, var(--c) 12%, transparent);
+}
+.claimed b {
+  font-weight: 700;
+}
+.claimed .why {
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+.claimed.not-applicable,
+.claimed.mismatched {
+  --c: var(--sev-high);
+}
+.claimed.wont-fix {
+  --c: var(--sev-high);
+}
+.claimed.deferred {
+  --c: var(--wait);
+}
+.claimed.affected {
+  --c: var(--ok);
+}
+/* Every outcome but affected hides risk, which is the distinction this queue
+   is built around, and is drawn in a warm color. One falling through to the
+   neutral base draws the same as a claim that hides none. A web test holds
+   every outcome the client names to an arm here. */
+.claimed.already-fixed {
+  --c: var(--sev-high);
+}
+.claimed.upgrade-needed {
+  --c: var(--wait);
+}
+.claimed.patch-needed {
+  --c: var(--wait);
+}
+
+/* One judgment, as an auditor reads it. */
+.judgment {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.judgment > header {
+  display: flex;
+  gap: var(--gap);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0 0 8px;
+  font-size: var(--step--1);
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 11px;
+  padding-top: 2px;
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+/* The one lifted thing on a screen: the act it exists for. Border and wash
+   rather than a shadow, because a shadow on one card among several reads as a
+   rendering accident and a tint reads as a choice. */
+.card.act {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+/* The same card where the act is refused rather than offered — no version
+   fixes any of this, so the work is a judgment. */
+.card.stuck {
+  border-color: var(--warn-line);
+  background: var(--warn-wash);
+}
+
+/* The versions a build could move to, with what each closes beside it. A list
+   rather than the browser's own completion, because the counts are the reason
+   to pick one and a datalist shows nothing until somebody clicks in. */
+.tomove {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+}
+.tomove > li {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.tomove > li:first-child {
+  border-top: 0;
+}
+.tomove > li.hint {
+  padding: 6px 9px;
+}
+.tomove button {
+  display: flex;
+  gap: var(--gap-loose);
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 6px 9px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--step--1);
+}
+.tomove button:hover {
+  background: var(--raised);
+}
+.tomove button.on {
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
+}
+.tomove .why {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 400;
+  text-align: right;
+}
+
+/* A pair of figures inside a panel rather than across a screen. */
+.kpis.tight {
+  margin-bottom: var(--gap-wide);
+}
+
+/* Where a package sits, as the chain it sits in: what pulls it in, the package,
+   and what it carries. A rail down the left with a node per step, because the
+   thing being read is a position in a graph rather than three unrelated
+   panels. */
+.sits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sits > li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 14px 18px;
+  position: relative;
+  border-left: 2px solid var(--line-strong);
+  margin-left: 5px;
+}
+.sits > li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+.sits > li::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--pill);
+  border: 2px solid var(--line-strong);
+  background: var(--surface);
+}
+/* The package the screen is about, marked so the eye lands on it first. */
+.sits > li.here::before {
+  left: -8px;
+  top: 3px;
+  width: 13px;
+  height: 13px;
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+/* The package the screen is about is marked by its node, not by its size. A
+   component name is as long as its packager made it — one kernel binary is
+   forty-six characters — so enlarging it takes the column and wraps to three
+   lines, which is worse than not marking it at all. */
+.sits .nm {
+  font-size: var(--step-0);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sits .eyebrow {
+  display: block;
+}
+.sits .sevbar {
+  margin-top: 7px;
+  max-width: 320px;
+}
+.sits .sub {
+  font-size: var(--step--1);
+  color: var(--faint);
+}
+
+/* What a count is made of, as one bar rather than a chip per band.
+   
+   Widths are the counts, so the shape is the answer: a bar that is mostly one
+   color says where the weight is before any number is read. Chips of equal
+   width say only which bands are present, which is the fact a reader least
+   needs.
+   
+   The key is not optional. Two of the severity colors are close enough that a
+   colorblind reader cannot separate them — measured at a perceptual distance
+   of 9.6 where 15 is the floor — so the labels beside the bar are what carries
+   the identity, and the color only reinforces it. */
+.sevbar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: var(--pill);
+  overflow: hidden;
+  background: var(--line);
+}
+/* A segment and a swatch are painted in the band's color from the arm above,
+   and in nothing where they carry no band. */
+.sevbar,
+.sevkey {
+  --c: transparent;
+}
+.sevbar > i {
+  display: block;
+  min-width: 3px;
+  background: var(--c);
+}
+.sevkey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+}
+.sevkey > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sevkey > span > i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+  background: var(--c);
+}
+
+/* The row a screen is currently about, in a table listing several. */
+tr.row.on > td {
+  background: var(--raised);
+}
+
+/* The facts grid, a row tighter: a judgment on the audit sheet is one of many
+   stacked, and reads as a block. */
+.judgment .facts {
+  gap: 3px 12px;
+}
+.judgment .reasoning {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 13px;
+}
+
+/* Only on paper. */
+.printhead {
+  display: none;
+}
+
+/* A chip takes its tint from one hook, so an arm names a color and nothing
+   else. */
+.vchip {
+  --c: var(--muted);
+  font-size: 10.5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0 7px;
+  color: var(--c);
+  white-space: nowrap;
+}
+.vchip.differs,
+.vchip.nothing,
+.vchip.bad,
+.vchip.ok {
+  border-color: var(--c);
+  background: color-mix(in oklab, var(--c) 10%, transparent);
+}
+.vchip.differs {
+  --c: var(--sev-high);
+}
+/* A chip marking what a row is missing rather than what it holds. It reads as
+   a warning and stays a chip, the height of the chips beside it. */
+.vchip.nothing {
+  --c: var(--sev-high);
+  font-weight: 600;
+}
+/* A chip somebody picks with, and the one picked. It stays a chip: a button
+   brings its own font, border and background, and left alone it stood a head
+   taller than the chips beside it. */
+button.vchip {
+  font: inherit;
+  font-size: 10.5px;
+  background: none;
+  cursor: pointer;
+  line-height: 1.7;
+}
+/* A chip tinted by what it says rather than by where it sits: a count of
+   criticals and a deadline are read at a glance or not at all. */
+.vchip.bad {
+  --c: var(--sev-critical);
+  font-weight: 600;
+}
+.vchip.ok {
+  --c: var(--ok);
+}
+.vchip.on {
+  border-color: var(--ink);
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
+}
+.variants {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  /* Chips sit on one line rather than being stretched to the tallest of
+     them, which is what a row of items of unequal height does by default. */
+  align-items: center;
+}
+
+/* A small table inside a panel: no wrapper, no scroll, four short columns.
+   The page's main table style assumes a full-width list with a scrolling
+   wrapper, which inside a panel draws a scrollbar under four numbers. */
+.panel table.plain {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 2px;
+}
+.panel table.plain th,
+.panel table.plain td {
+  padding: 4px 6px;
+  border: 0;
+  font-size: var(--step--1);
+}
+.panel table.plain thead th {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+/* What an upload was made of. Not a chip: a chip is something you press, and
+   these are a reading of what arrived. Struck through once the contents have
+   been let go, because the row is then a record rather than a file. */
+.sent {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--gap-hair);
+}
+.doc {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.doc.letgo {
+  color: var(--faint);
+  border-style: dashed;
+}

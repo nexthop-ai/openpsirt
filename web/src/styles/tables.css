@@ -1,0 +1,364 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Tables, and the rows and cells every list is built from. */
+
+/* ---------- tables ---------- */
+
+.tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+/* A table inside something that is already a block of its own: rows laid out
+   in columns, with none of the edges that say "separate object". Bordered
+   inside a panel it reads as a panel within a panel, and a screen of those
+   flattens the hierarchy it was drawn to show. */
+.tablewrap.plain {
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+/* A table wider than its box says so, at every width. It scrolls sideways,
+   which is discoverable once somebody knows it is a table and not once they
+   think the page is cut off — so the table says which it is, pinned so the
+   note stays put while the table moves.
+
+   Only the ones that are actually wider. The attribute is set by the
+   component when it measures itself past its box, because a stylesheet
+   cannot ask: saying it over a two-column table that fits is a note about
+   scrolling on something nobody can scroll, which teaches people to stop
+   reading the notes. */
+.tablewrap[data-wider]::before {
+  content: "This table scrolls sideways.";
+  display: block;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--step--1);
+  position: sticky;
+  left: 0;
+}
+/* The clipped edge is shaded, so the overflow shows before the note is read.
+   Drawn as the box's own background rather than a shadow: a shadow inset on
+   a scrolling box moves with the rows, and a background does not. The rows
+   are transparent over it, which is what lets it show through. */
+.tablewrap[data-clipped="right"] {
+  background-image: linear-gradient(to left, var(--shade), transparent 28px);
+}
+.tablewrap[data-clipped="left"] {
+  background-image: linear-gradient(to right, var(--shade), transparent 28px);
+}
+.tablewrap[data-clipped="both"] {
+  background-image:
+    linear-gradient(to left, var(--shade), transparent 28px),
+    linear-gradient(to right, var(--shade), transparent 28px);
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--step--1);
+}
+thead th {
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* A row that opens its target on a click anywhere takes the pointer and the
+   hover fill. A row that does not is drawn flat, so its links are what reads
+   as clickable. */
+tbody tr.row.opens {
+  cursor: pointer;
+}
+tbody tr.row.opens:hover td {
+  background: var(--raised);
+}
+/* The row the keys are about. Drawn on the left edge rather than as a fill, so
+   that it is still legible on the row a pointer is also over and on one that
+   is open below. */
+tbody tr.row.at > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+tbody tr.row.at > td {
+  background: var(--accent-soft);
+}
+td.num,
+th.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+/* The findings list is a worklist rather than a document. A row is read
+   against the forty-nine around it, so its height is paid fifty times a page
+   and the two things that set it are worth naming.
+
+   The component's name does not wrap. It breaks at every hyphen, and a Debian
+   kernel package is nothing but hyphens, so a name that would sit on one line
+   was arriving as three ragged ones and deciding the height of the row. The
+   column is as wide as the longest name either way — a name is one token to a
+   reader whatever the browser thinks — so holding it on one line costs
+   nothing and saves two.
+
+   And the padding is a worklist's rather than a table's. */
+.findings tbody td,
+.findings thead th {
+  padding: 6px 10px;
+}
+.findings .compname {
+  white-space: nowrap;
+}
+.findings .compline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--gap);
+  white-space: nowrap;
+}
+/* A value that a reader treats as one word, whatever the browser's line
+   breaker makes of the punctuation in it. */
+.whole {
+  white-space: nowrap;
+}
+
+/* The two small acts beside a component's name. The name itself opens the
+   component, so narrowing and hiding are what is left, and they sit together
+   rather than one of them being parked in the last column. */
+.hideit,
+.onlyit {
+  color: var(--faint);
+  font-weight: 500;
+  margin-left: 8px;
+  font-size: 11px;
+}
+.hideit:hover {
+  color: var(--sev-high);
+}
+.onlyit:hover {
+  color: var(--accent);
+}
+.share {
+  display: block;
+  height: 3px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.55;
+  margin-left: auto;
+}
+
+/* Where a row sits. It wraps, but only between the parts — the two ends of
+   the way down, and the note saying the row covers more builds than the one
+   named. Left to break anywhere, four short words became three lines and set
+   the height of every row on the page: the tallest cell decides, and in a
+   column 80px wide this was it. */
+.chain {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.chain > * {
+  white-space: nowrap;
+}
+.chain .ends {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.chain .hop {
+  color: var(--ink);
+}
+.chain .gap {
+  color: var(--faint);
+  border: 1px dashed var(--line-strong);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  cursor: help;
+}
+.chain .arrow {
+  color: var(--faint);
+}
+/* The control that opens a row's preview under it. A plus and a minus rather
+   than a triangle: at the size this sits in, a filled triangle reads as a dot,
+   and a box with a dot in it says nothing about what pressing it does. */
+.peek {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius);
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.peek:hover {
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+/* What a comment said before it was changed. Indented under the current text
+   and quieter than it, because it is the record rather than the
+   conversation. */
+.earlier {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.earlier > div + div {
+  margin-top: 8px;
+}
+button.edited {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+/* What would make an approver disagree. Beside the claim rather than a page
+   away from it, because a card that shows only the argument for is the rubber
+   stamp the queue exists to prevent — and quiet rather than alarming, since
+   none of it says the claim is wrong. */
+.counter {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--wait);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.counter h5 {
+  margin: 0 0 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.counter ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.counter li + li {
+  margin-top: 4px;
+}
+
+/* A name typed against a list the server holds. The list is over the page
+   rather than in the flow, so a field near the bottom of a form does not push
+   everything below it down as somebody types. */
+.suggest {
+  position: relative;
+}
+/* The one shape every list dropping from a control takes: suggestions under a
+   field, the choices under a picker, the filters under a filter button. Each
+   keeps its own width, padding and layout below. */
+.suggestions,
+.choicelist,
+.filterlist {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 3px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.suggestions {
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.suggestions li {
+  margin: 0;
+}
+/* The rows that are a message rather than a choice — "Looking…", nothing
+   matched. Only those, because the same class marks what a choice says about
+   itself beside its name: a block there drops that onto a second row and
+   stands every option in the list two rows tall. */
+.suggestions > li.hint {
+  display: block;
+  padding: 6px 8px;
+}
+.suggestions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+.suggestions button.at,
+.suggestions button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Select the row, and look at it without leaving the list. One narrow cell,
+   side by side: the two belong to the row rather than to its content, and
+   stacked they read as two unrelated controls. */
+.rowpickcell {
+  width: 1%;
+  white-space: nowrap;
+}
+.rowpick {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+.rowpick input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+}
+
+tr.places td {
+  background: var(--raised);
+  padding: 0 12px 12px 44px;
+}
+.placelist {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.placelist li {
+  display: flex;
+  gap: var(--gap-loose);
+  align-items: center;
+  font-size: var(--step--1);
+}
+.placelist .id {
+  color: var(--ink);
+}
+.placelist .note {
+  color: var(--faint);
+}

@@ -1,0 +1,332 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* The findings list's filters: the chips, what each opens, and the line over
+   the list. */
+
+/* ---------- the findings list's filters ---------- */
+
+/* The panel: groups side by side, each a titled set of labeled controls. It
+   replaced a flat run of boxes where half the filters were identified only by
+   their values — which is how two of the most-asked-for ones sat on screen
+   and were reported missing. */
+.filterpanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--gap-room);
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.filtergroup {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.filtergroup legend {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.filterset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-wide);
+}
+.filterset .field {
+  margin: 0;
+  max-width: none;
+}
+.filterset .field > span:first-child {
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink);
+}
+.filterset select,
+.filterset input:not([type="checkbox"]) {
+  width: 100%;
+}
+/* A generated document shown as it is. Never rendered: it is data a customer's
+   tooling reads, and what a reader has to check is exactly the text that will
+   be sent. */
+.asis {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  margin: 8px 0 0;
+  font-family: var(--mono);
+  font-size: var(--step--1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* One line of what an issue says, on its row. Clamped to one line rather than
+   wrapped: the row's height is what makes a page of fifty five thousand pixels
+   tall, and a summary that pushes it further would trade one problem for a
+   worse one. The whole of it is on the finding, and on the title here. */
+.summary {
+  margin-top: 2px;
+  font-size: var(--step--1);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Wide enough to tell two rows apart and no wider. This column takes the
+     table's slack — an untruncated sentence is what a browser sizes an
+     auto-laid column against — and every pixel it takes here is one the
+     columns that hold a whole value do not get. */
+  max-width: 40ch;
+}
+
+/* What a typed filter is holding. Chips above the box rather than inside it:
+   inside, a long name pushes the cursor off the end of the field. */
+.words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-tight);
+}
+
+/* Several answers to one question. Drawn as a field so it lines up with the
+   selects beside it, and the list it opens sits over the panel rather than
+   inside it: a group that grew by five rows when it was opened pushed every
+   filter below it down the screen. */
+.choices {
+  position: relative;
+}
+/* In the toolbar it stands beside chips rather than under a label, so it is
+   sized to what it says instead of to the column it would have filled. */
+.filters .choices {
+  min-width: 150px;
+}
+.filters .choicesat {
+  padding: 4px 10px;
+}
+.choicesat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-tight);
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.choicesat[data-on="yes"] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+/* After the picked state, which it outranks by position. */
+.choicesat:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.choicelist {
+  min-width: 100%;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  padding: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* The findings list's grouping, as tabs: it changes what a row is rather
+   than which rows show, so it sits above the filters rather than among them. */
+.viewtabs {
+  display: flex;
+  gap: var(--gap-room);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+  /* Wraps rather than scrolls. A box scrolling on one axis scrolls on both,
+     and each tab's underline sits one pixel into the border below. */
+  flex-wrap: wrap;
+}
+.viewtab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  padding: 6px 0 8px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.viewtab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+.viewtab .n {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A filter as one button carrying its own name and value. Each wraps as a
+   whole, so a name never lands on a different line from its value. */
+.filterbar .spacer {
+  flex: 1 1 0;
+}
+.filtermenu {
+  position: relative;
+}
+.filterbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  width: auto;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filterbtn:hover {
+  border-color: var(--accent-line);
+}
+.filterbtn .k,
+.filterbtn .caret {
+  color: var(--faint);
+}
+.filterbtn .v {
+  font-weight: 500;
+}
+.filterbtn[data-on="yes"] {
+  border-color: var(--line-strong);
+  background: var(--raised);
+}
+/* After the hover and the picked state, which it outranks by position. */
+.filterbtn:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+  outline: none;
+}
+.filterlist {
+  min-width: max(100%, 190px);
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+}
+.filteritem {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  font: inherit;
+  font-size: var(--step--1);
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.filteritem:hover,
+.filteritem:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+.filteritem .box,
+.filteritem .dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+.filteritem .box {
+  border-radius: 3px;
+}
+.filteritem .dot {
+  border-radius: 50%;
+}
+.filteritem[aria-checked="true"] .box {
+  position: relative;
+  border-color: var(--ink);
+  background: var(--ink);
+}
+/* The tick is drawn rather than an image, so it takes the canvas color of
+   whichever look is on against the ink behind it. */
+.filteritem[aria-checked="true"] .box::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--canvas);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.filteritem[aria-checked="true"] .dot {
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 3.5px, var(--surface) 4px);
+}
+
+/* The line over the list: how many, and in what order. */
+.listhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  margin: 4px 0 8px;
+}
+.sortby {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--step--1);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.sortby select {
+  width: auto;
+}
+
+/* A checkbox and its word. The class was in the markup and in no stylesheet —
+   it drew correctly only because the panel it used to sit in was a flex row
+   with a gap, so the moment it moved the box and its label ran together. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-tight);
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+.check input {
+  flex: none;
+  margin: 0;
+}
+
+/* What is on, above the list, whether or not the panel is open. A narrowed
+   list that looks unnarrowed is how two people read one screen and disagree
+   about what it says. */
+.narrowed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight);
+  margin-bottom: 12px;
+}
+/* A filter in force is read rather than pressed, so it sits on the raised
+   tone with its label quieter than its value, and never in the ink a chip
+   that is pressed takes. */
+.narrowed .chip,
+.narrowed .chip[aria-pressed="true"] {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 500;
+}
+.narrowed .chip .l {
+  color: var(--faint);
+  font-weight: 400;
+}
