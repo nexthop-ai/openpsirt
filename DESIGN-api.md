@@ -175,7 +175,8 @@ its driver.
 
 Whether an error's text may be published is one test, used wherever the
 question is asked: a refusal that carries nothing an engine or a driver put in
-it. The harness every route package runs over its mappers reads the whole body
+it. A failed scan run's receipt asks only the second half, because a scanner's
+own words are not a refusal and are what tell a producer why. The harness every route package runs over its mappers reads the whole body
 a fault answers, its list of errors included, and fails a fault that carries any
 detail of its cause.
 

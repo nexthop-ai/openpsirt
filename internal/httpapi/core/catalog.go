@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/uptrace/bun"
 )
 
@@ -340,7 +339,7 @@ func DeclineDeclaration(logger *slog.Logger, err error) error {
 	case errors.Is(err, database.ErrGoAgain):
 		// A lost race, which the transaction around the act takes again.
 		return err
-	case database.FromEngine(err):
+	case !database.Publishable(err):
 		return WentWrong(logger, "that could not be declared", err)
 	case errors.Is(err, catalog.ErrDiffers):
 		// Declared before, meaning something else. Answering with success
@@ -351,10 +350,8 @@ func DeclineDeclaration(logger *slog.Logger, err error) error {
 		// is what makes it safe to publish: an administrator declaring under
 		// a product that does not exist needs to know which name was wrong.
 		return Undeclared(nil, err, "")
-	case refusal.In(err):
-		return huma.Error400BadRequest(err.Error())
 	default:
-		return WentWrong(logger, "that could not be declared", err)
+		return huma.Error400BadRequest(err.Error())
 	}
 }
 

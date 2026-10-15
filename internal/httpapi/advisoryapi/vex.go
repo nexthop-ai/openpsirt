@@ -289,9 +289,9 @@ func vexRefused(in core.Deps, err error, what string) error {
 	case errors.Is(err, vex.ErrRenamed):
 		// The caller's to ask again, and the sentence says so.
 		return huma.Error409Conflict(vex.ErrRenamed.Error())
-	case database.FromEngine(err):
-		// A database that broke, whatever else is true. Logged, and answered
-		// in words that name nothing about it.
+	case !database.Publishable(err):
+		// A database that broke, or anything else that is not a sentence for
+		// the caller. Logged, and answered in words that name nothing about it.
 		return core.WentWrong(in.Logger, what, err)
 	case errors.Is(err, vex.ErrTooLarge):
 		// Something to narrow rather than something broken, and the sentence
