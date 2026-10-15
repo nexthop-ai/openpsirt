@@ -29,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/adminapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -978,6 +979,10 @@ func serveBeside(cfg config.Config, logger *slog.Logger, handler http.Handler,
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
 	defer cancel()
 	shutdownErr := srv.Shutdown(shutdownCtx)
+	// A deadline rewrite a request started runs off the request, so the
+	// server's drain does not wait for it. Ended here, once no request can
+	// start another, it hands its lease back for the next process.
+	adminapi.StopRewrites(shutdownCtx)
 
 	// And give the workers the same bound, rather than none.
 	//

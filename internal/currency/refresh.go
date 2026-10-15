@@ -119,6 +119,9 @@ const betweenCycles = time.Minute
 // and an operator who decides that was a mistake should not have to redeploy
 // to stop it.
 func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
+	// Handed back once the last cycle has ended, so the next replica asks
+	// without waiting out the lease.
+	defer r.leases.Handback(ctx, AskingLease, r.replica, r.logger)
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		on, err := r.enabled(ctx)
 		switch {

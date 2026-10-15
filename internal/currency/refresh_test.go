@@ -1081,3 +1081,41 @@ func TestASlowIndexDoesNotOutlastTheLease(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// A replica that stops between cycles hands the lease back, so the next one
+// asks at once rather than waiting the lease out.
+func TestARefresherStoppedBetweenCyclesHandsTheLeaseBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		r, _ := seed(t, db, []component{{purl: "pkg:golang/example.com/one@1.0"}}, nil, nil)
+		running, stop := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			r.Run(running, time.Hour)
+		}()
+		// The first cycle runs at once and takes the lease; the next is an
+		// hour away, so the stop below lands between the two.
+		holding := false
+		for range 10_000 {
+			var holder []string
+			if err := db.DB.NewSelect().TableExpr(`"lease"`).Column("held_by").
+				Where(`"name" = ?`, currency.AskingLease).Where(`"held_by" IS NOT NULL`).
+				Scan(t.Context(), &holder); err != nil {
+				t.Fatal(err)
+			}
+			if holding = len(holder) == 1; holding {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		if !holding {
+			t.Fatal("the refresher never took the lease, so there was nothing to hand back")
+		}
+		stop()
+		<-done
+		mine, err := queue.NewLeases(db.DB).Take(t.Context(), currency.AskingLease, "the-next-replica", time.Hour)
+		if err != nil || !mine {
+			t.Errorf("the next replica could not take the work at once: %v %v", mine, err)
+		}
+	})
+}

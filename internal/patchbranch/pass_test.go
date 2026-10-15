@@ -224,6 +224,45 @@ func TestAPassStoppedMidVisitHandsTheLeaseBack(t *testing.T) {
 	})
 }
 
+// A replica shutting down between visits hands the lease back too, so the next
+// one carries on at once whichever moment the stop arrived at.
+func TestAPassStoppedBetweenCyclesHandsTheLeaseBack(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			outward.Excluded{}, func(string) string { return "" }).Leased(db.DB, "one", time.Minute)
+		running, stop := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			pass.Run(running, time.Hour)
+		}()
+		// Nothing is due, so the first cycle takes the lease, visits nothing
+		// and ends; the next is an hour away, so the stop lands between them.
+		holding := false
+		for range 10_000 {
+			var holder []string
+			if err := db.DB.NewSelect().TableExpr(`"lease"`).Column("held_by").
+				Where(`"name" = ?`, patchbranch.Lease).Where(`"held_by" IS NOT NULL`).
+				Scan(t.Context(), &holder); err != nil {
+				t.Fatal(err)
+			}
+			if holding = len(holder) == 1; holding {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+		if !holding {
+			t.Fatal("the pass never took the lease, so there was nothing to hand back")
+		}
+		stop()
+		<-done
+		mine, err := queue.NewLeases(db.DB).Take(t.Context(), patchbranch.Lease, "two", time.Hour)
+		if err != nil || !mine {
+			t.Errorf("the next replica could not take the work at once: %v %v", mine, err)
+		}
+	})
+}
+
 // passOver is a pass that fetches each named project from its directory.
 func passOver(t *testing.T, db *database.DB, quota int64, excluded outward.Excluded, projects map[string]upstream) *patchbranch.Pass {
 	t.Helper()

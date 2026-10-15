@@ -126,6 +126,10 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 // all the time: on the demonstration images, a five-minute wait puts the 48
 // copies already on disk four hours ahead of the kernel.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
+	// Handed back once the last cycle has ended, between visits as well as
+	// during one, so the next replica carries on without waiting out the
+	// lease.
+	defer p.leases.Handback(ctx, Lease, p.replica, p.logger)
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		if !p.on {
 			return
