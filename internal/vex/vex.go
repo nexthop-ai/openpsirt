@@ -796,14 +796,14 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vex_statement" AS "ss" ON ss.id = f.stated_by`).
-		Join(`LEFT JOIN "statement_text" AS "stw" ON stw.id = ss.statement_id`).
+		Join(finding.WordsJoin("ss")).
 		ColumnExpr(`f.id AS "id"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`ss.publisher AS "publisher"`).
 		ColumnExpr(`COALESCE(ss.within, ss.component) AS "product"`).
 		ColumnExpr(`COALESCE(ss.within_about, ss.about) AS "version"`).
 		ColumnExpr(`COALESCE(ss.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(stw.words, '') AS "statement"`).
+		ColumnExpr(finding.WordsColumn+` AS "statement"`).
 		ColumnExpr(`ss.document AS "document"`).
 		Where(where, args...).
 		Scan(ctx, &read); err != nil {

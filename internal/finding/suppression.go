@@ -435,13 +435,13 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		// identifiers, and a screen needs moments.
 		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
 		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
-		Join(wordsJoin("sup")).
+		Join(WordsJoin("sup")).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
 		ColumnExpr(`COALESCE(NULLIF(sup.subject_name, ''), sup.subject_purl) AS "subject"`).
 		ColumnExpr(`COALESCE(sup.subject_version, '') AS "version"`).
 		ColumnExpr(`sup.status AS "status"`).
 		ColumnExpr(`COALESCE(sup.justification, '') AS "justification"`).
-		ColumnExpr(wordsColumn + ` AS "statement"`).
+		ColumnExpr(WordsColumn + ` AS "statement"`).
 		ColumnExpr(`sup.origin AS "origin"`).
 		ColumnExpr(`COALESCE(sup.within_purl, '') AS "within_purl"`).
 		ColumnExpr(`COALESCE(sup.within_name, '') AS "within_name"`).

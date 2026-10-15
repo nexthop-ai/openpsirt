@@ -54,15 +54,16 @@ func wordsDigest(words string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// wordsJoin joins the stored reasoning a row points at, under the alias
-// "stw". Every reader of a claim's reasoning reads it through this join.
-func wordsJoin(alias string) string {
+// WordsJoin joins the stored reasoning a row points at, under the alias
+// "stw". Every reader of a claim's reasoning reads it through this join, in
+// this package and outside it.
+func WordsJoin(alias string) string {
 	return `LEFT JOIN "statement_text" AS "stw" ON stw.id = ` + alias + `.statement_id`
 }
 
-// wordsColumn is the reasoning a row points at, read through wordsJoin, and
+// WordsColumn is the reasoning a row points at, read through WordsJoin, and
 // the empty string where it gave none.
-const wordsColumn = `COALESCE(stw.words, '')`
+const WordsColumn = `COALESCE(stw.words, '')`
 
 // internWords is the stored copy of each of the reasoning given, writing the
 // ones not yet held.

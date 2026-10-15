@@ -93,7 +93,7 @@ type Statement struct {
 // withWords reads every column of the statements a query selects, and the
 // reasoning each points at.
 func withWords(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.ColumnExpr("?TableColumns").Join(wordsJoin("ss")).ColumnExpr(wordsColumn + ` AS "statement"`)
+	return q.ColumnExpr("?TableColumns").Join(WordsJoin("ss")).ColumnExpr(WordsColumn + ` AS "statement"`)
 }
 
 // StatementOf is one claim a document makes, about one of the components it
@@ -355,7 +355,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		err := tx.NewSelect().Model(&standing).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification").
-			Join(wordsJoin("ss")).ColumnExpr(wordsColumn+` AS "statement"`).
+			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
@@ -385,7 +385,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification").
-			Join(wordsJoin("ss")).ColumnExpr(wordsColumn+` AS "statement"`).
+			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where("product_id = ?", productID).
 			Where("publisher = ?", publisher).
 			Where("source = ?", from.Source).
