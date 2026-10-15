@@ -195,3 +195,64 @@ func TestSomebodyWhoReadsNothingMeasuresNothing(t *testing.T) {
 		}
 	})
 }
+
+func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
+	// An issue at two places: one fixed in the window with the other still
+	// open is not fixed, one whose second place closes after the window is
+	// not fixed in it, and one whose second place closes in the window is
+	// fixed there, timed from its first place opening.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{swss, teamd, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnl}, {Parent: teamd, Child: libnl},
+			},
+		})
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
+			found("CVE-2026-3", libnl))
+		now := time.Now().UTC()
+		since, until := now.Add(-7*24*time.Hour), now.Add(-12*time.Hour)
+		closeOne := func(t *testing.T, issue string, at time.Time) {
+			t.Helper()
+			var id int64
+			if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("id").
+				Where(`"vulnerability_id" = ?`, f.issueID(t, issue)).
+				Where(`"closed_at" IS NULL`).OrderExpr(`"id"`).Limit(1).Scan(ctx, &id); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+				Set(`"closed_at" = ?`, at).Set(`"closed_because" = ?`, finding.Upgraded).
+				Where(`"id" = ?`, id).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3"} {
+			f.aged(t, issue, now.Add(-30*24*time.Hour))
+		}
+		// The first: one place fixed in the window, the other open.
+		closeOne(t, "CVE-2026-1", now.Add(-24*time.Hour))
+		// The second: one place fixed before the window, the other in it.
+		closeOne(t, "CVE-2026-2", now.Add(-20*24*time.Hour))
+		closeOne(t, "CVE-2026-2", now.Add(-24*time.Hour))
+		// The third: one place fixed in the window, the other after it ends.
+		closeOne(t, "CVE-2026-3", now.Add(-24*time.Hour))
+		closeOne(t, "CVE-2026-3", now.Add(-time.Hour))
+
+		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
+			f.wholeProduct(), since, until)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Fixed != 1 {
+			t.Errorf("counted %d fixes, want the one issue whose last place closed in the window", got.Fixed)
+		}
+		for band, took := range got.TimeToFix {
+			if took < 28*24*time.Hour || took > 30*24*time.Hour {
+				t.Errorf("%s took %s, want about twenty-nine days", band, took)
+			}
+		}
+	})
+}

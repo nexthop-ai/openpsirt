@@ -5133,7 +5133,7 @@ export interface paths {
          *
          *     A closure counts as a fix only where the issue went away. An upgrade that carried the issue into the next version, and a finding a scanner stopped reporting, are not counted.
          *
-         *     Counted in issues, not in places.
+         *     Counted in issues, not in places. An issue is fixed in the period its last place closed by a fix, and not while any place of it you may see is open.
          *
          *     Asked for neither a period nor a window, this is the last 30 days.
          *
@@ -11216,7 +11216,7 @@ export interface components {
             aging: components["schemas"]["BucketBody"][] | null;
             /**
              * Format: int64
-             * @description Distinct issues that actually went away in the window
+             * @description Distinct issues whose last open place closed by a fix in the window
              */
             fixed: number;
             /** @description The first day of the period. Absent where it runs from the beginning */
@@ -11226,7 +11226,7 @@ export interface components {
              * @description Distinct issues that appeared in it
              */
             opened: number;
-            /** @description Average hours an issue closed in the window was open for, by severity. A severity nothing closed at is absent rather than zero */
+            /** @description Average hours an issue fixed in the window was open for, from its first place opening to its last place closing, by severity. A severity nothing was fixed at is absent rather than zero */
             time_to_fix?: {
                 [key: string]: number;
             };

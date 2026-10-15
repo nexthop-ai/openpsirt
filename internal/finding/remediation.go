@@ -129,16 +129,36 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 
 	// spans is how long each issue took, averaged per severity band.
 	// Averaged over the issue rather than over its rows, because the places
-	// are what fans out: an issue counts once where any of its places closed
-	// by a fix in the window, and took from the first of those places to
-	// open to the last of them to close.
+	// are what fans out: an issue counts once, in the window its last place
+	// closed by a fix, and only where none of its places is still open. It
+	// took from the first of its places to open to the last of them to close.
 	var spans []struct {
 		Rank    int     `bun:"band_rank"`
 		Seconds float64 `bun:"seconds"`
 		Issues  int     `bun:"issues"`
 	}
+	// The issues with a place closed by a fix in the window. The last place
+	// to close closed in the window, so every issue counted is among these,
+	// and the places of the rest are never read.
+	closing := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`"f"."vulnerability_id"`).
+		Where(`"f"."closed_at" IS NOT NULL`).
+		Where(wasOpen).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			if !since.IsZero() {
+				q = q.Where(`"f"."closed_at" >= ?`, since)
+			}
+			return q.Where(`"f"."closed_at" < ?`, until)
+		})
+	closing = resolved(closing)
+
 	// One row per issue and product first, because a rating belongs to a
-	// product and every narrowing is a condition on a place.
+	// product and every narrowing is a condition on a place. Every place of
+	// those issues, open ones included, so that an issue still open
+	// anywhere the reader looks is not counted as fixed. A place closed for
+	// any other reason is left out: churn carried the issue to a place that
+	// is open, and a record taken back was never a place.
 	closed := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -147,20 +167,20 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`MAX("f"."closed_at") AS "closed_at"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		Where(`"f"."closed_at" IS NOT NULL`).
+		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "open_places"`).
 		Where(wasOpen).
+		Where(`"f"."vulnerability_id" IN (?)`, closing).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			if !since.IsZero() {
-				q = q.Where(`"f"."closed_at" >= ?`, since)
-			}
-			return q.Where(`"f"."closed_at" < ?`, until)
+			return q.Where(`"f"."closed_at" IS NULL`).
+				WhereOr(`"f"."closed_because" IN (?)`, bun.List(Resolving()))
 		}).
 		GroupExpr(`"f"."vulnerability_id", "st"."product_id"`)
-	closed = resolved(scope.Narrow(onlyReadable(closed, subject, products, all)))
+	closed = scope.Narrow(onlyReadable(closed, subject, products, all))
 
 	// Then one row per issue, in the strictest band any product it closed in
-	// gives it, so an issue rated two ways in
-	// two products is one fix, in the same unit as what opened.
+	// gives it, so an issue rated two ways in two products is one fix, in the
+	// same unit as what opened. Counted where no place of it is open in any
+	// product and the last place closed in the window.
 	perIssue := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, closed).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
@@ -168,7 +188,11 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MAX(` + rankCase(rating.BandExpr, 0) + `) AS "band_rank"`).
 		ColumnExpr(`MAX("grouped"."closed_at") AS "closed_at"`).
 		ColumnExpr(`MIN("grouped"."opened_at") AS "opened_at"`).
-		GroupExpr(`"grouped"."vulnerability_id"`)
+		GroupExpr(`"grouped"."vulnerability_id"`).
+		Having(`SUM("grouped"."open_places") = 0`)
+	// The window's start needs no condition of its own: a place closed in
+	// the window is what put the issue among those read.
+	perIssue = perIssue.Having(`MAX("grouped"."closed_at") < ?`, until)
 
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.

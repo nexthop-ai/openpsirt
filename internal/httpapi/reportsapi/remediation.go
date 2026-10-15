@@ -37,11 +37,11 @@ type RemediationOutput struct {
 	Body struct {
 		// Fixed and Opened are in the same unit deliberately, so the two can be
 		// read against each other.
-		Fixed  int `json:"fixed" doc:"Distinct issues that actually went away in the window"`
+		Fixed  int `json:"fixed" doc:"Distinct issues whose last open place closed by a fix in the window"`
 		Opened int `json:"opened" doc:"Distinct issues that appeared in it"`
 		// TimeToFix is by the severity a thing was rated, in hours. Absent for
 		// a rating nothing closed at, because a zero would read as instant.
-		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue closed in the window was open for, by severity. A severity nothing closed at is absent rather than zero"`
+		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue fixed in the window was open for, from its first place opening to its last place closing, by severity. A severity nothing was fixed at is absent rather than zero"`
 		Aging     []BucketBody       `json:"aging" doc:"Everything open now, by how long it has been. About now whatever period was asked for"`
 		// The period these cover, said back, so a figure is never read apart
 		// from the window it was worked out over.
@@ -78,7 +78,8 @@ func registerRemediation(api huma.API, in core.Deps) {
 			"A closure counts as a fix only where the issue went away. An upgrade that carried " +
 			"the issue into the next version, and a finding a scanner stopped reporting, are " +
 			"not counted.\n\n" +
-			"Counted in issues, not in places.\n\n" +
+			"Counted in issues, not in places. An issue is fixed in the period its last " +
+			"place closed by a fix, and not while any place of it you may see is open.\n\n" +
 			"Asked for neither a period nor a window, this is the last 30 days.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {

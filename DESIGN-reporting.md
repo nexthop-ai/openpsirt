@@ -329,10 +329,15 @@ Fix velocity, average time to remediate by severity, and aging buckets over a
 period. A finding records when it opened and when it closed, so how long
 something took is a subtraction rather than a second record somebody maintains.
 
-A fix is counted in issues, the unit what opened is counted in. An issue closed
-in two products is one fix, timed from its earliest opening to its last
-closing, in the strictest band any of those products gives it — the reduction
-the aging buckets make.
+A fix is counted in issues, the unit what opened is counted in.
+
+| Rule | Reason |
+|---|---|
+| An issue is fixed in the period its last place closed by a fix | An issue fixed at one place and open at another has not gone away. The grain is the issue across every place the reader may see, in every product |
+| An issue with any place open is not fixed in any period | The same rule from the other side |
+| A place closed for a reason that is not a fix is left out | Churn carried the issue to a place that is open, and a record taken back was never a place |
+| A fix is timed from the issue's earliest place opening to its last place closing | How long the issue was there, however far it fanned out |
+| It is rated in the strictest band any of its products gives it | The reduction the aging buckets make, so an issue rated two ways in two products is one fix |
 
 The aging buckets are cut two ways. One number per bucket says a hundred
 things are over three months old, and neither whether any of them matters nor
