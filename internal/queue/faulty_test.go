@@ -117,13 +117,7 @@ func TestWorkWhoseEndingCannotBeRecordedSaysSo(t *testing.T) {
 	ctx := t.Context()
 	handle, owner := dbtest.Racing(t, nil)
 	q := queue.New(handle, queue.DefaultOptions())
-	if _, err := q.Add(ctx, "ingest", "unrecorded"); err != nil {
-		t.Fatal(err)
-	}
-	job, err := q.Claim(ctx, "worker", "ingest")
-	if err != nil || job == nil {
-		t.Fatalf("claiming: %v", err)
-	}
+	job := claimed(t, q, "ingest", "unrecorded", "worker")
 	owner.Arm(database.Attempts)
 	ending := q.Settle(ctx, job, "worker", "upload", nil, nil, nil, nil)
 	if ending.Err == nil || ending.HandedOver {
@@ -144,13 +138,7 @@ func TestFinishingWorkAlreadyRecordedAsFinishedIsNotALostClaim(t *testing.T) {
 		}
 	})
 	q := queue.New(handle, queue.DefaultOptions())
-	if _, err := q.Add(ctx, "ingest", "answer-lost"); err != nil {
-		t.Fatal(err)
-	}
-	job, err := q.Claim(ctx, "worker", "ingest")
-	if err != nil || job == nil {
-		t.Fatalf("claiming: %v", err)
-	}
+	job := claimed(t, q, "ingest", "answer-lost", "worker")
 	owner.Arm(1)
 	if err := q.Succeed(ctx, job.ID, "worker"); err != nil {
 		t.Errorf("finishing work that reads finished answered %v", err)
@@ -199,12 +187,7 @@ func TestAClaimTakenAgainReadsTheMomentAgain(t *testing.T) {
 	handle, owner := dbtest.Racing(t, func() { now = now.Add(2 * time.Minute) })
 	q := queue.New(handle, opts)
 	queue.SetClock(q, func() time.Time { return now })
-	if _, err := q.Add(ctx, "ingest", "held-by-one-that-died"); err != nil {
-		t.Fatal(err)
-	}
-	if job, err := q.Claim(ctx, "dead", "ingest"); err != nil || job == nil {
-		t.Fatalf("first claim: %v", err)
-	}
+	claimed(t, q, "ingest", "held-by-one-that-died", "dead")
 	// A minute short of stale when the claim begins, and past it once the
 	// lost commit has been waited out.
 	now = now.Add(opts.ClaimTimeout - time.Minute)

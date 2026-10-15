@@ -124,19 +124,10 @@ func TestEveryProductStatusTheFormatDefinesIsRead(t *testing.T) {
 
 // oneStatus is the smallest advisory that lists one product under one status.
 func oneStatus(list string) string {
-	return `{
-	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
-	    "publisher": {"category": "vendor", "name": "Example"},
-	    "title": "One status", "tracking": {"id": "EX-1", "version": "1",
-	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
-	      "current_release_date": "2026-09-01T00:00:00Z",
-	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
-	                            "summary": "First"}]}},
-	  "product_tree": {"full_product_names": [{"product_id": "P", "name": "libnl",
-	    "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}]},
-	  "vulnerabilities": [{"cve": "CVE-2026-1",
-	    "product_status": {"` + list + `": ["P"]}}]
-	}`
+	return csafDocument("csaf_security_advisory",
+		`{"full_product_names": [{"product_id": "P", "name": "libnl",
+		  "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}]}`,
+		`[{"cve": "CVE-2026-1", "product_status": {"`+list+`": ["P"]}}]`)
 }
 
 func TestEveryProductStatusListYieldsTheStatusItMeans(t *testing.T) {
@@ -227,27 +218,18 @@ func TestWordsScopedByGroupReachTheProductsTheGroupHolds(t *testing.T) {
 	// identifier or by group. Read only the first and a remediation scoped by
 	// group falls through to the words written about the status at large, so
 	// an upgrade instruction lands on a claim the document never made.
-	const grouped = `{
-	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
-	    "publisher": {"category": "vendor", "name": "Example"},
-	    "title": "Grouped", "tracking": {"id": "EX-2", "version": "1",
-	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
-	      "current_release_date": "2026-09-01T00:00:00Z",
-	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
-	                            "summary": "First"}]}},
-	  "product_tree": {
+	grouped := csafDocument("csaf_security_advisory", `{
 	    "full_product_names": [
 	      {"product_id": "P1", "name": "libnl",
 	       "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}},
 	      {"product_id": "P2", "name": "zlib1g",
 	       "product_identification_helper": {"purl": "pkg:deb/debian/zlib1g@1.1.3"}}],
-	    "product_groups": [{"group_id": "G1", "product_ids": ["P1"]}]},
-	  "vulnerabilities": [{"cve": "CVE-2026-1",
+	    "product_groups": [{"group_id": "G1", "product_ids": ["P1"]}]}`,
+		`[{"cve": "CVE-2026-1",
 	    "product_status": {"fixed": ["P1"], "known_not_affected": ["P2"]},
 	    "flags": [{"label": "vulnerable_code_not_present", "product_ids": ["P2"]}],
 	    "remediations": [{"category": "vendor_fix",
-	      "details": "Upgrade to libnl 3.7.0.", "group_ids": ["G1"]}]}]
-	}`
+	      "details": "Upgrade to libnl 3.7.0.", "group_ids": ["G1"]}]}]`)
 	got, err := sbom.ReadAdvisory(strings.NewReader(grouped), sbom.Limits{})
 	if err != nil {
 		t.Fatalf("reading: %v", err)
@@ -413,42 +395,31 @@ func TestARelationshipCountsAgainstTheProductLimit(t *testing.T) {
 	// products and claiming one of them states few enough products and few
 	// enough claims to pass both other bounds, so this is the only thing
 	// standing between it and a map the reader fills from the wire.
-	var b strings.Builder
-	b.WriteString(`{
-	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
-	    "publisher": {"category": "vendor", "name": "Example"},
-	    "title": "Many joins", "tracking": {"id": "EX-3", "version": "1",
-	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
-	      "current_release_date": "2026-09-01T00:00:00Z",
-	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
-	                            "summary": "First"}]}},
-	  "product_tree": {
-	    "full_product_names": [{"product_id": "P", "name": "libnl",
-	      "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}],
-	    "relationships": [`)
+	var joins strings.Builder
 	for i := range 40 {
 		if i > 0 {
-			b.WriteString(",")
+			joins.WriteString(",")
 		}
-		fmt.Fprintf(&b, `{"category": "default_component_of",
+		fmt.Fprintf(&joins, `{"category": "default_component_of",
 		  "full_product_name": {"name": "libnl in platform %d", "product_id": "C%d"},
 		  "product_reference": "P", "relates_to_product_reference": "PLATFORM%d"}`, i, i, i)
 	}
-	b.WriteString(`]},
-	  "vulnerabilities": [{"cve": "CVE-2026-1",
-	    "product_status": {"fixed": ["C0"]}}]
-	}`)
+	document := csafDocument("csaf_security_advisory", `{
+	    "full_product_names": [{"product_id": "P", "name": "libnl",
+	      "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}],
+	    "relationships": [`+joins.String()+`]}`,
+		`[{"cve": "CVE-2026-1", "product_status": {"fixed": ["C0"]}}]`)
 
 	// One product, one claim: both other bounds are far above what this
 	// document states, so neither can be what refuses it.
 	lim := sbom.Limits{MaxComponents: 10, MaxStatements: 100}
-	if _, err := sbom.ReadAdvisory(strings.NewReader(b.String()), lim); err == nil {
+	if _, err := sbom.ReadAdvisory(strings.NewReader(document), lim); err == nil {
 		t.Fatal("a document composing more products than the limit was read")
 	} else if !strings.Contains(err.Error(), "product limit") {
 		t.Errorf("the refusal does not name the bound: %v", err)
 	}
 	// And the same document is read where the bound has room for the joins.
-	if _, err := sbom.ReadAdvisory(strings.NewReader(b.String()),
+	if _, err := sbom.ReadAdvisory(strings.NewReader(document),
 		sbom.Limits{MaxComponents: 100, MaxStatements: 100}); err != nil {
 		t.Errorf("the same document was refused with room for its joins: %v", err)
 	}

@@ -17,10 +17,10 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// heading matches a markdown heading, and internalLink a link into the same
-// document.
+// internalLink matches a link into the same document. Headings and code
+// fences are matched by the style test's expressions, so the two read a
+// document the same way.
 var (
-	heading      = regexp.MustCompile(`(?m)^#{1,6}\s+(.*)$`)
 	internalLink = regexp.MustCompile(`\]\(#([^)]+)\)`)
 	notInAnchor  = regexp.MustCompile(`[^\p{L}\p{N}_\s-]`)
 	// What the documentation site's anchor rule removes, and the runs it
@@ -37,9 +37,6 @@ var (
 	// one. internalLink requires the target to begin with "#", so without
 	// this every link from one document to another would go unchecked.
 	crossLink = regexp.MustCompile(`\]\((?:\./)?([^):#?]+\.md)(?:#([^)]*))?\)`)
-	// Anchors invented inside a code fence are not headings, so a heading
-	// written in an example resolves no link.
-	fenced = regexp.MustCompile("(?s)```.*?```")
 )
 
 // anchorFor derives the fragment a heading is reachable by on the forge.
@@ -101,12 +98,14 @@ func linkProblems(docs map[string]string, exists func(string) bool) ([]string, l
 	siteAnchors := map[string]map[string]bool{}
 	bodies := map[string]string{}
 	for path, text := range docs {
-		body := fenced.ReplaceAllString(text, "")
+		// Anchors invented inside a code fence are not headings, so a heading
+		// written in an example resolves no link.
+		body := fence.ReplaceAllString(text, "")
 		bodies[path] = body
 		forge, site := map[string]bool{}, map[string]bool{}
-		for _, m := range heading.FindAllStringSubmatch(body, -1) {
-			forge[anchorFor(m[1])] = true
-			site[siteAnchorFor(m[1])] = true
+		for _, m := range anyHeading.FindAllStringSubmatch(body, -1) {
+			forge[anchorFor(m[2])] = true
+			site[siteAnchorFor(m[2])] = true
 		}
 		forgeAnchors[path], siteAnchors[path] = forge, site
 	}
