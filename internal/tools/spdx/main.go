@@ -65,7 +65,7 @@ func styleOf(file string) style {
 		return slashes
 	case ".css":
 		return block
-	case ".sh", ".py":
+	case ".sh", ".py", ".mk":
 		return hashes
 	}
 	return none

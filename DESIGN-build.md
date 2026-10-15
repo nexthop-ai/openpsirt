@@ -82,7 +82,11 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `docs/` | The published documentation site |
 | `assets/` | Logo files |
 | `tools/` | One module per Go tool the gate and the image run, each requiring that tool at one version. See § Tool pins |
-| `Makefile` | The build, every gate, and what they clean up |
+| `Makefile` | The build, the test runs, the linter, the gate and `check`, the interface build, the measurements, and what they clean up. Every other makefile is included from it, after its own targets, so its first target stays the default. Each makefile declares its own targets phony, and a test fails on a makefile in the tree that no include names |
+| `mk/engines.mk` | The database servers the suite runs against, as containers, and `check-engines` |
+| `mk/gates.mk` | The checks beside the linter and the suite: dependency vulnerabilities and licenses, the inventory, credentials, the gate programs under `internal/tools/`, the generated files held to what generates them, and the pinned versions held to each other |
+| `mk/dist.mk` | The release assets, built and checked in one directory, and the record of a release's migrations |
+| `mk/packaging.mk` | The container image and the chart, checked as what ships |
 | `Makefile.demo` | The image and what is built from it: the seeded demo deployment, the hot-reload loop, and the offline scanner bundle. Included by the makefile beside it, so every target is reached the same way. A file of its own because it shares nothing with the gate half but the names of the docker and npm commands, so the half that decides whether a change may be pushed reads without the half that stands an instance up. The scanner bundle is here because it is built from the demo image rather than because it is a demo target, and every variable these read is here with them |
 
 Everything is under `internal/`, so nothing is importable by another module.

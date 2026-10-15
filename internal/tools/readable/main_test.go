@@ -59,6 +59,7 @@ func TestWhichFilesAreReadAsText(t *testing.T) {
 		{"Makefile", true},
 		{"Dockerfile", true},
 		{"Makefile.demo", true},
+		{"mk/gates.mk", true},
 		{"deploy/helm/openpsirt/templates/_helpers.tpl", true},
 		{"docs/hooks/release.py", true},
 		{"docs/requirements.in", true},

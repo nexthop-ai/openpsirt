@@ -49,7 +49,7 @@ func text(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".go", ".ts", ".tsx", ".js", ".mjs", ".css", ".md", ".yaml", ".yml",
 		".json", ".sql", ".sh", ".html", ".txt", ".mod", ".sum", ".toml",
-		".svg", ".tpl", ".py", ".in":
+		".svg", ".tpl", ".py", ".in", ".mk":
 		return true
 	}
 	switch name := filepath.Base(path); name {

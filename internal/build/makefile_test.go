@@ -55,6 +55,75 @@ func missing(from, in map[string]bool) []string {
 	return names
 }
 
+// An include line, which names the files make reads beside the makefile. The
+// optional form, "-include", is a machine's own settings and is not matched.
+var includes = regexp.MustCompile(`(?m)^include[ \t]+(.+)$`)
+
+// makefiles is every makefile of this repository, as a path from the package:
+// the makefile itself and each file its include lines name.
+func makefiles(t *testing.T) []string {
+	t.Helper()
+	root := filepath.Join("..", "..")
+	main := filepath.Join(root, "Makefile")
+	body, err := os.ReadFile(main) //nolint:gosec // this repository's own makefile
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{main}
+	for _, line := range includes.FindAllStringSubmatch(string(body), -1) {
+		for _, name := range strings.Fields(line[1]) {
+			paths = append(paths, filepath.Join(root, filepath.FromSlash(name)))
+		}
+	}
+	return paths
+}
+
+// makefileText is every makefile of this repository, read and joined in the
+// order make reads them.
+func makefileText(t *testing.T) string {
+	t.Helper()
+	var all strings.Builder
+	for _, path := range makefiles(t) {
+		body, err := os.ReadFile(path) //nolint:gosec // this repository's own makefiles
+		if err != nil {
+			t.Fatal(err)
+		}
+		all.Write(body)
+		all.WriteString("\n")
+	}
+	return all.String()
+}
+
+// Every makefile in the tree is one the makefile includes.
+//
+// The build is split across files make reads through include lines, so a file
+// beside them that no line names is targets nobody can run and that every
+// check reading the makefiles skips.
+func TestEveryMakefileInTheTreeIsIncluded(t *testing.T) {
+	root := filepath.Join("..", "..")
+	found, err := filepath.Glob(filepath.Join(root, "Makefile*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pieces, err := filepath.Glob(filepath.Join(root, "mk", "*.mk"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found = append(found, pieces...)
+	if len(pieces) == 0 {
+		t.Fatal("no makefile was found under mk, so this checked nothing")
+	}
+	read := map[string]bool{}
+	for _, path := range makefiles(t) {
+		read[filepath.Clean(path)] = true
+	}
+	for _, path := range found {
+		if !read[filepath.Clean(path)] {
+			t.Errorf("%s is a makefile the makefile does not include", filepath.ToSlash(path))
+		}
+	}
+}
+
 // Every target is declared phony and every declaration names a target.
 //
 // The convention is the whole list, not most of it, and it drifts in both
@@ -62,14 +131,11 @@ func missing(from, in map[string]bool) []string {
 // beside its siblings is not added to the list above them. Neither is visible
 // until a file of that name exists in the checkout, and then the target
 // reports "up to date" and runs nothing.
+//
+// Each makefile declares its own targets, so the list a target belongs on is
+// in the file a reader has open.
 func TestEveryTargetIsDeclaredPhonyAndEveryDeclarationNamesOne(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "Makefile*"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) == 0 {
-		t.Fatal("no makefiles were found, so this checked nothing")
-	}
+	paths := makefiles(t)
 	examined := 0
 	for _, path := range paths {
 		body, err := os.ReadFile(path) //nolint:gosec // this repository's own makefiles
@@ -78,14 +144,14 @@ func TestEveryTargetIsDeclaredPhonyAndEveryDeclarationNamesOne(t *testing.T) {
 		}
 		phony, targets := declarations(string(body))
 		if len(targets) == 0 {
-			t.Fatalf("%s defines no targets, so this checked nothing", filepath.Base(path))
+			t.Fatalf("%s defines no targets, so this checked nothing", filepath.ToSlash(path))
 		}
 		examined += len(targets)
 		if names := missing(targets, phony); len(names) > 0 {
-			t.Errorf("%s defines %v and does not declare them phony", filepath.Base(path), names)
+			t.Errorf("%s defines %v and does not declare them phony", filepath.ToSlash(path), names)
 		}
 		if names := missing(phony, targets); len(names) > 0 {
-			t.Errorf("%s declares %v phony and defines no such target", filepath.Base(path), names)
+			t.Errorf("%s declares %v phony and defines no such target", filepath.ToSlash(path), names)
 		}
 	}
 	t.Logf("%d targets across %d makefiles", examined, len(paths))
@@ -160,11 +226,7 @@ func documentReaders(files map[string]string) []string {
 // That target is what a change to documents alone runs. A test elsewhere that
 // reads one fails in CI for a prose edit the local gate passed.
 func TestDocsCheckTestsEveryPackageThatReadsADocument(t *testing.T) {
-	makefile, err := os.ReadFile(filepath.Join("..", "..", "Makefile")) //nolint:gosec // this repository's own makefile
-	if err != nil {
-		t.Fatal(err)
-	}
-	listed := regexp.MustCompile(`(?m)^DOCS_PACKAGES\s*:=(.*)$`).FindStringSubmatch(string(makefile))
+	listed := regexp.MustCompile(`(?m)^DOCS_PACKAGES\s*:=(.*)$`).FindStringSubmatch(makefileText(t))
 	if listed == nil {
 		t.Fatal("the makefile declares no DOCS_PACKAGES, so this checked nothing")
 	}

@@ -141,21 +141,17 @@ func TestALayoutGapIsReportedInBothDirections(t *testing.T) {
 	}
 }
 
-// Every target the gate can run is a target the makefile has and the build
-// document describes, and every target the document describes exists.
+// Every target the gate can run is a target one of the makefiles has and the
+// build document describes, and every target the document describes exists.
 //
 // The gate prints target names for make to run, so a name it prints that the
 // makefile does not define is a gate that fails where it should have run — and
 // a target described in the document and defined nowhere is a command somebody
 // types and does not get.
 func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
-	makefile, err := os.ReadFile(filepath.Join("..", "..", "Makefile")) //nolint:gosec // this repository's own makefile
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, targets := declarations(string(makefile))
+	_, targets := declarations(makefileText(t))
 	if len(targets) == 0 {
-		t.Fatal("the makefile defines no targets, so this checked nothing")
+		t.Fatal("the makefiles define no targets, so this checked nothing")
 	}
 
 	source, err := os.ReadFile(filepath.Join("..", "tools", "gate", "main.go")) //nolint:gosec // this repository's own source
@@ -205,17 +201,7 @@ func TestTheGateTheMakefileAndTheDocumentNameTheSameTargets(t *testing.T) {
 // repository's own instructions — and a renamed target leaves each of them
 // sending a reader to "No rule to make target".
 func TestEveryMakeCommandADocumentNamesIsATarget(t *testing.T) {
-	defined := map[string]bool{}
-	for _, name := range []string{"Makefile", "Makefile.demo"} {
-		body, err := os.ReadFile(filepath.Join("..", "..", name)) //nolint:gosec // this repository's own makefiles
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, targets := declarations(string(body))
-		for target := range targets {
-			defined[target] = true
-		}
-	}
+	_, defined := declarations(makefileText(t))
 	if len(defined) == 0 {
 		t.Fatal("the makefiles define no targets, so this checked nothing")
 	}
