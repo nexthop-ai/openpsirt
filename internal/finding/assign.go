@@ -179,6 +179,12 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 	if err != nil {
 		return 0, err
 	}
+	// Refused before any work is read, as Assign and AssignMatching refuse:
+	// asked only per piece, a hand-over of nothing to somebody else answered
+	// that nothing moved.
+	if err := mayMove(subject, productID, to, dispatches); err != nil {
+		return 0, err
+	}
 	var moved int64
 	for _, each := range work {
 		n, err := s.moveWork(ctx, tx, subject, productID, each[0], each[1], to,

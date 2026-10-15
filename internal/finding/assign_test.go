@@ -567,6 +567,13 @@ func TestWorkIsNotGivenAwayWithoutTheAssignerRightThroughAnyPath(t *testing.T) {
 			t.Errorf("handing several pieces to somebody else without the right answered %d, %v",
 				moved, err)
 		}
+		// Refused with nothing to hand over, as the other two paths refuse:
+		// the right is asked before any work is.
+		if moved, err := f.store.HandOverWithin(ctx, f.db.DB, triager, f.productID,
+			nil, &other); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("handing nothing to somebody else without the right answered %d, %v",
+				moved, err)
+		}
 		if _, err := f.store.AssignMatching(ctx, f.planner(t, access.PublicTriage), f.scope,
 			finding.Filter{}, nil, &other, nil); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("assigning everything matching to somebody else without the right: %v", err)
