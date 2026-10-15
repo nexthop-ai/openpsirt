@@ -82,7 +82,9 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// unbounded side is left out rather than bound to a moment that stands
 	// for forever, so a rate asked for nothing in particular is the rate over
 	// everything held.
-	within, bounds := "", []any{}
+	// Nil rather than empty while nothing bounds it: the query builder warns
+	// about arguments handed to a fragment with no placeholder.
+	within, bounds := "", []any(nil)
 	if !since.IsZero() {
 		within, bounds = ` AND "f"."closed_at" >= ?`, append(bounds, since)
 	}
