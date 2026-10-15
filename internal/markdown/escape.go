@@ -77,44 +77,41 @@ func escaped(runes []rune, i int) bool {
 }
 
 // leadingMarker is the position of a character that would open a block if
-// the string began a line, or -1.
+// the string began a line, or -1. The string has no leading spaces, which
+// Literal drops before asking.
 func leadingMarker(runes []rune) int {
-	i := 0
-	for i < len(runes) && runes[i] == ' ' {
-		i++
-	}
-	if i == len(runes) {
+	if len(runes) == 0 {
 		return -1
 	}
 	// A marker opens a block only when a space or the end of the line follows
 	// it, so `6.12.41-1` and `-rc1` stay as they are.
 	ends := func(at int) bool { return at >= len(runes) || runes[at] == ' ' }
-	switch runes[i] {
+	switch runes[0] {
 	case '>':
-		return i
+		return 0
 	case '#':
-		hashes := i
+		hashes := 0
 		for hashes < len(runes) && runes[hashes] == '#' {
 			hashes++
 		}
-		if hashes-i <= 6 && ends(hashes) {
-			return i
+		if hashes <= 6 && ends(hashes) {
+			return 0
 		}
 	case '+':
-		if ends(i + 1) {
-			return i
+		if ends(1) {
+			return 0
 		}
 	case '-':
 		// A run of them is a rule across the page.
-		if ends(i+1) || (i+1 < len(runes) && runes[i+1] == '-') {
-			return i
+		if ends(1) || (len(runes) > 1 && runes[1] == '-') {
+			return 0
 		}
 	}
-	digits := i
+	digits := 0
 	for digits < len(runes) && runes[digits] >= '0' && runes[digits] <= '9' {
 		digits++
 	}
-	if digits > i && digits-i <= 9 && digits < len(runes) &&
+	if digits > 0 && digits <= 9 && digits < len(runes) &&
 		(runes[digits] == '.' || runes[digits] == ')') && ends(digits+1) {
 		return digits
 	}
