@@ -6,17 +6,13 @@ package finding_test
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
-
-	"github.com/uptrace/bun"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -935,17 +931,15 @@ func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 		other.ID = who.ID + 1
 
 		// The withdrawal lands between the agreement's read and its write.
-		hook := &beforeAgreeing{run: func() {
-			if _, err := f.store.Withdraw(context.Background(), who, claim.ID); err != nil {
-				t.Errorf("withdrawing: %v", err)
-			}
-		}}
-		f.db.AddQueryHook(hook)
-		if _, err := f.store.Agree(t.Context(), other, claim.ID); err == nil {
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "assessment", "assessment", 5*time.Second, func() error {
+			_, err := f.store.Withdraw(context.Background(), who, claim.ID)
+			return err
+		})
+		if _, err := finding.NewStore(hooked).Agree(t.Context(), other, claim.ID); err == nil {
 			t.Error("agreeing to a claim withdrawn meanwhile was reported as done")
 		}
-		if !hook.fired {
-			t.Fatal("the withdrawal never ran between the read and the write, so this tests nothing")
+		if err := rival(); err != nil {
+			t.Errorf("withdrawing: %v", err)
 		}
 		var state string
 		if err := f.db.DB.NewSelect().Table("assessment").Column("state").
@@ -958,44 +952,12 @@ func TestAnAgreementLosingToAWithdrawalDoesNotResurrectTheClaim(t *testing.T) {
 	})
 }
 
-// beforeAgreeing runs something once, just before the first write that puts
-// an assessment in force.
-type beforeAgreeing struct {
-	run   func()
-	fired bool
-}
-
-func (h *beforeAgreeing) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
-	if !h.fired && strings.HasPrefix(e.Query, "UPDATE") && strings.Contains(e.Query, "assessment") &&
-		strings.Contains(e.Query, "'live'") {
-		h.fired = true
-		h.run()
-	}
-	return ctx
-}
-
-func (h *beforeAgreeing) AfterQuery(context.Context, *bun.QueryEvent) {}
-
 // A claim that could not be read is a fault. Answered as a claim that is not
 // there, the queue lists it with what agreeing would do silently left off.
 func TestWhatAgreeingWouldDoOverAFailedReadIsNotAnAbsentClaim(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gone.db")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	target, err := database.ParseURL("sqlite://" + path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gone, err := database.Open(t.Context(), target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := gone.Close(); err != nil {
-		t.Fatal(err)
-	}
+	gone := dbtest.Closed(t)
 	who := access.NewPerson(1, "approver", false, nil, 101)
-	_, err = finding.NewStore(gone.DB).WhatAgreeingWouldDo(t.Context(), who, []int64{1})
+	_, err := finding.NewStore(gone.DB).WhatAgreeingWouldDo(t.Context(), who, []int64{1})
 	if err == nil {
 		t.Fatal("a database nobody can reach answered what agreeing would do")
 	}

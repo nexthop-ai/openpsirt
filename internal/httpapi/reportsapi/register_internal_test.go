@@ -7,12 +7,10 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -20,21 +18,7 @@ import (
 // register. An absent block says nothing has been uploaded to the build, and a
 // fault is not that.
 func TestARegisterWhoseProvenanceCouldNotBeReadIsAFault(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "gone.db")
-	if err := os.WriteFile(path, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	target, err := database.ParseURL("sqlite://" + path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gone, err := database.Open(t.Context(), target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := gone.Close(); err != nil {
-		t.Fatal(err)
-	}
+	gone := dbtest.Closed(t)
 	logged := &tally{}
 	in := core.Deps{DB: gone, Logger: slog.New(logged)}
 	measured, err := measuredWith(t.Context(), in, access.Everything("a test"), 1,
