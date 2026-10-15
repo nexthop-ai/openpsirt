@@ -431,13 +431,14 @@ renderer's to apply. The rules are in `DESIGN-text.md`.
 A moment is stated in UTC, in RFC 3339, in a response and in its file alike. A
 driver hands back a time in the process's own zone, so a moment is converted
 before it is written rather than formatted behind a literal `Z`. A day is the
-UTC day of its moment, in a response, a report and an export alike, and a field
-answered as a time is converted to UTC before it is answered.
+UTC day of its moment, in a response, a report and an export alike. No API body
+carries a time value for the encoder to write: a test refuses one.
 
 A moment that is not known is left out of a response. A field that can be
 without one is optional, and a missing time is never written as the year 1 or
-as an empty string. Every moment a response states goes through one renderer,
-which holds both rules.
+as an empty string. Every moment an API body states goes through one renderer,
+which holds both rules. A published document states its dates as its format
+requires, in UTC.
 
 ## Addresses and labels
 
