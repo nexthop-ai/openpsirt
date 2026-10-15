@@ -305,7 +305,7 @@ func embargoedAt(t *testing.T, db *database.DB, targetID int64, identifier, comp
 	row := &finding.Finding{
 		TargetID: targetID, Kind: finding.Entered, Visibility: access.Private,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
-		PlaceIdentity: "place-of-" + identifier + "-" + component, LastChangedAt: now, OpenedAt: now,
+		PlaceIdentity: "place-of-" + identifier + "-" + component, OpenedAt: now,
 		DiscloseAt: &at, AssignedTo: &owner, AssignedAt: &now,
 	}
 	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -494,7 +494,7 @@ func critical(t *testing.T, db *database.DB, targetID int64, identifier, severit
 	row := &finding.Finding{
 		TargetID: targetID, Kind: finding.Vulnerable, Visibility: access.Public,
 		VulnerabilityID: ids[identifier], ComponentID: componentID,
-		PlaceIdentity: "place-of-" + identifier, LastChangedAt: now, OpenedAt: now,
+		PlaceIdentity: "place-of-" + identifier, OpenedAt: now,
 	}
 	if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 		t.Fatal(err)

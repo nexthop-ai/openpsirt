@@ -470,7 +470,6 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				ComponentID:     place.component,
 				ConsumerID:      optional(place.consumerID),
 				PlaceIdentity:   PlaceIdentity(place.name, place.consumer),
-				LastChangedAt:   now,
 				OpenedAt:        now,
 			}
 			// An embargo gets an end where somebody outside reported

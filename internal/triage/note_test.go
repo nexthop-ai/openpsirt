@@ -318,7 +318,6 @@ func (f *fixture) anotherIssue(t *testing.T, identifier string) int64 {
 		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: id,
 		Visibility: access.Public, ComponentID: f.component(t, "libbaz", "1.0"),
 		PlaceIdentity: "place-of-libbaz",
-		LastChangedAt: time.Now().Truncate(time.Microsecond),
 		OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

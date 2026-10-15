@@ -77,7 +77,6 @@ type written struct {
 	SuppressedBy     *int64     `bun:"suppressed_by"`
 	StatedBy         *int64     `bun:"stated_by"`
 	ClaimedBy        *int64     `bun:"claimed_by"`
-	LastChangedAt    time.Time  `bun:"last_changed_at"`
 	ExploitedLearned *time.Time `bun:"exploited_learned_at"`
 }
 
@@ -92,7 +91,7 @@ func (f *fixture) writtenIn(t *testing.T, target int64) map[[2]string]written {
 		ColumnExpr(`f.place_identity, f.urgency, f.urgency_exploited, f.urgency_shipped`).
 		ColumnExpr(`f.fix_state, f.fixed_in, f.fixed_at, f.matched, f.matched_from`).
 		ColumnExpr(`f.matched_in, f.matched_range, f.suppressed_by, f.stated_by, f.claimed_by`).
-		ColumnExpr(`f.last_changed_at, f.exploited_learned_at`).
+		ColumnExpr(`f.exploited_learned_at`).
 		Where("f.target_id = ?", target).
 		Where("f.closed_at IS NULL").
 		Scan(t.Context(), &rows); err != nil {
@@ -133,7 +132,6 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), yesterday); err != nil {
 			t.Fatal(err)
 		}
-		before := f.writtenIn(t, f.target)
 
 		fixed := likely("CVE-2026-FIXED", 0.01)
 		fixed.FixState, fixed.FixedIn = finding.FixedUpstream, "3.9.0"
@@ -168,8 +166,6 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 				t.Errorf("%v is open in the rescanned build and not in the first scan", at)
 				continue
 			}
-			// The moment a row last changed is its own and is compared below.
-			got.LastChangedAt, want.LastChangedAt = time.Time{}, time.Time{}
 			if !sameInstant(got.FixedAt, want.FixedAt) || !sameInstant(got.ExploitedLearned,
 				want.ExploitedLearned) {
 				t.Errorf("%v: moments differ: %+v against %+v", at, got, want)
@@ -182,14 +178,6 @@ func TestARescanWritesEachMovedFindingWhatAFirstScanOfTheReportWould(t *testing.
 				got.MatchedFrom != want.MatchedFrom || got.MatchedIn != want.MatchedIn ||
 				got.MatchedRange != want.MatchedRange {
 				t.Errorf("%v: rescanned as %+v, a first scan writes %+v", at, got, want)
-			}
-		}
-		for at, was := range before {
-			now := rescanned[at]
-			moved := at[0] != "CVE-2026-STILL"
-			if moved == now.LastChangedAt.Equal(was.LastChangedAt) {
-				t.Errorf("%v: last changed %v, was %v, and it moved: %v",
-					at, now.LastChangedAt, was.LastChangedAt, moved)
 			}
 		}
 	})
@@ -356,7 +344,7 @@ func TestAMovedLikelihoodIsWrittenAStatementPerBatchWithEachRowItsOwnValue(t *te
 			t.Fatalf("updated %d findings, want %d", applied.Updated, want)
 		}
 		estimates, estimated := asked.matching(`UPDATE "vulnerability" AS "vu" SET likelihood_ppm = `)
-		ordered, orderedRows := asked.matching(`UPDATE "finding" AS "f" SET last_changed_at = `)
+		ordered, orderedRows := asked.matching(`UPDATE "finding" AS "f" SET urgency = CASE id`)
 		reranked, rerankedRows := asked.matching(`UPDATE "finding" AS "f" SET urgency = (CASE WHEN`)
 		// One statement for the dated estimates and one for the undated.
 		if estimates != 2 || estimated != int64(len(all)) {

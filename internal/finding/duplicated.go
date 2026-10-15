@@ -132,10 +132,9 @@ func flawEnds(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 // or clears it where there is none. Only places ending later than it, or not
 // at all, where earlier says so: the rule a ruling dates by.
 func dateFlaw(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
-	until *time.Time, earlier bool, now time.Time) error {
+	until *time.Time, earlier bool) error {
 
 	q := db.NewUpdate().Model((*Finding)(nil)).
-		Set("last_changed_at = ?", now).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where("kind = ?", Entered).
 		Where("visibility = ?", access.Private).
@@ -191,7 +190,7 @@ func duplicateDated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 		// agrees, as a person's shortening is.
 		return nil
 	}
-	return dateFlaw(ctx, tx, ruling.ProductID, issue, &start.at, true, now)
+	return dateFlaw(ctx, tx, ruling.ProductID, issue, &start.at, true)
 }
 
 // waitsAsShortening reports whether a ruling's movement needs a second person.
@@ -283,7 +282,7 @@ func duplicateUndated(ctx context.Context, tx bun.IDB, ruling *ReportRuling,
 	if sameMoment(ends, standing) {
 		return nil
 	}
-	if err := dateFlaw(ctx, tx, ruling.ProductID, issue, standing, false, now); err != nil {
+	if err := dateFlaw(ctx, tx, ruling.ProductID, issue, standing, false); err != nil {
 		return err
 	}
 	rulingID := ruling.ID

@@ -735,7 +735,6 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 			VulnerabilityID: f.interned(t, "SONIC-2026-0007"),
 			ComponentID:     f.open(t)[0].ComponentID,
 			PlaceIdentity:   "place-of-something-we-build",
-			LastChangedAt:   opened,
 			OpenedAt:        opened,
 			RatedAt:         &opened,
 			DueAt:           ptr(opened.Add(finding.DefaultOwnWindows().High)),
@@ -941,8 +940,7 @@ func TestPagingWhatIsRunningOutVisitsEveryRowOnceInOneOrder(t *testing.T) {
 					TargetID: f.target, Kind: finding.Vulnerable,
 					VulnerabilityID: interned["CVE-2026-STDLIB"], Visibility: access.Public,
 					ComponentID: component.ID, PlaceIdentity: purl,
-					LastChangedAt: time.Now().Truncate(time.Microsecond),
-					OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
+					OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
 					DueAt: &due,
 				}
 				if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -1024,8 +1022,7 @@ func TestPagingWhatIsRunningOutPlacesRowsThatDifferOnlyInBeingExploited(t *testi
 				TargetID: f.target, Kind: finding.Vulnerable,
 				VulnerabilityID: interned["CVE-2026-MERGED"], Visibility: access.Public,
 				ComponentID: component.ID, PlaceIdentity: place,
-				LastChangedAt: time.Now().Truncate(time.Microsecond),
-				OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
+				OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &run,
 				DueAt: &due, RankExploited: exploited,
 			}
 			if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

@@ -47,7 +47,7 @@ func TestASweepLapsingLessThanABatchReadsTheDecisionsOnce(t *testing.T) {
 			if _, err := f.db.DB.NewInsert().Model(&finding.Finding{
 				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 				Visibility: access.Public, ComponentID: moved, PlaceIdentity: place,
-				LastChangedAt: now, OpenedAt: now, OpenedRunID: &in.run,
+				OpenedAt: now, OpenedRunID: &in.run,
 			}).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

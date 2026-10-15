@@ -414,7 +414,7 @@ func TestAFixReleaseSaysWhetherItsLatestScansHoldTheIssueOpen(t *testing.T) {
 		open := &finding.Finding{
 			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 			Visibility: access.Private, ComponentID: component, PlaceIdentity: "place-of-libfoo",
-			LastChangedAt: now, OpenedAt: now, OpenedRunID: &run.ID,
+			OpenedAt: now, OpenedRunID: &run.ID,
 		}
 		if _, err := f.db.DB.NewInsert().Model(open).Exec(ctx); err != nil {
 			t.Fatal(err)

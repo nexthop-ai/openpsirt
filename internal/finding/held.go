@@ -151,10 +151,9 @@ func (m *moving) add(id int64, urgency int64) {
 // list read the same thing as the ones that do not. The ELSE names the column
 // and nothing reaches it, because the statement names only the findings the
 // CASE does.
-func (m moving) update(tx bun.IDB, now time.Time, first, last int) *bun.UpdateQuery {
+func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 	f := m.f
-	update := tx.NewUpdate().Model((*Finding)(nil)).
-		Set("last_changed_at = ?", now)
+	update := tx.NewUpdate().Model((*Finding)(nil))
 	if m.described {
 		update = update.
 			Set("fix_state = ?", f.FixState).

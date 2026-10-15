@@ -661,8 +661,7 @@ func (f *fixture) opensAs(t *testing.T, issue, componentID int64, place string,
 	row := &finding.Finding{
 		TargetID: f.targetID, Kind: finding.Vulnerable, VulnerabilityID: issue,
 		Visibility: visibility, ComponentID: componentID, PlaceIdentity: place,
-		LastChangedAt: time.Now().UTC().Truncate(time.Microsecond),
-		OpenedAt:      time.Now().UTC().Truncate(time.Microsecond),
+		OpenedAt: time.Now().UTC().Truncate(time.Microsecond),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)

@@ -130,7 +130,7 @@ func (f *fixture) filed(t *testing.T, identifier string, target int64, place str
 	row := &finding.Finding{
 		TargetID: target, Kind: finding.Vulnerable, Visibility: access.Private,
 		VulnerabilityID: f.issueOf(t, identifier), ComponentID: componentID,
-		PlaceIdentity: place, LastChangedAt: now, OpenedAt: now,
+		PlaceIdentity: place, OpenedAt: now,
 		ClosedAt: closed, ClosedBecause: because,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(ctx); err != nil {

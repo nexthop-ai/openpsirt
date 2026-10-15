@@ -533,7 +533,7 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 			// that somebody asked; what is in force is still the old date.
 			return nil
 		}
-		return moveTo(ctx, tx, productID, vulnerabilityID, until, now)
+		return moveTo(ctx, tx, productID, vulnerabilityID, until)
 	})
 	if err != nil {
 		return nil, err
@@ -622,7 +622,7 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			if err := agree(ctx, tx, id, subject.ID, now); err != nil {
 				return err
 			}
-			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID, now)
+			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID)
 		}
 
 		// A ruling's shortening stands only while the ruling does. Withdrawn,
@@ -651,9 +651,9 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			return err
 		}
 		if asked.Act == Duplicated {
-			return dateFlaw(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, true, now)
+			return dateFlaw(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, true)
 		}
-		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, *asked.Until, now)
+		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, *asked.Until)
 	})
 	if err != nil {
 		return nil, err
@@ -797,11 +797,10 @@ func movedBy(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) 
 
 // moveTo writes the new end of an embargo across everything it covers.
 func moveTo(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
-	until, now time.Time) error {
+	until time.Time) error {
 
 	_, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set("disclose_at = ?", until).
-		Set("last_changed_at = ?", now).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where("closed_at IS NULL").

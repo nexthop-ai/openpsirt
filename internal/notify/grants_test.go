@@ -124,8 +124,7 @@ func (s *split) queued(t *testing.T, team *access.Team, visibility access.Visibi
 		TargetID: s.target, Kind: finding.Vulnerable, VulnerabilityID: s.issue,
 		Visibility: visibility, ComponentID: s.component,
 		PlaceIdentity: fmt.Sprintf("place-%d", s.places),
-		OpenedAt:      now, LastChangedAt: now,
-		AssignedTo: &team.PartyID, AssignedAt: &routed,
+		OpenedAt:      now, AssignedTo: &team.PartyID, AssignedAt: &routed,
 	}
 	if _, err := s.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)

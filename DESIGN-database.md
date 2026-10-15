@@ -484,6 +484,7 @@ which reads as no attempt in flight.
 | A delivery gains when its latest attempt began | A column that takes a null, added where the table stands on every engine, after the destinations are folded. On MySQL and MariaDB in a transaction of its own between the fold and the merge, which asks whether the column is there first, so a start after one stopped part way steps over it |
 | A patch repository records when its last visit ended | No visit v0.8.0 recorded has an end, so each counts as having held the pass for no time until it is visited again (`DESIGN-findings.md` § Host share) |
 | A graph node records the source package its build stated | Each node v0.8.0 recorded takes the source package and version of the component it holds, which is what a scanner was given for it. On v0.8.0 that value can be another product's statement, and an upgraded node keeps it: a moving line's next scan writes what the build itself states, and a tag, never uploaded again, keeps filling from it (`DESIGN-data-model.md` § Duplicate descriptions) |
+| A finding no longer records when it last moved | Nothing read it. SQLite rebuilds the table from v0.9.0's declaration and the others drop the column. On MySQL and MariaDB in a transaction of its own, last, which asks whether the column is there first, so a start after one stopped part way steps over it |
 
 The rules an identity, a fold key and a live key are worked out by are copied
 into the migration rather than called, so a later change to the application

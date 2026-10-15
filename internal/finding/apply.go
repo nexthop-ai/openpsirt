@@ -384,8 +384,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			heldAt[at{f.VulnerabilityID, f.PlaceIdentity}] = f
 		}
 
-		now := s.now().UTC().Truncate(time.Microsecond)
-
 		var opening []Finding
 		// An open finding a patch now fixes, by the claim that fixes it, and
 		// one first seen already patched, whose record is read below.
@@ -442,7 +440,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			already, open := held[k]
 			if !open {
-				f.LastChangedAt = now
 				// The same issue at the same place a moment ago, on a
 				// different component, means the version moved and the issue
 				// came with it. Recorded on the way in, because this is the
@@ -497,7 +494,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		for _, group := range updates {
 			for first := 0; first < len(group.ids); first += database.BatchSize {
 				last := min(first+database.BatchSize, len(group.ids))
-				if _, err := group.update(tx, now, first, last).Exec(ctx); err != nil {
+				if _, err := group.update(tx, first, last).Exec(ctx); err != nil {
 					return fmt.Errorf("update %d findings that moved: %w", len(group.ids), err)
 				}
 			}
@@ -577,7 +574,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				}
 				continue
 			}
-			f.LastChangedAt = now
 			f.ClosedAt = &startedAt
 			f.ClosedRunID = &runID
 			f.ClosedBecause = Patched
@@ -607,7 +603,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				}
 				continue
 			}
-			f.LastChangedAt = now
 			f.ClosedAt = &startedAt
 			f.ClosedRunID = &runID
 			f.ClosedBecause = Unaffected
@@ -649,7 +644,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				}
 				continue
 			}
-			f.LastChangedAt = now
 			f.ClosedAt = &startedAt
 			f.ClosedRunID = &runID
 			f.ClosedBecause = Disclaimed
@@ -668,7 +662,6 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 				_, err := tx.NewUpdate().Model((*Finding)(nil)).
 					Set("stated_by = ?", statement).
-					Set("last_changed_at = ?", now).
 					Where("id IN (?)", bun.List(batch)).Exec(ctx)
 				return err
 			})

@@ -74,8 +74,7 @@ func (f *fixture) finds(t *testing.T, in build, componentID int64, place string,
 	row := &finding.Finding{
 		TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 		Visibility: visibility, ComponentID: componentID, PlaceIdentity: place,
-		LastChangedAt: time.Now().Truncate(time.Microsecond),
-		OpenedAt:      time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
+		OpenedAt: time.Now().Truncate(time.Microsecond), OpenedRunID: &in.run,
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)

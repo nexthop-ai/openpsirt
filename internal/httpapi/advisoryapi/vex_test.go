@@ -755,11 +755,11 @@ func TestAVEXDocumentSaysNothingFixedWhileAPlaceIsOpen(t *testing.T) {
 		r.PatchedRows(t, `INSERT INTO "finding" ("target_id", "kind", "vulnerability_id",
 				"visibility", "component_id", "place_identity", "urgency",
 				"urgency_exploited", "urgency_exploited_here", "urgency_shipped",
-				"opened_at", "last_changed_at")
+				"opened_at")
 			SELECT "target_id", "kind", "vulnerability_id", "visibility",
 				(SELECT "id" FROM "component" WHERE "identity" = '`+hash+`'),
 				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
-				"urgency_shipped", "opened_at", "last_changed_at"
+				"urgency_shipped", "opened_at"
 			FROM "finding" WHERE "closed_because" = 'patched'`)
 		if fixed := r.FixedIn(t); len(fixed) != 0 {
 			t.Errorf("an issue open at another version of the component is said as %v fixed", fixed)

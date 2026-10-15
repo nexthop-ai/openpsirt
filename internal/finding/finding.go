@@ -336,10 +336,6 @@ type Finding struct {
 	// anybody means to do.
 	AssignedTo *int64     `bun:"assigned_to"`
 	AssignedAt *time.Time `bun:"assigned_at"`
-	// LastChangedAt is when anything about this finding last moved — a fix
-	// appearing, or the build answering it. A finding open for years outlives
-	// any record of the change kept elsewhere, so it carries its own.
-	LastChangedAt time.Time `bun:"last_changed_at,notnull"`
 	// ArrivedFrom is the upstream version this place held before, recorded
 	// only where the version moved and the issue came with it. Its presence is
 	// the statement that somebody bumped this and the bump did not resolve it;

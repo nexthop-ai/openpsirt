@@ -186,7 +186,7 @@ func TestASweepLapsingMoreThanOneBatchTellsEachProposerOnce(t *testing.T) {
 			findings = append(findings, finding.Finding{
 				TargetID: in.target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 				Visibility: access.Public, ComponentID: moved, PlaceIdentity: place,
-				LastChangedAt: now, OpenedAt: now, OpenedRunID: &in.run,
+				OpenedAt: now, OpenedRunID: &in.run,
 			})
 			key := fmt.Sprintf("bulk-%04d", i)
 			version := "1.2.3"

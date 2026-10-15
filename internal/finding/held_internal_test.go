@@ -98,12 +98,10 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 		set(&all, true)
 	}
 	all.add(1, all.f.Urgency)
-	statement := all.update(db, on, 0, 1).String()
+	statement := all.update(db, 0, 1).String()
 	var written []string
 	for _, m := range regexp.MustCompile(`(?:SET |, )"?([a-z_]+)"? = `).FindAllStringSubmatch(statement, -1) {
-		if m[1] != "last_changed_at" {
-			written = append(written, m[1])
-		}
+		written = append(written, m[1])
 	}
 	if len(written) == 0 {
 		t.Fatalf("no column was found in %s, so this checked nothing", statement)

@@ -848,12 +848,11 @@ func TestRescanningADisclaimedBuildTouchesNoRow(t *testing.T) {
 		f.shipped(t, beside(acmeY))
 		f.acmeSays(t)
 		f.reported(t, found(inside, zlib))
-		before := placedAt(t, f, f.every(t))["zlib under acme-y"]
+		asked := &matchedStatements{}
+		f.db.AddQueryHook(asked)
 		f.reported(t, found(inside, zlib))
-		after := placedAt(t, f, f.every(t))["zlib under acme-y"]
-		if !after.LastChangedAt.Equal(before.LastChangedAt) {
-			t.Errorf("a rescan rewrote the closed row: changed %v, was %v",
-				after.LastChangedAt, before.LastChangedAt)
+		if count, matched := asked.matching(`UPDATE "finding" AS "f" SET stated_by = `); count != 0 {
+			t.Errorf("a rescan rewrote the closed row: %d statements matching %d rows", count, matched)
 		}
 	})
 }

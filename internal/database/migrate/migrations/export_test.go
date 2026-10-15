@@ -57,6 +57,7 @@ func StatementsV080(engine database.Engine) map[string][]string {
 func StatementsV090(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
+		"finding":           findingV090(t),
 		"graph_node":        graphNodeV090(t),
 		"image_version":     imageVersionV090(t),
 		"outbound":          outboundV090(t),

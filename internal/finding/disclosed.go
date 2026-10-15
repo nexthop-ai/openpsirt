@@ -117,7 +117,7 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 		if out.NeedsApproval {
 			return nil
 		}
-		return makePublic(ctx, tx, productID, vulnerabilityID, now)
+		return makePublic(ctx, tx, productID, vulnerabilityID)
 	})
 	if err != nil {
 		return nil, err
@@ -192,13 +192,10 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 // The disclosure date goes with it. A public finding carries none, and one
 // left behind is read back as the date an embargo ends that has already
 // ended. The movement just recorded keeps where it stood.
-func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
-	now time.Time) error {
-
+func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) error {
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set("visibility = ?", access.Public).
 		Set("disclose_at = NULL").
-		Set("last_changed_at = ?", now).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where("visibility = ?", access.Private).
 		Where(inThisProduct, productID).

@@ -68,7 +68,7 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	if _, err := db.DB.NewInsert().Model(&finding.Finding{
 		TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: issue,
 		Visibility: access.Public, ComponentID: component.ID, PlaceIdentity: "place-of-libfoo",
-		LastChangedAt: now, OpenedAt: now, OpenedRunID: &run.ID,
+		OpenedAt: now, OpenedRunID: &run.ID,
 	}).Exec(ctx); err != nil {
 		return cast{}, err
 	}
