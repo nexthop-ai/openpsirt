@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -43,14 +44,27 @@ const (
 	ForReleases
 )
 
-// coveringOutcomes is the outcomes that cover a place for one reader.
+// StatedOutcomes is every outcome that covers a place for some reader, which
+// is every outcome a published document states.
+func StatedOutcomes() []string {
+	return []string{OutcomeNotApplicable, OutcomeMismatched, OutcomeAlreadyFixed, OutcomeWontFix}
+}
+
+// coveringOutcomes is the outcomes that cover a place for one reader: every
+// stated outcome, and a claim that will not be fixed only where it names a
+// mitigation for a reader that publishes one.
 func coveringOutcomes(reader Reader) string {
 	wontFix := `("cl"."outcome" = '` + OutcomeWontFix + `' AND COALESCE("cl"."mitigation", '') <> '')`
 	if reader == ForReleases {
 		wontFix = `"cl"."outcome" = '` + OutcomeWontFix + `'`
 	}
-	return `("cl"."outcome" IN ('` + OutcomeNotApplicable + `', '` + OutcomeMismatched + `', '` +
-		OutcomeAlreadyFixed + `') OR ` + wontFix + `)`
+	var plain []string
+	for _, outcome := range StatedOutcomes() {
+		if outcome != OutcomeWontFix {
+			plain = append(plain, "'"+outcome+"'")
+		}
+	}
+	return `("cl"."outcome" IN (` + strings.Join(plain, ", ") + `) OR ` + wontFix + `)`
 }
 
 // WhollyCovered narrows a grouped read of findings to the groups whose every

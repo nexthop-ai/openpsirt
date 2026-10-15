@@ -37,3 +37,17 @@ func TestEveryOutcomeIsStatedAsListedOrRefused(t *testing.T) {
 		t.Fatal("no outcome was examined, so this checked nothing")
 	}
 }
+
+// Every outcome a covering read can hand the document has a status, so the
+// refusal above is never reached by a claim the read selected.
+func TestEveryOutcomeACoveringReadSelectsHasAStatus(t *testing.T) {
+	stated := finding.StatedOutcomes()
+	if len(stated) == 0 {
+		t.Fatal("no outcome covers a place, so this checked nothing")
+	}
+	for _, outcome := range stated {
+		if statusOf(outcome) == "" {
+			t.Errorf("%s covers a place and has no VEX status", outcome)
+		}
+	}
+}
