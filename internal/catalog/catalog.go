@@ -515,9 +515,9 @@ func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, err
 // and compared, so a deployment with thousands of releases is one statement.
 func pastEndOfLife(stream, product string, at time.Time) (string, []any) {
 	day := at.UTC().Truncate(24 * time.Hour)
-	return `((` + stream + `.eol_on IS NOT NULL AND ` + stream + `.eol_on <= ?)
-			OR (` + stream + `.eol_on IS NULL AND ` + product + `.eol_on IS NOT NULL AND ` +
-		product + `.eol_on <= ?))`, []any{day, day}
+	s, p := `"`+stream+`"."eol_on"`, `"`+product+`"."eol_on"`
+	return `((` + s + ` IS NOT NULL AND ` + s + ` <= ?)
+			OR (` + s + ` IS NULL AND ` + p + ` IS NOT NULL AND ` + p + ` <= ?))`, []any{day, day}
 }
 
 // OnTheClock is the condition, as SQL, under which a release carries
@@ -529,7 +529,7 @@ func pastEndOfLife(stream, product string, at time.Time) (string, []any) {
 // off the clock that the scan did.
 func OnTheClock(stream, product string, at time.Time) (string, []any) {
 	past, args := pastEndOfLife(stream, product, at)
-	return `(` + stream + `.kind = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
+	return `("` + stream + `"."kind" = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
 }
 
 // Retired is a release that has gone out of support, with what it belongs to

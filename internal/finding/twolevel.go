@@ -46,31 +46,31 @@ const (
 )
 
 // places is how many places the group holds.
-func (g grain) places() string { return g.pick("COUNT(*)", "SUM(f.n)") }
+func (g grain) places() string { return g.pick("COUNT(*)", `SUM("f"."n")`) }
 
 // peak is the highest urgency among the group's places.
-func (g grain) peak() string { return g.pick(`MAX("f"."urgency")`, "MAX(f.peak)") }
+func (g grain) peak() string { return g.pick(`MAX("f"."urgency")`, `MAX("f"."peak")`) }
 
 // exploited and exploitedHere are the two exploitation flags.
-func (g grain) exploited() string { return g.pick(exploitedAcross, "MAX(f.hit)") }
+func (g grain) exploited() string { return g.pick(exploitedAcross, `MAX("f"."hit")`) }
 
-func (g grain) exploitedHere() string { return g.pick(exploitedHereAcross, "MAX(f.hit_here)") }
+func (g grain) exploitedHere() string { return g.pick(exploitedHereAcross, `MAX("f"."hit_here")`) }
 
 // withFix is how many places name a version that fixes the issue.
-func (g grain) withFix() string { return g.pick(withFixAcross, "SUM(f.with_fix)") }
+func (g grain) withFix() string { return g.pick(withFixAcross, `SUM("f"."with_fix")`) }
 
 // fixLeast and fixMost are the two ends of what upstream did.
-func (g grain) fixLeast() string { return g.pick(`MIN("f"."fix_state")`, "MIN(f.fix_least)") }
+func (g grain) fixLeast() string { return g.pick(`MIN("f"."fix_state")`, `MIN("f"."fix_least")`) }
 
-func (g grain) fixMost() string { return g.pick(`MAX("f"."fix_state")`, "MAX(f.fix_most)") }
+func (g grain) fixMost() string { return g.pick(`MAX("f"."fix_state")`, `MAX("f"."fix_most")`) }
 
 // held is how many places somebody holds, and heldLeast and heldMost the two
 // ends of who.
-func (g grain) held() string { return g.pick(`COUNT("f"."assigned_to")`, "SUM(f.held)") }
+func (g grain) held() string { return g.pick(`COUNT("f"."assigned_to")`, `SUM("f"."held")`) }
 
-func (g grain) heldLeast() string { return g.pick(`MIN("f"."assigned_to")`, "MIN(f.held_least)") }
+func (g grain) heldLeast() string { return g.pick(`MIN("f"."assigned_to")`, `MIN("f"."held_least")`) }
 
-func (g grain) heldMost() string { return g.pick(`MAX("f"."assigned_to")`, "MAX(f.held_most)") }
+func (g grain) heldMost() string { return g.pick(`MAX("f"."assigned_to")`, `MAX("f"."held_most")`) }
 
 // decided is how many places carry one of the flags byState's derived table
 // computes per place.
@@ -80,7 +80,7 @@ func (g grain) decided(flag string) string {
 	default:
 		panic("finding: " + flag + " is not a column of the decided table")
 	}
-	return g.pick("SUM(COALESCE(dd."+flag+", 0))", `SUM(f.`+flag+`)`)
+	return g.pick(`SUM(COALESCE("dd"."`+flag+`", 0))`, `SUM("f"."`+flag+`")`)
 }
 
 func (g grain) pick(rows, parts string) string {
@@ -267,7 +267,7 @@ func (f Filter) decidedBeside(db bun.IDB, rows *bun.SelectQuery, keys []partKey)
 	}
 	// A decided group always has places in the partial groups, because both
 	// read the same population; a group with none is not one the list holds.
-	return stacked.Having("SUM(u.n) > 0")
+	return stacked.Having(`SUM("u"."n") > 0`)
 }
 
 // comparesDecidedPlaces is whether a condition the filter asks of a group

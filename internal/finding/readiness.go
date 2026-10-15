@@ -183,9 +183,9 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "counted"`, inner).
-		ColumnExpr(`counted.band AS "band"`).
+		ColumnExpr(`"counted"."band" AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr("counted.band").
+		GroupExpr(`"counted"."band"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("count what this build holds: %w", err)
 	}

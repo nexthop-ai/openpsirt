@@ -427,14 +427,14 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	err = w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
 		ColumnExpr(`"q"."team_id" AS "team_id"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF(q.team_display, ''), q.team_name)) AS "team"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF("q"."team_display", ''), "q"."team_name")) AS "team"`).
 		// The matched name for the link and the typed one for the sentence:
 		// what a screen resolves a queue by is not what somebody calls it.
-		ColumnExpr(`MIN(q.team_name) AS "team_name"`).
+		ColumnExpr(`MIN("q"."team_name") AS "team_name"`).
 		ColumnExpr(`"q"."product_id" AS "product_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
-		ColumnExpr(`MAX(q.private_rows) AS "private_rows"`).
+		ColumnExpr(`MAX("q"."private_rows") AS "private_rows"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
 		GroupExpr(`"q"."team_id", "q"."product_id"`).
 		Scan(ctx, &rows)

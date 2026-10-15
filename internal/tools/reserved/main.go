@@ -24,7 +24,7 @@
 // | Invented names | `AS <word>` in a statement or a builder argument | an alias or an output name written bare |
 // | Tables | a table after FROM, JOIN, INTO or UPDATE, or opening a table expression | a table the migrations declare, written bare |
 // | Declared columns | a statement, the SQL argument of a builder method, and a clause built in a variable and handed to one | a column the migrations declare, written bare, alone or after a qualifier |
-// | Qualified columns | every literal outside the tests and the migrations: a clause, or one qualified name handed to code that places it | a column the migrations declare, written bare after a qualifier |
+// | Qualified columns | every literal outside the tests and the migrations: a clause, or one qualified name handed to code that places it | a column the migrations declare, or a name the file's queries invent with AS, written bare after a qualifier |
 // | Definitions | the migrations' data-definition literals | a declared name that collides with a word an engine reserves |
 // | Model aliases | a struct tag's alias | an alias that collides with a word an engine reserves |
 //
@@ -197,10 +197,23 @@ func main() {
 	// schema has one of that name.
 	schema := map[string]bool{}
 	columns := map[string]bool{}
+	// The names the code that runs invents with AS, read before any file is
+	// checked, because a derived table built in one file is read in another.
+	invented := map[string]bool{}
 	fset := token.NewFileSet()
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
 		tablesDeclared(path, body, schema)
 		if !strings.Contains(path, "database/migrate/migrations/") {
+			if strings.HasSuffix(path, "_test.go") || strings.Contains(path, "internal/tools/reserved") {
+				return nil
+			}
+			file, err := parser.ParseFile(fset, path, body, 0)
+			if err != nil {
+				return fmt.Errorf("%s: %w", path, err)
+			}
+			for word := range inventedNames(file, nil) {
+				invented[word] = true
+			}
 			return nil
 		}
 		file, err := parser.ParseFile(fset, path, body, 0)
@@ -224,7 +237,7 @@ func main() {
 	}
 
 	var bad []found
-	queries := 0
+	queries, qualified := 0, 0
 	// web holds the interface, which writes no SQL: it asks this server.
 	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
 		// This checker's own tests are written out of what it reports: a bare
@@ -237,9 +250,10 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		hits, examined := checkFile(fset, path, file, schema, columns, reserved)
+		hits, examined, read := checkFile(fset, path, file, schema, columns, reserved, invented)
 		bad = append(bad, hits...)
 		queries += examined
+		qualified += read
 		return nil
 	})
 	if err != nil {
@@ -248,6 +262,10 @@ func main() {
 	}
 	if queries == 0 {
 		fmt.Fprintln(os.Stderr, "no query was read, so the column pass checked nothing")
+		os.Exit(2)
+	}
+	if qualified == 0 {
+		fmt.Fprintln(os.Stderr, "no literal of the code that runs was read, so the qualified pass checked nothing")
 		os.Exit(2)
 	}
 

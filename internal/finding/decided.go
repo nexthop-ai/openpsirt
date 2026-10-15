@@ -215,5 +215,5 @@ var coversAsked = func() string {
 // state, under the state's own alias. A place no decision covers has no row
 // in the joined table and counts as none.
 func placesDecided(state decisionState) string {
-	return `SUM(COALESCE(dd.` + state.alias + `, 0)) AS "` + state.alias + `"`
+	return `SUM(COALESCE("dd"."` + state.alias + `", 0)) AS "` + state.alias + `"`
 }

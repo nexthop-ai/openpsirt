@@ -174,10 +174,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// own, because averaging inside the grouping would average the places.
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_issue"`, perIssue).
-		ColumnExpr(`per_issue.band_rank AS "band_rank"`).
+		ColumnExpr(`"per_issue"."band_rank" AS "band_rank"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
 		ColumnExpr(secondsBetween(s.db)+` AS "seconds"`).
-		GroupExpr("per_issue.band_rank").
+		GroupExpr(`"per_issue"."band_rank"`).
 		Scan(ctx, &spans); err != nil {
 		return nil, fmt.Errorf("read how long fixes took: %w", err)
 	}
@@ -267,7 +267,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		Join(`LEFT JOIN (?) AS "answered" ON answered.finding_id = "f"."id"`, answered).
+		Join(`LEFT JOIN (?) AS "answered" ON "answered"."finding_id" = "f"."id"`, answered).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		Where(`"f"."closed_at" IS NULL`).
@@ -277,7 +277,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		in, args := bucket.holds(now)
 		places = places.
 			ColumnExpr(`MAX(CASE WHEN `+in+` THEN 1 ELSE 0 END) AS "open_`+bucketName(i)+`"`, args...).
-			ColumnExpr(`MAX(CASE WHEN `+in+` AND answered.finding_id IS NULL THEN 1 ELSE 0 END)`+
+			ColumnExpr(`MAX(CASE WHEN `+in+` AND "answered"."finding_id" IS NULL THEN 1 ELSE 0 END)`+
 				` AS "undecided_`+bucketName(i)+`"`, args...)
 	}
 	places = scope.Narrow(onlyReadable(places, subject, products, all))
@@ -298,13 +298,13 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	for i := range agingBuckets {
 		name := bucketName(i)
 		issues = issues.
-			ColumnExpr(`MAX(grouped.open_` + name + `) AS "open_` + name + `"`).
-			ColumnExpr(`MAX(grouped.undecided_` + name + `) AS "undecided_` + name + `"`).
-			ColumnExpr(`MAX(CASE WHEN grouped.open_` + name + ` = 1 THEN ` + rankCase(rating.EffectiveExpr, 0) +
+			ColumnExpr(`MAX("grouped"."open_` + name + `") AS "open_` + name + `"`).
+			ColumnExpr(`MAX("grouped"."undecided_` + name + `") AS "undecided_` + name + `"`).
+			ColumnExpr(`MAX(CASE WHEN "grouped"."open_` + name + `" = 1 THEN ` + rankCase(rating.EffectiveExpr, 0) +
 				` END) AS "band_` + name + `"`)
 		for _, column := range []string{"open_", "undecided_", "band_"} {
-			counted = counted.ColumnExpr(`per_issue.` + column + name + ` AS "` + column + name + `"`)
-			keys = append(keys, "per_issue."+column+name)
+			counted = counted.ColumnExpr(`"per_issue"."` + column + name + `" AS "` + column + name + `"`)
+			keys = append(keys, `"per_issue"."`+column+name+`"`)
 		}
 	}
 	counted = counted.GroupExpr(strings.Join(keys, ", "))

@@ -312,7 +312,7 @@ func q(parts []string) {
 		t.Fatal(err)
 	}
 	columns := map[string]bool{"id": true, "name": true}
-	bad, examined := checkFile(fset, "internal/x/x.go", file, map[string]bool{"finding": true}, columns, nil)
+	bad, examined, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{"finding": true}, columns, nil, nil)
 	var got []string
 	for _, one := range ordered(bad) {
 		got = append(got, fmt.Sprintf("%d:%s", one.line, one.column))
@@ -345,7 +345,7 @@ func q() {
 		t.Fatal(err)
 	}
 	columns := map[string]bool{"id": true, "name": true, "purl": true}
-	bad, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{"component": true}, columns, nil)
+	bad, _, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{"component": true}, columns, nil, nil)
 	var got []string
 	for _, one := range ordered(bad) {
 		got = append(got, one.column)
@@ -394,7 +394,7 @@ func q() {
 		"target_id": true, "stream_id": true, "vulnerability_id": true, "id": true, "told_id": true,
 		"kind": true, "name": true, "namespace": true,
 	}
-	bad, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{}, columns, nil)
+	bad, _, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{}, columns, nil, nil)
 	var got []string
 	for _, one := range ordered(bad) {
 		got = append(got, one.column)
@@ -409,7 +409,34 @@ func q() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bad, _ := checkFile(fset, "internal/x/x_test.go", file, map[string]bool{}, columns, nil); len(bad) != 0 {
+	if bad, _, _ := checkFile(fset, "internal/x/x_test.go", file, map[string]bool{}, columns, nil, nil); len(bad) != 0 {
 		t.Errorf("a test was read for the qualified form: %v", bad)
+	}
+}
+
+func TestAnInventedNameALikeAndAListAreReadForTheQualifiedForm(t *testing.T) {
+	const source = "package x\n\nfunc q() {\n" +
+		"\tdb.ColumnExpr(`SUM(\"g\".\"open\") AS \"still_open\"`)\n" +
+		"\tdb.Having(`\"g\".\"covered\" = grouped.still_open`)\n" +
+		"\tdb.Where(names(\"c.name_folded LIKE ?\"))\n" +
+		"\tdb.GroupExpr(names(\"f.id, f.kind\"))\n" +
+		"}\n"
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/x/x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns := map[string]bool{"open": true, "covered": true, "name_folded": true, "id": true, "kind": true}
+	bad, _, qualified := checkFile(fset, "internal/x/x.go", file, map[string]bool{}, columns, nil, nil)
+	var got []string
+	for _, one := range ordered(bad) {
+		got = append(got, one.column)
+	}
+	want := `"grouped"."still_open" "c"."name_folded" "f"."id" "f"."kind"`
+	if strings.Join(got, " ") != want {
+		t.Errorf("reported %v, want %s", got, want)
+	}
+	if qualified == 0 {
+		t.Error("the qualified pass counted nothing it read")
 	}
 }

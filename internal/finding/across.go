@@ -498,7 +498,7 @@ func (s *Store) packagesAcross(ctx context.Context, targets []int64, held heldBy
 		ColumnExpr(`COALESCE("c"."latest_version", '') AS "latest_version"`).
 		ColumnExpr(`"c"."latest_released_at" AS "latest_released_at"`).
 		ColumnExpr(`"c"."first_seen_at" AS "first_seen_at"`).
-		ColumnExpr(`COALESCE("pl".consumers, 1) AS "consumers"`).
+		ColumnExpr(`COALESCE("pl"."consumers", 1) AS "consumers"`).
 		Where(`"n"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
@@ -598,7 +598,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		Join(`JOIN (?) AS "rk" ON "rk"."id" = "de"."claim_id"`, ranked).
 		ColumnExpr(`"dv"."issue_id" AS "issue_id"`).
 		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
-		ColumnExpr(`MAX("rk".promise) AS "promise"`).
+		ColumnExpr(`MAX("rk"."promise") AS "promise"`).
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		GroupExpr(`"dv"."issue_id", "de"."place_identity"`)
@@ -613,7 +613,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		ColumnExpr(exploitedAcross+` AS "exploited"`).
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
-		ColumnExpr(`MAX("pd".promise) AS "promise"`).
+		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
 		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."place_identity"`, "f"), promises).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -628,11 +628,11 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(`"pf"."target_id" AS "target_id"`).
 		ColumnExpr(foldOf+` AS "fold"`, foldArgs...).
 		ColumnExpr(`"pf"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`SUM("pf".places) AS "places"`).
+		ColumnExpr(`SUM("pf"."places") AS "places"`).
 		ColumnExpr(`MIN("pf"."due_at") AS "due_at"`).
 		ColumnExpr(`MAX("pf"."exploited") AS "exploited"`).
-		ColumnExpr(`MAX("pf".exploited_here) AS "exploited_here"`).
-		ColumnExpr(`MAX("pf".promise) AS "promise"`).
+		ColumnExpr(`MAX("pf"."exploited_here") AS "exploited_here"`).
+		ColumnExpr(`MAX("pf"."promise") AS "promise"`).
 		ColumnExpr(`MIN(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "lo"`).
 		ColumnExpr(`MAX(CASE WHEN "pf"."fixed_in" <> '' THEN "pf"."fixed_in" END) AS "hi"`).
 		GroupExpr(`"pf"."target_id", `+foldOf+`, "pf"."vulnerability_id"`, foldArgs...)
@@ -654,8 +654,8 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 	}
 
 	const (
-		oneFix    = `CASE WHEN "pi".lo = "pi".hi THEN "pi".lo END`
-		severalOf = `CASE WHEN "pi".lo <> "pi".hi THEN "pi"."vulnerability_id" END`
+		oneFix    = `CASE WHEN "pi"."lo" = "pi"."hi" THEN "pi"."lo" END`
+		severalOf = `CASE WHEN "pi"."lo" <> "pi"."hi" THEN "pi"."vulnerability_id" END`
 	)
 	// Scanned a column at a time, because the columns are as many as the
 	// binaries.
@@ -683,16 +683,16 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		// answers for all of them.
 		Join(rating.Here, productID).
 		ColumnExpr(`"pi"."target_id" AS "target_id"`).
-		ColumnExpr(`"pi".fold AS "fold"`).
+		ColumnExpr(`"pi"."fold" AS "fold"`).
 		ColumnExpr(oneFix + ` AS "fixed_in"`).
 		ColumnExpr(severalOf + ` AS "several"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "band"`).
 		ColumnExpr(`COUNT(*) AS "issues"`).
-		ColumnExpr(`SUM("pi".places) AS "places"`).
+		ColumnExpr(`SUM("pi"."places") AS "places"`).
 		ColumnExpr(`MIN("pi"."due_at") AS "due_at"`).
 		ColumnExpr(`MAX("pi"."exploited") AS "exploited"`).
-		ColumnExpr(`MAX("pi".exploited_here) AS "exploited_here"`).
-		ColumnExpr(`MAX("pi".promise) AS "promise"`)
+		ColumnExpr(`MAX("pi"."exploited_here") AS "exploited_here"`).
+		ColumnExpr(`MAX("pi"."promise") AS "promise"`)
 	for j := range columns {
 		column := bun.Ident(fmt.Sprint("on_", j))
 		q = q.ColumnExpr(`COUNT("pi".?) AS ?`, column, column)

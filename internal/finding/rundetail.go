@@ -123,10 +123,10 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			Where(run+" = ?", runID)
 		err := s.db.NewSelect().
 			TableExpr(`(?) AS "changed"`, inner).
-			ColumnExpr(`changed.band AS "band"`).
+			ColumnExpr(`"changed"."band" AS "band"`).
 			ColumnExpr(`COUNT(*) AS "count"`).
 			ColumnExpr(`SUM("changed"."exploited") AS "exploited"`).
-			GroupExpr("changed.band").
+			GroupExpr(`"changed"."band"`).
 			Scan(ctx, &rows)
 		if err != nil {
 			return fmt.Errorf("count what this run changed: %w", err)

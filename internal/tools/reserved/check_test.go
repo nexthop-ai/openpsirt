@@ -22,7 +22,7 @@ func check(t *testing.T, path, source string) []string {
 	schema := map[string]bool{"finding": true, "component": true}
 	reserved := map[string]bool{"as": true, "order": true}
 	var got []string
-	hits, _ := checkFile(fset, path, file, schema, map[string]bool{}, reserved)
+	hits, _, _ := checkFile(fset, path, file, schema, map[string]bool{}, reserved, nil)
 	for _, one := range ordered(hits) {
 		got = append(got, one.word)
 	}

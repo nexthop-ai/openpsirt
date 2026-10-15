@@ -906,8 +906,8 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 	edges := func() *bun.SelectQuery {
 		return s.db.NewSelect().
 			TableExpr(`"graph_edge" AS "e"`).
-			Join(`JOIN "graph_node" AS "nn" ON "nn"."id" = e.`+near).
-			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = e.`+far).
+			Join(`JOIN "graph_node" AS "nn" ON "nn"."id" = "e"."`+near+`"`).
+			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = "e"."`+far+`"`).
 			Where(`"e"."target_id" = ?`, targetID).
 			Where(`"nn"."component_id" = ?`, componentID).
 			Where(`"e"."closed_scan_id" IS NULL`)
@@ -950,7 +950,7 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// value per c.id and so adds nothing, but the engines that enforce
 		// the rule strictly will not take a column from a joined subquery on
 		// the strength of a primary key belonging to a different table.
-		GroupExpr(`"c"."id", "c"."name", "c"."version", kids.n, open.n`).
+		GroupExpr(`"c"."id", "c"."name", "c"."version", "kids"."n", "open"."n"`).
 		// Anything that opens comes before anything that does not, and within
 		// each the most findings first.
 		//
@@ -961,7 +961,7 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
 		// The identifier last, so two components of one name keep one order.
-		OrderExpr(`CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, "c"."name", "c"."id"`)
+		OrderExpr(`CASE WHEN COALESCE("kids"."n", 0) > 0 THEN 0 ELSE 1 END, findings DESC, "c"."name", "c"."id"`)
 }
 
 // openIssuesJoin adds how many issues are open against each component "c" in
@@ -998,13 +998,13 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 		within, args = ` AND "f"."component_id" IN (?)`, append(args, bun.List(only))
 	}
 	return query.
-		Join(`LEFT JOIN (SELECT g.cid AS "cid", COUNT(*) AS "n"
+		Join(`LEFT JOIN (SELECT "g"."cid" AS "cid", COUNT(*) AS "n"
 			FROM (SELECT "f"."component_id" AS "cid", "f"."vulnerability_id" AS "vid"
 			      FROM "finding" AS "f"
 			      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)`+within+`
 			      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
-			GROUP BY g.cid) AS "open" ON open.cid = "c"."id"`, args...).
-		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`)
+			GROUP BY "g"."cid") AS "open" ON "open"."cid" = "c"."id"`, args...).
+		ColumnExpr(`COALESCE("open"."n", 0) AS "findings"`)
 }
 
 // childrenJoin adds how many things each component "c" pulls in in this build,
@@ -1032,8 +1032,8 @@ func childrenJoin(query *bun.SelectQuery, targetID int64, only []int64) *bun.Sel
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON "dp"."id" = "d"."parent_id"
 			WHERE "d"."target_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
-			GROUP BY "dp"."component_id") AS "kids" ON kids.cid = "c"."id"`, args...).
-		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`)
+			GROUP BY "dp"."component_id") AS "kids" ON "kids"."cid" = "c"."id"`, args...).
+		ColumnExpr(`COALESCE("kids"."n", 0) AS "children"`)
 }
 
 // orphaned is the condition that nothing in the build pulls in the node the
@@ -1260,7 +1260,7 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	var rows []Neighbor
 	query := s.db.NewSelect().
 		TableExpr(matched, targetID, false, "%"+database.LikeEscaped(Folded(term))+"%").
-		Join(`JOIN "component" AS "c" ON "c"."id" = matched.cid`)
+		Join(`JOIN "component" AS "c" ON "c"."id" = "matched"."cid"`)
 	err = childrenJoin(openIssuesJoin(query, readable, targetID, nil), targetID, nil).
 		ColumnExpr(`"c"."id" AS "component_id"`).
 		ColumnExpr(`"c"."name" AS "name"`).

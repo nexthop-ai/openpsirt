@@ -207,7 +207,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		decided = f.amongDecidedIssues(decided, `"dv"."issue_id"`)
 	}
 	decided = decided.Where(`"de"."product_id" = ?`, f.ProductID)
-	return q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`, decided)
+	return q.Join(`LEFT JOIN (?) AS "dd" ON "dd"."finding_id" = "f"."id"`, decided)
 }
 
 // asksDecided is whether any condition the filter asks of a group reads the

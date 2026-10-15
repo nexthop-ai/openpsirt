@@ -441,7 +441,7 @@ func (f Filter) asListed(db bun.IDB, q *bun.SelectQuery, targets []int64,
 	return f.ofRows().narrow(q.
 		Join(`JOIN "component" AS "ck" ON "ck"."id" = "f"."component_id"`).
 		Join(`JOIN (?) AS "kept" ON "kept"."vulnerability_id" = "f"."vulnerability_id"`+
-			` AND kept.fold = "ck"."fold_key"`, kept))
+			` AND "kept"."fold" = "ck"."fold_key"`, kept))
 }
 
 // keepsAfterGrouping is whether asListed restricts its query's groups rather
@@ -579,7 +579,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.
 				WhereOr(`"f"."component_id" IN (?)`,
-					componentsWhere(q, "c.name_folded LIKE ?"+database.LikeClause, like)).
+					componentsWhere(q, `"c"."name_folded" LIKE ?`+database.LikeClause, like)).
 				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).Column("v.id").
 						Where(`LOWER("v"."identifier") LIKE ?`+database.LikeClause, like)).

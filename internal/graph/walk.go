@@ -64,10 +64,10 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 		UNION
 		SELECT "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = d.node
+		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
-	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = d.node`,
+	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
 		targetID, bun.List(componentIDs), targetID)
 }
 
@@ -153,9 +153,9 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	walk := `WITH RECURSIVE "down" AS (
 		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
 		UNION
-		SELECT d.start, "e"."child_id"
+		SELECT "d"."start", "e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = d.node
+		WHERE "e"."target_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
 	`
@@ -166,8 +166,8 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	}
 	err := s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
 	FROM "down" AS "d"
-	JOIN "graph_node" AS "sn" ON "sn"."id" = d.start
-	JOIN "graph_node" AS "n" ON "n"."id" = d.node`, walkArgs...).
+	JOIN "graph_node" AS "sn" ON "sn"."id" = "d"."start"
+	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, walkArgs...).
 		Scan(ctx, &reached)
 	if err != nil {
 		return nil, fmt.Errorf("walk beneath each component: %w", err)
@@ -327,16 +327,16 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 		UNION
 		SELECT "e"."parent_id"
 		FROM "up" AS "u" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."child_id" = u.node AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"
+		WHERE "e"."child_id" = "u"."node" AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"
 	)
-	SELECT u.node AS "node", "e"."parent_id" AS "parent",
+	SELECT "u"."node" AS "node", "e"."parent_id" AS "parent",
 	       "n"."component_id" AS "component_id", "n"."is_root" AS "is_root",
 	       "c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"
 	FROM "up" AS "u"
-	JOIN "graph_node" AS "n" ON "n"."id" = u.node
+	JOIN "graph_node" AS "n" ON "n"."id" = "u"."node"
 	JOIN "component" AS "c" ON "c"."id" = "n"."component_id"
 	LEFT JOIN "graph_edge" AS "e"
-	  ON "e"."child_id" = u.node AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"`,
+	  ON "e"."child_id" = "u"."node" AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" <> "e"."child_id"`,
 		targetID, bun.List(componentIDs)).
 		Scan(ctx, &rows)
 	if err != nil {

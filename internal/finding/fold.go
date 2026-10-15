@@ -29,7 +29,7 @@ import (
 // A source-package expression in its place cannot see three of the collisions
 // a real image contains: one source shipped at two versions in one build, and
 // two ecosystems using one word for different packages.
-const FoldedOn = "c.fold_key"
+const FoldedOn = `"c"."fold_key"`
 
 // GroupedOn is the grain the findings list, its hidden count and its
 // cross-product form all group by: one issue at one fold.
@@ -38,11 +38,11 @@ const FoldedOn = "c.fold_key"
 // the page it belongs to changes the figure above the list depending on which
 // page is being looked at. The grain of a page and the grain of the number
 // above it are one fact.
-const GroupedOn = "f.vulnerability_id, " + FoldedOn
+const GroupedOn = `"f"."vulnerability_id", ` + FoldedOn
 
 // GroupedAcross is the same grain across products, where a row is an issue at
 // a fold in one product.
-const GroupedAcross = "st.product_id, " + GroupedOn
+const GroupedAcross = `"st"."product_id", ` + GroupedOn
 
 // SourceName and SourceVersion are what a fold is called and what it is at:
 // what the producer said the component was built from, and the component's own

@@ -140,16 +140,16 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	// open is past its date and not covered.
 	err = s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, group).
-		ColumnExpr(`grouped.band AS "band"`).
-		ColumnExpr("SUM(CASE WHEN grouped.still_open = 0 AND grouped.judged > 0 "+
+		ColumnExpr(`"grouped"."band" AS "band"`).
+		ColumnExpr(`SUM(CASE WHEN "grouped"."still_open" = 0 AND "grouped"."judged" > 0 `+
 			`THEN 1 ELSE 0 END) AS "closed"`).
-		ColumnExpr("SUM(CASE WHEN grouped.still_open = 0 AND grouped.judged > 0 "+
-			`AND grouped.late = 0 THEN 1 ELSE 0 END) AS "met"`).
-		ColumnExpr("SUM(CASE WHEN grouped.still_open > 0 "+
-			`AND "grouped"."covered" = grouped.still_open THEN 1 ELSE 0 END) AS "deferred"`).
-		ColumnExpr(`SUM(CASE WHEN grouped.past_due > 0 THEN 1 ELSE 0 END) AS "overdue"`).
-		ColumnExpr(`SUM(CASE WHEN grouped.still_open > 0 THEN 1 ELSE 0 END) AS "still_open"`).
-		GroupExpr("grouped.band").
+		ColumnExpr(`SUM(CASE WHEN "grouped"."still_open" = 0 AND "grouped"."judged" > 0 `+
+			`AND "grouped"."late" = 0 THEN 1 ELSE 0 END) AS "met"`).
+		ColumnExpr(`SUM(CASE WHEN "grouped"."still_open" > 0 `+
+			`AND "grouped"."covered" = "grouped"."still_open" THEN 1 ELSE 0 END) AS "deferred"`).
+		ColumnExpr(`SUM(CASE WHEN "grouped"."past_due" > 0 THEN 1 ELSE 0 END) AS "overdue"`).
+		ColumnExpr(`SUM(CASE WHEN "grouped"."still_open" > 0 THEN 1 ELSE 0 END) AS "still_open"`).
+		GroupExpr(`"grouped"."band"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read how much met its deadline: %w", err)

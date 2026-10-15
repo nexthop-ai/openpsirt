@@ -118,7 +118,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		AnyClaim        int        `bun:"any_claim"`
 		Approved        int        `bun:"approved_here"`
 	}
-	err = q.Join(`LEFT JOIN (?) AS "dd" ON dd.finding_id = "f"."id"`,
+	err = q.Join(`LEFT JOIN (?) AS "dd" ON "dd"."finding_id" = "f"."id"`,
 		decisionsAtPlaces(q, productID, anyClaim, claimApproved)).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).

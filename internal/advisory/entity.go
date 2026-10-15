@@ -737,7 +737,7 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "recorded_flaw"."vulnerability_id"`).
 		ColumnExpr(`"vu"."identifier" AS "identifier"`).
 		ColumnExpr(`COALESCE("vu"."description", '') AS "summary"`).
-		ColumnExpr(`recorded_flaw.still_open AS "still_open"`).
+		ColumnExpr(`"recorded_flaw"."still_open" AS "still_open"`).
 		OrderExpr(`"vu"."identifier" ASC`).
 		Limit(mostNameable).
 		Scan(ctx, &rows)

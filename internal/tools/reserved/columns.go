@@ -231,10 +231,10 @@ var qualifiedBare = regexp.MustCompile(
 var qualifiedAlone = regexp.MustCompile(`\A\s*(?:"[a-z_][a-z0-9_]*"|\??[A-Za-z_][A-Za-z0-9_]*)\.[a-z_][a-z0-9_]*\s*\z`)
 
 // sqlShaped recognizes a literal holding a clause: a comparison written with
-// the spaces every query here gives one, a parenthesis, or a keyword written
-// in capitals as every keyword here is. A sentence naming a setting's key and
+// the spaces every query here gives one, a parenthesis, a list of qualified
+// names, or a keyword written in capitals as every keyword here is. A sentence naming a setting's key and
 // an option assigning one have none of them.
-var sqlShaped = regexp.MustCompile(`\s(?:=|<>|!=|<=|>=|<|>)\s|\(|\b(?:AND|OR|IS|NOT|NULL|IN|ON|AS|ASC|DESC|CASE|WHEN|THEN|ELSE|END|SELECT|WHERE|FROM|JOIN|EXISTS|BY)\b`)
+var sqlShaped = regexp.MustCompile(`\s(?:=|<>|!=|<=|>=|<|>)\s|\(|[a-z_]\.[a-z_]+"?\s*,\s*"?[a-z_]+"?\.|\b(?:LIKE|BETWEEN)\b|\b(?:AND|OR|IS|NOT|NULL|IN|ON|AS|ASC|DESC|CASE|WHEN|THEN|ELSE|END|SELECT|WHERE|FROM|JOIN|EXISTS|BY)\b`)
 
 // qualifiedColumns reports every declared column a clause writes bare after a
 // qualifier, in a literal that carries no statement marker.
@@ -385,4 +385,32 @@ func unquotedColumns(text string, columns map[string]bool, path string, line int
 		bad = append(bad, found{word: one.word, file: path, line: line, bare: true, column: one.quoted()})
 	}
 	return bad
+}
+
+// inventedQuoted is the name a query gives an expression or a derived table,
+// quoted as every invented name here is.
+var inventedQuoted = regexp.MustCompile(`(?i)\bAS\s+"([a-z_][a-z0-9_]*)"`)
+
+// inventedNames is every name the file's literals invent with AS that the
+// schema does not also declare as a column. A reference to one, qualified by
+// the derived table that carries it, is read as a declared column is.
+func inventedNames(file *ast.File, columns map[string]bool) map[string]bool {
+	names := map[string]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		lit, ok := node.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		text, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		for _, match := range inventedQuoted.FindAllStringSubmatch(text, -1) {
+			if !columns[match[1]] {
+				names[match[1]] = true
+			}
+		}
+		return true
+	})
+	return names
 }

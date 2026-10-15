@@ -130,12 +130,12 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).
-		ColumnExpr(`per_release.stream AS "stream"`).
-		ColumnExpr(`per_release.stream_name AS "stream_name"`).
+		ColumnExpr(`"per_release"."stream" AS "stream"`).
+		ColumnExpr(`"per_release"."stream_name" AS "stream_name"`).
 		ColumnExpr(`"per_release"."created_at" AS "created_at"`).
-		ColumnExpr(`per_release.band AS "band"`).
+		ColumnExpr(`"per_release"."band" AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`per_release.stream, per_release.stream_name, "per_release"."created_at", per_release.band`).
+		GroupExpr(`"per_release"."stream", "per_release"."stream_name", "per_release"."created_at", "per_release"."band"`).
 		// Newest last, so the chart reads left to right the way time does.
 		OrderExpr(`"created_at", stream, band`).
 		Scan(ctx, &rows); err != nil {

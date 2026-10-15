@@ -759,11 +759,20 @@ marker instead.
 
 | Literal | Read as |
 |---|---|
-| A clause: a comparison written with spaces, a parenthesis, or a keyword in capitals | Every qualified column in it |
+| A clause: a comparison written with spaces, a parenthesis, a list of qualified names, `LIKE`, `BETWEEN`, or another keyword in capitals | Every qualified column in it |
 | One qualified name and nothing else, handed to a call, returned, given as a field's value, or held in a constant of a named type | That name |
 | An argument of a builder method or function that quotes its argument itself | Nothing: the callee quotes it |
 | An argument of a standard library call, a map's key, a constant of plain string type | Nothing: a setting's key is written the same way |
 | Anything in a test | Nothing: a test hands a detector the bare spellings it exists to find |
+
+A name a query invents with `AS` is read the same way as a declared column
+wherever a reference qualifies it, in a statement or a fragment, in any file:
+a derived table built in one file is often read in another. The pass counts
+the literals it reads and fails on none.
+
+A constant of plain string type holding one qualified name, and a column built
+from an alias at run time, are invisible to the pass and are quoted where they
+are written.
 
 A helper that places a column it is given as written takes it quoted, so a
 list of the columns it accepts lists them quoted too. A helper that builds a

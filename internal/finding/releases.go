@@ -101,16 +101,16 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 
 	query := s.db.NewSelect().
 		TableExpr(`(?) AS "at"`, inner).
-		ColumnExpr(`at.stream AS "stream"`).
+		ColumnExpr(`"at"."stream" AS "stream"`).
 		ColumnExpr(`"at"."kind" AS "kind"`).
-		ColumnExpr(`at.variant AS "variant"`).
-		ColumnExpr(`at.band AS "band"`).
+		ColumnExpr(`"at"."variant" AS "variant"`).
+		ColumnExpr(`"at"."band" AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`at.stream, "at"."kind", at.variant, at.band`).
+		GroupExpr(`"at"."stream", "at"."kind", "at"."variant", "at"."band"`).
 		// Ordered here rather than in the caller, so every reader of this gets
 		// the same sequence. A chart whose points move between requests is
 		// worse than one that is wrong in a fixed way.
-		OrderExpr("at.stream, at.variant")
+		OrderExpr(`"at"."stream", "at"."variant"`)
 
 	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what is open against each build: %w", err)

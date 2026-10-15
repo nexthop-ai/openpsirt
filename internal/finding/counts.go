@@ -82,9 +82,9 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	}
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "counted"`, inner).
-		ColumnExpr(`counted.grouped_by AS "grouped_by"`).
+		ColumnExpr(`"counted"."grouped_by" AS "grouped_by"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr("counted.grouped_by").
+		GroupExpr(`"counted"."grouped_by"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what is open: %w", err)

@@ -24,9 +24,11 @@ func tablesDeclared(path string, body []byte, schema map[string]bool) {
 // checkFile reports every name one parsed source file writes wrongly: a bare
 // name a query invents, a bare table or declared column a query names, a
 // reserved word a migration declares, and a reserved alias a struct tag
-// declares. It also answers how many pieces of SQL it read for columns.
+// declares. elsewhere is the names queries in the rest of the tree invent.
+// It also answers how many pieces of SQL it read for columns, and
+// how many literals of the code that runs it read for the qualified form.
 func checkFile(fset *token.FileSet, path string, file *ast.File,
-	schema, columns, reserved map[string]bool) (bad []found, examined int) {
+	schema, columns, reserved, elsewhere map[string]bool) (bad []found, examined, qualified int) {
 	packages := importedNames(file)
 
 	// The data-definition half. Read from the string literals in a migration
@@ -51,6 +53,22 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 	// The qualified form is read in the code that runs. A test is where a
 	// detector is handed the bare spellings it exists to find.
 	production := !definitions && !strings.HasSuffix(path, "_test.go")
+	// The names queries invent, here and in the rest of the tree, which a
+	// reference qualifies the way it qualifies a declared column, and the two
+	// together. A derived table built in one file is often read in another.
+	madeUp := inventedNames(file, columns)
+	for word := range elsewhere {
+		if !columns[word] {
+			madeUp[word] = true
+		}
+	}
+	named := make(map[string]bool, len(columns)+len(madeUp))
+	for word := range columns {
+		named[word] = true
+	}
+	for word := range madeUp {
+		named[word] = true
+	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		lit, ok := node.(*ast.BasicLit)
 		if !ok || lit.Kind != token.STRING {
@@ -74,7 +92,8 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 		// in this repository.
 		if !statement.MatchString(text) {
 			if production && !quotedHere[lit.Pos()] {
-				if hits := qualifiedColumns(text, columns, path, at); len(hits) > 0 {
+				qualified++
+				if hits := qualifiedColumns(text, named, path, at); len(hits) > 0 {
 					bad = append(bad, hits...)
 					columnsRead[lit.Pos()] = true
 				}
@@ -88,11 +107,17 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 		}
 		examined++
 		bad = append(bad, unquotedColumns(text, columns, path, at)...)
+		// A declared column is read above; an invented one is read here,
+		// where a reference qualifies it.
+		if production {
+			qualified++
+			bad = append(bad, qualifiedIn(text, madeUp, path, at)...)
+		}
 		return true
 	})
 
 	if production {
-		bad = append(bad, handedNames(fset, path, file, columns, standardNames(file))...)
+		bad = append(bad, handedNames(fset, path, file, named, standardNames(file))...)
 	}
 
 	ast.Inspect(file, func(node ast.Node) bool {
@@ -247,7 +272,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 			return true
 		})
 	}
-	return bad, examined
+	return bad, examined, qualified
 }
 
 // A piece is one string literal of an argument written as a concatenation,
