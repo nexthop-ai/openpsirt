@@ -121,7 +121,7 @@ func (r requires) said() string {
 		}
 	case DeploymentRecords:
 		if len(r.AnyOf) > 0 {
-			what += ", or the audit permission over this deployment's own records"
+			what += ", and the audit permission over this deployment's own records"
 		}
 	case AnyPerson:
 		if len(r.AnyOf) > 0 {
