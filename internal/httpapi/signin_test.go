@@ -778,11 +778,11 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 			if err := setting.NewStore(r.db.DB).Set(t.Context(), setting.SignInKey, stored); err != nil {
 				t.Fatal(err)
 			}
+			// A key that cannot be read is a fault here, so starting a sign-in
+			// answers 500 and sets no redirect to the provider.
 			rec := httptest.NewRecorder()
 			r.handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
-			if rec.Code == http.StatusFound {
-				t.Errorf("with the key stored as %q a sign-in was started", stored)
-			}
+			httpapitest.RefusedWith(t, rec, http.StatusInternalServerError)
 
 			body := []byte(`{"pending":{"State":"the-state","Nonce":"the-nonce","Verifier":"the-verifier"},"minted":"` +
 				time.Now().UTC().Format(time.RFC3339Nano) + `"}`)
@@ -794,6 +794,7 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 			req.Header.Set("Cookie", "openpsirt_pending="+forged)
 			rec = httptest.NewRecorder()
 			r.handler.ServeHTTP(rec, req)
+			httpapitest.RefusedWith(t, rec, http.StatusUnauthorized)
 			for _, cookie := range rec.Result().Cookies() {
 				if cookie.Name == "openpsirt_session" && cookie.Value != "" {
 					t.Errorf("with the key stored as %q a sign-in sealed with an empty key was completed", stored)
