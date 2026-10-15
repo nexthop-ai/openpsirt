@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -869,6 +871,83 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 		}
 		if body[1][builds] != "" {
 			t.Errorf("one build's file states a build count of %q", body[1][builds])
+		}
+	})
+}
+
+// The pending-upgrades file names its columns and carries in each one what
+// the list carries in the field of the same meaning.
+func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`",`+
+				`"reasoning":"Taking the 8.5.0 bump.",`+
+				`"builds":[{"stream":"master","variant":"broadcom"}]}`); got.Code != http.StatusCreated {
+			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
+		}
+
+		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
+		var list struct {
+			Items []map[string]any `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", plan, &list)
+		if len(list.Items) != 1 {
+			t.Fatalf("the list holds %d upgrades, want the one declared", len(list.Items))
+		}
+
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, plan+".csv", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := httpapitest.RowsUnder(lines)
+		want := []string{
+			"upstream", "from", "to", "components", "issues", "places",
+			"declared_at", "by", "held_by", "held_by_name", "state", "claim",
+		}
+		if !slices.Equal(body[0], want) {
+			t.Fatalf("the file's columns are %v, want %v", body[0], want)
+		}
+		if len(body) != 2 {
+			t.Fatalf("the file holds %d rows, want the one upgrade", len(body)-1)
+		}
+
+		// The list's field for each column, written as the file writes it:
+		// a number as digits, a list joined by spaces, an absent field empty.
+		field := map[string]string{"claim": "claim_id"}
+		item := list.Items[0]
+		for at, column := range want {
+			key := column
+			if named, ok := field[column]; ok {
+				key = named
+			}
+			said := ""
+			switch value := item[key].(type) {
+			case nil:
+			case string:
+				said = value
+			case float64:
+				said = strconv.FormatFloat(value, 'f', -1, 64)
+			case []any:
+				parts := make([]string, 0, len(value))
+				for _, one := range value {
+					parts = append(parts, fmt.Sprint(one))
+				}
+				said = strings.Join(parts, " ")
+			default:
+				t.Fatalf("the list's %s is a %T", key, value)
+			}
+			if body[1][at] != said {
+				t.Errorf("the file's %s is %q and the list's %s is %q", column, body[1][at], key, said)
+			}
+		}
+		if item["claim_id"] == nil || item["upstream"] != "curl" || item["by"] == nil {
+			t.Errorf("the declared upgrade reads as %v, want curl, its date and the claim that argued for it", item)
 		}
 	})
 }
