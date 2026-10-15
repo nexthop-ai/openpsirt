@@ -563,7 +563,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		return nil, fmt.Errorf("read the issues a bulk claim covers: %w", err)
 	}
 	// A flaw recorded where this reader may not read it wrote its summary
-	// onto the issue row every product shares.
+	// and its rating onto the issue row every product shares.
 	withheld, err := finding.RecordedOutOfReach(ctx, s.db, subject, issueIDs)
 	if err != nil {
 		return nil, err
@@ -571,7 +571,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	byIssue := make(map[int64]finding.Vulnerability, len(issues))
 	for _, issue := range issues {
 		if withheld[issue.ID] {
-			issue.Description = ""
+			issue.WithholdRecorded()
 		}
 		byIssue[issue.ID] = issue
 	}

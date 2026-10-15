@@ -118,7 +118,7 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 		return nil, nil, fmt.Errorf("retitle an advisory: %w", err)
 	}
 	row.Title = title
-	held, err := s.covers(ctx, row)
+	held, err := s.covers(ctx, subject, row)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -239,7 +239,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	// An advisory covering nothing states nothing, so there is nothing to
 	// agree to. Refused here rather than at the document, so the refusal
 	// reaches whoever is being asked to read it.
-	held, err := s.covers(ctx, row)
+	held, err := s.covers(ctx, subject, row)
 	if err != nil {
 		return nil, err
 	}

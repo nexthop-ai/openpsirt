@@ -117,7 +117,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	if err != nil {
 		return nil, nil, err
 	}
-	held, err := s.covers(ctx, row)
+	held, err := s.covers(ctx, subject, row)
 	if err != nil {
 		return nil, nil, err
 	}

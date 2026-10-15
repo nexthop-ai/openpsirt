@@ -55,7 +55,7 @@ type releaseKey struct{ product, issue, stream, variant int64 }
 func placed(ctx context.Context, db bun.IDB, subject access.Subject,
 	advisoryID int64) ([]Placed, error) {
 
-	held, err := coveredBy(ctx, db, advisoryID)
+	held, err := coveredBy(ctx, db, subject, advisoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	held, err := s.covers(ctx, row)
+	held, err := s.covers(ctx, subject, row)
 	if err != nil {
 		return err
 	}

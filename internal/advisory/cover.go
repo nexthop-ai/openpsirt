@@ -42,9 +42,24 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		}
 		a.undisclosed = true
 	}
+	// A flaw recorded in another product about the same issue writes its
+	// summary, its minted name, its addresses and its rating onto the issue.
+	// Where that record sits out of this subject's reach all four are left
+	// out, by the rule the issue page follows.
+	recorded, err := finding.RecordedOutOfReach(ctx, s.db, subject, []int64{issue.ID})
+	if err != nil {
+		return err
+	}
+	withheld := recorded[issue.ID]
+	if withheld {
+		issue.WithholdRecorded()
+	}
 	aliases, err := s.namesOf(ctx, issue.ID)
 	if err != nil {
 		return err
+	}
+	if withheld {
+		aliases = nil
 	}
 	releases, err := releases(ctx, s.db, subject, a.advisory, one.ProductID, issue.ID)
 	if err != nil {
@@ -53,6 +68,9 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	pointers, err := s.referencesTo(ctx, issue)
 	if err != nil {
 		return err
+	}
+	if withheld {
+		pointers = nil
 	}
 	credited, err := s.creditedFor(ctx, one.ProductID, issue.ID)
 	if err != nil {
@@ -167,6 +185,9 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	ratings, err := finding.NewVulnerabilities(s.db).Ratings(ctx, issue.ID)
 	if err != nil {
 		return err
+	}
+	if withheld {
+		ratings = finding.Sourced(ratings)
 	}
 	vulnerability.Scores = scoresFor(issue, ratings, rated)
 	vulnerability.Remediations = remediationsFor(fixed, fixable, unfixed)

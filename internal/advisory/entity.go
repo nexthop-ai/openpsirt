@@ -459,7 +459,7 @@ func (s *Store) Covers(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, err
 	}
-	held, err := s.covers(ctx, row)
+	held, err := s.covers(ctx, subject, row)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -478,13 +478,18 @@ func (s *Store) Covers(ctx context.Context, subject access.Subject,
 // the argument: the only things that answer with one are byName, which
 // narrows, and Mint, which just made it and covers nothing. A caller holding
 // an identifier cannot reach this without going through one of them.
-func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
-	return coveredBy(ctx, s.db, row.ID)
+func (s *Store) covers(ctx context.Context, subject access.Subject, row *Advisory) ([]Covered, error) {
+	return coveredBy(ctx, s.db, subject, row.ID)
 }
 
 // coveredBy is what one advisory covers, read through the handle given, for a
 // caller that has already narrowed and may be inside a transaction.
-func coveredBy(ctx context.Context, db bun.IDB, advisoryID int64) ([]Covered, error) {
+//
+// A covered issue's summary is the issue's description, and a flaw recorded
+// in another product about the same issue writes its own summary there. Where
+// that record sits out of this subject's reach the summary is left out, as
+// every other reader of the description leaves it.
+func coveredBy(ctx context.Context, db bun.IDB, subject access.Subject, advisoryID int64) ([]Covered, error) {
 	var rows []Covered
 	err := db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
@@ -516,6 +521,7 @@ func coveredBy(ctx context.Context, db bun.IDB, advisoryID int64) ([]Covered, er
 	// it was first added.
 	seen := map[[2]int64]bool{}
 	once := rows[:0]
+	issues := make([]int64, 0, len(rows))
 	for _, row := range rows {
 		key := [2]int64{row.ProductID, row.IssueID}
 		if seen[key] {
@@ -523,6 +529,16 @@ func coveredBy(ctx context.Context, db bun.IDB, advisoryID int64) ([]Covered, er
 		}
 		seen[key] = true
 		once = append(once, row)
+		issues = append(issues, row.IssueID)
+	}
+	withheld, err := finding.RecordedOutOfReach(ctx, db, subject, issues)
+	if err != nil {
+		return nil, err
+	}
+	for i := range once {
+		if withheld[once[i].IssueID] {
+			once[i].Summary = ""
+		}
 	}
 	return once, nil
 }

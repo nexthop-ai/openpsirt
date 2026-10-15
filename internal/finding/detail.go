@@ -678,14 +678,16 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}
 
-	// The summary, other names and addresses a flaw recorded here wrote onto
-	// the shared issue row, where that record sits out of this reader's reach.
+	// The summary, other names, addresses, kinds and rating a flaw recorded
+	// here wrote onto the shared issue row, where that record sits out of
+	// this reader's reach.
 	withheld, err := recordedOutOfReach(ctx, s.db, subject, vulnerabilityID)
 	if err != nil {
 		return nil, err
 	}
 	if withheld {
-		issue.Description, aliases, references = "", nil, nil
+		issue.WithholdRecorded()
+		aliases, references, weaknesses = nil, nil, nil
 	}
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
@@ -702,6 +704,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 	if evidence.Ratings, err = NewVulnerabilities(s.db).Ratings(ctx, vulnerabilityID); err != nil {
 		return nil, err
+	}
+	if withheld {
+		evidence.Ratings = Sourced(evidence.Ratings)
 	}
 
 	// opened is when this first appeared here and what produced it. The

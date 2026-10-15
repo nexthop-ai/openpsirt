@@ -869,16 +869,20 @@ one issue, and a product's claims are not.
 ### Recorded words on a shared issue
 
 A flaw recorded here writes its summary as the issue's description, its minted
-identifier among the issue's names, and its addresses on the issue. The issue
-row is the one every product holding the issue reads, so those three follow the
-record rather than the row (REQ-42).
+identifier among the issue's names, its addresses, its kinds of flaw, and its
+severity, score and rating on the issue. The issue row is the one every product
+holding the issue reads, so those follow the record rather than the row
+(REQ-42).
 
 | Rule | Reason |
 |---|---|
 | The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The summary of an undisclosed flaw in another product is the embargo |
-| Every reader asks the one rule: the issue page and document, a finding's evidence, the component's issue list, the approaching-disclosure list, a decision's issue and an approver's outliers | One rule in one place keeps a new reader from being the one that forgets it |
+| The severity word, and the score and every rating that name no publisher, are left out under the same rule | How bad its recorder judged an undisclosed flaw is part of the record. A rating a feed published names its source and a recorded flaw's never does, so a sourced rating is the world's and stays. The severity word names nobody and is filled by whichever report arrived first, so it goes whole |
+| A finding's evidence leaves out the kinds of flaw too | A recorded flaw's classification is part of what its recorder wrote |
+| Every reader asks the one rule: the issue page and document, a finding's evidence, the component's issue list, the approaching-disclosure list, a decision's issue and an approver's outliers, and an advisory's covered issues and its document | One rule in one place keeps a new reader from being the one that forgets it |
 | A text match over descriptions matches nothing in a withheld description | A filter that matched it would say what the summary holds, one guess at a time |
-| An advisory's covered issues read the description unwithheld | The advisory is held to a reader of every place of its issues in its own product, and a recorded flaw in another product holding the same issue is not asked about |
+| An advisory's document leaves out the summary, the other names, the addresses and the unsourced ratings under the rule, asked of whoever generates it | The advisory is held to a reader of every place of its issues in its own product, which says nothing about a record in another product holding the same issue |
+| The working severity of a finding is read from the issue row unwithheld: lists, sorting, filtering, deadlines and urgency, and the baseline a decision records | These are the reader's own product's clock and rank. A withheld score there would rank and date the product's own work by a number nobody published, and a decision recorded against it would lapse on the next rating |
 
 ### Dispositions
 
