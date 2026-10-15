@@ -144,26 +144,26 @@ func scannedWith(about Note) string {
 	return ""
 }
 
-// measuredWith is what the later build was last measured with, as a clause,
-// or nothing where nothing has measured it.
-func measuredWith(about Note) string {
+// measured is what the later build was last measured with, as a lower-case
+// clause, or nothing where nothing has measured it.
+func measured(about Note) string {
 	var said []string
 	if !about.At.IsZero() {
-		said = append(said, "Last measured "+about.At.UTC().Format("2006-01-02"))
+		said = append(said, "last measured "+about.At.UTC().Format(time.DateOnly))
 	}
 	if with := scannedWith(about); with != "" {
 		said = append(said, with)
 	}
-	if len(said) == 0 {
+	return strings.Join(said, ", ")
+}
+
+// measuredWith is the clause measured writes, opening a sentence.
+func measuredWith(about Note) string {
+	line := measured(about)
+	if line == "" {
 		return ""
 	}
-	// The first clause opens the sentence where it is there, and the second
-	// opens it where it is not.
-	line := strings.Join(said, ", ")
-	if about.At.IsZero() {
-		line = strings.ToUpper(line[:1]) + line[1:]
-	}
-	return line
+	return strings.ToUpper(line[:1]) + line[1:]
 }
 
 // lead writes the line that makes the note re-checkable: which two builds, on
@@ -180,11 +180,8 @@ func lead(out *strings.Builder, about Note) {
 			said = append(said, "Comparing against "+from)
 		}
 	}
-	if !about.At.IsZero() {
-		said = append(said, "last measured "+about.At.UTC().Format("2006-01-02"))
-	}
-	if with := scannedWith(about); with != "" {
-		said = append(said, with)
+	if clause := measured(about); clause != "" {
+		said = append(said, clause)
 	}
 	if len(said) > 0 {
 		fmt.Fprintf(out, "\n%s.\n", strings.Join(said, ", "))
