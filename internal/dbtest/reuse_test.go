@@ -12,12 +12,13 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
-	"github.com/uptrace/bun"
 )
 
 // A server database is created and migrated by the first binary to lease its
@@ -135,13 +136,9 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 // openClosed opens the database at url for a test that closes it itself.
 func openClosed(t *testing.T, url string) *database.DB {
 	t.Helper()
-	target, err := database.ParseURL(url)
+	db, _, err := connect(t.Context(), url)
 	if err != nil {
 		t.Fatal(err)
-	}
-	db, err := database.Open(t.Context(), target)
-	if err != nil {
-		t.Fatalf("open %s: %v", target.Redacted, err)
 	}
 	return db
 }

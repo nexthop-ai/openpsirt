@@ -26,9 +26,6 @@ import (
 	"strings"
 )
 
-// Engines is every engine a release's schema is recorded on.
-var Engines = []string{"mariadb", "mysql", "postgres", "sqlite"}
-
 // Files is the name of the list of a release's files and their digests.
 const Files = "files.txt"
 
@@ -122,6 +119,23 @@ func Number(name string) int64 {
 	return n
 }
 
+// codeOf is the release code a file of table declarations carries, and
+// whether the file is one: a Go source file, not a test, whose name before
+// the first underscore is a code as Code writes one.
+func codeOf(name string) (string, bool) {
+	if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		return "", false
+	}
+	code, _, found := strings.Cut(name, "_")
+	if !found || !releaseCode.MatchString(code) {
+		return "", false
+	}
+	return code, true
+}
+
+// releaseCode is a code as Code writes one: a v and one digit per part.
+var releaseCode = regexp.MustCompile(`^v\d{3}$`)
+
 // Owned is the files of a migrations directory that belong to one release:
 // the migrations numbered after the previous release's last up to its own,
 // and the table declarations carrying its code.
@@ -135,7 +149,7 @@ func Owned(names []string, previous, last int64, code string) []string {
 			out = append(out, name)
 			continue
 		}
-		if strings.HasPrefix(name, code+"_") {
+		if c, ok := codeOf(name); ok && c == code {
 			out = append(out, name)
 		}
 	}
@@ -309,7 +323,8 @@ func replaced(migrations string, r *Record) ([]string, error) {
 		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		if n := Number(name); (n > 0 && n < r.Last) || strings.HasPrefix(name, code+"_") {
+		n := Number(name)
+		if c, ok := codeOf(name); (n > 0 && n < r.Last) || (ok && c == code) {
 			faults = append(faults, fmt.Sprintf("%s belongs to %s, whose migrations the baseline replaced", name, r.Version))
 		}
 	}

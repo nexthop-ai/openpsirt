@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Check is what is wrong with tagging a release from this tree. The release
@@ -34,8 +35,8 @@ func Check(root, migrations, tag string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, engine := range Engines {
-		info, err := os.Stat(filepath.Join(root, version, Schema(engine)))
+	for _, engine := range database.Engines() {
+		info, err := os.Stat(filepath.Join(root, version, Schema(string(engine))))
 		if err != nil || info.Size() == 0 {
 			faults = append(faults, fmt.Sprintf("%s has no record of the schema it builds on %s", version, engine))
 		}
@@ -65,7 +66,7 @@ func Check(root, migrations, tag string) ([]string, error) {
 				"if %s is not tagged yet, freeze it again; once it is, the migration belongs to the next release",
 				name, version, r.Last, version))
 		}
-		if m := declaration.FindStringSubmatch(name); m != nil && !codes[m[1]] {
+		if code, ok := codeOf(name); ok && !codes[code] {
 			faults = append(faults, fmt.Sprintf("%s declares tables for a release nothing froze", name))
 		}
 	}
@@ -131,10 +132,6 @@ func prepare(root, migrations, tag string) (*freezing, error) {
 	}
 	return &freezing{version: version, code: code, names: names, before: before, last: last}, nil
 }
-
-// declaration is the name of a file holding a release's table declarations,
-// and the code of the release it is for.
-var declaration = regexp.MustCompile(`^(v\d+)_[a-z_]+\.go$`)
 
 // Freeze writes the record of a release's files: every migration past the
 // previous release's last, and every declaration carrying its code. The

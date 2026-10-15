@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 const header = "// Copyright Nexthop Systems Inc.\n// SPDX-License-Identifier: Apache-2.0\n\n"
@@ -69,8 +71,8 @@ func frozen(t *testing.T, root, migrations, version string, last int64) {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(root, version, Files), b.String())
-	for _, engine := range Engines {
-		write(t, filepath.Join(root, version, Schema(engine)), "column t.c int\n")
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, version, Schema(string(engine))), "column t.c int\n")
 	}
 }
 
@@ -146,6 +148,30 @@ func TestADeclarationForAnUnfrozenReleaseIsRefused(t *testing.T) {
 	}
 }
 
+// A declaration whose name carries a digit past its code is a declaration
+// like any other: refused while its release is unfrozen, and held by the
+// release once it is.
+func TestADeclarationWithADigitInItsNameIsHeldByItsRelease(t *testing.T) {
+	root, migrations := tree(t)
+	write(t, filepath.Join(migrations, "v020_cvss4.go"), header+"package migrations\n\n// declared\n")
+	if err := os.Remove(filepath.Join(migrations, "00003_v020.go")); err != nil {
+		t.Fatal(err)
+	}
+	faults := check(t, root, migrations, "v0.1.0")
+	if !slices.ContainsFunc(faults, func(f string) bool {
+		return strings.Contains(f, "v020_cvss4.go declares tables for a release nothing froze")
+	}) {
+		t.Errorf("a declaration with a digit in its name answered %v", faults)
+	}
+	names, err := migrationNames(migrations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owned := Owned(names, 2, 2, "v020"); !slices.Equal(owned, []string{"v020_cvss4.go", "v020_finding.go"}) {
+		t.Errorf("v0.2.0 owns %v", owned)
+	}
+}
+
 // A file edited after it was frozen is stale.
 func TestAFileEditedAfterTheFreezeIsRefused(t *testing.T) {
 	root, migrations := tree(t)
@@ -189,8 +215,8 @@ func TestFreezingRecordsWhatTheReleaseOwns(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "v0.2.0"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	for _, engine := range Engines {
-		write(t, filepath.Join(root, "v0.2.0", Schema(engine)), "column t.c int\n")
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, "v0.2.0", Schema(string(engine))), "column t.c int\n")
 	}
 	r, err := Freeze(root, migrations, "v0.2.0")
 	if err != nil {
@@ -224,8 +250,8 @@ func TestAReleaseWithNoMigrationOfItsOwnIsFrozenEmpty(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "v0.1.1"), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	for _, engine := range Engines {
-		write(t, filepath.Join(root, "v0.1.1", Schema(engine)), "column t.c int\n")
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, "v0.1.1", Schema(string(engine))), "column t.c int\n")
 	}
 	r, err := Freeze(root, migrations, "v0.1.1")
 	if err != nil {
@@ -362,8 +388,8 @@ func TestABaselineReleaseHoldsNoFilesAndTheNextIsStillHeld(t *testing.T) {
 	if _, err := Freeze(root, migrations, "v0.2.0"); err != nil {
 		t.Fatal(err)
 	}
-	for _, engine := range Engines {
-		write(t, filepath.Join(root, "v0.2.0", Schema(engine)), "column t.c int\n")
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, "v0.2.0", Schema(string(engine))), "column t.c int\n")
 	}
 	baseline, err := Read(root, "v0.1.0")
 	if err != nil {

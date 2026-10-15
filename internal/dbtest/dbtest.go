@@ -46,11 +46,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
-	"github.com/uptrace/bun"
 )
 
 // URL environment variables for the production engines. Absent means skip.
@@ -375,13 +376,9 @@ func enginesWanted() map[database.Engine]bool {
 // Open connects to url and closes the connection when the test ends.
 func Open(t *testing.T, url string) *database.DB {
 	t.Helper()
-	target, err := database.ParseURL(url)
+	db, target, err := connect(context.Background(), url)
 	if err != nil {
-		t.Fatalf("parse the database URL: %v", err)
-	}
-	db, err := database.Open(context.Background(), target)
-	if err != nil {
-		t.Fatalf("open %s: %v", target.Redacted, err)
+		t.Fatal(err)
 	}
 	if db.Server.Engine == database.SQLite {
 		// One connection, where a deployment has a pool. A read through the
@@ -606,13 +603,9 @@ func prepareServer(ctx context.Context, engine database.Engine, base, name strin
 	if err != nil {
 		return "", false, err
 	}
-	target, err := database.ParseURL(base)
+	admin, _, err := connect(ctx, base)
 	if err != nil {
 		return "", false, err
-	}
-	admin, err := database.Open(ctx, target)
-	if err != nil {
-		return "", false, fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
 	defer func() { _ = admin.Close() }()
 	kept, err := ensureDatabase(ctx, admin, engine, name)
@@ -662,11 +655,7 @@ func databaseURL(base string, engine database.Engine, name string) (string, erro
 // carries. A database that cannot say is not whole: it is one this harness
 // made, and building it again costs a migration.
 func whole(ctx context.Context, url string) bool {
-	target, err := database.ParseURL(url)
-	if err != nil {
-		return false
-	}
-	db, err := database.Open(ctx, target)
+	db, _, err := connect(ctx, url)
 	if err != nil {
 		return false
 	}
@@ -722,12 +711,9 @@ func serverConnection(engine database.Engine, own string) (*database.DB, error) 
 	defer serverMu.Unlock()
 	pool, ok := serverDBs[engine]
 	if !ok {
-		target, err := database.ParseURL(own)
-		if err != nil {
+		var err error
+		if pool, _, err = connect(context.Background(), own); err != nil {
 			return nil, err
-		}
-		if pool, err = database.Open(context.Background(), target); err != nil {
-			return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
 		}
 		serverDBs[engine] = pool
 	}
@@ -826,16 +812,27 @@ func databasesFor(ctx context.Context, admin *database.DB, engine database.Engin
 	return names, nil
 }
 
-// migrateFresh applies every migration to the database at url and closes it.
-func migrateFresh(url string) error {
-	target, err := database.ParseURL(url)
+// connect opens the database at raw. A refusal to parse is the database
+// package's own, which never repeats the URL; a refusal to open names the URL
+// with its password taken out.
+func connect(ctx context.Context, raw string) (*database.DB, database.Target, error) {
+	target, err := database.ParseURL(raw)
 	if err != nil {
-		return err
+		return nil, database.Target{}, err
 	}
-	ctx := context.Background()
 	db, err := database.Open(ctx, target)
 	if err != nil {
-		return fmt.Errorf("open %s: %w", target.Redacted, err)
+		return nil, target, fmt.Errorf("open %s: %w", target.Redacted, err)
+	}
+	return db, target, nil
+}
+
+// migrateFresh applies every migration to the database at url and closes it.
+func migrateFresh(url string) error {
+	ctx := context.Background()
+	db, target, err := connect(ctx, url)
+	if err != nil {
+		return err
 	}
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if err := schema.Up(ctx, db, quiet); err != nil {

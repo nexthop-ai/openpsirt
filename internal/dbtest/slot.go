@@ -112,13 +112,9 @@ func takeSlot(ctx context.Context, engine database.Engine, base, namespace, fing
 	if err != nil {
 		return nil, err
 	}
-	target, err := database.ParseURL(locks)
+	db, target, err := connect(ctx, locks)
 	if err != nil {
 		return nil, err
-	}
-	db, err := database.Open(ctx, target)
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
 	conn, err := db.DB.DB.Conn(ctx)
 	if err != nil {
@@ -297,13 +293,9 @@ func dropUnheld(ctx context.Context, engine database.Engine, base, prefix string
 	if err != nil {
 		return nil, nil, err
 	}
-	target, err := database.ParseURL(locks)
+	admin, target, err := connect(ctx, locks)
 	if err != nil {
 		return nil, nil, err
-	}
-	admin, err := database.Open(ctx, target)
-	if err != nil {
-		return nil, nil, fmt.Errorf("open %s: %w", target.Redacted, err)
 	}
 	defer func() { _ = admin.Close() }()
 	conn, err := admin.DB.DB.Conn(ctx)

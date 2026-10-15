@@ -89,8 +89,8 @@ func TestWriteTheSchemaAReleaseTags(t *testing.T) {
 			dbtest.Reset(t, db)
 		})
 	})
-	for _, engine := range released.Engines {
-		if !wrote[engine] {
+	for _, engine := range database.Engines() {
+		if !wrote[string(engine)] {
 			t.Errorf("nothing was written for %s: a release is recorded on every engine, so run make engines-up first",
 				engine)
 		}
