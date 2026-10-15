@@ -49,6 +49,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Source is a supplier this deployment fetches advisories from.
@@ -127,15 +128,6 @@ func NewStore(db bun.IDB) *Store {
 
 // At fixes the clock, for a test that asks what happens at a given moment.
 func (s *Store) At(now func() time.Time) *Store { return &Store{db: s.db, now: now} }
-
-// matching is the name a supplier is found by.
-//
-// Lowered on the way in rather than compared loosely on the way out. The four
-// engines default to different collations, so asking one to fold makes whether
-// two spellings are one supplier depend on which engine is running; a lowered
-// value compares the same under any of them, and the unique constraint means
-// the same thing everywhere.
-func matching(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
 // Mark is the digest of an address, which is half of how far a source has been
 // read.
@@ -276,7 +268,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		return nil, refusal.Errorf("that product is out of use, and a supplier is read " +
 			"against what a product ships")
 	}
-	folded := matching(typed)
+	folded := typedname.Matching(typed)
 	now := s.now().UTC().Truncate(time.Microsecond)
 	row := &Source{
 		ProductID: productID, Name: folded, Display: typed, URL: address,
@@ -344,7 +336,7 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 		row := new(Source)
 		err := tx.NewSelect().Model(row).
 			Where("product_id = ?", productID).
-			Where("name = ?", matching(name)).
+			Where("name = ?", typedname.Matching(name)).
 			Where("retired_at IS NULL").
 			Limit(1).Scan(ctx)
 		// A source believed retired that was not goes on fetching, which is a

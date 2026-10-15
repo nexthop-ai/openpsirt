@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Account is somebody who has been granted access.
@@ -1223,7 +1224,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 	}
 	wanted := make([]string, 0, len(names))
 	for _, name := range names {
-		wanted = append(wanted, strings.ToLower(strings.TrimSpace(name)))
+		wanted = append(wanted, typedname.Matching(name))
 	}
 	// Lowered on both sides rather than asked to compare loosely, for the
 	// reason the picker does it: the engines do not agree on what a

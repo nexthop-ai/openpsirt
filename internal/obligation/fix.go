@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Fix is a person's statement that a release of the record's product carries
@@ -118,7 +119,7 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 		stream := new(catalog.Stream)
 		if err := tx.NewSelect().Model(stream).
 			Where("s.product_id = ?", record.ProductID).
-			Where("s.name = ?", catalog.Matching(release)).
+			Where("s.name = ?", typedname.Matching(release)).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchRelease

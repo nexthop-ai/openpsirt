@@ -24,10 +24,10 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Window is a period a deployment says it answers within, counted from the
@@ -198,10 +198,6 @@ type Store struct {
 func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
-
-// folded is a window's name as it is compared: without regard to capitals or
-// the space around it, the way every name people type is matched here.
-func folded(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
 // ErrNoSuchProduct is returned where a window names a product nobody declared.
 var ErrNoSuchProduct = refusal.New("no product goes by that name")
@@ -445,7 +441,7 @@ func productsNamed(ctx context.Context, tx bun.IDB, names []string) ([]int64, []
 	folded := make([]string, 0, len(names))
 	seen := map[string]bool{}
 	for _, typed := range names {
-		name := catalog.Matching(typed)
+		name := typedname.Matching(typed)
 		// A blank name is a name nobody declared, refused like any other:
 		// dropped, a list holding only blanks declares a window over every
 		// product.
@@ -532,7 +528,7 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		live := folded(said.Name)
+		live := typedname.Matching(said.Name)
 		*window = Window{
 			Name: said.Name, Hours: said.Hours, LeadHours: said.LeadHours,
 			DeclaredBy: subject.ID,
@@ -617,7 +613,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 					"this one would not", other.Name)
 			}
 		}
-		live := folded(said.Name)
+		live := typedname.Matching(said.Name)
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
 			Set("name = ?", said.Name).
 			Set("length_hours = ?", said.Hours).

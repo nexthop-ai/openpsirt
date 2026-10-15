@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // ErrNoSuchRelease says the issue is in no release by that name in that
@@ -219,8 +220,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	}
 	var at *Release
 	for i := range among {
-		if catalog.Matching(among[i].Stream) == catalog.Matching(stream) &&
-			catalog.Matching(among[i].Variant) == catalog.Matching(variant) {
+		if typedname.Matching(among[i].Stream) == typedname.Matching(stream) &&
+			typedname.Matching(among[i].Variant) == typedname.Matching(variant) {
 			at = &among[i]
 		}
 	}

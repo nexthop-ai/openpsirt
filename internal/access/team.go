@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Team is a named set of people that holds work and grants nothing.
@@ -73,7 +74,7 @@ var ErrNoSuchTeam = refusal.New("no team is known by that name")
 // twice is one team, and a second call is how a deployment script stays
 // runnable.
 func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Team, error) {
-	matched := teamNamed(name)
+	matched := typedname.Matching(name)
 	if matched == "" {
 		return nil, refusal.Errorf("a team needs a name")
 	}
@@ -154,7 +155,7 @@ func (s *Store) DeclareTeam(ctx context.Context, name, displayName string) (*Tea
 func (s *Store) TeamByName(ctx context.Context, name string) (*Team, error) {
 	team := new(Team)
 	err := s.db.NewSelect().Model(team).
-		Where("name = ?", teamNamed(name)).
+		Where("name = ?", typedname.Matching(name)).
 		Where("retired_at IS NULL").
 		Limit(1).Scan(ctx)
 	if err != nil {
@@ -369,13 +370,6 @@ func (s *Store) TeamsOf(ctx context.Context, personID int64) ([]Team, error) {
 		return nil, fmt.Errorf("read which teams somebody is on: %w", err)
 	}
 	return teams, nil
-}
-
-// teamNamed folds a team name the way every other name people type is folded :
-// normalized on the way in, so every engine compares it the same without any
-// of them being asked to compare loosely.
-func teamNamed(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }
 
 // Held is who a party is, for a screen that has an assignment and needs a name

@@ -24,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Kind distinguishes a moving line of development from a frozen point.
@@ -207,7 +208,7 @@ func (s *Store) DeclareProduct(ctx context.Context, name, displayName string) (*
 		return nil, err
 	}
 
-	p := &Product{Name: Matching(name), DisplayName: displayName, CreatedAt: now()}
+	p := &Product{Name: typedname.Matching(name), DisplayName: displayName, CreatedAt: now()}
 	if _, err := s.db.NewInsert().Model(p).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("declare product %q: %w", name, err)
 	}
@@ -683,7 +684,7 @@ func (s *Store) SetTriageFloor(ctx context.Context, productID int64, word string
 // ProductByName finds a product, or reports that it was never declared.
 func (s *Store) ProductByName(ctx context.Context, name string) (*Product, error) {
 	p := new(Product)
-	err := s.db.NewSelect().Model(p).Where("name = ?", Matching(name)).Scan(ctx)
+	err := s.db.NewSelect().Model(p).Where("name = ?", typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("product %q: %w", name, ErrNotFound)
@@ -713,7 +714,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 	}
 
 	st := &Stream{
-		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: typedname.Matching(name), DisplayName: strings.TrimSpace(name),
 		Kind: kind, ParentID: parentID, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(st).Exec(ctx); err != nil {
@@ -726,7 +727,7 @@ func (s *Store) DeclareStream(ctx context.Context, productID int64, name string,
 func (s *Store) StreamByName(ctx context.Context, productID int64, name string) (*Stream, error) {
 	st := new(Stream)
 	err := s.db.NewSelect().Model(st).
-		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("stream %q: %w", name, ErrNotFound)
@@ -755,7 +756,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 	}
 
 	v := &Variant{
-		ProductID: productID, Name: Matching(name), DisplayName: strings.TrimSpace(name),
+		ProductID: productID, Name: typedname.Matching(name), DisplayName: strings.TrimSpace(name),
 		CustomerFacing: customerFacing, CreatedAt: now(),
 	}
 	if _, err := s.db.NewInsert().Model(v).Exec(ctx); err != nil {
@@ -768,7 +769,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 func (s *Store) VariantByName(ctx context.Context, productID int64, name string) (*Variant, error) {
 	v := new(Variant)
 	err := s.db.NewSelect().Model(v).
-		Where("product_id = ?", productID).Where("name = ?", Matching(name)).Scan(ctx)
+		Where("product_id = ?", productID).Where("name = ?", typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
@@ -899,23 +900,6 @@ func (s *Store) TargetFor(ctx context.Context, streamID, variantID int64) (*Targ
 }
 
 func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
-
-// matching is how a name people type is compared.
-//
-// Lower case and trimmed. These names get typed by hand into build scripts, so
-// "sonic" reaching a product declared as "SONiC" is the same typo problem that
-// declaring-before-use exists to catch — and refusing it teaches somebody the
-// product is not declared when it plainly is.
-//
-// Normalizing the stored value rather than comparing case-insensitively is
-// what makes every engine agree without any of them being asked to: a
-// lower-case value compares the same under any collation, and the unique
-// constraint means the same thing everywhere.
-//
-// The spelling somebody typed is kept beside it and is what gets shown back.
-func Matching(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
-}
 
 // Target is one release built as one variant. It is what a scan is filed
 // against, and what everything downstream points at, so a single identifier

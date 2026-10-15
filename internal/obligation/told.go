@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Told is a record that somebody outside was told about an attack: who, when,
@@ -254,10 +255,10 @@ func detailsSaid(details Details) (reference, malicious *string, places []string
 		if utf8.RuneCountInString(place) > database.NameWidth {
 			return nil, nil, nil, refusal.Errorf("a place's name is at most %d characters", database.NameWidth)
 		}
-		if seen[strings.ToLower(place)] {
+		if seen[typedname.Matching(place)] {
 			continue
 		}
-		seen[strings.ToLower(place)] = true
+		seen[typedname.Matching(place)] = true
 		places = append(places, place)
 	}
 	return reference, malicious, places, nil

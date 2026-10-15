@@ -29,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Filter is a narrowing of a list that somebody kept.
@@ -177,7 +178,7 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 	if cap <= 0 {
 		cap = setting.DefaultSavedPerPerson
 	}
-	matched := matching(name)
+	matched := typedname.Matching(name)
 	if matched == "" {
 		return nil, refusal.Errorf("a saved filter needs a name")
 	}
@@ -374,7 +375,7 @@ func (s *Store) SavedFilters(ctx context.Context, personID int64,
 func (s *Store) ForgetFilter(ctx context.Context, personID int64, name string) error {
 	res, err := s.db.NewDelete().Model((*Filter)(nil)).
 		Where("person_id = ?", personID).
-		Where("name = ?", matching(name)).
+		Where("name = ?", typedname.Matching(name)).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("forget that filter: %w", err)
@@ -387,10 +388,4 @@ func (s *Store) ForgetFilter(ctx context.Context, personID int64, name string) e
 		return ErrNoSuchFilter
 	}
 	return nil
-}
-
-// matching is a filter's name as it is stored and looked up. Saving and
-// forgetting both go through it, so the two cannot come to fold differently.
-func matching(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
 }

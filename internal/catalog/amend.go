@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // RenameVariant corrects what a variant is called.
@@ -39,7 +40,7 @@ func (s *Store) RenameVariant(ctx context.Context, productID, variantID int64, n
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set("name = ?", Matching(name)).
+		Set("name = ?", typedname.Matching(name)).
 		Set("display_name = ?", name).
 		Where("id = ?", variantID).
 		Exec(ctx)
@@ -105,7 +106,7 @@ func (s *Store) RenameProduct(ctx context.Context, productID int64, name string)
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set("name = ?", Matching(name)).
+		Set("name = ?", typedname.Matching(name)).
 		Where("id = ?", productID).
 		Exec(ctx)
 	if err != nil {
@@ -168,7 +169,7 @@ func (s *Store) RenameStream(ctx context.Context, productID, streamID int64, nam
 		return err
 	}
 	res, err := s.db.NewUpdate().Model((*Stream)(nil)).
-		Set("name = ?", Matching(name)).
+		Set("name = ?", typedname.Matching(name)).
 		Set("display_name = ?", name).
 		Where("id = ?", streamID).
 		Exec(ctx)
