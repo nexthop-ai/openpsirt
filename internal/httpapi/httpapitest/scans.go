@@ -5,7 +5,6 @@ package httpapitest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -204,7 +203,7 @@ func Carrying(builtAt time.Time, components map[string]string) string {
 // ProductHere is the product the ingest fixture declared.
 func ProductHere(t *testing.T, f *IngestFixture) int64 {
 	t.Helper()
-	product, err := catalog.NewStore(f.DB.DB).ProductByName(context.Background(), "sonic")
+	product, err := catalog.NewStore(f.DB.DB).ProductByName(t.Context(), fixture.ProductName)
 	if err != nil {
 		t.Fatal(err)
 	}

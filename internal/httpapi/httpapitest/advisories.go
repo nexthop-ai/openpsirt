@@ -370,7 +370,7 @@ func (r *Reach) FixedIn(t *testing.T) map[string][]string {
 			} `json:"products"`
 		} `json:"statements"`
 	}
-	Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+	Read(t, r, "triager", ABuild, &doc)
 	fixed := map[string][]string{}
 	for _, one := range doc.Statements {
 		if one.Status != "fixed" {
@@ -411,7 +411,7 @@ func (r *Reach) VexStatements(t *testing.T) [][3]string {
 			} `json:"products"`
 		} `json:"statements"`
 	}
-	Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+	Read(t, r, "triager", ABuild, &doc)
 	var out [][3]string
 	for _, one := range doc.Statements {
 		inside := ""

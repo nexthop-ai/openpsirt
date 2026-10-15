@@ -6,6 +6,7 @@ package adminapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -141,8 +142,8 @@ func registerWork(api huma.API, in core.Deps) {
 			"each stopped where anything reported a reason. A job is set aside once it has " +
 			"been tried as many times as it is allowed to be, whether it reported a failure " +
 			"or its worker stopped answering.\n\n" +
-			"At most 200 are returned. `total` is how many are set aside in all, so a clipped " +
-			"page can be told from a complete one.\n\n" +
+			fmt.Sprintf("At most %d are returned. `total` is how many are set aside in all, so a clipped "+
+				"page can be told from a complete one.\n\n", queue.SetAsideCeiling) +
 			"`waiting` is what has not stopped: how much of each kind is queued, against the " +
 			"bound that refuses more of it. A queue filling up and a queue that has given up " +
 			"are different faults and only one of them leaves rows here.",

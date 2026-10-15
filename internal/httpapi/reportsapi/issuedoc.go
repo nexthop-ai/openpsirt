@@ -172,7 +172,7 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		if row.Places > 1 {
 			fmt.Fprintf(&out, ", at %d places", row.Places)
 		}
-		fmt.Fprintf(&out, " — %s", stateSaid(string(row.State)))
+		fmt.Fprintf(&out, " — %s", stateSaid(row.State))
 		if row.DueAt != nil {
 			fmt.Fprintf(&out, ", due %s", row.DueAt.UTC().Format(time.DateOnly))
 		}
@@ -273,16 +273,17 @@ func howManyCarry(total, shown int) string {
 }
 
 // stateSaid is how far a build has decided it, in words rather than in the
-// vocabulary the database stores.
-func stateSaid(state string) string {
+// vocabulary the database stores. A group that is none of the standings is
+// part decided.
+func stateSaid(state finding.ClaimStanding) string {
 	switch state {
-	case "agreed":
+	case finding.StandingAgreed:
 		return "agreed"
-	case "waiting":
+	case finding.StandingWaiting:
 		return "waiting for a second person"
-	case "lapsed":
+	case finding.StandingLapsed:
 		return "the judgment here no longer stands"
-	case "undecided":
+	case finding.StandingUndecided:
 		return "nobody has said"
 	}
 	return "part decided"

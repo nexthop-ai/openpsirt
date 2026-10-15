@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -22,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -286,7 +288,7 @@ func (r *Reach) StateOfClaim(t *testing.T, claim int64) string {
 func (r *Reach) LimitsOf(t *testing.T, review, agreed string) {
 	t.Helper()
 	for key, value := range map[string]string{
-		"triage.review-issues": review, "triage.agreed-issues": agreed,
+		setting.ReviewIssues: review, setting.AgreedIssues: agreed,
 	} {
 		if got := AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/"+key,
 			`{"value":"`+value+`"}`); got.Code != http.StatusNoContent {
@@ -531,7 +533,7 @@ func (r *Reach) Declared(t *testing.T, name string, hours int) int64 {
 func (r *Reach) Undisclosed(t *testing.T) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("finding").
-		Set("visibility = ?", "private").Where("1 = 1").Exec(t.Context()); err != nil {
+		Set("visibility = ?", access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }

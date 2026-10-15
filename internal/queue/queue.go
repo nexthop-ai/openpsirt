@@ -778,8 +778,8 @@ func held(res sql.Result) error {
 // stops being retried with nowhere to see it is the same silence as one that
 // is retried for ever.
 func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
-	if limit <= 0 || limit > setAsideCeiling {
-		limit = setAsideCeiling
+	if limit <= 0 || limit > SetAsideCeiling {
+		limit = SetAsideCeiling
 	}
 	var jobs []Job
 	if err := q.db.NewSelect().Model(&jobs).
@@ -800,10 +800,10 @@ func (q *Queue) SetAside(ctx context.Context, limit int) ([]Job, int, error) {
 	return jobs, total, nil
 }
 
-// setAsideCeiling bounds the set-aside listing. A read on an interactive route
+// SetAsideCeiling bounds the set-aside listing. A read on an interactive route
 // carries a cap, and a deployment whose queue has gone wrong is exactly where
 // the list is longest.
-const setAsideCeiling = 200
+const SetAsideCeiling = 200
 
 // ErrNotSetAside says the job is not one that stopped being retried, so there
 // is nothing here to put back.

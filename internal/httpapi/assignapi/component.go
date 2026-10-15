@@ -278,10 +278,10 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		by, err := time.Parse("2006-01-02", strings.TrimSpace(input.Body.By))
+		by, err := dateOnly(strings.TrimSpace(input.Body.By),
+			"say when this will be done, as a date like 2026-03-31")
 		if err != nil {
-			return nil, huma.Error422UnprocessableEntity(
-				"say when this will be done, as a date like 2026-03-31")
+			return nil, err
 		}
 		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {

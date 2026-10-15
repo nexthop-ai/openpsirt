@@ -382,13 +382,21 @@ func deferredUntil(outcome, stated string) (*time.Time, error) {
 		return nil, huma.Error422UnprocessableEntity(
 			"deferring needs a date to defer until — write it as 2026-03-31")
 	}
+	parsed, err := dateOnly(stated, "that is not a date — write it as 2026-03-31")
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+// dateOnly reads a date a caller states, as the start of that day in UTC, and
+// refuses anything else in the words given.
+func dateOnly(stated, refusal string) (time.Time, error) {
 	parsed, err := time.Parse(time.DateOnly, stated)
 	if err != nil {
-		return nil, huma.Error422UnprocessableEntity(
-			"that is not a date — write it as 2026-03-31")
+		return time.Time{}, huma.Error422UnprocessableEntity(refusal)
 	}
-	parsed = parsed.UTC()
-	return &parsed, nil
+	return parsed.UTC(), nil
 }
 
 // clipped shortens a list of names for an error message.
