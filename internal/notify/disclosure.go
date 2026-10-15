@@ -186,20 +186,11 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 	// extended clears the alert it opened only because the next sweep hands
 	// the same person a list without it. Returning nothing at all would leave
 	// every cleared condition standing.
-	people, held := w.people, w.held
-	private := map[int64]map[int64]bool{}
 	// The party itself. The assignment column holds a party rather than a
 	// person, and a notification goes to somebody, so the two are mapped
 	// in one place rather than at each use.
-	whose := make(map[int64]int64, len(people))
-	for _, person := range people {
-		reaches := map[int64]bool{}
-		for _, grant := range held[person.ID] {
-			if grant.Active && (grant.Role == access.PrivateRead || grant.Role == access.PrivateTriage) {
-				reaches[grant.ProductID] = true
-			}
-		}
-		private[person.ID] = reaches
+	whose := make(map[int64]int64, len(w.people))
+	for _, person := range w.people {
 		whose[person.PartyID] = person.ID
 	}
 
@@ -265,7 +256,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		if _, already := out[owner]; already && contains(out[owner], holds.About) {
 			continue
 		}
-		if !private[owner][row.ProductID] {
+		if !w.reach[owner][row.ProductID].reads(true) {
 			continue
 		}
 		out[owner] = append(out[owner], holds)

@@ -241,6 +241,12 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 		if n := waiting(t, db, outsider); n != 0 {
 			t.Errorf("somebody who may not read undisclosed work was told %d things", n)
 		}
+		// And not held for them either, where the read's own narrowing would
+		// hide it: the sweep decides who is told.
+		if n, err := db.DB.NewSelect().Model((*notify.Notification)(nil)).
+			Where("person_id = ?", outsider.ID).Count(ctx); err != nil || n != 0 {
+			t.Errorf("somebody who may not read undisclosed work holds %d alerts (%v)", n, err)
+		}
 
 		// Moving the date answers it, and the alert goes without anybody
 		// dismissing anything — which is the whole reason this is a condition.
