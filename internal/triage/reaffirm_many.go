@@ -373,17 +373,6 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	justification, mitigation, fixedVersion := "", "", ""
-	if previous.Justification != nil {
-		justification = *previous.Justification
-	}
-	if previous.Mitigation != nil {
-		mitigation = *previous.Mitigation
-	}
-	if previous.FixedVersion != nil {
-		fixedVersion = *previous.FixedVersion
-	}
-
 	proposals := make([]Proposal, 0, len(lapsed))
 	places := map[string]bool{}
 	// One proposal per place and versions, however many rows lead to it. A
@@ -404,18 +393,8 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
 			places[row.PlaceIdentity] = true
-			proposals = append(proposals, Proposal{
-				Place: at, Outcome: previous.Outcome,
-				Justification: Justification(justification),
-				Mitigation:    mitigation,
-				DeferredUntil: previous.DeferredUntil,
-				CommittedTo:   previous.CommittedTo,
-				UpgradeTo:     orEmpty(previous.UpgradeTo),
-				FixedVersion:  fixedVersion,
-				Reasoning:     reasoning, By: by,
-				SeverityCenti: severity[[2]int64{row.ProductID, row.VulnerabilityID}],
-				NeedsApproval: full,
-			})
+			proposals = append(proposals, remade(*previous, at, reasoning, by,
+				severity[[2]int64{row.ProductID, row.VulnerabilityID}], full))
 		}
 	}
 	if len(proposals) == 0 {

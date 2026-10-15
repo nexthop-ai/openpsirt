@@ -145,26 +145,6 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	place := r.Place
 	place.Visibility = previous.Visibility
 
-	justification := ""
-	if previous.Claim.Justification != nil {
-		justification = *previous.Claim.Justification
-	}
-	// Everything the claim rests on comes with it. A re-affirmation says the
-	// same claim still holds, so a field the outcome requires is as required
-	// here as it was the first time — and dropping one does not produce a
-	// weaker claim, it produces a refusal: what stops it is required with the
-	// mitigations reason and the version is required with the already-fixed
-	// outcome, so a re-affirmation of either was refused by its own validation
-	// for want of a value nobody had removed.
-	mitigation := ""
-	if previous.Claim.Mitigation != nil {
-		mitigation = *previous.Claim.Mitigation
-	}
-	fixedVersion := ""
-	if previous.Claim.FixedVersion != nil {
-		fixedVersion = *previous.Claim.FixedVersion
-	}
-
 	// The need for a second person is decided before this is written, and
 	// recorded on the claim, so a re-affirmation sent back for full approval
 	// waits in the review queue rather than suppressing the finding on one
@@ -186,20 +166,9 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	}
 	full := needsFullApproval(*previous, *previous.Claim, severityNow, carryable != nil)
 
-	proposal := Proposal{
-		Place: place, Outcome: previous.Claim.Outcome,
-		Justification: Justification(justification),
-		Mitigation:    mitigation,
-		DeferredUntil: previous.Claim.DeferredUntil,
-		CommittedTo:   previous.Claim.CommittedTo,
-		UpgradeTo:     orEmpty(previous.Claim.UpgradeTo),
-		FixedVersion:  fixedVersion,
-		Reasoning:     r.Reasoning, By: r.By,
-		SeverityCenti: severityNow,
-		NeedsApproval: full,
-		// The same judgment re-made, so it keeps the builds it was made on.
-		MadeAs: previous.ClaimID,
-	}
+	proposal := remade(*previous.Claim, place, r.Reasoning, r.By, severityNow, full)
+	// The same judgment re-made, so it keeps the builds it was made on.
+	proposal.MadeAs = previous.ClaimID
 	// The same checks Propose makes, made here because the write is already
 	// inside a transaction and Propose opens its own.
 	if !mayDecideOn(subject, place.ProductID, place.VulnerabilityID, visibilityOf(place)) {
@@ -231,6 +200,28 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return made, nil
+}
+
+// remade is a claim re-made at a place, under fresh reasoning.
+//
+// Everything the claim rests on comes with it. A re-affirmation says the same
+// claim still holds, so a field the outcome requires is as required here as it
+// was the first time — and dropping one does not produce a weaker claim, it
+// produces a refusal: what stops it is required with the mitigations reason
+// and the version is required with the already-fixed outcome.
+func remade(previous Claim, at Place, reasoning string, by int64, severity int, full bool) Proposal {
+	return Proposal{
+		Place: at, Outcome: previous.Outcome,
+		Justification: Justification(orEmpty(previous.Justification)),
+		Mitigation:    orEmpty(previous.Mitigation),
+		DeferredUntil: previous.DeferredUntil,
+		CommittedTo:   previous.CommittedTo,
+		UpgradeTo:     orEmpty(previous.UpgradeTo),
+		FixedVersion:  orEmpty(previous.FixedVersion),
+		Reasoning:     reasoning, By: by,
+		SeverityCenti: severity,
+		NeedsApproval: full,
+	}
 }
 
 // severityOf is how bad an issue is judged to be now, in hundredths.
@@ -408,20 +399,11 @@ func (s *Store) carryApprovalTo(ctx context.Context, made []*Decision, claim Cla
 	for _, one := range made {
 		ids = append(ids, one.ID)
 	}
-	result, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("state = ?", Approved).
-		Where("id IN (?)", bun.List(ids)).
-		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
-			claim.ID, *claim.RevisionID).Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("carry an approval forward: %w", err)
-	}
-	changed, err := database.Affected(result)
-	if err != nil {
-		return fmt.Errorf("carry an approval forward: %w", err)
-	}
-	if changed != int64(len(ids)) {
-		return refusal.Errorf("the reasoning changed while this was being agreed to")
+	// Every row was written as proposed in this transaction, so the state the
+	// statement asks for is the state each one is in.
+	if err := s.approveWhileRevised(ctx, claim, ids, "carry an approval forward",
+		"the reasoning changed while this was being agreed to"); err != nil {
+		return err
 	}
 	for _, one := range made {
 		one.State = Approved

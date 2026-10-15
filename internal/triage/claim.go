@@ -527,45 +527,61 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 	}
 
 	if len(returning) > 0 {
-		// The same argument, in a claim of its own: what an approver set
-		// aside is these rows, not a different judgment about them. The
-		// reasoning travels with it, because a claim with none is one nobody
-		// can be asked to agree to.
-		carried := claim.argument()
-		carried.MadeAs = claim.ID
-		if carried.Reasoning, err = s.reasoningOn(ctx, *claim); err != nil {
-			return nil, err
-		}
-		returned, err := s.newClaim(ctx, ReturnedClaim, claim.ProposedBy, &claim.ID,
-			orEmpty(claim.SelectedBy), carried)
+		// What an approver set aside is these rows, not a different judgment
+		// about them.
+		returned, err := s.intoReturned(ctx, subject, claim, returning, because, now, "set rows aside")
 		if err != nil {
-			return nil, err
-		}
-		// Matched on what was read: still waiting, and still this claim's. A
-		// row an approval or a withdrawal moved since is not set aside over
-		// it, and the whole act is taken again.
-		moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
-			Set("claim_id = ?", returned.ID).
-			Set("sent_back_at = ?", now).
-			Where("id IN (?)", bun.List(returning)).
-			Where("claim_id = ?", claim.ID).
-			Where("state = ?", Proposed).Exec(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("set rows aside: %w", err)
-		}
-		if err := movedAll(moved, len(returning), "set rows aside"); err != nil {
-			return nil, err
-		}
-		// The reason travels as a comment on the claim the rows went into, the
-		// way sending back records it: the author needs the words, and a
-		// reason kept anywhere else is one nobody reads.
-		if err := s.sayOn(ctx, subject, returned.ID, because, now); err != nil {
 			return nil, err
 		}
 		result.Returned = returned
 		result.ReturnedIn = returnedIn
 	}
 	return result, nil
+}
+
+// intoReturned moves rows still waiting on a claim into a claim of their own,
+// derived from it, and records why as a comment there.
+//
+// The same argument, in a claim of its own. The reasoning travels with it,
+// because a claim with none is one nobody can be asked to agree to. The rows
+// sit with their author: they leave the review queue until the argument for
+// them is stated again.
+//
+// Matched on what was read: still waiting, and still this claim's. A row an
+// approval or a withdrawal moved since is not moved over it, and the whole
+// act is taken again. The reason is a comment on the claim the rows went
+// into, the way sending back records it: the author needs the words, and a
+// reason kept anywhere else is one nobody reads.
+func (s *Store) intoReturned(ctx context.Context, subject access.Subject, claim *Claim, ids []int64,
+	because string, now time.Time, doing string) (*Claim, error) {
+
+	carried := claim.argument()
+	carried.MadeAs = claim.ID
+	var err error
+	if carried.Reasoning, err = s.reasoningOn(ctx, *claim); err != nil {
+		return nil, err
+	}
+	returned, err := s.newClaim(ctx, ReturnedClaim, claim.ProposedBy, &claim.ID,
+		orEmpty(claim.SelectedBy), carried)
+	if err != nil {
+		return nil, err
+	}
+	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
+		Set("claim_id = ?", returned.ID).
+		Set("sent_back_at = ?", now).
+		Where("id IN (?)", bun.List(ids)).
+		Where("claim_id = ?", claim.ID).
+		Where("state = ?", Proposed).Exec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", doing, err)
+	}
+	if err := movedAll(moved, len(ids), doing); err != nil {
+		return nil, err
+	}
+	if err := s.sayOn(ctx, subject, returned.ID, because, now); err != nil {
+		return nil, err
+	}
+	return returned, nil
 }
 
 // agree records one person agreeing to a claim, and moves the rows it covers.
@@ -600,6 +616,22 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 		return fmt.Errorf("record an approval: %w", err)
 	}
 
+	return s.approveWhileRevised(ctx, claim, ids, "record an approval",
+		"the reasoning changed while this was being agreed to; read it again")
+}
+
+// approveWhileRevised moves rows waiting on a claim to approved, while the
+// claim still rests on the revision the approval names, and refuses with
+// changed where any row did not move.
+//
+// The count is the control here, so a count that cannot be read is a refusal
+// rather than a pass. Read as optional, the whole revision-bound check would
+// be skipped after the approval row was already written, leaving a claim
+// agreed to under an approval naming reasoning that is no longer what it rests
+// on.
+func (s *Store) approveWhileRevised(ctx context.Context, claim Claim, ids []int64,
+	doing, changed string) error {
+
 	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
 		Set("state = ?", Approved).
 		Where("id IN (?)", bun.List(ids)).
@@ -607,19 +639,14 @@ func (s *Store) agree(ctx context.Context, subject access.Subject, claim Claim, 
 		Where(`EXISTS (SELECT 1 FROM "claim" AS "ac" WHERE ac.id = ? AND ac.revision_id = ?)`,
 			claim.ID, *claim.RevisionID).Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("record an approval: %w", err)
+		return fmt.Errorf("%s: %w", doing, err)
 	}
-	// The count is the control here, so a count that cannot be read is a
-	// refusal rather than a pass. Read as optional, the whole revision-bound
-	// check would be skipped after the approval row was already written,
-	// leaving a claim agreed to under an approval naming reasoning that is no
-	// longer what it rests on.
 	n, err := database.Affected(moved)
 	if err != nil {
-		return fmt.Errorf("record an approval: %w", err)
+		return fmt.Errorf("%s: %w", doing, err)
 	}
 	if n != int64(len(ids)) {
-		return refusal.Errorf("the reasoning changed while this was being agreed to; read it again")
+		return refusal.Errorf("%s", changed)
 	}
 	return nil
 }
@@ -724,9 +751,13 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 		}
 	}
 	holding := make(map[int64]bool, len(rows))
+	held := make([]int64, 0, len(rows))
 	for _, id := range rows {
 		if !named[id] {
 			return nil, refusal.Errorf("decision %d is not part of claim %d", id, claimID)
+		}
+		if !holding[id] {
+			held = append(held, id)
 		}
 		holding[id] = true
 	}
@@ -741,39 +772,10 @@ func (s *Store) split(ctx context.Context, subject access.Subject, claimID int64
 		}
 	}
 
-	// The same argument, in a claim of its own. The reasoning travels with it,
-	// because a claim with none is one nobody can be asked to agree to — and
-	// what makes it a different claim is the revision that follows.
-	carried := claim.argument()
-	carried.MadeAs = claim.ID
-	if carried.Reasoning, err = s.reasoningOn(ctx, *claim); err != nil {
-		return nil, err
-	}
-	held, err := s.newClaim(ctx, ReturnedClaim, claim.ProposedBy, &claim.ID,
-		orEmpty(claim.SelectedBy), carried)
-	if err != nil {
-		return nil, err
-	}
+	// What makes the rows held back a different claim is the revision that
+	// follows.
 	now := s.now().Truncate(time.Microsecond)
-	// Matched on what was read, as setting rows aside is.
-	moved, err := s.db.NewUpdate().Model((*Decision)(nil)).
-		Set("claim_id = ?", held.ID).
-		// With their author, which is what they are: they leave the review
-		// queue until the argument for them is stated again.
-		Set("sent_back_at = ?", now).
-		Where("id IN (?)", bun.List(rows)).
-		Where("claim_id = ?", claim.ID).
-		Where("state = ?", Proposed).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("hold those rows back: %w", err)
-	}
-	if err := movedAll(moved, len(holding), "hold those rows back"); err != nil {
-		return nil, err
-	}
-	if err := s.sayOn(ctx, subject, held.ID, because, now); err != nil {
-		return nil, err
-	}
-	return held, nil
+	return s.intoReturned(ctx, subject, claim, held, because, now, "hold those rows back")
 }
 
 // SentBack is what sending a claim back did.
