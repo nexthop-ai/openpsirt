@@ -496,7 +496,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 				if err := store.GrantRole(ctx, person.ID, product.ID, access.Role(hold.Role)); err != nil {
 					return core.Asked(a.Logger, err)
 				}
-				if err := core.Noted(ctx, db, trail.Role, person.Identity+" on "+product.Name,
+				if err := core.Noted(ctx, db, trail.Role, trail.OnProduct(person.Identity, product.Name),
 					nil, trail.Said(string(hold.Role), true)); err != nil {
 					return core.NotRecorded(a.Logger, err)
 				}
@@ -596,7 +596,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			case err != nil:
 				return core.WentWrong(a.Logger, "cannot withdraw the role", err)
 			}
-			if err := core.Noted(ctx, tx, trail.Role, person.Identity+" on "+product.Name,
+			if err := core.Noted(ctx, tx, trail.Role, trail.OnProduct(person.Identity, product.Name),
 				trail.Said(in.Role, true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
 			}

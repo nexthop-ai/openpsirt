@@ -109,7 +109,6 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			if err != nil {
 				return nil, err
 			}
-			about := named + " · " + issued
 			var person *access.Account
 			var added bool
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
@@ -127,7 +126,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 					return nil
 				}
 				if err := core.Noted(ctx, tx, trail.Case,
-					about+" · "+person.Identity,
+					trail.InCase(named, issued, person.Identity),
 					nil, trail.Said("a collaborator", true)); err != nil {
 					return core.NotRecorded(a.Logger, err)
 				}
@@ -186,7 +185,6 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			if err != nil {
 				return nil, err
 			}
-			about := named + " · " + issued
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
 				person, err := rights.ByIdentity(ctx, input.Identity)
@@ -200,7 +198,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 					return core.WentWrong(in.Logger, "they could not be taken off", err)
 				}
 				if err := core.Noted(ctx, tx, trail.Case,
-					about+" · "+person.Identity,
+					trail.InCase(named, issued, person.Identity),
 					trail.Said("a collaborator", true), nil); err != nil {
 					return core.NotRecorded(a.Logger, err)
 				}

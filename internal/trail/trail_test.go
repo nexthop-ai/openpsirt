@@ -263,7 +263,7 @@ func TestAMaximalCaseFitsTheColumn(t *testing.T) {
 		// A product, an issue and a person, each as wide as a name column
 		// holds, with the separators the recorder puts between them.
 		wide := strings.Repeat("W", database.NameWidth)
-		about := wide + " · " + wide + " · " + wide
+		about := trail.InCase(wide, wide, wide)
 		if utf8.RuneCountInString(about) > trail.NameLimit {
 			t.Fatalf("the widest thing recorded is %d runes and the column holds %d",
 				utf8.RuneCountInString(about), trail.NameLimit)

@@ -257,22 +257,12 @@ func standingFor(ctx context.Context, tx bun.IDB, subject access.Subject,
 func noteFix(ctx context.Context, tx bun.IDB, subject access.Subject,
 	record *triage.ExploitedHere, was, became *string) error {
 
-	var named struct {
-		Issue   string `bun:"issue"`
-		Product string `bun:"product"`
-	}
-	err := tx.NewSelect().
-		TableExpr(`"vulnerability" AS "v"`).
-		ColumnExpr(`v.identifier AS "issue"`).
-		ColumnExpr(`(SELECT p.name FROM "product" AS "p" WHERE p.id = ?) AS "product"`,
-			record.ProductID).
-		Where("v.id = ?", record.VulnerabilityID).
-		Scan(ctx, &named)
+	about, err := triage.TrailAbout(ctx, tx, record.ProductID, record.VulnerabilityID)
 	if err != nil {
-		return fmt.Errorf("read what this record is about: %w", err)
+		return err
 	}
 	return trail.NewStore(tx).Record(ctx, subject, trail.ExploitedHere,
-		named.Issue+" on "+named.Product+", fix release", was, became)
+		about+", fix release", was, became)
 }
 
 // FixesOf is every release named on these records as carrying the fix that

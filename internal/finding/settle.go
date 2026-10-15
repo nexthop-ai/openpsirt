@@ -381,7 +381,7 @@ func (v *Vulnerabilities) trailSuperseded(ctx context.Context, why superseding,
 		Scan(ctx, &product); err != nil {
 		return fmt.Errorf("read which product a merge superseded a judgment in: %w", err)
 	}
-	return trail.NewStore(v.db).RecordByMerge(ctx, trail.Merge, why.kept+" on "+product,
+	return trail.NewStore(v.db).RecordByMerge(ctx, trail.Merge, trail.OnProduct(why.kept, product),
 		trail.Said(was, true), trail.Said(why.because, true))
 }
 

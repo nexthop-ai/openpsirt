@@ -346,6 +346,21 @@ func (s *Store) write(ctx context.Context, change *Change) error {
 	return nil
 }
 
+// onProduct joins a name to the product a change was made against.
+const onProduct = " on "
+
+// OnProduct is what a change made against one product is recorded about: the
+// name of what changed and the product. About reads a name's history back by
+// this shape, so every producer of a per-product row builds it here.
+func OnProduct(name, product string) string { return name + onProduct + product }
+
+// InCase is what a change to who is on one undisclosed case is recorded about:
+// the product, the issue and the person. The column is sized for three maximal
+// names joined this way.
+func InCase(product, issue, identity string) string {
+	return product + " · " + issue + " · " + identity
+}
+
 // Over is the stretch of time a read of the trail covers.
 //
 // A zero start is the beginning and a zero end is now, which is what an
@@ -416,10 +431,10 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 			q = q.Where("kind = ?", kind)
 		}
 		return q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			prefix := name + " on "
+			prefix := OnProduct(name, "")
 			return q.Where("about = ?", name).
 				WhereOr(`(about LIKE ?`+database.LikeClause+` AND SUBSTR(about, 1, ?) = ?)`,
-					database.LikeEscaped(name)+" on %", utf8.RuneCountInString(prefix), prefix)
+					database.LikeEscaped(name)+onProduct+"%", utf8.RuneCountInString(prefix), prefix)
 		})
 	}
 	return s.page(ctx, narrow, limit, offset, fmt.Sprintf("what changed about %q", name))
