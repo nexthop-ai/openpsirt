@@ -117,8 +117,9 @@ const nameWidthV090 = 191
 // shapeWordsV090 makes the statement text table and the column each claim
 // table points at it with.
 //
-// On MySQL and MariaDB this commits as it runs, so a start resuming after it
-// steps over what is already there.
+// On MySQL and MariaDB this commits as it runs, and a start resuming after it
+// steps over the table and each column already made, as it steps over
+// anything a migration already created.
 func shapeWordsV090(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -131,13 +132,6 @@ func shapeWordsV090(ctx context.Context, tx bun.Tx) error {
 	for table, declared := range map[string][]string{
 		"suppression": suppressionV090(t), "vex_statement": vexStatementsV090(t),
 	} {
-		has, err := u.hasColumn(table, "statement_id")
-		if err != nil {
-			return err
-		}
-		if has {
-			continue
-		}
 		if err := u.change(declared, change{table: table, add: []added{{column: "statement_id"}}}); err != nil {
 			return err
 		}
@@ -208,6 +202,7 @@ func moveClaimWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) e
 		}
 		after = claims[len(claims)-1].ID
 		identity, vulnerability, justification := map[int64]any{}, map[int64]any{}, map[int64]any{}
+		version := map[int64]any{}
 		pointed := map[int64][]int64{}
 		for _, claim := range claims {
 			words := wordsOfV090(claim.Statement)
@@ -218,6 +213,15 @@ func moveClaimWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) e
 			}
 			if cutJustification != claim.Justification {
 				justification[claim.ID] = cutJustification
+			}
+			// A claim taken from a published statement states the version
+			// the statement was made about, which moveStatementWordsV090
+			// cuts as the statement's is cut.
+			if claim.Origin == publishedV090 {
+				if cut := headRunesV090(claim.SubjectVersion, nameWidthV090); cut != claim.SubjectVersion {
+					version[claim.ID] = cut
+					claim.SubjectVersion = cut
+				}
 			}
 			claim.Vulnerability, claim.Justification, claim.Statement = cutVulnerability, cutJustification, words
 			if key := claimIdentityV090(claim); key != claim.Identity {
@@ -234,7 +238,10 @@ func moveClaimWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) e
 		for _, column := range []struct {
 			name   string
 			values map[int64]any
-		}{{"identity", identity}, {"vulnerability", vulnerability}, {"justification", justification}} {
+		}{
+			{"identity", identity}, {"vulnerability", vulnerability}, {"justification", justification},
+			{"subject_version", version},
+		} {
 			if err := setByIDV090(ctx, tx, "suppression", column.name, column.values); err != nil {
 				return err
 			}
@@ -245,16 +252,30 @@ func moveClaimWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) e
 	}
 }
 
-// moveStatementWordsV090 points every supplier statement at its reasoning.
+// publishedV090 is the origin of a build's claim taken from a published
+// statement.
+const publishedV090 = "published"
+
+// moveStatementWordsV090 points every supplier statement at its reasoning,
+// and cuts what it says it is about and why to the width of their columns.
+//
+// SQLite held those at any length, and a claim taken from a statement is
+// keyed on them: one cut on the claim and whole on the statement would close
+// and reopen on the first scan after the upgrade.
 func moveStatementWordsV090(ctx context.Context, tx bun.Tx, held map[string]int64) error {
 	for after := int64(0); ; {
 		var said []struct {
-			ID        int64  `bun:"id"`
-			Statement string `bun:"statement"`
+			ID            int64  `bun:"id"`
+			Statement     string `bun:"statement"`
+			About         string `bun:"about"`
+			WithinAbout   string `bun:"within_about"`
+			Justification string `bun:"justification"`
 		}
 		if err := tx.NewSelect().TableExpr(`"vex_statement" AS "ss"`).
-			ColumnExpr(`ss.id`).
+			ColumnExpr(`ss.id, ss.about`).
 			ColumnExpr(`COALESCE(ss.statement, '') AS "statement"`).
+			ColumnExpr(`COALESCE(ss.within_about, '') AS "within_about"`).
+			ColumnExpr(`COALESCE(ss.justification, '') AS "justification"`).
 			Where("ss.id > ?", after).
 			OrderExpr("ss.id").Limit(pageV090).
 			Scan(ctx, &said); err != nil {
@@ -265,7 +286,15 @@ func moveStatementWordsV090(ctx context.Context, tx bun.Tx, held map[string]int6
 		}
 		after = said[len(said)-1].ID
 		pointed := map[int64][]int64{}
+		cut := map[string]map[int64]any{"about": {}, "within_about": {}, "justification": {}}
 		for _, one := range said {
+			for column, value := range map[string]string{
+				"about": one.About, "within_about": one.WithinAbout, "justification": one.Justification,
+			} {
+				if kept := headRunesV090(value, nameWidthV090); kept != value {
+					cut[column][one.ID] = kept
+				}
+			}
 			words := wordsOfV090(one.Statement)
 			if words == "" {
 				continue
@@ -275,6 +304,11 @@ func moveStatementWordsV090(ctx context.Context, tx bun.Tx, held map[string]int6
 				return err
 			}
 			pointed[id] = append(pointed[id], one.ID)
+		}
+		for _, column := range []string{"about", "within_about", "justification"} {
+			if err := setByIDV090(ctx, tx, "vex_statement", column, cut[column]); err != nil {
+				return err
+			}
 		}
 		if err := pointAtWordsV090(ctx, tx, "vex_statement", pointed); err != nil {
 			return err

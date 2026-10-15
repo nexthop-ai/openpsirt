@@ -103,7 +103,7 @@ Engine-specific code is confined to these places:
 | Reading a table's layout beside a measurement | PostgreSQL keeps a table's pages and each column's correlation in catalogs of its own. MySQL and MariaDB report a table's size through the information schema, in bytes of a page size each server sets |
 | Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and the servers keep their own. § SQLite settings has the measurement |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
-| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
+| A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
@@ -451,7 +451,7 @@ keys a build's claim on it, and keys a reference on its address as given.
 
 | Step | What it does |
 |---|---|
-| The image version table is made | By v0.9.0's declaration. On MySQL and MariaDB in a transaction of its own, before the rest: both commit a data-definition statement as it runs, so the steps after it would otherwise run a statement at a time and a merge stopped part way would stay part done. The next start steps over the table and runs the rest again whole |
+| The image version table is made | By v0.9.0's declaration. On MySQL and MariaDB in a transaction of its own, as is every step after it: both commit a data-definition statement as it runs, so steps sharing a transaction would run a statement at a time and a merge stopped part way would stay part done. The next start steps over the table, and each later step steps over what a stopped attempt finished |
 | Every build's row is taken | The lock a scan's apply and a run's apply take, so on a server a replica of v0.8.0 still running waits rather than writing a graph part way through the upgrade |
 | Images are found by their package identifier | A component whose identifier is of type `oci` or `docker`. v0.8.0 kept nothing saying the format called a component a container, so one with no identifier is not found, and its next upload stores it by name |
 | Each image's components are grouped by name | The identifier with no version, reduced the way identity reduces it |
@@ -495,15 +495,17 @@ Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
 opened.
 
-The claims and references move after the images, in three steps of their own.
-On MySQL and MariaDB each runs in a transaction of its own, and each steps over
-what a stopped attempt already did.
+The claims and references move after the images, in the steps below. On MySQL
+and MariaDB the table and columns are made in one transaction, the rows are moved
+in a second, and the copies are removed in a third. Each steps over what a
+stopped attempt already did.
 
 | Step | What it does |
 |---|---|
 | The statement text table is made, and `suppression` and `vex_statement` gain the reference to it | By v0.9.0's declarations. A column added holds a null and is added where the table stands, on SQLite too. A table already holding the column is stepped over |
 | Each piece of reasoning is stored once | Every build claim and supplier statement giving reasoning points at the one copy of its words, cut the way v0.9.0 cuts them. Read a page of rows at a time, by identifier: the copies being removed are what made these tables large |
-| Every build claim is keyed again | On its reasoning beside what it says, with the issue's identifier and the justification cut as v0.9.0 writes them. Only a row whose key, identifier or justification moves is written |
+| Every build claim is keyed again | On its reasoning beside what it says, with the issue's identifier and the justification cut as v0.9.0 writes them, and for a claim taken from a published statement the version it repeats from that statement. Only a row whose key or a value it is worked out from moves is written |
+| A supplier statement's justification and the versions it names are cut to their columns' width | As v0.9.0 writes them. SQLite held them at any length, and a claim taken from a statement is keyed on them, so one cut on the claim and whole on the statement would close and reopen on the first scan |
 | Every reference is keyed on its address as given | v0.8.0 keyed it on the address in capitals, cut to an index key's width. No two keys of one issue collide on the way: two references v0.8.0 held apart differ in capitals or past the cut, and so differ as given |
 | The copy each claim row carried is removed | SQLite rebuilds both tables from their declarations; the others drop the column. A table whose column is already gone is stepped over, and so is the move above |
 
@@ -515,6 +517,9 @@ what a stopped attempt already did.
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.8.0 build with claims sharing one explanation, a claim giving none, a claim whose identifier is longer than an indexed name, two supplier statements giving the first explanation, and two references | Upgraded, each explanation is stored once and every row giving it points at that copy, the first scan restating every claim writes nothing, each reference is keyed on its address as given, and each declaration describes the table the migrations built |
+| The same on SQLite, with a statement whose justification and version are longer than an indexed name, and a claim taken from it | The statement and the claim hold the same justification and version, each cut to the width |
+| The same on MySQL and MariaDB, the rows' move stopped part way | The next start steps over the table and columns already made and leaves what an upgrade that did not stop leaves |
+| The same on MySQL and MariaDB, stopped between the two removals, and after both | The next start moves and removes only what remains, and leaves what an upgrade that did not stop leaves |
 
 ### Release records
 

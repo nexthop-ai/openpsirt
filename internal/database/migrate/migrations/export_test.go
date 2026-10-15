@@ -3,7 +3,15 @@
 
 package migrations
 
-import "github.com/nexthop-ai/openpsirt/internal/database"
+import (
+	"context"
+	"log/slog"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+)
 
 // StatementsV060 is v0.6.0's declaration of each table it
 // creates or changes.
@@ -55,4 +63,35 @@ func StatementsV090(engine database.Engine) map[string][]string {
 		"suppression":    suppressionV090(t),
 		"vex_statement":  vexStatementsV090(t),
 	}
+}
+
+// StopV090AfterDropping runs the v0.9.0 upgrade's steps, each in a
+// transaction of its own as on MySQL and MariaDB, and stops once the named
+// claim tables have lost their copy of the reasoning: a start that died
+// between the drops, or after them.
+func StopV090AfterDropping(ctx context.Context, db *database.DB, tables ...string) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	drop := func(ctx context.Context, tx bun.Tx) error {
+		t, err := types(ctx)
+		if err != nil {
+			return err
+		}
+		u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+		declared := map[string][]string{"suppression": suppressionV090(t), "vex_statement": vexStatementsV090(t)}
+		for _, table := range tables {
+			if err := u.change(declared[table], change{table: table, drop: []string{"statement"}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, step := range []func(context.Context, bun.Tx) error{
+		createImageVersionV090, foldDestinationsV090, mergeImagesV090,
+		shapeWordsV090, moveWordsV090, drop,
+	} {
+		if err := inV020(ctx, db.DB.DB, step); err != nil {
+			return err
+		}
+	}
+	return nil
 }
