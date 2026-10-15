@@ -1061,9 +1061,14 @@ An insert that can lose a race on a unique key hands the race back rather than
 reporting the duplicate: recording a person, authorizing a name to sign in with,
 numbering an advisory or its next edition. The act is taken again whole, and its
 look then finds the row the other writer made or numbers after it. A bound
-counted before an insert takes turns on the owner's row first, written as an
-ordinary update every engine locks the row for: a person's saved filters count
-one under the limit in two transactions at once otherwise, and both add.
+counted before an insert takes turns on a row of the owner's first, written as
+an ordinary update every engine locks the row for: a person's saved filters
+count one under the limit in two transactions at once otherwise, and both add.
+The update writes a new value every time. MySQL and MariaDB match a row an
+update leaves as it was without writing it, and a cluster certifies only rows
+that were written, so an update to the value already held lets two nodes both
+pass. The row is one per person in the lease table, made before the
+transaction opens, and nothing takes it as a lease.
 
 A locking read — `SELECT ... FOR UPDATE` — is the other answer, and is not used
 for this: it is spelled per engine, and the condition works the same on all

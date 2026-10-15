@@ -14,9 +14,11 @@ package saved
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -237,17 +239,27 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		Reasoning: prepares.Reasoning, DeferDays: prepares.DeferDays,
 	}
 
+	turn, err := s.ensureTurn(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
 	// An update then an insert, in one transaction, because there is no
 	// portable spelling of an upsert and because what the insert writes
 	// against has to be what the update just saw.
 	write := func(ctx context.Context, db bun.IDB) error {
-		// One person's saves take turns, on the person's own row: the count
+		// One person's saves take turns, on a row of their own: the count
 		// below bounds only what this transaction can see, and two saves of
 		// different names at once both count one under the limit and both
 		// add. A write to the row is a lock every engine takes without being
 		// asked in words of its own.
-		if _, err := db.NewUpdate().TableExpr(`"person"`).
-			Set(`"id" = "id"`).Where(`"id" = ?`, personID).Exec(ctx); err != nil {
+		//
+		// The write puts a new value in the row every time. An update setting
+		// a column to what it already holds is matched and not written on
+		// MySQL and MariaDB, and a cluster certifies only rows that were
+		// written, so two saves on two nodes would both pass.
+		if _, err := db.NewUpdate().Model((*turnRow)(nil)).
+			Set(`"held_by" = ?`, rand.Text()).
+			Where(`"name" = ?`, turn).Exec(ctx); err != nil {
 			return err
 		}
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
@@ -306,6 +318,29 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		return nil, fmt.Errorf("keep that filter: %w", err)
 	}
 	return kept, nil
+}
+
+// turnRow is the row one person's saves take turns on. It sits in the lease
+// table, which holds named rows whose only use is to be written, and nothing
+// takes it as a lease.
+type turnRow struct {
+	bun.BaseModel `bun:"table:lease"`
+
+	Name string `bun:"name,pk"`
+}
+
+// ensureTurn makes the row one person's saves take turns on, and answers its
+// name.
+//
+// Outside the transaction, because a second writer's insert is refused by the
+// primary key, and on PostgreSQL a refused statement aborts the transaction it
+// is in.
+func (s *Store) ensureTurn(ctx context.Context, personID int64) (string, error) {
+	name := "saved filters " + strconv.FormatInt(personID, 10)
+	if _, err := s.db.NewInsert().Model(&turnRow{Name: name}).Exec(ctx); err != nil && !database.IsDuplicate(err) {
+		return "", fmt.Errorf("record where saves take turns: %w", err)
+	}
+	return name, nil
 }
 
 // SavedFilters lists what one person has kept, by name: one list, offered on
