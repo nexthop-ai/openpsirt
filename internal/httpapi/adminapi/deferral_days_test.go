@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // A deferral threshold is a whole number of days, because a deferral is dated
@@ -32,6 +33,41 @@ func TestADeferralThresholdIsAWholeNumberOfDays(t *testing.T) {
 		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
 		if me.DeferralDays != 2 {
 			t.Errorf("a threshold of two days publishes %d", me.DeferralDays)
+		}
+	})
+}
+
+// The limits a screen is told are the shipped ones where nobody has set them,
+// and the set ones where somebody has.
+func TestTheSessionPublishesTheLimitsInForce(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		type limits struct {
+			DeferralDays int `json:"deferral_days"`
+			BulkCap      int `json:"bulk_cap"`
+		}
+		var me limits
+		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
+		shipped := limits{
+			DeferralDays: int(triage.DefaultDeferralThreshold.Hours() / 24),
+			BulkCap:      triage.DefaultTogetherCap,
+		}
+		if me != shipped {
+			t.Errorf("with nothing set the session publishes %+v, want %+v", me, shipped)
+		}
+
+		for name, value := range map[string]string{
+			setting.DeferralThreshold: "240h",
+			setting.TogetherCap:       "7",
+		} {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/settings/"+name,
+				`{"value":"`+value+`"}`); got.Code >= 300 {
+				t.Fatalf("setting %s answered %d: %s", name, got.Code, got.Body.String())
+			}
+		}
+		me = limits{}
+		httpapitest.Read(t, r, "triager", "/v1/session/me", &me)
+		if want := (limits{DeferralDays: 10, BulkCap: 7}); me != want {
+			t.Errorf("with both set the session publishes %+v, want %+v", me, want)
 		}
 	})
 }

@@ -567,9 +567,16 @@ func (r *Reach) SetAside(t *testing.T, kind, reference string) int64 {
 // RanAgainst records a finished scanner run stating a data version.
 func (r *Reach) RanAgainst(t *testing.T, version string, started time.Time) {
 	t.Helper()
+	r.RanReading(t, version, "", started)
+}
+
+// RanReading records a finished scanner run stating a data version and the
+// CVE record snapshot it narrowed its matches with.
+func (r *Reach) RanReading(t *testing.T, version, records string, started time.Time) {
+	t.Helper()
 	finished := started.Add(time.Minute)
 	if _, err := r.DB.NewInsert().Model(&finding.Run{
-		TargetID: r.TargetOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version,
+		TargetID: r.TargetOf(t, SeededBuild), Scanner: seededScanner, DatabaseVersion: version, RecordsVersion: records,
 		RanHere: true, StartedAt: started, FinishedAt: &finished,
 	}).Exec(t.Context()); err != nil {
 		t.Fatal(err)

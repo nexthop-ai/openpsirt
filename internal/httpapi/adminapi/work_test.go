@@ -73,14 +73,20 @@ func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
 // enough ago to count as stopped. Verified by inverting the stale comparison.
 func TestTheVulnerabilityDataSaysWhetherItHasStoppedMoving(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		type data struct {
+		type snapshot struct {
 			Version string     `json:"version"`
 			MovedAt *time.Time `json:"moved_at"`
 			Stale   bool       `json:"stale"`
 		}
+		type data struct {
+			Version string     `json:"version"`
+			MovedAt *time.Time `json:"moved_at"`
+			Stale   bool       `json:"stale"`
+			Records snapshot   `json:"records"`
+		}
 		var got data
 		httpapitest.Read(t, r, "admin", "/v1/vulnerability-data", &got)
-		if got.Version != "" || got.MovedAt != nil || got.Stale {
+		if got.Version != "" || got.MovedAt != nil || got.Stale || got.Records != (snapshot{}) {
 			t.Errorf("a deployment nothing has scanned reads as %+v", got)
 		}
 
@@ -92,11 +98,36 @@ func TestTheVulnerabilityDataSaysWhetherItHasStoppedMoving(t *testing.T) {
 			t.Errorf("data that last moved a year ago reads as %+v", got)
 		}
 
-		r.RanAgainst(t, "2026-01-01", time.Now().UTC().Truncate(time.Second))
+		now := time.Now().UTC().Truncate(time.Second)
+		r.RanAgainst(t, "2026-01-01", now.Add(-2*time.Minute))
 		got = data{}
 		httpapitest.Read(t, r, "admin", "/v1/vulnerability-data", &got)
 		if got.Version != "2026-01-01" || got.Stale {
 			t.Errorf("data that moved today reads as %+v", got)
+		}
+		if got.Records != (snapshot{}) {
+			t.Errorf("runs that read no record snapshot report one: %+v", got.Records)
+		}
+
+		// The record snapshot is answered the same way, from what the runs
+		// read, apart from the scanner's data. A run a year ago is the first
+		// to read this snapshot; its data version was already in hand then.
+		r.RanReading(t, "2025-01-01", "2025-06-01T00:00:00Z", longAgo.Add(time.Hour))
+		got = data{}
+		httpapitest.Read(t, r, "admin", "/v1/vulnerability-data", &got)
+		if got.Records.Version != "2025-06-01T00:00:00Z" || got.Records.MovedAt == nil ||
+			!got.Records.MovedAt.Equal(longAgo.Add(time.Hour)) || !got.Records.Stale {
+			t.Errorf("a record snapshot first read a year ago reads as %+v", got.Records)
+		}
+		if got.Version != "2026-01-01" || got.Stale {
+			t.Errorf("the scanner's data took the record snapshot's age: %+v", got)
+		}
+
+		r.RanReading(t, "2026-01-01", "2026-10-01T00:00:00Z", now.Add(-time.Minute))
+		got = data{}
+		httpapitest.Read(t, r, "admin", "/v1/vulnerability-data", &got)
+		if got.Records.Version != "2026-10-01T00:00:00Z" || got.Records.Stale {
+			t.Errorf("a record snapshot that moved today reads as %+v", got.Records)
 		}
 
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/vulnerability-data", ""),
