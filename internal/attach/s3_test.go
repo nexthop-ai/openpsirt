@@ -7,11 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"testing/iotest"
 	"time"
@@ -168,43 +165,8 @@ func TestNoBucketIsNoStore(t *testing.T) {
 // before sending it unless told the payload is unsigned. The server here is on
 // a loopback address, which is the development store.
 func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
-	held := map[string][]byte{}
-	var mu sync.Mutex
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-		switch r.Method {
-		case http.MethodPut:
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			held[r.URL.Path] = body
-		case http.MethodGet:
-			body, ok := held[r.URL.Path]
-			if !ok {
-				w.Header().Set("Content-Type", "application/xml")
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = io.WriteString(w, `<Error><Code>NoSuchKey</Code></Error>`)
-				return
-			}
-			_, _ = w.Write(body)
-		case http.MethodDelete:
-			delete(held, r.URL.Path)
-			w.WriteHeader(http.StatusNoContent)
-		}
-	}))
-	defer server.Close()
-
 	ctx := context.Background()
-	bucket, err := NewBucket(ctx, BucketConfig{
-		Endpoint: server.URL, Bucket: "attachments", Region: "us-east-1",
-		Key: "key", Secret: "secret", PathStyle: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	bucket, server := ObjectStore(t)
 	const key, content = "attachments/ab/cd/abcd", "the bytes of a file"
 	// No Seek: the shape the upload path hands over.
 	streamed := io.MultiReader(strings.NewReader(content))
@@ -221,7 +183,7 @@ func TestAPlaintextStoreTakesAStreamedBody(t *testing.T) {
 		t.Fatalf("read back %q, %v", got, err)
 	}
 	link, err := bucket.URLFor(ctx, key, time.Minute, `attachment; filename="a"`, "text/plain")
-	if err != nil || !strings.HasPrefix(link, server.URL+"/attachments/"+key+"?") {
+	if err != nil || !strings.HasPrefix(link, server+"/attachments/"+key+"?") {
 		t.Fatalf("signed %q, %v", link, err)
 	}
 	if err := bucket.Delete(ctx, key); err != nil {
