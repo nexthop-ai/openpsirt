@@ -803,3 +803,28 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 		}
 	})
 }
+
+// A provider sign-in whose match could not be read is a fault. Answered as
+// "not authorized", an outage turns every browser away as though nothing had
+// granted them anything, and nothing is logged as an error.
+func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
+	handle := dbtest.Without(t, "person_identity")
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
+	rights := access.NewStore(handle.DB)
+	handler, _ := httpapi.New(quiet, nil, core.Deps{
+		Mode: func(context.Context) access.Mode { return access.Direct },
+		DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
+		Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
+		Providers: map[string]signin.Provider{"stub": provider},
+		PlainHTTP: true,
+		BaseURL:   "http://example.com",
+	})
+	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("a sign-in over a lookup that failed answered %d, want 500", rec.Code)
+	}
+	if hasSession(rec.Result().Cookies()) {
+		t.Error("a sign-in over a lookup that failed was handed a session")
+	}
+}

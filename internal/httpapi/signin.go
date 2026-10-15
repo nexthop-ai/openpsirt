@@ -170,7 +170,14 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// authorization, so somebody arriving for the first time in a mapped group
 	// is admitted and recorded then — and somebody in no mapped group is
 	// refused exactly as a stranger is.
+	// Every deliberate refusal admit returns is a denial. Anything else is a
+	// lookup that failed, which is a fault: answered as "not authorized", an
+	// outage turns every browser away as though nothing granted them anything.
 	person, err := admit(r, in, rights, identity)
+	if err != nil && !errors.Is(err, access.ErrDenied) {
+		wentWrongHere(w, in, "who signed in could not be looked up", err)
+		return
+	}
 	if err != nil {
 		if in.Logger != nil {
 			in.Log().Info("refused somebody who authenticated but reaches nothing",

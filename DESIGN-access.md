@@ -782,6 +782,7 @@ miss the case this exists for and refuse the one it does not care about.
 | A bound identity whose issuer is no longer configured stops the process | One provider at a time is a rule across time, not at one instant (REQ-41). Nothing at sign-in can distinguish a reinterpreted identifier from an ordinary arrival, so the refusal is at startup, where an operator sees it |
 | A row bound before the provider was recorded reads as the one configured now | There is nothing else it could mean, and refusing every one of them would lock out a deployment that never changed provider |
 | A row nobody has bound names no provider | Unbinding clears the identifier and the provider that issued it together. Left behind, a withdrawn binding still reads as a binding nobody withdrew, so unbinding everybody would not be enough to let the new provider start |
+| A match that could not be read is a fault on every way in, answered 500 and logged as an error | Answered as "not authorized", an outage turns every arrival away as though nothing granted them anything, and the log reads as a run of strangers |
 
 ### The way in without the provider
 
