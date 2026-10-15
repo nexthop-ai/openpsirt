@@ -6,6 +6,7 @@ package adminapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -38,6 +39,29 @@ func registerKeys(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
 		}
+		// Every name a key narrows to, read once for the whole list rather
+		// than a query per key.
+		products, err := productNames(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		var streamIDs, variantIDs []int64
+		for _, key := range keys {
+			if key.StreamID != nil {
+				streamIDs = append(streamIDs, *key.StreamID)
+			}
+			if key.VariantID != nil {
+				variantIDs = append(variantIDs, *key.VariantID)
+			}
+		}
+		streams, err := names.StreamsByID(ctx, streamIDs)
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
+		}
+		variants, err := names.VariantsByID(ctx, variantIDs)
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
+		}
 
 		out := &core.ListOutput[KeyBody]{}
 		out.Body.Items = make([]KeyBody, 0, len(keys))
@@ -50,31 +74,35 @@ func registerKeys(api huma.API, a core.Administering) {
 			// ProductByName — and the Stream and Variant fields beside it
 			// already answer the address. A listing that cannot be used to
 			// remake what it lists is a listing of something else.
-			product, err := names.ProductByID(ctx, key.ProductID)
-			if err != nil {
-				return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
-			}
-			body.Product = product.Name
-			if product.DisplayName != product.Name {
-				body.ProductDisplayName = product.DisplayName
-			}
+			//
 			// The whole narrowing, not only the product it names. "any
 			// branch, any variant" and "one release only" are different
 			// credentials, and a list that renders both the same way cannot be
-			// used to decide which one to withdraw. A read that fails answers
-			// the whole listing with an error for the same reason: a pinned key
-			// listed unscoped is the wrong credential to withdraw.
+			// used to decide which one to withdraw. A name that cannot be read
+			// answers the whole listing with an error for the same reason: a
+			// pinned key listed unscoped is the wrong credential to withdraw.
+			product, found := products[key.ProductID]
+			if !found {
+				return nil, core.WentWrong(a.Logger, "cannot list credentials",
+					fmt.Errorf("key %q names product %d, which is not there", key.Name, key.ProductID))
+			}
+			body.Product = product.Address
+			if product.Display != product.Address {
+				body.ProductDisplayName = product.Display
+			}
 			if key.StreamID != nil {
-				stream, err := names.StreamByID(ctx, *key.StreamID)
-				if err != nil {
-					return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
+				stream, found := streams[*key.StreamID]
+				if !found {
+					return nil, core.WentWrong(a.Logger, "cannot list credentials",
+						fmt.Errorf("key %q names stream %d, which is not there", key.Name, *key.StreamID))
 				}
 				body.Stream = stream.Name
 			}
 			if key.VariantID != nil {
-				variant, err := names.VariantByID(ctx, *key.VariantID)
-				if err != nil {
-					return nil, core.WentWrong(a.Logger, "cannot list credentials", err)
+				variant, found := variants[*key.VariantID]
+				if !found {
+					return nil, core.WentWrong(a.Logger, "cannot list credentials",
+						fmt.Errorf("key %q names variant %d, which is not there", key.Name, *key.VariantID))
 				}
 				body.Variant = variant.Name
 			}

@@ -163,7 +163,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 			"breaks if it is turned off.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[TokenBody], error) {
-		rights, names, err := core.Administerable(ctx, a, a.Handle())
+		rights, _, err := core.Administerable(ctx, a, a.Handle())
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +179,13 @@ func registerRevocation(api huma.API, a core.Administering) {
 		for _, person := range people {
 			owners[person.ID] = person.Identity
 		}
-		return tokenList(ctx, a.Logger, names, tokens, owners)
+		// Every product named once for the whole list, rather than a read per
+		// narrowed token.
+		products, err := productNames(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		return tokenList(a.Logger, products, tokens, owners)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{

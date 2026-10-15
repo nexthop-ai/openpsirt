@@ -312,21 +312,21 @@ func registerAdministration(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		// Read once for everybody, like the per-product grants beside it. A
+		// Read once for everybody, like the per-product grants beside them. A
 		// query per person makes a long list slow.
 		everywhere, err := store.EveryEstateGrant(ctx)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot list what people hold everywhere", err)
 		}
+		identities, err := store.EveryIdentity(ctx)
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot read how they sign in", err)
+		}
 
 		out := &core.ListOutput[PersonBody]{}
 		out.Body.Items = make([]PersonBody, 0, len(people))
 		for _, person := range people {
-			doors, err := store.Identities(ctx, person.ID)
-			if err != nil {
-				return nil, core.WentWrong(a.Logger, "cannot read how they sign in", err)
-			}
-			body := personBody(&person, doors, everywhere[person.ID], held[person.ID], named)
+			body := personBody(&person, identities[person.ID], everywhere[person.ID], held[person.ID], named)
 			if !holding(body.Holds, onProduct, named, string(input.Role)) {
 				continue
 			}

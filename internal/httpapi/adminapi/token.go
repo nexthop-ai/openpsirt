@@ -6,6 +6,7 @@ package adminapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -65,7 +66,11 @@ func registerTokens(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "cannot list your tokens", err)
 		}
-		return tokenList(ctx, in.Logger, names, tokens, nil)
+		products, err := narrowedTo(ctx, in.Logger, names, tokens)
+		if err != nil {
+			return nil, err
+		}
+		return tokenList(in.Logger, products, tokens, nil)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -261,8 +266,33 @@ func mine(ctx context.Context, in core.Deps) (access.Subject, *access.Store, *ca
 	return subject, access.NewStore(in.DB.DB), catalog.NewStore(in.DB.DB), nil
 }
 
-// tokenList renders tokens, naming the products they are narrowed to.
-func tokenList(ctx context.Context, logger *slog.Logger, names *catalog.Store, tokens []access.Token,
+// narrowedTo names the products a person's own tokens are narrowed to, which
+// are few, by reading each one.
+func narrowedTo(ctx context.Context, logger *slog.Logger, names *catalog.Store,
+	tokens []access.Token) (map[int64]core.Named, error) {
+
+	products := map[int64]core.Named{}
+	for _, token := range tokens {
+		if token.ProductID == nil {
+			continue
+		}
+		if _, read := products[*token.ProductID]; read {
+			continue
+		}
+		product, err := names.ProductByID(ctx, *token.ProductID)
+		if err != nil {
+			return nil, core.WentWrong(logger, "the product a token is narrowed to could not be read", err)
+		}
+		products[product.ID] = core.Named{
+			Address: product.Name, Display: catalog.Shown(product.DisplayName, product.Name),
+		}
+	}
+	return products, nil
+}
+
+// tokenList renders tokens, naming the products they are narrowed to from
+// products.
+func tokenList(logger *slog.Logger, products map[int64]core.Named, tokens []access.Token,
 	owners map[int64]string) (*core.ListOutput[TokenBody], error) {
 	out := &core.ListOutput[TokenBody]{}
 	out.Body.Items = make([]TokenBody, 0, len(tokens))
@@ -289,13 +319,14 @@ func tokenList(ctx context.Context, logger *slog.Logger, names *catalog.Store, t
 			// resolves this field, and a display name resolves to nothing.
 			// A product that cannot be read is a failed list, never a token
 			// listed as reaching everything.
-			product, err := names.ProductByID(ctx, *token.ProductID)
-			if err != nil {
-				return nil, core.WentWrong(logger, "the product a token is narrowed to could not be read", err)
+			product, found := products[*token.ProductID]
+			if !found {
+				return nil, core.WentWrong(logger, "the product a token is narrowed to could not be read",
+					fmt.Errorf("token %q names product %d, which is not there", token.Name, *token.ProductID))
 			}
-			body.Product = product.Name
-			if product.DisplayName != product.Name {
-				body.ProductDisplayName = product.DisplayName
+			body.Product = product.Address
+			if product.Display != product.Address {
+				body.ProductDisplayName = product.Display
 			}
 		}
 		out.Body.Items = append(out.Body.Items, body)

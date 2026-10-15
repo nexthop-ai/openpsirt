@@ -422,6 +422,22 @@ func (s *Store) Identities(ctx context.Context, personID int64) ([]Identity, err
 	return identities, nil
 }
 
+// EveryIdentity is how every person signs in, keyed by person, each person's
+// in the order Identities answers them. One read for a list of everybody, where
+// Identities per person is a query a row.
+func (s *Store) EveryIdentity(ctx context.Context) (map[int64][]Identity, error) {
+	var identities []Identity
+	if err := s.db.NewSelect().Model(&identities).
+		Order("person_id ASC", "username ASC").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read how everybody signs in: %w", err)
+	}
+	by := make(map[int64][]Identity)
+	for _, each := range identities {
+		by[each.PersonID] = append(by[each.PersonID], each)
+	}
+	return by, nil
+}
+
 // byID reads a person by row.
 func (s *Store) byID(ctx context.Context, id int64) (*Account, error) {
 	person := new(Account)
