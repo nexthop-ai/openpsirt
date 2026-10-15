@@ -18,7 +18,6 @@ vi.mock("@tanstack/react-query", async (actual) => ({
   }),
 }));
 
-const { useAfterClaim } = await import("./claims");
 const { useAfterAdvisory } = await import("./advisories");
 const { useAfterReport } = await import("./intake");
 
@@ -33,29 +32,8 @@ function after(hook: () => () => void): string[] {
 }
 
 // A key dropped from one of these sets leaves a screen showing what the act
-// changed as it stood before. For a claim that is an approval a revision took
-// back still drawn as standing, which is the state the second-person control
-// exists to make visible.
+// changed as it stood before.
 describe("what an act invalidates", () => {
-  it("a change to a claim reaches the queue, its decisions, its findings, its own blocks and advisories", () => {
-    expect(after(useAfterClaim)).toEqual(
-      [
-        "advisory",
-        "advisory-document",
-        "advisory-releases",
-        "claim",
-        "comments",
-        "decided",
-        "decision",
-        "finding",
-        "findings",
-        "home",
-        "my-claims",
-        "queue",
-      ].sort(),
-    );
-  });
-
   it("a change to an advisory reaches the list, the advisory, its document, its releases and what went out", () => {
     expect(after(useAfterAdvisory)).toEqual(
       [

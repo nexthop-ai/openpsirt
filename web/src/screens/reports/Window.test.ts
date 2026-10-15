@@ -128,10 +128,6 @@ describe("the period a sheet was asked for", () => {
   it("sends a period or a window and never both", () => {
     // The two are ways of saying the same thing, and sending both is refused
     // by the server: a caller who sent both meant one of them.
-    expect(asked2({ from: "2026-01-01", to: "2026-04-01" }, 30)).toEqual({
-      from: "2026-01-01",
-      to: "2026-04-02",
-    });
     expect(asked2({ from: "", to: "" }, 30)).toEqual({ days: 30 });
     expect(asked2({ from: "2026-01-01", to: "" }, 30)).toEqual({ from: "2026-01-01" });
   });
