@@ -65,3 +65,30 @@ describe("re-affirming a lapsed claim from its own page", () => {
     expect(invalidated()).toEqual(expect.arrayContaining(["claim", "my-claims", "decided"]));
   });
 });
+
+describe("the stripe on a claim's page", () => {
+  it("draws a proposed claim nothing waits on as in force", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: ANA };
+      if (path === "/v1/claims/{id}") {
+        return {
+          data: {
+            claim: { id: 4, proposed_by: "ana" },
+            place: { product: "sonic", vulnerability: "CVE-2026-1" },
+            argument: { outcome: "not-applicable" },
+            happened: "waiting",
+            issues: 1,
+            places: 1,
+            age_days: 1,
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Claim who={ANA} />, "/claims/4", "/claims/:id", client()));
+    await settle();
+    const card = mount.host().querySelector(".card.standing");
+    expect(card?.classList.contains("approved")).toBe(true);
+    expect(card?.classList.contains("pending")).toBe(false);
+  });
+});

@@ -118,9 +118,7 @@ export function Claim({ who }: { who: Who }) {
 function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChanged: () => void }) {
   const bulk = claim.issues > 1;
   return (
-    <div
-      className={`card standing ${stripeOf(claim.happened, claim.argument.needs_approval ?? true)}`}
-    >
+    <div className={`card standing ${stripeOf(claim.happened, !!claim.argument.needs_approval)}`}>
       <header className="dhead">
         <h3>The decision</h3>
         <Happened word={claim.happened} by={claim.by_name || claim.by} />
