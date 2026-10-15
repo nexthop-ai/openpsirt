@@ -10145,8 +10145,11 @@ export interface components {
             failing: number;
             /** @description The host a webhook sends to. The rest of the address is never returned */
             host?: string;
-            /** @description The notifications that go here, or * for all of them */
-            kind: string;
+            /**
+             * @description The notifications that go here, or * for all of them
+             * @enum {string}
+             */
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -11232,7 +11235,8 @@ export interface components {
             made_on: components["schemas"]["MadeOnBody"][] | null;
             /** @description What stops the flaw, where the decision named it. The document states it as the impact */
             mitigation?: string;
-            outcome: string;
+            /** @enum {string} */
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The decision's justification, which the document states as the reason the release is not affected */
             reason?: string;
         };
@@ -12052,8 +12056,11 @@ export interface components {
             decision: number;
             /** @description Where it sits, as the decision names it */
             place: string;
-            /** @description How far that decision has got */
-            state: string;
+            /**
+             * @description How far that decision has got
+             * @enum {string}
+             */
+            state: "proposed" | "approved" | "withdrawn" | "lapsed";
             vulnerability: string;
         };
         SpentBody: {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { label, waiting } from "./notices";
+import { label, takes, waiting } from "./notices";
 
 // The two decisions the notification area makes for itself, tested apart from
 // the drawing.
@@ -71,5 +71,12 @@ describe("the count on the way in", () => {
     // as "2.5".
     expect(waiting(2.5)).toBe("2");
     expect(waiting(0.5)).toBe("·");
+  });
+});
+
+describe("what a destination takes", () => {
+  it("says one kind in its words and the wildcard as everything", () => {
+    expect(takes("holding-absent")).toBe("somebody away holding work");
+    expect(takes("*")).toBe("everything");
   });
 });

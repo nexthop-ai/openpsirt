@@ -7211,6 +7211,36 @@ components:
           type: string
         kind:
           description: The notifications that go here, or * for all of them
+          enum:
+            - assigned
+            - mentioned
+            - sent-back
+            - build-quiet
+            - holding-absent
+            - critical-on-release
+            - disclosure-due
+            - disclosure-near
+            - statement-revised
+            - claim-waiting
+            - sent-back-waiting
+            - deferral-ending
+            - queue-untaken
+            - approval-undone
+            - approval-withdrawn
+            - claim-lapsed
+            - merge-superseded
+            - brought-in
+            - disclosed
+            - unanswered-report
+            - vulnerability-data-stale
+            - risk-unagreed
+            - pairs-concentrated
+            - supplier-silent
+            - inventory-moved
+            - obligation-open
+            - obligation-near
+            - obligation-passed
+            - "*"
           type: string
         name:
           description: The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling
@@ -8986,6 +9016,15 @@ components:
           description: What stops the flaw, where the decision named it. The document states it as the impact
           type: string
         outcome:
+          enum:
+            - affected
+            - not-applicable
+            - mismatched
+            - deferred
+            - wont-fix
+            - already-fixed
+            - upgrade-needed
+            - patch-needed
           type: string
         reason:
           description: The decision's justification, which the document states as the reason the release is not affected
@@ -10379,6 +10418,11 @@ components:
           type: string
         state:
           description: How far that decision has got
+          enum:
+            - proposed
+            - approved
+            - withdrawn
+            - lapsed
           type: string
         vulnerability:
           type: string

@@ -312,10 +312,10 @@ func registerBulk(api huma.API, in core.Deps) {
 // SkippedBody is a place a bulk judgment left out, and the decision that
 // already covers it.
 type SkippedBody struct {
-	Vulnerability string `json:"vulnerability"`
-	Place         string `json:"place" doc:"Where it sits, as the decision names it"`
-	Decision      int64  `json:"decision" doc:"The decision standing there"`
-	State         string `json:"state" doc:"How far that decision has got"`
+	Vulnerability string          `json:"vulnerability"`
+	Place         string          `json:"place" doc:"Where it sits, as the decision names it"`
+	Decision      int64           `json:"decision" doc:"The decision standing there"`
+	State         core.ClaimState `json:"state" doc:"How far that decision has got"`
 }
 
 // skippedBodies names what a bulk judgment left out, by the issues' names.
@@ -335,7 +335,7 @@ func skippedBodies(ctx context.Context, in core.Deps, skipped []triage.Skipped) 
 	for _, each := range skipped {
 		out = append(out, SkippedBody{
 			Vulnerability: named[each.VulnerabilityID], Place: each.PlaceIdentity,
-			Decision: each.DecisionID, State: string(each.State),
+			Decision: each.DecisionID, State: core.ClaimState(each.State),
 		})
 	}
 	return out, nil

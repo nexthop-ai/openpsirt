@@ -178,6 +178,7 @@ func statedVocabularies() map[string][]string {
 		"ruling states":                  words(finding.RulingStates()),
 		"platforms":                      notify.Platforms(),
 		"notification kinds":             words(notify.Kinds()),
+		"destination kinds":              append(words(notify.Kinds()), notify.Everything),
 		"notification lifetimes":         words(notify.Lifetimes()),
 		"upload progress":                words(ingest.Progresses()),
 		"document kinds":                 words(ingest.Kinds()),

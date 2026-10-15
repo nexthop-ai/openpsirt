@@ -10,6 +10,7 @@ import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
+import { takes } from "../ui/notices";
 import { Wide } from "../ui/Wide";
 
 // The destinations this deployment posts to, and whether anything is arriving.
@@ -47,12 +48,6 @@ function NoWebhooks() {
       detail="Notifications stay inside the application, and mail goes where an address is recorded."
     />
   );
-}
-
-// A kind's own word. A destination taking everything says so in a word
-// rather than in the wildcard the address is stored with.
-function kindOf(kind?: string) {
-  return kind === "*" ? "everything" : kind;
 }
 
 // The number failing, and the reason the last one did.
@@ -129,7 +124,7 @@ export function Webhooks() {
               {rows.map((row) => (
                 <tr key={`${row.name} ${row.kind}`} className="row">
                   <td className="id">{row.name}</td>
-                  <td>{kindOf(row.kind)}</td>
+                  <td>{takes(row.kind)}</td>
                   {/* Not a link: it is somewhere this deployment posts to,
                       not somewhere a person goes. */}
                   <td className="id">{row.host}</td>
@@ -248,7 +243,7 @@ export function WebhookDelivery() {
               {rows.map((row) => (
                 <tr key={`${row.name} ${row.kind}`} className="row">
                   <td className="id">{row.name}</td>
-                  <td>{kindOf(row.kind)}</td>
+                  <td>{takes(row.kind)}</td>
                   <td className="id">{row.platform === "webhook" ? row.host : row.channel}</td>
                   <td>{(row.sent ?? 0).toLocaleString()}</td>
                   <td>

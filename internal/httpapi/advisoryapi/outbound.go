@@ -29,14 +29,14 @@ import (
 // A destination is told apart from another by its name and kind, which is what
 // retiring one takes.
 type OutboundBody struct {
-	Name     string        `json:"name" doc:"The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling"`
-	Kind     string        `json:"kind" doc:"The notifications that go here, or * for all of them"`
-	Platform core.Platform `json:"platform" doc:"How it is reached: a signed request, or a chat platform"`
-	Host     string        `json:"host,omitempty" doc:"The host a webhook sends to. The rest of the address is never returned"`
-	Channel  string        `json:"channel,omitempty" doc:"The chat channel it posts to"`
-	Topic    string        `json:"topic,omitempty" doc:"The topic within a Zulip channel"`
-	Product  string        `json:"product,omitempty" doc:"The product a chat channel belongs to"`
-	Team     string        `json:"team,omitempty" doc:"The team a chat channel belongs to"`
+	Name     string               `json:"name" doc:"The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling"`
+	Kind     core.DestinationKind `json:"kind" doc:"The notifications that go here, or * for all of them"`
+	Platform core.Platform        `json:"platform" doc:"How it is reached: a signed request, or a chat platform"`
+	Host     string               `json:"host,omitempty" doc:"The host a webhook sends to. The rest of the address is never returned"`
+	Channel  string               `json:"channel,omitempty" doc:"The chat channel it posts to"`
+	Topic    string               `json:"topic,omitempty" doc:"The topic within a Zulip channel"`
+	Product  string               `json:"product,omitempty" doc:"The product a chat channel belongs to"`
+	Team     string               `json:"team,omitempty" doc:"The team a chat channel belongs to"`
 	// Sent and Failing say whether it is working, which is the question an
 	// operator has about a destination and one nothing else answers.
 	Sent    int    `json:"sent" doc:"The number of things delivered there"`
@@ -73,7 +73,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		out.Body.Items = make([]OutboundBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, OutboundBody{
-				Name: row.Name, Kind: row.Kind, Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
+				Name: row.Name, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
 				Channel: row.Channel, Topic: row.Topic, Product: row.Product, Team: row.Team,
 				Sent: row.Sent, Failing: row.Failing, Because: row.Because,
 			})
@@ -203,7 +203,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			Status int
 			Body   OutboundBody
 		}{Status: http.StatusCreated, Body: OutboundBody{
-			Name: row.DisplayName, Kind: row.Kind, Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
+			Name: row.DisplayName, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
 			Channel: deref(row.Channel), Topic: deref(row.Topic),
 			Product: productName, Team: teamName,
 		}}, nil

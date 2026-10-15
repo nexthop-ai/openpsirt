@@ -11,6 +11,7 @@ import { AddButton, Declare, Field } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
+import { takes } from "../ui/notices";
 import { Wide } from "../ui/Wide";
 
 // The chat channels this deployment posts to.
@@ -129,7 +130,7 @@ export function ChatChannels({ platforms }: { platforms: string[] }) {
               {rows.map((row) => (
                 <tr key={`${row.name} ${row.kind}`} className="row">
                   <td className="id">{row.name}</td>
-                  <td>{row.kind === "*" ? "everything" : row.kind}</td>
+                  <td>{takes(row.kind)}</td>
                   <td>
                     {PLATFORMS[row.platform ?? ""] ?? row.platform} ·{" "}
                     <span className="id">{row.channel}</span>

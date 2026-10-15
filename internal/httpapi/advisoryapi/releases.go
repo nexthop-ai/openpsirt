@@ -36,7 +36,7 @@ type AdvisoryReleaseBody struct {
 // ReleaseCoveringBody is the decision a release stands under.
 type ReleaseCoveringBody struct {
 	Decision   int64        `json:"decision" doc:"The earliest decision covering the release"`
-	Outcome    string       `json:"outcome"`
+	Outcome    core.Outcome `json:"outcome"`
 	Reason     string       `json:"reason,omitempty" doc:"The decision's justification, which the document states as the reason the release is not affected"`
 	Mitigation string       `json:"mitigation,omitempty" doc:"What stops the flaw, where the decision named it. The document states it as the impact"`
 	MadeOn     []MadeOnBody `json:"made_on" doc:"The builds the decision was made on: the one on screen when it was proposed and every one chosen beside it. Empty where none was recorded"`
@@ -92,7 +92,7 @@ func registerReleases(api huma.API, in core.Deps) {
 			}
 			if one.Grounds != nil {
 				body.Covered = &ReleaseCoveringBody{
-					Decision: one.Grounds.Decision, Outcome: one.Grounds.Outcome,
+					Decision: one.Grounds.Decision, Outcome: core.Outcome(one.Grounds.Outcome),
 					Reason: one.Grounds.Reason, Mitigation: one.Grounds.Mitigation,
 					MadeOn: make([]MadeOnBody, 0, len(one.Grounds.MadeOn)),
 				}

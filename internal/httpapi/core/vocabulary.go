@@ -374,6 +374,16 @@ type NotificationKind string
 // Schema offers every kind of notification.
 func (NotificationKind) Schema(huma.Registry) *huma.Schema { return words(notify.Kinds()) }
 
+// DestinationKind is the notifications a destination takes, as a response
+// says it: one kind, or the word for all of them. A request names it as typed,
+// because the store folds its case.
+type DestinationKind string
+
+// Schema offers every kind of notification, and then the word for all of them.
+func (DestinationKind) Schema(huma.Registry) *huma.Schema {
+	return words(append(plainly(notify.Kinds()), notify.Everything))
+}
+
 // Lifetime is how long a notification is worth showing.
 type Lifetime string
 

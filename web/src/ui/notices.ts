@@ -74,6 +74,12 @@ export function label(kind?: string): string {
   return own(WORDS, kind) ?? kind ?? "";
 }
 
+// The notifications a destination takes: one kind's words, or "everything"
+// for the wildcard the destination is stored with.
+export function takes(kind?: Body<"OutboundBody">["kind"]): string {
+  return kind === "*" ? "everything" : label(kind);
+}
+
 // The count on the control that opens it.
 //
 // A number rather than a dot, because "three things" and "something" are
