@@ -336,9 +336,6 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		Component       string `bun:"component"`
 		Purl            string `bun:"purl"`
 		finding.Covering
-		Justification string    `bun:"-"`
-		Mitigation    string    `bun:"-"`
-		DecidedAt     time.Time `bun:"-"`
 	}
 	// One statement per issue and component, from the claims that stand and
 	// have been agreed to. Joined from the findings this build actually holds:
@@ -427,11 +424,6 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
-	for i := range rows {
-		rows[i].Justification = said[rows[i].DecidedBy].Justification
-		rows[i].Mitigation = said[rows[i].DecidedBy].Mitigation
-		rows[i].DecidedAt = said[rows[i].DecidedBy].ProposedAt
-	}
 
 	// Which revision this is, read from what has gone out for this build.
 	// A document generated twice with nothing published in between is the
@@ -476,72 +468,29 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		return nil, err
 	}
 	for _, row := range rows {
-		about := row.Purl
-		if about == "" {
-			// A component with no package identifier is named by the name the
-			// build calls it. Less use to a machine and better than dropping
-			// the statement: the reader can still match it by hand, and a
-			// silent omission reads as "no claim" — which is the one thing
-			// this document must not say by accident.
-			about = row.Component
-		}
-		statement := Statement{
-			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
-			Timestamp:     row.DecidedAt.UTC(),
-			Products: []Shipped{{
-				ID: shipped, Subcomponents: []Inside{{ID: about}},
-			}},
-			Status: statusOf(row.Outcome),
-		}
-		// The same sentence goes in a different field depending on what is
-		// being said about it. On a claim that something does not apply it is
-		// why, beside the category a machine reads; on one that will not be
-		// fixed it is what to do instead, which is the field the format asks
-		// for and the reason such a claim is published at all.
-		switch statement.Status {
-		case "not_affected":
-			statement.Justification = row.Justification
-			statement.ImpactStatement = row.Mitigation
-		case "affected":
-			statement.ActionStatement = row.Mitigation
+		statement, err := claimed(Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
+			shipped, subject(row.Purl, row.Component), row.Outcome, said[row.DecidedBy])
+		if err != nil {
+			return nil, err
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
 	// A place stated on its own names what pulls the component in as the
 	// product, so a reader applies it beneath that product and nowhere else.
 	for _, row := range placed {
-		about := row.Purl
-		if about == "" {
-			about = row.Component
-		}
-		words := said[row.DecidedBy]
-		statement := Statement{
-			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
-			Timestamp:     words.ProposedAt.UTC(),
-			Products: []Shipped{{
-				ID: row.ConsumerPurl, Subcomponents: []Inside{{ID: about}},
-			}},
-			Status: statusOf(row.Outcome),
-		}
-		switch statement.Status {
-		case "not_affected":
-			statement.Justification = words.Justification
-			statement.ImpactStatement = words.Mitigation
-		case "affected":
-			statement.ActionStatement = words.Mitigation
+		statement, err := claimed(Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
+			row.ConsumerPurl, subject(row.Purl, row.Component), row.Outcome, said[row.DecidedBy])
+		if err != nil {
+			return nil, err
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
 	for _, row := range fixed {
-		about := row.Purl
-		if about == "" {
-			about = row.Component
-		}
 		doc.Statements = append(doc.Statements, Statement{
 			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
 			Timestamp:     row.PatchedAt.UTC(),
 			Products: []Shipped{{
-				ID: shipped, Subcomponents: []Inside{{ID: about}},
+				ID: shipped, Subcomponents: []Inside{{ID: subject(row.Purl, row.Component)}},
 			}},
 			Status: "fixed",
 		})
@@ -551,15 +500,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// a place open, and a supplier's statement only of one with none, so the
 	// two never speak about one issue in one component.
 	for _, row := range stated {
-		about := row.Purl
-		if about == "" {
-			about = row.Component
-		}
 		doc.Statements = append(doc.Statements, Statement{
 			Vulnerability: Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
 			Timestamp:     row.ClosedAt.UTC(),
 			Products: []Shipped{{
-				ID: shipped, Subcomponents: []Inside{{ID: about}},
+				ID: shipped, Subcomponents: []Inside{{ID: subject(row.Purl, row.Component)}},
 			}},
 			Status:          "not_affected",
 			Justification:   known(row.Justification),
@@ -848,12 +793,15 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	return stated, nil
 }
 
-// statusOf turns an outcome into what the format calls it.
+// statusOf turns an outcome into what the format calls it, and is empty for
+// an outcome the format is not told about.
 //
 // Only the four a VEX document per build names arrive here. A deferral never
 // does: publishing it as not-affected would tell the world we assessed
 // something as harmless when we had only postponed it, and silence already
-// reads as affected.
+// reads as affected. An outcome missing from the table is refused rather
+// than published under a default, because the only safe default on a
+// published document is to say nothing.
 //
 // A claim that the scanner matched something that is not here publishes as
 // not-affected, carrying the reason it states: that the component is absent,
@@ -867,14 +815,55 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 // it and no advisory is issued about it, and under silence it would never be
 // said at all.
 func statusOf(outcome string) string {
-	switch outcome {
-	case "already-fixed":
-		return "fixed"
-	case "wont-fix":
-		return "affected"
-	default:
-		return "not_affected"
+	return statuses[outcome]
+}
+
+// statuses is the format's status for each outcome a document states.
+var statuses = map[string]string{
+	finding.OutcomeNotApplicable: "not_affected",
+	finding.OutcomeMismatched:    "not_affected",
+	finding.OutcomeAlreadyFixed:  "fixed",
+	finding.OutcomeWontFix:       "affected",
+}
+
+// subject is what a statement names the component by: its package
+// identifier, or where it has none, the name the build calls it.
+//
+// Less use to a machine and better than dropping the statement: the reader can
+// still match it by hand, and a silent omission reads as "no claim", which is
+// the one thing this document must not say by accident.
+func subject(purl, component string) string {
+	if purl == "" {
+		return component
 	}
+	return purl
+}
+
+// claimed is the statement an agreed claim makes about one component beneath
+// one product, in the words the decision it rests on states.
+//
+// The same sentence goes in a different field depending on what is being said
+// about it. On a claim that something does not apply it is why, beside the
+// category a machine reads; on one that will not be fixed it is what to do
+// instead, which is the field the format asks for and the reason such a claim
+// is published at all.
+func claimed(issue Issue, product, about, outcome string, words finding.Stated) (Statement, error) {
+	statement := Statement{
+		Vulnerability: issue,
+		Timestamp:     words.ProposedAt.UTC(),
+		Products:      []Shipped{{ID: product, Subcomponents: []Inside{{ID: about}}}},
+		Status:        statusOf(outcome),
+	}
+	switch statement.Status {
+	case "":
+		return Statement{}, fmt.Errorf("outcome %q has no VEX status", outcome)
+	case "not_affected":
+		statement.Justification = words.Justification
+		statement.ImpactStatement = words.Mitigation
+	case "affected":
+		statement.ActionStatement = words.Mitigation
+	}
+	return statement, nil
 }
 
 // identify is what the document calls itself, which is the same string every
