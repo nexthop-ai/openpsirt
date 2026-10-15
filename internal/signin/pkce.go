@@ -11,19 +11,10 @@ import (
 )
 
 // The two halves of an authorization-code exchange with a proof key, which
-// both adapters do the same way.
-//
-// Written out once per provider, and the OIDC copy's own comment is the record
-// of that going wrong: the guarded client reached the key fetches and not the
-// token exchange — the one call carrying the secret — and the fix had to be
-// found and applied to one adapter. Every literal involved appeared in one copy
-// and its twin, which is what made a change to either invisible from the
-// other.
-//
-// A third provider, or any hardening here — a shorter timeout, a check that
-// the provider echoed the challenge method, a refusal of a downgraded redirect
-// — would land in two places today and in more later, and nothing observed
-// either.
+// both adapters share. The guarded client reaches the token exchange — the one
+// call carrying the secret — through here, for every adapter at once, and so
+// does any hardening: a shorter timeout, a check that the provider echoed the
+// challenge method, a refusal of a downgraded redirect.
 
 // beginPKCE returns where to send the browser, and what to remember until it
 // comes back.

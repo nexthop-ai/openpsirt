@@ -28,9 +28,9 @@ var resumableURLs = map[database.Engine]string{
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
-	// Every migration here is registered in the library's transactional form
-	// and takes a transaction. On MySQL and MariaDB that transaction is
-	// decorative: both commit implicitly before and after every
+	// The baseline is registered in the library's transactional form, and
+	// every migration after it opens a transaction of its own. On MySQL and
+	// MariaDB a transaction is decorative: both commit implicitly before and after every
 	// data-definition statement. A failure at statement N leaves 1 to N-1
 	// committed, the rollback removes nothing, and no version row is written
 	// — so the next start runs the same migration from statement 1 and fails

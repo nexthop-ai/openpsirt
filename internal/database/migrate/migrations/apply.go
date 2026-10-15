@@ -38,11 +38,11 @@ func types(ctx context.Context) (*columnTypes, error) {
 // apply runs a migration's statements in order, naming the one that failed.
 //
 // It also makes a re-run resume rather than collide, on the two engines that
-// cannot roll one back. Every migration here is registered in the library's
-// transactional form and takes a transaction, and on MySQL and MariaDB that
-// transaction is decorative: both commit implicitly before and after every
-// data-definition statement. A failure at statement N leaves 1 to N-1
-// committed, the rollback removes nothing, and no version row is written — so
+// cannot roll one back. The baseline is registered in the library's
+// transactional form, and every migration after it opens a transaction of its
+// own. On MySQL and MariaDB a transaction is decorative: both commit
+// implicitly before and after every data-definition statement. A failure at
+// statement N leaves 1 to N-1 committed, the rollback removes nothing, and no version row is written — so
 // the next start runs the same migration from statement 1 and fails on "table
 // already exists". Nothing recovers from that on its own, and every
 // replacement process fails its startup probe in turn.

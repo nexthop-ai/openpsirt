@@ -101,9 +101,7 @@ func Kinds() []Kind {
 }
 
 // Actor is what made a change: a person, the deployment's startup
-// configuration, a merge of two issues, or an upgrade. An upgrade's rows are
-// written by the migration that makes them, which holds its own copy of the
-// word "upgrade" as it holds its own copy of every rule it applies.
+// configuration, a merge of two issues, or an upgrade.
 type Actor string
 
 const (

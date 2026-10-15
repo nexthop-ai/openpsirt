@@ -12,8 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// v080 is the migration the untagged release carries v0.7.0's schema across
-// with.
+// v080 is the migration v0.8.0 carries v0.7.0's schema across with.
 const v080 = 42
 
 // A v0.7.0 database is upgraded, and its finding, decision and notification

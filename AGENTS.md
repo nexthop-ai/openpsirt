@@ -551,9 +551,9 @@ gets ticked without being read.
 - Regression tests are named for the invariant they pin.
 
 A gate that iterates a collection counts what it examined and fails on
-zero. The form is `internal/config/documented_test.go:44-45` — `if len(reads)
-== 0 { t.Fatal("no settings were found in the source, so this checked
-nothing") }` — and its two-direction join is the standard: it reports both a
+zero. The form is the one in `internal/config/documented_test.go` — `if
+len(reads) == 0 { t.Fatal("no settings were found in the source, so this
+checked nothing") }` — and its two-direction join is the standard: it reports both a
 setting documented and not read, and one read and not documented. Sixteen gates
 were scoped so that they could not go red for the failure they name, and the
 shapes are worth knowing because they recur: a loop over a collection that may
