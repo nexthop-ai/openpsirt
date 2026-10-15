@@ -143,11 +143,7 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicTriage)
 
 		// A second product, declared properly: the row has foreign keys to
@@ -245,11 +241,7 @@ func TestALapsedPlaceDecidedAgainReadsAsWaiting(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
 		place := finding.PlaceIdentity(swss.Name, "")
@@ -296,11 +288,7 @@ func TestALiveDecisionCoversOnlyTheVersionsItWasKeyedOn(t *testing.T) {
 			}
 		}
 		f.shipped(t, directly(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		other := f.anotherBuild(t, "202411")
 		f.shippedTo(t, other, directly(libnlNew))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -388,11 +376,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicTriage)
 
 		somebody := f.somebodyElse(t)
@@ -765,12 +749,10 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			found("CVE-2026-1", libnl),
 			found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		who := f.holding(t, access.PublicTriage)
 
 		count := func(t *testing.T, states ...finding.ClaimStanding) int {
@@ -931,11 +913,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
 		issueID := f.issueID(t, "CVE-2026-1")
@@ -1004,11 +982,7 @@ func TestANarrowingThatCannotBeAppliedAnswersNothingRatherThanEverything(t *test
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		who := f.holding(t, access.PublicRead)
 
 		all, total, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
@@ -1053,11 +1027,7 @@ func TestAClaimNarrowsTheListToThePlacesItWroteAt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss), found("CVE-2026-2", teamd),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss), found("CVE-2026-2", teamd))
 		who := f.holding(t, access.PublicTriage)
 		somebody := f.somebodyElse(t)
 		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "edge-router", "Edge")

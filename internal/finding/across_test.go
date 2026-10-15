@@ -33,11 +33,7 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		// The same code, the same version, the same way down, in a second
 		// variant of the same product.
 		other := f.anotherVariant(t, "mellanox")
@@ -102,11 +98,7 @@ func TestAGroupOnlyOneBuildHoldsSaysSoAcrossTheProduct(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(teamd))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -143,11 +135,7 @@ func TestASubtreeIsRefusedWhereTheSelectionHoldsMoreThanOneBuild(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -182,11 +170,7 @@ func TestAProductNobodyMayReadAnswersNothingAtEveryScopeLevel(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		stranger := access.NewPerson(9, "nobody@example.com", false,
 			map[int64][]access.Role{f.productID + 999: {access.PublicRead}}, 0)
 

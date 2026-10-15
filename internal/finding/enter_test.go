@@ -491,11 +491,7 @@ func TestWhichBuildsAScannedIssueIsInIsNotOursToSet(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		if _, err := f.store.Affects(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), f.productID,
 			f.issueID(t, "CVE-2026-1"), []int64{f.target}, "because"); err == nil {
 			t.Error("a scanned issue's builds were set by hand")
@@ -657,11 +653,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		}
 
 		// A scan of the same build writes the same component again.
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		var scanned []string
 		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
 			ColumnExpr(`"f"."place_identity"`).

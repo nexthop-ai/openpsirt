@@ -19,11 +19,7 @@ func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
 		ctx := t.Context()
 		// The fixture's own stream is a branch, so it must not appear.
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		// Two tagged releases of the same product, one worse than the other.
 		first := f.anotherBuild(t, "v1.0")
 		f.shippedTo(t, first, through(libnl))
@@ -68,11 +64,7 @@ func TestABranchIsNotAPointOnAReleaseTrend(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		points, err := f.store.ReleaseTrend(ctx, f.holding(t, access.PublicRead),
 			f.wholeProduct(), 12)
 		if err != nil {

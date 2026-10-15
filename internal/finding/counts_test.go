@@ -24,11 +24,7 @@ func TestCountingWhatIsOpenAgreesWithTheListAndCarriesVisibility(t *testing.T) {
 		// in two places — which is exactly where counting rows and counting
 		// what somebody decides about diverge.
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", swss))
 		who := f.holding(t, access.PublicRead)
 
 		byProduct, err := f.store.OpenBy(ctx, who, finding.Scope{}, finding.ByProduct)

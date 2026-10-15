@@ -61,11 +61,7 @@ func TestWhoHoldsAFoldIsAskedOfEveryHeldPlaceAndCountsEachPlaceOnce(t *testing.T
 			Components:   []graph.Described{lib, tool},
 			Dependencies: []graph.Dependency{{Parent: root, Child: lib}, {Parent: root, Child: tool}},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-FOLD", lib), found("CVE-2026-FOLD", tool), found("CVE-2026-LIB", lib),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-FOLD", lib), found("CVE-2026-FOLD", tool), found("CVE-2026-LIB", lib))
 		// The reader and two other people, numbered one below the reader and
 		// one above, so neither end of who holds a group answers alone. Every
 		// identifier is given: MySQL and MariaDB keep a table's counter past
@@ -143,12 +139,10 @@ func TestUndecidedReadsTheDecidedPlacesOfEveryIssueADecisionMarks(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			found("CVE-2026-LAPSED", libnl), found("CVE-2026-MERGED", libnl),
 			found("CVE-2026-WITHDRAWN", libnl), found("CVE-2026-OPEN", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "GHSA-aaaa-bbbb-cccc"},
 		}); err != nil {

@@ -21,11 +21,7 @@ func TestAssigningEverythingMatchingNamesAnUnheldPieceItCouldNotMove(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss), found("CVE-2026-2", teamd),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss), found("CVE-2026-2", teamd))
 		undisclosed := f.issueID(t, "CVE-2026-2")
 		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"visibility" = ?`, access.Private).

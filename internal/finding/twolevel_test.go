@@ -258,11 +258,7 @@ func TestBundlesTiedOnEveryOtherKeyAreOrderedByTheirFold(t *testing.T) {
 			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: on,
 				FixState: finding.FixedUpstream, FixedIn: "8.5.0-9"}
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			fixed("CVE-2026-91", older), fixed("CVE-2026-91", newer),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, fixed("CVE-2026-91", older), fixed("CVE-2026-91", newer))
 		who := f.holding(t, access.PublicTriage)
 		var folds []string
 		for offset := 0; offset < 2; offset++ {

@@ -24,11 +24,7 @@ func TestTheOverviewCountsADecidedPlaceOnceHoweverManyDecisionsReachIt(t *testin
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		if len(places) != 2 {
 			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
@@ -76,11 +72,7 @@ func TestTheOverviewCountsADecisionOnlyAtTheVersionItWasMadeAgainst(t *testing.T
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		f.decidedAt(t, f.somebodyElse(t), places[swss.Name], "approved", libnlNew.Version, swss.Version, "elsewhere")
 		_, whole, err := f.store.HowItStands(ctx, f.holding(t, access.PublicRead), f.productID)
@@ -161,11 +153,7 @@ func TestTheOverviewAgreesAGroupInTwoBuildsOnlyWhereEveryPlaceInBothIsAnswered(t
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -207,11 +195,7 @@ func TestTheOverviewFoldsAGroupAnsweredInOneBuildAndOverdueInTheOther(t *testing
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, graph.Snapshot{
 			Root:       root,
@@ -272,11 +256,7 @@ func TestADecisionKeyedOnAConsumerVersionCoversNoPlaceWithoutAConsumer(t *testin
 			Root: root, Components: []graph.Described{libnl},
 			Dependencies: []graph.Dependency{{Parent: root, Child: libnl}},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		at := map[int64]finding.Finding{}
 		for _, row := range f.open(t) {
 			if row.ConsumerID != nil {

@@ -161,11 +161,7 @@ func TestARegisterSaysWhoDecidedSomethingThatHasSinceLapsed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		open := f.open(t)
 		if len(open) == 0 {
 			t.Fatal("nothing opened to decide about")
@@ -336,11 +332,7 @@ func TestAPlaceWithAWithdrawnOrLapsedPastReadsOnceInTheRegister(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss), found("CVE-2026-2", teamd), found("CVE-2026-3", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss), found("CVE-2026-2", teamd), found("CVE-2026-3", libnl))
 		who := f.holding(t, access.PublicRead)
 		somebody := f.somebodyElse(t)
 		_, before, err := f.store.Register(ctx, who, f.target, finding.Registering{}, 50, 0)
@@ -409,11 +401,7 @@ func TestTheRegisterReportsALiveDecisionOnlyAtTheVersionsItWasKeyedOn(t *testing
 			}
 		}
 		f.shipped(t, directly(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		other := f.anotherBuild(t, "202411")
 		f.shippedTo(t, other, directly(libnlNew))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -452,11 +440,7 @@ func TestAFindingTwoLiveDecisionsCoverReadsOnceInTheRegister(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", swss))
 		who := f.holding(t, access.PublicRead)
 		somebody := f.somebodyElse(t)
 		issue, place := f.issueID(t, "CVE-2026-1"), finding.PlaceIdentity(swss.Name, "")

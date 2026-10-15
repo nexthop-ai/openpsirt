@@ -61,11 +61,7 @@ func TestAnIssueAgingInTwoBucketsIsUndecidedOnlyInTheBucketWhosePlacesNobodyAnsw
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		now := time.Now().UTC()
 		for name, opened := range map[string]time.Time{
@@ -112,11 +108,7 @@ func TestATrendReadsTheProductsOwnRatingOfAnIssueOpenAtManyPlaces(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		f.rate(t, f.productID, "CVE-2026-1", "critical")
 		points, err := f.store.Trend(ctx, f.holding(t, access.PublicRead), f.wholeProduct(),
 			time.Time{}, 24*time.Hour, 2, finding.Within{})
@@ -137,11 +129,7 @@ func TestAReleaseCountsAnIssueAtAComponentOnceAtTheProductsRating(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		f.rate(t, f.productID, "CVE-2026-1", "low")
 		releases, err := f.store.Releases(ctx, f.holding(t, access.PublicRead), f.productID)
 		if err != nil {

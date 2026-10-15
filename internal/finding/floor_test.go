@@ -226,11 +226,7 @@ func TestNothingOnAReleaseOutOfSupportIsOnAClock(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		for _, row := range f.open(t) {
 			if row.DueAt == nil {
 				t.Fatal("a finding on a supported release has no deadline, so this proves nothing")
@@ -260,11 +256,7 @@ func TestNothingOnAReleaseOutOfSupportIsOnAClock(t *testing.T) {
 
 		// And a finding opening afterwards gets none either.
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", swss))
 		for _, row := range f.open(t) {
 			if row.DueAt != nil {
 				t.Errorf("a finding opened on a release out of support is due %s", row.DueAt)

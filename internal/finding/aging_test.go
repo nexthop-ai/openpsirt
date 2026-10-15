@@ -19,12 +19,10 @@ func TestAnAgingBucketSaysWhatIsUndecidedAndHowItSplitsBySeverity(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "critical"}, Component: swss},
-			{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "low"}, Component: libnl},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t,
+			finding.Reported{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "critical"}, Component: swss},
+			finding.Reported{Issue: finding.Named{Identifier: "CVE-2026-2", Severity: "low"}, Component: libnl},
+		)
 		old := time.Now().UTC().Add(-120 * 24 * time.Hour)
 		f.aged(t, "CVE-2026-1", old)
 		f.aged(t, "CVE-2026-2", old)

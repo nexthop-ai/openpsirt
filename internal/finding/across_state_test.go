@@ -37,11 +37,7 @@ func (f *fixture) acrossProducts(t *testing.T) acrossProducts {
 	t.Helper()
 	ctx := t.Context()
 	f.shipped(t, twoConsumers())
-	if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-		found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", libnl),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", libnl))
 	elsewhere := f.inAnotherProduct(t, "hedgehog")
 	f.shippedTo(t, elsewhere, twoConsumers())
 	if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere), []finding.Reported{

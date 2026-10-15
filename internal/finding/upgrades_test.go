@@ -727,11 +727,7 @@ func TestACommitmentStandsWhenALaterInventoryStatesMore(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		who := f.someoneElse(t, access.PublicTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
 			f.componentID(t, libnl.Name), "3.9.0", nil, nil,

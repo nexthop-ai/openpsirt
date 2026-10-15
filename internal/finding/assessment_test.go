@@ -973,11 +973,7 @@ func TestARatingIsListedByWhatItsOwnIssueReachesAndNotByAnotherIssue(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		keeper := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		hidden := f.embargoed(t, keeper)
 		public := f.issueID(t, "CVE-2026-1")

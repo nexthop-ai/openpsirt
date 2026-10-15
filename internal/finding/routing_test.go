@@ -234,11 +234,7 @@ func TestWhatPlacedAFindingIsAnswerableAboutTheWholeFold(t *testing.T) {
 				{Parent: root, Child: lib}, {Parent: root, Child: tool},
 			},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-CURL", lib), found("CVE-2026-CURL", tool),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-CURL", lib), found("CVE-2026-CURL", tool))
 
 		who := f.planner(t, access.PublicTriage, access.Assigner)
 		where := f.team(t, "platform")
@@ -331,11 +327,7 @@ func TestARuleThatOutgrewItsBoundDoesNotStopTheRestOfTheSweep(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", teamd),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", teamd))
 		who := f.planner(t, access.PublicTriage, access.Assigner)
 		where := f.team(t, "platform")
 

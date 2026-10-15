@@ -215,11 +215,7 @@ func TestPackageKindsAcrossProductsReachOnlyTheProductsSomebodyReads(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, kinded())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		cat := catalog.NewStore(f.db.DB)
 		other, err := cat.DeclareProduct(ctx, "edge-router", "Edge")
 		if err != nil {

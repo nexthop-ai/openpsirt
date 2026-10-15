@@ -44,12 +44,10 @@ func TestComparingTwoBuildsSaysWhatWentWhatCameAndWhatStayed(t *testing.T) {
 		// The release a customer is on: two issues, one at the library and one
 		// at the daemon.
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			found("CVE-2026-GONE", libnl),
 			found("CVE-2026-STAYS", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		earlier := f.target
 
 		// The release they would move to. It carried the same two, and then
@@ -280,13 +278,11 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			found("CVE-2026-OPEN", swss),
 			found("CVE-2026-QUIET", teamd),
 			found("CVE-2026-VOID", teamd),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		earlier := f.target
 
 		// The later build carried them and then a scan of it found none of

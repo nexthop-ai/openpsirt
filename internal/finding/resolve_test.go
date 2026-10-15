@@ -226,14 +226,12 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 		// A scan then reports the same identifier at a different component,
 		// which is a third party's package carrying an issue filed under the
 		// name this record acquired. Nothing about it is evidence here.
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			{
+		f.applied(t,
+			finding.Reported{
 				Issue:     finding.Named{Identifier: identifier, Severity: "high"},
 				Component: libnl, FixState: finding.NoFix,
 			},
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 
 		done, err := f.store.Resolve(ctx, who, f.target, rows[0].VulnerabilityID,
 			"Fixed in the next image.")

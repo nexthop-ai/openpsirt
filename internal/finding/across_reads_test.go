@@ -146,13 +146,11 @@ func TestAnIssueWhoseBinariesNameDifferentFixesCountsOnceUnderEach(t *testing.T)
 			return finding.Reported{Issue: finding.Named{Identifier: id, Severity: "high"}, Component: on,
 				FixState: finding.FixedUpstream, FixedIn: fixedIn}
 		}
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			fixed("CVE-2026-71", lib, "8.5.0-3"),
 			fixed("CVE-2026-71", gnutls, "8.5.0-4"),
 			fixed("CVE-2026-73", lib, "8.5.0-3"),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 
 		other := f.anotherBranch(t, "next")
 		f.shippedTo(t, other, graph.Snapshot{
@@ -212,11 +210,7 @@ func TestAPromiseInAnotherProductDoesNotStandOverThisProductsBuild(t *testing.T)
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		elsewhere := f.inAnotherProduct(t, "hedgehog")
 		f.shippedTo(t, elsewhere, through(libnl))
 		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere), []finding.Reported{
@@ -426,11 +420,7 @@ func TestTwoVersionsOfASourceInOneBuildAreListedInTheEcosystemsOrder(t *testing.
 				{Parent: root, Child: swss}, {Parent: swss, Child: older}, {Parent: swss, Child: newer},
 			},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-81", older), found("CVE-2026-82", newer),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-81", older), found("CVE-2026-82", newer))
 		builds, err := f.store.AcrossBuilds(ctx, f.holding(t, access.PublicTriage), f.wholeProduct(), "curl")
 		if err != nil {
 			t.Fatal(err)

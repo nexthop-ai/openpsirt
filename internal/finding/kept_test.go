@@ -51,15 +51,13 @@ func TestTheViewsKeepTheListsGroupsUnderAFilterNeedingADecision(t *testing.T) {
 			}
 		}
 		// Applied as one run with the fold's own issue, so it stays open.
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			fixed("CVE-2026-CURL", lib), fixed("CVE-2026-CURL", tool),
 			fixed("CVE-2026-LAPSED", lib), fixed("CVE-2026-LAPSED", zlib),
 			fixed("CVE-2026-WAITING", tool),
 			fixed("CVE-2026-PLANNED", tool),
 			fixed("CVE-2026-OPEN", lib), fixed("CVE-2026-OPEN", tool),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		at := func(component graph.Described) string { return finding.PlaceIdentity(component.Name, "") }
 		somebody := f.somebodyElse(t)
 		f.decided(t, somebody, f.issue(t, "CVE-2026-CURL"), at(lib), "approved", lib.Version, "curl-lib")

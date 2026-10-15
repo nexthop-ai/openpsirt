@@ -225,11 +225,7 @@ func TestMarkingIsAskedAtTheFindingsOwnVisibility(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-1", swss),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-1", swss))
 		f.undisclose(t, f.target, "CVE-2026-1", swss.Name)
 		issue := f.issueID(t, "CVE-2026-1")
 		disclosed, undisclosed := f.componentID(t, libnl.Name), f.componentID(t, swss.Name)

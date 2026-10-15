@@ -24,11 +24,7 @@ func TestEveryFieldSomebodyTypesGoesThroughTheSubmissionPolicy(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		f.recorded(t, 1, "someone")
 		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.issue(t, "CVE-2026-1")

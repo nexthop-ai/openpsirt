@@ -47,13 +47,11 @@ func TestAChurnedVersionIsNotCountedAsAFix(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		f.applied(t,
 			found("CVE-2026-1", libnl),
 			found("CVE-2026-2", libnl),
 			found("CVE-2026-3", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		)
 		now := time.Now().UTC()
 		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3"} {
 			f.aged(t, issue, now.Add(-10*24*time.Hour))
@@ -91,11 +89,7 @@ func TestHowLongAFixTookIsCountedPerIssueAndNotPerPlace(t *testing.T) {
 				{Parent: swss, Child: libnl}, {Parent: teamd, Child: libnl},
 			},
 		})
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		var places int
 		if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
 			ColumnExpr("COUNT(*)").Where(`"closed_at" IS NULL`).Scan(ctx, &places); err != nil {
@@ -130,11 +124,7 @@ func TestWhatIsAgingIsCountedInTheBucketsPeopleAskIn(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		now := time.Now().UTC()
 		f.aged(t, "CVE-2026-1", now.Add(-2*24*time.Hour))
 		f.aged(t, "CVE-2026-2", now.Add(-120*24*time.Hour))
@@ -190,11 +180,7 @@ func TestSomebodyWhoReadsNothingMeasuresNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		f.aged(t, "CVE-2026-1", time.Now().UTC().Add(-5*24*time.Hour))
 		f.closeIt(t, "CVE-2026-1", finding.Upgraded, time.Now().UTC())
 

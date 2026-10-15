@@ -354,11 +354,7 @@ func TestAGroupWhosePlacesDisagreeSaysSo(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		// A second branch of the same product where the scanner says upstream
 		// has published nothing.
 		branch := f.anotherBranchOf(t, f.productID, "2026.06")

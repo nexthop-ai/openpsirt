@@ -20,11 +20,7 @@ func TestAPromiseAcrossBuildsIsOnePromisesDateAndVersion(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		somebody := f.somebodyElse(t)
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		march := time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -87,11 +83,7 @@ func TestThePromiseThatStandsNamesAVersionThenADateThenTheLatestThenTheLaterClai
 			each(t, func(t *testing.T, f *fixture) {
 				ctx := t.Context()
 				f.shipped(t, through(libnl))
-				if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-					found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-				}); err != nil {
-					t.Fatal(err)
-				}
+				f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 				somebody := f.somebodyElse(t)
 				promise := func(issue string, one said) {
 					t.Helper()
@@ -140,11 +132,7 @@ func TestAPlaceUnderTwoPromisesIsCountedOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		somebody := f.somebodyElse(t)
 		june := time.Date(2027, 6, 1, 0, 0, 0, 0, time.UTC)
 		for _, version := range []string{libnl.Version, "3.6.0"} {

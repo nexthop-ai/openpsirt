@@ -36,13 +36,8 @@ func TestAStateIsCountedOverOnlyThePlacesTheOtherConditionsKeep(t *testing.T) {
 	// counted at a place the other conditions dropped would answer the second
 	// question with the first place's agreement.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		if len(places) != 2 {
 			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
@@ -81,11 +76,7 @@ func TestALapsedDecisionFiledUnderAMergedIssueFindsTheGroupOfTheIssueItMergedInt
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "GHSA-aaaa-bbbb-cccc"},
 		}); err != nil {
@@ -114,13 +105,8 @@ func TestSeveralStatesNeedingADecisionEachFindTheirOwnGroups(t *testing.T) {
 	// waiting ones together. Narrowed to either kind alone, the other's groups
 	// drop out of a list that asked for them.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl))
 		by := f.somebodyElse(t)
 		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-1")[swss.Name], "lapsed", libnl.Version, swss.Version, "")
 		f.decidedAt(t, by, f.placesOf(t, "CVE-2026-2")[swss.Name], "proposed", libnl.Version, swss.Version, "waiting")
@@ -153,11 +139,7 @@ func TestAStateOverSeveralBuildsCountsEachBuildsPlacesOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, through(libnl))
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl))
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
 		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
@@ -223,13 +205,8 @@ func TestAnOutcomeHoldsForAGroupOnlyWhereEveryPlaceIsAnsweredThatWay(t *testing.
 	// group is not a dismissal; dismissed at both, it is. Each place is counted
 	// once, so two decided places compare equal to the group's two places.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		if len(places) != 2 {
 			t.Fatalf("the fixture put the issue at %d places, want 2", len(places))
@@ -258,11 +235,7 @@ func TestAGroupHalfHeldIsHeldNeitherByNobodyNorBySomebody(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.foundOnLibnl(t)
 		places := f.placesOf(t, "CVE-2026-1")
 		party := &access.Party{Kind: access.APerson}
 		if _, err := f.db.DB.NewInsert().Model(party).Exec(ctx); err != nil {
