@@ -229,7 +229,7 @@ func TestEveryEnumInTheDocumentIsAListSomethingStates(t *testing.T) {
 		"CVE record statuses": {"affected", "unaffected"},
 		"commit lookups":      {"found", "absent"},
 		"upload answers":      {"queued", "already_held"},
-		"subject kinds":       {"person", "key"},
+		"who answers":         {"person"},
 	}
 
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
