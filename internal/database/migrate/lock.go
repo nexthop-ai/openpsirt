@@ -237,8 +237,9 @@ func heldWhenReleased(released *int) error {
 // blames another instance sends an operator looking for a replica that may not
 // exist, so it names the connection instead.
 //
-// A role without the right to see other sessions sees no user or application
-// on PostgreSQL. The answer is then the process identifier alone.
+// On PostgreSQL every role sees each session's user and application; a role
+// without the right to see other sessions sees neither their state nor their
+// query. Where the server leaves a name empty the answer omits it.
 func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name string) string {
 	asking, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
 	defer cancel()

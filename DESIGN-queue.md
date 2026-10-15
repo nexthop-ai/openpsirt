@@ -145,7 +145,7 @@ update.
 | Release | Handed back on a clean shutdown, by every pass that takes one, once its last cycle has ended, whether the stop arrived during a cycle or between two. A deadline rewrite a request started runs off the request, so it is ended once the server stops taking requests, and the shutdown waits for it to hand its lease back within the same grace. The release runs on a bounded context of its own, because the pass's has ended |
 | Holder | The worker's name: the host and the process an operator reads, and random characters that tell apart two processes sharing both. Replicas on the host's network share its name, and in a container every process is the first |
 | First use | The lease's row is made inside the transaction that takes it, written so that a row another replica made first is left alone. A cluster refuses that write at commit like any other, and the take goes again |
-| Duration | Outlasts a cycle of the work, sized from how often the pass runs rather than how often its subject recurs, so a replica that stops without handing it back holds the work for a few passes. Not renewed mid-pass |
+| Duration | Outlasts a cycle of the work, sized from how often the pass runs rather than how often its subject recurs, so a replica that stops without handing it back holds the work for a few passes. Not renewed mid-pass. A process restarted in place after a crash is a new holder, so it waits out every lease the crashed one held: up to the mail and webhook leases' full length, at one replica as at many |
 
 | Work shape | On losing the race | Passes |
 |---|---|---|
