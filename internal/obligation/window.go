@@ -514,7 +514,7 @@ func limit(ctx context.Context, tx bun.IDB, windowID int64, products []int64) er
 func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 	said WindowSaid) (*Window, error) {
 
-	if err := administers(subject, "declare a window"); err != nil {
+	if err := subject.Administering("declare a window"); err != nil {
 		return nil, err
 	}
 	said, err := windowSaid(said)
@@ -571,7 +571,7 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
 func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int64,
 	said WindowSaid) (*Window, error) {
 
-	if err := administers(subject, "change a window"); err != nil {
+	if err := subject.Administering("change a window"); err != nil {
 		return nil, err
 	}
 	said, err := windowSaid(said)
@@ -665,7 +665,7 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 // Retired rather than deleted: a notice recorded against it keeps naming it,
 // and the name is released so it may be declared again.
 func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int64) error {
-	if err := administers(subject, "retire a window"); err != nil {
+	if err := subject.Administering("retire a window"); err != nil {
 		return err
 	}
 	return s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
@@ -727,14 +727,6 @@ func inForce(ctx context.Context, tx bun.IDB, id int64) (*Window, error) {
 		return nil, err
 	}
 	return &limited[0], nil
-}
-
-// administers refuses anybody but a signed-in administrator the act named.
-func administers(subject access.Subject, act string) error {
-	if !subject.Admin || subject.Kind != access.Person {
-		return access.Denied(act)
-	}
-	return nil
 }
 
 // writing runs do inside one transaction, retried as a whole.

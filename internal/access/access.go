@@ -379,6 +379,19 @@ func (s Subject) ReadsTheDeployment() bool {
 	return s.Kind == Person && (s.Admin || s.Audits)
 }
 
+// Administering refuses anybody but an administrator signed in as a person the
+// act named.
+//
+// A store asks it at its own entry points rather than leaving it to a handler,
+// so a second caller is held to the same rule. What such an act configures is
+// the deployment's, and a pipeline key holds no part of it.
+func (s Subject) Administering(what string) error {
+	if !s.Admin || s.Kind != Person {
+		return Denied(what)
+	}
+	return nil
+}
+
 // NewPipeline returns the subject for a build authenticating with a key.
 func NewPipeline(id int64, name string, scope Scope) Subject {
 	return Subject{Kind: Pipeline, ID: id, Identity: name, scope: &scope}

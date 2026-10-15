@@ -672,17 +672,6 @@ func reachable(address string) error {
 	return nil
 }
 
-// administering refuses anybody but an administrator signed in as a person.
-//
-// The three writes and the read beside them take a subject and ask it here,
-// so the signing secret stays off the wire whatever handler calls them.
-func administering(subject access.Subject, what string) error {
-	if !subject.Admin || subject.Kind != access.Person {
-		return access.Denied(what)
-	}
-	return nil
-}
-
 // Configured is one destination and whether it is working.
 //
 // The fields an operator's question needs, spelled out rather than embedding
@@ -709,7 +698,7 @@ type Configured struct {
 // Refused here rather than at the handler, because that is where the rest of
 // this table's rules live (REQ-42 and REQ-43).
 func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Configured, error) {
-	if err := administering(subject, "read where things go"); err != nil {
+	if err := subject.Administering("read where things go"); err != nil {
 		return nil, err
 	}
 	var rows []struct {
@@ -795,7 +784,7 @@ type Destination struct {
 func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 	d Destination, offered []string) (*Outbound, error) {
 
-	if err := administering(subject, "configure where things go"); err != nil {
+	if err := subject.Administering("configure where things go"); err != nil {
 		return nil, err
 	}
 	row := &Outbound{
@@ -807,7 +796,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		Platform: strings.ToLower(strings.TrimSpace(d.Platform)),
 		URL:      strings.TrimSpace(d.URL), Secret: d.Secret,
 		ProductID: d.ProductID, TeamID: d.TeamID,
-		CreatedBy: subject.ID, CreatedAt: time.Now().UTC().Truncate(time.Microsecond),
+		CreatedBy: subject.ID, CreatedAt: s.now().UTC().Truncate(time.Microsecond),
 	}
 	if row.Platform == "" {
 		row.Platform = Webhook
@@ -833,7 +822,7 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 
-	res, err := s.db.NewUpdate().Model((*Outbound)(nil)).
+	revive := s.db.NewUpdate().Model((*Outbound)(nil)).
 		Set("retired_at = ?", nil).
 		Set("display_name = ?", row.DisplayName).
 		Set("url = ?", row.URL).
@@ -847,30 +836,12 @@ func (s *Store) AddDestination(ctx context.Context, subject access.Subject,
 		Set("created_at = ?", row.CreatedAt).
 		Where("name = ?", row.Name).
 		Where("kind = ?", row.Kind).
-		Where("retired_at IS NOT NULL").
-		Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("take that destination up again: %w", err)
-	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return nil, fmt.Errorf("take that destination up again: %w", err)
-	}
-	if n > 0 {
-		if err := s.db.NewSelect().Model(row).
-			Where("name = ?", row.Name).Where("kind = ?", row.Kind).
-			Limit(1).Scan(ctx); err != nil {
-			return nil, fmt.Errorf("read that destination back: %w", err)
-		}
-		return row, nil
-	}
-	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-		if database.IsDuplicate(err) {
-			// In use under that name and kind, since a retired one was taken
-			// up again above.
-			return nil, fmt.Errorf("%w: %q", ErrDestinationTaken, row.Name)
-		}
-		return nil, fmt.Errorf("record that destination: %w", err)
+		Where("retired_at IS NOT NULL")
+	readBack := s.db.NewSelect().Model(row).
+		Where("name = ?", row.Name).Where("kind = ?", row.Kind).Limit(1)
+	if err := database.TakeUpAgain(ctx, revive, readBack, s.db.NewInsert().Model(row),
+		fmt.Errorf("%w: %q", ErrDestinationTaken, row.Name), "destination"); err != nil {
+		return nil, err
 	}
 	return row, nil
 }
@@ -958,7 +929,7 @@ func deref(s *string) string {
 func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 	name, kind string) (*Outbound, error) {
 
-	if err := administering(subject, "configure where things go"); err != nil {
+	if err := subject.Administering("configure where things go"); err != nil {
 		return nil, err
 	}
 	var retired *Outbound

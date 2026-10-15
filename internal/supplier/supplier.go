@@ -152,19 +152,6 @@ func Mark(address string) string {
 // ErrNameTaken says a supplier is already read under that name.
 var ErrNameTaken = refusal.New("a supplier is already read under that name")
 
-// administering refuses anybody but an administrator.
-//
-// Configuring a supplier admits a third party's judgment into this deployment's
-// evidence and points it at an address of their choosing. It is a deployment
-// decision rather than a product one, held by the same person who configures
-// where notifications go.
-func administering(subject access.Subject, what string) error {
-	if !subject.Admin || subject.Kind != access.Person {
-		return access.Denied(what)
-	}
-	return nil
-}
-
 // inUse narrows to the sources of a product that is still in use.
 //
 // A product taken out of use offers nothing and accepts no scan, and nothing
@@ -185,7 +172,7 @@ func inUse(q *bun.SelectQuery) *bun.SelectQuery {
 // named this morning read this afternoon rather than tomorrow.
 func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Time) ([]Source, error) {
 	if !subject.Unnarrowed() {
-		if err := administering(subject, "read which suppliers are fetched from"); err != nil {
+		if err := subject.Administering("read which suppliers are fetched from"); err != nil {
 			return nil, err
 		}
 	}
@@ -225,7 +212,7 @@ func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Source, er
 
 // For is every supplier configured against one product.
 func (s *Store) For(ctx context.Context, subject access.Subject, productID int64) ([]Source, error) {
-	if err := administering(subject, "read which suppliers are fetched from"); err != nil {
+	if err := subject.Administering("read which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
 	var rows []Source
@@ -250,10 +237,14 @@ func (s *Store) For(ctx context.Context, subject access.Subject, productID int64
 // it takes what was issued while it was away and nothing it already read. How
 // far back that reaches is bounded by the history window a new supplier is
 // read from. Taken up at another address, it starts where a new one does.
+//
+// Only an administrator configures one. A supplier admits a third party's
+// judgment into this deployment's evidence and points it at an address of
+// their choosing, which is a deployment decision rather than a product one.
 func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64,
 	name, address string) (*Source, error) {
 
-	if err := administering(subject, "configure which suppliers are fetched from"); err != nil {
+	if err := subject.Administering("configure which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
 	typed := strings.TrimSpace(name)
@@ -291,7 +282,7 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		ProductID: productID, Name: folded, Display: typed, URL: address,
 		CreatedBy: subject.ID, CreatedAt: now,
 	}
-	res, err := s.db.NewUpdate().Model((*Source)(nil)).
+	revive := s.db.NewUpdate().Model((*Source)(nil)).
 		// The mark is kept only where the address is the one it was read
 		// at. An address never read has nothing behind it this supplier has
 		// seen, so it starts where a new one does. Ahead of the address
@@ -311,31 +302,15 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		Set("failed = ?", "").
 		Where("product_id = ?", productID).
 		Where("name = ?", folded).
-		Where("retired_at IS NOT NULL").
-		Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("take that supplier up again: %w", err)
-	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return nil, fmt.Errorf("take that supplier up again: %w", err)
-	}
-	if n > 0 {
-		if err := s.db.NewSelect().Model(row).
-			Where("sp.product_id = ?", productID).Where("sp.name = ?", folded).
-			Limit(1).Scan(ctx); err != nil {
-			return nil, fmt.Errorf("read that supplier back: %w", err)
-		}
-		return row, nil
-	}
-	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-		// A name already in use is somebody adding the same supplier twice,
-		// which is an answer rather than a fault: the row it collides with is
-		// one they can see.
-		if database.IsDuplicate(err) {
-			return nil, fmt.Errorf("%w: %q", ErrNameTaken, typed)
-		}
-		return nil, fmt.Errorf("record that supplier: %w", err)
+		Where("retired_at IS NOT NULL")
+	readBack := s.db.NewSelect().Model(row).
+		Where("sp.product_id = ?", productID).Where("sp.name = ?", folded).Limit(1)
+	// A name already in use is somebody adding the same supplier twice, which
+	// is an answer rather than a fault: the row it collides with is one they
+	// can see.
+	if err := database.TakeUpAgain(ctx, revive, readBack, s.db.NewInsert().Model(row),
+		fmt.Errorf("%w: %q", ErrNameTaken, typed), "supplier"); err != nil {
+		return nil, err
 	}
 	return row, nil
 }
@@ -358,7 +333,7 @@ func (s *Store) productInUse(ctx context.Context, productID int64) (bool, error)
 func (s *Store) Retire(ctx context.Context, subject access.Subject, productID int64,
 	name string) (*Source, error) {
 
-	if err := administering(subject, "configure which suppliers are fetched from"); err != nil {
+	if err := subject.Administering("configure which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
 	// The row is answered so the caller names it as it is stored, whatever

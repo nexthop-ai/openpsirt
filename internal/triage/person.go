@@ -47,8 +47,8 @@ type Record struct {
 // and a count taken over every product's decisions is taken over decisions.
 // The page leaves the block out rather than refusing.
 func (s *Store) RecordOf(ctx context.Context, subject access.Subject, personID int64) (Record, error) {
-	if !subject.Admin || subject.Kind != access.Person {
-		return Record{}, access.Denied("read somebody else's part in the record")
+	if err := subject.Administering("read somebody else's part in the record"); err != nil {
+		return Record{}, err
 	}
 	var out Record
 
