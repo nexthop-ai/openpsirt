@@ -157,6 +157,7 @@ components:
           minLength: 1
           type: string
         name:
+          description: "What to call it. Matched without regard to capitals: a name differing from one in use only in capitals names that one"
           maxLength: 191
           minLength: 1
           type: string
@@ -7182,7 +7183,7 @@ components:
           description: The notifications that go here, or * for all of them
           type: string
         name:
-          description: The name, so a log line and a screen can use it
+          description: The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling
           type: string
         platform:
           description: "How it is reached: a signed request, or a chat platform"

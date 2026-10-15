@@ -1921,7 +1921,7 @@ starts read them, so they stay in the environment beside a file.</p>
 <tr>
 <td><code>OPENPSIRT_ADDR</code></td>
 <td><code>server.address</code></td>
-<td>The <code>host:port</code> the HTTP server listens on</td>
+<td>The <code>host:port</code> the HTTP server listens on. The image's health check, <code>openpsirt health</code>, asks the server there. A container configured by file replaces the image's check with <code>openpsirt health --config &lt;file&gt;</code>, because the image's check names no file</td>
 <td><code>:8080</code></td>
 </tr>
 <tr>
@@ -1945,7 +1945,7 @@ starts read them, so they stay in the environment beside a file.</p>
 <tr>
 <td><code>OPENPSIRT_STARTUP_TIMEOUT</code></td>
 <td><code>server.startup_timeout</code></td>
-<td>How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on</td>
+<td>How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. <code>openpsirt migrate</code> connects within it too, and migrates without a bound. Past it the process stops and names what it was waiting on</td>
 <td><code>60s</code></td>
 </tr>
 <tr>
@@ -2075,6 +2075,14 @@ read.</p>
 <tr>
 <td>A PostgreSQL URL says nothing and <code>PGSSLMODE</code> is set</td>
 <td>The environment's mode is judged in the URL's place: <code>require</code>, <code>verify-ca</code> and <code>verify-full</code> are left to apply, <code>prefer</code> and <code>allow</code> become <code>require</code>, and <code>disable</code> is refused</td>
+</tr>
+<tr>
+<td>A PostgreSQL URL names a service</td>
+<td>The service file's mode is judged too: the URL, the environment and the service file together must leave no attempt in cleartext, or the process refuses to start</td>
+</tr>
+<tr>
+<td>A PostgreSQL query pair cannot be read</td>
+<td>Refused at startup. The driver drops it, so the mode it held is replaced by the driver's default</td>
 </tr>
 <tr>
 <td>The URL asks for cleartext</td>
@@ -2234,13 +2242,11 @@ it, which <code>signin.claim-window</code> also bounds.</p>
 <p><code>preferred_username</code> rides on the <code>profile</code> scope rather than <code>email</code>. The
 scopes requested are <code>openid profile email</code> and are not configurable, so a
 claim carried by any of the three is available.</p>
-<p>A claim the provider does not send, or sends as something other than a string,
-reads as absent. The sign-in then falls back to the address the provider says
-it verified, and failing that to the subject — which matches no authorization
-anybody typed, so the person is refused rather than admitted. A claim name
-with a typo in it therefore reads as "this person was never granted access",
-not as a configuration error, so check the name against the provider's own
-token before deciding somebody's grant is missing.</p>
+<p>A claim the provider does not send, or sends empty or as something other than
+a string, refuses the sign-in. Nothing stands in for it: not the address the
+provider verified, and not the subject. The person sees only that they were
+not let in, and the log line <code>a sign-in could not be completed</code> names the claim
+that was missing, so a claim name with a typo in it shows up there.</p>
 <h3 id="github">GitHub<a class="headerlink" href="#github" title="Permanent link">&para;</a></h3>
 <p>One sign-in provider is configured at a time. Setting a GitHub client id
 beside an OpenID Connect issuer stops the process.</p>
@@ -2379,7 +2385,7 @@ set.</p>
 </tr>
 <tr>
 <td><code>networkPolicy.ingressController.podLabels</code></td>
-<td>The labels of its pods, replacing the defaults the same way</td>
+<td>The labels of its pods, replacing the defaults the same way. Refused at render without <code>namespaceLabels</code>, because a pod with these labels can be created in any namespace</td>
 <td>ingress-nginx's, where neither is set</td>
 </tr>
 <tr>
@@ -2841,7 +2847,7 @@ people direct messages.</p>
 <tr>
 <td><code>OPENPSIRT_ZULIP_SITE</code></td>
 <td><code>chat.zulip.site</code></td>
-<td>The Zulip server's https address, e.g. <code>https://chat.example.com</code></td>
+<td>The Zulip server's https address, e.g. <code>https://chat.example.com</code>. Refused at startup if it carries a path, a query, a fragment or credentials</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -3011,7 +3017,7 @@ web server serves them, at the address you give below.</p>
 <tr>
 <td><code>OPENPSIRT_DIRECTORY_URL</code></td>
 <td><code>directory.url</code></td>
-<td>The <code>https</code> address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an <code>https</code> address, or carries a query, a fragment or credentials. A value that is only whitespace is unset</td>
+<td>The <code>https</code> address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an <code>https</code> address, or carries a query (an empty one included), a fragment or credentials. A value that is only whitespace is unset</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -3065,7 +3071,7 @@ web server serves them, at the address you give below.</p>
 <tr>
 <td><code>OPENPSIRT_DIRECTORY_DIR</code></td>
 <td><code>directory.dir</code></td>
-<td>A directory on this machine to write the files into instead. The bucket wins where both are set</td>
+<td>A directory on this machine to write the files into instead. The bucket wins where both are set. Refused at startup where it is, holds or sits inside <code>OPENPSIRT_ATTACHMENT_DIR</code>, and a bucket is refused where it is the attachment bucket on the same endpoint</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -3304,8 +3310,7 @@ alone.</p>
 </table>
 <pre><code>OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
 </code></pre>
-<p>The chart sets it from <code>outbound.excluded</code>. Its earlier name,
-<code>OPENPSIRT_PATCH_EXCLUDED</code>, is refused at startup.</p>
+<p>The chart sets it from <code>outbound.excluded</code>.</p>
 <h2 id="supplier-advisories">Supplier advisories<a class="headerlink" href="#supplier-advisories" title="Permanent link">&para;</a></h2>
 <p>Off unless an administrator names a supplier, under Settings. Each is named
 against one product, and what is read lands as evidence beside a finding — a

@@ -850,7 +850,7 @@ install needs and which setting each value sets.</p>
 <tbody>
 <tr>
 <td><code>database.url</code> or <code>database.existingSecret</code></td>
-<td>The database. SQLite is for a single-pod trial, and the chart refuses it beside a second replica</td>
+<td>The database. SQLite is for a single-pod trial, and the chart refuses it beside a second replica. Its file lives under <code>/var/lib/openpsirt</code>, as <code>sqlite:///var/lib/openpsirt/openpsirt.db</code>, on scratch space unless <code>database.sqlite.existingClaim</code> names a claim. The chart cannot read a URL held in <code>database.existingSecret</code>, so it mounts nothing for SQLite there and refuses <code>database.sqlite.existingClaim</code> beside it: use <code>database.url</code> for a trial</td>
 </tr>
 <tr>
 <td><code>auth.baseURL</code></td>
@@ -1149,7 +1149,7 @@ through <code>extraEnv</code>, which takes entries in the Kubernetes <code>env</
 <tr>
 <td><code>outbound.excluded</code></td>
 <td><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></td>
-<td><a href="../configuration/#outbound-exclusions">Outbound exclusions</a>. The chart refuses to render with its earlier key, <code>patchBranches.excluded</code>, set</td>
+<td><a href="../configuration/#outbound-exclusions">Outbound exclusions</a></td>
 </tr>
 <tr>
 <td><code>scanner.cacheDir</code>, as its <code>cve-records</code> directory</td>

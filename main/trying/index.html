@@ -752,7 +752,7 @@
 <p>Two ways, for two different questions. The published image answers "what does
 this thing do"; the checkout answers "what does my change do".</p>
 <h2 id="the-published-image">The published image<a class="headerlink" href="#the-published-image" title="Permanent link">&para;</a></h2>
-<pre><code>docker run -p 8080:8080 \
+<pre><code>docker run -p 127.0.0.1:8080:8080 \
   -v &quot;$PWD/openpsirt-data:/data&quot; \
   -e OPENPSIRT_DATABASE_URL=&quot;sqlite:///data/openpsirt.db&quot; \
   -e OPENPSIRT_ADDR=&quot;0.0.0.0:8080&quot; \
@@ -768,7 +768,9 @@ one port. The Helm chart is published beside the image, as
 <div class="admonition warning">
 <p class="admonition-title">Not a small production deployment</p>
 <p>Plain HTTP, and administration handed to whoever a header says they are.
-It is for looking at.</p>
+It is for looking at. The port is published on this machine alone,
+because anybody who reaches it from an address in the trusted ranges and
+sends the header is that person.</p>
 </div>
 <h3 id="sign-in">Sign-in<a class="headerlink" href="#sign-in" title="Permanent link">&para;</a></h3>
 <p>Nothing creates an account and no path admits an unknown arrival, so a
@@ -806,9 +808,12 @@ range. A header from anywhere else is refused and logged, and the refusal
 says only "not authorized" — the log is where it says why.</p>
 </div>
 <h2 id="from-a-checkout">From a checkout<a class="headerlink" href="#from-a-checkout" title="Permanent link">&para;</a></h2>
-<pre><code>make demo                    # build, start, seed two products, print the address
-make demo DEMO_HOST=yourbox  # if you browse by something other than localhost
+<pre><code>make demo                                      # build, start, seed two products, print the address
+make demo DEMO_BIND=0.0.0.0 DEMO_HOST=yourbox  # to browse from another machine, by this one's name
 </code></pre>
+<p>The demo and <code>make dev</code> listen on this machine alone unless <code>DEMO_BIND</code> says
+otherwise. Every request through them is signed in as somebody, the first door
+as an administrator, so anybody who can reach them is that person.</p>
 <p>Docker is all you need, plus <code>curl</code> and <code>xz</code> to read the compressed fixtures.
 The image builds the interface and the binary inside itself and carries the
 scanner, and it builds from your working tree — so what comes up is your
