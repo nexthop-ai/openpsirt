@@ -149,6 +149,47 @@ type movedRow struct {
 	Has     int    `bun:"has"`
 }
 
+// folder gathers rows into one per name, version and scan, in the order each
+// was first seen. Two components spelling one name in different capitals fold
+// into one row, which shows the spelling that sorts first so that the screen
+// does not depend on the order the database answered in.
+type folder struct {
+	rows  map[foldKey]*movedRow
+	order []foldKey
+}
+
+type foldKey struct {
+	at            int64
+	name, version string
+}
+
+// add is the row for one name at one version and scan, made where it is the
+// first.
+func (f *folder) add(at int64, name, display, version string) *movedRow {
+	k := foldKey{at, name, version}
+	row, ok := f.rows[k]
+	if !ok {
+		if f.rows == nil {
+			f.rows = map[foldKey]*movedRow{}
+		}
+		row = &movedRow{At: at, Name: name, Display: display, Version: version}
+		f.rows[k] = row
+		f.order = append(f.order, k)
+	} else if display < row.Display {
+		row.Display = display
+	}
+	return row
+}
+
+// folded is every row, in the order each was first added.
+func (f *folder) folded() []movedRow {
+	rows := make([]movedRow, 0, len(f.order))
+	for _, k := range f.order {
+		rows = append(rows, *f.rows[k])
+	}
+	return rows
+}
+
 // moved reads every version of every name one of these scans moved, with what
 // each scan found there and what it left.
 //
@@ -252,23 +293,10 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 	// what makes "the same name at a different set of versions" answerable:
 	// the page of receipts counts those rows and the listing of one scan reads
 	// the strings off them.
-	type key struct {
-		at            int64
-		name, version string
-	}
-	folded := map[key]*movedRow{}
-	var order []key
+	var fold folder
 	for _, node := range nodes {
 		for _, at := range touched[node.Name] {
-			k := key{at, node.Name, node.Version}
-			row, ok := folded[k]
-			if !ok {
-				row = &movedRow{At: at, Name: node.Name, Display: node.Display, Version: node.Version}
-				folded[k] = row
-				order = append(order, k)
-			} else if node.Display < row.Display {
-				row.Display = node.Display
-			}
+			row := fold.add(at, node.Name, node.Display, node.Version)
 			// Present immediately before the scan, and present at it. A row
 			// the scan closed was still there on the near side of it, which is
 			// why one bound is inclusive and the other is not.
@@ -280,11 +308,7 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 			}
 		}
 	}
-	rows := make([]movedRow, 0, len(order))
-	for _, k := range order {
-		rows = append(rows, *folded[k])
-	}
-	return rows, nil
+	return fold.folded(), nil
 }
 
 // Change is what one scan did to one name in a build's inventory.

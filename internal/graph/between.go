@@ -75,11 +75,9 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 	}
 
 	// One row per version of a name, standing on the first side, the second,
-	// or both. The fold reads the rows of one comparison under one key, and
-	// this comparison is the only one here.
-	type key struct{ name, version string }
-	folded := map[key]*movedRow{}
-	var order []key
+	// or both. The fold reads the rows of one comparison under one scan, and
+	// this comparison is the only one here, so every row is at scan zero.
+	var fold folder
 	held := map[int64]bool{}
 	for _, node := range nodes {
 		held[node.Target] = true
@@ -88,15 +86,7 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 			// and its name differs per variant.
 			continue
 		}
-		k := key{node.Name, node.Version}
-		row, ok := folded[k]
-		if !ok {
-			row = &movedRow{Name: node.Name, Display: node.Display, Version: node.Version}
-			folded[k] = row
-			order = append(order, k)
-		} else if node.Display < row.Display {
-			row.Display = node.Display
-		}
+		row := fold.add(0, node.Name, node.Display, node.Version)
 		// One build compared with itself stands on both sides of every row,
 		// which is no change anywhere.
 		if node.Target == fromID {
@@ -110,9 +100,5 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		return nil, 0, ErrNoInventory
 	}
 
-	rows := make([]movedRow, 0, len(order))
-	for _, k := range order {
-		rows = append(rows, *folded[k])
-	}
-	return paged(changed(rows)[0], only, limit, offset)
+	return paged(changed(fold.folded())[0], only, limit, offset)
 }

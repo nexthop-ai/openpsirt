@@ -124,6 +124,32 @@ func TestTheListingAndTheCountsAreOneAnswer(t *testing.T) {
 	})
 }
 
+func TestOneVersionSpelledTwoWaysIsOneSideOfOneChange(t *testing.T) {
+	// Two producers capitalizing one dependency differently, at one version,
+	// are one version of one name, shown in the spelling that sorts first.
+	each(t, func(t *testing.T, f *fixture) {
+		applied(t, f, tree())
+
+		bumped := at("openssl", "3.0.12")
+		shouted := graph.Described{
+			Purl: "pkg:generic/OpenSSL@3.0.12", Name: "OpenSSL", Version: "3.0.12",
+		}
+		next := graph.Snapshot{
+			Root: root, Components: []graph.Described{bumped, shouted, curl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: root, Child: bumped},
+				{Parent: root, Child: shouted},
+			},
+		}
+		got := spelled(changes(t, f, applied(t, f, next)))
+		want := []string{"changed OpenSSL [3.0.11] -> [3.0.12]"}
+		if strings.Join(got, "; ") != strings.Join(want, "; ") {
+			t.Errorf("the listing reads %v, want %v", got, want)
+		}
+	})
+}
+
 func TestANameAtTwoVersionsListsBothSides(t *testing.T) {
 	// What makes the row worth reading: the count says a name moved, and only
 	// the versions say what a vendored tree did with it.
