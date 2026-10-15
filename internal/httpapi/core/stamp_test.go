@@ -53,7 +53,7 @@ func TestEveryMomentAResponseStatesGoesThroughStamp(t *testing.T) {
 			return nil
 		}
 		examined++
-		source, err := os.ReadFile(path)
+		source, err := os.ReadFile(path) //nolint:gosec // G304: this repository's own source
 		if err != nil {
 			return err
 		}

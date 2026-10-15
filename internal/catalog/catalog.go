@@ -988,29 +988,6 @@ func (s *Store) ProductByID(ctx context.Context, id int64) (*Product, error) {
 	return p, nil
 }
 
-// StreamByID names a branch or tag already known by identifier.
-//
-// Beside ProductByID because a credential and a target both carry identifiers
-// and a screen showing either has to say the name somebody typed.
-func (s *Store) StreamByID(ctx context.Context, id int64) (*Stream, error) {
-	row := new(Stream)
-	if err := s.db.NewSelect().Model(row).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, missingOr(err, fmt.Sprintf("stream %d", id),
-			fmt.Sprintf("look up stream %d", id))
-	}
-	return row, nil
-}
-
-// VariantByID names a variant already known by identifier.
-func (s *Store) VariantByID(ctx context.Context, id int64) (*Variant, error) {
-	row := new(Variant)
-	if err := s.db.NewSelect().Model(row).Where("id = ?", id).Scan(ctx); err != nil {
-		return nil, missingOr(err, fmt.Sprintf("variant %d", id),
-			fmt.Sprintf("look up variant %d", id))
-	}
-	return row, nil
-}
-
 // ExistingTarget finds a release built as a variant, without recording one.
 //
 // Reading is not filing. Asking what is open against a build that has never
