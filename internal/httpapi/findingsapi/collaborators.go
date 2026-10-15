@@ -315,10 +315,6 @@ func caseAtHolding(ctx context.Context, in core.Deps, product, vulnerability str
 	if err != nil {
 		return access.Subject{}, nil, 0, 0, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, 0, 0,
-			core.NoDatabase(in.Logger)
-	}
 	// A route about one named issue, so the wider of the two rules: somebody
 	// brought into a case here holds nothing on the product and is still
 	// answering about the one issue they were granted. Their reach over it is

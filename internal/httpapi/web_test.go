@@ -9,8 +9,10 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // built stands in for the frontend's output: a page, a hashed asset beside it,
@@ -24,7 +26,9 @@ func built() fstest.MapFS {
 
 func serving(t *testing.T, files fstest.MapFS) http.Handler {
 	t.Helper()
+	gone := dbtest.Closed(t)
 	handler, _ := httpapi.New(nil, nil, core.Deps{
+		DB: gone, Queue: queue.New(gone, queue.DefaultOptions()),
 		Interface: core.Interface{Files: files},
 	})
 	return handler
@@ -138,7 +142,8 @@ func TestThePageIsNeverCached(t *testing.T) {
 func TestABinaryBuiltWithoutTheInterfaceServesTheAPIAlone(t *testing.T) {
 	// A checkout with no node toolchain still has to build and serve. What it
 	// must not do is answer as though a page were there.
-	handler, _ := httpapi.New(nil, nil, core.Deps{})
+	gone := dbtest.Closed(t)
+	handler, _ := httpapi.New(nil, nil, core.Deps{DB: gone, Queue: queue.New(gone, queue.DefaultOptions())})
 	got := fetch(t, handler, http.MethodGet, "/products")
 	if got.Code != http.StatusUnauthorized {
 		t.Errorf("a binary with no interface answered %d, want 401: %q", got.Code, got.Body.String())

@@ -180,10 +180,6 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			}
 		}
 
-		if in.DB == nil {
-			return &struct{ Body WhoBody }{Body: body}, nil
-		}
-
 		// The display name, where one is recorded. Falls back to the identity
 		// rather than to nothing, so a header never renders blank.
 		named, err := access.NewStore(in.DB.DB).Names(ctx, []int64{subject.ID})

@@ -185,8 +185,5 @@ func keeping(ctx context.Context, in core.Deps) (access.Subject, *saved.Store, e
 		return access.Subject{}, nil, huma.Error403Forbidden(
 			"a saved filter belongs to somebody, and this credential is not somebody")
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, core.NoDatabase(in.Logger)
-	}
 	return who, saved.NewStore(in.DB.DB), nil
 }

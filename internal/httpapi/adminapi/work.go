@@ -112,9 +112,6 @@ func registerWork(api huma.API, in core.Deps) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return &answer{}, nil
-		}
 		data, err := notify.NewWatch(in.DB.DB, in.Log()).DataInForce(ctx)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger,
@@ -167,9 +164,6 @@ func registerWork(api huma.API, in core.Deps) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		if in.Queue == nil {
-			return &answer{}, nil
-		}
 		jobs, total, err := in.Queue.SetAside(ctx, 0)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "work that was set aside could not be read", err)
@@ -216,9 +210,6 @@ func registerWork(api huma.API, in core.Deps) {
 	}) (*struct{}, error) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
-		}
-		if in.Queue == nil {
-			return nil, huma.Error404NotFound("there is no queue here")
 		}
 		if err := in.Queue.Requeue(ctx, in2.ID); err != nil {
 			if errors.Is(err, queue.ErrNotSetAside) {

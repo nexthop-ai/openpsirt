@@ -78,9 +78,6 @@ func readersHere(ctx context.Context, in core.Deps, product, visibility string) 
 	if err != nil {
 		return access.Subject{}, nil, "", err
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, "", core.NoDatabase(in.Log())
-	}
 	named, err := core.ProductNamedVisibly(ctx, in, subject, product)
 	if err != nil {
 		return access.Subject{}, nil, "", err

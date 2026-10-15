@@ -192,9 +192,6 @@ func outOfSupport(ctx context.Context, in core.Deps, asked core.ScopeQuery,
 	if err != nil {
 		return nil, err
 	}
-	if in.DB == nil {
-		return nil, core.NoDatabase(in.Logger)
-	}
 	scope, err := core.Scoped(ctx, in, subject, asked)
 	if err != nil {
 		return nil, err

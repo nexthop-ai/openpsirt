@@ -146,9 +146,6 @@ func registerComponent(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		asked := input.ScopeQuery
 		asked.Product = input.Product
 		scope, err := core.Scoped(ctx, in, subject, asked)

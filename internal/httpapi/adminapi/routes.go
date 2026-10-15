@@ -32,15 +32,9 @@ func Register(api huma.API, in core.Deps) {
 	registerCatalog(api, core.Declaring{
 		DB: in.DB, Store: in.Catalog, Logger: in.Logger,
 		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
 			return finding.NewStore(in.DB.DB)
 		},
 		Scans: func() *ingest.Store {
-			if in.DB == nil {
-				return nil
-			}
 			return ingest.NewStore(in.DB.DB)
 		},
 		RewriteDeadlines: deadlinesRewritten(in),
@@ -48,9 +42,6 @@ func Register(api huma.API, in core.Deps) {
 	registerAdministration(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
 		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
 			return finding.NewStore(in.DB.DB)
 		},
 		Settings: in.Settings,
@@ -61,9 +52,6 @@ func Register(api huma.API, in core.Deps) {
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
 		// Deactivating somebody hands back what they were dealing with.
 		Findings: func() *finding.Store {
-			if in.DB == nil {
-				return nil
-			}
 			return finding.NewStore(in.DB.DB)
 		},
 	})

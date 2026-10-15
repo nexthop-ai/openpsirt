@@ -28,7 +28,7 @@ import (
 // be done by hand is the step every pipeline works around.
 type Declaring struct {
 	// DB is the database a declaration and the record of it are written on, in
-	// one transaction. Nil where this process has no database.
+	// one transaction.
 	DB *database.DB
 	// Store is built over whatever handle the caller is writing on: the
 	// transaction, where a declaration is being made, and the pooled handle
@@ -51,13 +51,7 @@ type Declaring struct {
 }
 
 // Handle is the database a read-only route builds its store over.
-//
-// Named rather than written as d.DB at each site: a nil *database.DB handed to
-// an interface parameter is an interface that is not nil.
 func (d Declaring) Handle() bun.IDB {
-	if d.DB == nil {
-		return nil
-	}
 	return d.DB.DB
 }
 
@@ -254,32 +248,13 @@ func Refused(logger *slog.Logger, err error, what string) error {
 	return WentWrong(logger, what, err)
 }
 
-// StoreFor gives the handlers a catalog, or says plainly that this process
-// has none.
-//
-// db is the handle it builds it over: the transaction a declaration is being
-// made in, or handle() where the route only reads.
-func StoreFor(d Declaring, db bun.IDB) (*catalog.Store, error) {
-	if d.Store == nil || db == nil {
-		return nil, NoDatabase(d.Logger)
-	}
-	store := d.Store(db)
-	if store == nil {
-		return nil, NoDatabase(d.Logger)
-	}
-	return store, nil
-}
-
 // ProductIn resolves a product by name inside db, with the catalog store over
 // db. A name that resolves to nothing is refused as undeclared, and the
 // refusal names the product.
 func ProductIn(ctx context.Context, d Declaring, db bun.IDB,
 	product string) (*catalog.Store, *catalog.Product, error) {
 
-	store, err := StoreFor(d, db)
-	if err != nil {
-		return nil, nil, err
-	}
+	store := d.Store(db)
 	found, err := store.ProductByName(ctx, product)
 	if err != nil {
 		return nil, nil, Undeclared(d.Logger, err, "that product could not be looked up")

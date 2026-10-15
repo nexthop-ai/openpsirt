@@ -141,9 +141,6 @@ func registerEntry(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		names := catalog.NewStore(in.DB.DB)
 		targets := make([]int64, 0, len(input.Body.Builds))
 		for _, build := range input.Body.Builds {
@@ -277,9 +274,6 @@ func registerResolution(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
@@ -341,9 +335,6 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
 		if err != nil {
@@ -627,9 +618,6 @@ func registerMovements(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		rows, total, err := finding.NewStore(in.DB.DB).PendingPage(ctx, subject,
 			input.Limit, input.Offset)
 		if err != nil {
@@ -690,9 +678,6 @@ func registerMovements(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		store := finding.NewStore(in.DB.DB)
 		agreed, err := store.AgreeToMovement(ctx, subject, input.ID)
@@ -784,10 +769,6 @@ func embargoAt(ctx context.Context, in core.Deps, productName, issueName string)
 	subject, err := core.Reading(ctx)
 	if err != nil {
 		return subject, nil, 0, 0, err
-	}
-	if in.DB == nil {
-		return subject, nil, 0, 0,
-			core.NoDatabase(in.Logger)
 	}
 	product, err := core.ProductNamedVisibly(ctx, in, subject, productName)
 	if err != nil {
@@ -891,9 +872,6 @@ func registerAffects(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		// The rule for a route about one named issue, which is what this is —
 		// and it is the rule the build lookup below applies. Gated on the

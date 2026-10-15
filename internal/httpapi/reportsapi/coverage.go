@@ -169,9 +169,6 @@ func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]inges
 	if err != nil {
 		return nil, 0, err
 	}
-	if in.DB == nil {
-		return nil, 0, core.NoDatabase(in.Logger)
-	}
 	scope, err := core.Scoped(ctx, in, subject, q)
 	if err != nil {
 		return nil, 0, err

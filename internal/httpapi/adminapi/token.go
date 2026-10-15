@@ -258,9 +258,6 @@ func mine(ctx context.Context, in core.Deps) (access.Subject, *access.Store, *ca
 	if err != nil {
 		return access.Subject{}, nil, nil, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, nil, core.NoDatabase(in.Logger)
-	}
 	return subject, access.NewStore(in.DB.DB), catalog.NewStore(in.DB.DB), nil
 }
 

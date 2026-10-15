@@ -111,9 +111,6 @@ func registerTags(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Log())
-		}
 		named, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err

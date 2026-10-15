@@ -72,9 +72,6 @@ func registerPatchBranches(api huma.API, in core.Deps) {
 		}
 		out := &PatchBranchesOutput{}
 		out.Body.Repositories = []PatchRepositoryBody{}
-		if in.DB == nil {
-			return out, nil
-		}
 		out.Body.On = in.PatchBranches
 		repositories, totals, err := patchbranch.Progress(ctx, in.DB.DB, in.Excluded)
 		if err != nil {

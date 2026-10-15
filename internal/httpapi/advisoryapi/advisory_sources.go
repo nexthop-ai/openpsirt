@@ -59,9 +59,6 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
@@ -130,9 +127,6 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
@@ -197,9 +191,6 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		by, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename committing

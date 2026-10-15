@@ -199,8 +199,8 @@ func Hide(t *testing.T, db bun.IDB, table string) (restore func()) {
 
 // Closed is a database every call to fails: one that was opened and closed.
 //
-// Opened first, because a handler refuses a missing database with an answer
-// of its own, which is a different arm.
+// Opened first, because a process with no database answers every request
+// from the router, which is a different arm.
 func Closed(t *testing.T) *database.DB {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "gone.db")

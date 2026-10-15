@@ -185,9 +185,6 @@ func registerAttachments(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		productID, vulnerabilityID, err := files.Issue(ctx, subject, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that issue could not be looked up",
@@ -230,7 +227,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil || !files.Configured() {
+		if !files.Configured() {
 			return nil, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
 		}
 		row, address, body, err := files.Fetch(ctx, subject, input.Token, signedFor)
@@ -284,7 +281,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil || !files.Configured() {
+		if !files.Configured() {
 			return nil, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
 		}
 		err = files.Redact(ctx, subject, input.Token, input.Body.Reason)
@@ -332,7 +329,7 @@ func issueAttaching(ctx context.Context, in core.Deps, product, vulnerability st
 		return access.Subject{}, attach.Against{}, err
 	}
 	files := in.Attachments()
-	if files == nil || !files.Configured() {
+	if !files.Configured() {
 		return access.Subject{}, attach.Against{}, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
 	}
 	productID, vulnerabilityID, err := files.Issue(ctx, subject, product, vulnerability)

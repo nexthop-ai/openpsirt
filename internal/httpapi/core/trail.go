@@ -28,9 +28,6 @@ import (
 func Changing(ctx context.Context, db *database.DB, logger *slog.Logger,
 	do func(ctx context.Context, tx bun.Tx) error) error {
 
-	if db == nil {
-		return NoDatabase(logger)
-	}
 	return database.InTransaction(ctx, db.DB, do)
 }
 

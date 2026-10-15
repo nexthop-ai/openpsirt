@@ -152,9 +152,6 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		// The same handling the cross-product list gives severity: the line is
 		// applied per row inside the store, and asking for it as a filter as
 		// well would narrow twice and answer neither question.

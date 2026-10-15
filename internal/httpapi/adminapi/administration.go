@@ -787,7 +787,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 // handsBack is whether this deployment hands back the work of somebody whose
 // last role in a product went.
 func handsBack(a core.Administering) bool {
-	return a.Findings != nil && a.Findings() != nil
+	return a.Findings != nil
 }
 
 // timeFormat is how a moment is reported.
@@ -805,14 +805,7 @@ func mintable(ctx context.Context, a core.Administering, db bun.IDB) (*access.St
 // claimWindowIn is how long an authorization stays redeemable, read through
 // the handle of the act that writes one.
 func claimWindowIn(ctx context.Context, a core.Administering, db bun.IDB) (time.Duration, error) {
-	if a.Settings == nil {
-		return access.DefaultClaimWindow, nil
-	}
-	settings := a.Settings(db)
-	if settings == nil {
-		return access.DefaultClaimWindow, nil
-	}
-	window, err := settings.Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
+	window, err := a.Settings(db).Duration(ctx, setting.ClaimWindow, access.DefaultClaimWindow)
 	if err != nil {
 		return 0, core.WentWrong(a.Logger, "cannot read how long an authorization stays redeemable", err)
 	}
@@ -828,7 +821,7 @@ func readable(ctx context.Context, a core.Administering, db bun.IDB) (*access.St
 	if err := core.ReadingTheDeployment(ctx); err != nil {
 		return nil, nil, err
 	}
-	return core.Stores(a, db)
+	return a.Access(db), a.Catalog(db), nil
 }
 
 // held is one thing somebody holds over the deployment: what it is called in

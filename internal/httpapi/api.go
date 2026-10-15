@@ -157,6 +157,9 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
 	router.Use(browserHeaders(policyFor(in.Interface.Files)))
+	if in.DB == nil || in.Queue == nil {
+		router.Use(unconfigured(in.Log()))
+	}
 	// One resolution step, before any handler. Doing it here rather than in
 	// each handler is the whole point: a handler that forgets is a handler
 	// answering for everybody, and the forgetting is invisible until somebody
@@ -378,6 +381,27 @@ var open = map[string]bool{
 // A route added here is checked against what sign-in touches. Nothing under
 // this prefix is harmless by construction.
 const openPrefix = "/v1/sign-in/"
+
+// unconfigured answers every request but the probes for a process built
+// without a database or a queue, before a caller is resolved.
+//
+// No handler is reached without both, so no handler guards against either.
+// The one sentence says nothing about the request, because the caller did not
+// cause it and cannot fix it. Logged, because otherwise the only trace of a
+// deployment wired up wrong is a 500 with a sentence in it.
+func unconfigured(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logger.Error("this process has no database or queue behind it, so it can answer nothing",
+				"path", r.URL.Path)
+			Problem(w, http.StatusInternalServerError, "this deployment is not fully configured")
+		})
+	}
+}
 
 // refuse answers somebody unrecognized.
 //

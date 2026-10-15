@@ -99,9 +99,6 @@ func ScopedFloor(ctx context.Context, in Deps, q ScopeQuery,
 	if err != nil {
 		return access.Subject{}, none, finding.Floor{}, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, none, finding.Floor{}, NoDatabase(in.Logger)
-	}
 	scope, err := Scoped(ctx, in, subject, q)
 	if err != nil {
 		return subject, none, finding.Floor{}, err

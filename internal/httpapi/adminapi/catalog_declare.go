@@ -42,10 +42,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 		}
 		var out *core.DeclaredOutput[core.ProductBody]
 		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, err := core.StoreFor(d, tx)
-			if err != nil {
-				return err
-			}
+			store := d.Store(tx)
 			product, did, err := store.EnsureProduct(ctx, in.Body.Name, in.Body.DisplayName)
 			if err != nil {
 				return core.DeclineDeclaration(d.Logger, err)

@@ -22,13 +22,24 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
-	h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
+	h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, unreached(t))
 	return h
+}
+
+// unreached is a process wired as a served one is, over a database every call
+// to fails. A route that answers before reading anything answers the same over
+// it as over a working one.
+func unreached(t *testing.T) core.Deps {
+	t.Helper()
+	gone := dbtest.Closed(t)
+	return core.Deps{DB: gone, Queue: queue.New(gone, queue.DefaultOptions())}
 }
 
 func TestProbesAnswerWithoutAuthentication(t *testing.T) {
@@ -73,6 +84,44 @@ func TestAProcessThatCannotTellWhoIsAskingAnswersNobody(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	if rec.Code != http.StatusOK {
 		t.Errorf("the liveness probe answered %d", rec.Code)
+	}
+}
+
+func TestAProcessWithNoDatabaseAnswersEveryRequestButTheProbesInOneSentence(t *testing.T) {
+	files := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html>")}}
+	for name, in := range map[string]core.Deps{
+		"no database": {Interface: core.Interface{Files: files}},
+		"no queue":    {DB: dbtest.Closed(t), Interface: core.Interface{Files: files}},
+	} {
+		h, _ := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, in)
+		for _, asked := range []struct{ method, path string }{
+			{http.MethodGet, "/v1/people"},
+			{http.MethodGet, "/v1/advisories"},
+			{http.MethodGet, "/v1/unassigned"},
+			{http.MethodGet, "/v1/findings"},
+			{http.MethodGet, "/v1/running-out"},
+			{http.MethodPost, "/v1/products/p/streams/s/variants/v/scans"},
+			{http.MethodGet, "/v1/review-queue"},
+			{http.MethodGet, "/v1/version"},
+			{http.MethodGet, "/v1/sign-in"},
+			{http.MethodGet, "/v1/sign-in/stub"},
+			{http.MethodGet, "/openapi.json"},
+			{http.MethodGet, "/a/page/of/the/interface"},
+		} {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(asked.method, asked.path, nil))
+			if rec.Code != http.StatusInternalServerError ||
+				!strings.Contains(rec.Body.String(), "this deployment is not fully configured") {
+				t.Errorf("%s: %s %s answered %d: %s", name, asked.method, asked.path, rec.Code, rec.Body)
+			}
+		}
+		for _, path := range []string{"/healthz", "/readyz"} {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+			if rec.Code != http.StatusOK {
+				t.Errorf("%s: the probe %s answered %d", name, path, rec.Code)
+			}
+		}
 	}
 }
 

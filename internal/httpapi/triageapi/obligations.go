@@ -100,9 +100,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		store := obligation.NewStore(in.DB.DB)
 		shelf, err := store.Shelf(ctx, subject)
 		if err != nil {
@@ -170,9 +167,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		windows, err := obligation.NewStore(in.DB.DB).Windows(ctx, subject)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the windows could not be read", err)
@@ -205,9 +199,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		window, err := obligation.NewStore(in.DB.DB).DeclareWindow(ctx, subject,
 			windowSaid(input.Body))
@@ -242,9 +233,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		window, err := obligation.NewStore(in.DB.DB).ChangeWindow(ctx, subject, input.ID,
 			windowSaid(input.Body))
 		if err != nil {
@@ -270,9 +258,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := obligation.NewStore(in.DB.DB).RetireWindow(ctx, subject, input.ID); err != nil {
 			return nil, refusedWindow(in, err)
@@ -302,9 +287,6 @@ func registerObligations(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		toldAt, err := time.Parse(time.RFC3339, input.Body.ToldAt)
 		if err != nil {

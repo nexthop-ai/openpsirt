@@ -202,11 +202,11 @@ A read that could not be made is a fault rather than a 404. The split is one
 helper rather than a judgment made per route: made per route, it is made
 differently per route.
 
-A process with no database answers with one sentence. Every handler guards
-against it, because a nil pointer inside one is worse than a refusal, and each
-guard writing its own wording reads as that many different conditions. It says
-nothing about what the caller asked for, because the caller did not cause it
-and cannot fix it.
+A process with no database or no queue answers every request but the probes
+with one sentence, a 500 written by the router before a caller is resolved. No
+handler guards against either, because no handler is reached without both. The
+sentence says nothing about what the caller asked for, because the caller did
+not cause it and cannot fix it.
 
 ## Paging
 

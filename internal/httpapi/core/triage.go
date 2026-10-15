@@ -167,9 +167,6 @@ func Triaging(ctx context.Context, in Deps) (access.Subject, *triage.Store, erro
 	if err != nil {
 		return access.Subject{}, nil, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, NoDatabase(in.Logger)
-	}
 	return subject, triage.NewStore(in.DB.DB), nil
 }
 
@@ -262,9 +259,6 @@ func DecisionBodyOf(d triage.Decision) DecisionBody {
 // moment its database was in trouble, with nothing saying so. A setting nobody
 // has changed is a different matter, and answers with the default.
 func DeferralThreshold(ctx context.Context, in Deps) (time.Duration, error) {
-	if in.DB == nil {
-		return triage.DefaultDeferralThreshold, nil
-	}
 	// The store's own read, so the screens and the gate measure one value.
 	return triage.DeferralThreshold(ctx, in.DB.DB)
 }

@@ -78,9 +78,6 @@ func registerKinds(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		kinds, err := finding.NewStore(in.DB.DB).PackageKindsAnywhere(ctx, subject)
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "cannot read what is open")

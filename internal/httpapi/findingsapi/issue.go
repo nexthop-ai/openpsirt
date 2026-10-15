@@ -91,9 +91,6 @@ func registerIssue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		out := &IssueOutput{}
 		out.Body.Vulnerability = input.Vulnerability
 		out.Body.Items = []SightingBody{}

@@ -67,9 +67,6 @@ func registerRouting(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
@@ -124,9 +121,6 @@ func registerRouting(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
@@ -272,9 +266,6 @@ func routable(ctx context.Context, in core.Deps, name string) (access.Subject, i
 	if err != nil {
 		return access.Subject{}, 0, nil, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, 0, nil, core.NoDatabase(in.Logger)
-	}
 	product, err := core.ProductNamedVisibly(ctx, in, subject, name)
 	if err != nil {
 		return access.Subject{}, 0, nil, err
@@ -294,9 +285,6 @@ func routable(ctx context.Context, in core.Deps, name string) (access.Subject, i
 // leaves every open finding it covers unrouted until another rule is saved, so
 // a full queue refuses the rule and the caller sends it again.
 func queueSweep(ctx context.Context, in core.Deps, tx bun.Tx, productID int64) error {
-	if in.Queue == nil {
-		return nil
-	}
 	_, err := in.Queue.AddTx(ctx, tx, queue.Route, strconv.FormatInt(productID, 10))
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):

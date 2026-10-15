@@ -10,8 +10,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // The schemas are worked out once per process and every API shares them, but
@@ -21,7 +19,7 @@ import (
 func TestEveryAPIAProcessBuildsLinksItsAnswersToTheirSchema(t *testing.T) {
 	var documents []string
 	for range 2 {
-		h, api := New(nil, nil, core.Deps{})
+		h, api := New(nil, nil, unreached(t))
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/sign-in", nil))
 		if rec.Code != http.StatusOK {

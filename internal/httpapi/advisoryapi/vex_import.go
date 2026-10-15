@@ -142,9 +142,6 @@ func registerVexImport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)

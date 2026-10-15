@@ -19,8 +19,7 @@ import (
 // Administering carries what the endpoints for people and credentials run on.
 type Administering struct {
 	// DB is the database an administrative act and the record of it are
-	// written on, in one transaction. Nil where this process has no database,
-	// and then every route here refuses rather than changing anything.
+	// written on, in one transaction.
 	DB *database.DB
 	// Access and Catalog are built over whatever handle the caller is
 	// writing on: the transaction, where the act is being made, and the
@@ -30,7 +29,7 @@ type Administering struct {
 	Logger  *slog.Logger
 	// Findings says whether work is handed back to the unassigned list when
 	// somebody can no longer reach it, rather than staying where nobody can.
-	// Nil where this process has no database, and then nothing is released.
+	// Nil where the routes built over it release nothing.
 	//
 	// The withdrawal of somebody's last role on a product hands back inside
 	// its own transaction, over a store built on it, and reads this only as
@@ -38,21 +37,12 @@ type Administering struct {
 	// handle, once the deactivation has committed.
 	Findings func() *finding.Store
 	// Settings is where the window an unredeemed authorization stays
-	// redeemable for is read. Nil where this process has no database, and
-	// then the built-in window applies.
+	// redeemable for is read.
 	Settings func(bun.IDB) *setting.Store
 }
 
 // Handle is the database a read-only route builds its stores over.
-//
-// Named rather than written as a.DB at each site: a nil *database.DB handed to
-// an interface parameter is an interface that is not nil, so every check below
-// it reads as a database that is there and every store built over it panics on
-// first use.
 func (a Administering) Handle() bun.IDB {
-	if a.DB == nil {
-		return nil
-	}
 	return a.DB.DB
 }
 
@@ -69,17 +59,5 @@ func Administerable(ctx context.Context, a Administering, db bun.IDB) (*access.S
 	if err := Administrating(ctx); err != nil {
 		return nil, nil, err
 	}
-	return Stores(a, db)
-}
-
-// Stores builds the pair over db, or says this process has no database.
-func Stores(a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
-	if a.Access == nil || a.Catalog == nil || db == nil {
-		return nil, nil, NoDatabase(a.Logger)
-	}
-	store, names := a.Access(db), a.Catalog(db)
-	if store == nil || names == nil {
-		return nil, nil, NoDatabase(a.Logger)
-	}
-	return store, names, nil
+	return a.Access(db), a.Catalog(db), nil
 }

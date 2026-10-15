@@ -123,9 +123,6 @@ func registerScrutiny(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		var products []int64
 		if input.Product != "" {
 			// Resolved against what the caller may see, and a product they may

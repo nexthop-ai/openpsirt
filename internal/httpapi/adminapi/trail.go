@@ -107,9 +107,6 @@ func registerTrail(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		// No default window. A trail read with one would answer about the
 		// last stretch while looking like it answered about everything, which
 		// is the reading an audit must not be given.

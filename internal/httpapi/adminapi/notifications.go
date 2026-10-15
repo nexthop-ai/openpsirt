@@ -61,9 +61,6 @@ func registerNotifications(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		rows, total, err := notify.NewStore(in.DB.DB).
 			Waiting(ctx, subject, input.Limit, input.Offset)
 		if err != nil {
@@ -99,9 +96,6 @@ func registerNotifications(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		if err := notify.NewStore(in.DB.DB).Acknowledge(ctx, subject, input.ID); err != nil {
 			// The same answer whether it is somebody else's or not there,
 			// which is what stops this being a way to find out which
@@ -129,9 +123,6 @@ func registerNotifications(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		n, err := notify.NewStore(in.DB.DB).AcknowledgeAll(ctx, subject)
 		if err != nil {
@@ -172,7 +163,7 @@ func registerDigest(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if subject.Kind != access.Person || in.DB == nil {
+		if subject.Kind != access.Person {
 			// A credential is not sent mail, so it has nothing to choose.
 			return nil, huma.Error403Forbidden("only a person chooses what is sent to them")
 		}
@@ -211,7 +202,7 @@ func registerChatChoices(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if subject.Kind != access.Person || in.DB == nil {
+		if subject.Kind != access.Person {
 			return nil, huma.Error403Forbidden("only a person chooses what is sent to them")
 		}
 		if len(in.Chats) == 0 {

@@ -44,9 +44,6 @@ func registerSession(api huma.API, in core.Deps) {
 		if session == nil {
 			return nil, huma.Error400BadRequest("this request did not arrive on a session")
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		if err := access.NewStore(in.DB.DB).EndSession(ctx, session.ID); err != nil {
 			return nil, core.WentWrong(in.Logger, "the session could not be ended", err)
 		}

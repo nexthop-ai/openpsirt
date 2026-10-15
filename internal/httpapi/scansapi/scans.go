@@ -115,9 +115,6 @@ func registerScans(api huma.API, in core.Deps) {
 }
 
 func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutput, error) {
-	if in.DB == nil || in.Queue == nil {
-		return nil, core.NoDatabase(in.Logger)
-	}
 	parts := input.RawBody.Data()
 
 	// Asked again, though the form was only read once it was asked: what a

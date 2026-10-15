@@ -53,13 +53,7 @@ func registerTeams(api huma.API, a core.Administering) {
 			if _, err := core.Reading(ctx); err != nil {
 				return nil, err
 			}
-			if a.Access == nil {
-				return nil, core.NoDatabase(a.Logger)
-			}
 			store := a.Access(a.Handle())
-			if store == nil {
-				return nil, core.NoDatabase(a.Logger)
-			}
 			teams, err := store.Teams(ctx, "", database.InBulk.Most)
 			if err != nil {
 				return nil, core.WentWrong(a.Logger, "cannot list teams", err)

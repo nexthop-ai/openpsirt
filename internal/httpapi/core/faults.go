@@ -95,21 +95,3 @@ func Asked(logger *slog.Logger, err error) error {
 	}
 	return WentWrong(logger, "that could not be recorded", err)
 }
-
-// NoDatabase is the answer when this process has no database behind it.
-//
-// One sentence for every handler. Each guards against it, because a nil
-// pointer inside one is worse than a refusal, and a guard that words it for
-// itself reads as many conditions where there is one. Logged, because
-// otherwise the only trace of a deployment wired up wrong is a 500 with a
-// sentence in it.
-//
-// It says nothing about what the caller asked for, because the caller did not
-// cause it and cannot fix it: this is a process that came up without the thing
-// it exists to read.
-func NoDatabase(logger *slog.Logger) error {
-	if logger != nil {
-		logger.Error("this process has no database behind it, so it can answer nothing")
-	}
-	return huma.Error500InternalServerError("this deployment is not fully configured")
-}

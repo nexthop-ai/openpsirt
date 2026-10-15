@@ -42,9 +42,6 @@ func registerFixes(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		store := obligation.NewStore(in.DB.DB)
 		fix, err := store.NameFix(ctx, subject, input.ID, input.Body.Release)
 		if err != nil {
@@ -93,9 +90,6 @@ func registerFixes(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := obligation.NewStore(in.DB.DB).WithdrawFix(ctx, subject, input.ID,
 			input.Fix); err != nil {

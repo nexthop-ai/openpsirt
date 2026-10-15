@@ -60,9 +60,6 @@ func registerEffort(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		since, until, err := input.Window(90, time.Now().UTC())
 		if err != nil {
 			return nil, err

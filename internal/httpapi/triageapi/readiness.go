@@ -123,9 +123,6 @@ func registerReadiness(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err

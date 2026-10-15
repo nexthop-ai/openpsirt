@@ -458,9 +458,6 @@ func registerCompliance(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		scope, err := core.Scoped(ctx, in, subject, input.ScopeQuery)
 		if err != nil {
 			return nil, err

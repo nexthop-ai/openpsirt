@@ -62,9 +62,6 @@ func registerIssueDocument(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		written, err := issueDocument(ctx, in, subject, input.Vulnerability)
 		if err != nil {
 			return nil, err

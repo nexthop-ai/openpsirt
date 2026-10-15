@@ -72,9 +72,6 @@ func registerReleases(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		rows, err := advisory.NewStore(in.DB.DB).Releases(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the releases could not be read")
@@ -130,9 +127,6 @@ func registerReleases(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := advisory.NewStore(in.DB.DB).MarkAffected(ctx, subject, input.Advisory,
 			input.Body.Product, input.Body.Vulnerability, input.Body.Stream,

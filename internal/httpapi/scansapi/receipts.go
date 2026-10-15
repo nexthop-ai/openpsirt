@@ -148,9 +148,6 @@ func registerReceipts(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 
 		// What was filed against a build is the product's to read, and a case
 		// grant reaches one issue rather than the product: somebody brought

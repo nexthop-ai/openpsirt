@@ -49,11 +49,7 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 		if _, _, err := readable(ctx, a, a.Handle()); err != nil {
 			return nil, err
 		}
-		store := settings(a.Handle())
-		if store == nil {
-			return nil, core.NoDatabase(a.Logger)
-		}
-		stored, _, err := store.Get(ctx, setting.RoleMode)
+		stored, _, err := settings(a.Handle()).Get(ctx, setting.RoleMode)
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read where roles come from", err)
 		}
@@ -115,10 +111,7 @@ func productLabels(ctx context.Context, a core.Administering) (map[string]string
 // is given — which is the transaction deciding, rather than this.
 func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
-		if settings(db) == nil {
-			return access.Direct, nil
-		}
-		stored, _, err := setting.NewStore(db).Get(ctx, setting.RoleMode)
+		stored, _, err := settings(db).Get(ctx, setting.RoleMode)
 		if err != nil {
 			return "", fmt.Errorf("read where roles come from: %w", err)
 		}

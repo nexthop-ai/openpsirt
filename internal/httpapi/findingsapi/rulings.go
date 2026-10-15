@@ -137,9 +137,6 @@ func registerRulings(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		asked := finding.RulingsAsked{Waiting: input.Waiting, Approvable: input.Approvable,
 			Limit: input.Limit, Offset: input.Offset}
 		for _, name := range input.Product {

@@ -78,9 +78,6 @@ func registerUpstream(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		// Classified against every root, because that is what the pass held
 		// names back against. Read against a narrower list, a name the pass
 		// never sent is reported as sent.

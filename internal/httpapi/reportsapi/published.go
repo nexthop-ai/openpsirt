@@ -68,9 +68,6 @@ func registerPublished(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		var products []int64
 		if input.Product != "" {
 			named, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)

@@ -396,9 +396,6 @@ func VisibleBuild(ctx context.Context, in Deps, product, stream, variant string)
 	if err != nil {
 		return access.Subject{}, 0, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, 0, NoDatabase(in.Logger)
-	}
 	target, err := TargetIDOf(ctx, in, subject, product, stream, variant)
 	if err != nil {
 		return access.Subject{}, 0, err

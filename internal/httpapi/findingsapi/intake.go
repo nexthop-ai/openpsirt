@@ -316,9 +316,6 @@ func registerIntake(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		files := in.Attachments()
-		if files == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, product.ID, input.Reference)
 		if err != nil {
 			return nil, refusedReport(in, err, "that report could not be read")
@@ -355,9 +352,6 @@ func productForReports(ctx context.Context, in core.Deps, name string) (
 	if err != nil {
 		return access.Subject{}, nil, err
 	}
-	if in.DB == nil {
-		return access.Subject{}, nil, core.NoDatabase(in.Logger)
-	}
 	product, err := core.ProductNamedVisibly(ctx, in, subject, name)
 	if err != nil {
 		return access.Subject{}, nil, err
@@ -376,7 +370,7 @@ func reportAttaching(ctx context.Context, in core.Deps, product, reference strin
 		return access.Subject{}, attach.Against{}, err
 	}
 	files := in.Attachments()
-	if files == nil || !files.Configured() {
+	if !files.Configured() {
 		return access.Subject{}, attach.Against{}, huma.Error501NotImplemented(attach.ErrNotConfigured.Error())
 	}
 	row, err := finding.NewStore(in.DB.DB).ReportBy(ctx, subject, named.ID, reference)

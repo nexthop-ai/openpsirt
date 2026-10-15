@@ -76,11 +76,6 @@ func (u *Uploads) give() { u.active.Add(-1) }
 // terms.
 func BoundedForm(api huma.API, in Deps, admission Admission) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		if in.DB == nil {
-			// The handler answers that there is no database.
-			next(ctx)
-			return
-		}
 		if admission.Admit != nil {
 			if err := admission.Admit(ctx); err != nil {
 				writeRefusal(api, ctx, err)

@@ -53,9 +53,6 @@ func registerAnywhere(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		// The line is per product and is applied per row inside the store, so
 		// what is handed over here is only what the caller asked to raise it
 		// to — never a number chosen for a page that spans products.

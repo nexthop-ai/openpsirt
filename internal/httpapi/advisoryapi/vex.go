@@ -53,9 +53,6 @@ func registerVEX(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, err
 			}
-			if in.DB == nil {
-				return nil, core.NoDatabase(in.Logger)
-			}
 			doc, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).For(ctx, subject, in.Publisher,
 				input.Product, input.Stream, input.Variant, input.Undisclosed, input.Kind.kind())
 			if err != nil {
@@ -92,9 +89,6 @@ func registerVEX(api huma.API, in core.Deps) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
-			}
-			if in.DB == nil {
-				return nil, core.NoDatabase(in.Logger)
 			}
 			store := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling)
 			gone, err := store.Issuances(ctx, subject,
@@ -160,9 +154,6 @@ func registerVEX(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, err
 			}
-			if in.DB == nil {
-				return nil, core.NoDatabase(in.Logger)
-			}
 			recorded, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Issued(ctx, subject, in.Publisher,
 				input.Product, input.Stream, input.Variant, input.Kind.kind())
 			if err != nil {
@@ -203,9 +194,6 @@ func registerVEX(api huma.API, in core.Deps) {
 			subject, err := core.Reading(ctx)
 			if err != nil {
 				return nil, err
-			}
-			if in.DB == nil {
-				return nil, core.NoDatabase(in.Logger)
 			}
 			sent, err := vex.NewStoreCarrying(in.DB.DB, in.VexCeiling).Sent(ctx, subject,
 				input.Product, input.Stream, input.Variant, input.Kind.kind(), input.Version)

@@ -101,34 +101,23 @@ type Deps struct {
 	Uploads *Uploads
 }
 
-// Attachments returns a store over the files this deployment holds, or nothing
-// where there is no database. A nil Storage inside it is the deployment that
-// configured none, and every path through it refuses in the same words.
+// Attachments returns a store over the files this deployment holds. A nil
+// Storage inside it is the deployment that configured none, and every path
+// through it refuses in the same words.
 func (in Deps) Attachments() *attach.Store {
-	if in.DB == nil {
-		return nil
-	}
 	return attach.NewStore(in.DB.DB, in.Files)
 }
 
-// Catalog returns a store over the handle it is given, or nothing when there
-// is none — which is the process that only renders the API document.
+// Catalog returns a store over the handle it is given.
 //
 // The handle is the transaction an administrative act is being made in, or
 // this deployment's pooled one where the route only reads.
 func (in Deps) Catalog(db bun.IDB) *catalog.Store {
-	if in.DB == nil || db == nil {
-		return nil
-	}
 	return catalog.NewStore(db)
 }
 
-// Settings returns a store over what an operator has set, or nothing where
-// there is no database.
+// Settings returns a store over what an operator has set.
 func (in Deps) Settings(db bun.IDB) *setting.Store {
-	if in.DB == nil || db == nil {
-		return nil
-	}
 	return setting.NewStore(db)
 }
 
@@ -147,23 +136,13 @@ func (in Deps) Log() *slog.Logger {
 }
 
 // Rights returns a store over who may do what, built over the handle it is
-// given, or nothing where there is none.
+// given.
 func (in Deps) Rights(db bun.IDB) *access.Store {
-	if in.DB == nil || db == nil {
-		return nil
-	}
 	return access.NewStore(db)
 }
 
 // Handle is the database a read-only route builds its stores over.
-//
-// Named rather than written as in.DB at each site: a nil *database.DB handed
-// to an interface parameter is an interface that is not nil, so every check
-// below it reads as a database that is there.
 func (in Deps) Handle() bun.IDB {
-	if in.DB == nil {
-		return nil
-	}
 	return in.DB.DB
 }
 

@@ -326,14 +326,7 @@ func registerSettings(api huma.API, in core.Deps) {
 		if err := core.ReadingTheDeployment(ctx); err != nil {
 			return nil, err
 		}
-		// From the accessor, which answers nothing where there is no
-		// database. Built from `in.DB.DB` directly it panics into the recovery
-		// middleware and answers 500, where the route already has words for a
-		// process that has no database.
 		settings := in.Settings(in.Handle())
-		if settings == nil {
-			return nil, core.NoDatabase(in.Log())
-		}
 		out := &core.ListOutput[SettingBody]{}
 		out.Body.Items = make([]SettingBody, 0, len(settable))
 		for _, each := range settable {
@@ -449,9 +442,6 @@ func registerSettings(api huma.API, in core.Deps) {
 		// ever held.
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			settings := in.Settings(tx)
-			if settings == nil {
-				return core.NoDatabase(in.Log())
-			}
 			before, had, err := settings.Change(ctx, input.Name, value)
 			if err != nil {
 				return recording(in.Logger, "that setting could not be recorded", err)
@@ -504,9 +494,6 @@ func registerSettings(api huma.API, in core.Deps) {
 func deadlinesRewritten(in core.Deps) func(context.Context, string, string) {
 	return func(ctx context.Context, what, value string) {
 		logger, db, replica := in.Logger, in.DB, in.Replica
-		if db == nil {
-			return
-		}
 		rewriterFor(db).ask(ctx, what, value, func(ctx context.Context, what, value string) {
 			rewrite(ctx, db, replica, logger, what, value)
 		})

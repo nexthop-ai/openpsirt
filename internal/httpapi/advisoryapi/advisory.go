@@ -102,9 +102,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		made, err := advisory.NewStore(in.DB.DB).Mint(ctx, subject, in.Publisher,
 			input.Body.Title)
 		if err != nil {
@@ -144,9 +141,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		rows, total, err := advisory.NewStore(in.DB.DB).List(ctx, subject,
 			advisory.Covering{Product: input.Product, Vulnerability: input.Vulnerability},
 			input.Limit, input.Offset)
@@ -184,9 +178,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		store := advisory.NewStore(in.DB.DB)
 		row, held, err := store.Covers(ctx, subject, input.Advisory)
@@ -232,9 +223,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, err
 			}
-			if in.DB == nil {
-				return nil, core.NoDatabase(in.Logger)
-			}
 			rows, total, err := advisory.NewStore(in.DB.DB).Nameable(ctx, subject, input.Product)
 			if errors.Is(err, catalog.ErrNotFound) {
 				return nil, core.NoSuchProduct()
@@ -279,9 +267,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		added, err := advisory.NewStore(in.DB.DB).Add(ctx, subject, input.Advisory,
 			input.Body.Product, input.Body.Vulnerability)
 		if err != nil {
@@ -314,9 +299,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := advisory.NewStore(in.DB.DB).Drop(ctx, subject, input.Advisory,
 			input.Product, input.Vulnerability); err != nil {
@@ -356,9 +338,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		doc, err := advisory.NewStore(in.DB.DB).ForAdvisory(ctx, subject, in.Publisher,
 			input.Advisory)
 		if err != nil {
@@ -388,9 +367,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		gone, err := advisory.NewStore(in.DB.DB).Issuances(ctx, subject, input.Advisory)
 		if err != nil {
@@ -429,9 +405,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		row, held, err := advisory.NewStore(in.DB.DB).Retitle(ctx, subject,
 			input.Advisory, input.Body.Title)
 		if err != nil {
@@ -464,9 +437,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
-		}
 		given, err := advisory.NewStore(in.DB.DB).Approve(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "that could not be agreed to")
@@ -494,9 +464,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		if err := advisory.NewStore(in.DB.DB).Withdraw(ctx, subject, input.Advisory); err != nil {
 			return nil, advisoryRefused(in, err, "that could not be withdrawn")
@@ -537,9 +504,6 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if in.DB == nil {
-			return nil, core.NoDatabase(in.Logger)
 		}
 		recorded, err := advisory.NewStore(in.DB.DB).Issued(ctx, subject, in.Publisher,
 			input.Advisory, input.Body.Summary)
