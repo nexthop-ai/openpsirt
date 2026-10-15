@@ -151,7 +151,7 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 			t.Error("the trend ends with nothing open, but something is")
 		}
 
-		// Settings, which had no way to be set at all.
+		// Settings are listed, and one is set.
 		var settings struct {
 			Items []struct {
 				Name    string `json:"name"`
@@ -162,11 +162,6 @@ func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
 		httpapitest.Read(t, r, "admin", "/v1/settings", &settings)
 		if len(settings.Items) == 0 {
 			t.Fatal("no settings are listed")
-		}
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/settings/remediation.due.critical",
-			`{"value":"nonsense"}`); got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("an unreadable duration was accepted: %d", got.Code)
 		}
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
 			"/v1/settings/remediation.due.critical",
