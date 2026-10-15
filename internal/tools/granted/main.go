@@ -67,12 +67,12 @@ var inside = map[string]string{
 	"internal/access/estate.go:WithdrawEstateRole": "withdraws a grant across the estate, which is one row of that table",
 	"internal/access/estate.go:EstateGrants":       "lists what one person holds across the estate, beside Grants",
 	"internal/access/estate.go:EveryEstateGrant":   "lists what everybody holds across the estate, beside People",
-	"internal/access/store.go:GrantRole":           "records a grant on one product, which is one row of that table",
-	"internal/access/store.go:holds": "whether a per-product grant that failed to insert is already there, " +
+	"internal/access/grants.go:GrantRole":          "records a grant on one product, which is one row of that table",
+	"internal/access/grants.go:holds": "whether a per-product grant that failed to insert is already there, " +
 		"which is a question about that row; an estate grant does not make it a duplicate",
-	"internal/access/store.go:People":   "lists what everybody holds per product, beside EveryEstateGrant",
-	"internal/access/store.go:Grants":   "lists what one person holds per product, beside EstateGrants",
-	"internal/access/store.go:Withdraw": "withdraws a grant on one product, which is one row of that table",
+	"internal/access/grants.go:People":   "lists what everybody holds per product, beside EveryEstateGrant",
+	"internal/access/grants.go:Grants":   "lists what one person holds per product, beside EstateGrants",
+	"internal/access/grants.go:Withdraw": "withdraws a grant on one product, which is one row of that table",
 }
 
 // reach is which grant tables a piece of source reaches.

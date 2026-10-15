@@ -5,11 +5,14 @@ package access
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -341,4 +344,175 @@ func ParseSources(raw string) ([]net.IPNet, error) {
 		out = append(out, net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
 	}
 	return out, nil
+}
+
+// ByIdentity finds somebody by what a sign-in path calls them.
+func (s *Store) ByIdentity(ctx context.Context, identity string) (*Account, error) {
+	person := new(Account)
+	// Folded to match how it was stored. An identity typed with different
+	// capitals is the same person, and looking it up exactly would answer
+	// "nobody" for somebody who is plainly there.
+	err := s.db.NewSelect().Model(person).Where("identity = ?", Folded(identity)).Scan(ctx)
+	if err != nil {
+		return nil, database.FromRead(err,
+			fmt.Errorf("nobody is recorded as %q: %w", identity, ErrNoSuchPerson),
+			fmt.Sprintf("look up %q", identity))
+	}
+	return person, nil
+}
+
+// ErrNoSuchPerson is what an identity nobody here holds comes back as.
+//
+// A sentinel rather than a sentence, because whoever asked has to tell it from
+// a read that could not be made: the first is a 404 and the second is a fault.
+var ErrNoSuchPerson = refusal.New("nobody here is called that")
+
+// Resolve turns an identity into the subject it stands for.
+//
+// Somebody unknown, and somebody known but granted nothing, are both refused —
+// with the same answer, deliberately.
+func (s *Store) Resolve(ctx context.Context, identity string) (Subject, error) {
+	return s.resolve(ctx, identity, false)
+}
+
+// resolve is Resolve, and says whether a grant a group derived has to be fresh.
+//
+// It does for a personal token and does not for a browser. A session's derived
+// grants were written by the sign-in that issued it, so bounding them here
+// would take roles away from somebody mid-session for being exactly as old as
+// the session itself. A token has no sign-in behind it at all, which is the
+// whole of what this is for.
+func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool) (Subject, error) {
+	person, err := s.ByIdentity(ctx, identity)
+	if errors.Is(err, ErrNoSuchPerson) {
+		return Subject{}, ErrDenied
+	}
+	if err != nil {
+		return Subject{}, err
+	}
+	// Somebody who has left holds whatever they held, and reaches none of
+	// it. Checked here because every way a person gets in comes through
+	// this — a session, a personal token and a group-bound sign-in all
+	// resolve by identity — so a second spelling of it would be a second
+	// rule to keep in step (REQ-45).
+	//
+	// Their roles are deliberately not withdrawn. What they held is part of
+	// why the record reads as it does, and restoring somebody who came back
+	// should not mean reconstructing it from memory.
+	if person.DeactivatedAt != nil {
+		return Subject{}, ErrDenied
+	}
+
+	var held []Grant
+	// Inactive grants are read past entirely. A row that grants nothing
+	// must never be counted as access — not here, and not in any report or
+	// review that asks what somebody holds.
+	if err := s.db.NewSelect().Model(&held).
+		Where("person_id = ?", person.ID).Where("active = ?", true).Scan(ctx); err != nil {
+		return Subject{}, fmt.Errorf("read what %q may do: %w", identity, err)
+	}
+	grants := map[int64][]Role{}
+	for _, grant := range held {
+		// A row naming something that is not a role grants nothing. It can
+		// only get there by hand, and reading it as "some
+		// role" would make it a grant of whatever the reader assumes.
+		if !grant.Role.Valid() {
+			continue
+		}
+		if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
+			continue
+		}
+		grants[grant.ProductID] = append(grants[grant.ProductID], grant.Role)
+	}
+	// A role held across every product is spread over the catalog as it stands
+	// now, which is what makes a product declared after the grant covered
+	// without anybody being re-granted anything (REQ-42). Read only where one
+	// is held, so the ordinary subject costs nothing.
+	var estate []EstateGrant
+	if err := s.db.NewSelect().Model(&estate).
+		Where("person_id = ?", person.ID).Where("active = ?", true).Scan(ctx); err != nil {
+		return Subject{}, fmt.Errorf("read what %q may do everywhere: %w", identity, err)
+	}
+	if len(estate) > 0 {
+		everywhere := make([]Role, 0, len(estate))
+		for _, grant := range estate {
+			if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
+				continue
+			}
+			if grant.Role.Valid() {
+				everywhere = append(everywhere, grant.Role)
+			}
+		}
+		products, err := s.everyProduct(ctx)
+		if err != nil {
+			return Subject{}, err
+		}
+		spreadEstate(grants, everywhere, products)
+	}
+	// Every case they were brought into, one issue at a time. Read beside
+	// the roles because it is the same question — what may they reach —
+	// asked at a smaller unit, and because being on a case is a grant:
+	// somebody holding nothing but a case is somebody with access, not
+	// somebody who slipped in.
+	cases, err := s.CasesOf(ctx, person.ID)
+	if err != nil {
+		return Subject{}, err
+	}
+	// Administration a group conferred is bounded the same way the roles it
+	// conferred are, and for the same reason: a group is what says so, and a
+	// credential that never signs in never asks a group again. Without this a
+	// person a group made an administrator, who minted a year-long token and
+	// then left, went on administering through it — and administration is what
+	// decides who may read anybody's notification feed.
+	//
+	// A stamp that is missing on a derived flag is treated as stale rather
+	// than as fresh. It means nothing has confirmed it since the column
+	// existed, which is the same thing the bound is for.
+	administers := person.IsAdmin
+	if boundDerived && person.AdminDerived {
+		if person.AdminDerivedAt == nil || s.stale(ctx, Derived, *person.AdminDerivedAt) {
+			administers = false
+		}
+	}
+	// Named in configuration is administration of its own, which no group
+	// confirms and no stamp bounds.
+	administers = administers || person.IsBootstrap
+	// Auditing is bounded exactly as administration is, and for the same
+	// reason: a group is what says so, and a credential that never signs in
+	// never asks a group again.
+	audits := person.Audits
+	if boundDerived && person.AuditsDerived {
+		if person.AuditsDerivedAt == nil || s.stale(ctx, Derived, *person.AuditsDerivedAt) {
+			audits = false
+		}
+	}
+	// Somebody holding the audit permission alone holds access: they reach no
+	// product and read the deployment's own records, which is the whole of
+	// what it is for.
+	if !administers && !audits && len(grants) == 0 && len(cases) == 0 {
+		return Subject{}, ErrDenied
+	}
+
+	if _, err := s.touch(ctx, (*Account)(nil), person.ID, "last_seen_at", person.LastSeenAt); err != nil {
+		return Subject{}, fmt.Errorf("record that %q was seen: %w", identity, err)
+	}
+	// Theirs is their own name in the assignable space, and
+	// the name of every team they are on. Read here because this is the
+	// one place a person becomes a subject, and "assigned to me" has to
+	// mean the same thing on the list, the counts, the digest and the
+	// reminders.
+	teams, err := s.TeamsOf(ctx, person.ID)
+	if err != nil {
+		return Subject{}, err
+	}
+	on := make([]int64, 0, len(teams))
+	for _, team := range teams {
+		on = append(on, team.PartyID)
+	}
+	subject := NewPerson(person.ID, person.Identity, administers, grants,
+		person.PartyID, on...).OnCases(cases)
+	if audits {
+		subject = subject.Auditing()
+	}
+	return subject, nil
 }

@@ -482,3 +482,46 @@ func (s *Store) match(ctx context.Context, who Arrival) (*Account, error) {
 func (a Arrival) handle() string {
 	return Folded(a.Username)
 }
+
+// Deactivate records that somebody has left, and Reactivate that they are
+// back.
+//
+// Never a deletion. The record names them as the proposer of judgments and the
+// approver of others, and an assignment may point at them; deleting the row
+// would either break those or rewrite what happened. So leaving is a date, and
+// every path in reads it (REQ-45).
+//
+// Their roles are left where they are. What somebody held is part of why
+// the record reads as it does, and restoring an account should not mean
+// reconstructing its grants from memory. What stops them is the date, which is
+// read before anything else about them.
+//
+// Reports whether it changed anything, so a caller can tell "done" from
+// "already". Deactivating somebody twice is not an error — an administrator
+// clicking again, or two of them acting at once, is the ordinary case — but
+// the second one does not move the date, because the date is when they left.
+func (s *Store) Deactivate(ctx context.Context, personID int64) (bool, error) {
+	res, err := s.db.NewUpdate().Model((*Account)(nil)).
+		Set("deactivated_at = ?", s.now().Truncate(time.Microsecond)).
+		Where("id = ?", personID).
+		Where("deactivated_at IS NULL").
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("record that they left: %w", err)
+	}
+	return database.Changed(res, "record that they left")
+}
+
+// Reactivate clears the date, so they may sign in again with whatever they
+// still hold.
+func (s *Store) Reactivate(ctx context.Context, personID int64) (bool, error) {
+	res, err := s.db.NewUpdate().Model((*Account)(nil)).
+		Set("deactivated_at = ?", nil).
+		Where("id = ?", personID).
+		Where("deactivated_at IS NOT NULL").
+		Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("record that they are back: %w", err)
+	}
+	return database.Changed(res, "record that they are back")
+}
