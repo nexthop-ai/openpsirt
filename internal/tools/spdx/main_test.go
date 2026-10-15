@@ -106,7 +106,7 @@ func TestOnlySourceIsHeld(t *testing.T) {
 		"web/src/api/schema.d.ts":   false,
 		"deploy/helm/x/values.yaml": false,
 	} {
-		if got, _ := covered(file); got != want {
+		if got := covered(file); got != want {
 			t.Errorf("%s held to a header: %v, want %v", file, got, want)
 		}
 	}

@@ -183,7 +183,7 @@ func registerRouting(api huma.API, in core.Deps) {
 			Beneath  string `json:"beneath,omitempty" maxLength:"191" doc:"A component name, matching it and everything under it"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
-		subject, product, _, err := routable(ctx, in, input.Product)
+		subject, product, err := routable(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
 		}
@@ -231,7 +231,7 @@ func registerRouting(api huma.API, in core.Deps) {
 			Product string `path:"product"`
 			ID      int64  `path:"id"`
 		}) (*struct{}, error) {
-			subject, product, _, err := routable(ctx, in, input.Product)
+			subject, product, err := routable(ctx, in, input.Product)
 			if err != nil {
 				return nil, err
 			}
@@ -259,23 +259,21 @@ func registerRouting(api huma.API, in core.Deps) {
 // which is satisfied by any one of what it names. Writing a rule performs the
 // act the assigner right is named for — continuously, on behalf of whoever
 // wrote it — so it asks for that right and not merely for triage.
-func routable(ctx context.Context, in core.Deps, name string) (access.Subject, int64,
-	*access.Store, error) {
-
+func routable(ctx context.Context, in core.Deps, name string) (access.Subject, int64, error) {
 	subject, err := core.Reading(ctx)
 	if err != nil {
-		return access.Subject{}, 0, nil, err
+		return access.Subject{}, 0, err
 	}
 	product, err := core.ProductNamedVisibly(ctx, in, subject, name)
 	if err != nil {
-		return access.Subject{}, 0, nil, err
+		return access.Subject{}, 0, err
 	}
 	if !subject.Holds(access.Assigner, product.ID) {
 		// The product resolved, so the caller can see it: refused for the
 		// role. A product they cannot see was answered as not there above.
-		return access.Subject{}, 0, nil, huma.Error403Forbidden("not authorized")
+		return access.Subject{}, 0, huma.Error403Forbidden("not authorized")
 	}
-	return subject, product.ID, access.NewStore(in.DB.DB), nil
+	return subject, product.ID, nil
 }
 
 // queueSweep asks for the rules to be applied to what is already open, in the

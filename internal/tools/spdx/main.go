@@ -48,8 +48,9 @@ const (
 
 // generated is files a third party's tool writes whole, which a header would
 // be taken off every time they are written.
-var generated = map[string]string{
-	"web/src/api/schema.d.ts": "written whole by openapi-typescript from the API document",
+var generated = map[string]bool{
+	// Written whole by openapi-typescript from the API document.
+	"web/src/api/schema.d.ts": true,
 }
 
 // styleOf is how a file writes a comment, or none where it is not source.
@@ -71,16 +72,16 @@ func styleOf(file string) style {
 	return none
 }
 
-// covered says whether a file is held to a header, and why not where it is
-// not.
-func covered(file string) (bool, string) {
+// covered says whether a file is held to a header. A fixture is not, and
+// neither is a generated file.
+func covered(file string) bool {
 	if strings.HasPrefix(file, "testdata/") || strings.Contains(file, "/testdata/") {
-		return false, "a fixture"
+		return false
 	}
-	if why, is := generated[file]; is {
-		return false, why
+	if generated[file] {
+		return false
 	}
-	return styleOf(file) != none, ""
+	return styleOf(file) != none
 }
 
 // licenseOf is the expression a file states: this tree's own, joined with the
@@ -197,7 +198,7 @@ func main() {
 		if file == "" {
 			continue
 		}
-		if in, _ := covered(file); !in {
+		if !covered(file) {
 			continue
 		}
 		content, err := os.ReadFile(file) //nolint:gosec // G304: a path git lists in this checkout

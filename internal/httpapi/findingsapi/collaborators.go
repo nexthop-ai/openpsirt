@@ -58,7 +58,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Product       string `path:"product"`
 			Vulnerability string `path:"vulnerability"`
 		}) (*core.ListOutput[CollaboratorBody], error) {
-			subject, _, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
@@ -97,7 +97,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Vulnerability string `path:"vulnerability"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
-			subject, _, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
@@ -173,7 +173,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Vulnerability string `path:"vulnerability"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
-			subject, _, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
@@ -268,7 +268,7 @@ func collaboratorBodies(ctx context.Context, in core.Deps, productID, issueID in
 // caseAt resolves a product and an issue for the collaborator endpoints, and
 // answers "no such finding" for anything the caller may not reach.
 func caseAt(ctx context.Context, in core.Deps, product, vulnerability string) (
-	access.Subject, *access.Store, int64, int64, error) {
+	access.Subject, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, false)
 }
@@ -302,17 +302,17 @@ func namedCase(ctx context.Context, in core.Deps, productID, issueID int64) (str
 // operation and the check in the handler saying different things — and the
 // annotation is what the generated reference tells an operator the rule is.
 func caseAtTriaging(ctx context.Context, in core.Deps, product, vulnerability string) (
-	access.Subject, *access.Store, int64, int64, error) {
+	access.Subject, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, true)
 }
 
 func caseAtHolding(ctx context.Context, in core.Deps, product, vulnerability string,
-	triaging bool) (access.Subject, *access.Store, int64, int64, error) {
+	triaging bool) (access.Subject, int64, int64, error) {
 
 	subject, err := core.Reading(ctx)
 	if err != nil {
-		return access.Subject{}, nil, 0, 0, err
+		return access.Subject{}, 0, 0, err
 	}
 	// A route about one named issue, so the wider of the two rules: somebody
 	// brought into a case here holds nothing on the product and is still
@@ -320,17 +320,17 @@ func caseAtHolding(ctx context.Context, in core.Deps, product, vulnerability str
 	// decided below, by the issue rather than by the product.
 	named, err := core.ProductForIssue(ctx, in, subject, product)
 	if err != nil {
-		return access.Subject{}, nil, 0, 0, err
+		return access.Subject{}, 0, 0, err
 	}
 	if triaging && !subject.TriagesIn(named.ID) {
 		// Asked before the name is resolved further, so a refusal says
 		// nothing about whether the issue is here.
-		return access.Subject{}, nil, 0, 0,
+		return access.Subject{}, 0, 0,
 			huma.Error403Forbidden("not authorized")
 	}
 	issueID, err := core.IssueHere(ctx, in, subject, named.ID, vulnerability)
 	if err != nil {
-		return access.Subject{}, nil, 0, 0, err
+		return access.Subject{}, 0, 0, err
 	}
-	return subject, access.NewStore(in.DB.DB), named.ID, issueID, nil
+	return subject, named.ID, issueID, nil
 }
