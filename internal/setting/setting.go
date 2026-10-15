@@ -420,6 +420,14 @@ const DefaultUploadsAtOnce = 4
 // a disk.
 const DefaultAttachmentMaxSize = 25 << 20
 
+// MostAttachmentMaxSize is the largest value AttachmentMaxSize may be set to.
+//
+// An upload is written to scratch space whole as it arrives, and that space is
+// sized for UploadsAtOnce of the largest request a route takes. 512 MiB is the
+// scan route's request at the shipped inventory bound, so an attachment never
+// becomes the larger of the two.
+const MostAttachmentMaxSize = 512 << 20
+
 // DefaultAttachmentQuota is what a deployment holds in total where nobody has
 // said. Four hundred files at the default size, which is a working year for a
 // team and small enough that filling it is noticed rather than invoiced.

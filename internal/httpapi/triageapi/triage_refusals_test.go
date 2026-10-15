@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func TestTheNewEndpointsAnswerRatherThanExist(t *testing.T) {
@@ -233,6 +235,24 @@ func TestASettingThatWouldReadAsUnsetIsRefused(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, cap,
 			`{"value":"5"}`); got.Code != http.StatusNoContent {
 			t.Errorf("setting the cap answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAnAttachmentSizeAboveItsCeilingIsRefused(t *testing.T) {
+	// Every upload is written to scratch space whole as it arrives, and the
+	// space is sized for the largest request a route takes.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		at := "/v1/settings/attachment.max-size"
+		over := strconv.Itoa(setting.MostAttachmentMaxSize + 1)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, at,
+			`{"value":"`+over+`"}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a size past the ceiling was accepted: %d %s", got.Code, got.Body.String())
+		}
+		most := strconv.Itoa(setting.MostAttachmentMaxSize)
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, at,
+			`{"value":"`+most+`"}`); got.Code != http.StatusNoContent {
+			t.Errorf("a size at the ceiling answered %d: %s", got.Code, got.Body.String())
 		}
 	})
 }

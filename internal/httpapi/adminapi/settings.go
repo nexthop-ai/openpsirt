@@ -234,7 +234,7 @@ var settable = []struct {
 		setting.Switch, theSwitch, func(core.Deps) string { return setting.Off }, false},
 	{setting.AttachmentMaxSize, "Maximum attachment size", setting.Limits,
 		"The largest single file this deployment accepts",
-		"",
+		"At most 512 MiB. Each upload is written to scratch space whole as it arrives.",
 		setting.Size, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
 	{setting.AttachmentQuota, "Total attachment storage", setting.Limits,
 		"How much this deployment holds in attachments in total",
@@ -301,6 +301,12 @@ var inDays = map[string]struct{ because, example string }{
 	setting.QuietAfter:        {"a build's silence is shown in days", "168h for a week"},
 }
 
+// atMost is the count and size settings that take no value above a compiled
+// ceiling, with the ceiling.
+var atMost = map[string]int{
+	setting.AttachmentMaxSize: setting.MostAttachmentMaxSize,
+}
+
 // theSwitch is the two values an on-or-off setting may take.
 var theSwitch = []string{setting.On, setting.Off}
 
@@ -353,6 +359,7 @@ func registerSettings(api huma.API, in core.Deps) {
 			"them — `72h`, `30m` — and a value that cannot be read is refused rather than " +
 			"stored, since a setting nothing can parse is a policy silently reverting to the " +
 			"shipped one.\n\n" +
+			"A size above the most a setting takes is refused, naming the most.\n\n" +
 			"Only the settings this deployment recognizes may be set. A name it does not know is " +
 			"refused, because storing it would create something nothing ever reads.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
@@ -393,6 +400,11 @@ func registerSettings(api huma.API, in core.Deps) {
 				return nil, huma.Error422UnprocessableEntity(
 					fmt.Sprintf("%q is not a count — write a whole number above zero",
 						input.Body.Value))
+			}
+			if most, capped := atMost[input.Name]; capped && n > most {
+				return nil, huma.Error422UnprocessableEntity(
+					fmt.Sprintf("%q is more than this setting takes — write at most %d",
+						input.Body.Value, most))
 			}
 		case setting.Percent:
 			n, err := strconv.Atoi(input.Body.Value)

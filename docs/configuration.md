@@ -522,6 +522,12 @@ environment rather than a key somebody stored.
 | `OPENPSIRT_ATTACHMENT_ALLOW_HTTP` | `attachments.allow_http` | Accept an endpoint that is not `https` and is not this machine. Read what it costs below before setting it | off |
 | `OPENPSIRT_ATTACHMENT_DIR` | `attachments.dir` | A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set | unset |
 
+How large one file may be, how much the deployment holds and how much one
+person may hold are settings an administrator changes in the application. One
+file is at most 512 MiB, and a larger value is refused: each upload is written
+to scratch space whole as it arrives, and the chart sizes that space for the
+largest request a route takes.
+
 An endpoint that is not `https` is refused, because a file is handed over as a
 redirect to a signed address and that address is a bearer token: anybody on the
 path between the browser and the store may spend it for the file it names.

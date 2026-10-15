@@ -28068,6 +28068,8 @@ paths:
       description: |-
         Sets one value for everybody here. Durations are written the way Go writes them — `72h`, `30m` — and a value that cannot be read is refused rather than stored, since a setting nothing can parse is a policy silently reverting to the shipped one.
 
+        A size above the most a setting takes is refused, naming the most.
+
         Only the settings this deployment recognizes may be set. A name it does not know is refused, because storing it would create something nothing ever reads.
 
         Requires: administrator
