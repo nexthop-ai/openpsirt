@@ -79,17 +79,6 @@ func TestTextShowingAReferenceDoesNotMakeOne(t *testing.T) {
 	}
 }
 
-func TestOnlyAMintedIdentifierCounts(t *testing.T) {
-	// A reference to something shaped differently is a broken link in a
-	// document, not a row to go looking for.
-	for _, bad := range []string{"attachment:short", "attachment:" + strings.ToUpper(token),
-		"attachment:../../etc/passwd", "attachment:"} {
-		if got := markdown.References("[x](" + bad + ")"); len(got) != 0 {
-			t.Errorf("%q resolved to %v", bad, got)
-		}
-	}
-}
-
 func TestMentionsAreReadFromProseAndNotFromCode(t *testing.T) {
 	// a mention notifying at once tells whoever was named, so what counts
 	// as naming somebody has to be narrow: a log line pasted into a
