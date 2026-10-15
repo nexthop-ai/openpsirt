@@ -377,6 +377,9 @@ func matches(decoder *json.Decoder, limits Limits, result *Result) error {
 		if err := decoder.Decode(&match); err != nil {
 			return err
 		}
+		// Every string a match carries may be stored, and the query builder
+		// refuses a NUL on two of the engines.
+		bound.TextIn(&match)
 		reported, err := reported(match, limits)
 		if err != nil {
 			return err

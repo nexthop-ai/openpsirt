@@ -250,7 +250,7 @@ func (f *fixture) putOffAtTwoVersions(t *testing.T, place string, from, until ti
 		t.Fatalf("record a claim: %v", err)
 	}
 	for _, version := range []string{"1.2.3", "1.2.4"} {
-		live := fmt.Sprintf("%d\x00%s\x00%s", f.product, place, version)
+		live := fmt.Sprintf("%d|%s|%s", f.product, place, version)
 		row := &triage.Decision{
 			ClaimID: claim.ID, ProductID: f.product, VulnerabilityID: f.issue,
 			PlaceIdentity: place, Visibility: access.Public, LiveKey: &live,

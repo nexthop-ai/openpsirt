@@ -13,10 +13,11 @@ import (
 )
 
 // A NUL character is refused in every typed input: a query parameter, a path
-// value, a form field and a string in a JSON body. The query builder refuses a
-// string holding one, so a value carrying it could be neither stored nor
-// matched, and the request would fail where nothing could say why. An uploaded
-// file is not typed input and keeps its own handling.
+// value, a form field and a string in a JSON body. On PostgreSQL and SQLite the
+// query builder refuses a string holding one, so the request would fail where
+// nothing could say why; on MySQL and MariaDB it drops one, so the same request
+// would be answered differently by engine. An uploaded file is not typed input
+// and keeps its own handling.
 
 // HoldsNUL reports whether s carries a NUL character.
 func HoldsNUL(s string) bool { return strings.IndexByte(s, 0) >= 0 }

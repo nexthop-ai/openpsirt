@@ -632,7 +632,8 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	// The attempt count and the write that acts on it are read in one
 	// transaction, so whether this was the last attempt rests on the value
 	// the statement that buries or re-queues the job was written against.
-	said := head(cause.Error(), mostOfAnError)
+	// A scanner's standard error is quoted in it, in bytes of its choosing.
+	said := head(bound.Text(cause.Error()), mostOfAnError)
 	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		job := new(Job)

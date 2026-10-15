@@ -668,6 +668,7 @@ sign-ins, which has to be swept and which anybody can fill.
 | The proof key is sent as a digest and kept as the secret it hashes | An authorization code taken in flight being exchanged by whoever took it |
 | The identity token must carry the value tying it to this sign-in | It belonging to a different one |
 | An identity token naming no subject is refused | Quietly reducing that deployment to matching by name |
+| An identity carrying a NUL character in its subject, username, name, address or groups is refused | An identity is matched exactly, so dropping the character would make two identities one, and a NUL fails the statement on two of the engines |
 | A provider's stated address is recorded only where the provider says it verified it | Mail about an undisclosed finding going to whatever address an account holder typed. No address redeems an authorization: the username claim alone does |
 | The sealed value carries when it was minted, and a stale one is refused | The window being a request to the browser and nothing else. The browser holding the value may be the one that planted it, and the key sealing it is never rotated — so without a time in the payload a sign-in sealed months ago stays acceptable |
 

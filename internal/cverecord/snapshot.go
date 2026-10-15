@@ -224,6 +224,7 @@ func readLines(r io.Reader) (*Snapshot, error) {
 		if err := json.Unmarshal(lines.Bytes(), &record); err != nil {
 			return nil, fmt.Errorf("read a record in the CVE record snapshot: %w", err)
 		}
+		bound.TextIn(&record)
 		id := strings.ToUpper(strings.TrimSpace(record.ID))
 		if id == "" {
 			continue

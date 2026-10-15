@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -591,7 +592,7 @@ const MostSummary = 300
 
 // clip shortens text to a bound, on a rune boundary, and trims what is left.
 func clip(text string, most int) string {
-	text = strings.Join(strings.Fields(text), " ")
+	text = strings.Join(strings.Fields(bound.Text(text)), " ")
 	if len([]rune(text)) <= most {
 		return text
 	}

@@ -211,8 +211,10 @@ not cause it and cannot fix it.
 ### NUL characters
 
 A NUL character in typed input is refused with a 400 naming the input that
-held it. The query builder refuses a string holding one, so carried through it
-fails the request as a fault with nothing to say why.
+held it. On PostgreSQL and SQLite the query builder refuses a string holding
+one, so carried through it fails the request as a fault with nothing to say
+why. On MySQL and MariaDB it drops one, so one deployment would match what
+another refuses.
 
 | Input | Where it is checked |
 |---|---|

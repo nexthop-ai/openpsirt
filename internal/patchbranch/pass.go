@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -641,9 +640,8 @@ func (p *Pass) finish(ctx context.Context, before repositoryRow, dir string, fai
 		update = update.Set(`"fetched_at" = ?`, utc(before.FetchedAt)).Set(`"failed" = ?`, before.Failed).
 			Set(`"ended_at" = ?`, utc(before.EndedAt))
 	case failed != nil:
-		// git quotes what the remote said, in bytes of the remote's choosing,
-		// and the query builder refuses a NUL in any string it is handed.
-		reason := strings.ReplaceAll(failed.Error(), "\x00", "")
+		// git quotes what the remote said, in bytes of the remote's choosing.
+		reason := bound.Text(failed.Error())
 		update = update.Set(`"failed" = ?`, bound.HeadRunes(reason, MostReason)).
 			Set(`"ended_at" = ?`, p.Now().UTC())
 	default:

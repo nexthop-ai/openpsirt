@@ -635,7 +635,7 @@ func chatText(text, link string) string {
 const mostOfAFailure = 400
 
 // trimTo bounds what is stored of a failure.
-func trimTo(text string, most int) string { return bound.Head(text, most) }
+func trimTo(text string, most int) string { return bound.Head(bound.Text(text), most) }
 
 // outboundClient is how a request leaves here: outward's client for an
 // address an administrator configured. https only, no user in the address, and

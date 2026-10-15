@@ -152,6 +152,14 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		refuseSignIn(w, in)
 		return
 	}
+	if part, carried := identity.NUL(); carried {
+		if in.Logger != nil {
+			in.Log().Warn("a sign-in was refused because the provider's identity carries a NUL character",
+				"provider", provider.Name(), "part", part)
+		}
+		refuseSignIn(w, in)
+		return
+	}
 
 	rights := access.NewStore(in.DB.DB)
 

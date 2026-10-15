@@ -47,6 +47,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
@@ -234,6 +235,9 @@ func (c *Client) getAs(ctx context.Context, at, accept string, into any) error {
 		// for this name rather than a bad day, so it is recorded.
 		return fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
 	}
+	// An index's every string may be stored, and the query builder refuses
+	// a NUL on two of the engines.
+	bound.TextIn(into)
 	return nil
 }
 

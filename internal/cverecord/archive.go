@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
@@ -251,6 +252,9 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 	if err := json.NewDecoder(io.LimitReader(opened, int64(largestRecord))).Decode(&doc); err != nil {
 		return Record{}, time.Time{}, false, err
 	}
+	// A record's every string may be stored, and the query builder refuses
+	// a NUL on two of the engines.
+	bound.TextIn(&doc)
 	updated := time.Time(doc.Metadata.Updated)
 	if !strings.EqualFold(doc.Metadata.State, "PUBLISHED") {
 		return Record{}, updated, false, nil

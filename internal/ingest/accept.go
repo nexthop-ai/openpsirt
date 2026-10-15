@@ -429,7 +429,8 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 	}
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
 		Set(`"status" = ?`, Failed).
-		Set(`"failure" = ?`, truncate(reason, 2000)).
+		// A refusal may quote the document it refuses, NUL included.
+		Set(`"failure" = ?`, truncate(bound.Text(reason), 2000)).
 		Where(`"id" = ?`, id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record that scan %d failed: %w", id, err)

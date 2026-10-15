@@ -44,6 +44,27 @@ type Identity struct {
 	Groups []string
 }
 
+// NUL names the first part of an identity holding a NUL character, and
+// reports whether one does. An identity is matched exactly, so dropping the
+// character would make two different identities one; and the query builder
+// refuses a string holding one on two of the engines.
+func (i Identity) NUL() (string, bool) {
+	for _, part := range []struct{ name, value string }{
+		{"subject", i.Subject}, {"provider", i.Provider}, {"username", i.Username},
+		{"display name", i.DisplayName}, {"email", i.Email},
+	} {
+		if strings.IndexByte(part.value, 0) >= 0 {
+			return part.name, true
+		}
+	}
+	for _, group := range i.Groups {
+		if strings.IndexByte(group, 0) >= 0 {
+			return "groups", true
+		}
+	}
+	return "", false
+}
+
 // Pending is what has to survive the round trip to the provider.
 //
 // It is held by the browser rather than here, in a cookie the browser cannot

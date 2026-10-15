@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -122,6 +123,12 @@ func (b *bounded) token() (json.Token, error) {
 	tok, err := b.dec.Token()
 	if errors.Is(err, io.ErrUnexpectedEOF) && b.src.err == nil {
 		return nil, refusal.New("the document ends partway through a value")
+	}
+	// Every string a document carries may reach the database, and the query
+	// builder refuses a NUL on two of the engines. The decoder has already
+	// replaced each invalid byte.
+	if s, ok := tok.(string); ok && strings.IndexByte(s, 0) >= 0 {
+		tok = strings.ReplaceAll(s, "\x00", "")
 	}
 	return tok, err
 }

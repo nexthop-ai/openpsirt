@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -613,9 +614,9 @@ func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersio
 	// A scanner writes what it likes to standard error, and the failure and
 	// the caution quote it. A run whose end cannot be recorded stays open.
 	_, err := s.db.NewUpdate().Model((*Run)(nil)).
-		Set(`"finished_at" = ?`, done).Set(`"failure" = ?`, asText(failure)).
-		Set(`"caution" = ?`, asText(caution)).
-		Set(`"scanner_version" = ?`, asText(version)).Set(`"database_version" = ?`, asText(databaseVersion)).
+		Set(`"finished_at" = ?`, done).Set(`"failure" = ?`, bound.Text(failure)).
+		Set(`"caution" = ?`, bound.Text(caution)).
+		Set(`"scanner_version" = ?`, bound.Text(version)).Set(`"database_version" = ?`, bound.Text(databaseVersion)).
 		Where(`"id" = ?`, runID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the end of scan run %d: %w", runID, err)

@@ -24,6 +24,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -1016,7 +1017,7 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
-		answered := refusal.Errorf("that publisher answered %s", res.Status)
+		answered := refusal.Errorf("that publisher answered %s", bound.Text(res.Status))
 		switch {
 		case later(res.StatusCode), res.StatusCode >= 500:
 			// About reaching the publisher: asked again, the same address
@@ -1055,6 +1056,9 @@ func (f *Fetcher) json(ctx context.Context, client *http.Client, address string,
 		// than about reaching the publisher.
 		return unreadable{err: err}
 	}
+	// A publisher's every string may be stored, and the query builder
+	// refuses a NUL on two of the engines.
+	bound.TextIn(into)
 	return nil
 }
 

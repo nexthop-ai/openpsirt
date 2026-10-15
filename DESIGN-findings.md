@@ -1150,7 +1150,7 @@ question asked years later.
 | Stored claim | |
 |---|---|
 | A statement's reasoning is stored once, and each of its claims points at it | One statement naming five thousand components gives one explanation five thousand times. Two documents giving the same words share the copy. Every reader of a claim's words joins them: a finding's claim, the carried patches, the disposition register and the VEX document |
-| The reasoning is cut to the bound a markdown field typed here is held to, and kept | One over-long explanation is no reason to refuse the scan or the document carrying it. The cut lands on a character. A NUL is dropped and invalid UTF-8 replaced before the words are keyed. The query builder refuses a NUL and replaces invalid UTF-8 the same way, so the words keyed are the words stored |
+| The reasoning is cut to the bound a markdown field typed here is held to, and kept | One over-long explanation is no reason to refuse the scan or the document carrying it. The cut lands on a character. A NUL is dropped and invalid UTF-8 replaced before the words are keyed. The query builder replaces invalid UTF-8 the same way and is never handed a NUL, so the words keyed are the words stored |
 | The issue's identifier and the justification are cut to an indexed name's width | Every claim of a statement repeats them |
 
 A supplier's statement is stored the same way (`DESIGN-triage.md` § Evidence
