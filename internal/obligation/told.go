@@ -133,8 +133,8 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 			"say what they were told. A notice is read later by somebody answering for it, " +
 				"and what was said is the part they cannot find anywhere else")
 	}
-	if len(said) > triage.GroundsLimit {
-		return nil, refusal.Errorf("what they were told is longer than %d bytes", triage.GroundsLimit)
+	if len(said) > markdown.MaxBytes {
+		return nil, refusal.Errorf("what they were told is longer than %d bytes", markdown.MaxBytes)
 	}
 	if err := markdown.Check(said); err != nil {
 		return nil, err
