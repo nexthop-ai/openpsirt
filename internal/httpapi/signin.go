@@ -433,9 +433,10 @@ type inProgress struct {
 // domain vouch for somebody else's page, and it is the classic bug in exactly
 // this flow. So the address is a path here or it is discarded:
 //
-//   - it starts with a single "/", so no scheme and no host;
-//   - it does not start with "//" or "/", which browsers read as
-//     protocol-relative and would send the browser to another host;
+//   - it starts with "/", so no scheme and no host;
+//   - it does not start with two slashes, or with a slash and a backslash,
+//     which browsers read as protocol-relative and would send the browser to
+//     another host;
 //   - it parses, and carries no scheme or host of its own.
 //
 // Anything else becomes the home page. Refusing to sign somebody in over it

@@ -38,7 +38,7 @@ type CollaboratorBody struct {
 // engineer who normally sees only public findings and is needed on one
 // embargoed flaw in their own component.
 //
-// Anybody holding private triage on the product manages the list, rather
+// Anybody who reads private findings on the product manages the list, rather
 // than an administrator: knowing who needs to be on a case is knowing the case,
 // and routing that through somebody who does not read it would make the
 // administrator the bottleneck on every embargo.

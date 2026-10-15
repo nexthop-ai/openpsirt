@@ -613,9 +613,8 @@ var outsideTheTrail = map[string]string{
 // the server builds and fails on a write that nobody has classified.
 //
 // This is the half that catches the next route rather than the last one. A
-// literal of twelve acts walks nothing, whatever the comment at
-// internal/httpapi/core/trail.go claims, and leaves nine administrative writes
-// recording nothing with the suite green.
+// literal list of acts walks nothing, and a write added beside it records
+// nothing with the suite green.
 func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		trailed := map[string]bool{}
@@ -639,7 +638,7 @@ func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 				case trailed[operation.OperationID], outsideTheTrail[operation.OperationID] != "":
 				default:
 					t.Errorf("%s %s (%s) is neither trailed nor deliberately outside the trail: "+
-						"record it with noteChange, or say in outsideTheTrail why it leaves no row",
+						"record it with core.Noted, or say in outsideTheTrail why it leaves no row",
 						operation.Method, operation.Path, operation.OperationID)
 				}
 			}
@@ -760,10 +759,10 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 // note is written in.
 //
 // Deactivating somebody ends their sessions and hands their work back, and
-// both of those can answer 500 with the deactivation already written. Recorded
-// afterwards, that left a person who cannot sign in and nothing saying who
-// stopped them — permanently, because the second attempt finds nothing to move
-// and returns before reaching the note at all.
+// both of those can answer 500 with the deactivation already written. The note
+// is written first: recorded afterwards, a failure leaves a person who cannot
+// sign in and nothing saying who stopped them, permanently, because the second
+// attempt finds nothing to move and returns before reaching the note at all.
 func TestADeactivationIsRecordedEvenWhenTheRestOfTheActFails(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",

@@ -347,8 +347,9 @@ func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject)
 			continue
 		}
 		at := Stamp(*row.LastReceivedAt)
-		// The newest across a product's builds. Rows arrive quietest first,
-		// so the last one to win is the most recent.
+		// The newest across a product's builds, whatever order the rows
+		// arrive in. Every stamp is UTC and the same width, so they compare
+		// as strings.
 		if at > seen[row.Product] {
 			seen[row.Product] = at
 		}
