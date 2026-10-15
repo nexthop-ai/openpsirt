@@ -104,7 +104,7 @@ func TestARemoteErrorInBytesThatAreNotTextIsRecordedAndWaitsADay(t *testing.T) {
 		// A git that dies the way it does when a remote answers its
 		// advertisement with an error in bytes of the remote's choosing.
 		wrapper := filepath.Join(t.TempDir(), "git")
-		script := "#!/bin/sh\nprintf 'fatal: remote error: caf\\351 \\377\\376\\n' >&2\nexit 128\n"
+		script := "#!/bin/sh\nprintf 'fatal: remote error: caf\\351 \\377\\376\\000 and so on\\n' >&2\nexit 128\n"
 		if err := os.WriteFile(wrapper, []byte(script), 0o700); err != nil { //nolint:gosec // G306: the wrapper has to be executable
 			t.Fatal(err)
 		}
@@ -121,7 +121,8 @@ func TestARemoteErrorInBytesThatAreNotTextIsRecordedAndWaitsADay(t *testing.T) {
 			t.Fatalf("the report says %+v, want the repository failed", repositories)
 		}
 		reason := repositories[0].Reason
-		if !strings.Contains(reason, "remote error: caf\uFFFD") || !utf8.ValidString(reason) {
+		if !strings.Contains(reason, "remote error: caf\uFFFD") || !strings.Contains(reason, " and so on") ||
+			strings.Contains(reason, "\x00") || !utf8.ValidString(reason) {
 			t.Errorf("the reason recorded is %q", reason)
 		}
 		if visited, err := pass.Once(ctx); err != nil || visited != "" {

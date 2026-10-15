@@ -610,10 +610,12 @@ func (s *Store) Finish(ctx context.Context, runID int64, version, databaseVersio
 	default:
 		failure = cause.Error()
 	}
+	// A scanner writes what it likes to standard error, and the failure and
+	// the caution quote it. A run whose end cannot be recorded stays open.
 	_, err := s.db.NewUpdate().Model((*Run)(nil)).
-		Set(`"finished_at" = ?`, done).Set(`"failure" = ?`, failure).
-		Set(`"caution" = ?`, caution).
-		Set(`"scanner_version" = ?`, version).Set(`"database_version" = ?`, databaseVersion).
+		Set(`"finished_at" = ?`, done).Set(`"failure" = ?`, asText(failure)).
+		Set(`"caution" = ?`, asText(caution)).
+		Set(`"scanner_version" = ?`, asText(version)).Set(`"database_version" = ?`, asText(databaseVersion)).
 		Where(`"id" = ?`, runID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the end of scan run %d: %w", runID, err)

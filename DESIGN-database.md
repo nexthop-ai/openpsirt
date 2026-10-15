@@ -1333,14 +1333,14 @@ A cut is made on a character boundary, never at a byte offset.
 | Rule | Reason |
 |---|---|
 | A value shortened to fit a width is cut between characters | A byte offset lands inside a multi-byte character about two times in three, and what is left is not valid UTF-8 |
-| The query builder writes text as valid UTF-8 | It writes every value into the statement text, character by character: an invalid byte becomes U+FFFD and a NUL is dropped. A cut inside a character is stored with a replacement character where its last character was |
-| Text another program wrote is stored however it is encoded | A scanner's standard error and git's account of what a remote said carry whatever bytes they carry. Each engine refuses an invalid byte or a NUL handed to it as a parameter — PostgreSQL always, MySQL and MariaDB in strict mode — and none is handed one, because the builder sends none |
+| The query builder writes text as valid UTF-8, and refuses a NUL | It writes every value into the statement text, character by character: an invalid byte becomes U+FFFD. A cut inside a character is stored with a replacement character where its last character was. A string holding a NUL fails the statement before it reaches the engine |
+| Text another program wrote is stored however it is encoded | A scanner's standard error and git's account of what a remote said carry whatever bytes they carry. Each engine refuses an invalid byte or a NUL handed to it as a parameter — PostgreSQL always, MySQL and MariaDB in strict mode. Each NUL is dropped before the text reaches the builder, and the builder replaces each invalid byte |
 | The two directions are separate operations | Keeping the head leaves the partial character at the end and keeping the tail leaves it at the front, so one of them trims backward and the other forward |
 | Both live in one place | Every site wrote its own slice, and the ones that were correct were written by people who had already been bitten. The cut is one fact, so it is written once and called |
 
 A test on each of the four engines ends a scan run with a failure, a caution
 and versions carrying invalid bytes and a NUL, and records a patch repository's
-failure quoting a remote error in invalid bytes: each is stored, valid, with
+failure quoting a remote error in invalid bytes and a NUL: each is stored, valid, with
 the text around the bytes kept, and the repository waits its day.
 
 A lookup key is cut in characters, which is how its column is declared; a
