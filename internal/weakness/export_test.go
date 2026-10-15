@@ -17,3 +17,12 @@ func All() map[string]string {
 	}
 	return out
 }
+
+// Common is every identifier the screen's own list names, in its order.
+func Common() []string {
+	out := make([]string, 0, len(common))
+	for _, each := range common {
+		out = append(out, each.id)
+	}
+	return out
+}

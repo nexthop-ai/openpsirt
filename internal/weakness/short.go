@@ -90,7 +90,8 @@ type Named struct {
 }
 
 // shortNames and rank are the common list keyed by identifier, and ordered is
-// every identifier either list names, most common first.
+// every identifier the catalog names, most common first. Every identifier on
+// the common list is one the catalog names, which a test holds.
 var (
 	shortNames = map[string]string{}
 	rank       = map[string]int{}
@@ -104,11 +105,6 @@ func init() {
 	}
 	for id := range names {
 		ordered = append(ordered, id)
-	}
-	for id := range shortNames {
-		if _, known := names[id]; !known {
-			ordered = append(ordered, id)
-		}
 	}
 	sort.Slice(ordered, func(i, j int) bool { return before(ordered[i], ordered[j]) })
 }
