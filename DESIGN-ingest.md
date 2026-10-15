@@ -136,6 +136,7 @@ that had in fact succeeded.
 | The label on a part is not trusted | What a part is gets decided by reading it. A build pushing a file with an ordinary command-line client labels it as opaque bytes |
 | A large part is not held in memory | Parts above a few kilobytes are spilled to a temporary file for the length of the request. The deployment therefore needs a writable temporary path despite a read-only root filesystem, which the packaging provides |
 | The temporary path holds at most `upload.max-concurrent` of the largest requests | The setting bounds how many uploads one server reads at once, across the scan, attachment and import routes, and a place is held until the request is answered, because the spilled files are removed only then. Four at the shipped values, each up to 512 MiB for a scan |
+| The places are one pool for the server, shared by every sender, with no share per sender or per route | The pool is what bounds the temporary path, and that bound is per server. A sender holds a place only after it is authorized, and only until the request's read deadline, so one sender holding every place is a credential somebody issued, sending slowly on purpose |
 | An upload a sender may not make spills nothing | A pipeline key for one product, or a person holding no role on it, is refused before the form is read, in the words the handler refuses in. A product the sender may not see answers as one nobody declared |
 
 ## The arrival decision
