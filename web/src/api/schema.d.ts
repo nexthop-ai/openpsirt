@@ -4867,6 +4867,8 @@ export interface paths {
          *
          *     A VEX document is refused here and taken by the VEX endpoint instead.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
+         *
          *     Requires: administrator
          */
         post: operations["upload-supplier-advisory"];
@@ -5016,6 +5018,8 @@ export interface paths {
          *     OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
          *
          *     A CSAF security advisory is refused here and taken by the supplier-advisory endpoint instead. It is a document about somebody's own flaws, one per issue, and what a later upload of it replaces is the advisory of the same name rather than everything that publisher has said.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
          *
          *     Requires: administrator
          */

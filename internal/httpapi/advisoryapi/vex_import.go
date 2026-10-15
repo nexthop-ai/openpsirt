@@ -118,7 +118,9 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"A CSAF security advisory is refused here and taken by the supplier-advisory " +
 			"endpoint instead. It is a document about somebody's own flaws, one per issue, " +
 			"and what a later upload of it replaces is the advisory of the same name rather " +
-			"than everything that publisher has said.",
+			"than everything that publisher has said." +
+			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
+			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,
 		// A published document is somebody else's output arriving over a link
 		// we do not control, exactly as a scan file is, and this is the first

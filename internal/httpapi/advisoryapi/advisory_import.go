@@ -59,7 +59,9 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 			"readable. It is matched on the name the publisher gave it, so everything else " +
 			"that publisher has issued stays standing — which is the difference from a VEX " +
 			"document, where a publisher's whole statement set is replaced at once.\n\n" +
-			"A VEX document is refused here and taken by the VEX endpoint instead.",
+			"A VEX document is refused here and taken by the VEX endpoint instead." +
+			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
+			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,
 		// A published document is somebody else's output arriving over a link
 		// we do not control, exactly as a scan file is, and this is the first
