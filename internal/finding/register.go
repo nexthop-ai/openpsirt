@@ -438,7 +438,7 @@ func outcomeOf(decision string) string {
 // rankOf orders the live decisions at one place the way the finding's screen
 // does: a correction in force before anything else.
 func rankOf(decision string) string {
-	return `(CASE WHEN ` + outcomeOf(decision) + ` = '` + Mismatched + `'
+	return `(CASE WHEN ` + outcomeOf(decision) + ` = '` + OutcomeMismatched + `'
 		AND (` + decision + `.state = 'approved'
 		  OR (` + decision + `.needs_approval = FALSE AND ` + decision + `.sent_back_at IS NULL))
 		THEN 0 ELSE 1 END)`

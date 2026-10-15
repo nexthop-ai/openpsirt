@@ -26,14 +26,6 @@ const (
 // ReleaseStatuses is every status a document can state about a release.
 func ReleaseStatuses() []string { return []string{KnownAffected, KnownNotAffected, Fixed} }
 
-// The outcomes a covering decision states, as the triage vocabulary spells
-// them.
-const (
-	notApplicable = "not-applicable"
-	alreadyFixed  = "already-fixed"
-	wontFix       = "wont-fix"
-)
-
 // Release is one build of the product and where it stands on the issue.
 type Release struct {
 	StreamID  int64
@@ -102,7 +94,7 @@ func (r Release) MadeElsewhere() bool {
 // NoFixPlanned says the release is stated affected because approved decisions
 // that it will not be fixed cover every open place of the issue there.
 func (r Release) NoFixPlanned() bool {
-	return r.Holds && r.Grounds != nil && r.Grounds.Outcome == wontFix
+	return r.Holds && r.Grounds != nil && r.Grounds.Outcome == finding.OutcomeWontFix
 }
 
 // Name is how the release is written in the document.
@@ -125,10 +117,10 @@ func (r Release) Decided() string {
 		return Fixed
 	case r.Grounds == nil:
 		return KnownAffected
-	case (r.Grounds.Outcome == notApplicable || r.Grounds.Outcome == finding.Mismatched) &&
+	case (r.Grounds.Outcome == finding.OutcomeNotApplicable || r.Grounds.Outcome == finding.OutcomeMismatched) &&
 		r.Grounds.Reason != "":
 		return KnownNotAffected
-	case r.Grounds.Outcome == alreadyFixed:
+	case r.Grounds.Outcome == finding.OutcomeAlreadyFixed:
 		return Fixed
 	}
 	return KnownAffected

@@ -394,7 +394,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 // apply, the match is wrong, it will not be fixed, the fix is already here.
 // The triage package owns the outcomes and a test there holds this list to
 // its own.
-var Dismissing = []string{"not-applicable", Mismatched, "wont-fix", "already-fixed"}
+var Dismissing = []string{OutcomeNotApplicable, OutcomeMismatched, OutcomeWontFix, OutcomeAlreadyFixed}
 
 // distinctReferences folds and de-duplicates the names given, in a stable
 // order.

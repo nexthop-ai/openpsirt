@@ -371,7 +371,7 @@ func TestAPlaceSomebodyMarkedAffectedStaysOpen(t *testing.T) {
 			t.Fatal(err)
 		}
 		row := map[string]any{
-			"claim_id":   claimSaying(t, f.db, somebody.ID, finding.AffectedOutcome),
+			"claim_id":   claimSaying(t, f.db, somebody.ID, finding.OutcomeAffected),
 			"product_id": f.productID, "vulnerability_id": issueID,
 			"place_identity": finding.PlaceIdentity(zlib.Name, acmeY.Name), "visibility": "public",
 			"state": "proposed", "needs_approval": false, "proposed_by": somebody.ID,

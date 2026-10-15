@@ -230,13 +230,13 @@ func (s Statement) Prefills() (outcome string, offers bool) {
 		// The one status that *is* a claim of non-applicability, and the
 		// justification is the publisher's own term from the same vocabulary
 		// ours uses.
-		return "not-applicable", true
+		return OutcomeNotApplicable, true
 	case "affected":
 		// They say it applies and they are not fixing it here, which is a
 		// will-not-fix in our vocabulary and never a dismissal.
-		return "wont-fix", true
+		return OutcomeWontFix, true
 	case "fixed":
-		return "already-fixed", true
+		return OutcomeAlreadyFixed, true
 	}
 	// Under investigation offers nothing: it is a publisher saying they do not
 	// know yet, and a prefill from it would be a judgment nobody made.

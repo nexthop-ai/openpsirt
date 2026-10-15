@@ -46,12 +46,6 @@ const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 const Decidable = "(f.closed_at IS NULL OR (f.closed_because = '" + string(Disclaimed) + "' AND " +
 	LatestAtItsPlace + "))"
 
-// AffectedOutcome is the outcome a person records to say an issue applies,
-// named here so the run and the triage package cannot drift on the spelling.
-// A standing decision of it at a place keeps a supplier's statement from
-// closing the finding there.
-const AffectedOutcome = "affected"
-
 // disclaiming is what a run needs to apply suppliers' statements: the
 // statements that can close a finding in this build, the graph they are placed
 // in, and the places a person has said are affected.
@@ -290,7 +284,7 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "component"`).
 		ColumnExpr(`COALESCE(de.consumer_upstream_version, '') AS "consumer"`).
 		Where("de.product_id = ?", productID).
-		Where("cl.outcome = ?", AffectedOutcome).
+		Where("cl.outcome = ?", OutcomeAffected).
 		Where("de.live_key IS NOT NULL").
 		Where(standing, held...).
 		Where(issues, ids...).

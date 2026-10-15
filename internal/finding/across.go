@@ -590,7 +590,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		TableExpr(`"claim" AS "cl"`).
 		ColumnExpr(`cl.id AS "id"`).
 		ColumnExpr(promiseRank+` * ? + cl.id AS "promise"`, promiseSpan).
-		Where("cl.outcome = ?", "upgrade-needed")
+		Where("cl.outcome = ?", OutcomeUpgradeNeeded)
 	// Every build here is in one product — the scope names it — so one bound
 	// identifier is the product a decision is correlated by. One row per
 	// issue and place, so a place under two promises is still one place.

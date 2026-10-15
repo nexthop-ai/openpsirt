@@ -29,7 +29,7 @@ type liveDecision struct {
 }
 
 // anyVersion is whether the claim stands at whatever versions the place holds.
-func (d liveDecision) anyVersion() bool { return d.Outcome == Mismatched }
+func (d liveDecision) anyVersion() bool { return d.Outcome == OutcomeMismatched }
 
 // outranks is whether one decision has more standing than another: approved
 // over proposed, and otherwise the newer.

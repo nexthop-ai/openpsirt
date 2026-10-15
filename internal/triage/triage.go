@@ -13,7 +13,11 @@
 // judgment made about a leaf.
 package triage
 
-// Outcome is what somebody decided about a finding.
+import "github.com/nexthop-ai/openpsirt/internal/finding"
+
+// Outcome is what somebody decided about a finding. Each word is declared
+// from the findings package's spelling, which asks about several of them in
+// the statements it builds.
 //
 // More than two. A vocabulary with only "affects us" and "does not" has
 // nowhere to put the most common real answer, which is "yes, but not now" —
@@ -23,9 +27,9 @@ type Outcome string
 
 const (
 	// Affected means it applies and goes to remediation.
-	Affected Outcome = "affected"
+	Affected Outcome = finding.OutcomeAffected
 	// NotApplicable means it does not affect this product here.
-	NotApplicable Outcome = "not-applicable"
+	NotApplicable Outcome = finding.OutcomeNotApplicable
 	// Mismatched means the scanner matched this against something it is not.
 	// The finding is wrong rather than answered.
 	//
@@ -36,11 +40,11 @@ const (
 	// and wrong for whether the thing is there at all. A version bump does
 	// not make a wrong match right, so without this the same wrong match
 	// comes back at every point release and somebody answers it again.
-	Mismatched Outcome = "mismatched"
+	Mismatched Outcome = finding.OutcomeMismatched
 	// Deferred means it affects us and is not being worked on until a date.
-	Deferred Outcome = "deferred"
+	Deferred Outcome = finding.OutcomeDeferred
 	// WontFix means it affects us and will not be addressed.
-	WontFix Outcome = "wont-fix"
+	WontFix Outcome = finding.OutcomeWontFix
 	// AlreadyFixed means the version shipping here carries the fix,
 	// although nothing here can see that it does.
 	//
@@ -51,7 +55,7 @@ const (
 	// this. It is not "does not affect us" — the code is there and it was
 	// affected — and the exchange format keeps the two apart as well, with
 	// a status of its own rather than a reason under "not affected".
-	AlreadyFixed Outcome = "already-fixed"
+	AlreadyFixed Outcome = finding.OutcomeAlreadyFixed
 	// UpgradeNeeded means the answer here is moving the component to a newer
 	// version, and somebody has committed to doing it by a date.
 	//
@@ -60,7 +64,7 @@ const (
 	// this date", and the scans decide whether it happened — nobody marks
 	// their own work done. Written in bulk from an upgrade rather than one at
 	// a time, because a bump answers many issues at once.
-	UpgradeNeeded Outcome = "upgrade-needed"
+	UpgradeNeeded Outcome = finding.OutcomeUpgradeNeeded
 	// PatchNeeded means the answer here is a backported patch, and the
 	// version does not move.
 	//
@@ -69,7 +73,7 @@ const (
 	// backport closes — the build's next inventory declares the patch it
 	// carries and says what it resolves, so the finding goes without the
 	// version moving, which no version comparison could have seen.
-	PatchNeeded Outcome = "patch-needed"
+	PatchNeeded Outcome = finding.OutcomePatchNeeded
 )
 
 // Outcomes are all of them, in the order a person meets them.

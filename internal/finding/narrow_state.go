@@ -30,7 +30,7 @@ import (
 // Exported because the same question is asked outside this package: what is
 // undecided is what the notification sweep means by work sitting still, and a
 // second spelling of it would be a second definition of "decided".
-const KeyMatches = "(cl.outcome = '" + Mismatched + "' OR (" +
+const KeyMatches = "(cl.outcome = '" + OutcomeMismatched + "' OR (" +
 	"COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr +
 	" AND COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
 
@@ -45,10 +45,6 @@ func keyMatchesOn(decision, outcome string) string {
 	return strings.NewReplacer("cl.outcome", outcome, "de.", decision+".").Replace(KeyMatches)
 }
 
-// Mismatched is the outcome whose claim is about identity, named here so the
-// expression above and the triage package cannot drift on the spelling.
-const Mismatched = "mismatched"
-
 // PlannedFilter is whether a promised upgrade covers a finding.
 type PlannedFilter string
 
@@ -61,10 +57,6 @@ const (
 	// promise takes what it covers out of view.
 	NotPlanned PlannedFilter = "unplanned"
 )
-
-// upgradeNeeded is the outcome that promises a move, named here so the
-// filter and the triage package cannot drift on the spelling.
-const upgradeNeeded = "upgrade-needed"
 
 // DecisionAt is the one spelling of a decision `de`, read beside `dv` through
 // Decisions, being about the finding `f`: the same product, the same issue and
@@ -267,7 +259,7 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 		// deriving this rather than writing a tag.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
-			append(append([]any{}, inForce...), string(upgradeNeeded))...).
+			append(append([]any{}, inForce...), OutcomeUpgradeNeeded)...).
 		// The kind of judgment standing here, counted only for the claim that
 		// currently stands: a dismissal withdrawn eighteen months ago must not
 		// answer for its place, which is the same rule "approved" above holds

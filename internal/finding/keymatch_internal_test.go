@@ -21,7 +21,7 @@ func TestTheVersionMatchUnderAnotherAliasIsTheSameRule(t *testing.T) {
 		}
 	}
 	for _, want := range []string{"d2.component_upstream_version", "d2.consumer_upstream_version",
-		"(SELECT x) = '" + Mismatched + "'", ComponentUpstreamExpr, ConsumerUpstreamExpr} {
+		"(SELECT x) = '" + OutcomeMismatched + "'", ComponentUpstreamExpr, ConsumerUpstreamExpr} {
 		if !strings.Contains(renamed, want) {
 			t.Errorf("renamed, the rule does not name %q: %s", want, renamed)
 		}

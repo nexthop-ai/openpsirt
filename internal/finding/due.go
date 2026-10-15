@@ -268,7 +268,7 @@ func OffTheClock(product string, now time.Time) (string, []any) {
 // the finding off the clock is one that moved its date. The same joins, the
 // same binding order.
 func StandingDeferral(product string, now time.Time) (string, []any) {
-	return offTheClock(product, now, "deferred")
+	return offTheClock(product, now, OutcomeDeferred)
 }
 
 func offTheClock(product string, now time.Time, outcome string) (string, []any) {
