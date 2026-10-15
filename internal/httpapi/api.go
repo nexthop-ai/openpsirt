@@ -305,11 +305,22 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	cfg := huma.DefaultConfig("OpenPSIRT", version.Get().Version)
 	cfg.Info.Description = "Track vulnerabilities in the products you ship.\n\n" +
 		"A request carrying a query parameter the operation does not take is refused " +
-		"with a 400 naming the parameter."
+		"with a 400 naming the parameter.\n\n" +
+		"A NUL character is refused with a 400 naming the input that held it: a query " +
+		"parameter, a path value, a form field, or a string or key in a JSON body. The " +
+		"contents of an uploaded file are not checked."
 	// Documentation is published separately, so the server serves no page
 	// for it. The document itself stays on the framework's own route,
 	// authenticated like everything else.
 	cfg.DocsPath = ""
+	// A JSON body is read through one format, so a NUL in any of its strings
+	// is refused for every operation alike.
+	cfg.Formats = map[string]huma.Format{}
+	for name, format := range huma.DefaultFormats {
+		cfg.Formats[name] = format
+	}
+	cfg.Formats["application/json"] = core.RefusingNUL(huma.DefaultFormats["application/json"])
+	cfg.Formats["json"] = core.RefusingNUL(huma.DefaultFormats["json"])
 	// Every API this process builds shares the schemas worked out from Go
 	// types, which is most of what building one costs.
 	components := newSchemas()
@@ -337,6 +348,7 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	// scope on its own declaration being enforced.
 	core.EnforceDeclarations(api)
 	refuseUnknownParameters(api)
+	refuseNUL(api)
 	registerVersion(api)
 	registerSession(api, in)
 	registerProviders(api, in)

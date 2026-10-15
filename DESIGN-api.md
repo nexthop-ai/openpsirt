@@ -92,7 +92,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 201 | Something now exists, and its identifier is in the answer |
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
-| 400 | A query parameter the operation does not take. The refusal names it |
+| 400 | A query parameter the operation does not take, or a NUL character in typed input. The refusal names the input |
 | 403 | An act the caller may not do, on a product they can see: an issue act or a routing rule without the role it asks for |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a build renamed while its document was being generated, a retirement of something already retired, a name another row already holds |
@@ -207,6 +207,23 @@ with one sentence, a 500 written by the router before a caller is resolved. No
 handler guards against either, because no handler is reached without both. The
 sentence says nothing about what the caller asked for, because the caller did
 not cause it and cannot fix it.
+
+### NUL characters
+
+A NUL character in typed input is refused with a 400 naming the input that
+held it. The query builder refuses a string holding one, so carried through it
+fails the request as a fault with nothing to say why.
+
+| Input | Where it is checked |
+|---|---|
+| A query parameter, by name | Once for every operation, after unknown parameters are refused |
+| A path value, by name | The same check |
+| A form field, by name | Where every multipart form is read, before the operation parses it |
+| A string or a key in a JSON body, by its place in the body | The one format every JSON body is read through, reported as the body could not be read |
+| An uploaded file's contents | Not checked. A file is not typed input, and each reader keeps its own handling of the bytes it carries |
+
+Names are taken in order, so a request holding two is refused naming the same
+one every time.
 
 ## Paging
 

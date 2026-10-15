@@ -125,6 +125,14 @@ func BoundedForm(api huma.API, in Deps, admission Admission) func(ctx huma.Conte
 				tooLarge()
 				return
 			}
+			// Every form field, the files' contents excepted: a file is not
+			// typed input.
+			if r.MultipartForm != nil {
+				if at, found := NULInValues("form field", r.MultipartForm.Value); found {
+					refuse(http.StatusBadRequest, RefusalOfNUL(at))
+					return
+				}
+			}
 		}
 		next(ctx)
 	}

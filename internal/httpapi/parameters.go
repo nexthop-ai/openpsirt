@@ -9,6 +9,8 @@ import (
 	"sort"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
 // refuseUnknownParameters answers 400 to a request carrying a query parameter
@@ -61,6 +63,35 @@ func refuseUnknownParameters(api huma.API) {
 			if !takes[name] {
 				_ = huma.WriteErr(api, ctx, http.StatusBadRequest,
 					"unknown query parameter "+name+": this operation does not take it")
+				return
+			}
+		}
+		next(ctx)
+	})
+}
+
+// refuseNUL answers 400 to a request carrying a NUL character in a query
+// parameter or a path value, naming the input. A form field is checked where
+// the form is read, and a JSON body by the format that reads it.
+//
+// Registered after unknown parameters are refused, so a parameter the
+// operation does not take is refused as that first.
+func refuseNUL(api huma.API) {
+	api.UseMiddleware(func(ctx huma.Context, next func(huma.Context)) {
+		op := ctx.Operation()
+		if op == nil {
+			next(ctx)
+			return
+		}
+		// The query was readable, or the request was refused above.
+		query, _ := url.ParseQuery(ctx.URL().RawQuery)
+		if at, found := core.NULInValues("query parameter", query); found {
+			_ = huma.WriteErr(api, ctx, http.StatusBadRequest, core.RefusalOfNUL(at))
+			return
+		}
+		for _, param := range op.Parameters {
+			if param.In == "path" && core.HoldsNUL(ctx.Param(param.Name)) {
+				_ = huma.WriteErr(api, ctx, http.StatusBadRequest, core.RefusalOfNUL("path value "+param.Name))
 				return
 			}
 		}
