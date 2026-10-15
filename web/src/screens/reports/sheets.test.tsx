@@ -8,6 +8,7 @@ import { Compliance } from "./Compliance";
 import { Register } from "./Register";
 import { Support } from "./Support";
 import { location, mounted, screen, serve, settle, type Answer } from "../../test/mount";
+import { BANDS } from "../../ui/severities";
 
 const mount = mounted();
 
@@ -199,9 +200,9 @@ describe("deadline compliance", () => {
         ? {
             data: {
               items: [
-                { severity: "critical", closed: 3, met: 2, late: 1, deferred: 1, overdue: 2 },
-                { severity: "high", closed: 1, met: 1, late: 0, deferred: 0, overdue: 0 },
-                { severity: "low", closed: 0, met: 0, late: 0, deferred: 0, overdue: 0 },
+                { severity: BANDS[0], closed: 3, met: 2, late: 1, deferred: 1, overdue: 2 },
+                { severity: BANDS[1], closed: 1, met: 1, late: 0, deferred: 0, overdue: 0 },
+                { severity: BANDS[3], closed: 0, met: 0, late: 0, deferred: 0, overdue: 0 },
               ],
             },
           }
