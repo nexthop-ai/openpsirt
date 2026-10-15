@@ -185,9 +185,9 @@ func registerAssigning(api huma.API, in core.Deps) {
 		rights := access.NewStore(in.DB.DB)
 		switch {
 		case input.Body.Person != "":
-			person, err := rights.ByIdentity(ctx, input.Body.Person)
+			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
 			if err != nil {
-				return nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return nil, err
 			}
 			// An assignment carries visibility of what was assigned, so the
 			// check is against the level rather than against their present
@@ -198,10 +198,9 @@ func registerAssigning(api huma.API, in core.Deps) {
 			to, whoToTell = &party, person.ID
 			admits = personAdmits(person, product)
 		case input.Body.Team != "":
-			team, err := rights.TeamByName(ctx, input.Body.Team)
+			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
 			if err != nil {
-				return nil, core.Absent(in.Logger, err, "that team could not be looked up",
-					func() error { return noSuchTeamNamed(input.Body.Team) })
+				return nil, err
 			}
 			// At least one member has to be able to read what is being
 			// routed there, asked at the strictest visibility present.
@@ -309,9 +308,9 @@ func registerAssigning(api huma.API, in core.Deps) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
 		rights := access.NewStore(in.DB.DB)
-		from, err := rights.ByIdentity(ctx, input.Identity)
+		from, err := core.PersonNamed(ctx, in.Logger, rights, input.Identity)
 		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+			return nil, err
 		}
 
 		findings := finding.NewStore(in.DB.DB)
@@ -320,8 +319,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 			moved, err = findings.Release(ctx, subject, from.PartyID)
 		} else {
 			var to *access.Account
-			if to, err = rights.ByIdentity(ctx, input.Body.To); err != nil {
-				return nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+			if to, err = core.PersonNamed(ctx, in.Logger, rights, input.Body.To); err != nil {
+				return nil, err
 			} else {
 				moved, err = findings.HandOver(ctx, subject, from.PartyID, to.PartyID)
 			}

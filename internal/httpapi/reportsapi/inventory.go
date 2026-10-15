@@ -64,34 +64,14 @@ func registerInventoryChanges(api huma.API, in core.Deps) {
 		Limit   int             `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned"`
 		Offset  int             `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ListedInventoryChanges, error) {
-		subject, err := core.Requester(ctx)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
-		}
-
-		// What an upload changed is the product's to read, and a case grant
-		// reaches one issue rather than the product: somebody brought into a
-		// case is answered as a stranger is, before any name past the product
-		// is resolved.
-		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
-			return nil, err
-		}
-
-		// Resolved and authorized together, so a build somebody may not reach
-		// reads as one that was never declared.
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-		}
-		if subject.Kind == access.Pipeline &&
-			!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
-			return nil, huma.Error403Forbidden("not authorized")
 		}
 
 		out := &ListedInventoryChanges{}
 		out.Body.Items = []InventoryChangeBody{}
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
 		switch {
 		case errors.Is(err, catalog.ErrNotFound):
 			// Declared, and nothing has ever been filed against it.

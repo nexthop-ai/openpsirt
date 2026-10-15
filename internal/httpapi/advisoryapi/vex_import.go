@@ -135,16 +135,9 @@ func registerVexImport(api huma.API, in core.Deps) {
 		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, where the document does not name itself. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		by, err := core.Reading(ctx)
+		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
-		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
 		}
 
 		file := input.RawBody.Data().Statements

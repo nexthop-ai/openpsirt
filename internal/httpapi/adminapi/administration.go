@@ -571,9 +571,9 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			person, err := store.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, store, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			product, err := names.ProductByName(ctx, in.Product)
 			if err != nil {
@@ -660,9 +660,9 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			person, err := store.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, store, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			// The window re-opened is the one the deployment configured, read
 			// inside the act like every other value it decides from.
@@ -720,9 +720,9 @@ func registerAdministration(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			person, err := store.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, store, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			role := access.Role(in.Role)
 			if !role.Valid() {

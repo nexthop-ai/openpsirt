@@ -96,14 +96,9 @@ func registerAssessment(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+		product, err := core.TriagedProduct(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
-		}
-		// Before the issue name is resolved. Refusing afterwards answers "is
-		// this issue known here" for anybody who may read the product.
-		if !subject.TriagesIn(product.ID) {
-			return nil, huma.Error403Forbidden("not authorized")
 		}
 		issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, input.Vulnerability)
 		if err != nil {

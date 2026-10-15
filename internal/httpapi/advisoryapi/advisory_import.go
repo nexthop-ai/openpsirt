@@ -14,7 +14,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -75,16 +74,9 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		RawBody huma.MultipartFormFiles[advisoryParts]
 	}) (*struct{ Body AdvisoryTakenBody }, error) {
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		by, err := core.Reading(ctx)
+		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
-		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
 		}
 
 		file := input.RawBody.Data().Advisory

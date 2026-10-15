@@ -206,10 +206,9 @@ func registerRevocation(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			person, err := rights.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, rights, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up",
-					core.NoSuchPerson)
+				return err
 			}
 			token, err := rights.TokenByName(ctx, person.ID, in.Name)
 			if err != nil {
@@ -250,9 +249,9 @@ func registerRevocation(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			person, err := rights.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, rights, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			if err := rights.EndSessionsFor(ctx, person.ID); err != nil {
 				return core.WentWrong(a.Logger, "cannot end the sessions", err)

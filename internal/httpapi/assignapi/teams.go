@@ -141,9 +141,9 @@ func registerTeams(api huma.API, a core.Administering) {
 					"a team is declared with at most %d members at once", access.MostTeamMembers))
 			}
 			for _, identity := range in.Body.Members {
-				person, err := store.ByIdentity(ctx, identity)
+				person, err := core.PersonNamed(ctx, a.Logger, store, identity)
 				if err != nil {
-					return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+					return err
 				}
 				added, err := store.AddToTeam(ctx, team.ID, person.ID, by.ID)
 				if err != nil {
@@ -187,13 +187,13 @@ func registerTeams(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			team, err := store.TeamByName(ctx, in.Team)
+			team, err := core.TeamNamed(ctx, a.Logger, store, in.Team)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
+				return err
 			}
 			if err := store.RetireTeam(ctx, team.ID); err != nil {
 				if errors.Is(err, access.ErrNoSuchTeam) {
-					return noSuchTeamNamed(in.Team)
+					return core.NoSuchTeam(in.Team)
 				}
 				return core.WentWrong(a.Logger, "cannot retire that team", err)
 			}
@@ -229,13 +229,13 @@ func registerTeams(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			team, err := store.TeamByName(ctx, in.Team)
+			team, err := core.TeamNamed(ctx, a.Logger, store, in.Team)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
+				return err
 			}
-			person, err := store.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, store, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			added, err := store.AddToTeam(ctx, team.ID, person.ID, by.ID)
 			if err != nil {
@@ -273,13 +273,13 @@ func registerTeams(api huma.API, a core.Administering) {
 			if err != nil {
 				return err
 			}
-			team, err := store.TeamByName(ctx, in.Team)
+			team, err := core.TeamNamed(ctx, a.Logger, store, in.Team)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(in.Team) })
+				return err
 			}
-			person, err := store.ByIdentity(ctx, in.Identity)
+			person, err := core.PersonNamed(ctx, a.Logger, store, in.Identity)
 			if err != nil {
-				return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return err
 			}
 			// Mapped before the trail row, as every other withdrawal is: a
 			// removal that matched nothing is not a removal, and recording it
@@ -320,8 +320,4 @@ func teamBody(ctx context.Context, store *access.Store, team access.Team) (TeamB
 		body.Members = append(body.Members, named[person])
 	}
 	return body, nil
-}
-
-func noSuchTeamNamed(name string) error {
-	return huma.Error404NotFound("no team is known as " + name)
 }

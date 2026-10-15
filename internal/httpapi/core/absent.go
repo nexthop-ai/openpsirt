@@ -10,6 +10,7 @@ import (
 	"log/slog"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
@@ -52,6 +53,37 @@ func NoSuchProduct() error {
 
 func NoSuchPerson() error {
 	return huma.Error404NotFound("nobody here is called that")
+}
+
+// NoSuchTeam is the answer to a team name nobody uses. It names the team,
+// because the caller wrote the name and a team is not product data.
+func NoSuchTeam(name string) error {
+	return huma.Error404NotFound("no team is known as " + name)
+}
+
+// PersonNamed resolves the person a request names by identity, over store,
+// and refuses a name nobody holds as NoSuchPerson.
+func PersonNamed(ctx context.Context, logger *slog.Logger, store *access.Store,
+	identity string) (*access.Account, error) {
+
+	person, err := store.ByIdentity(ctx, identity)
+	if err != nil {
+		return nil, Absent(logger, err, "that person could not be looked up", NoSuchPerson)
+	}
+	return person, nil
+}
+
+// TeamNamed resolves the team a request names, over store, and refuses a name
+// nobody uses as NoSuchTeam.
+func TeamNamed(ctx context.Context, logger *slog.Logger, store *access.Store,
+	name string) (*access.Team, error) {
+
+	team, err := store.TeamByName(ctx, name)
+	if err != nil {
+		return nil, Absent(logger, err, "that team could not be looked up",
+			func() error { return NoSuchTeam(name) })
+	}
+	return team, nil
 }
 
 // NoSuchGrant is the answer to withdrawing something nobody holds.
@@ -339,6 +371,85 @@ func ProductNamedVisibly(ctx context.Context, in Deps, subject access.Subject,
 	product, err := catalog.NewStore(in.DB.DB).VisibleProduct(ctx, subject, name)
 	if err != nil {
 		return nil, Absent(in.Logger, err, "that product could not be looked up", NoSuchProduct)
+	}
+	return product, nil
+}
+
+// AdministeredProduct is the caller and the product an administrative route
+// about one product names, resolved over db: the transaction an act is made
+// in, or the pooled handle where the route only reads. The caller is refused
+// before the name is resolved, and every product is an administrator's to
+// name, so the product is looked up whatever anybody sees of it.
+func AdministeredProduct(ctx context.Context, in Deps, db bun.IDB,
+	name string) (access.Subject, *catalog.Product, error) {
+
+	if err := Administrating(ctx); err != nil {
+		return access.Subject{}, nil, err
+	}
+	by, err := Reading(ctx)
+	if err != nil {
+		return access.Subject{}, nil, err
+	}
+	product, err := catalog.NewStore(db).ProductByName(ctx, name)
+	if err != nil {
+		return access.Subject{}, nil, Absent(in.Logger, err, "that product could not be looked up", NoSuchProduct)
+	}
+	return by, product, nil
+}
+
+// ReadableBuild is the caller and the build a read of what was filed against
+// it names: the scans, what they changed.
+//
+// What was filed against a build is the product's to read, and a case grant
+// reaches one issue rather than the product: somebody brought into a case is
+// answered as a stranger is, before any name past the product is resolved, so
+// the answer says nothing about which builds exist or were scanned. The build
+// is then resolved and authorized together, so a build somebody may not reach
+// reads as one that was never declared, and a pipeline key is refused a build
+// it may not send to.
+func ReadableBuild(ctx context.Context, in Deps,
+	product, stream, variant string) (access.Subject, *catalog.Named, error) {
+
+	subject, err := Requester(ctx)
+	if err != nil {
+		return access.Subject{}, nil, err
+	}
+	if _, err := ProductNamedVisibly(ctx, in, subject, product); err != nil {
+		return access.Subject{}, nil, err
+	}
+	named, err := catalog.NewStore(in.DB.DB).LocateVisible(ctx, subject, product, stream, variant)
+	if err != nil {
+		return access.Subject{}, nil, Undeclared(in.Logger, err, "that build could not be looked up")
+	}
+	if err := PipelineReaches(subject, named); err != nil {
+		return access.Subject{}, nil, err
+	}
+	return subject, named, nil
+}
+
+// PipelineReaches refuses a pipeline key a build it may not send to. A key
+// reads what was filed on a build it may upload to and nothing wider.
+func PipelineReaches(subject access.Subject, named *catalog.Named) error {
+	if subject.Kind == access.Pipeline &&
+		!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
+		return huma.Error403Forbidden("not authorized")
+	}
+	return nil
+}
+
+// TriagedProduct resolves a product the subject may see and refuses somebody
+// who does not triage in it. A route that goes on to resolve an issue name
+// calls it first: refusing afterwards answers "is this issue known here" for
+// anybody who may read the product.
+func TriagedProduct(ctx context.Context, in Deps, subject access.Subject,
+	name string) (*catalog.Product, error) {
+
+	product, err := ProductNamedVisibly(ctx, in, subject, name)
+	if err != nil {
+		return nil, err
+	}
+	if !subject.TriagesIn(product.ID) {
+		return nil, huma.Error403Forbidden("not authorized")
 	}
 	return product, nil
 }

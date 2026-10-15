@@ -12,7 +12,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
@@ -62,9 +61,8 @@ func registerRetained(api huma.API, in core.Deps) {
 		if !subject.Sees(named.ProductID) {
 			return nil, core.NoSuchProduct()
 		}
-		if subject.Kind == access.Pipeline &&
-			!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
-			return nil, huma.Error403Forbidden("not authorized")
+		if err := core.PipelineReaches(subject, named); err != nil {
+			return nil, err
 		}
 		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
 		if err != nil {

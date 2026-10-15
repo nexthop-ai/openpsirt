@@ -121,10 +121,9 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		person, err := store.ByIdentity(ctx, input.Identity)
+		person, err := core.PersonNamed(ctx, a.Logger, store, input.Identity)
 		if err != nil {
-			return nil, core.Absent(a.Logger, err, "that person could not be looked up",
-				core.NoSuchPerson)
+			return nil, err
 		}
 
 		body := AboutPersonBody{
@@ -401,10 +400,9 @@ func aboutPerson(ctx context.Context, a core.Administering, db bun.IDB, identity
 	if err != nil {
 		return nil, access.Subject{}, nil, err
 	}
-	person, err := rights.ByIdentity(ctx, identity)
+	person, err := core.PersonNamed(ctx, a.Logger, rights, identity)
 	if err != nil {
-		return nil, access.Subject{}, nil,
-			core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+		return nil, access.Subject{}, nil, err
 	}
 	return rights, subject, person, nil
 }

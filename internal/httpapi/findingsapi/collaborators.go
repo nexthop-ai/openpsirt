@@ -113,8 +113,8 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
 				var err error
-				if person, err = rights.ByIdentity(ctx, input.Identity); err != nil {
-					return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				if person, err = core.PersonNamed(ctx, a.Logger, rights, input.Identity); err != nil {
+					return err
 				}
 				if added, err = rights.AddToCase(ctx, product, issue, person.ID, subject.ID); err != nil {
 					return core.WentWrong(in.Logger, "they could not be brought in", err)
@@ -186,9 +186,9 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			}
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
 				rights := access.NewStore(tx)
-				person, err := rights.ByIdentity(ctx, input.Identity)
+				person, err := core.PersonNamed(ctx, a.Logger, rights, input.Identity)
 				if err != nil {
-					return core.Absent(a.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+					return err
 				}
 				switch err := rights.RemoveFromCase(ctx, product, issue, person.ID, subject.ID); {
 				case errors.Is(err, access.ErrNothingMatched):

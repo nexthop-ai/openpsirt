@@ -15,7 +15,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -52,16 +51,9 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 	}) (*core.ListOutput[AdvisorySourceBody], error) {
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		by, err := core.Reading(ctx)
+		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
 		if err != nil {
 			return nil, err
-		}
-		product, err := catalog.NewStore(in.DB.DB).ProductByName(ctx, input.Product)
-		if err != nil {
-			return nil, core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
 		}
 		rows, err := supplier.NewStore(in.DB.DB).For(ctx, by, product.ID)
 		if err != nil {
@@ -120,13 +112,6 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		Status int
 		Body   AdvisorySourceBody
 	}, error) {
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		by, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
@@ -139,9 +124,9 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename or a retirement
 			// committing between the two is what a retry reads.
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
 			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return err
 			}
 			row, err = supplier.NewStore(tx).Add(ctx, by, product.ID, input.Body.Name, address)
 			switch {
@@ -185,19 +170,12 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Name    string `path:"name"`
 	}) (*struct{}, error) {
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		by, err := core.Reading(ctx)
-		if err != nil {
-			return nil, err
-		}
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename committing
 			// between the two is what a retry reads.
-			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
+			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
 			if err != nil {
-				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
+				return err
 			}
 			// Mapped before the trail row, which would otherwise record a
 			// withdrawal that did not happen — and the pass goes on reaching

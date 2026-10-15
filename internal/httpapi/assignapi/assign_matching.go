@@ -149,18 +149,17 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		var admits finding.Admits
 		switch {
 		case input.Body.Person != "":
-			person, err := rights.ByIdentity(ctx, input.Body.Person)
+			person, err := core.PersonNamed(ctx, in.Logger, rights, input.Body.Person)
 			if err != nil {
-				return nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+				return nil, err
 			}
 			party := person.PartyID
 			to, whoToTell = &party, person.ID
 			admits = personAdmits(person, product)
 		case input.Body.Team != "":
-			team, err := rights.TeamByName(ctx, input.Body.Team)
+			team, err := core.TeamNamed(ctx, in.Logger, rights, input.Body.Team)
 			if err != nil {
-				return nil, core.Absent(in.Logger, err, "that team could not be looked up",
-					func() error { return noSuchTeamNamed(input.Body.Team) })
+				return nil, err
 			}
 			party := team.PartyID
 			to = &party

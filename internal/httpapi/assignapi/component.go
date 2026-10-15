@@ -358,17 +358,16 @@ func carrying(ctx context.Context, in core.Deps, subject access.Subject, product
 	}
 	rights := access.NewStore(in.DB.DB)
 	if person != "" {
-		who, err := rights.ByIdentity(ctx, person)
+		who, err := core.PersonNamed(ctx, in.Logger, rights, person)
 		if err != nil {
-			return nil, nil, core.Absent(in.Logger, err, "that person could not be looked up", core.NoSuchPerson)
+			return nil, nil, err
 		}
 		party := who.PartyID
 		return &party, personAdmits(who, productID), nil
 	}
-	found, err := rights.TeamByName(ctx, team)
+	found, err := core.TeamNamed(ctx, in.Logger, rights, team)
 	if err != nil {
-		return nil, nil, core.Absent(in.Logger, err, "that team could not be looked up",
-			func() error { return noSuchTeamNamed(team) })
+		return nil, nil, err
 	}
 	party := found.PartyID
 	return &party, teamAdmits(found, productID), nil

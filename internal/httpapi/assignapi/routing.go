@@ -122,16 +122,13 @@ func registerRouting(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
-			return nil, err
-		}
 		// Declared triage, like the rule it previews. What comes back is
 		// narrowed to what the asker may read, but a preview is part of
 		// writing a rule and nobody who may not write one has a reason to run
 		// it.
-		if !subject.TriagesIn(product.ID) {
-			return nil, huma.Error403Forbidden("not authorized")
+		product, err := core.TriagedProduct(ctx, in, subject, input.Product)
+		if err != nil {
+			return nil, err
 		}
 		if input.Upstream == "" && input.Beneath == "" {
 			return nil, huma.Error422UnprocessableEntity(
@@ -191,8 +188,8 @@ func registerRouting(api huma.API, in core.Deps) {
 		var team *access.Team
 		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
 			var err error
-			if team, err = access.NewStore(tx).TeamByName(ctx, input.Body.Team); err != nil {
-				return core.Absent(in.Logger, err, "that team could not be looked up", func() error { return noSuchTeamNamed(input.Body.Team) })
+			if team, err = core.TeamNamed(ctx, in.Logger, access.NewStore(tx), input.Body.Team); err != nil {
+				return err
 			}
 			if rule, err = finding.NewStore(tx).AddRule(ctx, subject, product, team.ID,
 				input.Body.Name, input.Body.Upstream, input.Body.Beneath); err != nil {

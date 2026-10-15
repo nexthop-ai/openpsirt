@@ -144,34 +144,12 @@ func registerReceipts(api huma.API, in core.Deps) {
 		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
 		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ReceiptsOutput, error) {
-		subject, err := core.Requester(ctx)
+		subject, named, err := core.ReadableBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 
-		// What was filed against a build is the product's to read, and a case
-		// grant reaches one issue rather than the product: somebody brought
-		// into a case is answered as a stranger is, before any name past the
-		// product is resolved, so the answer says nothing about which builds
-		// exist or were scanned.
-		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
-			return nil, err
-		}
-
-		// Resolved and authorized together, so a build somebody may not reach
-		// reads as one that was never declared.
-		names := catalog.NewStore(in.DB.DB)
-		named, err := names.LocateVisible(ctx, subject, input.Product, input.Stream, input.Variant)
-		if err != nil {
-			return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-		}
-
-		if subject.Kind == access.Pipeline &&
-			!subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
-			return nil, huma.Error403Forbidden("not authorized")
-		}
-
-		target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
 		out := &ReceiptsOutput{}
 		out.Body.Items = []ReceiptBody{}
 		switch {

@@ -6,6 +6,7 @@ package adminapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -78,12 +79,8 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 			// name can be refused, because only that is in an identifier.
 			if name != "" && (!strings.EqualFold(name, variant.Name) || name != variant.DisplayName) {
 				if !strings.EqualFold(name, variant.Name) {
-					issued, err := published(ctx, tx, "variant", variant.ID)
-					if err != nil {
-						return core.WentWrong(d.Logger, "that variant could not be renamed", err)
-					}
-					if issued {
-						return heldByReaders("variant")
+					if err := renameGuard(ctx, tx, d.Logger, levelVariant, variant.ID); err != nil {
+						return err
 					}
 				}
 				if err := store.RenameVariant(ctx, product.ID, variant.ID, name); err != nil {
@@ -202,12 +199,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			}
 			about := product.Name
 			if name != "" && !strings.EqualFold(name, product.Name) {
-				issued, err := published(ctx, tx, "product", product.ID)
-				if err != nil {
-					return core.WentWrong(d.Logger, "that product could not be renamed", err)
-				}
-				if issued {
-					return heldByReaders("product")
+				if err := renameGuard(ctx, tx, d.Logger, levelProduct, product.ID); err != nil {
+					return err
 				}
 				// A group mapping names its product by name, so a rename to or
 				// from a mapped name would change who holds the product from
@@ -324,12 +317,8 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 				return nil
 			}
 			if !strings.EqualFold(name, stream.Name) {
-				issued, err := published(ctx, tx, "release", stream.ID)
-				if err != nil {
-					return core.WentWrong(d.Logger, "that release could not be renamed", err)
-				}
-				if issued {
-					return heldByReaders("release")
+				if err := renameGuard(ctx, tx, d.Logger, levelRelease, stream.ID); err != nil {
+					return err
 				}
 			}
 			if err := store.RenameStream(ctx, product.ID, stream.ID, name); err != nil {
@@ -386,6 +375,28 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	})
 }
 
+// catalogLevel is the part of the catalog a rename moves.
+type catalogLevel string
+
+const (
+	levelProduct catalogLevel = "product"
+	levelRelease catalogLevel = "release"
+	levelVariant catalogLevel = "variant"
+)
+
+// renameGuard refuses a rename of a name a reader outside this deployment
+// already holds a document by, in the transaction the rename is written in.
+func renameGuard(ctx context.Context, tx bun.IDB, logger *slog.Logger, level catalogLevel, id int64) error {
+	issued, err := published(ctx, tx, level, id)
+	if err != nil {
+		return core.WentWrong(logger, "that "+string(level)+" could not be renamed", err)
+	}
+	if issued {
+		return heldByReaders(level)
+	}
+	return nil
+}
+
 // published reports whether anything naming this part of the catalog has gone
 // out to a reader outside this deployment.
 //
@@ -398,21 +409,23 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 // Given the handle the rename will be written on, so both run inside its
 // transaction. A document issued between asking and renaming would otherwise
 // be published under a name this had already said nothing was published under.
-func published(ctx context.Context, db bun.IDB, level string, id int64) (bool, error) {
+func published(ctx context.Context, db bun.IDB, level catalogLevel, id int64) (bool, error) {
 	var asked []func(context.Context, bun.IDB, int64) (bool, error)
 	switch level {
-	case "product":
+	case levelProduct:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
 			vex.AnyIssuedForProduct, advisory.AnyIssuedForProduct,
 		}
-	case "release":
+	case levelRelease:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
 			vex.AnyIssuedForStream, advisory.AnyIssuedForStream,
 		}
-	default:
+	case levelVariant:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
 			vex.AnyIssuedForVariant,
 		}
+	default:
+		return false, fmt.Errorf("no part of the catalog is called %q", level)
 	}
 	for _, ask := range asked {
 		gone, err := ask(ctx, db, id)
@@ -429,7 +442,7 @@ func published(ctx context.Context, db bun.IDB, level string, id int64) (bool, e
 // heldByReaders is the refusal a name that has been published answers with.
 //
 // It names what to do instead, which is the part a caller can act on.
-func heldByReaders(level string) error {
+func heldByReaders(level catalogLevel) error {
 	// A product and a variant can be retired and the intended name declared
 	// beside them, because what a new one holds is a fresh start and that is
 	// what was wanted. A release cannot: declaring it again brings this same
@@ -437,12 +450,12 @@ func heldByReaders(level string) error {
 	// one's history, so the remedy that works for the other two is the one
 	// thing this endpoint's own description says does not work here.
 	remedy := "Retire it and declare the intended name instead."
-	if level == "release" {
+	if level == levelRelease {
 		remedy = "Declare the intended name as a release of its own; this one keeps the " +
 			"name readers hold it by."
 	}
 	return huma.NewError(http.StatusConflict,
-		"a document naming this "+level+" has been published, so its name is what "+
+		"a document naming this "+string(level)+" has been published, so its name is what "+
 			"readers already hold it by. "+remedy)
 }
 
