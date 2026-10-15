@@ -131,11 +131,7 @@ func TestEveryDecisionIsCorrelatedToItsFindingThroughOneSpelling(t *testing.T) {
 			return err
 		}
 		examined++
-		// The one spelling itself.
 		name := filepath.ToSlash(path)
-		if strings.HasSuffix(name, "finding/narrow_state.go") {
-			return nil
-		}
 		for _, each := range correlationsSpelledOut(name, string(source)) {
 			compared++
 			if !each.issue {
