@@ -64,7 +64,7 @@ describe("the webhooks an administrator configures", () => {
     change(labeled(mount.host(), "URL"), "https://hooks.example.com/x");
     change(labeled(mount.host(), "Signing secret"), "short");
     expect(submit()?.disabled).toBe(true);
-    change(labeled(mount.host(), "Signing secret"), "0123456789abcdef");
+    change(labeled(mount.host(), "Signing secret"), "a long enough secret");
     expect(submit()?.disabled).toBe(false);
     await act(async () => submit()?.click());
     await settle();
@@ -73,7 +73,7 @@ describe("the webhooks an administrator configures", () => {
       name: "sec2",
       kind: "*",
       url: "https://hooks.example.com/x",
-      secret: "0123456789abcdef",
+      secret: "a long enough secret",
     });
   });
 });
