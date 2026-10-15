@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 )
 
 func TestProducerSuppliedTextIsNotBoundedByAColumn(t *testing.T) {
@@ -75,9 +76,8 @@ func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
 	// these rather than that they are ever large.
 	oversized := strings.Repeat("s", 4096)
 
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		target := aTarget(t, db)
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx, db, target := t.Context(), w.DB, w.Target.ID
 		if _, err := db.ExecContext(ctx,
 			`INSERT INTO "scan_run" ("target_id", "scanner", "scanner_version",
 				"database_version", "ran_here", "started_at")
@@ -86,12 +86,8 @@ func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
 			t.Fatalf("a scanner's own words were refused at %d bytes: %v", len(oversized), err)
 		}
 		// Read back by the build rather than by an inserted identifier, which
-		// one of the four drivers does not report — and the build is this
-		// test's own, so it names exactly the row just written.
-		t.Cleanup(func() {
-			_, _ = db.ExecContext(context.WithoutCancel(ctx),
-				`DELETE FROM "scan_run" WHERE "target_id" = ?`, target)
-		})
+		// one of the four drivers does not report. The database is this
+		// test's alone, so the build names exactly the row just written.
 
 		var scanner, version, data string
 		if err := db.QueryRowContext(ctx,
@@ -107,66 +103,4 @@ func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
 			}
 		}
 	})
-}
-
-// aTarget makes the build a scan run has to point at, and returns its
-// identifier.
-//
-// Hand-rolled, because internal/dbtest exports lifecycle and no fixtures — the
-// reason thirty-five files do the same thing beside this one.
-func aTarget(t *testing.T, db *database.DB) int64 {
-	t.Helper()
-	ctx := t.Context()
-	name := uniqueName(t)
-	now := time.Now().UTC()
-
-	insert := func(statement string, args ...any) {
-		t.Helper()
-		if _, err := db.ExecContext(ctx, statement, args...); err != nil {
-			t.Fatalf("%s: %v", statement, err)
-		}
-	}
-	read := func(statement string, args ...any) int64 {
-		t.Helper()
-		var id int64
-		if err := db.QueryRowContext(ctx, statement, args...).Scan(&id); err != nil {
-			t.Fatalf("%s: %v", statement, err)
-		}
-		return id
-	}
-
-	insert(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`,
-		name, name, now)
-	productID := read(`SELECT "id" FROM "product" WHERE "name" = ?`, name)
-
-	insert(`INSERT INTO "stream" ("product_id", "name", "display_name", "kind", "created_at")
-		VALUES (?, ?, ?, ?, ?)`, productID, name, name, "branch", now)
-	streamID := read(`SELECT "id" FROM "stream" WHERE "product_id" = ? AND "name" = ?`, productID, name)
-
-	insert(`INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
-		VALUES (?, ?, ?, ?, ?)`, productID, name, name, true, now)
-	variantID := read(`SELECT "id" FROM "variant" WHERE "product_id" = ? AND "name" = ?`, productID, name)
-
-	insert(`INSERT INTO "target" ("stream_id", "variant_id", "created_at") VALUES (?, ?, ?)`,
-		streamID, variantID, now)
-	targetID := read(`SELECT "id" FROM "target" WHERE "stream_id" = ? AND "variant_id" = ?`,
-		streamID, variantID)
-
-	// Removed in the order the foreign keys allow, and on a context the test's
-	// own is not, because a cleanup runs after that one is canceled.
-	t.Cleanup(func() {
-		clean := context.WithoutCancel(ctx)
-		for _, step := range []struct {
-			statement string
-			id        int64
-		}{
-			{`DELETE FROM "target" WHERE "id" = ?`, targetID},
-			{`DELETE FROM "variant" WHERE "id" = ?`, variantID},
-			{`DELETE FROM "stream" WHERE "id" = ?`, streamID},
-			{`DELETE FROM "product" WHERE "id" = ?`, productID},
-		} {
-			_, _ = db.ExecContext(clean, step.statement, step.id)
-		}
-	})
-	return targetID
 }
