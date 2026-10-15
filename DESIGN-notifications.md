@@ -758,6 +758,7 @@ notices; what is said about them is here.
 | Rule | Reason |
 |---|---|
 | Three conditions: running, near its end, and passed | They clear differently, the way the embargo conditions do. The running one and the near one clear when the end arrives, and the passed one opens |
+| Worked out from the shelf, read once per sweep for all three | The shelf and the conditions agree on when a window starts, nears and ends, at one moment |
 | Running is raised from the moment the window starts | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
 | A window waiting on another window's notice raises nothing until that notice is recorded | It has no end to say, and saying it is running would be false |
 | A window counting from the fix raises nothing until a stated release date of a tag named on the record has come | The same reason. A release date still to come is a start that has not arrived |

@@ -277,36 +277,31 @@ func noteFix(ctx context.Context, tx bun.IDB, subject access.Subject,
 // FixesOf is every release named on these records as carrying the fix that
 // this subject may be told of, withdrawn ones among them, earliest named
 // first, each with its release date and what its latest scans say.
-//
-// Narrowed by the record each naming is about, with the question that
-// authorizes one issue in one product, as the notices are.
 func (s *Store) FixesOf(ctx context.Context, subject access.Subject,
 	recordIDs []int64) (map[int64][]Fix, error) {
 
-	out := map[int64][]Fix{}
-	if len(recordIDs) == 0 {
-		return out, nil
+	records, err := tellable(ctx, s.db, subject, recordIDs)
+	if err != nil {
+		return nil, err
 	}
-	var records []triage.ExploitedHere
-	if err := s.db.NewSelect().Model(&records).
-		Where("eh.id IN (?)", bun.List(recordIDs)).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("read the records of being exploited: %w", err)
+	return s.fixesOf(ctx, subject, records)
+}
+
+// fixesOf is every release named on records already narrowed to what the
+// reader may be told of. The subject still narrows what each release's scans
+// are said to hold.
+func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
+	records []triage.ExploitedHere) (map[int64][]Fix, error) {
+
+	out := map[int64][]Fix{}
+	if len(records) == 0 {
+		return out, nil
 	}
 	allowed := make(map[int64]triage.ExploitedHere, len(records))
 	ids := make([]int64, 0, len(records))
 	for _, record := range records {
-		ok, err := finding.MayBeToldOfWithin(ctx, s.db, subject,
-			record.ProductID, record.VulnerabilityID)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			allowed[record.ID] = record
-			ids = append(ids, record.ID)
-		}
-	}
-	if len(ids) == 0 {
-		return out, nil
+		allowed[record.ID] = record
+		ids = append(ids, record.ID)
 	}
 	var rows []struct {
 		Fix `bun:"extend"`

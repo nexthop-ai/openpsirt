@@ -6,7 +6,6 @@ package notify
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
@@ -53,18 +52,28 @@ func (w *sweep) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
 	return w.windows(ctx, ObligationPassed)
 }
 
+// shelf is every standing record with each window as it runs, read once per
+// sweep for the three kinds.
+//
+// As the deployment, which reads everything; each recipient is narrowed by
+// what they may act on. The shelf is the obligation screen's own read, so the
+// screen and these alerts agree on when a window starts and ends.
+func (w *sweep) shelf(ctx context.Context) ([]obligation.Entry, error) {
+	if w.shelved == nil {
+		entries, err := obligation.NewStore(w.db).Shelf(ctx,
+			access.Everything("the obligation sweep"))
+		if err != nil {
+			return nil, err
+		}
+		w.shelved = &entries
+	}
+	return *w.shelved, nil
+}
+
 // windows is the one pass behind all three, which differ in which part of a
 // window they report.
 func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, error) {
-	store := obligation.NewStore(w.db)
-	// As the deployment, which reads everything; each recipient is narrowed
-	// below by what they may act on.
-	everything := access.Everything("the obligation sweep")
-	standing, err := store.Standings(ctx, everything)
-	if err != nil {
-		return nil, err
-	}
-	windows, err := store.Windows(ctx, everything)
+	entries, err := w.shelf(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -75,28 +84,8 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 	if err != nil {
 		return nil, err
 	}
-	if len(standing) == 0 || len(windows) == 0 {
-		return out, nil
-	}
-	ids := make([]int64, 0, len(standing))
-	for _, one := range standing {
-		ids = append(ids, one.Record.ID)
-	}
-	told, err := store.ToldAbout(ctx, everything, ids)
-	if err != nil {
-		return nil, err
-	}
-	fixes, err := store.FixesOf(ctx, everything, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now().UTC()
-	for _, one := range standing {
-		fixed, _ := obligation.FixAvailable(fixes[one.Record.ID])
-		for _, due := range obligation.Running(windows, one.Record.ProductID,
-			one.Record.KnownAt, told[one.Record.ID], fixed, now) {
-
+	for _, one := range entries {
+		for _, due := range one.Windows {
 			if due.Answered || !due.Started {
 				continue
 			}

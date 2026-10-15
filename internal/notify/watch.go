@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -142,6 +143,8 @@ type sweep struct {
 	// reach is what each person may do with each product, from the two
 	// above.
 	reach map[int64]map[int64]acts
+	// shelved is the obligation shelf once a kind has read it.
+	shelved *[]obligation.Entry
 }
 
 // tell makes what each person is told of one kind exactly what they are

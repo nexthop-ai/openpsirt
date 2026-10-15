@@ -156,15 +156,17 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	if err != nil {
 		return nil, err
 	}
-	ids := make([]int64, 0, len(kept))
+	// Standings has narrowed every record already, by the same question the
+	// notices and the fixes are narrowed by.
+	records := make([]triage.ExploitedHere, 0, len(kept))
 	for _, one := range kept {
-		ids = append(ids, one.Record.ID)
+		records = append(records, one.Record)
 	}
-	told, err := s.ToldAbout(ctx, subject, ids)
+	told, err := s.toldAbout(ctx, records)
 	if err != nil {
 		return nil, err
 	}
-	fixes, err := s.FixesOf(ctx, subject, ids)
+	fixes, err := s.fixesOf(ctx, subject, records)
 	if err != nil {
 		return nil, err
 	}

@@ -263,37 +263,62 @@ func detailsSaid(details Details) (reference, malicious *string, places []string
 	return reference, malicious, places, nil
 }
 
-// ToldAbout is every notice recorded about these records that this subject
-// may be told of, earliest told first.
+// tellable is the records these identifiers name that this subject may be
+// told of.
 //
-// Narrowed by the record each notice is about, with the question that
-// authorizes one issue in one product: a notice names an attack, and an
-// attack on an undisclosed issue is undisclosed with it.
-func (s *Store) ToldAbout(ctx context.Context, subject access.Subject,
-	recordIDs []int64) (map[int64][]Told, error) {
+// Narrowed record by record, with the question that authorizes one issue in
+// one product. A notice names an attack and a fix release names what answers
+// it, and both are undisclosed with an undisclosed issue, so the notices and
+// the fixes of a record are read through this one narrowing.
+func tellable(ctx context.Context, db bun.IDB, subject access.Subject,
+	recordIDs []int64) ([]triage.ExploitedHere, error) {
 
-	out := map[int64][]Told{}
 	if len(recordIDs) == 0 {
-		return out, nil
+		return nil, nil
 	}
 	var records []triage.ExploitedHere
-	if err := s.db.NewSelect().Model(&records).
+	if err := db.NewSelect().Model(&records).
 		Where("eh.id IN (?)", bun.List(recordIDs)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the records of being exploited: %w", err)
 	}
-	allowed := make([]int64, 0, len(records))
+	out := records[:0]
 	for _, record := range records {
-		ok, err := finding.MayBeToldOfWithin(ctx, s.db, subject,
+		ok, err := finding.MayBeToldOfWithin(ctx, db, subject,
 			record.ProductID, record.VulnerabilityID)
 		if err != nil {
 			return nil, err
 		}
 		if ok {
-			allowed = append(allowed, record.ID)
+			out = append(out, record)
 		}
 	}
-	if len(allowed) == 0 {
+	return out, nil
+}
+
+// ToldAbout is every notice recorded about these records that this subject
+// may be told of, earliest told first.
+func (s *Store) ToldAbout(ctx context.Context, subject access.Subject,
+	recordIDs []int64) (map[int64][]Told, error) {
+
+	records, err := tellable(ctx, s.db, subject, recordIDs)
+	if err != nil {
+		return nil, err
+	}
+	return s.toldAbout(ctx, records)
+}
+
+// toldAbout is every notice recorded about records already narrowed to what
+// the reader may be told of, earliest told first.
+func (s *Store) toldAbout(ctx context.Context,
+	records []triage.ExploitedHere) (map[int64][]Told, error) {
+
+	out := map[int64][]Told{}
+	if len(records) == 0 {
 		return out, nil
+	}
+	allowed := make([]int64, 0, len(records))
+	for _, record := range records {
+		allowed = append(allowed, record.ID)
 	}
 	var rows []Told
 	err := s.db.NewSelect().Model(&rows).
