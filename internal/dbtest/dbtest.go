@@ -646,7 +646,9 @@ func databaseURL(base string, engine database.Engine, name string) (string, erro
 	if engine == database.Postgres {
 		query := parsed.Query()
 		query.Set("options", "-c synchronous_commit=off")
-		parsed.RawQuery = query.Encode()
+		// A space is written %20. The encoder writes it as "+", which pgx
+		// reads as a plus sign.
+		parsed.RawQuery = strings.ReplaceAll(query.Encode(), "+", "%20")
 	}
 	return parsed.String(), nil
 }
