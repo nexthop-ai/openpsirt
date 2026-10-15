@@ -64,3 +64,44 @@ func TestALastRoleAndTheWorkHandedBackAreWithdrawnTogether(t *testing.T) {
 		t.Error("the role was withdrawn although the work it held could not be handed back")
 	}
 }
+
+// The same holds for a role held on every product: its withdrawal and the
+// hand-back in each product it was the last role in commit together.
+func TestALastEstateRoleAndTheWorkHandedBackAreWithdrawnTogether(t *testing.T) {
+	ctx := t.Context()
+	handle := dbtest.Without(t, "finding")
+	if _, err := catalog.NewStore(handle.DB).DeclareProduct(ctx, "mine", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	rights := access.NewStore(handle.DB)
+	admin, err := rights.Ensure(ctx, "admin", "", new(true), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.Claim(ctx, admin.ID, "admin"); err != nil {
+		t.Fatal(err)
+	}
+	triager, err := rights.Ensure(ctx, "triager", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.GrantEstateRole(ctx, triager.ID, access.PublicRead); err != nil {
+		t.Fatal(err)
+	}
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
+		DB: handle, Queue: queue.New(handle, queue.DefaultOptions()),
+		Access: httpapitest.Trusting(t, rights),
+	})
+
+	got := httpapitest.AsPerson(t, &httpapitest.Reach{Handler: handler}, "admin",
+		http.MethodDelete, "/v1/people/triager/roles/public-read", "")
+	if got.Code != http.StatusInternalServerError {
+		t.Errorf("an estate withdrawal whose hand-back could not be written answered %d: %s",
+			got.Code, got.Body.String())
+	}
+	again := httpapitest.AsPerson(t, &httpapitest.Reach{Handler: handler}, "admin",
+		http.MethodDelete, "/v1/people/triager/roles/public-read", "")
+	if again.Code == http.StatusNotFound {
+		t.Error("the estate role was withdrawn although the work it held could not be handed back")
+	}
+}
