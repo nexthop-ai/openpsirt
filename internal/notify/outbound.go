@@ -136,7 +136,7 @@ type Signal struct {
 	now     func() time.Time
 	// turn counts cycles, and picks which destination a cycle offers its
 	// budget to first.
-	turn atomic.Uint64
+	turn atomic.Uint32
 }
 
 // NewSignal returns the sweep over db.
