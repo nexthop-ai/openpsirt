@@ -115,6 +115,34 @@ func TestASuppliersStatementClosesTheFindingAndIsPublishedOnlyWhenAsked(t *testi
 	})
 }
 
+// A supplier's justification outside the format's vocabulary is not
+// published under this deployment's name. The impact statement beside it
+// satisfies the format without one.
+func TestASuppliersJustificationTheFormatDoesNotDefineIsLeftOut(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		said := strings.Replace(httpapitest.AcmeSays(t), `"vulnerable_code_not_in_execute_path"`,
+			`"because we said so"`, 1)
+		if said == httpapitest.AcmeSays(t) {
+			t.Fatal("the supplier's document names no justification to replace")
+		}
+		if got := r.VexedAs(t, "admin", "acme", "acme-y.openvex.json", said); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		r.ScannedInsideAcme(t, "inside", false)
+
+		_, stated := statementsAbout(t, r, "with-suppliers")
+		if len(stated) != 1 {
+			t.Fatalf("the document with suppliers says %+v, want one statement", stated)
+		}
+		if stated[0].Justification != "" {
+			t.Errorf("the document publishes the justification %q", stated[0].Justification)
+		}
+		if !strings.Contains(stated[0].ImpactStatement, "Per acme, in acme-y.openvex.json") {
+			t.Errorf("the impact statement reads %q", stated[0].ImpactStatement)
+		}
+	})
+}
+
 // A person who disagrees with a supplier marks the place affected through the
 // ordinary route, while the statement has it closed, and the next scan opens it
 // again.

@@ -139,39 +139,53 @@ func TestTwoIssuancesAtOnceTakeTheNextNumberRatherThanFail(t *testing.T) {
 // and a rename committing in between would record one naming what the build
 // had been called.
 func TestADocumentIsNotRecordedUnderANameTheBuildLost(t *testing.T) {
-	fixture.Each(t, func(t *testing.T, w *fixture.World) {
-		db := w.DB
-		if db.Stats().MaxOpenConnections == 1 {
-			t.Skip("one connection: nothing lands between a read and a write")
-		}
-		ctx := t.Context()
-		product := w.Product
-		variant := w.Customer
-		who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
-			new(false), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		subject := access.NewPerson(who.ID, who.Email, false,
-			map[int64][]access.Role{product.ID: {access.PublicTriage}}, 0)
-		named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
+	// Each part of the build's name is confirmed, so renaming any one of
+	// them meanwhile keeps the document from being recorded.
+	for _, level := range []struct {
+		name  string
+		model any
+		id    func(w *fixture.World) int64
+	}{
+		{"product", (*catalog.Product)(nil), func(w *fixture.World) int64 { return w.Product.ID }},
+		{"stream", (*catalog.Stream)(nil), func(w *fixture.World) int64 { return w.Branch.ID }},
+		{"variant", (*catalog.Variant)(nil), func(w *fixture.World) int64 { return w.Customer.ID }},
+	} {
+		t.Run(level.name, func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, w *fixture.World) {
+				db := w.DB
+				if db.Stats().MaxOpenConnections == 1 {
+					t.Skip("one connection: nothing lands between a read and a write")
+				}
+				ctx := t.Context()
+				product := w.Product
+				who, err := access.NewStore(db.DB).Ensure(ctx, "ana@example.com", "Ana",
+					new(false), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				subject := access.NewPerson(who.ID, who.Email, false,
+					map[int64][]access.Role{product.ID: {access.PublicTriage}}, 0)
+				named := publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
 
-		store := vex.NewStore(db.DB)
-		vex.Between(store, func() {
-			if _, err := db.DB.NewUpdate().Model((*catalog.Variant)(nil)).
-				Set(`"name" = ?`, "bcm").Where(`"id" = ?`, variant.ID).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
+				store := vex.NewStore(db.DB)
+				vex.Between(store, func() {
+					if _, err := db.DB.NewUpdate().Model(level.model).
+						Set(`"name" = ?`, "renamed").Where(`"id" = ?`, level.id(w)).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+				})
+				if _, err := store.Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours); !errors.Is(err, vex.ErrRenamed) {
+					t.Errorf("recording a document for a build whose %s was renamed meanwhile answered %v",
+						level.name, err)
+				}
+				went, err := db.DB.NewSelect().Table("vex_issuance").Count(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if went != 0 {
+					t.Errorf("%d documents were recorded under a name the build no longer has", went)
+				}
+			})
 		})
-		if _, err := store.Issued(ctx, subject, named, "sonic", "master", "broadcom", vex.Ours); !errors.Is(err, vex.ErrRenamed) {
-			t.Errorf("recording a document for a build renamed meanwhile answered %v", err)
-		}
-		went, err := db.DB.NewSelect().Table("vex_issuance").Count(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if went != 0 {
-			t.Errorf("%d documents were recorded under a name the build no longer has", went)
-		}
-	})
+	}
 }
