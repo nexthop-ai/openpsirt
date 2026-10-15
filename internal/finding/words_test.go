@@ -159,13 +159,14 @@ func TestTwoAddressesDifferingOnlyPastTheIndexWidthOrInCaseAreBothKept(t *testin
 			{URL: "https://lore.kernel.org/r/abcd@example", Kind: finding.Report},
 		}
 		vulnerabilities := finding.NewVulnerabilities(f.db.DB)
+		everyone := access.Everything("reading back every address held")
 		interned, err := vulnerabilities.Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-1", References: references},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		held, err := vulnerabilities.PointsAt(ctx, interned["CVE-2026-1"])
+		held, err := vulnerabilities.PointsAtFor(ctx, everyone, interned["CVE-2026-1"])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -179,7 +180,7 @@ func TestTwoAddressesDifferingOnlyPastTheIndexWidthOrInCaseAreBothKept(t *testin
 		}); err != nil {
 			t.Fatal(err)
 		}
-		again, err := vulnerabilities.PointsAt(ctx, interned["CVE-2026-1"])
+		again, err := vulnerabilities.PointsAtFor(ctx, everyone, interned["CVE-2026-1"])
 		if err != nil {
 			t.Fatal(err)
 		}
