@@ -729,12 +729,12 @@ func (p Proposal) valid(now time.Time) error {
 	if p.DeferredUntil != nil && !p.DeferredUntil.After(now) {
 		return refusal.Errorf(
 			"a deferral returns on a date still to come: %s has passed",
-			p.DeferredUntil.Format(time.DateOnly))
+			p.DeferredUntil.UTC().Format(time.DateOnly))
 	}
 	if p.CommittedTo != nil && !p.CommittedTo.After(now) {
 		return refusal.Errorf(
 			"promised work lands on a date still to come: %s has passed",
-			p.CommittedTo.Format(time.DateOnly))
+			p.CommittedTo.UTC().Format(time.DateOnly))
 	}
 	// A backport moves no version, which is the whole difference between the
 	// two: naming one here would record an upgrade under the outcome

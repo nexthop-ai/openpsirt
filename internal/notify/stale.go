@@ -355,7 +355,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 			About: identify(fmt.Sprintf("deferral-ending %d", row.ClaimID)),
 			Body: fmt.Sprintf("A deferral of yours in %s ends on %s, covering %s. "+
 				"On that date it stops applying and the finding is open again.",
-				row.Product, row.Until.Format(time.DateOnly), rowsWritten(row.Places)),
+				row.Product, day(row.Until), rowsWritten(row.Places)),
 			Link:      weblink.ReviewQueueMine(),
 			Private:   private,
 			ProductID: &row.ProductID,
@@ -564,7 +564,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		}
 		when := ""
 		if row.ReceivedOn != nil {
-			when = " on " + row.ReceivedOn.Format(time.DateOnly)
+			when = " on " + day(*row.ReceivedOn)
 		}
 		holds := Holds{
 			About: identify(fmt.Sprintf("unanswered %d", row.VulnerabilityID)),

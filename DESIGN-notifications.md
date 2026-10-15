@@ -20,6 +20,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Claim outcomes](#claim-outcomes)
 - [The digest](#the-digest)
 - [Outbound content](#outbound-content)
+- [Dates and times](#dates-and-times)
 - [The notification list](#the-notification-list)
 - [Delivery](#delivery)
 - [Mail](#mail)
@@ -455,6 +456,16 @@ Who hears about an embargo is narrower than who hears about the tool's health.
 Administrators, and whoever holds it — the second only where they may still read
 undisclosed work in that product. An assignment can outlive the role that
 allowed it.
+
+## Dates and times
+
+The text of a notification is composed once and carried by every channel, so
+these hold for the notification area, mail and chat alike.
+
+| Rule | |
+|---|---|
+| A day is the UTC day a moment falls on | One moment is one day to every reader, whatever zone the server's clock is in, and it is the day the interface shows for it (`DESIGN-interface.md`) |
+| A time within a day is to the minute in UTC, and says UTC | An obligation window ends at an hour, and a time with no zone reads as the reader's own |
 
 ## The notification list
 

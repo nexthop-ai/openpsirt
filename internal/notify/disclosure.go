@@ -223,12 +223,12 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		about, body := "disclosure",
 			row.Vulnerability+" in "+row.Product+" at "+row.Component+
 				" reached its disclosure date on "+
-				row.DiscloseAt.Format(time.DateOnly)+" and nothing has been decided."
+				day(row.DiscloseAt)+" and nothing has been decided."
 		if lead > 0 {
 			about = "disclosure-near"
 			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
 				" discloses on " +
-				row.DiscloseAt.Format(time.DateOnly) +
+				day(row.DiscloseAt) +
 				" and nothing has been decided. Extending it needs a second person, " +
 				"and that takes time to arrange."
 		}

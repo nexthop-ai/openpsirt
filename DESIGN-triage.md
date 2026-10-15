@@ -1436,6 +1436,10 @@ at or before the moment the claim is being made.
 | A deferral until a date already gone | Takes the place's live key so nobody else may decide there, suppresses nothing, and arrives in the review queue already run out — a work item the tool made for itself |
 | Promised work due on a date already gone | Worse, because the gate asks whether the date is past the deadline the work already has and a date in the past never is. The promise stands on one signature and hides the finding for good |
 
+The refusal names the date as the UTC day it falls on, whatever offset the
+request wrote it with and whatever zone the server's clock is in. It is the day
+the interface shows for the same moment (`DESIGN-interface.md`).
+
 Checked where every write path inherits it rather than at each of them, which
 is how the two acts that build a claim without going through the ordinary
 entry point came to write claims nothing had looked at.

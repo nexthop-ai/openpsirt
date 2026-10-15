@@ -73,10 +73,10 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 			continue
 		}
 		body := fmt.Sprintf("The supplier %s for %s has not been read successfully since %s.",
-			one.Display, one.Product, since.Format("2006-01-02"))
+			one.Display, one.Product, day(since))
 		if one.ReachedAt == nil {
 			body = fmt.Sprintf("The supplier %s for %s has not been read successfully since "+
-				"it was configured on %s.", one.Display, one.Product, since.Format("2006-01-02"))
+				"it was configured on %s.", one.Display, one.Product, day(since))
 		}
 		if one.Failed != "" {
 			body += " The last attempt stopped at: " + one.Failed

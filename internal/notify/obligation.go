@@ -117,14 +117,14 @@ func (w *sweep) windows(ctx context.Context, kind Kind) (map[int64][]Holds, erro
 			case due.Window.FromID != nil:
 				from = fmt.Sprintf("the first notice for %q", due.Window.FromName)
 			case due.Window.FromFix:
-				from = "the release of the fix, " + due.StartsAt.Format("2006-01-02")
+				from = "the release of the fix, " + day(due.StartsAt)
 			}
 			holds := Holds{
 				About: identify(fmt.Sprintf("%s %d %d", about, one.Record.ID, due.Window.ID)),
 				Body: fmt.Sprintf("%s in %s: the window %q, counted from %s, %s %s. "+
 					"No notice outside is recorded against it.",
 					one.Issue, one.ProductName, due.Window.Name, from, verb,
-					due.EndsAt.Format("2006-01-02 15:04 MST")),
+					minute(due.EndsAt)),
 				Link:            weblink.ExploitedHere(),
 				Private:         one.Private,
 				ProductID:       &one.Record.ProductID,

@@ -404,7 +404,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			}
 			body = fmt.Sprintf("%s has not been scanned for %s, and an upload "+
 				"against it was turned away on %s%s", where, plainly(days),
-				row.LastRefusedAt.Format("2006-01-02"), why)
+				day(*row.LastRefusedAt), why)
 		}
 		holding = append(holding, Holds{
 			// Hashed rather than the three names joined. Each of them may be
