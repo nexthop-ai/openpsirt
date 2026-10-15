@@ -32,6 +32,7 @@ triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a reco
 triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 graph.Store.CurrentComponents A background pass: the scanner is fed a build's components from here.
+graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
 graph.Store.Apply A background pass: it records a scan's graph against a build.
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
