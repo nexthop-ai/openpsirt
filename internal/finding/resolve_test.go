@@ -29,9 +29,6 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 			t.Fatal(err)
 		}
 		row := rows[0]
-		if err != nil {
-			t.Fatal(err)
-		}
 		issueID := row.VulnerabilityID
 
 		// A reason is required, for the same reason moving a disclosure date
@@ -146,9 +143,6 @@ func TestClosingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 			t.Fatal(err)
 		}
 		row := rows[0]
-		if err != nil {
-			t.Fatal(err)
-		}
 
 		// Reading it and not triaging it is refused as that.
 		reads := f.planner(t, access.PublicTriage, access.PrivateRead)
