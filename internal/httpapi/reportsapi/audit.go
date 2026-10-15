@@ -243,12 +243,7 @@ func registerAudit(api huma.API, in core.Deps) {
 		Auditing
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*struct {
-		Body struct {
-			Items []JudgedBody `json:"items"`
-			Total int          `json:"total"`
-		}
-	}, error) {
+	}) (*core.CountedListOutput[JudgedBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -262,12 +257,7 @@ func registerAudit(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
 		}
-		out := &struct {
-			Body struct {
-				Items []JudgedBody `json:"items"`
-				Total int          `json:"total"`
-			}
-		}{}
+		out := &core.CountedListOutput[JudgedBody]{}
 		out.Body.Items = make([]JudgedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, judgedBody(row))
@@ -335,12 +325,7 @@ func registerAuditClaims(api huma.API, in core.Deps) {
 		Auditing
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`
-	}) (*struct {
-		Body struct {
-			Items []JudgedClaimBody `json:"items"`
-			Total int               `json:"total"`
-		}
-	}, error) {
+	}) (*core.CountedListOutput[JudgedClaimBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -353,12 +338,7 @@ func registerAuditClaims(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "the record could not be read", err)
 		}
-		out := &struct {
-			Body struct {
-				Items []JudgedClaimBody `json:"items"`
-				Total int               `json:"total"`
-			}
-		}{}
+		out := &core.CountedListOutput[JudgedClaimBody]{}
 		out.Body.Items = make([]JudgedClaimBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, judgedClaimBody(row))

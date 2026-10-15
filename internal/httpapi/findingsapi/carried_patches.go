@@ -72,12 +72,7 @@ func registerCarried(api huma.API, in core.Deps) {
 		Variant   string `path:"variant"`
 		Component string `query:"component" doc:"Narrow to what one package was claimed about"`
 		core.Paging
-	}) (*struct {
-		Body struct {
-			Items []CarriedClaimBody `json:"items"`
-			Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
-		}
-	}, error) {
+	}) (*core.CountedListOutput[CarriedClaimBody], error) {
 		subject, targetID, err := core.VisibleBuild(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
@@ -87,12 +82,7 @@ func registerCarried(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
-		out := &struct {
-			Body struct {
-				Items []CarriedClaimBody `json:"items"`
-				Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
-			}
-		}{}
+		out := &core.CountedListOutput[CarriedClaimBody]{}
 		out.Body.Total = total
 		out.Body.Items = make([]CarriedClaimBody, 0, len(rows))
 		for _, row := range rows {

@@ -190,6 +190,17 @@ type ListOutput[T any] struct {
 	Body listBody[T]
 }
 
+// CountedListOutput is a page of a list that always states its total, zero
+// included, so a caller can tell an empty page from a list with nothing in it.
+type CountedListOutput[T any] struct {
+	Body countedListBody[T]
+}
+
+type countedListBody[T any] struct {
+	Items []T `json:"items"`
+	Total int `json:"total" doc:"The total, so a page says what it is a page of"`
+}
+
 // OverPeriod is a listing that covers a stretch of time and says which.
 //
 // Its own shape rather than two more fields on every listing: most lists here

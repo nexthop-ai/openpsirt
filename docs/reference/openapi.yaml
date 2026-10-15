@@ -2170,6 +2170,102 @@ components:
         - items
         - total
       type: object
+    CountedListBodyBundleBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyBundleBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/BundleBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyCarriedClaimBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyCarriedClaimBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/CarriedClaimBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyJudgedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyJudgedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/JudgedBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
+    CountedListBodyJudgedClaimBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CountedListBodyJudgedClaimBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/JudgedClaimBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: The total, so a page says what it is a page of
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+      type: object
     CounterBody:
       additionalProperties: false
       properties:
@@ -5223,99 +5319,6 @@ components:
             - "null"
       required:
         - items
-      type: object
-    List-audit-claimsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-audit-claimsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/JudgedClaimBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-auditResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-auditResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/JudgedBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-carried-patchesResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-carried-patchesResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/CarriedClaimBody"
-          type:
-            - array
-            - "null"
-        total:
-          description: The total, so a page says what it is a page of
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
-      type: object
-    List-fix-bundlesResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-fix-bundlesResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/BundleBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-        - total
       type: object
     List-issues-at-componentResponse:
       additionalProperties: false
@@ -13475,7 +13478,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-auditResponse"
+                $ref: "#/components/schemas/CountedListBodyJudgedBody"
           description: OK
         default:
           content:
@@ -13805,7 +13808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-audit-claimsResponse"
+                $ref: "#/components/schemas/CountedListBodyJudgedClaimBody"
           description: OK
         default:
           content:
@@ -21517,7 +21520,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-fix-bundlesResponse"
+                $ref: "#/components/schemas/CountedListBodyBundleBody"
           description: OK
         default:
           content:
@@ -24162,7 +24165,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-carried-patchesResponse"
+                $ref: "#/components/schemas/CountedListBodyCarriedClaimBody"
           description: OK
         default:
           content:

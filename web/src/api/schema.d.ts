@@ -7385,6 +7385,62 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        CountedListBodyBundleBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountedListBodyBundleBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["BundleBody"][] | null;
+            /**
+             * Format: int64
+             * @description The total, so a page says what it is a page of
+             */
+            total: number;
+        };
+        CountedListBodyCarriedClaimBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountedListBodyCarriedClaimBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["CarriedClaimBody"][] | null;
+            /**
+             * Format: int64
+             * @description The total, so a page says what it is a page of
+             */
+            total: number;
+        };
+        CountedListBodyJudgedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountedListBodyJudgedBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["JudgedBody"][] | null;
+            /**
+             * Format: int64
+             * @description The total, so a page says what it is a page of
+             */
+            total: number;
+        };
+        CountedListBodyJudgedClaimBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CountedListBodyJudgedClaimBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["JudgedClaimBody"][] | null;
+            /**
+             * Format: int64
+             * @description The total, so a page says what it is a page of
+             */
+            total: number;
+        };
         CounterBody: {
             /** @description Approved claims about this issue at other places, counted by outcome */
             elsewhere?: {
@@ -9103,53 +9159,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AttachmentBody"][] | null;
-        };
-        "List-audit-claimsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-audit-claimsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["JudgedClaimBody"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
-        "List-auditResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-auditResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["JudgedBody"][] | null;
-            /** Format: int64 */
-            total: number;
-        };
-        "List-carried-patchesResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-carried-patchesResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["CarriedClaimBody"][] | null;
-            /**
-             * Format: int64
-             * @description The total, so a page says what it is a page of
-             */
-            total: number;
-        };
-        "List-fix-bundlesResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-fix-bundlesResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["BundleBody"][] | null;
-            /** Format: int64 */
-            total: number;
         };
         "List-issues-at-componentResponse": {
             /**
@@ -13899,7 +13908,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-auditResponse"];
+                    "application/json": components["schemas"]["CountedListBodyJudgedBody"];
                 };
             };
             /** @description Error */
@@ -14013,7 +14022,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-audit-claimsResponse"];
+                    "application/json": components["schemas"]["CountedListBodyJudgedClaimBody"];
                 };
             };
             /** @description Error */
@@ -17667,7 +17676,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-fix-bundlesResponse"];
+                    "application/json": components["schemas"]["CountedListBodyBundleBody"];
                 };
             };
             /** @description Error */
@@ -19497,7 +19506,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-carried-patchesResponse"];
+                    "application/json": components["schemas"]["CountedListBodyCarriedClaimBody"];
                 };
             };
             /** @description Error */

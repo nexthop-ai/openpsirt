@@ -110,24 +110,14 @@ func registerBundles(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		BundleQuery
 		core.CountedPaging
-	}) (*struct {
-		Body struct {
-			Items []BundleBody `json:"items"`
-			Total int          `json:"total"`
-		}
-	}, error) {
+	}) (*core.CountedListOutput[BundleBody], error) {
 		subject, scope, floor, err := core.ScopedFloor(ctx, in, core.ScopeQuery{
 			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
 		}, "the triage line could not be read")
 		if err != nil {
 			return nil, err
 		}
-		out := &struct {
-			Body struct {
-				Items []BundleBody `json:"items"`
-				Total int          `json:"total"`
-			}
-		}{}
+		out := &core.CountedListOutput[BundleBody]{}
 		store := finding.NewStore(in.DB.DB)
 		if input.Limit == 0 {
 			total, err := store.CountBundles(ctx, subject, scope, input.narrow(floor))
