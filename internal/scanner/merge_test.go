@@ -412,17 +412,8 @@ func TestAMergeMeetingTwoRatingsThatDisagreeKeepsTheOneInForceAndTellsTheTriager
 	// claim, and the one in force outranks the newer.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
-		f.reporting(t, named(national, libnl), named(advisory, swss))
+		product, store, underNational, underAdvisory := f.twoNamesApart(t)
 		proposer, approver := f.triagers(t)
-		product, store, issues := f.rating(t)
-		underNational, err := issues.ByName(ctx, national)
-		if err != nil {
-			t.Fatal(err)
-		}
-		underAdvisory, err := issues.ByName(ctx, advisory)
-		if err != nil {
-			t.Fatal(err)
-		}
 		worse, err := store.Assess(ctx, approver, product, underAdvisory, "critical",
 			"Reachable from any port the switch answers on.")
 		if err != nil {
@@ -484,17 +475,8 @@ func TestAMergeMeetingTwoRatingsThatAgreeKeepsTheNewerAndTellsNobody(t *testing.
 	// about the product's rating changed.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
-		f.reporting(t, named(national, libnl), named(advisory, swss))
+		product, store, underNational, underAdvisory := f.twoNamesApart(t)
 		proposer, approver := f.triagers(t)
-		product, store, issues := f.rating(t)
-		underNational, err := issues.ByName(ctx, national)
-		if err != nil {
-			t.Fatal(err)
-		}
-		underAdvisory, err := issues.ByName(ctx, advisory)
-		if err != nil {
-			t.Fatal(err)
-		}
 		older, err := store.Assess(ctx, approver, product, underAdvisory, "critical",
 			"Reachable from any port the switch answers on.")
 		if err != nil {
@@ -539,17 +521,8 @@ func TestAMergeMeetingTwoRecordsOfAnAttackKeepsTheNewerAndTellsTheTriagers(t *te
 	// which one stands is news to the product.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
-		f.reporting(t, named(national, libnl), named(advisory, swss))
+		product, _, underNational, underAdvisory := f.twoNamesApart(t)
 		proposer, approver := f.triagers(t)
-		product, _, issues := f.rating(t)
-		underNational, err := issues.ByName(ctx, national)
-		if err != nil {
-			t.Fatal(err)
-		}
-		underAdvisory, err := issues.ByName(ctx, advisory)
-		if err != nil {
-			t.Fatal(err)
-		}
 		records := triage.NewStore(f.db.DB)
 		known := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Second)
 		older, _, err := records.RecordExploitedHere(ctx, proposer, product, underAdvisory,
@@ -608,6 +581,24 @@ func (f *runFixture) rating(t *testing.T) (int64, *finding.Store, *finding.Vulne
 		t.Fatal(err)
 	}
 	return product.ID, finding.NewStore(f.db.DB), finding.NewVulnerabilities(f.db.DB)
+}
+
+// twoNamesApart reports one issue under two names, the national one on libnl
+// and the advisory on swss, before any report joins them, and answers the
+// product, its finding store and the issue under each name.
+func (f *runFixture) twoNamesApart(t *testing.T) (product int64, store *finding.Store, underNational, underAdvisory int64) {
+	t.Helper()
+	f.reporting(t, named(national, libnl), named(advisory, swss))
+	product, store, issues := f.rating(t)
+	underNational, err := issues.ByName(t.Context(), national)
+	if err != nil {
+		t.Fatal(err)
+	}
+	underAdvisory, err = issues.ByName(t.Context(), advisory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return product, store, underNational, underAdvisory
 }
 
 // openFindings is every open finding of the fixture's build.

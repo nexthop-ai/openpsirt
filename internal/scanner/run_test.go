@@ -286,23 +286,8 @@ func (f *runFixture) decided(t *testing.T) int64 {
 	t.Helper()
 	ctx := t.Context()
 
-	rights := access.NewStore(f.db.DB)
-	product := f.world.Product
-	var people []access.Subject
-	for _, who := range []string{"proposer", "approver"} {
-		person, err := rights.Ensure(ctx, who, "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(ctx, person.ID, product.ID, access.PublicTriage); err != nil {
-			t.Fatal(err)
-		}
-		subject, err := rights.Resolve(ctx, who)
-		if err != nil {
-			t.Fatal(err)
-		}
-		people = append(people, subject)
-	}
+	proposer, approver := f.triagers(t)
+	people := []access.Subject{proposer, approver}
 
 	issue, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, "CVE-2026-1")
 	if err != nil {
@@ -962,9 +947,19 @@ func TestABuildNeverScannedWithASnapshotIsScannedWithoutOne(t *testing.T) {
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 		f.waiting(t)
-		if _, err := scanner.NewRunner(f.db, f.queue, &stub{}, quiet, "test").
-			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context()); err != nil {
-			t.Errorf("a build never narrowed was refused without a snapshot: %v", err)
+		s := &stub{}
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Narrowing(cverecord.NewHeld(t.TempDir())).Once(t.Context())
+		if err != nil {
+			t.Fatalf("a build never narrowed was refused without a snapshot: %v", err)
+		}
+		// A scan that waits for a snapshot also answers no error, so what
+		// tells the two apart is that the scanner ran and the run finished.
+		if outcome == nil || s.saw == nil {
+			t.Fatal("a build never narrowed waited for a snapshot rather than being scanned")
+		}
+		if got := f.finishedRuns(t); got != 1 {
+			t.Errorf("%d finished runs, want 1", got)
 		}
 	})
 }
