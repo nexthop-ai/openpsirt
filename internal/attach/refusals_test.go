@@ -42,3 +42,20 @@ func TestOnlyAPersonReachesAnAttachment(t *testing.T) {
 		}
 	})
 }
+
+func TestAFileHangingOffNothingIsReachedByNobody(t *testing.T) {
+	// Nothing writes a row naming neither an issue nor a report, and the
+	// schema does not refuse one. Nobody may read a file nothing can answer
+	// "who may read this" about, an administrator included.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		row := f.upload(t, f.who(t, access.PublicTriage), "evidence.txt", []byte("the request"))
+		if _, err := f.db.DB.NewRaw(`UPDATE "attachment" SET "vulnerability_id" = NULL WHERE "id" = ?`,
+			row.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Find(ctx, f.admin(t), row.Token); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a file hanging off nothing was found: %v", err)
+		}
+	})
+}
