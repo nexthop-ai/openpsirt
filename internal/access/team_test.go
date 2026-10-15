@@ -152,12 +152,11 @@ func TestDeclaringATeamTwiceIsOneTeam(t *testing.T) {
 }
 
 func TestDeclaringARetiredTeamsNameBringsItBack(t *testing.T) {
-	// The lookup said a retired team's name was free to be declared again and
-	// it was not: the row stays, so that work already routed to it resolves to
-	// something a screen can name, and the unique index refused a second team
-	// under the same name — with a message about a team nobody could see.
-	// Declaring is idempotent everywhere else here, and this is what somebody
-	// typing a name they retired last week means.
+	// A retired team's row stays, so that work already routed to it resolves
+	// to something a screen can name, and its name stays taken under the
+	// unique index. Declaring the name again brings the team back: declaring
+	// is idempotent everywhere else here, and this is what somebody typing a
+	// name they retired last week means.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 

@@ -183,9 +183,8 @@ func (s *Store) Teams(ctx context.Context, term string, limit int) ([]Team, erro
 		// Read in bulk rather than a screenful at a time: the picker asks for
 		// a screenful and the two callers that want every team say so with
 		// this kind's own ceiling. Bounded as a list somebody pages through,
-		// "all of them" fell past the 200 ceiling and took the 50-row default
-		// — so a deployment past fifty teams rendered every routing rule owned
-		// by an alphabetically-later team with a blank team name.
+		// "all of them" past that list's ceiling takes its default instead,
+		// and every team past the default reads as no team.
 		Limit(database.InBulk.Of(limit))
 	if err := query.Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which teams there are: %w", err)
@@ -288,7 +287,7 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 //
 // Read then written rather than as one upsert, because there is no portable
 // spelling of one — two of the four engines want ON CONFLICT and the other two
-// ON DUPLICATE KEY UPDATE, and engine-specific SQL stays out of the core .
+// ON DUPLICATE KEY UPDATE, and engine-specific SQL stays out of the core.
 // Both statements in one transaction, so what the read saw is what the write
 // writes against; two administrators adding the same person at once resolve
 // against the primary key.
@@ -322,11 +321,10 @@ func (s *Store) AddToTeam(ctx context.Context, teamID, personID, by int64) (bool
 // what has arrived.
 //
 // A removal that matched nothing is ErrNothingMatched, like every other write
-// here that takes access away: taking somebody off a team they were never on
-// otherwise answered as though it had happened, and the caller wrote a trail
-// row saying a membership was ended that never existed. Membership is what
-// routes an undisclosed finding to somebody, so a trail that says who stopped
-// receiving them is a record of who could have seen what.
+// here that takes access away, so the caller writes no trail row for a
+// membership that never existed. Membership is what routes an undisclosed
+// finding to somebody, so a trail that says who stopped receiving them is a
+// record of who could have seen what.
 func (s *Store) RemoveFromTeam(ctx context.Context, teamID, personID int64) error {
 	res, err := s.db.NewDelete().Model((*Membership)(nil)).
 		Where("team_id = ?", teamID).Where("person_id = ?", personID).Exec(ctx)
@@ -461,12 +459,10 @@ func (s *Store) PersonReads(ctx context.Context, personID, productID int64,
 // here reports whether this person is still someone the deployment answers
 // for: recorded, and not deactivated.
 //
-// One spelling, because "may this person do this" has to exclude somebody who
-// has left at every site that asks it, and it excluded them at one — the
-// mention picker, whose own doc gives the reason: they are refused at sign-in,
-// so offering their name mentions somebody who will never see it. The same
-// sentence applies to routing work to them and to counting administrators, and
-// was carried to neither.
+// One spelling, because "may this person do this" excludes somebody who has
+// left at every site that asks it: the mention picker, routing work to them,
+// and counting administrators. They are refused at sign-in, so anything handed
+// to them is handed to somebody who will never see it.
 func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 	live, err := s.db.NewSelect().Model((*Account)(nil)).
 		Where("id = ?", personID).
@@ -539,13 +535,10 @@ func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
 	if len(enough) == 0 {
 		return false, nil
 	}
-	// An administrator is not counted. Administration is not a read grant
-	// , and a team whose only qualifying member is an administrator is a
-	// queue nobody working the product can see.
-	// A member who has left is not a member who can read it. The team is a
-	// queue, and one whose only qualifying member is gone is a queue nobody
-	// working the product can see — the argument the administrator case above
-	// already makes, for a case nobody made it for.
+	// An administrator is not counted. Administration is not a read grant,
+	// and a team whose only qualifying member is an administrator is a queue
+	// nobody working the product can see. A member who has left is not
+	// counted either, for the same reason.
 	reads, err := holdingAny(s.db.NewSelect().
 		TableExpr(`"team_member" AS "tmm"`).
 		Join(`JOIN "person" AS "pe" ON pe.id = tmm.person_id`).

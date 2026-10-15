@@ -450,13 +450,12 @@ func TestATokenDefaultsToWhateverTheCeilingAllows(t *testing.T) {
 // TestANarrowedTokenIsStillTheSamePerson pins what narrowing takes away and
 // what it must not.
 //
-// It was written as a fresh Subject carrying five fields, so everything else
-// went silently: who somebody is in the assignable space, the teams they are
-// on, and the cases they were brought into. None of those is a per-product
-// fact. Through such a token every "assigned to me" surface answered empty and
-// taking an unowned finding for yourself was refused with a message saying you
-// were giving work to somebody else — while the same acts worked through the
-// same person's session.
+// Narrowing keeps who somebody is in the assignable space, the teams they are
+// on, and the cases they were brought into, because none of those is a
+// per-product fact. Without them, every "assigned to me" surface answers empty
+// through the token, and taking an unowned finding for yourself is refused as
+// giving work to somebody else, while the same acts work through the same
+// person's session.
 func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -545,13 +544,13 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 // Membership is read at sign-in, and a sign-in replaces somebody's derived
 // grants whole — so a browser's are never older than its session. A token never
 // signs in. It resolves through its owner and reads whatever their last sign-in
-// wrote, so without a bound a group somebody left went on granting them roles
-// through that token until they next signed in, which for somebody who has gone
+// wrote, so without a bound a group somebody left goes on granting them roles
+// through that token until they next sign in, which for somebody who has gone
 // is never.
 //
 // The window is the session lifetime, which is the same one the access document
-// already names as how long a role a group withdrew can still be held. It was
-// true of a browser and false of a token.
+// names as how long a role a group withdrew can still be held, for a browser
+// and a token alike.
 //
 // A grant an administrator assigned is untouched. That is a standing decision
 // rather than a reading of somebody's membership, and it does not go off.
@@ -615,8 +614,7 @@ func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 // intersection rather than a grant.
 //
 // A credential handed to a script that only reads should not also be able to
-// triage, and until it could be narrowed the only way to get one was to hold
-// nothing else yourself. Minting it needs no second person precisely because it
+// triage. Minting it needs no second person precisely because it
 // can only ever reach less: naming a role its owner does not hold reaches
 // nothing through it.
 func TestATokenCarriesOnlyTheRolesItWasMintedFor(t *testing.T) {
