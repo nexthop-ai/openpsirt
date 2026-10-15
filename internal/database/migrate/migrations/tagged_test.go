@@ -108,7 +108,9 @@ func taggedSchema(t *testing.T, version string, engine database.Engine, got []st
 	if err != nil {
 		t.Fatalf("read what %s built on %s: %v", version, engine, err)
 	}
-	lines := strings.Split(strings.TrimRight(string(want), "\n"), "\n")
+	// A record frozen before the bookkeeping table was left out still
+	// describes it, and the files a tag froze are never edited.
+	lines := ours(strings.Split(strings.TrimRight(string(want), "\n"), "\n"))
 	if diff := setDiff(lines, got); diff != "" {
 		t.Errorf("the migrations no longer build what %s built on %s:\n%s", version, engine, diff)
 	}

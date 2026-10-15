@@ -283,6 +283,7 @@ schema they build on each of the four engines, captured from the tag.
 |---|---|
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit. On SQLite the description also says whether each table's key is `AUTOINCREMENT` and whether each index is partial, which the engine's column and index listings leave out |
+| The migration library's bookkeeping table is left out of the schema compared, on every engine, and a record that lists it is compared without it | The library creates that table and chooses its column types, and a release of the library changes them with no migration here changing |
 | A release the baseline replaced lists no file | Its files are gone from the tree. Its schema on each engine is what holds the baseline. v0.5.0's record is the one |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what

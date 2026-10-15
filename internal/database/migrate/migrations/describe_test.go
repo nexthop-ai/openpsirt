@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -21,6 +22,10 @@ import (
 // and no query here reads a column by position. Everything else the engine reports about a
 // column is in: its type as the engine spells it, whether it takes a null, its
 // default, and on MySQL and MariaDB its collation and the table's options.
+//
+// The migration library's own bookkeeping table is left out. The library
+// creates it and chooses its column types, and a release of the library
+// changes them without any migration here changing.
 func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 	t.Helper()
 	var queries []string
@@ -68,7 +73,7 @@ func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 			 GROUP BY "k"."TABLE_NAME", "k"."CONSTRAINT_NAME"`,
 		}
 	case database.SQLite:
-		return describeSQLite(t, ctx, db)
+		return ours(describeSQLite(t, ctx, db))
 	default:
 		t.Fatalf("no description of a schema on %s", db.Server.Engine)
 	}
@@ -78,7 +83,28 @@ func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 		lines = append(lines, queryLines(t, ctx, db.DB.DB, q)...)
 	}
 	slices.Sort(lines)
-	return lines
+	return ours(lines)
+}
+
+// bookkeeping is the table the migration library keeps its record in.
+const bookkeeping = "goose_db_version"
+
+// ours is a description without the lines about the migration library's
+// bookkeeping table. A line names its table after the kind of thing it
+// describes, and a column line names it before a dot.
+func ours(lines []string) []string {
+	return slices.DeleteFunc(lines, func(line string) bool {
+		rest := line
+		for _, kind := range []string{"foreign key ", "column ", "constraint ", "index ", "table "} {
+			if after, found := strings.CutPrefix(line, kind); found {
+				rest = after
+				break
+			}
+		}
+		table, _, _ := strings.Cut(rest, " ")
+		table, _, _ = strings.Cut(table, ".")
+		return table == bookkeeping
+	})
 }
 
 // describeSQLite reads the same from SQLite's pragmas, which report per table.
