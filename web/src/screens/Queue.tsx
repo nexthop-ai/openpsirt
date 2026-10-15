@@ -8,31 +8,21 @@ import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
 import { Became } from "./QueueMine";
 import { ToReaffirm } from "./QueueReaffirm";
-import { Embargoes, PENDING_PAGE, Ratings } from "./QueuePending";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Embargoes, Ratings } from "./QueuePending";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
 import { UNOWNED_LIST, usePaging } from "./list";
-import { claimAt, decisionAt, findingOf, issueAt } from "../app/routes";
-import { unwrap } from "../api/queries";
-import { claimOf, useAfterClaim, useApproveClaim, useRejectClaim, type Claim } from "../api/claims";
+import { claimOf, useAfterClaim, type Claim } from "../api/claims";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Markdown } from "../ui/Markdown";
-import { Editor, forget } from "../ui/Editor";
-import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
-import { called, labeled } from "../ui/Outcome";
-import { Wide } from "../ui/Wide";
 import { Count } from "../ui/Count";
-import { QueueFilters, queueNarrowing } from "./QueueFilters";
-import { issuesIn, toggled } from "./outliers";
-import { promised, queueReason, REASONS, wordsFor, type Reason } from "./queueReasons";
+import { QueueFilters } from "./QueueFilters";
+import { REASONS, wordsFor } from "./queueReasons";
 import { fileAt } from "../api/links";
-
-// A page of claims. The queue is read at the grain of a claim, and a claim
-// is a card with its whole argument, so a page is what fits a sitting.
-const PAGE = 50;
+import { Card, Dated } from "./QueueCard";
+import { PAGE, useQueueReads } from "./useQueueReads";
+import { useQueueApproval } from "./useQueueApproval";
 
 // The review queue at the grain of a claim: one card per proposer's action,
 // however many records it wrote. Three lists, one per reason a claim waits:
@@ -47,11 +37,10 @@ export function Queue() {
   // and shown, or said to be missing — a link that lands on the queue with
   // nothing marked leaves somebody hunting through cards for the one meant.
   const wanted = Number(params.get("claim") ?? 0);
-  // The claim beside its key, not the key alone. A selection deliberately
-  // survives paging — a row is selected by what it is rather than by where it
-  // sits — and the loop that acted on it filtered the current page, so
-  // everything ticked on an earlier page was counted in the button and
-  // silently never approved.
+  // The claim beside its key, not the key alone. A selection survives paging,
+  // because a row is selected by what it is rather than by where it sits, and
+  // an approval acts on everything ticked, including what is ticked on another
+  // page.
   const [picked, setPicked] = useState<Map<string, Claim>>(new Map());
   // Moving to another tab: the tab's own words set or cleared, the page back
   // to its first, and the selection dropped, because it was made out of the
@@ -67,118 +56,38 @@ export function Queue() {
     setParams(now);
   }
   const { cap, over } = useBulkCap(picked.size);
-  const [batch, setBatch] = useState("");
-  // The batch just agreed to, which is the only one there is a safe control
-  // for: undoing one named at some point in the past is a control nobody can
-  // use without knowing what is in it.
-  const [justDone, setJustDone] = useState("");
-  // The rows of a batch refused, so a partial result says so rather than
-  // leaving somebody to compare counts.
-  const [refused, setRefused] = useState(0);
-  const approveClaim = useApproveClaim();
+  const {
+    batch,
+    setBatch,
+    justDone,
+    setJustDone,
+    refused,
+    setRefused,
+    approveClaim,
+    undo,
+    approvePicked,
+  } = useQueueApproval(picked, setPicked);
   const queries = useQueryClient();
   const afterClaim = useAfterClaim();
-  const undo = useMutation({
-    mutationFn: async (name: string) =>
-      unwrap(
-        await api.DELETE("/v1/approval-batches/{batch}", {
-          params: { path: { batch: name } },
-        }),
-      ),
-    onSuccess: () => {
-      setJustDone("");
-      afterClaim();
-    },
-  });
-
-  // Whose claims. The queue proper is what is waiting on you; your own are a
-  // different question — what did I propose that nobody has agreed to — and
-  // they were mixed in, which made the queue a list containing work the reader
-  // cannot do, because approving your own is refused.
-  const mine = params.get("mine") === "1";
-  // The claims of yours that lapsed. A tab of its own because the lapse alert
-  // links here: it is work handed back, not a record of what happened.
-  const reaffirm = params.get("reaffirm") === "1";
-  // Either of the two tabs about your own claims, where the queue proper is
-  // only counted.
-  const aside = mine || reaffirm;
-  // Which of the three lists, where the reader is on one of them.
-  const reason = queueReason(params);
-  // Only the reader's own claims, on the two lists that show everybody's.
-  const own = params.get("own") === "1";
-  // The product, where the address names one. The figure on the home screen
-  // is narrowed by the scope picker and links here with it, so a queue that
-  // ignored it answered a different question from the number that was clicked.
-  const product = params.get("product") ?? "";
-  const within = product ? { product } : {};
-  // What else the queue is narrowed by: who proposed a claim, its age, the
-  // severity it covers, its outcome and the release it covers.
-  const narrowing = queueNarrowing(params);
-  // One list per reason. A page when it is the list being read, the total
-  // alone when it is only a tab's count: every list is asked for on every visit so each
-  // tab carries its number without being opened. The filters apply only to the
-  // list on screen, so a tab's count is the whole of its list.
-  const listing = (which: Reason) => {
-    const reading = !aside && reason === which;
-    const yours = reading && own && which !== "approval";
-    return {
-      queryKey: [
-        "queue",
-        which,
-        reading ? offset : 0,
-        reading,
-        product,
-        reading ? narrowing : {},
-        yours,
-      ],
-      queryFn: async () =>
-        unwrap(
-          await api.GET("/v1/review-queue", {
-            params: {
-              query: {
-                reason: which,
-                limit: reading ? PAGE : 0,
-                offset: reading ? offset : 0,
-                ...within,
-                ...(reading ? narrowing : {}),
-                ...(yours ? { mine: true } : {}),
-              },
-            },
-          }),
-        ),
-    };
-  };
-  const approvals = useQuery(listing("approval"));
-  const expired = useQuery(listing("expired-deferral"));
-  const missed = useQuery(listing("missed-fix-date"));
-  const counted = { approval: approvals, "expired-deferral": expired, "missed-fix-date": missed };
-  const queue = counted[reason];
-  // The lapsed claims that are this person's to re-affirm, narrowed to the
-  // product the address names like the queue beside it.
-  const lapsedMine = useQuery({
-    queryKey: ["to-reaffirm", reaffirm ? offset : 0, reaffirm, product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/to-reaffirm", {
-          params: {
-            query: { limit: reaffirm ? PAGE : 1, offset: reaffirm ? offset : 0, ...within },
-          },
-        }),
-      ),
-  });
-  // The fate of what this person proposed. A different question from the
-  // queue's, and a different statement: the queue lists what is pending, so
-  // approved, withdrawn, lapsed and undone all present there as the row
-  // disappearing, and the proposer finds out by reopening the finding.
-  const became = useQuery({
-    queryKey: ["my-claims", mine ? offset : 0, mine],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/my-claims", {
-          params: { query: { limit: mine ? PAGE : 1, offset: mine ? offset : 0 } },
-        }),
-      ),
-  });
+  const {
+    mine,
+    reaffirm,
+    aside,
+    reason,
+    own,
+    product,
+    narrowing,
+    counted,
+    queue,
+    lapsedMine,
+    became,
+    embargoes,
+    embargoAt,
+    setEmbargoAt,
+    ratings,
+    ratingAt,
+    setRatingAt,
+  } = useQueueReads(params, offset);
 
   const found = wanted > 0 && (queue.data?.items ?? []).some((row) => claimOf(row).id === wanted);
   useEffect(() => {
@@ -205,38 +114,6 @@ export function Queue() {
     watch.observe(document.body, { childList: true, subtree: true });
     return () => watch.disconnect();
   }, [hash]);
-  // A milder rating of an issue waits for a second person the same way a
-  // dismissal does, and so does a request to keep something hidden longer.
-  // Both are listed here, where a request is otherwise read only on the
-  // finding it belongs to.
-  //
-  // It is on this screen because this is where somebody goes to be a second
-  // person, and it is a separate list rather than a queue card because what is
-  // agreed to is not a claim about code — it is how long something stays
-  // hidden, and nothing about a claim's shape fits it.
-  const [embargoAt, setEmbargoAt] = useState(0);
-  const [ratingAt, setRatingAt] = useState(0);
-  const embargoes = useQuery({
-    queryKey: ["movements", "pending", embargoAt],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/disclosure-movements", {
-          params: { query: { limit: PENDING_PAGE, offset: embargoAt } },
-        }),
-      ),
-    // Somebody who may read nothing undisclosed gets an empty list rather than
-    // a refusal, so this is quiet on their screen rather than an error on it.
-    retry: false,
-  });
-  const ratings = useQuery({
-    queryKey: ["queue", "assessments", ratingAt],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/assessments", {
-          params: { query: { state: "proposed", limit: PENDING_PAGE, offset: ratingAt } },
-        }),
-      ),
-  });
 
   if (queue.isPending) return <Loading />;
   if (queue.isError) {
@@ -268,44 +145,6 @@ export function Queue() {
   const records = claims.reduce((sum, c) => sum + c.records, 0);
   const words = wordsFor(reason);
   const approving = !aside && reason === "approval";
-
-  async function approvePicked() {
-    // Sequential rather than parallel: each is a separate claim and a refusal
-    // on one does not decide the fate of the rest. Every claim is tried, the
-    // selection is left holding what was refused, and the batch name is set
-    // whenever one landed, so the undo control appears for those.
-    const named = batch.trim();
-    const failed: string[] = [];
-    let landed = 0;
-    const acted = new Set(picked.keys());
-    for (const [key, claim] of picked) {
-      try {
-        await approveClaim.mutateAsync({ id: claim.id, batch: named || undefined });
-        landed++;
-      } catch {
-        failed.push(key);
-      }
-    }
-    // The refused rows, and nothing else.
-    //
-    // The selection spans pages and the loop above acts on all of it, so an
-    // entry that is not on the page in front of somebody was approved like the
-    // rest — keeping it ticked because it is off-page left the count standing
-    // and made a second press report every one of them as refused.
-    //
-    // Kept from the current selection rather than from the snapshot this loop
-    // started with, so anything ticked while it ran survives and anything
-    // unticked while it ran stays unticked.
-    setPicked((prev) => stillPicked(prev, acted, failed));
-    setRefused(failed.length);
-    // The agreement just made under one name, so it can be taken back
-    // without remembering the name. The control the queue already promised:
-    // "approvals under one batch name can be undone together" said so and
-    // there was nowhere to do it.
-    // Whenever at least one landed, which is the moment somebody notices —
-    // not only when every one of them did.
-    if (named && landed > 0) setJustDone(named);
-  }
 
   return (
     <>
@@ -455,8 +294,7 @@ export function Queue() {
               checked={claims.length > 0 && claims.every((c) => picked.has(c.key))}
               onChange={(event) => {
                 // This page either way, so ticking and unticking are
-                // inverses. Unticking cleared every page's selection where
-                // ticking added only this one's.
+                // inverses and the rest of the selection stands.
                 const next = new Map(picked);
                 for (const claim of claims) {
                   if (event.target.checked) next.set(claim.key, claim);
@@ -612,625 +450,4 @@ export function Queue() {
       <WaitingRulings product={product || undefined} />
     </>
   );
-}
-
-// A claim waiting for a new decision rather than an agreement: a deferral
-// whose date passed, or a promise whose date passed with the finding open.
-//
-// It says which promise it was and offers the acts that answer it. Both lists
-// are anybody's in the product to act on, the proposer included, so there is
-// no approving here. A missed promise can be moved to a new version or date,
-// which puts it in front of a second person again where the new date needs
-// one; either can be decided again on the finding.
-// Who proposed a claim and how long it has stood, which every card says first.
-function Proposal({ claim }: { claim: Claim }) {
-  return (
-    <>
-      {claim.proposedBy && (
-        <span>
-          Proposed by <b>{claim.proposedBy}</b>
-        </span>
-      )}
-      <span>
-        Standing <b>{claim.ageDays === 0 ? "today" : `${claim.ageDays} days`}</b>
-      </span>
-    </>
-  );
-}
-
-function Dated({ claim, reason, marked }: { claim: Claim; reason: Reason; marked: boolean }) {
-  const f = claim.finding;
-  const [moving, setMoving] = useState(false);
-  const upgrade = claim.outcome === "upgrade-needed";
-  const [to, setTo] = useState(claim.upgradeTo);
-  const [by, setBy] = useState("");
-  const [because, setBecause] = useState("");
-  const [moved, setMoved] = useState(false);
-  const after = useAfterClaim();
-  // The queue is read again only once the confirmation is put away. The
-  // promise leaves this list when its date moves, and the card carrying the
-  // answer would leave with it.
-  const repromise = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.PUT("/v1/claims/{id}/promise", {
-          params: { path: { id: claim.id } },
-          body: { ...(upgrade ? { to: to.trim() } : {}), by, reasoning: because },
-        }),
-      ),
-    onSuccess: () => {
-      setMoving(false);
-      setMoved(true);
-      after();
-    },
-  });
-  const decideAgain = f ? findingOf(f) : claimAt(claim.id);
-  const words = wordsFor(reason);
-
-  return (
-    <article
-      id={`claim-${claim.id}`}
-      className="qcard lapsedcard"
-      style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
-    >
-      <header>
-        {f?.severity && <Severity word={f.severity} />}
-        {f?.exploited && <Exploited when />}
-        <Link to={decideAgain} className="linkish id">
-          {claim.title}
-        </Link>
-        <span className={`claimed ${claim.outcome}`}>
-          <b>{promised(claim) || labeled(claim.outcome)}</b>
-        </span>
-        <span style={{ color: "var(--muted)" }}>
-          {f
-            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
-            : claim.product}
-          {claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
-        </span>
-        <span className="state lapsed" style={{ marginLeft: "auto" }}>
-          {words.stated}
-        </span>
-      </header>
-      {claim.reasoning && (
-        <div className="why">
-          <Markdown source={claim.reasoning} />
-        </div>
-      )}
-      <div className="qmeta">
-        <Proposal claim={claim} />
-        {claim.builds.length > 0 && (
-          <span>
-            Covers <b>{claim.builds.join(", ")}</b>
-          </span>
-        )}
-      </div>
-
-      {repromise.error != null && (
-        <Failed error={repromise.error} what="The promise could not be changed." />
-      )}
-      {moved ? (
-        <div className="alert info" role="status" style={{ margin: 0 }}>
-          <strong>Promise changed</strong>
-          <span>
-            Any earlier approval was withdrawn.{" "}
-            <Link to={claimAt(claim.id)} className="linkish">
-              Open the decision →
-            </Link>
-          </span>
-          <button type="button" className="linkish" style={{ marginLeft: "auto" }} onClick={after}>
-            Done
-          </button>
-        </div>
-      ) : moving ? (
-        <div>
-          <div className="filters" style={{ marginBottom: 8 }}>
-            {upgrade && (
-              <label className="field">
-                <span>Version</span>
-                <input
-                  {...notACredential}
-                  type="text"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                  style={{ width: 130 }}
-                />
-              </label>
-            )}
-            <label className="field">
-              <span>By</span>
-              <input type="date" value={by} onChange={(event) => setBy(event.target.value)} />
-            </label>
-          </div>
-          <Editor
-            value={because}
-            onChange={setBecause}
-            draftKey={`repromise:${claim.key}`}
-            rows={3}
-            label="Reason for the change"
-            placeholder="Why the date or the version is moving."
-          />
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!by || !because.trim() || (upgrade && !to.trim()) || repromise.isPending}
-              onClick={() => repromise.mutate()}
-            >
-              Change the promise
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setMoving(false)}>
-              Cancel
-            </button>
-            <span className="consequence">Withdraws any approval it had</span>
-          </div>
-        </div>
-      ) : (
-        <div className="actions">
-          {reason === "missed-fix-date" && (
-            <button type="button" className="btn" onClick={() => setMoving(true)}>
-              {upgrade ? "Change the version or date" : "Change the date"}
-            </button>
-          )}
-          <Link to={decideAgain} className="btn ghost">
-            Decide again →
-          </Link>
-        </div>
-      )}
-    </article>
-  );
-}
-
-function Card({
-  claim,
-  marked,
-  picked,
-  onPick,
-}: {
-  claim: Claim;
-  // An arrival sent to this claim in particular.
-  marked: boolean;
-  picked: boolean;
-  onPick: (on: boolean) => void;
-}) {
-  const approveClaim = useApproveClaim();
-  const rejectClaim = useRejectClaim();
-  const [asking, setAsking] = useState(false);
-  const [more, setMore] = useState(false);
-  const f = claim.finding;
-  const [because, setBecause] = useState("");
-  const [aside, setAside] = useState<Set<number>>(new Set());
-  // Issues, which is what the claim counts: the set aside holds a decision per
-  // place, and one issue can sit at many.
-  const rejecting = issuesIn(claim.outliers?.rows ?? [], aside);
-  const draftKey = `send-back:${claim.key}`;
-  const bulk = claim.kind === "together";
-  const extension = claim.kind === "extension";
-  const busy = approveClaim.isPending || rejectClaim.isPending;
-  const error = approveClaim.error ?? rejectClaim.error;
-
-  function doApprove() {
-    approveClaim.mutate({
-      id: claim.id,
-      ...(aside.size > 0
-        ? {
-            except: [...aside],
-            because: "Set aside at approval: these do not match the shape of the claim.",
-          }
-        : {}),
-    });
-  }
-
-  function doReject() {
-    rejectClaim.mutate(
-      { id: claim.id, because },
-      {
-        onSuccess: () => {
-          forget(draftKey);
-          setBecause("");
-          setAsking(false);
-        },
-      },
-    );
-  }
-
-  return (
-    <article
-      id={`claim-${claim.id}`}
-      className={`qcard${claim.previouslyApproved ? " returning" : ""}${bulk ? " bulkclaim" : ""}${extension ? " extension" : ""}`}
-      style={marked ? { outline: "2px solid var(--accent)", outlineOffset: 2 } : undefined}
-    >
-      <header>
-        <input
-          type="checkbox"
-          className="qpick"
-          checked={picked}
-          onChange={(event) => onPick(event.target.checked)}
-          aria-label="Select this claim"
-        />
-        {bulk && <span className="bulkmark">Bulk claim</span>}
-        {f?.severity && <Severity word={f.severity} />}
-        {f?.exploited && <Exploited when />}
-        {/* The issue opens its finding, which carries everything an approver
-            could want; the decision record is one link further, from there. */}
-        <Link to={f ? findingOf(f) : decisionAt(claim.decisionId)} className="linkish id">
-          {claim.title}
-        </Link>
-        {/* What is being claimed, in its own right rather than as the fifth
-            clause of a sentence about where the finding lives. It is the thing
-            an approver is agreeing to, and it was reading as an afterthought
-            behind the component, the version, the product, the branch and the
-            variant. */}
-        <Outcome
-          outcome={claim.outcome}
-          justification={claim.justification}
-          until={claim.deferredUntil}
-        />
-        <span style={{ color: "var(--muted)" }}>
-          {f?.component && (
-            <>
-              in <span className="id">{f.component}</span>
-              {f.version && (
-                <span className="id" style={{ color: "var(--faint)" }}>
-                  {" "}
-                  {f.version}
-                </span>
-              )}{" "}
-              ·{" "}
-            </>
-          )}
-          {f
-            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
-            : claim.product}
-          {bulk && claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
-          {extension && claim.derivedFrom && (
-            <>
-              {" "}
-              · extends <b>#{claim.derivedFrom}</b>
-            </>
-          )}
-        </span>
-        <span className="state waiting" style={{ marginLeft: "auto" }}>
-          {extension ? "Extension" : claim.previouslyApproved ? "Approved before" : "Pending"}
-        </span>
-      </header>
-
-      {/* What the issue is and where it sits, before the argument about it
-: an approver judging a claim without these is judging the
-          prose. Shown from the scan's own text, escaped, never rendered. */}
-      {f && (f.description || f.owner || f.parent) && (
-        <div className="about">
-          {f.description && (
-            <p className={more ? "" : "clamp"} style={{ margin: 0 }}>
-              {f.description}
-              {f.description.length >= 400 && !more && "…"}
-            </p>
-          )}
-          <p
-            className="hint"
-            style={{ margin: "4px 0 0", display: "flex", flexWrap: "wrap", gap: "4px 12px" }}
-          >
-            {(f.owner || f.parent) && (
-              <span>
-                <span className="id">{f.owner}</span>
-                {f.parent && f.parent !== f.owner && (
-                  <>
-                    {" "}
-                    › <span className="id">{f.parent}</span>
-                  </>
-                )}
-              </span>
-            )}
-            {typeof f.places === "number" && (
-              <span title={`${f.places} ${f.places === 1 ? "place" : "places"} underneath`}>
-                {f.places} {f.places === 1 ? "consumer" : "consumers"}
-                {typeof f.decided === "number" && f.decided > 0 && (
-                  <> · {f.decided} covered by this claim</>
-                )}
-              </span>
-            )}
-            {f.fixed_in ? (
-              <span>
-                fixed in <span className="id">{f.fixed_in}</span>
-              </span>
-            ) : f.fix_state === "wont-fix" ? (
-              <span>upstream declined</span>
-            ) : f.fix_state === "mixed" ? (
-              <span>upstream fix differs by build</span>
-            ) : null}
-            {/* The scheme beside the number. Two are scorable and their
-                numbers are not comparable, so a bare score invites a reader to
-                rank one against another. */}
-            {typeof f.score === "number" && (
-              <span>
-                CVSS{f.score_version ? ` ${f.score_version}` : ""} {f.score.toFixed(1)}
-              </span>
-            )}
-            {f.description && f.description.length >= 200 && (
-              <button
-                type="button"
-                className="linkish"
-                style={{ fontWeight: 500 }}
-                onClick={() => setMore(!more)}
-              >
-                {more ? "less" : "more"}
-              </button>
-            )}
-          </p>
-        </div>
-      )}
-
-      {claim.reasoning && (
-        <div className="why">
-          <Markdown source={claim.reasoning} />
-        </div>
-      )}
-
-      <div className="qmeta">
-        <Proposal claim={claim} />
-        {claim.deferredDays > 0 && (
-          <span>
-            Put off <b>{claim.deferredDays} days</b> in total
-          </span>
-        )}
-        {claim.selectedBy && (
-          <span>
-            Narrowed by <b className="mono">{claim.selectedBy}</b>
-          </span>
-        )}
-        {extension && claim.derivedFrom && (
-          <span>
-            Rests on <b>#{claim.derivedFrom}</b>
-          </span>
-        )}
-        <span>
-          Writes{" "}
-          <b>
-            {claim.records.toLocaleString()} {claim.records === 1 ? "record" : "records"}
-          </b>
-        </span>
-      </div>
-
-      {!bulk && (
-        <div className="reachrow">
-          {/* What the claim covers, in the unit it was made in: one judgment
-              at one fold, however many places sit underneath. The place count
-              is a title rather than a headline — it is what the bulk cap is
-              measured against, not a figure an approver reconciles with
-              anything else on the card. */}
-          <span
-            className="r auto"
-            title={`${claim.places} ${claim.places === 1 ? "place" : "places"} underneath`}
-          >
-            <b>one judgment</b> in this build
-          </span>
-          {claim.builds.length > 0 && (
-            <span className="r ask">
-              {/* Every build it covers, this one included — which is what the
-                  server sends and what the number means. It said "other" and
-                  counted its own, so a claim covering one build read as
-                  reaching a second one somewhere. */}
-              <b>{claim.builds.length}</b> {claim.builds.length === 1 ? "build" : "builds"} covered:{" "}
-              {claim.builds.join(", ")}
-            </span>
-          )}
-          <span className="hint">One approval covers every record; undo reverts them all</span>
-        </div>
-      )}
-
-      {/* What would make an approver disagree. Two counts and no
-          argument: nothing here can know a claim is wrong, and what it says is
-          what a careful reader would go and look up — so that not looking is a
-          choice rather than an omission. */}
-      {claim.counter && (
-        <div className="counter">
-          <h5>Before approving</h5>
-          <ul>
-            {Object.entries(claim.counter.elsewhere ?? {}).map(([outcome, places]) => (
-              <li key={outcome}>
-                The same issue is <b>{called(outcome)}</b> at {places}{" "}
-                {places === 1 ? "other place" : "other places"} you can see, already agreed to.
-                {outcome !== claim.outcome && (
-                  <>
-                    {" "}
-                    This claim says <b>{called(claim.outcome)}</b>.
-                  </>
-                )}{" "}
-                <Link to={issueAt(claim.title)} className="linkish">
-                  Everywhere it sits →
-                </Link>
-              </li>
-            ))}
-            {(claim.counter.undecided ?? 0) > 0 && (
-              <li>
-                <b>{claim.counter.undecided}</b> other{" "}
-                {claim.counter.undecided === 1 ? "issue sits" : "issues sit"} undecided at the same
-                place. A claim in a run is usually right, and a run is also how one gets waved
-                through.
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {/* Every act over many issues carries this, including rows set aside
-          from one and one re-made after it lapsed: agreeing to any of them is
-          refused over an issue this product was attacked through, and this
-          table is where that issue is set aside. */}
-      {claim.outliers && (
-        <div className="outliers">
-          <header>
-            <h5>Outliers</h5>
-            <span className="hint">Rows that do not match the shape of the claim.</span>
-          </header>
-          <div className="ostats">
-            {claim.outliers.exploited_here > 0 && (
-              <span className="o bad">
-                <b>{claim.outliers.exploited_here}</b> attacked here
-              </span>
-            )}
-            <span className={`o${claim.outliers.exploited ? " bad" : ""}`}>
-              <b>{claim.outliers.exploited}</b> known exploited
-            </span>
-            <span className={`o${claim.outliers.severe ? " hot" : ""}`}>
-              <b>{claim.outliers.severe}</b> critical or high
-            </span>
-            <span className="o">
-              <b>{claim.outliers.fixable}</b> have a fix available
-            </span>
-            <span className={`o${claim.outliers.unmatched ? " hot" : ""}`}>
-              <b>{claim.outliers.unmatched}</b> do not match the narrowing
-            </span>
-          </div>
-          {(claim.outliers.rows ?? []).length > 0 && (
-            <Wide style={{ boxShadow: "none" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th style={{ width: 30 }} />
-                    <th>Severity</th>
-                    <th>Issue</th>
-                    <th>Description</th>
-                    <th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(claim.outliers.rows ?? []).map((row) => (
-                    <tr key={row.decision_id}>
-                      <td>
-                        {/* Every place of the issue, not one: agreeing to any
-                            of them is agreeing to the issue. */}
-                        <input
-                          type="checkbox"
-                          aria-label="Set aside"
-                          checked={aside.has(row.decision_id)}
-                          onChange={(event) => setAside(toggled(aside, row, event.target.checked))}
-                        />
-                      </td>
-                      <td>
-                        <Severity word={row.severity} />
-                      </td>
-                      <td>
-                        <span className="id">{row.vulnerability}</span>{" "}
-                        <ExploitedHere when={row.exploited_here} />{" "}
-                        <Exploited when={row.exploited} />
-                      </td>
-                      <td className="hint">{(row.description ?? "").slice(0, 120)}</td>
-                      <td className="hint">{(row.why ?? []).join(", ")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Wide>
-          )}
-          <p className="hint" style={{ margin: "8px 0 0" }}>
-            Selected rows go back to {claim.proposedBy} as a separate item.
-          </p>
-        </div>
-      )}
-      {bulk && !claim.outliers && (
-        <p className="hint" style={{ margin: 0 }}>
-          One claim over {claim.issues.toLocaleString()} issues, read once and approved once.
-        </p>
-      )}
-
-      {claim.deferredDays > 0 && claim.previouslyApproved && (
-        <p style={{ margin: 0, fontSize: "var(--step--1)", color: "var(--sev-high)" }}>
-          Measured against the total already deferred, not the days being asked.
-        </p>
-      )}
-
-      {error != null && <Failed error={error} what="That could not be recorded." />}
-
-      {asking ? (
-        <div>
-          {/* No attach control: a rejection is about what is missing from the
-              reasoning, and a claim may cover many issues, so there is not one
-              a file would hang off. */}
-          <Editor
-            value={because}
-            onChange={setBecause}
-            draftKey={draftKey}
-            rows={4}
-            label="Reason for rejection"
-            placeholder="The part that is missing or wrong."
-          />
-          <div className="actions" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn"
-              disabled={!because.trim() || busy}
-              onClick={doReject}
-            >
-              Reject
-            </button>
-            <button type="button" className="btn quiet" onClick={() => setAsking(false)}>
-              Cancel
-            </button>
-            <span className="consequence">
-              Rejected, back to <b>{claim.proposedBy}</b>
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="actions">
-          <button type="button" className="btn" disabled={busy} onClick={doApprove}>
-            {bulk && aside.size > 0
-              ? `Approve ${(claim.issues - rejecting).toLocaleString()}, reject ${rejecting}`
-              : bulk
-                ? `Approve all ${claim.issues.toLocaleString()}`
-                : "Approve"}
-          </button>
-          <button type="button" className="btn ghost" onClick={() => setAsking(true)}>
-            {bulk ? "Reject all" : "Reject"}
-          </button>
-          {bulk && (
-            <span className="consequence">
-              <b>{claim.records.toLocaleString()}</b> records, each expiring independently
-            </span>
-          )}
-        </div>
-      )}
-    </article>
-  );
-}
-
-// The claim itself, said as its own thing.
-//
-// The outcome is what an approver is agreeing to, and it was the fifth clause
-// of a line that led with the component, the version, the product, the branch
-// and the variant — so the most important fact on the card read as an
-// afterthought. It leads now, in its own mark, with the recognized reason
-// beneath it in the vocabulary the record actually stores.
-function Outcome({
-  outcome,
-  justification,
-  until,
-}: {
-  outcome: string;
-  justification?: string;
-  until?: string;
-}) {
-  return (
-    <span className={`claimed ${outcome}`}>
-      <b>{labeled(outcome)}</b>
-      {justification && <span className="why mono">{justification}</span>}
-      {until && <span className="why">until {until}</span>}
-    </span>
-  );
-}
-
-// What stays ticked once an approval loop has run: everything it did not act
-// on, as the selection now stands, and of what it acted on only what was
-// refused and is still ticked.
-export function stillPicked<T>(
-  now: Map<string, T>,
-  acted: Set<string>,
-  refused: string[],
-): Map<string, T> {
-  const left = new Map<string, T>();
-  for (const [key, claim] of now) {
-    if (!acted.has(key) || refused.includes(key)) left.set(key, claim);
-  }
-  return left;
 }

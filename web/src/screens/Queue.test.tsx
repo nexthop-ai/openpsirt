@@ -3,7 +3,8 @@
 
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Queue, stillPicked } from "./Queue";
+import { Queue } from "./Queue";
+import { stillPicked } from "./useQueueApproval";
 import { Product } from "./Product";
 import { accept, screen, serve, settle, mounted } from "../test/mount";
 
