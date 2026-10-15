@@ -23,14 +23,20 @@ type routed struct {
 	// served is the body for each path. A path it does not name answers 404.
 	served map[string]string
 	header map[string]http.Header
+	// status, where it names a path, is answered there with no body.
+	status map[string]int
 }
 
 func routing(t *testing.T, served map[string]string) *routed {
 	t.Helper()
-	r := &routed{served: served, header: map[string]http.Header{}}
+	r := &routed{served: served, header: map[string]http.Header{}, status: map[string]int{}}
 	r.Server = httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, req *http.Request) {
 			r.asked = append(r.asked, req.URL.RequestURI())
+			if status, set := r.status[req.URL.Path]; set {
+				w.WriteHeader(status)
+				return
+			}
 			body, found := r.served[req.URL.Path]
 			if !found {
 				w.WriteHeader(http.StatusNotFound)
@@ -112,6 +118,20 @@ func TestMavenCentralAnswersTheNewestReleaseRatherThanItsOwnReleaseField(t *test
 	}
 	if latest.Project != "https://logging.apache.org/log4j/2.x/" {
 		t.Errorf("project %q, want the project's own pages", latest.Project)
+	}
+}
+
+func TestAProjectDocumentHavingABadDayFailsTheWholeAnswer(t *testing.T) {
+	// Answered with the version alone, the row would hold no date and never
+	// be asked for one again.
+	pom := "/maven2/org/apache/logging/log4j/log4j-core/2.25.1/log4j-core-2.25.1.pom"
+	r := routing(t, map[string]string{
+		"/maven2/org/apache/logging/log4j/log4j-core/maven-metadata.xml": log4jMetadata,
+	})
+	r.status[pom] = http.StatusServiceUnavailable
+	_, err := routedClient(r).For("maven").Latest(t.Context(), "org.apache.logging.log4j/log4j-core")
+	if !errors.Is(err, currency.ErrNotAnswering) {
+		t.Errorf("got %v, want the index not answering", err)
 	}
 }
 
@@ -325,6 +345,22 @@ func TestANuGetPackageOfOnlyPreReleasesIsReadABoundedDistance(t *testing.T) {
 	// The registration, and then no more pages than the bound.
 	if len(r.asked) != 1+4 {
 		t.Errorf("made %d requests, want the registration and four pages: %v", len(r.asked), r.asked)
+	}
+}
+
+func TestANuGetPackageThatHasPublishedOnlyPreReleasesAnswersTheNewest(t *testing.T) {
+	// Every page read, so no release sits on a page that was not.
+	r := routing(t, map[string]string{
+		"/v3/registration5-gz-semver2/beta.only/index.json": `{"items":[{"@id":"x","items":[
+			{"catalogEntry":{"version":"1.0.0-beta1","listed":true}},
+			{"catalogEntry":{"version":"1.0.0-beta2","listed":true}}]}]}`,
+	})
+	latest, err := routedClient(r).For("nuget").Latest(t.Context(), "Beta.Only")
+	if err != nil {
+		t.Fatalf("latest: %v", err)
+	}
+	if latest.Version != "1.0.0-beta2" {
+		t.Errorf("version %q, want the newest pre-release", latest.Version)
 	}
 }
 
