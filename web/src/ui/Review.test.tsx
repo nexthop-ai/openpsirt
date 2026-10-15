@@ -59,7 +59,7 @@ describe("the reach of a decision, reviewed before it is written", () => {
     );
     await act(async () => first?.click());
     await press(mount.host(), "Review and submit → ↵");
-    // Three places here and four in the version ticked.
+    // The places here and the places in the version ticked.
     expect(text()).toContain("7 records written");
     expect(text()).toContain("Left undecided");
     expect(text()).toContain("unstated in this build");

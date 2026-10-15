@@ -50,9 +50,8 @@ describe("narrowing a bulk decision", () => {
 const AT = "/products/sonic/streams/master/variants/x/components/openssl/decide";
 const PATTERN = "/products/:product/streams/:stream/variants/:variant/components/:component/decide";
 
-// The issues at the component, as the server pages them: a page holds up to
-// five hundred, and the fake holds three on the first and two on the second.
-// The total is what makes a second page exist at all.
+// The issues at the component, as the server pages them, split over two
+// pages. The total is what makes a second page exist at all.
 function issuesAt(query: { offset?: number }) {
   const every = ["CVE-1", "CVE-2", "CVE-3", "CVE-4", "CVE-5"].map((name, i) => ({
     vulnerability: name,
@@ -109,8 +108,7 @@ describe("what a bulk decision would write", () => {
     );
     await settle();
     await tick("CVE-5");
-    // Three places from the first page and five from this one: past the
-    // limit of six, which only the remembered first page shows.
+    // Past the limit only when the first page's places are remembered.
     expect(said()).toContain("2 issues · 8 findings would be written");
     expect(said()).toContain("limit 6 findings");
   });
