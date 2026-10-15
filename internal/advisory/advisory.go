@@ -166,13 +166,10 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 		// to carry. Claiming the security-advisory profile while failing its
 		// tests describes the document as something it is not, and a reader's
 		// tooling drops it on exactly that.
-		CSAFVersion: "2.0",
+		CSAFVersion: CSAFVersion,
 		Title:       titleOf(row, assembled),
 		Language:    "en-US",
-		Publisher: Issuer{
-			Category: categoryOf(who), Name: who.Name,
-			Namespace: who.Namespace,
-		},
+		Publisher:   IssuerOf(who),
 		Tracking: Tracking{
 			// The advisory's own name. A document naming an issue's
 			// identifier as its own tracking identifier claims to be the
@@ -340,11 +337,18 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 	return count > 0, nil
 }
 
-func categoryOf(p publisher.Named) string {
-	if p.Category == "" {
-		return "vendor"
+// CSAFVersion is the version of the standard every document here meets.
+const CSAFVersion = "2.0"
+
+// IssuerOf is this deployment's publisher as a document names it, and as the
+// provider description names it beside the documents. One with no category is
+// a vendor.
+func IssuerOf(who publisher.Named) Issuer {
+	category := who.Category
+	if category == "" {
+		category = "vendor"
 	}
-	return p.Category
+	return Issuer{Category: category, Name: who.Name, Namespace: who.Namespace}
 }
 
 // summaryOf is what the flaw is, in the words of whoever recorded it.

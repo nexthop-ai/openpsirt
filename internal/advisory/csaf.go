@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 )
 
 // Document is a CSAF 2.0 document.
@@ -64,12 +66,9 @@ type Meta struct {
 	Language     string        `json:"lang,omitempty"`
 }
 
-// Issuer is the publisher as the document carries it.
-type Issuer struct {
-	Category  string `json:"category"`
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-}
+// Issuer is the publisher as the document carries it, which is the object the
+// provider description carries too.
+type Issuer = csaf.Issuer
 
 // Tracking is the document's identity and where it is in its life.
 type Tracking struct {

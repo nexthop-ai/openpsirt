@@ -450,18 +450,19 @@ func TestNoAddressAndNoStoreIsNoWriter(t *testing.T) {
 // fixture is a world with one product, somebody to write an advisory and
 // somebody else to agree to it, and a directory on disk to write into.
 type fixture struct {
-	db     *bun.DB
-	store  *advisory.Store
-	finds  *finding.Store
-	graph  *graph.Store
-	scans  *ingest.Store
-	target int64
-	who    access.Subject
-	agrees access.Subject
-	files  attach.Storage
-	where  string
-	logger *slog.Logger
-	seq    int
+	db      *bun.DB
+	store   *advisory.Store
+	finds   *finding.Store
+	graph   *graph.Store
+	scans   *ingest.Store
+	target  int64
+	product int64
+	who     access.Subject
+	agrees  access.Subject
+	files   attach.Storage
+	where   string
+	logger  *slog.Logger
+	seq     int
 }
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
@@ -482,7 +483,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		f := &fixture{
 			db: w.DB.DB, store: advisory.NewStore(w.DB.DB),
 			finds: finding.NewStore(w.DB.DB), graph: graph.NewStore(w.DB.DB),
-			scans: ingest.NewStore(w.DB.DB), target: w.Target.ID,
+			scans: ingest.NewStore(w.DB.DB), target: w.Target.ID, product: w.Product.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, roles, 0),
 			agrees: access.NewPerson(second.ID, second.Identity, false,
 				map[int64][]access.Role{

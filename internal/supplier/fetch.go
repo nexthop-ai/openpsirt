@@ -24,6 +24,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -357,7 +358,7 @@ type listing struct {
 func (f *Fetcher) listings(ctx context.Context, client *http.Client,
 	address string) ([]listing, error) {
 
-	var described providerMetadata
+	var described csaf.ProviderMetadata
 	if err := f.json(ctx, client, address, &described); err != nil {
 		return nil, fmt.Errorf("read what that publisher offers: %w", err)
 	}
@@ -522,7 +523,7 @@ func (f *Fetcher) entries(ctx context.Context, client *http.Client,
 func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 	address string) ([]entry, error) {
 
-	var feed rolieFeed
+	var feed csaf.Feed
 	if err := f.json(ctx, client, address, &feed); err != nil {
 		return nil, err
 	}
@@ -575,7 +576,7 @@ func stampOf(said string) (time.Time, error) {
 // One per algorithm is all the comparison can use, and a count bounded by the
 // algorithms is what keeps an entry naming thousands of them from holding one
 // document past the lease.
-func sumsIn(one feedEntry) []string {
+func sumsIn(one csaf.Entry) []string {
 	byKind := make([]string, len(algorithms))
 	for _, link := range one.Links {
 		href := strings.TrimSpace(link.Href)
@@ -658,7 +659,7 @@ func listable(address string) bool {
 // The content source first and the self link second. The standard asks for
 // both and real feeds carry both, and where a publisher carries only one it is
 // as often the one as the other.
-func documentIn(one feedEntry) string {
+func documentIn(one csaf.Entry) string {
 	if address := strings.TrimSpace(one.Content.Source); address != "" {
 		return address
 	}
@@ -1071,51 +1072,6 @@ func later(status int) bool {
 func (t *Taken) bar(address string, err error) {
 	t.Barred++
 	t.BarredBy = fmt.Sprintf("%s: %v", address, err)
-}
-
-// The two JSON files a publisher serves to say what they offer and where. The
-// field names are the standard's rather than ours, which is why they are
-// spelled as it spells them.
-
-type providerMetadata struct {
-	Distributions []distribution `json:"distributions"`
-}
-
-type distribution struct {
-	DirectoryURL string `json:"directory_url,omitempty"`
-	ROLIE        *rolie `json:"rolie,omitempty"`
-}
-
-type rolie struct {
-	Feeds []feedDescription `json:"feeds"`
-}
-
-type feedDescription struct {
-	TLPLabel string `json:"tlp_label"`
-	URL      string `json:"url"`
-}
-
-type rolieFeed struct {
-	Feed feedBody `json:"feed"`
-}
-
-type feedBody struct {
-	Entries []feedEntry `json:"entry"`
-}
-
-type feedEntry struct {
-	Links   []link  `json:"link"`
-	Updated string  `json:"updated"`
-	Content content `json:"content"`
-}
-
-type link struct {
-	Rel  string `json:"rel"`
-	Href string `json:"href"`
-}
-
-type content struct {
-	Source string `json:"src"`
 }
 
 // steppedOver is whether the client refused an address in a way it repeats on
