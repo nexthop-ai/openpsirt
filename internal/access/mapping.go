@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Mapping is one thing configuration says membership of a group grants.
@@ -153,7 +154,7 @@ func parseEntry(entry string) ([]Mapping, error) {
 			if err != nil {
 				return nil, err
 			}
-			product = strings.ToLower(product)
+			product = typedname.Matching(product)
 			switch {
 			case product == "":
 				return nil, refusal.Errorf("group %q names an empty product", group)

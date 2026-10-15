@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // A word somebody put on a finding.
@@ -45,7 +46,7 @@ type Tag struct {
 }
 
 // TagAs folds a tag the way every other name people type is folded.
-func TagAs(tag string) string { return strings.ToLower(strings.TrimSpace(tag)) }
+func TagAs(tag string) string { return typedname.Matching(tag) }
 
 // TagIt puts a word on a finding.
 //

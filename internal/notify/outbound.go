@@ -33,6 +33,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // signalTimeout bounds one request to one destination, and is what the sweep's
@@ -595,14 +596,14 @@ func about(row Notification) string {
 // compare loosely makes what a destination receives depend on which engine is
 // running.
 func DestinationKind(kind string) string {
-	return strings.ToLower(strings.TrimSpace(kind))
+	return typedname.Matching(kind)
 }
 
 // DestinationKey is the key a destination's name is stored and matched under:
 // the name folded, by the rule its kind follows. The spelling typed is kept
 // beside it for display.
 func DestinationKey(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
+	return typedname.Matching(name)
 }
 
 // chatMarkup escapes the three characters a chat channel reads as its own

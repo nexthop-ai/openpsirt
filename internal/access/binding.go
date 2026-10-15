@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Mode is where a person's roles come from, for the whole deployment.
@@ -197,7 +198,7 @@ func (s *Store) ApplyMappings(ctx context.Context, wanted []Mapping) (Mapped, er
 func (s *Store) MapsProduct(ctx context.Context, names ...string) (bool, error) {
 	folded := make([]string, 0, len(names))
 	for _, name := range names {
-		folded = append(folded, strings.ToLower(strings.TrimSpace(name)))
+		folded = append(folded, typedname.Matching(name))
 	}
 	held, err := s.db.NewSelect().Model((*Binding)(nil)).
 		Where(`"product_name" IN (?)`, bun.List(folded)).Exists(ctx)

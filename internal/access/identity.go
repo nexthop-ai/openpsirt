@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Identity is how a person signs in.
@@ -59,7 +60,7 @@ type Identity struct {
 // compares the same under any engine, which is what keeps this from depending
 // on a collation (REQ-08).
 func Folded(username string) string {
-	return strings.ToLower(strings.TrimSpace(username))
+	return typedname.Matching(username)
 }
 
 // DefaultClaimWindow is how long an unredeemed authorization stays redeemable
