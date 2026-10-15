@@ -248,19 +248,11 @@ func (s *Store) RetireTeam(ctx context.Context, teamID int64) error {
 			Where(`"team_id" = ?`, teamID).Exec(ctx); err != nil {
 			return err
 		}
-		res, err := db.NewUpdate().Model((*Team)(nil)).
-			Set(`"retired_at" = ?`, s.now().Truncate(time.Microsecond)).
-			Where(`"id" = ?`, teamID).
-			Where(`"retired_at" IS NULL`).
-			Exec(ctx)
+		took, err := database.Retire(ctx, db, (*Team)(nil), teamID, s.now().Truncate(time.Microsecond))
 		if err != nil {
 			return err
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return err
-		}
-		if n == 0 {
+		if !took {
 			return ErrNoSuchTeam
 		}
 		return nil

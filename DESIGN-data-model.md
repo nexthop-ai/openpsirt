@@ -180,6 +180,7 @@ Retiring says the thing is not tracked here.
 | Retiring a product writes nothing onto its releases and variants | They are reached through the product, so they leave every list with it. A date written onto each of them would be a bulk write whose only effect is to make bringing the product back a second bulk write that has to remember exactly what it changed |
 | A retired variant is still named by the releases built as it, and a retired product or release is named by nothing | Only the variant has a second list that answers a different question — what a release was actually built as, where the findings filed against it sit. A retired product is reached by a link somebody kept, and the page for it says it is retired |
 | Retiring one already retired is refused | Answered as done, two administrators retiring it at once would both record having done it |
+| One write retires every kind of row kept after retirement | A catalog part, a team, a destination, a supplier, a routing rule and an obligation window are retired by one conditional write that matches only a row still in use, so the refusal above is one rule for all of them |
 
 Renaming, correcting what a variant reaches and retiring anything are
 administrative acts, and each leaves a record of who did it and what it held

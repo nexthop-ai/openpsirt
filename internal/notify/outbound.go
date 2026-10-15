@@ -949,18 +949,11 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("retire that destination: %w", err)
 		}
 		at := s.now().UTC().Truncate(time.Microsecond)
-		res, err := tx.NewUpdate().Model((*Outbound)(nil)).
-			Set(`"retired_at" = ?`, at).
-			Where(`"id" = ?`, row.ID).
-			Where(`"retired_at" IS NULL`).Exec(ctx)
+		took, err := database.Retire(ctx, tx, (*Outbound)(nil), row.ID, at)
 		if err != nil {
 			return fmt.Errorf("retire that destination: %w", err)
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("retire that destination: %w", err)
-		}
-		if n == 0 {
+		if !took {
 			return fmt.Errorf("no destination is taking %q under that name: %w",
 				kind, access.ErrNothingMatched)
 		}

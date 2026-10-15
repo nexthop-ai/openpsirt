@@ -6,6 +6,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/uptrace/bun"
 )
@@ -47,4 +48,32 @@ func TakeUpAgain(ctx context.Context, revive *bun.UpdateQuery, readBack *bun.Sel
 		return fmt.Errorf("record that %s: %w", what, err)
 	}
 	return nil
+}
+
+// Retire dates one row of model as out of use at the moment given, and
+// reports whether this write is the one that retired it.
+//
+// The write repeats that the row is in use, so two retirements at once record
+// one act: the second matches nothing. A row already retired, and a row that
+// was never there, both answer false; telling those apart is the caller's.
+// also adds to the write whatever else retiring that kind of row clears.
+func Retire(ctx context.Context, db bun.IDB, model any, id int64, at time.Time,
+	also ...func(*bun.UpdateQuery) *bun.UpdateQuery) (bool, error) {
+
+	write := db.NewUpdate().Model(model).
+		Set(`"retired_at" = ?`, at).
+		Where(`"id" = ?`, id).
+		Where(`"retired_at" IS NULL`)
+	for _, more := range also {
+		write = more(write)
+	}
+	res, err := write.Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := Affected(res)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }

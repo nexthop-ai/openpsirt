@@ -347,18 +347,11 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 			return fmt.Errorf("stop fetching from that supplier: %w", err)
 		}
 		at := s.now().UTC().Truncate(time.Microsecond)
-		res, err := tx.NewUpdate().Model((*Source)(nil)).
-			Set(`"retired_at" = ?`, at).
-			Where(`"id" = ?`, row.ID).
-			Where(`"retired_at" IS NULL`).Exec(ctx)
+		took, err := database.Retire(ctx, tx, (*Source)(nil), row.ID, at)
 		if err != nil {
 			return fmt.Errorf("stop fetching from that supplier: %w", err)
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("stop fetching from that supplier: %w", err)
-		}
-		if n == 0 {
+		if !took {
 			return fmt.Errorf("no supplier is fetched from under the name %q: %w",
 				name, access.ErrNothingMatched)
 		}

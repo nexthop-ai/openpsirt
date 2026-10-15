@@ -684,22 +684,12 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 			return err
 		}
 		window = &named[0]
-		res, err := tx.NewUpdate().Model((*Window)(nil)).
-			Set(`"retired_at" = ?`, s.now().Truncate(time.Microsecond)).
-			Set(`"live_name" = ?`, nil).
-			Where(`"id" = ?`, id).
-			// Still in force when this lands, so two retirements at once
-			// record one act rather than two.
-			Where(`"retired_at" IS NULL`).
-			Exec(ctx)
+		took, err := database.Retire(ctx, tx, (*Window)(nil), id, s.now().Truncate(time.Microsecond),
+			func(q *bun.UpdateQuery) *bun.UpdateQuery { return q.Set(`"live_name" = ?`, nil) })
 		if err != nil {
 			return fmt.Errorf("retire a window: %w", err)
 		}
-		retired, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("retire a window: %w", err)
-		}
-		if retired == 0 {
+		if !took {
 			return ErrNoSuchWindow
 		}
 		return noteWindow(ctx, tx, subject, window.Name, describe(*window), nil)

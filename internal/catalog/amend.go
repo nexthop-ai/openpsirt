@@ -211,15 +211,14 @@ func (s *Store) EveryProduct(ctx context.Context) ([]Product, error) {
 // nothing and is refused, so two administrators retiring it at once do not
 // both record having done it.
 func (s *Store) retire(ctx context.Context, model any, id int64, what string) error {
-	res, err := s.db.NewUpdate().Model(model).
-		Set(`"retired_at" = ?`, now()).
-		Where(`"id" = ?`, id).
-		Where(`"retired_at" IS NULL`).
-		Exec(ctx)
+	took, err := database.Retire(ctx, s.db, model, id, now())
 	if err != nil {
 		return fmt.Errorf("retire %s %d: %w", what, id, err)
 	}
-	return counted(res, what, id, "retire")
+	if !took {
+		return fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
+	}
+	return nil
 }
 
 // restore clears one row of model's retirement.

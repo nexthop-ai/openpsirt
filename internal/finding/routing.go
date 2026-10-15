@@ -153,18 +153,12 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 	if err := mayRoute(by, productID); err != nil {
 		return err
 	}
-	res, err := s.db.NewUpdate().Model((*Routing)(nil)).
-		Set(`"retired_at" = ?`, s.now().UTC().Truncate(time.Microsecond)).
-		Where(`"id" = ?`, id).Where(`"product_id" = ?`, productID).
-		Where(`"retired_at" IS NULL`).Exec(ctx)
+	took, err := database.Retire(ctx, s.db, (*Routing)(nil), id, s.now().UTC().Truncate(time.Microsecond),
+		func(q *bun.UpdateQuery) *bun.UpdateQuery { return q.Where(`"product_id" = ?`, productID) })
 	if err != nil {
 		return fmt.Errorf("retire that rule: %w", err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("retire that rule: %w", err)
-	}
-	if n == 0 {
+	if !took {
 		return ErrNoSuchRule
 	}
 	return nil
