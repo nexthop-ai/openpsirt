@@ -155,10 +155,9 @@ func (p *provider) adapter(t *testing.T, cfg OIDCConfig) (*OIDC, error) {
 }
 
 func TestTheAddressASignInStartsAtCarriesTheDigestAndNotTheSecret(t *testing.T) {
-	// The control this names lives in the address Begin produces, and the test
-	// that claimed to pin it compared a sha256 digest with its own preimage —
-	// false for every implementation, including a broken one, and it sent
-	// nothing anywhere.
+	// The control this names lives in the address Begin produces, so the test
+	// reads that address. A digest compared with its own preimage differs for
+	// every implementation, a broken one included.
 	p := standing(t)
 	adapter, err := p.adapter(t, OIDCConfig{})
 	if err != nil {
@@ -260,8 +259,7 @@ func TestAProviderNamingItsEndpointsElsewhereIsRefusedAtStartup(t *testing.T) {
 	// A discovery document names the addresses this deployment will send
 	// people to, and it arrives over the network. Pinning the fetch to the
 	// issuer's host does not stop the document naming somewhere else inside
-	// itself — and the keys endpoint, which the library does not expose, was
-	// the one address nothing checked.
+	// itself, the keys endpoint included, which the library does not expose.
 	for _, c := range []struct {
 		what  string
 		named string
@@ -507,9 +505,8 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 	// GitHub's organization logins are case-insensitive to look up and
 	// canonical in what it hands back, so the operator's spelling and GitHub's
 	// need not match byte for byte. Compared byte for byte, a mismatch of
-	// capitals skipped every membership — teams came back empty with no error,
-	// nobody derived any role in group-bound mode, and startup logged "sign-in
-	// configured" with the operator's own spelling echoed back.
+	// capitals skips every membership, with no error and no role derived in
+	// group-bound mode.
 	// Both spellings vary: what the operator typed, and what GitHub hands
 	// back. GitHub answers with the organization's canonical casing, which is
 	// whatever its owner registered — so folding the operator's input at

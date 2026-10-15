@@ -181,10 +181,8 @@ func (g *GitHub) teams(ctx context.Context, token *oauth2.Token) ([]string, erro
 		for _, membership := range memberships {
 			// Folded, because GitHub hands back the organization's canonical
 			// casing and the operator typed whatever they typed. Compared byte
-			// for byte, a mismatch of capitals skipped every membership —
-			// teams came back empty with no error, nobody derived any role in
-			// group-bound mode, and startup logged "sign-in configured" with
-			// the operator's own spelling echoed back.
+			// for byte, a mismatch of capitals skips every membership, with no
+			// error and no role derived in group-bound mode.
 			if !strings.EqualFold(membership.Organization.Login, g.organization) {
 				continue
 			}

@@ -3,14 +3,11 @@
 
 // Package walk visits the files of this repository for the gate programs.
 //
-// "Part of this repository" is decided six times over, with five
-// different answers, and nothing recorded why they differed. `reserved` walked
-// the build output directory and the other Go gates did not, so a generated
-// file there would have failed one gate and been invisible to the rest;
-// `unreachable` walked the interface, the documentation site and the
-// distribution directory where they skipped all three. An empty result means
-// both "nothing wrong" and "nothing looked at", so a gate reading less of the
-// tree than its output implies reports the same "OK" either way.
+// "Part of this repository" is decided here, once. Gates that each decide it
+// disagree: a generated file in a directory one gate walks and another skips
+// fails one and is invisible to the rest. An empty result means both "nothing
+// wrong" and "nothing looked at", so a gate reading less of the tree than its
+// output implies reports the same "OK" either way.
 //
 // So the default skip set lives here and each caller names what it adds, with
 // the reason at the call site, which is where a reader looks for it.
@@ -80,9 +77,10 @@ func Only(suffix string, extra []string, visit func(path string, body []byte) er
 // gate that decides from the name whether to read it at all.
 //
 // It reports how many the caller kept, not how many it was shown. A count of
-// visits is held above zero by any file at all — a licence, a readme — so the
-// refusal below could never fire for a gate that reads one kind of file, which
-// is the answer-that-means-two-things this package exists to remove.
+// visits is held above zero by any file at all — a license, a readme — so
+// counted that way the refusal below never fires for a gate that reads one
+// kind of file, which is the answer-that-means-two-things this package exists
+// to remove.
 func Paths(extra []string, visit func(path string) (bool, error)) (int, error) {
 	kept := 0
 	err := each(extra, func(path string) error {

@@ -9,13 +9,9 @@ import (
 
 func TestWhatOneSignInIsGivenIsUnguessableAndItsOwn(t *testing.T) {
 	// This file can say one thing about a sign-in's three values: that they are
-	// distinct, unguessable, and not shared with the next sign-in.
-	//
-	// It was named for the proof key being sent as a digest and kept as the
-	// secret, and it asserted that a sha256 digest differs from its own
-	// preimage — false for every implementation of challenge(), including a
-	// broken one — while sending nothing anywhere. That control is the address
-	// Begin produces, and it is asserted there, against both adapters.
+	// distinct, unguessable, and not shared with the next sign-in. The proof
+	// key being sent as a digest and kept as the secret is a property of the
+	// address Begin produces, and it is asserted there, against both adapters.
 	first, err := newPending()
 	if err != nil {
 		t.Fatal(err)

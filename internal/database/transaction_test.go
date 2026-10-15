@@ -160,11 +160,10 @@ func TestContentionThatNeverClearsIsReportedRatherThanRetriedForever(t *testing.
 }
 
 func TestGivingUpDoesNotWaitToBackOffBeforeNothing(t *testing.T) {
-	// The backoff sat inside the loop body with nothing guarding the last
-	// attempt, so a transaction that had already run out of attempts slept a
-	// final interval before returning an error that was decided before it
-	// began — holding the handler goroutine and its pooled connection for it,
-	// under exactly the sustained contention this path exists to report.
+	// A transaction that has run out of attempts returns at once. Sleeping a
+	// final interval first holds the handler goroutine and its pooled
+	// connection for an error already decided, under exactly the sustained
+	// contention this path exists to report.
 	//
 	// Measured from the last attempt rather than from the start, because the
 	// backoffs between attempts are jittered and their totals overlap: a run
@@ -191,11 +190,10 @@ func TestGivingUpDoesNotWaitToBackOffBeforeNothing(t *testing.T) {
 }
 
 func TestFindingNothingIsToldApartFromFailing(t *testing.T) {
-	// This was three separate copies, each asking whether the words "no rows"
-	// appeared anywhere in the message. That is wrong in both directions, and
-	// both mistakes are silent: an unrelated failure mentioning the phrase
-	// reads as an empty result, and a driver wording it differently reads as a
-	// failure. "Not found" decides control flow in enough places here that
+	// Asking whether the words "no rows" appear anywhere in the message is
+	// wrong in both directions, and both mistakes are silent: an unrelated
+	// failure mentioning the phrase reads as an empty result, and a driver
+	// wording it differently reads as a failure. "Not found" decides control flow in enough places here that
 	// either one changes behavior rather than logging.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -221,10 +219,10 @@ func TestFindingNothingIsToldApartFromFailing(t *testing.T) {
 
 func TestWithinOpensATransactionForThisPackagesOwnHandle(t *testing.T) {
 	// The handle this package hands out embeds a bun.DB rather than being
-	// one, so an assertion for *bun.DB alone was failed by the very handle
-	// Open returns — and the arm that answered it ran each statement as its
-	// own autocommit, with no transaction, no retry and nothing said. The two
-	// spellings differ by four characters and both compile.
+	// one, so an assertion for *bun.DB alone fails for the very handle Open
+	// returns, and each statement then runs as its own autocommit, with no
+	// transaction, no retry and nothing said. The two spellings differ by four
+	// characters and both compile.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		for _, handle := range []struct {
 			what string
@@ -270,9 +268,9 @@ func TestWithinJoinsATransactionItIsGiven(t *testing.T) {
 }
 
 func TestWithinRefusesAHandleItDoesNotRecognize(t *testing.T) {
-	// The arm that used to run the closure unwrapped. A handle nothing here
-	// knows about is a fault worth reporting, not a fifth way to run work
-	// outside a transaction and say nothing about it.
+	// A handle nothing here knows about is a fault worth reporting. Running
+	// the closure against it would run work outside a transaction and say
+	// nothing about it.
 	err := database.Within(t.Context(), stranger{}, func(ctx context.Context, db bun.IDB) error {
 		t.Error("the closure ran against a handle that is not a transaction")
 		return nil
