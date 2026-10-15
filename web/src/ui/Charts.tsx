@@ -16,7 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Body } from "../api/client";
-import { BANDS as LADDER, COLORS } from "./severities";
+import { BANDS as LADDER, BELOW_LOW, COLORS } from "./severities";
 
 // The window a trend chart draws when the reader has not chosen one, as a
 // number for the request and as the words its heading carries.
@@ -46,26 +46,20 @@ type Point = {
 // where the list agreed on 38.
 //
 // Seeded from the ladder, so every band the chart draws a series for is a key
-// of every row, and a split always sums to its count.
+// of every row, and a split always sums to its count. The words are the
+// ladder's own: a band stays, the words beneath low are low, and every other
+// word is medium.
 export function folded(by: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = Object.fromEntries(LADDER.map((band) => [band, 0]));
   for (const [word, count] of Object.entries(by)) {
-    switch (word) {
-      case "critical":
-      case "high":
-        out[word] = (out[word] ?? 0) + count;
-        break;
-      case "low":
-      case "negligible":
-      case "none":
-        out.low = (out.low ?? 0) + count;
-        break;
-      default:
-        out.medium = (out.medium ?? 0) + count;
-    }
+    const band = rungs.has(word) ? word : beneath.has(word) ? "low" : "medium";
+    out[band] = (out[band] ?? 0) + count;
   }
   return out;
 }
+
+const rungs = new Set<string>(LADDER);
+const beneath = new Set<string>(BELOW_LOW);
 
 // Derived from the ladder rather than written beside it, so a rung added to the
 // ladder is a band here and the split still sums to the count beside it.

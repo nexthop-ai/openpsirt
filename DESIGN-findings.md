@@ -1841,7 +1841,7 @@ below every band, so that the sentinel for "no line" does.
 | The SQL is generated from it | The expression every query bands a rating with is built from the table, and a test evaluates it on every engine against the table for every recordable word, the empty word, `unknown` and a capitalized word with a leading space |
 | The Go readers read through it | The band a finding is drawn and clocked in, the deadline window, and the score that stands in for a word with no number. A word the table does not recognize scores nothing rather than the middle band it is clocked at |
 | A score's band is the scorer's | A stored score turned back into a word is banded by the scoring package's own thresholds, so the two cannot disagree at an edge |
-| The interface reads one ladder | The floors are the bands reversed and the recordable words are the bands and the two beneath low; the gate refusing a second copy of the ladder reads its words from the same file |
+| The interface reads one ladder | The floors are the bands reversed and the recordable words are the bands and the two beneath low; the gate refusing a second copy of the ladder reads its words from the same file. The trend reaches the front-page chart in a feed's words, and the chart folds them through the same file: a band stays, the two beneath low are low, every other word is medium |
 
 ## The rating in force
 
