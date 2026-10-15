@@ -280,23 +280,98 @@ func TestAZip64ArchiveBehindOtherDataIsCountedFromWhereAReaderStarts(t *testing.
 	}
 }
 
-func TestAMemberCountWalksPastTheCountTheDirectoryEndStates(t *testing.T) {
-	// The directory end's count is compared by a reader in its low sixteen
-	// bits only, so an archive stating one member and holding many more is
-	// opened whole. The count is of the entries a reader walks.
-	cverecord.LowerBounds(t, cverecord.Bounds{Members: 3})
+// rewritten writes an archive of four empty members with its directory end
+// changed by edit, and names it.
+func rewritten(t *testing.T, edit func(end []byte, size int)) string {
+	t.Helper()
 	path := zipOf(t, 4, "")
 	raw, err := os.ReadFile(path) //nolint:gosec // G304: a path under the test's own directory
 	if err != nil {
 		t.Fatal(err)
 	}
-	end := bytes.LastIndex(raw, []byte("PK\x05\x06"))
-	raw[end+8], raw[end+9], raw[end+10], raw[end+11] = 1, 0, 1, 0
+	edit(raw[bytes.LastIndex(raw, []byte("PK\x05\x06")):], len(raw))
 	if err := os.WriteFile(path, raw, 0o600); err != nil { //nolint:gosec // G703: a path under the test's own directory
 		t.Fatal(err)
 	}
+	return path
+}
+
+// wrapped writes an archive holding an archive as its one member, cves.zip,
+// the way the List publishes, and names it.
+func wrapped(t *testing.T, innerPath string) string {
+	t.Helper()
+	inner, err := os.ReadFile(innerPath) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "outer.zip")
+	f, err := os.Create(path) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := zip.NewWriter(f)
+	member, err := w.CreateHeader(&zip.FileHeader{Name: "cves.zip", Method: zip.Store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := member.Write(inner); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// refusedEverywhere asserts that an archive is refused for its member count
+// by the count itself, by reading it as the List archive, and by reading it
+// as the archive inside one.
+func refusedEverywhere(t *testing.T, path string) {
+	t.Helper()
 	if err := cverecord.CountMembers(path); !cverecord.IsTooLarge(err) {
-		t.Errorf("an archive understating its members answered %v, want a refusal", err)
+		t.Errorf("counting the archive answered %v, want a refusal", err)
+	}
+	if _, _, err := cverecord.FromArchive(path, t.TempDir()); !cverecord.IsTooLarge(err) {
+		t.Errorf("reading the archive answered %v, want a refusal", err)
+	}
+	if _, _, err := cverecord.FromArchive(wrapped(t, path), t.TempDir()); !cverecord.IsTooLarge(err) {
+		t.Errorf("reading the archive inside another answered %v, want a refusal", err)
+	}
+}
+
+func TestAMemberCountWalksPastTheCountTheDirectoryEndStates(t *testing.T) {
+	// The directory end's count is compared by a reader in its low sixteen
+	// bits only, and only after every entry is walked into memory, so the
+	// count is of the entries a reader walks. A reader refuses this archive
+	// for the mismatch, not its size, so a refusal for its size comes from
+	// the count made before it is opened.
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 3})
+	refusedEverywhere(t, rewritten(t, func(end []byte, _ int) {
+		end[8], end[9], end[10], end[11] = 1, 0, 1, 0
+	}))
+}
+
+func TestADirectoryOffsetPastTheFileIsCountedWhereAReaderWalks(t *testing.T) {
+	// A reader takes the directory to start where the directory end's size
+	// puts it, before the end, whatever offset it names, and walks every
+	// entry from there.
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 3})
+	path := rewritten(t, func(end []byte, size int) {
+		binary.LittleEndian.PutUint32(end[16:], uint32(size+1000)) //nolint:gosec // G115: a small test archive
+	})
+	opened, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatalf("a reader does not open the archive, so it tests nothing: %v", err)
+	}
+	if len(opened.File) != 4 {
+		t.Fatalf("a reader found %d members", len(opened.File))
+	}
+	_ = opened.Close()
+	if err := cverecord.CountMembers(path); !cverecord.IsTooLarge(err) {
+		t.Errorf("the archive answered %v, want a refusal", err)
 	}
 }
 

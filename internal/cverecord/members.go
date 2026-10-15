@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 )
 
@@ -20,6 +21,9 @@ var (
 	directory64Locus = []byte("PK\x06\x07")
 	directoryEntry   = []byte("PK\x01\x02")
 )
+
+// zip64Field is the tag of the extra field holding an entry's zip64 values.
+const zip64Field = 0x0001
 
 // Fixed lengths of those records, before their variable parts.
 const (
@@ -108,41 +112,97 @@ func directoryStart(f io.ReaderAt, size int64) (int64, bool, error) {
 	dirSize := uint64(binary.LittleEndian.Uint32(end[12:]))
 	dirOffset := uint64(binary.LittleEndian.Uint32(end[16:]))
 
-	// A file's size is never negative, so it compares as unsigned.
-	limit := uint64(size) //nolint:gosec // G115: a file size, never negative
 	if records == 0xffff || dirSize == 0xffffffff || dirOffset == 0xffffffff {
-		if loc := endOffset - locusLen; loc >= 0 {
-			locus := make([]byte, locusLen)
-			if _, err := f.ReadAt(locus, loc); err == nil && bytes.Equal(locus[:4], directory64Locus) {
-				if at := binary.LittleEndian.Uint64(locus[8:]); at < limit {
-					at64 := int64(at) //nolint:gosec // G115: below a file size, which an int64 holds
-					record := make([]byte, directory64EndLen)
-					if _, err := f.ReadAt(record, at64); err == nil && bytes.Equal(record[:4], directory64End) {
-						endOffset = at64
-						dirSize = binary.LittleEndian.Uint64(record[40:])
-						dirOffset = binary.LittleEndian.Uint64(record[48:])
-					}
-				}
+		if at, found := zip64End(f, endOffset, size); found {
+			record := make([]byte, directory64EndLen)
+			if _, err := f.ReadAt(record, at); err == nil && bytes.Equal(record[:4], directory64End) {
+				endOffset = at
+				dirSize = binary.LittleEndian.Uint64(record[40:])
+				dirOffset = binary.LittleEndian.Uint64(record[48:])
 			}
 		}
 	}
-	if dirOffset > limit || dirSize > limit {
+	if dirOffset > math.MaxInt64 || dirSize > math.MaxInt64 {
 		return 0, false, nil
 	}
-	// Both are at most a file size, which an int64 holds.
-	offset := int64(dirOffset)                  //nolint:gosec // G115: bounded by the file size above
-	base := endOffset - int64(dirSize) - offset //nolint:gosec // G115: bounded by the file size above
-	if base > 0 {
-		// Data before the archive moves every offset in it, unless an entry
-		// is found where the directory end says without moving it.
-		probe := make([]byte, 4)
-		if _, err := f.ReadAt(probe, offset); err == nil && bytes.Equal(probe, directoryEntry) {
-			base = 0
+	// The base is worked out as a reader works it out, wrapping where it
+	// wraps, so the directory found is the one a reader walks: a directory
+	// end naming an offset past the file still has its directory found
+	// where its size says, which is inside the file.
+	offset := int64(dirOffset)                  //nolint:gosec // G115: at most the largest int64, checked above
+	base := endOffset - int64(dirSize) - offset //nolint:gosec // G115: at most the largest int64, checked above
+	if o := base + offset; o < 0 || o >= size {
+		return 0, false, nil
+	}
+	if base > 0 && entryAt(f, offset, size) {
+		// Data before the archive moves every offset in it, unless a whole
+		// entry is found where the directory end says without moving it.
+		base = 0
+	}
+	return base + offset, true, nil
+}
+
+// zip64End reads the zip64 locator just before a directory end and names
+// where it says the zip64 record is. A locator naming a disk other than the
+// first of one is no locator, as a reader of the format has it.
+func zip64End(f io.ReaderAt, endOffset, size int64) (int64, bool) {
+	loc := endOffset - locusLen
+	if loc < 0 {
+		return 0, false
+	}
+	locus := make([]byte, locusLen)
+	if _, err := f.ReadAt(locus, loc); err != nil || !bytes.Equal(locus[:4], directory64Locus) {
+		return 0, false
+	}
+	if binary.LittleEndian.Uint32(locus[4:]) != 0 || binary.LittleEndian.Uint32(locus[16:]) != 1 {
+		return 0, false
+	}
+	at := binary.LittleEndian.Uint64(locus[8:])
+	if at >= uint64(size) { //nolint:gosec // G115: a file size, never negative
+		return 0, false
+	}
+	return int64(at), true //nolint:gosec // G115: below a file size, which an int64 holds
+}
+
+// entryAt reports whether a whole directory entry begins at an offset, by the
+// checks a reader of the format makes of one: its fixed part and its variable
+// parts are inside the file, it carries the entry signature, and a zip64
+// field it declares holds every value its fixed part defers to one.
+func entryAt(f io.ReaderAt, off, size int64) bool {
+	if off < 0 || size-off < entryLen {
+		return false
+	}
+	fixed := make([]byte, entryLen)
+	if _, err := f.ReadAt(fixed, off); err != nil || !bytes.Equal(fixed[:4], directoryEntry) {
+		return false
+	}
+	nameLen := int64(binary.LittleEndian.Uint16(fixed[28:]))
+	extraLen := int64(binary.LittleEndian.Uint16(fixed[30:]))
+	commentLen := int64(binary.LittleEndian.Uint16(fixed[32:]))
+	if size-off-entryLen < nameLen+extraLen+commentLen {
+		return false
+	}
+	extra := make([]byte, extraLen)
+	if _, err := f.ReadAt(extra, off+entryLen+nameLen); err != nil {
+		return false
+	}
+	deferred := 0
+	for _, at := range []int{24, 20, 42} {
+		if binary.LittleEndian.Uint32(fixed[at:]) == 0xffffffff {
+			deferred++
 		}
 	}
-	start := base + offset
-	if start < 0 || start >= size {
-		return 0, false, nil
+	for len(extra) >= 4 {
+		tag := binary.LittleEndian.Uint16(extra)
+		fieldLen := int(binary.LittleEndian.Uint16(extra[2:]))
+		extra = extra[4:]
+		if len(extra) < fieldLen {
+			break
+		}
+		if tag == zip64Field && fieldLen < 8*deferred {
+			return false
+		}
+		extra = extra[fieldLen:]
 	}
-	return start, true, nil
+	return true
 }
