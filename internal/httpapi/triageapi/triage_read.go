@@ -219,7 +219,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		}
 		details, err := core.DescribeDecisions(ctx, in, store, []triage.Decision{*decision},
 			map[int64]string{decision.ID: reasoning})
-		if err != nil || len(details) == 0 {
+		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
 		return &struct{ Body core.DecisionDetail }{Body: details[0]}, nil
