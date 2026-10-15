@@ -100,3 +100,54 @@ func TestABulkAnswerIsBoundedByTheIssuesItAsksAReviewerToRead(t *testing.T) {
 		}
 	})
 }
+
+func TestABulkDeferralRecordsTheDateItRunsTo(t *testing.T) {
+	// A date is read only for a deferral, and refused beside any other
+	// outcome or where it is not a date.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom" +
+			"/components/linux-image/decisions"
+		decide := func(outcome, until string) (int, string) {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+				`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"`+outcome+`",`+
+					`"selected_by":"the drivers","reasoning":"Waiting on the vendor."`+
+					`,"deferred_until":"`+until+`"}`)
+			return got.Code, got.Body.String()
+		}
+
+		if code, body := decide("wont-fix", httpapitest.AheadOfUs); code != http.StatusUnprocessableEntity ||
+			!strings.Contains(body, "only means something when the outcome is deferred") {
+			t.Errorf("a date beside another outcome answered %d: %s", code, body)
+		}
+		if code, body := decide("deferred", "31/12/2026"); code != http.StatusUnprocessableEntity ||
+			!strings.Contains(body, "that is not a date") {
+			t.Errorf("a date in another layout answered %d: %s", code, body)
+		}
+
+		code, body := decide("deferred", httpapitest.AheadOfUs)
+		if code != http.StatusCreated {
+			t.Fatalf("a bulk deferral answered %d: %s", code, body)
+		}
+		var made struct {
+			ClaimID  int64 `json:"claim_id"`
+			Recorded int   `json:"recorded"`
+		}
+		if err := json.Unmarshal([]byte(body), &made); err != nil {
+			t.Fatal(err)
+		}
+		if made.Recorded != 2 {
+			t.Errorf("a deferral of two issues recorded %d", made.Recorded)
+		}
+		var claim struct {
+			Argument struct {
+				Outcome       string `json:"outcome"`
+				DeferredUntil string `json:"deferred_until"`
+			} `json:"argument"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/claims/"+httpapitest.Itoa(made.ClaimID), &claim)
+		if claim.Argument.Outcome != "deferred" || claim.Argument.DeferredUntil != httpapitest.AheadOfUs {
+			t.Errorf("the claim reads %+v, want deferred until %s", claim.Argument, httpapitest.AheadOfUs)
+		}
+	})
+}
