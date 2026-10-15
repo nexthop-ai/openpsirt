@@ -68,7 +68,7 @@ func registerKeys(api huma.API, a core.Administering) {
 		for _, key := range keys {
 			body := KeyBody{
 				Name: key.Name, Withdrawn: key.RevokedAt != nil,
-				CreatedAt: key.CreatedAt.UTC().Format(timeFormat),
+				CreatedAt: core.Stamp(key.CreatedAt),
 			}
 			// The address, because create-key resolves this field through
 			// ProductByName — and the Stream and Variant fields beside it
@@ -106,9 +106,7 @@ func registerKeys(api huma.API, a core.Administering) {
 				}
 				body.Variant = variant.Name
 			}
-			if key.LastUsedAt != nil {
-				body.LastUsedAt = key.LastUsedAt.UTC().Format(timeFormat)
-			}
+			body.LastUsedAt = core.StampAt(key.LastUsedAt)
 			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil

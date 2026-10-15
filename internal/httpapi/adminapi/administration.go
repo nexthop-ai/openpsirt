@@ -790,9 +790,6 @@ func handsBack(a core.Administering) bool {
 	return a.Findings != nil
 }
 
-// timeFormat is how a moment is reported.
-const timeFormat = "2006-01-02T15:04:05Z"
-
 // mintable is administerable for the acts that hand out a way in: a credential
 // cannot hand out another.
 func mintable(ctx context.Context, a core.Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {

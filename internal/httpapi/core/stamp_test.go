@@ -57,7 +57,8 @@ func TestEveryMomentAResponseStatesGoesThroughStamp(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(source), "Format(time.RFC3339") {
+		if strings.Contains(string(source), "Format(time.RFC3339") ||
+			strings.Contains(string(source), `"2006-01-02T15:04:05`) {
 			t.Errorf("%s formats a moment by hand; state it through core.Stamp or core.StampAt", path)
 		}
 		return nil
