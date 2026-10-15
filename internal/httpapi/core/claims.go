@@ -121,6 +121,9 @@ func ProductsDecidedIn(ctx context.Context, in Deps, rows []triage.Elsewhere) (m
 	return catalog.NewStore(in.DB.DB).ProductsCalled(ctx, ids)
 }
 
+// OrBlank reads a string that may be absent as the string, or as nothing where
+// it is absent: an override the product has no opinion of its own on, a
+// justification nobody gave.
 func OrBlank(s *string) string {
 	if s == nil {
 		return ""

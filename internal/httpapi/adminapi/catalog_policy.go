@@ -119,7 +119,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			// own: it is one of the three levers that rewrite what this tool
 			// reports without anything being scanned.
 			if err := core.Noted(ctx, tx, trail.Setting, "triage floor of "+product.Name,
-				trail.Said(core.WordStated(before), before != nil),
+				trail.Said(core.OrBlank(before), before != nil),
 				trail.Said(word, word != "")); err != nil {
 				return core.NotRecorded(d.Logger, err)
 			}

@@ -120,16 +120,6 @@ type ApprovalBody struct {
 	CarriedFrom int64 `json:"carried_from,omitempty" doc:"The approval this was carried forward from, where a re-affirmation stood on an earlier agreement rather than a fresh one"`
 }
 
-// CommentBody is one remark on a decision.
-type CommentBody struct {
-	ID            int64  `json:"id"`
-	Body          string `json:"body" doc:"The comment text, in markdown"`
-	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
-	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	WrittenAt     string `json:"written_at"`
-	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
-}
-
 func registerTriageReading(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-decisions", Method: http.MethodGet, Path: "/v1/decisions",
@@ -419,8 +409,7 @@ type StandingBody struct {
 }
 
 func registerPlaceDecisions(api huma.API, in core.Deps) {
-	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-		"/findings/{vulnerability}/places/{place}/decision"
+	const at = placeDecisionPath
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding-decision", Method: http.MethodGet, Path: at,
@@ -435,11 +424,7 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 			"making a new one.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product       string `path:"product"`
-		Stream        string `path:"stream"`
-		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
-		Place         string `path:"place" doc:"The place, as the findings list gives it"`
+		PlacePath
 	}) (*struct{ Body StandingBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
@@ -512,12 +497,8 @@ func registerPlaceDecisions(api huma.API, in core.Deps) {
 			"re-affirmation becomes when it is made too easy.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product       string `path:"product"`
-		Stream        string `path:"stream"`
-		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
-		Place         string `path:"place"`
-		Body          struct {
+		PlacePath
+		Body struct {
 			Previous  int64  `json:"previous" doc:"The decision being re-made"`
 			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason it still holds, in markdown"`
 		}

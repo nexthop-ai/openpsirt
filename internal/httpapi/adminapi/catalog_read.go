@@ -90,7 +90,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 				Branches: shape.Branches, Tags: shape.Tags, Variants: shape.Variants,
 				Open:          counted(in.Counts, open, row.ID),
 				LastScanAt:    seen[row.Name],
-				TriageFloor:   core.Line(core.WordStated(row.TriageFloor)),
+				TriageFloor:   core.Line(core.OrBlank(row.TriageFloor)),
 				PairShare:     core.CountedOr(row.PairShare),
 				PairApprovers: core.CountedOr(row.PairApprovers),
 				EndOfLife:     core.OnDate(row.EOLOn),

@@ -99,6 +99,12 @@ func (b Bounds) orDefaults() Bounds {
 	return b
 }
 
+// Limits is every limit on an act answering many issues at once, as the
+// deployment sets them, read through db.
+func Limits(ctx context.Context, db bun.IDB) (Bounds, error) {
+	return Bounds{}.within(ctx, db)
+}
+
 // within fills each limit left unset from the deployment's settings, read
 // through the transaction the act writes in. A limit read before the
 // transaction opened describes a deployment a retry may no longer be running

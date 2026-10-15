@@ -348,24 +348,8 @@ func DeclineDeclaration(logger *slog.Logger, err error) error {
 // numbers that can disagree, and the one on the catalog would be the one
 // nobody checks.
 func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject) (map[string]string, error) {
-	rows, err := scans.Scanning(ctx, subject, finding.Scope{}, 0)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[string]string, len(rows))
-	for _, row := range rows {
-		if row.LastReceivedAt == nil {
-			continue
-		}
-		at := Stamp(*row.LastReceivedAt)
-		// The newest across a product's builds, whatever order the rows
-		// arrive in. Every stamp is UTC and the same width, so they compare
-		// as strings.
-		if at > seen[row.Product] {
-			seen[row.Product] = at
-		}
-	}
-	return seen, nil
+	return lastScansBy(ctx, scans, subject, finding.Scope{},
+		func(row ingest.Coverage) string { return row.Product })
 }
 
 // LastScansIn is the same within one product, keyed by whichever level the
@@ -376,7 +360,16 @@ func LastScans(ctx context.Context, scans *ingest.Store, subject access.Subject)
 func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subject, productID int64,
 	key func(ingest.Coverage) string) (map[string]string, error) {
 
-	rows, err := scans.Scanning(ctx, subject, finding.Scope{ProductID: &productID}, 0)
+	return lastScansBy(ctx, scans, subject, finding.Scope{ProductID: &productID}, key)
+}
+
+// lastScansBy is the newest arrival across the builds in scope, by key,
+// whatever order the rows arrive in. Every stamp is UTC and the same width,
+// so they compare as strings.
+func lastScansBy(ctx context.Context, scans *ingest.Store, subject access.Subject, scope finding.Scope,
+	key func(ingest.Coverage) string) (map[string]string, error) {
+
+	rows, err := scans.Scanning(ctx, subject, scope, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -390,15 +383,6 @@ func LastScansIn(ctx context.Context, scans *ingest.Store, subject access.Subjec
 		}
 	}
 	return seen, nil
-}
-
-// WordStated reads an override that may be absent as the word it states, or as
-// nothing where the product has no opinion of its own.
-func WordStated(word *string) string {
-	if word == nil {
-		return ""
-	}
-	return *word
 }
 
 // CalendarDate reads a calendar date, or nothing where one was cleared.

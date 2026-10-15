@@ -156,13 +156,21 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 			return nil, core.Refused(a.Logger, err, "cannot read what they used to hold")
 		}
 		body.HeldTotal = total
-		who, err := whoChanged(ctx, in, a, changes)
+		// Named together rather than per row: the trail holds who by number,
+		// and fifty changes made by two people are two names to read.
+		changers := make([]int64, 0, len(changes))
+		for _, change := range changes {
+			if person := change.Person(); person != 0 {
+				changers = append(changers, person)
+			}
+		}
+		who, err := core.WhoSigned(ctx, in.DB.DB, changers)
 		if err != nil {
-			return nil, err
+			return nil, core.WentWrong(a.Logger, "cannot read who made those changes", err)
 		}
 		for _, change := range changes {
 			body.Held = append(body.Held, HeldChangeBody{
-				At: core.Stamp(change.At), By: who[change.Person()],
+				At: core.Stamp(change.At), By: who.Identity(change.Person()),
 				About: change.Name, Was: core.OrBlank(change.Was), Now: core.OrBlank(change.Became),
 			})
 		}
@@ -200,33 +208,6 @@ func registerPerson(api huma.API, in core.Deps, a core.Administering) {
 		}
 		return &struct{ Body AboutPersonBody }{Body: body}, nil
 	})
-}
-
-// whoChanged names the people who made a set of changes, once each.
-//
-// The trail holds who by number, and a page naming numbers is a page nobody
-// can read. Looked up together rather than per row, because a screen showing
-// fifty changes made by two people would otherwise ask fifty times.
-func whoChanged(ctx context.Context, in core.Deps, a core.Administering, changes []trail.Change) (map[int64]string, error) {
-	who := map[int64]string{}
-	for _, change := range changes {
-		if person := change.Person(); person != 0 {
-			who[person] = ""
-		}
-	}
-	if len(who) == 0 {
-		return who, nil
-	}
-	people, _, err := access.NewStore(in.DB.DB).People(ctx)
-	if err != nil {
-		return nil, core.WentWrong(a.Logger, "cannot read who made those changes", err)
-	}
-	for _, person := range people {
-		if _, wanted := who[person.ID]; wanted {
-			who[person.ID] = person.Identity
-		}
-	}
-	return who, nil
 }
 
 // registerDeactivation is somebody leaving, and somebody coming back.

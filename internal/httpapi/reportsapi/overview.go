@@ -127,7 +127,7 @@ func registerOverview(api huma.API, in core.Deps) {
 		out := &OverviewOutput{}
 		out.Body.Name = named.Name
 		out.Body.DisplayName = named.DisplayName
-		out.Body.TriageFloor = core.WordStated(named.TriageFloor)
+		out.Body.TriageFloor = core.OrBlank(named.TriageFloor)
 		out.Body.EndOfLife = core.OnDate(named.EOLOn)
 		out.Body.Retired = named.Retired()
 		out.Body.Builds = make([]BuildStandingBody, 0, len(covered)+len(held))

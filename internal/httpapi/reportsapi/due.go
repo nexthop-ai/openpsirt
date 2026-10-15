@@ -80,49 +80,58 @@ func registerDue(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "what is running out of time could not be read", err)
 		}
 
-		owners := make([]int64, 0, len(rows))
-		for _, row := range rows {
-			if row.AssignedTo != nil {
-				owners = append(owners, *row.AssignedTo)
-			}
-		}
-		// Whoever holds it, which is a person or a team: the
-		// assignment column holds a party, and this screen does not
-		// have to know which.
-		who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, owners)
+		bodies, err := lateBodies(ctx, in, rows, time.Now().UTC())
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "who is dealing with these could not be read", err)
 		}
-
-		now := time.Now().UTC()
 		out := &core.ListOutput[LateBody]{}
 		// The total, so a tile counting this list says what the list it opens
 		// says. Without it the front page reports its own page size as the
 		// figure.
 		out.Body.Total = total
-		out.Body.Items = make([]LateBody, 0, len(rows))
-		for _, row := range rows {
-			body := LateBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity,
-				Exploited: row.Exploited, Component: row.Component, Version: row.Version,
-				Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-				Product: row.Product, ProductName: row.ProductName,
-				Stream: row.Stream, Variant: row.Variant,
-				StreamName:  row.StreamName,
-				VariantName: row.VariantName,
-				Places:      row.Places,
-				Due:         row.Due.UTC().Format(time.DateOnly),
-				// Rounded down, not toward zero. Truncation reports something
-				// twelve hours overdue as having zero days left, which reads
-				// as due today rather than as late.
-				DaysLeft: int(math.Floor(row.Due.Sub(now).Hours() / 24)),
-			}
-			if row.AssignedTo != nil {
-				held := who[*row.AssignedTo]
-				body.AssignedTo, body.AssignedName = held.Address, core.LabelBeside(held.Name, held.Address)
-			}
-			out.Body.Items = append(out.Body.Items, body)
-		}
+		out.Body.Items = bodies
 		return out, nil
 	})
+}
+
+// lateBodies renders rows running out of time, as the screen and its export
+// both state them, from the moment now.
+func lateBodies(ctx context.Context, in core.Deps, rows []finding.Late, now time.Time) ([]LateBody, error) {
+	owners := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		if row.AssignedTo != nil {
+			owners = append(owners, *row.AssignedTo)
+		}
+	}
+	// Whoever holds it, which is a person or a team: the assignment column
+	// holds a party, and a list naming only people reports a team's work as
+	// nobody's.
+	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, owners)
+	if err != nil {
+		return nil, err
+	}
+	bodies := make([]LateBody, 0, len(rows))
+	for _, row := range rows {
+		body := LateBody{
+			Vulnerability: row.Vulnerability, Severity: row.Severity,
+			Exploited: row.Exploited, Component: row.Component, Version: row.Version,
+			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
+			Product: row.Product, ProductName: row.ProductName,
+			Stream: row.Stream, Variant: row.Variant,
+			StreamName:  row.StreamName,
+			VariantName: row.VariantName,
+			Places:      row.Places,
+			Due:         row.Due.UTC().Format(time.DateOnly),
+			// Rounded down, not toward zero. Truncation reports something
+			// twelve hours overdue as having zero days left, which reads as
+			// due today rather than as late.
+			DaysLeft: int(math.Floor(row.Due.Sub(now).Hours() / 24)),
+		}
+		if row.AssignedTo != nil {
+			held := who[*row.AssignedTo]
+			body.AssignedTo, body.AssignedName = held.Address, core.LabelBeside(held.Name, held.Address)
+		}
+		bodies = append(bodies, body)
+	}
+	return bodies, nil
 }

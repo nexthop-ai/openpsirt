@@ -564,10 +564,27 @@ func registerTriage(api huma.API, in core.Deps) {
 	})
 }
 
+// placePathPrefix addresses one place of a finding on one build, and
+// placeDecisionPath the decision made there. Every route about a place names it
+// through PlacePath.
+const (
+	placePathPrefix   = "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}"
+	placeDecisionPath = placePathPrefix + "/decision"
+)
+
+// PlacePath is the five names a place of a finding is addressed by.
+type PlacePath struct {
+	Product       string `path:"product"`
+	Stream        string `path:"stream"`
+	Variant       string `path:"variant"`
+	Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+	Place         string `path:"place" doc:"The place, as the findings list gives it"`
+}
+
 func registerProposing(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision",
+		Path:    placeDecisionPath,
 		Summary: "Record a triage decision for a finding",
 		Description: "Records how a finding was triaged: `affected`, `not-applicable`, " +
 			"`mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.\n\n" +
@@ -601,12 +618,8 @@ func registerProposing(api huma.API, in core.Deps) {
 			"decision cannot honestly cover all of them.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
-		Product       string `path:"product"`
-		Stream        string `path:"stream"`
-		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
-		Place         string `path:"place" doc:"The place, as the findings list gives it"`
-		Body          core.DecisionBody
+		PlacePath
+		Body core.DecisionBody
 	}) (*struct{ Body core.DecisionBody }, error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
@@ -653,20 +666,10 @@ func registerProposing(api huma.API, in core.Deps) {
 			// Made on the build in the path, which is the one on screen.
 			MadeOn: []int64{target},
 		}
-		if input.Body.DeferredUntil != "" {
-			until, err := time.Parse(time.DateOnly, input.Body.DeferredUntil)
-			if err != nil {
-				return nil, huma.Error422UnprocessableEntity("a deferral returns on a date, written as YYYY-MM-DD")
-			}
-			proposal.DeferredUntil = &until
-		}
-		if input.Body.CommittedTo != "" {
-			by, err := time.Parse(time.DateOnly, input.Body.CommittedTo)
-			if err != nil {
-				return nil, huma.Error422UnprocessableEntity(
-					"the date promised work lands on is written as YYYY-MM-DD")
-			}
-			proposal.CommittedTo = &by
+		proposal.DeferredUntil, proposal.CommittedTo, err = promisedDates(
+			input.Body.DeferredUntil, input.Body.CommittedTo)
+		if err != nil {
+			return nil, err
 		}
 
 		// The wait for a second person is worked out by the store, inside the

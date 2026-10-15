@@ -5,7 +5,6 @@ package reportsapi
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -80,7 +78,6 @@ func registerDueExport(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		store := finding.NewStore(in.DB.DB)
-		rights := access.NewStore(in.DB.DB)
 		now := time.Now().UTC()
 		out := core.Exporting{
 			What:  "what is running out of time",
@@ -96,41 +93,23 @@ func registerDueExport(api huma.API, in core.Deps) {
 				if err != nil {
 					return nil, err
 				}
-				owners := make([]int64, 0, len(late))
-				for _, row := range late {
-					if row.AssignedTo != nil {
-						owners = append(owners, *row.AssignedTo)
-					}
-				}
-				// A person or a team: the column holds a party, and a file
-				// naming only people reports a team's work as nobody's.
-				who, err := rights.WhoHolds(ctx, owners)
+				// The rows the screen states, so the file and the screen
+				// cannot round or name a holder differently.
+				bodies, err := lateBodies(ctx, in, late, now)
 				if err != nil {
 					return nil, err
 				}
-				rows := make([][]string, 0, len(late))
-				for _, row := range late {
-					// The holder by identity or team name, the way the list
-					// carries it, with the label beside it.
-					held, heldName := "", ""
-					if row.AssignedTo != nil {
-						h := who[*row.AssignedTo]
-						held, heldName = h.Address, core.LabelBeside(h.Name, h.Address)
-					}
+				rows := make([][]string, 0, len(bodies))
+				for _, body := range bodies {
 					rows = append(rows, []string{
-						row.Vulnerability, row.Severity,
-						strconv.FormatBool(row.Exploited),
-						row.Component, row.Version,
-						row.Product, row.ProductName,
-						row.Stream, row.StreamName,
-						row.Variant, row.VariantName,
-						strconv.Itoa(row.Places), held, heldName,
-						row.Due.UTC().Format(time.DateOnly),
-						// Rounded down rather than toward zero, the way the
-						// screen rounds it: truncation reports something twelve
-						// hours overdue as having zero days left, which reads
-						// as due today.
-						strconv.Itoa(int(math.Floor(row.Due.Sub(now).Hours() / 24))),
+						body.Vulnerability, body.Severity,
+						strconv.FormatBool(body.Exploited),
+						body.Component, body.Version,
+						body.Product, body.ProductName,
+						body.Stream, body.StreamName,
+						body.Variant, body.VariantName,
+						strconv.Itoa(body.Places), body.AssignedTo, body.AssignedName,
+						body.Due, strconv.Itoa(body.DaysLeft),
 					})
 				}
 				return rows, nil

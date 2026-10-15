@@ -6667,6 +6667,15 @@ export interface components {
             token: string;
             uploaded_at: string;
         };
+        AttachmentsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AttachmentsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AttachmentBody"][] | null;
+        };
         BecameBody: {
             /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
@@ -7310,19 +7319,6 @@ export interface components {
             id: number;
             /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the text is about — deliberately not said which */
             not_notified?: string[] | null;
-        };
-        CommentBody: {
-            /** @description The comment text, in markdown */
-            body: string;
-            /** @description The moment the author last changed it, if they did */
-            edited_at?: string;
-            /** Format: int64 */
-            id: number;
-            written_at: string;
-            /** @description The author, by sign-in identity */
-            written_by: string;
-            /** @description Their display name, where it differs from their identity */
-            written_by_name?: string;
         };
         ComparisonBody: {
             /**
@@ -9151,15 +9147,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        "List-attachmentsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-attachmentsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["AttachmentBody"][] | null;
-        };
         "List-issues-at-componentResponse": {
             /**
              * Format: uri
@@ -9182,15 +9169,6 @@ export interface components {
             place_limit: number;
             /** Format: int64 */
             total: number;
-        };
-        "List-report-attachmentsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-report-attachmentsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["AttachmentBody"][] | null;
         };
         "List-set-aside-workResponse": {
             /**
@@ -9278,17 +9256,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["CollaboratorBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodyCommentBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyCommentBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["CommentBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -9410,17 +9377,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["NameableBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodyNoteBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyNoteBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["NoteBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -9663,6 +9619,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["WasSaidBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyWrittenBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyWrittenBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["WrittenBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -9939,19 +9906,6 @@ export interface components {
             readonly $schema?: string;
             /** @description The text, in markdown */
             body: string;
-        };
-        NoteBody: {
-            /** @description The text, in markdown */
-            body: string;
-            /** @description The moment the author last changed it, where they have */
-            edited_at?: string;
-            /** Format: int64 */
-            id: number;
-            written_at: string;
-            /** @description The author, by sign-in identity */
-            written_by: string;
-            /** @description Their display name, where it differs from their identity */
-            written_by_name?: string;
         };
         NoteWritten: {
             /**
@@ -13051,6 +13005,19 @@ export interface components {
              */
             withdrawn: number;
         };
+        WrittenBody: {
+            /** @description The text, in markdown */
+            body: string;
+            /** @description The moment the author last changed it, where they have */
+            edited_at?: string;
+            /** Format: int64 */
+            id: number;
+            written_at: string;
+            /** @description The author, by sign-in identity */
+            written_by: string;
+            /** @description Their display name, where it differs from their identity */
+            written_by_name?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -14179,7 +14146,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyCommentBody"];
+                    "application/json": components["schemas"]["ListBodyWrittenBody"];
                 };
             };
             /** @description Error */
@@ -17899,7 +17866,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-attachmentsResponse"];
+                    "application/json": components["schemas"]["AttachmentsOutputBody"];
                 };
             };
             /** @description Error */
@@ -18348,7 +18315,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyNoteBody"];
+                    "application/json": components["schemas"]["ListBodyWrittenBody"];
                 };
             };
             /** @description Error */
@@ -18941,7 +18908,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-report-attachmentsResponse"];
+                    "application/json": components["schemas"]["AttachmentsOutputBody"];
                 };
             };
             /** @description Error */
@@ -20071,7 +20038,9 @@ export interface operations {
                 product: string;
                 stream: string;
                 variant: string;
+                /** @description The issue, by any name it is known under */
                 vulnerability: string;
+                /** @description The place, as the findings list gives it */
                 place: string;
             };
             cookie?: never;
@@ -20110,7 +20079,9 @@ export interface operations {
                 product: string;
                 stream: string;
                 variant: string;
+                /** @description The issue, by any name it is known under */
                 vulnerability: string;
+                /** @description The place, as the findings list gives it */
                 place: string;
             };
             cookie?: never;

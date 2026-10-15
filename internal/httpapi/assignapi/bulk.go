@@ -16,7 +16,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -95,9 +94,9 @@ func registerBulk(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.RefusedFinding(in, err)
 		}
-		bounds, err := boundsFor(ctx, in)
+		bounds, err := triage.Limits(ctx, in.DB.DB)
 		if err != nil {
-			return nil, err
+			return nil, core.WentWrong(in.Logger, "the limits on one action could not be read", err)
 		}
 
 		issues := make([]int64, 0, len(at))
@@ -339,29 +338,6 @@ func skippedBodies(ctx context.Context, in core.Deps, skipped []triage.Skipped) 
 		})
 	}
 	return out, nil
-}
-
-// boundsFor reads the limits on an act answering many issues at once, as the
-// deployment sets them.
-func boundsFor(ctx context.Context, in core.Deps) (triage.Bounds, error) {
-	settings := setting.NewStore(in.DB.DB)
-	var b triage.Bounds
-	for _, each := range []struct {
-		key      string
-		fallback int
-		into     *int
-	}{
-		{setting.ReviewIssues, setting.DefaultReviewIssues, &b.Review},
-		{setting.AgreedIssues, setting.DefaultAgreedIssues, &b.Agreed},
-		{setting.WriteCeiling, setting.DefaultWriteCeiling, &b.Places},
-	} {
-		n, err := settings.Count(ctx, each.key, each.fallback)
-		if err != nil {
-			return b, core.WentWrong(in.Logger, "the limits on one action could not be read", err)
-		}
-		*each.into = n
-	}
-	return b, nil
 }
 
 // deferredUntil reads the date a postponement runs to.

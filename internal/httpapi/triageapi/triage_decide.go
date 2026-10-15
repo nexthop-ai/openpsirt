@@ -32,6 +32,28 @@ import (
 // namedTwice refuses a judgment naming one build twice.
 const namedTwice = "a build is named twice, and one judgment is recorded against it once"
 
+// promisedDates reads the date a deferral returns on and the date promised
+// work lands on, either of which may be absent.
+func promisedDates(deferred, committed string) (until, lands *time.Time, err error) {
+	if deferred != "" {
+		when, err := time.Parse(time.DateOnly, deferred)
+		if err != nil {
+			return nil, nil, huma.Error422UnprocessableEntity(
+				"a deferral returns on a date, written as YYYY-MM-DD")
+		}
+		until = &when
+	}
+	if committed != "" {
+		when, err := time.Parse(time.DateOnly, committed)
+		if err != nil {
+			return nil, nil, huma.Error422UnprocessableEntity(
+				"the date promised work lands on is written as YYYY-MM-DD")
+		}
+		lands = &when
+	}
+	return until, lands, nil
+}
+
 // FindingDecisionBody is one judgment about a finding, and which of its places
 // it covers.
 type FindingDecisionBody struct {
@@ -168,23 +190,9 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		asked := append([]AlsoBuild{{
 			Stream: input.Stream, Variant: input.Variant, Version: input.Version,
 		}}, input.Body.Also...)
-		var until *time.Time
-		if input.Body.DeferredUntil != "" {
-			when, err := time.Parse(time.DateOnly, input.Body.DeferredUntil)
-			if err != nil {
-				return nil, huma.Error422UnprocessableEntity(
-					"a deferral returns on a date, written as YYYY-MM-DD")
-			}
-			until = &when
-		}
-		var lands *time.Time
-		if input.Body.CommittedTo != "" {
-			when, err := time.Parse(time.DateOnly, input.Body.CommittedTo)
-			if err != nil {
-				return nil, huma.Error422UnprocessableEntity(
-					"the date promised work lands on is written as YYYY-MM-DD")
-			}
-			lands = &when
+		until, lands, err := promisedDates(input.Body.DeferredUntil, input.Body.CommittedTo)
+		if err != nil {
+			return nil, err
 		}
 
 		limit, err := setting.NewStore(in.DB.DB).Count(ctx, setting.TogetherCap,

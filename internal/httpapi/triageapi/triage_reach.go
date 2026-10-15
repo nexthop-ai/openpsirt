@@ -71,7 +71,7 @@ type MatchBody struct {
 func registerElsewhere(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-decision-reach", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/reach",
+		Path:    placePathPrefix + "/reach",
 		Summary: "Show how far a decision here would reach",
 		Description: "Returns the three parts of what a judgment made here covers.\n\n" +
 			"`here` is how many places in this build. `automatic` are other builds it reaches " +
@@ -84,11 +84,7 @@ func registerElsewhere(api huma.API, in core.Deps) {
 			"comes to reach builds the person making it never knew about.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product       string `path:"product"`
-		Stream        string `path:"stream"`
-		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
-		Place         string `path:"place"`
+		PlacePath
 	}) (*struct{ Body ReachBody }, error) {
 		subject, _, err := core.Triaging(ctx, in)
 		if err != nil {

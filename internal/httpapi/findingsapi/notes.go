@@ -47,7 +47,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		"Anywhere else it answers as an issue that is not there."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
-	}) (*core.ListOutput[NoteBody], error) {
+	}) (*core.ListOutput[core.WrittenBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
 			return nil, err
@@ -182,16 +182,6 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 	})
 }
 
-// NoteBody is one note on an issue in a product.
-type NoteBody struct {
-	ID            int64  `json:"id"`
-	Body          string `json:"body" doc:"The text, in markdown"`
-	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
-	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	WrittenAt     string `json:"written_at"`
-	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
-}
-
 // NoteWritten is the answer to writing or changing a note.
 type NoteWritten struct {
 	ID          int64    `json:"id"`
@@ -236,28 +226,13 @@ func noteAbout(ctx context.Context, in core.Deps, subject access.Subject,
 }
 
 // notesOut renders a thread, naming its authors in one lookup.
-func notesOut(ctx context.Context, in core.Deps, notes []triage.IssueNote) (*core.ListOutput[NoteBody], error) {
-	authors := make([]int64, 0, len(notes))
+func notesOut(ctx context.Context, in core.Deps, notes []triage.IssueNote) (*core.ListOutput[core.WrittenBody], error) {
+	rows := make([]core.Writing, 0, len(notes))
 	for _, note := range notes {
-		authors = append(authors, note.WrittenBy)
+		rows = append(rows, core.Writing{ID: note.ID, Body: note.Body,
+			WrittenBy: note.WrittenBy, WrittenAt: note.WrittenAt, EditedAt: note.EditedAt})
 	}
-	who, err := core.WhoSigned(ctx, in.DB.DB, authors)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "the notes could not be read", err)
-	}
-	out := &core.ListOutput[NoteBody]{}
-	out.Body.Items = make([]NoteBody, 0, len(notes))
-	for _, note := range notes {
-		body := NoteBody{
-			ID: note.ID, Body: note.Body,
-			WrittenBy:     who.Identity(note.WrittenBy),
-			WrittenByName: who.Label(note.WrittenBy),
-			WrittenAt:     core.Stamp(note.WrittenAt),
-		}
-		body.EditedAt = core.StampAt(note.EditedAt)
-		out.Body.Items = append(out.Body.Items, body)
-	}
-	return out, nil
+	return core.Written(ctx, in, rows, "the notes could not be read")
 }
 
 // tellNamed tells whoever a note named, at the visibility of the issue in that

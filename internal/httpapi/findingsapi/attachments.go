@@ -47,6 +47,45 @@ type AttachmentBody struct {
 	RedactedReason string `json:"redacted_reason,omitempty" doc:"The reason it was removed"`
 }
 
+// attachmentUploaded is the answer to a file stored.
+type attachmentUploaded struct {
+	Status int
+	Body   AttachmentBody
+}
+
+// attachmentsOutput is the files attached to one thing.
+type attachmentsOutput struct {
+	Body struct {
+		Items []AttachmentBody `json:"items"`
+	}
+}
+
+// uploaded answers an upload from what storing it did, with the refusals an
+// issue's file and a report's file share: too large, no room left, or
+// anything the store refused.
+func uploaded(in core.Deps, stored *attach.Attachment, err error, size, maxSize int64) (*attachmentUploaded, error) {
+	switch {
+	case errors.Is(err, attach.ErrTooLarge):
+		return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+			"that file is %d bytes and this deployment accepts %d", size, maxSize))
+	case errors.Is(err, attach.ErrNoRoom):
+		return nil, huma.Error507InsufficientStorage(attach.ErrNoRoom.Error())
+	case err != nil:
+		return nil, core.Refused(in.Logger, err, "cannot store that file")
+	}
+	return &attachmentUploaded{Status: http.StatusCreated, Body: attachmentBody(stored)}, nil
+}
+
+// attachmentList renders the files attached to one thing, in the order given.
+func attachmentList(rows []attach.Attachment) *attachmentsOutput {
+	out := &attachmentsOutput{}
+	out.Body.Items = make([]AttachmentBody, 0, len(rows))
+	for i := range rows {
+		out.Body.Items = append(out.Body.Items, attachmentBody(&rows[i]))
+	}
+	return out
+}
+
 func attachmentBody(a *attach.Attachment) AttachmentBody {
 	out := AttachmentBody{
 		Token: a.Token, Reference: markdown.Attachment + ":" + a.Token,
@@ -125,10 +164,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, under any identifier it goes by"`
 		RawBody       huma.MultipartFormFiles[attachmentParts]
-	}) (*struct {
-		Status int
-		Body   AttachmentBody
-	}, error) {
+	}) (*attachmentUploaded, error) {
 		subject, at, err := issueAttaching(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
@@ -147,19 +183,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		evidence := input.RawBody.Data().Evidence
 		stored, err := files.Upload(ctx, subject, at,
 			part.Filename, part, part.Size, maxSize, quota, share, evidence)
-		switch {
-		case errors.Is(err, attach.ErrTooLarge):
-			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
-				"that file is %d bytes and this deployment accepts %d", part.Size, maxSize))
-		case errors.Is(err, attach.ErrNoRoom):
-			return nil, huma.Error507InsufficientStorage(attach.ErrNoRoom.Error())
-		case err != nil:
-			return nil, core.Refused(in.Logger, err, "cannot store that file")
-		}
-		return &struct {
-			Status int
-			Body   AttachmentBody
-		}{Status: http.StatusCreated, Body: attachmentBody(stored)}, nil
+		return uploaded(in, stored, err, part.Size, maxSize)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -175,11 +199,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
-	}) (*struct {
-		Body struct {
-			Items []AttachmentBody `json:"items"`
-		}
-	}, error) {
+	}) (*attachmentsOutput, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
@@ -194,16 +214,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.Refused(in.Logger, err, "cannot read what is attached")
 		}
-		out := &struct {
-			Body struct {
-				Items []AttachmentBody `json:"items"`
-			}
-		}{}
-		out.Body.Items = make([]AttachmentBody, 0, len(rows))
-		for i := range rows {
-			out.Body.Items = append(out.Body.Items, attachmentBody(&rows[i]))
-		}
-		return out, nil
+		return attachmentList(rows), nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
