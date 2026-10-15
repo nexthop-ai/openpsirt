@@ -109,7 +109,7 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 // and one naming every port on a host would make the fetcher a port scanner
 // whose findings come back in the supplier's error.
 func Open(within time.Duration, excluded Excluded) *http.Client {
-	return open(within, excluded, "443")
+	return open(within, excluded, HTTPSPort)
 }
 
 // open is Open with the one port it reaches named, so a test can point it at
@@ -164,25 +164,34 @@ func ConfiguredTrusting(within time.Duration, roots *x509.CertPool) *http.Client
 // configured: none.
 func anywhere(string) error { return nil }
 
+// HTTPSPort is the one port a request whose host a document chose may reach.
+const HTTPSPort = "443"
+
+// Dialer connects only to an address reachable allows, checked on the address
+// a name resolved to.
+//
+// Control rather than a wrapped DialContext. DialContext is handed the
+// *unresolved* host and port from the URL, so a check there sees a name and
+// never an address. Control runs once per address the name resolved to, after
+// resolution and before the connection is made, which is both where the
+// address actually exists and the only place a check cannot be slipped past by
+// a name that resolves differently the second time it is asked.
+func Dialer(reachable func(address string) error) *net.Dialer {
+	return &net.Dialer{
+		Timeout: Timeout,
+		Control: func(_, address string, _ syscall.RawConn) error {
+			return reachable(address)
+		},
+	}
+}
+
 // client is the one shape every outbound client here takes: an address check
 // at the dial, a host check at the round trip, redirects refused, and a budget
 // for the whole call.
 func client(within time.Duration, reachable func(string) error,
 	permits func(to *url.URL) error) *http.Client {
 
-	// Control rather than a wrapped DialContext. DialContext is handed the
-	// *unresolved* host and port from the URL, so a check there sees a name
-	// and never an address. Control runs once per address the name resolved
-	// to, after resolution and before the connection is made, which is both
-	// where the address actually exists and the only place a check cannot be
-	// slipped past by a name that resolves differently the second time it is
-	// asked.
-	dialer := &net.Dialer{
-		Timeout: Timeout,
-		Control: func(_, address string, _ syscall.RawConn) error {
-			return reachable(address)
-		},
-	}
+	dialer := Dialer(reachable)
 	return &http.Client{
 		Timeout: within,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {

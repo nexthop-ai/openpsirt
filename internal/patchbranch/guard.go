@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/outward"
@@ -59,7 +58,7 @@ func openGuard(host string, excluded outward.Excluded) (*guard, error) {
 	}
 	g := &guard{
 		listener: listener, host: strings.ToLower(host), excluded: excluded,
-		port: "443", reachable: excluded.Reachable,
+		port: outward.HTTPSPort, reachable: excluded.Reachable,
 	}
 	g.server = &http.Server{
 		Handler:           http.HandlerFunc(g.tunnel),
@@ -113,12 +112,7 @@ func (g *guard) tunnel(w http.ResponseWriter, r *http.Request) {
 		g.refuse(w, fmt.Errorf("refused a tunnel to %s: an administrator excluded it", host))
 		return
 	}
-	dialer := &net.Dialer{
-		Timeout: dialBudget,
-		Control: func(_, address string, _ syscall.RawConn) error {
-			return g.reachable(address)
-		},
-	}
+	dialer := outward.Dialer(g.reachable)
 	ctx, cancel := context.WithTimeout(r.Context(), dialBudget)
 	defer cancel()
 	upstream, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
