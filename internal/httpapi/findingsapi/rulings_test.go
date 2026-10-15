@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -342,5 +343,32 @@ func TestARulingIsNarrowedToItsProductAndRefusedWhereItCannotStand(t *testing.T)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
 			at+"/approval", ""), http.StatusConflict)
+	})
+}
+
+func TestADuplicateOfAClosedIssueIsRefusedInTheStoresWords(t *testing.T) {
+	// A duplicate buries the report under work it says exists. Work that is
+	// closed everywhere here is not that, and the refusal says so.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		minted := r.Embargoed(t)
+		claimed := r.Claim(t, "The management socket lets anybody in, with a screenshot.")
+		issue, err := finding.NewVulnerabilities(r.DB.DB).ByName(t.Context(), minted)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := r.DB.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"closed_at" = ?`, time.Now().UTC()).Set(`"closed_because" = ?`, finding.Upgraded).
+			Where(`"vulnerability_id" = ?`, issue).Where(`"closed_at" IS NULL`).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/report-rulings",
+			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
+				claimed, minted))
+		httpapitest.RefusedWith(t, got, http.StatusUnprocessableEntity)
+		if !strings.Contains(got.Body.String(), finding.ErrDuplicateOfClosed.Error()) {
+			t.Errorf("a duplicate of a closed issue was refused as %s", got.Body.String())
+		}
 	})
 }

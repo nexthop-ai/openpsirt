@@ -160,7 +160,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			if name := strings.TrimSpace(input.Body.Product); name != "" {
 				product, err := a.Catalog(tx).ProductByName(ctx, name)
 				if errors.Is(err, catalog.ErrNotFound) {
-					return huma.Error404NotFound("no product is recorded under that name")
+					return core.NoSuchProduct()
 				} else if err != nil {
 					return core.WentWrong(a.Logger, "the product could not be read", err)
 				}
@@ -169,7 +169,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			if name := strings.TrimSpace(input.Body.Team); name != "" {
 				team, err := a.Access(tx).TeamByName(ctx, name)
 				if errors.Is(err, access.ErrNoSuchTeam) {
-					return huma.Error404NotFound("no team is in use under that name")
+					return core.NoSuchTeam(name)
 				} else if err != nil {
 					return core.WentWrong(a.Logger, "the team could not be read", err)
 				}
