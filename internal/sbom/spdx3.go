@@ -417,18 +417,11 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 		// identifiers to answer a question about the document's own record is
 		// work nobody asked for, and every handler in the other two formats
 		// skips its contents outright.
-		if e.id == "" || c.headerOnly {
+		if c.headerOnly {
 			return nil
 		}
-		// The same rule the other version's arrays are held to, across a
-		// single array rather than two: an edge naming an identifier a path
-		// and a package share resolves to the package and invents a
-		// dependency nobody stated.
-		if _, clash := c.byRef[e.id]; clash {
-			return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(e.id))
-		}
-		c.files[e.id] = true
-		return nil
+		// One array holds both kinds here, and the rule is the same.
+		return c.fileRef(e.id)
 	case spdx3Package:
 		return c.spdx3Package(e)
 	case spdx3Expression, spdx3Listed, spdx3Custom:

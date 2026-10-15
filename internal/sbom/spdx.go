@@ -148,18 +148,7 @@ func (c *reader) spdxCreationInfo() error {
 		if key != "created" {
 			return c.b.skip()
 		}
-		raw, err := c.b.str()
-		if err != nil {
-			return err
-		}
-		built, err := buildTime(raw)
-		if err != nil {
-			return err
-		}
-		if !built.IsZero() {
-			c.doc.BuiltAt = built
-		}
-		return nil
+		return c.builtAt()
 	})
 }
 
@@ -382,18 +371,7 @@ func (c *reader) spdxFiles() error {
 		}); err != nil {
 			return err
 		}
-		if ref == "" {
-			return nil
-		}
-		// The same rule bind applies, across the two arrays rather than within
-		// one: an edge naming an identifier two things share is a coin toss,
-		// and here it would resolve to the package and invent a dependency the
-		// producer never stated.
-		if _, clash := c.byRef[ref]; clash {
-			return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
-		}
-		c.files[ref] = true
-		return nil
+		return c.fileRef(ref)
 	})
 }
 

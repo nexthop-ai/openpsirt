@@ -228,6 +228,40 @@ func (c *reader) bind(ref string, described graph.Described) error {
 	return nil
 }
 
+// builtAt reads the header value saying when the build was made, at the
+// stream's current value. An empty value leaves the document undated.
+func (c *reader) builtAt() error {
+	raw, err := c.b.str()
+	if err != nil {
+		return err
+	}
+	built, err := buildTime(raw)
+	if err != nil {
+		return err
+	}
+	if !built.IsZero() {
+		c.doc.BuiltAt = built
+	}
+	return nil
+}
+
+// fileRef records one of the document's own identifiers as naming a file.
+//
+// The rule bind applies, across the two kinds rather than within one: an edge
+// naming an identifier a file and a component share is a coin toss, and here
+// it would resolve to the component and invent a dependency the producer never
+// stated.
+func (c *reader) fileRef(ref string) error {
+	if ref == "" {
+		return nil
+	}
+	if _, clash := c.byRef[ref]; clash {
+		return refusal.Errorf("a file and a component share the identifier %q, so every edge naming it is ambiguous", trim(ref))
+	}
+	c.files[ref] = true
+	return nil
+}
+
 // add records a component, once per identity.
 //
 // The bound is charged where a component is read rather than here, so that it

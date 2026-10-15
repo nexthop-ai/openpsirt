@@ -88,18 +88,7 @@ func (c *reader) metadata() error {
 	return c.b.object(func(key string) error {
 		switch key {
 		case "timestamp":
-			raw, err := c.b.str()
-			if err != nil {
-				return err
-			}
-			built, err := buildTime(raw)
-			if err != nil {
-				return err
-			}
-			if !built.IsZero() {
-				c.doc.BuiltAt = built
-			}
-			return nil
+			return c.builtAt()
 		case "component":
 			return c.rootComponent()
 		default:
