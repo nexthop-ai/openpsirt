@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -188,8 +187,6 @@ func TestATokenDecidesOnlyWhatItsOwnerCould(t *testing.T) {
 		}
 	})
 }
-
-var _ = access.PublicTriage
 
 func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing.T) {
 	// the outcomes that promise work at the issue grain. A backport is the
