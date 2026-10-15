@@ -9009,7 +9009,7 @@ export interface components {
             readonly $schema?: string;
             /** @description The date it was issued. A pipeline key does not expire, so this is the only thing that dates it */
             created_at?: string;
-            /** @description The last time it sent something */
+            /** @description When it last sent something, to the hour */
             last_used_at?: string;
             /** @description The credential's purpose, stored in lower case and matched without regard to capitals */
             name: string;
@@ -12439,7 +12439,7 @@ export interface components {
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
             holds?: ("approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage")[] | null;
-            /** @description The last time it was used */
+            /** @description When it was last used, to the hour */
             last_used_at?: string;
             /** @description The lifetime, such as "720h". There is a configured maximum */
             lifetime?: string;

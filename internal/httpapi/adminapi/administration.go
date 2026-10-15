@@ -256,7 +256,7 @@ type KeyBody struct {
 	// A pipeline key does not expire, which is why the date it was made is
 	// the only thing that bounds it.
 	CreatedAt  string `json:"created_at,omitempty" doc:"The date it was issued. A pipeline key does not expire, so this is the only thing that dates it"`
-	LastUsedAt string `json:"last_used_at,omitempty" doc:"The last time it sent something"`
+	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it last sent something, to the hour"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
 

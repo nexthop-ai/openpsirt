@@ -43,7 +43,7 @@ type TokenBody struct {
 	// age, and a review of what is outstanding asks about each.
 	CreatedAt  string `json:"created_at,omitempty" doc:"The moment it was minted"`
 	ExpiresAt  string `json:"expires_at,omitempty" doc:"The moment it stops working"`
-	LastUsedAt string `json:"last_used_at,omitempty" doc:"The last time it was used"`
+	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it was last used, to the hour"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
 

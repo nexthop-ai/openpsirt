@@ -5037,7 +5037,7 @@ components:
           description: The date it was issued. A pipeline key does not expire, so this is the only thing that dates it
           type: string
         last_used_at:
-          description: The last time it sent something
+          description: When it last sent something, to the hour
           type: string
         name:
           description: The credential's purpose, stored in lower case and matched without regard to capitals
@@ -11118,7 +11118,7 @@ components:
             - array
             - "null"
         last_used_at:
-          description: The last time it was used
+          description: When it was last used, to the hour
           type: string
         lifetime:
           description: The lifetime, such as "720h". There is a configured maximum
