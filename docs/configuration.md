@@ -1141,10 +1141,14 @@ A database v0.6.0 or an earlier release built is refused at startup and by
 v0.7.0's schema in one step and carries none of the upgrades before it.
 
 1. Back the database up.
-2. Run `openpsirt migrate up` with v0.8.0 against it. v0.8.0 carries every
-   earlier upgrade, and its [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.8.0/configuration/#upgrading)
-   say what each one changes and what to do after it.
-3. Deploy this release, reading the sections from v0.8.0 on.
+2. Read v0.8.0's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.8.0/configuration/#upgrading)
+   from the section for your release on, and do what they say before upgrading
+   as well as after: the upgrade from v0.5.0 removes group mappings that have to
+   be carried into `OPENPSIRT_GROUP_ROLES` first.
+3. For a database v0.4.0 or an earlier release built, run `openpsirt migrate up`
+   with v0.6.0 against it. v0.8.0 refuses such a database, as this release does.
+4. Run `openpsirt migrate up` with v0.8.0 against it.
+5. Deploy this release, reading the sections from v0.8.0 on.
 
 A database v0.7.0 built needs none of this, and reads the sections from v0.8.0
 on.

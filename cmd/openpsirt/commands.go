@@ -107,7 +107,7 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 func schemaState(applied, wanted int64) string {
 	switch {
 	case schema.BeforeTheBaseline(applied):
-		return "before the baseline: upgrade it with " + schema.Through + " first"
+		return "before the baseline: upgrade it with " + schema.UpgradeWith(applied) + " first"
 	case applied < wanted:
 		return fmt.Sprintf("behind by %d", wanted-applied)
 	case applied > wanted:

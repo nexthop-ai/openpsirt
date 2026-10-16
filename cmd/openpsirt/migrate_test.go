@@ -168,7 +168,7 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 // A database a release before v0.7.0 built records a version from 1 to 40,
 // below the migration that makes v0.7.0's schema at once. Serving or
 // migrating it is refused before anything runs, naming the version and the
-// release that upgrades it. The baseline's own version is not refused.
+// releases that upgrade it. The baseline's own version is not refused.
 func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -185,7 +185,18 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 				`INSERT INTO "`+migrate.VersionTable+`" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
 			return err
 		}
-		for _, earlier := range []int64{1, migrations.Baseline - 1} {
+		// v0.8.0 upgrades a database from its own baseline, 39, on, and
+		// refuses one below it, which v0.6.0 upgrades first.
+		for _, c := range []struct {
+			earlier int64
+			with    string
+		}{
+			{1, "with v0.6.0 and then v0.8.0,"},
+			{38, "with v0.6.0 and then v0.8.0,"},
+			{39, "with v0.8.0,"},
+			{migrations.Baseline - 1, "with v0.8.0,"},
+		} {
+			earlier := c.earlier
 			if err := record(ctx, migrations.Baseline, earlier); err != nil {
 				t.Fatalf("record version %d: %v", earlier, err)
 			}
@@ -197,7 +208,7 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 					t.Errorf("%s a schema at version %d was allowed", what, earlier)
 					continue
 				}
-				for _, want := range []string{strconv.FormatInt(earlier, 10), "v0.7.0", schema.Through} {
+				for _, want := range []string{"version " + strconv.FormatInt(earlier, 10) + ",", "v0.7.0", c.with} {
 					if !strings.Contains(err.Error(), want) {
 						t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
 					}
@@ -213,22 +224,25 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 	})
 }
 
-// migrate status names a version before the baseline as one, with the release
-// that upgrades it, and says how every other version stands against this
+// migrate status names a version before the baseline as one, with the
+// releases that upgrade it, and says how every other version stands against this
 // build's.
 func TestMigrateStatusSaysWhereASchemaStands(t *testing.T) {
 	wanted, err := schema.Expected()
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := "before the baseline: upgrade it with " + schema.Through + " first"
+	twice := "before the baseline: upgrade it with v0.6.0 and then v0.8.0 first"
+	once := "before the baseline: upgrade it with v0.8.0 first"
 	for _, c := range []struct {
 		applied int64
 		want    string
 	}{
 		{0, "behind by " + strconv.FormatInt(wanted, 10)},
-		{1, before},
-		{migrations.Baseline - 1, before},
+		{1, twice},
+		{38, twice},
+		{39, once},
+		{migrations.Baseline - 1, once},
 		{migrations.Baseline, "behind by " + strconv.FormatInt(wanted-migrations.Baseline, 10)},
 		{wanted, "the version this build expects"},
 		{wanted + 1, "ahead of this build"},
