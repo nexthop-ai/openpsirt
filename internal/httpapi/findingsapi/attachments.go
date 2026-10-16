@@ -308,7 +308,8 @@ func registerAttachments(api huma.API, in core.Deps) {
 	})
 }
 
-// attachmentLimits reads what this deployment accepts.
+// attachmentLimits reads what this deployment accepts. One file is never
+// accepted past the compiled ceiling.
 func attachmentLimits(ctx context.Context, in core.Deps) (maxSize, quota, share int64, err error) {
 	settings := setting.NewStore(in.DB.DB)
 	size, err := settings.Count(ctx, setting.AttachmentMaxSize, setting.DefaultAttachmentMaxSize)
@@ -323,6 +324,9 @@ func attachmentLimits(ctx context.Context, in core.Deps) (maxSize, quota, share 
 	if err != nil {
 		return 0, 0, 0, err
 	}
+	// A stored value past the ceiling is read as the ceiling: the scratch
+	// space an upload is written to is sized for it whatever is stored.
+	size = min(size, setting.MostAttachmentMaxSize)
 	return int64(size), int64(held), int64(each), nil
 }
 

@@ -524,9 +524,10 @@ environment rather than a key somebody stored.
 
 How large one file may be, how much the deployment holds and how much one
 person may hold are settings an administrator changes in the application. One
-file is at most 512 MiB, and a larger value is refused: each upload is written
-to scratch space whole as it arrives, and the chart sizes that space for the
-largest request a route takes.
+file is at most 512 MiB, and a larger value is refused, and read as 512 MiB
+where one is already stored: each upload is written to scratch space whole as
+it arrives, and the chart sizes that space for the largest request a route
+takes.
 
 An endpoint that is not `https` is refused, because a file is handed over as a
 redirect to a signed address and that address is a bearer token: anybody on the
@@ -1192,4 +1193,5 @@ v0.5.0's schema in one step and carries none of the upgrades before it.
 | Compliance, cumulative deferral, the triage measures and time to fix are worked out again. A deferral counts for the time it held, with overlaps once; a send-back and a wait count once per claim; an issue fixed in two products is one fix | Nothing. A figure read before the upgrade may differ from the same period read after it |
 | Every day and moment the API answers is in UTC. v0.8.0 answered some in the database server's zone | Nothing where the database server runs in UTC. Otherwise a due date or a disclosure date near midnight reads one day off from what v0.8.0 answered |
 | A CSAF document states the base vector inside the vector held, in the specification's order. v0.8.0 published the vector as held, metrics outside the base set included | Nothing. An advisory v0.8.0 issued from such a vector reads as changed since it went out; issue it again to send the corrected document |
+| `attachment.max-size` takes no value above 512 MiB, and a larger value is refused when set. v0.8.0 took any size | Nothing. A larger value v0.8.0 stored is read as 512 MiB, so a file past it is refused at upload. Set it again at 512 MiB or below, so the settings screen shows the size that applies |
 | `triage.deferral-threshold` and `scanning.quiet-after` are whole numbers of days, and a part-day value is refused when set | Nothing. A value v0.8.0 stored between two days is read as the later whole day everywhere: `12h` is one day |
