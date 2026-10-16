@@ -186,9 +186,6 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	if withheld {
-		ratings = finding.Sourced(ratings)
-	}
 	// The vector this product recorded the flaw with, which is held off the
 	// issue row: the advisory is this product's word on its own flaw.
 	if vector, err := finding.RecordedVector(ctx, s.db, one.ProductID, issue.ID); err != nil {

@@ -878,7 +878,6 @@ holding the issue reads, so those follow the record rather than the row
 | Rule | Reason |
 |---|---|
 | The description, the other names and the addresses are left out where a flaw recorded here about the issue sits where the reader may not read it | The summary of an undisclosed flaw in another product is the embargo |
-| The severity word, and the score and every rating that name no publisher, are left out under the same rule | A rating that names no publisher is not a feed's, and the reader is told only what a feed published. A sourced rating is the world's and stays. The severity word names nobody and is filled by whichever report arrived first, so it goes whole |
 | A finding's evidence leaves out the kinds of flaw too | A recorded flaw's classification is part of what its recorder wrote |
 | Every reader asks the one rule: the issue page and document, a finding's evidence, the component's issue list, the approaching-disclosure list, a decision's issue and an approver's outliers, and an advisory's covered issues and its document | One rule in one place keeps a new reader from being the one that forgets it |
 | A text match over descriptions matches nothing in a withheld description | A filter that matched it would say what the summary holds, one guess at a time |

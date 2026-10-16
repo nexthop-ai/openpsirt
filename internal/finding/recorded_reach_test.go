@@ -106,10 +106,11 @@ func TestAnUndisclosedRecordsWordsReachNoReaderOfDisclosedWorkAlone(t *testing.T
 	})
 }
 
-func TestAnUndisclosedRecordsRatingReachesNoReaderOfDisclosedWorkAlone(t *testing.T) {
-	// A recorded flaw writes its severity, its score and its rating onto the
-	// shared issue row too, and none of them names a publisher. A rating a
-	// feed published names its source and stays.
+func TestAnUndisclosedRecordsScoreReachesNoReaderOfDisclosedWorkAlone(t *testing.T) {
+	// A recorded flaw's score is its product's own, held off the issue row,
+	// and the issue page and a finding's evidence carry it only where every
+	// record of the issue is in the reader's reach. A rating a feed
+	// published stays for everybody.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
@@ -122,26 +123,22 @@ func TestAnUndisclosedRecordsRatingReachesNoReaderOfDisclosedWorkAlone(t *testin
 			t.Fatal("the scan opened nothing, so this checked nothing")
 		}
 		issue, component := open[0].VulnerabilityID, open[0].ComponentID
-		const vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
-		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
-			Set(`"severity" = ?`, "critical").Set(`"score_centi" = ?`, 980).
-			Set(`"vector" = ?`, vector).Set(`"score_version" = ?`, "3.1").
-			Set(`"score_source" = NULL`).
-			Where(`"id" = ?`, issue).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
 		if _, err := f.db.DB.NewDelete().Model((*finding.CVSS)(nil)).
 			Where(`"vulnerability_id" = ?`, issue).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		for _, rating := range []finding.CVSS{
-			{VulnerabilityID: issue, Generation: 3, ScoreCenti: 980, Vector: vector},
-			{VulnerabilityID: issue, Generation: 2, ScoreCenti: 750,
-				Vector: "AV:N/AC:L/Au:N/C:P/I:P/A:P", Source: "nvd@nist.gov"},
-		} {
-			if _, err := f.db.DB.NewInsert().Model(&rating).Exec(ctx); err != nil {
-				t.Fatal(err)
-			}
+		if _, err := f.db.DB.NewInsert().Model(&finding.CVSS{VulnerabilityID: issue, Generation: 2,
+			ScoreCenti: 750, Vector: "AV:N/AC:L/Au:N/C:P/I:P/A:P", Source: "nvd@nist.gov"}).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		word, score := "critical", 980
+		vector, version := "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "3.1"
+		if _, err := f.db.DB.NewInsert().Model(&finding.RecordedRating{
+			VulnerabilityID: issue, ProductID: f.productID, Severity: &word,
+			ScoreCenti: &score, Vector: &vector, ScoreVersion: &version,
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
 		}
 		recorded := open[0]
 		recorded.ID, recorded.Kind, recorded.Visibility = 0, finding.Entered, access.Private
@@ -151,10 +148,7 @@ func TestAnUndisclosedRecordsRatingReachesNoReaderOfDisclosedWorkAlone(t *testin
 		}
 
 		vulnerabilities := finding.NewVulnerabilities(f.db.DB)
-		type told struct {
-			severity       string
-			score, ratings int
-		}
+		type told struct{ score, ratings int }
 		read := func(t *testing.T, who access.Subject) []told {
 			t.Helper()
 			named, err := vulnerabilities.DescribeFor(ctx, who, issue)
@@ -166,19 +160,20 @@ func TestAnUndisclosedRecordsRatingReachesNoReaderOfDisclosedWorkAlone(t *testin
 				t.Fatal(err)
 			}
 			return []told{
-				{named.Severity, int(named.Score * 100), len(named.Ratings)},
-				{evidence.Severity, evidence.ScoreCenti, len(evidence.Ratings)},
+				{int(named.Score * 100), len(named.Ratings)},
+				{evidence.ScoreCenti, len(evidence.Ratings)},
 			}
 		}
 		for i, got := range read(t, f.holding(t, access.PublicTriage)) {
-			if got != (told{"", 0, 1}) {
+			if got != (told{0, 1}) {
 				t.Errorf("read %d: a reader of disclosed work alone was told %+v, "+
-					"want no severity, no score and the one published rating", i, got)
+					"want no score and the one published rating", i, got)
 			}
 		}
 		for i, got := range read(t, f.holding(t, access.PublicTriage, access.PrivateTriage)) {
-			if got != (told{"critical", 980, 2}) {
-				t.Errorf("read %d: a reader of both halves was told %+v", i, got)
+			if got != (told{980, 1}) {
+				t.Errorf("read %d: a reader of both halves was told %+v, "+
+					"want the recorded score and the one published rating", i, got)
 			}
 		}
 	})

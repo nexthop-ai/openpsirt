@@ -133,12 +133,10 @@ func (v *Vulnerabilities) NamesByID(ctx context.Context, ids []int64) (map[int64
 // lookup is the names — and those are the reason somebody arrived here,
 // because the name their scanner used is often not the one it is filed under.
 //
-// A flaw recorded here writes its summary as the issue's description, its
-// minted identifier among the issue's names, and its severity and rating onto
-// the issue. Where such a record sits in a product the subject may not read, at
-// its visibility, all of those are left out: the summary of an undisclosed flaw
-// in somebody else's product is the embargo, and so is how bad its recorder
-// judged it.
+// A flaw recorded here writes its summary as the issue's description and its
+// minted identifier among the issue's names. Where such a record sits in a
+// product the subject may not read, at its visibility, both are left out: the
+// summary of an undisclosed flaw in somebody else's product is the embargo.
 func (v *Vulnerabilities) DescribeFor(ctx context.Context, subject access.Subject,
 	id int64) (Named, error) {
 
@@ -195,42 +193,17 @@ func deref(s *string) string {
 }
 
 // withholdRecorded leaves out what a flaw recorded out of the reader's reach
-// may have written onto the issue: the description, the other names, the
-// severity word, and every score that names no publisher.
-//
-// A rating a feed published names its source, and a recorded flaw's never
-// does, so a sourced rating is the world's and stays. The severity word is
-// filled by whichever report arrived first and names nobody, so it goes whole.
+// may have written onto the issue: the description and the other names. Its
+// rating is the recording product's own and never on the issue.
 func (n *Named) withholdRecorded() {
 	n.Description = ""
 	n.Aliases = nil
-	n.Severity = ""
-	if n.ScoreSource == "" {
-		n.Score, n.Vector, n.ScoreVersion, n.ScoreKind = 0, "", "", ""
-	}
-	n.Ratings = Sourced(n.Ratings)
-}
-
-// Sourced is the ratings that name the publisher they came from. A recorded
-// flaw's rating never names one.
-func Sourced(ratings []CVSS) []CVSS {
-	var kept []CVSS
-	for _, one := range ratings {
-		if one.Source != "" {
-			kept = append(kept, one)
-		}
-	}
-	return kept
 }
 
 // WithholdRecorded leaves out of an issue row what a flaw recorded out of the
 // reader's reach may have written onto it, by the rule Named follows.
 func (v *Vulnerability) WithholdRecorded() {
 	v.Description = ""
-	v.Severity = ""
-	if v.ScoreSource == "" {
-		v.ScoreCenti, v.Vector, v.ScoreVersion, v.ScoreKind = nil, "", "", ""
-	}
 }
 
 // recordedOutOfReach reports whether a flaw recorded here about this issue sits

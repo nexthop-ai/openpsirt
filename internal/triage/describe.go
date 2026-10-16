@@ -164,7 +164,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
 	// A flaw recorded where this reader may not read it wrote its summary
-	// and its rating onto the issue row every product shares.
+	// onto the issue row every product shares.
 	withheld, err := finding.RecordedOutOfReach(ctx, s.db, subject, wanted)
 	if err != nil {
 		return nil, err
