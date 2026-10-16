@@ -57,11 +57,13 @@ func TestMySQLDSNIsRewrittenForItsDriver(t *testing.T) {
 	// The driver wants user:pass@tcp(host:port)/db, not a URL. Handing it the
 	// URL unchanged fails at connect time with an unhelpful message.
 	//
-	// The mode is named rather than appended to whatever the server holds. A
-	// server whose global sql_mode omits strictness truncates an oversized
-	// value with no error, which is the one portability difference that loses
-	// data rather than reporting it. Naming the mode makes it a property of
-	// this application rather than of the server it was pointed at.
+	// Strictness and ANSI quoting are named rather than inherited: they are
+	// added to whatever mode the server holds, and backslash escapes are
+	// taken out of it. A server whose global sql_mode omits strictness
+	// truncates an oversized value with no error, which is the one
+	// portability difference that loses data rather than reporting it.
+	// Naming the two makes them a property of this application rather than
+	// of the server it was pointed at.
 	got, err := ParseURL("mysql://user:secret@db.example:3306/openpsirt")
 	if err != nil {
 		t.Fatalf("ParseURL: %v", err)
