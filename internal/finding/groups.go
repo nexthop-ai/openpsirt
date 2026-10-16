@@ -292,6 +292,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// The person "mine" means, from the subject rather than from the request,
 	// and their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
+	filter.reader = subject
 	// The store's clock, so the deadline filters compare against the same
 	// moment everything else here does — and so a frozen clock reaches them,
 	// which is what left the overdue filter with no test.

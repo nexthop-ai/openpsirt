@@ -144,6 +144,15 @@ func registerIssue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what merged into this issue could not be read", err)
 		}
+		// A merge names what it absorbed, and an absorbed record's minted
+		// name is one of the names withheld where the record is out of reach.
+		withheld, err := finding.RecordedOutOfReach(ctx, in.DB.DB, subject, []int64{id})
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "what merged into this issue could not be read", err)
+		}
+		if withheld[id] {
+			merged = nil
+		}
 		absorbed := make([]int64, 0, len(merged))
 		for _, one := range merged {
 			absorbed = append(absorbed, one.AbsorbedID)

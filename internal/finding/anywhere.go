@@ -75,6 +75,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	filter.Across = true
 	filter.ProductID = 0
 	filter.HeldBy = subject.Mine()
+	filter.reader = subject
 	// All three are statements about a selection of builds, which this is not.
 	filter.Builds = 0
 	filter.DiffersBetweenBuilds = false

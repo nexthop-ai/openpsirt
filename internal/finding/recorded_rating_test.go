@@ -393,3 +393,56 @@ func TestAFilledWordReranksAndReclocksAnotherProductsFinding(t *testing.T) {
 		}
 	})
 }
+
+func TestARecordedNameFindsNothingForAReaderItIsWithheldFrom(t *testing.T) {
+	// A record merged into a scanned issue leaves its minted name among the
+	// issue's names. A reader of another product holding the issue, who may
+	// not read the record, finds nothing by that name; the published name
+	// still finds the issue.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere),
+			[]finding.Reported{found("CVE-2026-9", swss)}); err != nil {
+			t.Fatal(err)
+		}
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.applied(t, found("CVE-2026-9", swss, identifier))
+		if f.issueID(t, identifier) != f.issueID(t, "CVE-2026-9") {
+			t.Fatal("the record did not merge into the scanned issue, so this checked nothing")
+		}
+
+		other := f.productOf(t, elsewhere)
+		reader := access.NewPerson(2, "elsewhere", false,
+			map[int64][]access.Role{other: {access.PublicRead, access.PrivateRead}}, 0)
+		search := func(t *testing.T, who access.Subject, scope finding.Scope, term string) int {
+			t.Helper()
+			groups, _, err := f.store.Groups(ctx, who, scope, 50, 0, finding.Filter{Search: term})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return len(groups)
+		}
+		there := finding.Scope{ProductID: &other}
+		if got := search(t, reader, there, identifier); got != 0 {
+			t.Errorf("searching the minted name found %d rows for a reader it is withheld from", got)
+		}
+		if got := search(t, reader, there, "CVE-2026-9"); got == 0 {
+			t.Error("searching the published name found nothing")
+		}
+		recorder := f.planner(t, access.PublicRead, access.PrivateRead)
+		if got := search(t, recorder, f.wholeProduct(), identifier); got == 0 {
+			t.Error("the recording product's search for its own minted name found nothing")
+		}
+	})
+}

@@ -194,6 +194,11 @@ type Filter struct {
 	// by a caller — for the same reason ProductID is: a caller supplying it
 	// could ask for somebody else's while saying "mine".
 	HeldBy []int64
+	// reader is the subject the list is for, set by the store beside HeldBy.
+	// A name a flaw recorded out of their reach gave an issue matches nothing
+	// in a search, so the search is no way to find which issue it was filed
+	// under.
+	reader access.Subject
 	// now is the store's clock, set where the store narrows. What the
 	// deadline filters compare against, so that a frozen clock reaches them
 	// and so that one request answers "is this overdue" and "is anything off
@@ -574,6 +579,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	// everywhere.
 	if term := strings.TrimSpace(f.Search); term != "" {
 		like := "%" + containsTerm(term) + "%"
+		withheld, withheldArgs := recordedOutOfReachOf(f.reader, `"va"."vulnerability_id"`)
 		// Either side matches. A person typing into one box does not say
 		// which of the two they mean, and an identifier cannot be mistaken
 		// for a package name in practice.
@@ -587,7 +593,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				WhereOr(`"f"."vulnerability_id" IN (?)`,
 					q.NewSelect().TableExpr(`"vulnerability_alias" AS "va"`).
 						Column("va.vulnerability_id").
-						Where(`LOWER("va"."identifier") LIKE ?`+database.LikeClause, like))
+						Where(`LOWER("va"."identifier") LIKE ?`+database.LikeClause, like).
+						Where("NOT ("+withheld+")", withheldArgs...))
 		})
 	}
 	if names := trimmed(f.Exclude); len(names) > 0 {
