@@ -4,28 +4,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useComment, useEditComment, useEditNote, useRevise, useWithdraw } from "./mutations";
 import { acted } from "../test/acted";
+import { EVERY_CLAIM_KEY } from "../test/claimKeys";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
-
-// Everything a change to a claim moves, which claims.test.tsx pins beside the
-// review acts.
-const EVERY_CLAIM_KEY = [
-  "advisory",
-  "advisory-document",
-  "advisory-releases",
-  "claim",
-  "comments",
-  "decided",
-  "decision",
-  "finding",
-  "findings",
-  "home",
-  "my-claims",
-  "queue",
-].sort();
 
 describe("an edit to a claim, once it lands", () => {
   it("revising the reasoning sends it to the claim named and moves every claim read", async () => {
