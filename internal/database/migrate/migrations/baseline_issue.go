@@ -275,6 +275,10 @@ func issueBaseline(t *columnTypes) []string {
 			-- report a component as affected when the vulnerable function is
 			-- not linked in — that qualifies every finding of that run.
 			"caution"          ` + t.text + ` NULL,
+			-- Which CVE record snapshot the run read, as the moment the
+			-- snapshot describes. Null where it read none, which narrows
+			-- nothing.
+			"records_version"  ` + t.free + ` NULL,
 			CONSTRAINT "scan_run_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
 		)` + t.suffix,
 	}

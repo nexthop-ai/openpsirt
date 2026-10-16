@@ -15,7 +15,7 @@ import (
 //
 // The baseline's, with the source package a build stated for the component
 // beside the identifiers it already holds. Derived from the baseline's
-// declaration, which v0.5.0's record of its schema holds.
+// declaration, which v0.7.0's record of its schema holds.
 func graphNodeV090(t *columnTypes) []string {
 	statements := graphNodeBaseline(t)
 	statements[0] = withColumn(statements[0], `"cpe"            `+t.text+` NULL,`,

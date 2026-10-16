@@ -21,7 +21,7 @@ import (
 // shape the release declares. Each release's migration supplies the order,
 // the rows and its declarations, and calls these.
 
-// inV020 runs a release's upgrade in one transaction. Migration 40 calls it
+// inV020 runs a release's upgrade in one transaction. Migration 42 calls it
 // by this name, and a tagged release froze that file.
 //
 // On PostgreSQL and SQLite a failure leaves the schema as it was. On MySQL and
@@ -463,4 +463,15 @@ func (d *declaration) constraint(name string) (string, error) {
 		return def, nil
 	}
 	return "", fmt.Errorf("no constraint %s is declared", name)
+}
+
+// withColumn adds a column to a table's declaration, after the column it
+// follows.
+func withColumn(statement, after, column string) string {
+	at := strings.Index(statement, after)
+	if at < 0 {
+		panic("the declaration being extended has no column " + after)
+	}
+	at += len(after)
+	return statement[:at] + "\n\t\t\t" + column + statement[at:]
 }

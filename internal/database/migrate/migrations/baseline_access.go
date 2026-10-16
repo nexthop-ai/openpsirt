@@ -173,9 +173,7 @@ func accessBaseline(t *columnTypes) []string {
 		// index that would fix it is engine-specific.
 		//
 		// source and active mean what they mean above, so setting assignments
-		// aside and restoring them covers these rows by the same act. Nothing
-		// derives one today: a group binding names a product, so a derived row
-		// here has no way to be written.
+		// aside and restoring them covers these rows by the same act.
 		`CREATE TABLE "role_grant_all" (
 			"id"         ` + t.id + `,
 			"person_id"  ` + t.ref + ` NOT NULL,
@@ -270,16 +268,18 @@ func accessBaseline(t *columnTypes) []string {
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			"last_used_at" ` + t.timestamp + ` NULL,
 			"revoked_at"   ` + t.timestamp + ` NULL,
+			-- The name while the key is in force, and null once it is
+			-- withdrawn. An administrator withdraws a key by its name, so two
+			-- in force may not share one. A withdrawn key's name may be given
+			-- to a new one: what a key sent is recorded against the key's
+			-- row, so a new key holding an old key's name reads back nothing
+			-- the old one sent.
+			"live_name"    ` + t.name + ` NULL,
 			CONSTRAINT "api_key_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "api_key_stream_fk" FOREIGN KEY ("stream_id") REFERENCES "stream"("id"),
 			CONSTRAINT "api_key_variant_fk" FOREIGN KEY ("variant_id") REFERENCES "variant"("id"),
 			CONSTRAINT "api_key_secret_unique" UNIQUE ("secret_hash"),
-			-- The name is what an ingest records as having sent a scan, and
-			-- what an administrator revokes by. Two keys sharing one would
-			-- make each able to read the other's receipts, and would make a
-			-- revocation report success having withdrawn whichever row came
-			-- back first.
-			CONSTRAINT "api_key_name_unique" UNIQUE ("name")
+			CONSTRAINT "api_key_live_unique" UNIQUE ("live_name")
 		)` + t.suffix,
 
 		`CREATE INDEX "api_key_product_idx" ON "api_key" ("product_id")`,
@@ -319,25 +319,42 @@ func accessBaseline(t *columnTypes) []string {
 		// Expired rows are cleared in bulk rather than one at a time.
 		`CREATE INDEX "session_expires_idx" ON "session" ("expires_at")`,
 
-		// A provider group bound to a role on a product. In
-		// group-bound mode this table *is* the pre-authorization:
-		// somebody arriving for the first time in a mapped group is
-		// admitted and recorded then, which is what reconciles
-		// admitting them with never creating an account for somebody
-		// nobody authorized.
+		// A provider group bound to a role on a product, as configuration
+		// states it. In group-bound mode this table *is* the
+		// pre-authorization: somebody arriving for the first time in a
+		// mapped group is admitted and recorded then, which is what
+		// reconciles admitting them with never creating an account for
+		// somebody nobody authorized.
 		//
 		// The group is matched by the name the provider reports — a
 		// team slug from GitHub, a claim value from an identity
 		// provider — so it is stored as given rather than resolved to
 		// anything of ours.
+		//
+		// A mapping names its product by the name configuration states, so a
+		// product configuration names before any pipeline declares it is held
+		// and grants once the product exists.
 		`CREATE TABLE "group_role" (
+			"id"           ` + t.id + `,
+			"group_name"   ` + t.name + ` NOT NULL,
+			-- The product's name folded the way a product's name is, so it
+			-- matches the product whatever capitals configuration wrote.
+			"product_name" ` + t.name + ` NOT NULL,
+			"role"         ` + t.kind + ` NOT NULL,
+			"created_at"   ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "group_role_unique" UNIQUE ("group_name", "product_name", "role")
+		)` + t.suffix,
+
+		// A provider group bound to a role across every product. A table of
+		// its own for the reason administration has one: a uniqueness rule
+		// over a column that may be absent behaves differently on each of the
+		// four engines.
+		`CREATE TABLE "group_role_all" (
 			"id"         ` + t.id + `,
 			"group_name" ` + t.name + ` NOT NULL,
-			"product_id" ` + t.ref + ` NOT NULL,
 			"role"       ` + t.kind + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "group_role_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "group_role_unique" UNIQUE ("group_name", "product_id", "role")
+			CONSTRAINT "group_role_all_unique" UNIQUE ("group_name", "role")
 		)` + t.suffix,
 
 		// Somebody's own credential for scripting. It is a live reference to
@@ -374,12 +391,14 @@ func accessBaseline(t *columnTypes) []string {
 			"expires_at"   ` + t.timestamp + ` NOT NULL,
 			"last_used_at" ` + t.timestamp + ` NULL,
 			"revoked_at"   ` + t.timestamp + ` NULL,
+			-- The name while the token is in force, and null once it is
+			-- withdrawn. Its owner withdraws it by that name, so two of
+			-- theirs in force may not share one.
+			"live_name"    ` + t.name + ` NULL,
 			CONSTRAINT "personal_token_person_fk" FOREIGN KEY ("person_id") REFERENCES "person"("id"),
 			CONSTRAINT "personal_token_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "personal_token_secret_unique" UNIQUE ("secret_hash"),
-			-- Its owner names it and withdraws it by that name, so two of
-			-- theirs may not share one.
-			CONSTRAINT "personal_token_name_unique" UNIQUE ("person_id", "name")
+			CONSTRAINT "personal_token_live_unique" UNIQUE ("person_id", "live_name")
 		)` + t.suffix,
 
 		// Admin is global rather than held against a product, so a

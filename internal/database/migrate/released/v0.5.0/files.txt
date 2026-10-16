@@ -1,3 +1,0 @@
-# The migrations v0.5.0 tagged, replaced by one migration that makes its schema directly.
-baseline
-last 39

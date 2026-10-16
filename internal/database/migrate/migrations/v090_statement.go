@@ -40,18 +40,18 @@ func pointedAtWords(statement, was, t string) string {
 			"statement_id" `+t+` NULL,`, 1)
 }
 
-// suppressionV090 is v0.9.0's declaration of a build's own claims: v0.7.0's,
-// with the reasoning stored once and pointed at.
+// suppressionV090 is v0.9.0's declaration of a build's own claims: the
+// baseline's, with the reasoning stored once and pointed at.
 func suppressionV090(t *columnTypes) []string {
-	statements := suppressionV070(t)
+	statements := suppressionBaseline(t)
 	statements[0] = pointedAtWords(statements[0], `"statement"      `+t.text+` NULL,`, t.refNull)
 	return statements
 }
 
-// vexStatementsV090 is v0.9.0's declaration of a supplier's statements:
-// v0.7.0's, with the reasoning stored once and pointed at.
+// vexStatementsV090 is v0.9.0's declaration of a supplier's statements: the
+// baseline's, with the reasoning stored once and pointed at.
 func vexStatementsV090(t *columnTypes) []string {
-	statements := vexStatementsV070(t)
+	statements := vexBaseline(t)
 	statements[0] = pointedAtWords(statements[0], `"statement"   `+t.text+` NULL,`, t.refNull)
 	return statements
 }

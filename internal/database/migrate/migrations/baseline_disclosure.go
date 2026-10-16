@@ -141,9 +141,10 @@ func obligationBaseline(t *columnTypes) []string {
 		`CREATE INDEX "exploited_here_issue_idx" ON "exploited_here" ("vulnerability_id", "product_id")`,
 
 		// A window a deployment says it is under, counted from the moment
-		// an attack became known. None ships: a window here is an
-		// interpretation of somebody's rules, and the deployment is the one
-		// holding them.
+		// an attack became known, from the first notice naming another
+		// window, or from the release of the fix. None ships: a window here
+		// is an interpretation of somebody's rules, and the deployment is the
+		// one holding them.
 		`CREATE TABLE "obligation_window" (
 			"id"    ` + t.id + `,
 			-- What the window is called, as it was typed. Matched without
@@ -164,9 +165,19 @@ func obligationBaseline(t *columnTypes) []string {
 			-- retired, so a retired name may be declared again. The same
 			-- mechanism a standing record of being exploited uses.
 			"live_name" ` + t.name + ` NULL,
+			-- The window whose first notice this one counts from. Null
+			-- counts from the moment the attack became known.
+			"from_window_id" ` + t.refNull + ` NULL,
+			-- Whether the window counts from the earliest release date
+			-- stated for a release the record names as carrying the fix.
+			-- Never true beside from_window_id: a window counts from one
+			-- moment.
+			"from_fix" ` + t.boolean + ` NOT NULL,
 			CONSTRAINT "obligation_window_live_unique" UNIQUE ("live_name"),
 			CONSTRAINT "obligation_window_declarer_fk" FOREIGN KEY ("declared_by")
-				REFERENCES "person"("id")
+				REFERENCES "person"("id"),
+			CONSTRAINT "obligation_window_from_fk" FOREIGN KEY ("from_window_id")
+				REFERENCES "obligation_window"("id")
 		)` + t.suffix,
 
 		// The products a window is limited to. None is every product: a
@@ -204,6 +215,12 @@ func obligationBaseline(t *columnTypes) []string {
 			"said"      ` + t.text + ` NOT NULL,
 			"recorded_by" ` + t.ref + ` NOT NULL,
 			"recorded_at" ` + t.timestamp + ` NOT NULL,
+			-- The reference the recipient gave the notice, where there was
+			-- one.
+			"reference" ` + t.name + ` NULL,
+			-- What the notice said about whether the attack was malicious:
+			-- 'yes', 'no' or 'unknown'. Null where it said nothing.
+			"suspected_malicious" ` + t.kind + ` NULL,
 			CONSTRAINT "told_outside_record_fk" FOREIGN KEY ("exploited_here_id")
 				REFERENCES "exploited_here"("id"),
 			CONSTRAINT "told_outside_window_fk" FOREIGN KEY ("window_id")
@@ -214,6 +231,46 @@ func obligationBaseline(t *columnTypes) []string {
 
 		// A record's notices, read for every record the shelf shows.
 		`CREATE INDEX "told_outside_record_idx" ON "told_outside" ("exploited_here_id", "told_at")`,
+
+		// The places a notice named, in the order they were given. Free
+		// text: which places a deployment names is its own business, and
+		// nothing here matches them against a list.
+		`CREATE TABLE "told_place" (
+			"told_id"  ` + t.ref + ` NOT NULL,
+			"position" INTEGER NOT NULL,
+			"place"    ` + t.name + ` NOT NULL,
+			CONSTRAINT "told_place_pk" PRIMARY KEY ("told_id", "position"),
+			CONSTRAINT "told_place_told_fk" FOREIGN KEY ("told_id")
+				REFERENCES "told_outside"("id")
+		)` + t.suffix,
+
+		// The releases a person names on a record as carrying the fix. Each
+		// is a tag of the record's product, often one declared before any
+		// scan of it. Withdrawn rather than deleted, so a release named in
+		// error stays readable with who took it back.
+		`CREATE TABLE "exploited_fix" (
+			"id"                ` + t.id + `,
+			"exploited_here_id" ` + t.ref + ` NOT NULL,
+			"stream_id"         ` + t.ref + ` NOT NULL,
+			"named_by"          ` + t.ref + ` NOT NULL,
+			"named_at"          ` + t.timestamp + ` NOT NULL,
+			"withdrawn_by"      ` + t.refNull + ` NULL,
+			"withdrawn_at"      ` + t.timestamp + ` NULL,
+			-- The release while the naming stands, and null once it is
+			-- withdrawn, so a record names a release once at a time and a
+			-- withdrawn naming does not hold it back. The same mechanism a
+			-- standing record of being exploited uses.
+			"live_stream_id"    ` + t.refNull + ` NULL,
+			CONSTRAINT "exploited_fix_live_unique" UNIQUE ("exploited_here_id", "live_stream_id"),
+			CONSTRAINT "exploited_fix_record_fk" FOREIGN KEY ("exploited_here_id")
+				REFERENCES "exploited_here"("id"),
+			CONSTRAINT "exploited_fix_stream_fk" FOREIGN KEY ("stream_id")
+				REFERENCES "stream"("id"),
+			CONSTRAINT "exploited_fix_namer_fk" FOREIGN KEY ("named_by")
+				REFERENCES "person"("id"),
+			CONSTRAINT "exploited_fix_withdrawer_fk" FOREIGN KEY ("withdrawn_by")
+				REFERENCES "person"("id")
+		)` + t.suffix,
 	}
 }
 

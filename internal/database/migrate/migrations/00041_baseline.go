@@ -15,19 +15,19 @@ func init() {
 	goose.AddMigrationContext(upBaseline, nil)
 }
 
-// Baseline is the migration that makes v0.5.0's schema, the version a
-// database v0.5.0 built records.
-const Baseline = 39
+// Baseline is the migration that makes v0.7.0's schema, the version a
+// database v0.7.0 built records.
+const Baseline = 41
 
-// The schema v0.5.0 built, made directly on an empty database.
+// The schema v0.7.0 built, made directly on an empty database.
 //
-// Numbered as v0.5.0's last migration, so a database v0.5.0 or v0.6.0 built
+// Numbered as v0.7.0's last migration, so a database v0.7.0 or v0.8.0 built
 // has it recorded already and applies only what follows. A database an
 // earlier release built records a version below it, and is refused before
 // anything runs (DESIGN-database.md § The baseline).
 //
 // The baseline files beside this one hold each table's declaration, with the
-// reasoning for its shape. v0.5.0's record of the schema it built on each
+// reasoning for its shape. v0.7.0's record of the schema it built on each
 // engine is what holds them to it.
 func upBaseline(ctx context.Context, tx *sql.Tx) error {
 	t, err := types(ctx)
@@ -72,6 +72,7 @@ var baseline = []baselineTable{
 	{"api_key", accessBaseline},
 	{"personal_token", accessBaseline},
 	{"group_role", accessBaseline},
+	{"group_role_all", accessBaseline},
 	{"group_admin", accessBaseline},
 	{"role_grant", accessBaseline},
 	{"role_grant_all", accessBaseline},
@@ -126,6 +127,8 @@ var baseline = []baselineTable{
 	{"obligation_window_product", obligationBaseline},
 	{"exploited_here", obligationBaseline},
 	{"told_outside", obligationBaseline},
+	{"told_place", obligationBaseline},
+	{"exploited_fix", obligationBaseline},
 	{"patch_repository", patchBranchBaseline},
 	{"patch_commit", patchBranchBaseline},
 	{"patch_commit_branch", patchBranchBaseline},

@@ -269,9 +269,7 @@ The chain is the baseline, then one part per release.
 
 | Migrations | What they are |
 |---|---|
-| 39 | The baseline: v0.5.0's schema, made at once on an empty database. § The baseline says what holds it |
-| 40 | v0.6.0: v0.5.0's schema changed into v0.6.0's, and the rows moved with it. § The v0.6.0 upgrade says what it does. A database v0.6.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| 41 | v0.7.0: v0.6.0's schema changed into v0.7.0's. § The v0.7.0 upgrade says what it does. A database v0.7.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 41 | The baseline: v0.7.0's schema, made at once on an empty database. § The baseline says what holds it |
 | 42 | v0.8.0: v0.7.0's schema changed into v0.8.0's. § The v0.8.0 upgrade says what it does. A database v0.8.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 43 | v0.9.0, untagged: v0.8.0's schema changed into v0.9.0's. § The v0.9.0 upgrade says what it does. Edited until v0.9.0 is tagged |
 
@@ -284,7 +282,7 @@ schema they build on each of the four engines, captured from the tag.
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit. On SQLite the description also says whether each table's key is `AUTOINCREMENT` and whether each index is partial, which the engine's column and index listings leave out |
 | The migration library's bookkeeping table is left out of the schema compared, on every engine, and a record that lists it is compared without it | The library creates that table and chooses its column types, and a release of the library changes them with no migration here changing |
-| A release the baseline replaced lists no file | Its files are gone from the tree. Its schema on each engine is what holds the baseline. v0.5.0's record is the one |
+| A release the baseline replaced lists no file | Its files are gone from the tree. Its schema on each engine is what holds the baseline. v0.7.0's record is the one |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
 declares the table rather than adding a migration beside it — within the
@@ -294,21 +292,22 @@ At 1.0 the baseline becomes 1.0's schema, beside one migration that upgrades a
 database the last 0.x release built. A database an earlier 0.x release built is
 upgraded to that release first.
 
-Migration 39 creates every table v0.5.0 had. Migrations 40 to 43 change existing tables and add the ones their release introduced.
+Migration 41 creates every table v0.7.0 had. Migrations 42 and 43 change existing tables and add the ones their release introduced.
 
 ### The baseline
 
-Migration 39 makes v0.5.0's schema directly. It is numbered as v0.5.0's last
-migration, so a database v0.5.0 or v0.6.0 built has it recorded and applies
+Migration 41 makes v0.7.0's schema directly. It is numbered as v0.7.0's last
+migration, so a database v0.7.0 or v0.8.0 built has it recorded and applies
 only what follows it. A fresh install applies it and every migration after it.
 
 | Rule | |
 |---|---|
 | Each table is made by one declaration | The declarations sit beside the migration, grouped by area, with the reasoning for each table's shape. The migration names every table in an order where each follows every table it points at |
-| v0.5.0's record of its schema holds it | On each of the four engines the baseline builds exactly the columns, constraints and indexes v0.5.0 built, and the schema test fails on any line either side lacks |
+| v0.7.0's record of its schema holds it | On each of the four engines the baseline builds exactly the columns, constraints and indexes v0.7.0 built, and the schema test fails on any line either side lacks |
 | Every statement a declaration holds is one the baseline makes | A test reads each declaration and fails on a table or index the baseline makes from somewhere else, so no declaration reads as schema and is not |
-| A release's declaration may be derived from a baseline declaration | v0.7.0's declarations of the finding, claim, statement and issuance tables are the baseline's with columns beside them. The baseline's schema test holds what they start from |
-| A database below the baseline is refused | A version from 1 to 38 is one a release before v0.5.0 built. Startup and `openpsirt migrate up` refuse it before anything runs, naming its version and v0.6.0, which carries every upgrade before the baseline, and `openpsirt migrate status` reports it as before the baseline. Without the refusal the baseline would run against the old tables: PostgreSQL and SQLite fail on the first name already taken, and MySQL and MariaDB step over every table that exists (§ Migrations that stop half way) and record the baseline over the old schema |
+| A release's declaration may be derived from a baseline declaration | v0.8.0's declarations of the finding, decision and notification tables are the baseline's with indexes beside them, and most of v0.9.0's are the baseline's or v0.8.0's with columns beside them. The baseline's schema test holds what they start from |
+| A baseline declaration a tagged migration reads keeps its name and its statements | Migration 42 reads the finding table's declaration by the name v0.7.0 gave it. The baseline's declaration answers to that name, and builds the same statements, byte for byte, that v0.7.0's declaration built |
+| A database below the baseline is refused | A version from 1 to 40 is one a release before v0.7.0 built. Startup and `openpsirt migrate up` refuse it before anything runs, naming its version and v0.8.0, which carries every upgrade before the baseline, and `openpsirt migrate status` reports it as before the baseline. Without the refusal the baseline would run against the old tables: PostgreSQL and SQLite fail on the first name already taken, and MySQL and MariaDB step over every table that exists (§ Migrations that stop half way) and record the baseline over the old schema |
 
 ### Forward only
 
@@ -328,9 +327,9 @@ are no spellings for, running each statement, naming the one that failed — is
 one place. A copy per migration becomes a spelling per migration: one prints
 the whole statement rather than its first line, so a failed table declaration
 reports ninety lines of data definition, and another names the table and not
-the statement. Dropping a table and dropping an index are the same rule — two
-engines name an index's table and the other two refuse to — and held in copies,
-the next migration is free to write it again with one arm missing.
+the statement. Dropping an index is one place too: two engines name an index's
+table and the other two refuse to, and held in copies, the next migration is
+free to write it again with one arm missing.
 
 ### Migrations that stop half way
 
@@ -362,9 +361,9 @@ check-engines` fails when either did not run it.
 
 ### Release upgrades
 
-Each release after v0.5.0 that changes the schema carries one migration that
+Each release after v0.7.0 that changes the schema carries one migration that
 changes the schema the release before it built into its own, and moves the rows
-with it: 40 carries a database from v0.5.0 to v0.6.0. A database a release built
+with it: 42 carries a database from v0.7.0 to v0.8.0. A database a release built
 applies the ones after its own; a fresh install makes the baseline and applies
 every one after it. They are shaped the way every migration after 1.0 will be.
 
@@ -379,57 +378,6 @@ every one after it. They are shaped the way every migration after 1.0 will be.
 | Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
 | A column added is last in its table on the three servers | A table SQLite rebuilds has it where the release declares it. No query reads a column by position |
 | On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the migration together there, and the version is not recorded. The operator page says to take one first |
-
-### The v0.6.0 upgrade
-
-Migration 40. A window gains the window it counts from, a column that holds a
-null, with a reference to the window table, and whether it counts from the
-release of the fix, a column every existing window fills as false; SQLite
-rebuilds the table from the release's declaration. A notice gains the reference
-its recipient gave it and what it said about malice, two columns that hold a
-null and that every engine adds where the table stands. The places a notice
-named and the releases a record names as carrying its fix are new tables. A
-group's role on a product is replaced by one naming its product by name, and a
-group's role on every product is a new table. Configuration is the only source
-of either and is applied at every start, so the role mappings v0.5.0 holds are
-dropped rather than carried. Mappings to admin and audit are in a table this
-leaves alone. A
-key and a token each gain the name in force, filled from the name for every
-credential not withdrawn, and the uniqueness of the name moves to it: a key's
-across the deployment, a token's within its owner. The new rule is made before
-the old one is dropped, because MySQL and MariaDB serve a token's owner key from
-whichever of the two leads with the owner; SQLite rebuilds both tables.
-
-| Check, on each of the four engines | What it holds |
-|---|---|
-| A v0.5.0 window and a notice answering it | Upgraded, the window counts from the moment the attack became known rather than from a notice or the fix, the notice says nothing about a reference or malice, the record names no fix release, and each declaration describes the table the migrations built |
-| A v0.5.0 group mapping to a role on a product, and one to admin | Upgraded, the role mapping is gone and the admin mapping remains |
-| A v0.5.0 key and token in force and one of each withdrawn | Upgraded, the one in force holds its name in force and the withdrawn one holds none, and the withdrawn name is accepted again |
-
-### The v0.7.0 upgrade
-
-Migration 41. Each change is a column added to a table the release declares
-anew, the declaration being the tagged one with the column beside it.
-
-| Table | Gains | Every engine |
-|---|---|---|
-| `finding` | The CVE record lines that closed it as unaffected, the supplier's statement answering it, and the build's claim covering it whatever the claim says | Three columns holding a null, added where the table stands. A finding names no claim of the second kind until the next run |
-| `suppression` | The product a claim's subject ships inside: its package identifier, its name and its version, and the published statement a claim was taken from | Four columns holding a null, added where the table stands. A claim recorded before the upgrade names no product and applies across the build until the build's next upload restates it |
-| `scan_run` | The CVE record snapshot it read | A column holding a null, added where the table stands |
-| `vex_statement` | The product the statement's component ships inside: its package identifier, its name and its version, what the statement names its supplier's product as, and when a later document last said it again | Five columns holding a null, added where the table stands. A statement uploaded before the upgrade names no product until it is read again |
-| `advisory_source` | Nothing; every supplier is set back to read from its window | Its cursor cleared, so the next pass reads what it already read with the product each statement places |
-| `vex_issuance` | Which kind of document went out, every existing row taking this deployment's own, and its revisions numbered per build and kind | A column filled as it is added. The rule numbering revisions per build is replaced by one numbering them per build and kind, added before the old one is dropped, because MySQL and MariaDB refuse to drop the index a foreign key is served by. SQLite rebuilds the table |
-
-| Rule | |
-|---|---|
-| The supplier's statement on a finding is a reference without a foreign key | A statement is superseded and never deleted, so the reference cannot dangle, and a column holding a null is added where the finding table stands on SQLite rather than rebuilding it |
-| The build's claim covering a finding, and the statement a claim was taken from, are references without a foreign key | The same reason: a claim is closed and never deleted, and so is a statement |
-
-| Check, on each of the four engines | What it holds |
-|---|---|
-| A v0.6.0 database | Upgraded, no finding holds record lines, a statement or a build's claim of the new kind, no run a snapshot, no statement or claim a product, and each declaration describes the table the migrations built |
-| A VEX document a v0.6.0 deployment recorded as gone out | Upgraded, it is this deployment's own document. The other kind's first revision is accepted beside it, and a second first revision of the same kind is refused |
-| A supplier a v0.6.0 deployment read part of | Upgraded, it holds no record of how far it read |
 
 ### The v0.8.0 upgrade
 
@@ -584,7 +532,7 @@ last migration as its own.
 
 `make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
 earlier release built and filled itself. It is a step of the release
-checklist above, run from every release from v0.5.0 on, on each of the four
+checklist above, run from every release from v0.7.0 on, on each of the four
 engines.
 It builds images and scans the demo's inventories, so it runs locally and not
 in the gate.

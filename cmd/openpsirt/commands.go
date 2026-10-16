@@ -96,17 +96,22 @@ func runMigrate(ctx context.Context, cfg config.Config, logger *slog.Logger, std
 		if err != nil {
 			return err
 		}
-		state := "the version this build expects"
-		switch {
-		case schema.BeforeTheBaseline(applied):
-			state = "before the baseline: upgrade it with v0.6.0 first"
-		case applied < wanted:
-			state = fmt.Sprintf("behind by %d", wanted-applied)
-		case applied > wanted:
-			state = "ahead of this build"
-		}
 		_, err = fmt.Fprintf(stdout, "%s %s, schema version %d of %d (%s)\n",
-			db.Server.Engine, db.Server.Version, applied, wanted, state)
+			db.Server.Engine, db.Server.Version, applied, wanted, schemaState(applied, wanted))
 		return err
 	}
+}
+
+// schemaState is what migrate status says of the schema version a database
+// holds, beside the one this build expects.
+func schemaState(applied, wanted int64) string {
+	switch {
+	case schema.BeforeTheBaseline(applied):
+		return "before the baseline: upgrade it with " + schema.Through + " first"
+	case applied < wanted:
+		return fmt.Sprintf("behind by %d", wanted-applied)
+	case applied > wanted:
+		return "ahead of this build"
+	}
+	return "the version this build expects"
 }

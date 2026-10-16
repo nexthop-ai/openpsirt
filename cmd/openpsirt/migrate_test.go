@@ -165,18 +165,17 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 	})
 }
 
-// A database a release before v0.5.0 built records a version below the
-// migration that makes v0.5.0's schema at once. Serving or migrating it is
-// refused before anything runs, naming the version and the release that
-// upgrades it.
+// A database a release before v0.7.0 built records a version from 1 to 40,
+// below the migration that makes v0.7.0's schema at once. Serving or
+// migrating it is refused before anything runs, naming the version and the
+// release that upgrades it. The baseline's own version is not refused.
 func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, migrations.Baseline)
-		// Standing in for v0.4.0's last migration, recorded the way the
-		// library records one, in place of the baseline's.
-		const v040 = 38
+		// An earlier release's last migration, recorded the way the library
+		// records one, in place of the baseline's.
 		record := func(ctx context.Context, from, to int64) error {
 			if _, err := db.ExecContext(ctx,
 				`DELETE FROM "`+migrate.VersionTable+`" WHERE "version_id" = ?`, from); err != nil {
@@ -186,28 +185,56 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 				`INSERT INTO "`+migrate.VersionTable+`" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
 			return err
 		}
-		if err := record(ctx, migrations.Baseline, v040); err != nil {
-			t.Fatalf("record v0.4.0's last migration: %v", err)
-		}
-		t.Cleanup(func() {
-			if err := record(context.WithoutCancel(ctx), v040, migrations.Baseline); err != nil {
-				t.Errorf("record the baseline again: %v", err)
+		for _, earlier := range []int64{1, migrations.Baseline - 1} {
+			if err := record(ctx, migrations.Baseline, earlier); err != nil {
+				t.Fatalf("record version %d: %v", earlier, err)
 			}
-		})
-
-		for what, err := range map[string]error{
-			"serving":   schemaIsCurrent(ctx, db, silent()),
-			"migrating": schema.Up(ctx, db, silent()),
-		} {
-			if err == nil {
-				t.Errorf("%s a schema a release before v0.5.0 built was allowed", what)
-				continue
-			}
-			for _, want := range []string{strconv.FormatInt(v040, 10), "v0.6.0"} {
-				if !strings.Contains(err.Error(), want) {
-					t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
+			for what, err := range map[string]error{
+				"serving":   schemaIsCurrent(ctx, db, silent()),
+				"migrating": schema.Up(ctx, db, silent()),
+			} {
+				if err == nil {
+					t.Errorf("%s a schema at version %d was allowed", what, earlier)
+					continue
+				}
+				for _, want := range []string{strconv.FormatInt(earlier, 10), "v0.7.0", schema.Through} {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
+					}
 				}
 			}
+			if err := record(context.WithoutCancel(ctx), earlier, migrations.Baseline); err != nil {
+				t.Fatalf("record the baseline again: %v", err)
+			}
+		}
+		if err := schema.NotBeforeTheBaseline(ctx, db); err != nil {
+			t.Errorf("the baseline's own version was refused: %v", err)
 		}
 	})
+}
+
+// migrate status names a version before the baseline as one, with the release
+// that upgrades it, and says how every other version stands against this
+// build's.
+func TestMigrateStatusSaysWhereASchemaStands(t *testing.T) {
+	wanted, err := schema.Expected()
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := "before the baseline: upgrade it with " + schema.Through + " first"
+	for _, c := range []struct {
+		applied int64
+		want    string
+	}{
+		{0, "behind by " + strconv.FormatInt(wanted, 10)},
+		{1, before},
+		{migrations.Baseline - 1, before},
+		{migrations.Baseline, "behind by " + strconv.FormatInt(wanted-migrations.Baseline, 10)},
+		{wanted, "the version this build expects"},
+		{wanted + 1, "ahead of this build"},
+	} {
+		if got := schemaState(c.applied, wanted); got != c.want {
+			t.Errorf("version %d of %d reads %q, want %q", c.applied, wanted, got, c.want)
+		}
+	}
 }

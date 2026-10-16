@@ -371,11 +371,10 @@ exception and never changes; each release's declarations sit beside the
 migration that upgrades to it (`DESIGN-database.md` § Migrations). The version
 in the API path is the shape it will have, not a promise anybody may hold us to.
 
-Migration 39 is the baseline: it makes v0.5.0's schema at once, and a database
-a release before v0.5.0 built is refused rather than upgraded. Migrations 40,
-41 and 42 are kept because they upgrade databases v0.5.0, v0.6.0 and v0.7.0
-built. The next schema change is migration 43, the untagged release's own,
-edited until a tag ships it. At 1.0 the baseline becomes 1.0's schema, beside one migration
+Migration 41 is the baseline: it makes v0.7.0's schema at once, and a database
+a release before v0.7.0 built is refused rather than upgraded. Migration 42 is
+kept because it upgrades a database v0.7.0 built. The next schema change is
+migration 43, the untagged release's own, edited until a tag ships it. At 1.0 the baseline becomes 1.0's schema, beside one migration
 that upgrades a database the last 0.x release built, which `TODO.md` records so
 it happens rather than being remembered.
 

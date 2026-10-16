@@ -20,7 +20,7 @@ func init() {
 
 // The v0.8.0 release's schema changed into v0.9.0's.
 //
-// Run in one transaction of its own, the way migrations 40 to 42 are. On
+// Run in one transaction of its own, the way migration 42 is. On
 // MySQL and MariaDB each table is made in one and its rows moved in another:
 // both commit a data-definition statement as it runs, so made in the one
 // transaction, the hold on every build and the merge after it would run a

@@ -32,8 +32,8 @@ Required for 1.0, and wrong to do earlier.
 
 | | |
 |---|---|
-| Today | A new database is built by the baseline, migration 39, which makes v0.5.0's schema at once, and then every release's migration after it: 40 upgrades v0.5.0 to v0.6.0. A database a release before v0.5.0 built is refused. Each tagged release's migrations are frozen, and a test enforces it |
-| Problem | At 1.0 a fresh install would still build v0.5.0's schema and then reshape it once per release since |
+| Today | A new database is built by the baseline, migration 41, which makes v0.7.0's schema at once, and then every release's migration after it: 42 upgrades v0.7.0 to v0.8.0. A database a release before v0.7.0 built is refused. Each tagged release's migrations are frozen, and a test enforces it |
+| Problem | At 1.0 a fresh install would still build v0.7.0's schema and then reshape it once per release since |
 | Work | Make the baseline the 1.0 schema, plus one migration that upgrades a database built by the last 0.x release, and refuse a database any earlier release built. Document that a database from an older 0.x release is first upgraded to that last 0.x release |
 | Waits on | The 1.0 schema being final |
 

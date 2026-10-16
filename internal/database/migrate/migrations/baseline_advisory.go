@@ -431,6 +431,24 @@ func vexBaseline(t *columnTypes) []string {
 			-- that name is the one meant.
 			"purl"        ` + t.free + ` NULL,
 			"component"   ` + t.name + ` NOT NULL,
+			-- The product the component ships inside, where the document
+			-- named one: the product of an OpenVEX statement with
+			-- subcomponents, the platform a CSAF relationship composes the
+			-- component into. A supplier speaking about its own product
+			-- speaks about what sits inside it, so this is what places the
+			-- statement in a build. The package identifier where the document
+			-- gave one, the name, folded, and the version it was stated at.
+			-- Null where the document named the component alone.
+			"within_purl"  ` + t.free + ` NULL,
+			"within"       ` + t.name + ` NULL,
+			"within_about" ` + t.name + ` NULL,
+			-- What the statement names its supplier's product as: inside,
+			-- for a component inside a product the document named; product,
+			-- for a product named alone by no package identifier. Null for a
+			-- package named alone, which cannot be told from a rebuild of its
+			-- source, and for every statement recorded before this was read,
+			-- so that neither closes anything.
+			"placement"    ` + t.kind + ` NULL,
 			-- Which version the claim was made about, where the document
 			-- stated one. Inside the package identifier for a publisher that
 			-- states packages, and as the branch the product sits in for one
@@ -461,6 +479,11 @@ func vexBaseline(t *columnTypes) []string {
 			"digest"      ` + t.hash + ` NOT NULL,
 			"uploaded_by" ` + t.ref + ` NOT NULL,
 			"uploaded_at" ` + t.timestamp + ` NOT NULL,
+			-- When a later document from the publisher said the statement
+			-- again, word for word, where one has. The row is kept for the
+			-- repeat, so this is the moment the publisher last said it. Null
+			-- for a statement nothing has repeated.
+			"restated_at" ` + t.timestamp + ` NULL,
 			-- Superseded rather than deleted when the same publisher says
 			-- something else about the same thing. What an approval was
 			-- granted on the strength of has to stay readable, which is the
@@ -516,7 +539,12 @@ func vexIssuanceBaseline(t *columnTypes) []string {
 			-- build is a different document rather than a revision of this
 			-- one.
 			"target_id" ` + t.ref + ` NOT NULL,
-			-- Which issuance this is, counting from one. The document
+			-- Which document about the build went out: what this deployment
+			-- agreed to, or that with what suppliers state about their own
+			-- products beside it. Each is a document of its own, so a reader
+			-- holding one never sees it change into the other.
+			"kind"      ` + t.kind + ` NOT NULL,
+			-- Which issuance of its kind this is, counting from one. The document
 			-- generated now is one past it, the way the next advisory is one
 			-- past what has gone out.
 			"ordinal"   ` + t.ref + ` NOT NULL,
@@ -531,7 +559,7 @@ func vexIssuanceBaseline(t *columnTypes) []string {
 			"document"  ` + t.free + ` NOT NULL,
 			"issued_by" ` + t.ref + ` NOT NULL,
 			"issued_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "vex_issuance_once" UNIQUE ("target_id", "ordinal"),
+			CONSTRAINT "vex_issuance_once_per_kind" UNIQUE ("target_id", "kind", "ordinal"),
 			CONSTRAINT "vex_issuance_target_fk"
 				FOREIGN KEY ("target_id") REFERENCES "target"("id"),
 			CONSTRAINT "vex_issuance_by_fk" FOREIGN KEY ("issued_by") REFERENCES "person"("id")

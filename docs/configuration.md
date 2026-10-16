@@ -1112,7 +1112,7 @@ deleting by surprise.
 
 A database is upgraded in place, at startup or by `openpsirt migrate up`,
 through each later release's upgrade on the way. A database built by the
-release the [oldest section below](#from-v040) names, or by an earlier one, is
+release the [oldest section below](#from-v060) names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.
@@ -1134,42 +1134,20 @@ database a later release upgraded and serves it, failing on what changed, so
 redeploying one, `helm rollback` included, is not going back: restore the
 backup first.
 
-### From v0.4.0
-
-A database v0.4.0 or an earlier release built is refused at startup and by
-`openpsirt migrate up`, naming the version it holds. This release makes
-v0.5.0's schema in one step and carries none of the upgrades before it.
-
-1. Back the database up.
-2. Run `openpsirt migrate up` with v0.6.0 against it. v0.6.0 carries every
-   earlier upgrade, and its [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.6.0/configuration/#upgrading)
-   say what each one changes.
-3. Deploy this release, reading the sections from v0.6.0 on.
-
-### From v0.5.0
-
-| Change | What to do |
-|---|---|
-| Group mappings come from `OPENPSIRT_GROUP_ROLES` alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through `/v1/roles/bindings`, and the upgrade removes those on a product. `POST` and `DELETE` on `/v1/roles/bindings` and `PUT` on `/v1/roles/mode` are gone | Before upgrading, read `GET /v1/roles/mode`. If it answers `group-bound`, list the mappings with `GET /v1/roles/bindings` and write them into `OPENPSIRT_GROUP_ROLES`. If it answers `direct`, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People |
-| `openpsirt migrate down` is gone, and a database a later release upgraded is refused at startup. v0.5.0 rolled a database back to an earlier release and served one ahead of it | Take a backup before every upgrade, as [Every upgrade](#every-upgrade) says; going back is restoring it |
-
-| After the upgrade from v0.5.0 | |
-|---|---|
-| A withdrawn API key's or personal token's name | May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it |
-
 ### From v0.6.0
 
-| Change | What to do |
-|---|---|
-| Each replica fetches the CVE List's daily archive from `github.com`, which hands the download to `release-assets.githubusercontent.com` or `objects.githubusercontent.com`. About 620 MB a day, and about 1.3 GB on the scanner's volume while it is read | Where those hosts cannot be reached, set `OPENPSIRT_RECORDS_UPDATE=false` and place a snapshot from `make cve-records` in `OPENPSIRT_RECORDS_DIR`; otherwise the fetch logs a failure every hour and nothing narrows. Size the scanner's volume for the 1.3 GB beside the scanner's own data |
-| The first scan of each build after the snapshot arrives closes the findings the records exclude, as `unaffected` | Nothing. They are listed in the register under that reason, with the record's lines. A kernel build may close thousands at once |
-| Compliance rate and the register's met column | Nothing. A finding closed as invalid, unaffected or disclaimed is in neither, for every period, so a rate read before the upgrade may differ from the same period read after it |
-| A supplier's statement that its own product is not affected closes the finding inside that product, as `disclaimed`, where the product is in the build at the version the statement names | Upload again each VEX document and advisory uploaded before the upgrade. A statement recorded by v0.6.0 kept no product, so it closes nothing and is evidence by package until it is read again. Read again, a claim it repeats stands where it stood and raises no notice; a claim the publisher has since changed is noticed as changed |
-| Every supplier read from its directory reads its advisories again from its window, a year before it was configured unless set otherwise | Nothing. It is what configuring a new supplier costs, drained at the same per-pass bound, so a large publisher takes days |
-| A VEX document a build's page generates is this deployment's own unless `kind=with-suppliers` is asked for, which is a second document with an identifier and revisions of its own | Nothing. Every document v0.6.0 recorded as gone out is this deployment's own, and keeps its revisions |
-| A generated VEX document names the build by the package identifier its SBOM gave its root, where that identifier names a version, and states a dismissal agreed at some places of a component one place at a time | Tell anybody matching on the old product name, `product:stream:variant`, that the document now names what the SBOM does. A build whose SBOM gave its root no such identifier keeps the old name |
-| A claim the build sent with its SBOM about a component inside a product of the build applies beneath that product, rather than at every place of the component | Nothing for a branch: its next upload restates each claim with its product. A tag is not uploaded again, so its claims keep applying across the build until it is |
-| A VEX document uploaded on its own whose statements name the build's root is the build's own claim | Upload such a document again. A statement recorded by v0.6.0 kept no product, so it stays evidence until it is read again |
+A database v0.6.0 or an earlier release built is refused at startup and by
+`openpsirt migrate up`, naming the version it holds. This release makes
+v0.7.0's schema in one step and carries none of the upgrades before it.
+
+1. Back the database up.
+2. Run `openpsirt migrate up` with v0.8.0 against it. v0.8.0 carries every
+   earlier upgrade, and its [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.8.0/configuration/#upgrading)
+   say what each one changes and what to do after it.
+3. Deploy this release, reading the sections from v0.8.0 on.
+
+A database v0.7.0 built needs none of this, and reads the sections from v0.8.0
+on.
 
 ### From v0.8.0
 

@@ -23,7 +23,7 @@ import (
 // one is shaped as it is — and there is nothing repeated about them. What is
 // here is everything else: asking the context which engine this is, refusing
 // an engine there are no spellings for, running each statement, naming the one
-// that failed, and the two rules about dropping what a migration made.
+// that failed, and the rule about dropping an index a migration made.
 
 // types is the column spellings for the engine a migration is running against.
 func types(ctx context.Context) (*columnTypes, error) {
@@ -88,21 +88,6 @@ func apply(ctx context.Context, tx *sql.Tx, statements []string) error {
 		}
 		if _, err := tx.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("%s: %w", firstLine(stmt), err)
-		}
-	}
-	return nil
-}
-
-// dropTables drops tables in the order given, which has to put a table before
-// anything it points at.
-func dropTables(ctx context.Context, tx *sql.Tx, names ...string) error {
-	for _, name := range names {
-		// Quoted, like every other identifier in the schema. A reserved word
-		// is only reserved when bare, and the four engines do not agree on
-		// which words those are — so an unquoted name fails on whichever
-		// engine somebody is least likely to be running.
-		if _, err := tx.ExecContext(ctx, `DROP TABLE "`+name+`"`); err != nil {
-			return fmt.Errorf("drop %s: %w", name, err)
 		}
 	}
 	return nil

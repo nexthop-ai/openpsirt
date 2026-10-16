@@ -14,7 +14,7 @@ import (
 // patchBranchV090 is v0.9.0's declaration of the patch-branch tables.
 //
 // The baseline's, with when a repository's last visit ended, however it
-// ended. Derived from the baseline's declaration, which v0.5.0's record of its
+// ended. Derived from the baseline's declaration, which v0.7.0's record of its
 // schema holds.
 func patchBranchV090(t *columnTypes) []string {
 	statements := patchBranchBaseline(t)

@@ -194,6 +194,25 @@ func findingBaseline(t *columnTypes) []string {
 			-- scanned row, whose clock runs from its opening, and on a
 			-- recorded flaw nobody has rated, which has no clock.
 			"rated_at"         ` + t.timestamp + ` NULL,
+			-- The lines of the CVE record that state this finding's version
+			-- is unaffected, as JSON, where that is why it closed. Kept on
+			-- the row because the snapshot the run read is replaced by the
+			-- next, and the closure has to stay explicable after it is.
+			"unaffected_by"    ` + t.text + ` NULL,
+			-- The supplier's statement that answers this finding, where one
+			-- does: on a row closed as disclaimed, the statement that closed
+			-- it; on an open row, a statement answering it on some routes up
+			-- the tree and not on others. A plain reference without a foreign
+			-- key: a statement is superseded and never deleted, so the
+			-- reference cannot dangle, and a column taking a null and holding
+			-- one is added where the table stands on every engine.
+			"stated_by"        ` + t.refNull + ` NULL,
+			-- The build's claim covering this finding, whatever it says. The
+			-- reference above it names only a claim that suppresses; this one
+			-- names a claim that the flaw applies as well, which is what
+			-- carries the workaround the build published. A plain reference
+			-- without a foreign key, for the reason the one above it gives.
+			"claimed_by"       ` + t.refNull + ` NULL,
 			CONSTRAINT "finding_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
 			CONSTRAINT "finding_vulnerability_id_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "finding_component_id_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
@@ -265,8 +284,15 @@ func findingBaseline(t *columnTypes) []string {
 	}
 }
 
+// findingV070 is the baseline's declaration of the finding table, under the
+// name v0.8.0's declaration of it reads.
+func findingV070(t *columnTypes) []string {
+	return findingBaseline(t)
+}
+
 // suppressionBaseline declares a build's own claims, with the subject's name
-// folded and the version the claim was made about, and its index.
+// folded, the version the claim was made about, the product the subject ships
+// inside and the published statement the claim was taken from, and its index.
 func suppressionBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "suppression" (
@@ -292,6 +318,21 @@ func suppressionBaseline(t *columnTypes) []string {
 			-- package states it as the branch its product sits in, and a
 			-- claim stored without it covers every version of the name.
 			"subject_version" ` + t.free + ` NULL,
+			-- The product the subject ships inside, where the document named
+			-- one: the package identifier, the name as the producer spelled
+			-- it, and the version it was stated at. A claim about a
+			-- component inside a product of the build applies beneath that
+			-- product and nowhere else. Null where the document named the
+			-- subject alone.
+			"within_purl"    ` + t.text + ` NULL,
+			"within_name"    ` + t.free + ` NULL,
+			"within_version" ` + t.free + ` NULL,
+			-- The published statement this claim was taken from, where a
+			-- document uploaded on its own named the build's root as its
+			-- product. A plain reference without a foreign key: a statement
+			-- is superseded and never deleted, so the reference cannot
+			-- dangle. Null for a claim the build sent with its inventory.
+			"stated_by"      ` + t.refNull + ` NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
 			"closed_scan_id" ` + t.refNull + ` NULL,
 			CONSTRAINT "suppression_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
