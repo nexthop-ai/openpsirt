@@ -169,3 +169,53 @@ func TestARecordedFlawFiledUnderAPublishedNameTakesTheFeedsWord(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *testing.T) {
+	// A recorded flaw's score is held off the issue row, so a reader that
+	// takes the score from the row alone says nothing about how bad the
+	// recording product judged its own flaw.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		earlier := f.anotherBuild(t, "1.0")
+		f.shippedTo(t, earlier, twoConsumers())
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := f.planner(t, access.PublicRead, access.PrivateRead)
+
+		comparison, err := f.store.Compare(ctx, reader, earlier, f.target, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		noted := -1
+		for _, entry := range comparison.Newly {
+			if entry.Vulnerability == identifier {
+				noted = entry.ScoreCenti
+			}
+		}
+		if noted != 980 {
+			t.Errorf("the release note scores the recorded flaw %d, want 980", noted)
+		}
+
+		places, _, _, err := f.store.AtComponent(ctx, reader, f.target, f.componentID(t, swss.Name), "", 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(places) == 0 {
+			t.Fatal("the component lists nothing, so this checked nothing")
+		}
+		for _, place := range places {
+			if place.SeverityCenti != 980 {
+				t.Errorf("the component scores the recorded flaw %d, want 980", place.SeverityCenti)
+			}
+		}
+	})
+}

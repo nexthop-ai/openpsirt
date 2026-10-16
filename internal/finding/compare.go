@@ -156,16 +156,18 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE("f"."arrived_from", '')) AS "arrived_from"`).
-			// Properties of the issue rather than of the place, so they are
-			// grouped on rather than aggregated: every row of a group carries
-			// the same three.
-			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
+			// The flag and the advisory are properties of the issue, so they
+			// are grouped on: every row of a group carries the same two. The
+			// score is the recording product's own for a recorded flaw, read
+			// row by row, and taken as the largest so that a group holding a
+			// recorded row and a scanned one reads the recorded score.
+			ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
 			ColumnExpr(`"v"."exploited" AS "exploited"`).
 			ColumnExpr(`COALESCE("v"."advisory", '') AS "advisory"`).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			GroupExpr(`"v"."identifier", "c"."name", ` + rating.EffectiveExpr +
-				`, "f"."closed_because", "v"."score_centi", "v"."exploited", "v"."advisory"`)
+				`, "f"."closed_because", "v"."exploited", "v"."advisory"`)
 		return q.Where(`"f"."closed_at" IS NULL`)
 	}
 

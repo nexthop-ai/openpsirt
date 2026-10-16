@@ -150,7 +150,8 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-			ColumnExpr(`MIN(COALESCE("v"."score_centi", 0)) AS "severity_centi"`).
+			// The recording product's own score for a recorded flaw.
+			ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE("f"."fixed_in", '')) AS "fixed_in"`).
 			// The issue's own account of itself, whether anybody is known to
 			// be using it, and the published estimate. One row per issue
