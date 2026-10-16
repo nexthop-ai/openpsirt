@@ -219,3 +219,92 @@ func TestTheRecordingProductsReleaseNoteAndComponentCarryTheScoreItRecorded(t *t
 		}
 	})
 }
+
+func TestWithdrawingARatingClaimReturnsARecordedFlawToItsRecordedWord(t *testing.T) {
+	// A recorded flaw's word is its product's rating in force until a claim
+	// there replaces it. With the claim taken back, the recorded word is in
+	// force again and the deadline follows it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		f.shipped(t, twoConsumers())
+		f.recorded(t, 1, "someone")
+		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := f.issueID(t, identifier)
+		due := func(t *testing.T) time.Time {
+			t.Helper()
+			var at time.Time
+			if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("due_at").
+				Where(`"vulnerability_id" = ?`, issue).Limit(1).Scan(ctx, &at); err != nil {
+				t.Fatal(err)
+			}
+			return at
+		}
+		recordedDue := due(t)
+
+		claim, err := f.store.Assess(ctx, who, f.productID, issue, "critical", "Reachable from the network.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, word := f.ratings(t, identifier); word != "critical" {
+			t.Fatalf("the claim put %q in force, want critical", word)
+		}
+		if !due(t).Before(recordedDue) {
+			t.Fatalf("rated critical, the deadline %s is no sooner than the recorded %s", due(t), recordedDue)
+		}
+		if _, err := f.store.Withdraw(ctx, who, claim.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, word := f.ratings(t, identifier); word != "high" {
+			t.Errorf("with the claim taken back %q is in force, want the recorded high", word)
+		}
+		if got := due(t); !got.Equal(recordedDue) {
+			t.Errorf("with the claim taken back the deadline is %s, want the recorded %s", got, recordedDue)
+		}
+	})
+}
+
+func TestAMergeCarriesARecordedRatingToTheIssueKept(t *testing.T) {
+	// A record and a scanned issue that turn out to be one issue merge into
+	// the scanned one, which is filed under the published name. The rating
+	// the record's product recorded goes with it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		f.shipped(t, twoConsumers())
+		f.applied(t, found("CVE-2026-7", teamd))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			Vector:  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		kept, gone := f.issueID(t, "CVE-2026-7"), f.issueID(t, identifier)
+		if kept == gone {
+			t.Fatal("the record was filed under the published name before the merge, so this checked nothing")
+		}
+		f.applied(t, found("CVE-2026-7", teamd, identifier))
+		if f.issueID(t, identifier) != kept {
+			t.Fatalf("the minted name does not reach the kept issue %d", kept)
+		}
+		var rows []finding.RecordedRating
+		if err := f.db.DB.NewSelect().Model(&rows).
+			Where(`"rr"."product_id" = ?`, f.productID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].VulnerabilityID != kept || rows[0].Severity == nil ||
+			*rows[0].Severity != "critical" || rows[0].ScoreCenti == nil || *rows[0].ScoreCenti != 980 {
+			t.Errorf("the recorded ratings read %+v, want one on the kept issue %d at critical and 9.80", rows, kept)
+		}
+	})
+}
