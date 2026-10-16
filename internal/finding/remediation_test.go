@@ -200,7 +200,9 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 	// An issue at two places: one fixed in the window with the other still
 	// open is not fixed, one whose second place closes after the window is
 	// not fixed in it, and one whose second place closes in the window is
-	// fixed there, timed from its first place opening.
+	// fixed there, timed from its first place opening. One whose place in
+	// the window is out of the reader's reach is timed by what the reader
+	// reads, and its last readable place closed before the window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, graph.Snapshot{
@@ -212,7 +214,7 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 			},
 		})
 		f.applied(t, found("CVE-2026-1", libnl), found("CVE-2026-2", libnl),
-			found("CVE-2026-3", libnl))
+			found("CVE-2026-3", libnl), found("CVE-2026-4", libnl))
 		now := time.Now().UTC()
 		since, until := now.Add(-7*24*time.Hour), now.Add(-12*time.Hour)
 		closeOne := func(t *testing.T, issue string, at time.Time) {
@@ -229,7 +231,7 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3"} {
+		for _, issue := range []string{"CVE-2026-1", "CVE-2026-2", "CVE-2026-3", "CVE-2026-4"} {
 			f.aged(t, issue, now.Add(-30*24*time.Hour))
 		}
 		// The first: one place fixed in the window, the other open.
@@ -240,6 +242,17 @@ func TestAnIssueIsFixedInThePeriodItsLastPlaceClosed(t *testing.T) {
 		// The third: one place fixed in the window, the other after it ends.
 		closeOne(t, "CVE-2026-3", now.Add(-24*time.Hour))
 		closeOne(t, "CVE-2026-3", now.Add(-time.Hour))
+		// The fourth: one place fixed before the window, the other in it and
+		// undisclosed, so a reader of disclosed findings saw its last fix
+		// before the window.
+		closeOne(t, "CVE-2026-4", now.Add(-20*24*time.Hour))
+		closeOne(t, "CVE-2026-4", now.Add(-24*time.Hour))
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, f.issueID(t, "CVE-2026-4")).
+			Where(`"closed_at" >= ?`, since).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
 
 		got, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead),
 			f.wholeProduct(), since, until)

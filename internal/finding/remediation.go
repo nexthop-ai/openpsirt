@@ -137,9 +137,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Seconds float64 `bun:"seconds"`
 		Issues  int     `bun:"issues"`
 	}
-	// The issues with a place closed by a fix in the window. The last place
-	// to close closed in the window, so every issue counted is among these,
-	// and the places of the rest are never read.
+	// The issues with a place closed by a fix in the window, whoever may read
+	// it. Every issue counted is among these, so the places of the rest are
+	// never read. A place out of the reader's reach can put an issue here, so
+	// the window's two ends are checked again on what the reader reads.
 	closing := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
@@ -190,9 +191,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MIN("grouped"."opened_at") AS "opened_at"`).
 		GroupExpr(`"grouped"."vulnerability_id"`).
 		Having(`SUM("grouped"."open_places") = 0`)
-	// The window's start needs no condition of its own: a place closed in
-	// the window is what put the issue among those read.
 	perIssue = perIssue.Having(`MAX("grouped"."closed_at") < ?`, until)
+	if !since.IsZero() {
+		perIssue = perIssue.Having(`MAX("grouped"."closed_at") >= ?`, since)
+	}
 
 	// The averaging happens over the grouped issues, in a statement of its
 	// own, because averaging inside the grouping would average the places.
