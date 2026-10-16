@@ -57,30 +57,40 @@ func createRecordedRatingV090(ctx context.Context, tx bun.Tx) error {
 // moveRecordedRatingsV090 takes the rating a flaw was recorded at off the
 // issue row, where v0.8.0 wrote it, into the recording product's own.
 //
-// A recorded flaw's issue row is minted for it, so what it holds that names no
-// publisher is the record's: the word, the score, the vector and its version,
-// and every rating beside it with no source. A feed's rating names its source
-// and stays. The word is put in force in the recording product where nothing
-// rates the issue there already. Each statement steps over what an earlier
-// start moved.
+// The row's word is the record's wherever the issue holds a recorded flaw,
+// unless a scanned issue absorbed the record in a merge: the issue holds a
+// finding no person entered and is the kept side of a merge, so its word is
+// the scanner's. A record filed under a published name keeps its own word on
+// the row, because no report fills a word the row already holds. The score,
+// its vector and its scheme are the record's only where they name no
+// publisher, and so is every rating beside them with no source. The word is
+// put in force in the recording product where nothing rates the issue there
+// already. Each statement steps over what an earlier start moved.
 func moveRecordedRatingsV090(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+	unsourced := `COALESCE("v"."score_source", '') = ''`
 	return u.run([]string{
 		`INSERT INTO "recorded_rating"
 			("vulnerability_id", "product_id", "severity", "score_centi", "vector", "score_version")
-		SELECT DISTINCT "v"."id", "st"."product_id", NULLIF("v"."severity", ''), "v"."score_centi",
-			NULLIF("v"."vector", ''), NULLIF("v"."score_version", '')
+		SELECT DISTINCT "v"."id", "st"."product_id", NULLIF("v"."severity", ''),
+			CASE WHEN ` + unsourced + ` THEN "v"."score_centi" END,
+			CASE WHEN ` + unsourced + ` THEN NULLIF("v"."vector", '') END,
+			CASE WHEN ` + unsourced + ` THEN NULLIF("v"."score_version", '') END
 		FROM "finding" AS "f"
 		JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"
 		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
 		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 		WHERE "f"."kind" = 'entered'
-			AND COALESCE("v"."score_source", '') = ''
-			AND (COALESCE("v"."severity", '') <> '' OR "v"."score_centi" IS NOT NULL)
+			AND (COALESCE("v"."severity", '') <> ''
+				OR (` + unsourced + ` AND "v"."score_centi" IS NOT NULL))
+			AND NOT (EXISTS (SELECT 1 FROM "finding" AS "scanned"
+					WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" <> 'entered')
+				AND EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm"
+					WHERE "vm"."kept_id" = "v"."id"))
 			AND NOT EXISTS (SELECT 1 FROM "recorded_rating" AS "rr"
 				WHERE "rr"."vulnerability_id" = "v"."id" AND "rr"."product_id" = "st"."product_id")`,
 		`INSERT INTO "issue_rating" ("vulnerability_id", "product_id", "severity")
@@ -93,7 +103,9 @@ func moveRecordedRatingsV090(ctx context.Context, tx bun.Tx) error {
 		`DELETE FROM "vulnerability_rating"
 		WHERE COALESCE("score_source", '') = ''
 			AND "vulnerability_id" IN (SELECT "rr"."vulnerability_id" FROM "recorded_rating" AS "rr")`,
-		`UPDATE "vulnerability" SET "severity" = NULL, "score_centi" = NULL, "vector" = NULL,
+		`UPDATE "vulnerability" SET "severity" = NULL
+		WHERE "id" IN (SELECT "rr"."vulnerability_id" FROM "recorded_rating" AS "rr")`,
+		`UPDATE "vulnerability" SET "score_centi" = NULL, "vector" = NULL,
 			"score_version" = NULL, "score_kind" = NULL
 		WHERE COALESCE("score_source", '') = ''
 			AND "id" IN (SELECT "rr"."vulnerability_id" FROM "recorded_rating" AS "rr")`,

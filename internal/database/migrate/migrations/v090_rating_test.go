@@ -4,6 +4,7 @@
 package migrations_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -15,7 +16,9 @@ import (
 // A v0.8.0 database holding a recorded flaw's rating on the issue row is
 // upgraded: the word, the score, the vector and its scheme are the recording
 // product's, the word is in force there, the issue holds none of them, and a
-// rating a feed published beside them stays.
+// rating a feed published beside them stays. A scanned issue that absorbed a
+// record keeps its scanner's word and score, and a record filed under a
+// published name gives up its word and keeps a feed's sourced score.
 func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -54,11 +57,40 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 			VALUES (?, ?, ?, ?)`, issue, 3, 980, vector)
 		exec(`INSERT INTO "vulnerability_rating" ("vulnerability_id", "generation", "score_centi", "vector", "score_source")
 			VALUES (?, ?, ?, ?, ?)`, issue, 2, 750, "AV:N/AC:L/Au:N/C:P/I:P/A:P", "nvd@nist.gov")
-		exec(`INSERT INTO "finding" ("target_id", "kind", "visibility", "vulnerability_id", "component_id",
-			"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
-			"urgency_shipped", "last_changed_at", "opened_at")
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			declared.Target.ID, "entered", "private", issue, component, "swss", 1, false, false, true, at, at)
+		place := func(kind string, issue int64, identity string) {
+			t.Helper()
+			exec(`INSERT INTO "finding" ("target_id", "kind", "visibility", "vulnerability_id", "component_id",
+				"place_identity", "urgency", "urgency_exploited", "urgency_exploited_here",
+				"urgency_shipped", "last_changed_at", "opened_at")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				declared.Target.ID, kind, "private", issue, component, identity, 1, false, false, true, at, at)
+		}
+		place("entered", issue, "swss")
+		rated := func(identifier, severity string, score int, source string) int64 {
+			t.Helper()
+			exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "severity", "exploited",
+				"score_centi", "score_source", "first_seen_at", "issue_id")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				identifier, strings.ToLower(identifier), severity, false, score, source, at, 0)
+			id := id(`SELECT "id" FROM "vulnerability" WHERE "identifier" = ?`, identifier)
+			exec(`UPDATE "vulnerability" SET "issue_id" = "id" WHERE "id" = ?`, id)
+			return id
+		}
+
+		// A scanned issue that absorbed a record in a merge: its word and its
+		// unsourced score are the scanner's, and stay.
+		kept := rated("CVE-2026-0002", "high", 750, "")
+		absorbed := rated("SONIC-2026-0002", "low", 200, "")
+		exec(`UPDATE "vulnerability" SET "issue_id" = ? WHERE "id" = ?`, kept, absorbed)
+		exec(`INSERT INTO "vulnerability_merge" ("absorbed_id", "kept_id", "named", "merged_at")
+			VALUES (?, ?, ?, ?)`, absorbed, kept, "CVE-2026-0002 SONIC-2026-0002", at)
+		place("vulnerability", kept, "swss-scanned")
+		place("entered", kept, "swss-entered")
+
+		// A record filed under a published name that a feed later scored:
+		// the word is the record's, and the sourced score is the feed's.
+		refiled := rated("CVE-2026-0003", "critical", 880, "nvd@nist.gov")
+		place("entered", refiled, "swss-refiled")
 
 		dbtest.MigrateTo(t, db, v090)
 
@@ -99,6 +131,44 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 		}
 		if left := id(`SELECT COUNT(*) FROM "vulnerability_rating" WHERE "vulnerability_id" = ?`, issue); left != 1 {
 			t.Errorf("%d ratings are left on the issue, want the one a feed published", left)
+		}
+
+		var merged struct {
+			Severity   *string `bun:"severity"`
+			ScoreCenti *int64  `bun:"score_centi"`
+		}
+		if err := db.DB.NewRaw(`SELECT "severity", "score_centi" FROM "vulnerability" WHERE "id" = ?`,
+			kept).Scan(ctx, &merged); err != nil {
+			t.Fatal(err)
+		}
+		if merged.Severity == nil || *merged.Severity != "high" || merged.ScoreCenti == nil || *merged.ScoreCenti != 750 {
+			t.Errorf("the merged issue reads %+v, want the scanner's high and 7.50", merged)
+		}
+		if moved := id(`SELECT COUNT(*) FROM "recorded_rating" WHERE "vulnerability_id" = ?`, kept); moved != 0 {
+			t.Errorf("the scanner's rating of a merged issue was recorded as a product's %d times", moved)
+		}
+
+		var fromRecord struct {
+			Severity   *string `bun:"severity"`
+			ScoreCenti *int64  `bun:"score_centi"`
+		}
+		if err := db.DB.NewRaw(`SELECT "severity", "score_centi" FROM "recorded_rating" WHERE "vulnerability_id" = ?`,
+			refiled).Scan(ctx, &fromRecord); err != nil {
+			t.Fatal(err)
+		}
+		if fromRecord.Severity == nil || *fromRecord.Severity != "critical" || fromRecord.ScoreCenti != nil {
+			t.Errorf("the refiled record's rating reads %+v, want its word critical and no score", fromRecord)
+		}
+		var refiledRow struct {
+			Severity   *string `bun:"severity"`
+			ScoreCenti *int64  `bun:"score_centi"`
+		}
+		if err := db.DB.NewRaw(`SELECT "severity", "score_centi" FROM "vulnerability" WHERE "id" = ?`,
+			refiled).Scan(ctx, &refiledRow); err != nil {
+			t.Fatal(err)
+		}
+		if refiledRow.Severity != nil || refiledRow.ScoreCenti == nil || *refiledRow.ScoreCenti != 880 {
+			t.Errorf("the refiled issue reads %+v, want no word and the feed's 8.80", refiledRow)
 		}
 	})
 }
