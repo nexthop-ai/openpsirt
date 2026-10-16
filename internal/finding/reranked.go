@@ -37,11 +37,12 @@ import (
 // stored because it cannot be worked out again is a different thing and is
 // not this.
 //
-// Only the exploited flag moves a deadline, and only for the rows it was
+// Here only the exploited flag moves a deadline, and only for the rows it was
 // raised on, counted from when this was learned — the same rule and the same
 // moment the scanned build's own rows are clocked by. A score or a likelihood
 // moving deliberately changes no clock: neither is in the deadline, and a
-// clock reset by a revised number would never arrive.
+// clock reset by a revised number would never arrive. A severity word filled
+// in is re-clocked where it is filled, because the word is in the deadline.
 //
 // The scanned build's own scanner findings are left out of the order's
 // rewrite: applying the scan has just ranked every one of them from the same

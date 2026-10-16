@@ -157,7 +157,8 @@ it opens, and there is no floor for a slow pipeline.
 | The issue keeps the earliest day any report states | Stored on the issue, and only ever moved earlier, by a statement of its own. Two reports stating different days leave the earlier whichever arrives first |
 | A scan with no listing day learns exploitation at its own start | The moment every issue a database held before the day was read counts from |
 | A listing day filled or moved earlier re-clocks the issue | Every open exploited finding of the issue counting from a later moment is moved onto the day, in every build, and its deadline worked out again. Once per issue: after it, nothing counts from later |
-| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a record of being attacked and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
+| A severity word filled in re-clocks the issue in every product holding it | The deadline of each open finding is worked out again from when it opened, by the product's rating in force with the new word as its fallback (`DESIGN-findings.md` § Report merging) |
+| A finding with no deadline keeps none when re-clocked | A tag, a release past end of life and a missing fix are off the clock whatever the moment is. A rating moving, a word filled in, a record of being attacked and an issue becoming exploited each re-clock only what sits on a release that moves and is in support |
 | A recount reasons at the store's clock | One moment per recount, read from the clock every other write reads, so a fix date is weighed the same way by a recount and by the scan beside it |
 
 The same rule governs every writer. A scan counts it per finding, and an edited

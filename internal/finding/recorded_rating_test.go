@@ -167,6 +167,35 @@ func TestARecordedFlawFiledUnderAPublishedNameTakesTheFeedsWord(t *testing.T) {
 		if word != "high" {
 			t.Errorf("the issue's word is %q after a rescan, want the scanner's high", word)
 		}
+
+		// A scanner's "unknown" ranks as no word, so it is filled the same
+		// way, and a report of "unknown" fills nothing.
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
+			Set(`"severity" = NULL`).Where(`"id" = ?`, issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		unknown := found("CVE-2026-9", swss)
+		unknown.Issue.Severity = "Unknown"
+		f.applied(t, unknown)
+		if err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).Column("severity").
+			Where(`"id" = ?`, issue).Scan(ctx, &word); err != nil {
+			t.Fatal(err)
+		}
+		if word != "" {
+			t.Errorf("a report of unknown filled the issue's word with %q", word)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
+			Set(`"severity" = ?`, "Unknown").Where(`"id" = ?`, issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.applied(t, found("CVE-2026-9", swss))
+		if err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).Column("severity").
+			Where(`"id" = ?`, issue).Scan(ctx, &word); err != nil {
+			t.Fatal(err)
+		}
+		if word != "high" {
+			t.Errorf("an issue held at Unknown reads %q after a report, want the scanner's high", word)
+		}
 	})
 }
 
@@ -305,6 +334,62 @@ func TestAMergeCarriesARecordedRatingToTheIssueKept(t *testing.T) {
 		if len(rows) != 1 || rows[0].VulnerabilityID != kept || rows[0].Severity == nil ||
 			*rows[0].Severity != "critical" || rows[0].ScoreCenti == nil || *rows[0].ScoreCenti != 980 {
 			t.Errorf("the recorded ratings read %+v, want one on the kept issue %d at critical and 9.80", rows, kept)
+		}
+	})
+}
+
+func TestAFilledWordReranksAndReclocksAnotherProductsFinding(t *testing.T) {
+	// A word filled in by one product's scan is the published word for every
+	// product holding the issue, so a finding another product opened before
+	// it, with no rating of its own there, ranks and is clocked by it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		elsewhere := f.inAnotherProduct(t, "hedgehog")
+		f.shippedTo(t, elsewhere, twoConsumers())
+		// One issue already filed under the name the report gives, and one
+		// that the report files under a better name, which reach the word by
+		// the two ways a report is resolved.
+		unrated := []finding.Reported{found("CVE-2026-8", swss), found("GHSA-2026-0009", teamd)}
+		for i := range unrated {
+			unrated[i].Issue.Severity = ""
+		}
+		if _, err := f.store.Apply(ctx, elsewhere, f.runOn(t, elsewhere), unrated); err != nil {
+			t.Fatal(err)
+		}
+		type clock struct {
+			Urgency int64      `bun:"urgency"`
+			DueAt   *time.Time `bun:"due_at"`
+		}
+		read := func(t *testing.T, issue int64) clock {
+			t.Helper()
+			var got clock
+			if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).Column("urgency", "due_at").
+				Where(`"target_id" = ?`, elsewhere).Where(`"vulnerability_id" = ?`, issue).
+				Limit(1).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		issues := []int64{f.issueID(t, "CVE-2026-8"), f.issueID(t, "GHSA-2026-0009")}
+		before := []clock{read(t, issues[0]), read(t, issues[1])}
+
+		f.shipped(t, twoConsumers())
+		critical := []finding.Reported{found("CVE-2026-8", swss), found("CVE-2026-9", teamd, "GHSA-2026-0009")}
+		for i := range critical {
+			critical[i].Issue.Severity = "critical"
+		}
+		f.applied(t, critical...)
+
+		for i, issue := range issues {
+			after := read(t, issue)
+			if after.Urgency <= before[i].Urgency {
+				t.Errorf("issue %d: the other product's finding ranks %d after the word was filled, want above %d",
+					i, after.Urgency, before[i].Urgency)
+			}
+			if after.DueAt == nil || (before[i].DueAt != nil && !after.DueAt.Before(*before[i].DueAt)) {
+				t.Errorf("issue %d: the other product's deadline is %v after a critical word was filled, "+
+					"want sooner than %v", i, after.DueAt, before[i].DueAt)
+			}
 		}
 	})
 }
