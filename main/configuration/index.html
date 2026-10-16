@@ -2764,6 +2764,12 @@ environment rather than a key somebody stored.</p>
 </tr>
 </tbody>
 </table>
+<p>How large one file may be, how much the deployment holds and how much one
+person may hold are settings an administrator changes in the application. One
+file is at most 512 MiB, and a larger value is refused, and read as 512 MiB
+where one is already stored: each upload is written to scratch space whole as
+it arrives, and the chart sizes that space for the largest request a route
+takes.</p>
 <p>An endpoint that is not <code>https</code> is refused, because a file is handed over as a
 redirect to a signed address and that address is a bearer token: anybody on the
 path between the browser and the store may spend it for the file it names.
@@ -3946,6 +3952,14 @@ v0.5.0's schema in one step and carries none of the upgrades before it.</p>
 <tr>
 <td>A CSAF document states the base vector inside the vector held, in the specification's order. v0.8.0 published the vector as held, metrics outside the base set included</td>
 <td>Nothing. An advisory v0.8.0 issued from such a vector reads as changed since it went out; issue it again to send the corrected document</td>
+</tr>
+<tr>
+<td>A flaw recorded here is rated by the product that recorded it, and its rating is no longer on the issue every product holding it reads. The upgrade moves it there</td>
+<td>Nothing. Where another product holds the same issue, its findings read no severity word from the record, and keep the deadline v0.8.0 worked out from it until the next scan reporting the issue with a word works it out again</td>
+</tr>
+<tr>
+<td><code>attachment.max-size</code> takes no value above 512 MiB, and a larger value is refused when set. v0.8.0 took any size</td>
+<td>Nothing. A larger value v0.8.0 stored is read as 512 MiB, so a file past it is refused at upload. Set it again at 512 MiB or below, so the settings screen shows the size that applies</td>
 </tr>
 <tr>
 <td><code>triage.deferral-threshold</code> and <code>scanning.quiet-after</code> are whole numbers of days, and a part-day value is refused when set</td>
