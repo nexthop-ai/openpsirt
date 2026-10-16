@@ -391,7 +391,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			components = append(components, *row.ConsumerID)
 		}
 	}
-	named, err := issuesNamed(ctx, s.db, issues)
+	named, err := issuesNamed(ctx, s.db, subject, issues)
 	if err != nil {
 		return nil, 0, err
 	}

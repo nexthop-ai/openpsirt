@@ -359,7 +359,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	for i, row := range rows {
 		known[anyKey{row.ProductID, row.VulnerabilityID, row.Fold}] = i
 	}
-	named, err := issuesNamed(ctx, s.db, issues)
+	named, err := issuesNamed(ctx, s.db, subject, issues)
 	if err != nil {
 		return nil, 0, err
 	}

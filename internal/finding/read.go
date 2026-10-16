@@ -48,12 +48,14 @@ func readableIn(ctx context.Context, db bun.IDB, subject access.Subject,
 }
 
 // issuesNamed reads what these issues are called and how bad they were
-// published to be.
+// published to be, as this subject may be told it.
 //
 // The published rating only. What a product says instead belongs to the
 // product, so it is read alongside by whoever knows which product is being
-// asked about and put on the copy the row shows (RatedIn).
-func issuesNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]Vulnerability, error) {
+// asked about and put on the copy the row shows (RatedIn). A description a
+// flaw recorded out of the subject's reach wrote is left out.
+func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
+	ids []int64) (map[int64]Vulnerability, error) {
 	held := map[int64]Vulnerability{}
 	if len(ids) == 0 {
 		return held, nil
@@ -67,7 +69,14 @@ func issuesNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]Vulner
 		Where(`"id" IN (?)`, bun.List(ids)).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
+	withheld, err := RecordedOutOfReach(ctx, db, subject, ids)
+	if err != nil {
+		return nil, err
+	}
 	for _, issue := range issues {
+		if withheld[issue.ID] {
+			issue.WithholdRecorded()
+		}
 		held[issue.ID] = issue
 	}
 	return held, nil

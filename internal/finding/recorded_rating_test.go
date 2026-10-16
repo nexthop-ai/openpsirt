@@ -17,7 +17,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 	// product holding the same issue sorts, filters and counts its own
 	// findings by the published rating, and the issue publishes none, so
 	// nothing a reader there does can find out how bad the recorder judged
-	// it.
+	// it. The list leaves out the summary the record wrote, too.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.store.Clock(minting)
@@ -72,6 +72,7 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		type told struct {
 			listed, critical, score int
 			counted                 int
+			summary                 string
 		}
 		read := func(t *testing.T, reader access.Subject, scope finding.Scope) told {
 			t.Helper()
@@ -90,6 +91,9 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 				if group.Vulnerability == identifier && group.ScoreCenti > got.score {
 					got.score = group.ScoreCenti
 				}
+				if group.Vulnerability == identifier && group.Summary != "" {
+					got.summary = group.Summary
+				}
 			}
 			aging, err := f.store.Remediation(ctx, reader, scope, time.Time{}, time.Time{})
 			if err != nil {
@@ -105,13 +109,14 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 			map[int64][]access.Role{other.ID: {access.PublicRead, access.PrivateRead}}, 0)
 		there := finding.Scope{ProductID: &other.ID, StreamID: &stream.ID, VariantID: &variant.ID}
 		if got := read(t, elsewhere, there); got.listed == 0 || got.critical != 0 ||
-			got.score != 0 || got.counted != 0 {
+			got.score != 0 || got.counted != 0 || got.summary != "" {
 			t.Errorf("a reader of the other product alone was told %+v: "+
-				"want the issue listed, and nothing critical, scored or counted as critical", got)
+				"want the issue listed, and nothing critical, scored, counted as critical or summarized", got)
 		}
 		recorder := f.planner(t, access.PublicRead, access.PrivateRead)
-		if got := read(t, recorder, f.scope); got.critical == 0 || got.score != 980 || got.counted == 0 {
-			t.Errorf("the recording product was told %+v: want its own flaw critical and scored 9.80", got)
+		if got := read(t, recorder, f.scope); got.critical == 0 || got.score != 980 || got.counted == 0 ||
+			got.summary == "" {
+			t.Errorf("the recording product was told %+v: want its own flaw critical, scored 9.80 and summarized", got)
 		}
 	})
 }

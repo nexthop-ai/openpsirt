@@ -983,7 +983,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		components = append(components, head.ComponentID)
 		targets = append(targets, head.TargetID)
 	}
-	named, err := issuesNamed(ctx, s.db, issues)
+	named, err := issuesNamed(ctx, s.db, subject, issues)
 	if err != nil {
 		return nil, 0, err
 	}
