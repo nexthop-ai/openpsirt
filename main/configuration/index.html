@@ -943,28 +943,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#from-v040" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.4.0
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-v050" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.5.0
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#from-v060" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1617,28 +1595,6 @@
     <span class="md-ellipsis">
       
         Every upgrade
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-v040" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.4.0
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-v050" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.5.0
       
     </span>
   </a>
@@ -3747,7 +3703,7 @@ deleting by surprise.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
 <p>A database is upgraded in place, at startup or by <code>openpsirt migrate up</code>,
 through each later release's upgrade on the way. A database built by the
-release the <a href="#from-v040">oldest section below</a> names, or by an earlier one, is
+release the <a href="#from-v060">oldest section below</a> names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.</p>
@@ -3781,97 +3737,23 @@ earlier release against it. Every release before this one starts against a
 database a later release upgraded and serves it, failing on what changed, so
 redeploying one, <code>helm rollback</code> included, is not going back: restore the
 backup first.</p>
-<h3 id="from-v040">From v0.4.0<a class="headerlink" href="#from-v040" title="Permanent link">&para;</a></h3>
-<p>A database v0.4.0 or an earlier release built is refused at startup and by
+<h3 id="from-v060">From v0.6.0<a class="headerlink" href="#from-v060" title="Permanent link">&para;</a></h3>
+<p>A database v0.6.0 or an earlier release built is refused at startup and by
 <code>openpsirt migrate up</code>, naming the version it holds. This release makes
-v0.5.0's schema in one step and carries none of the upgrades before it.</p>
+v0.7.0's schema in one step and carries none of the upgrades before it.</p>
 <ol>
 <li>Back the database up.</li>
-<li>Run <code>openpsirt migrate up</code> with v0.6.0 against it. v0.6.0 carries every
-   earlier upgrade, and its <a href="https://nexthop-ai.github.io/openpsirt/0.6.0/configuration/#upgrading">upgrade notes</a>
-   say what each one changes.</li>
-<li>Deploy this release, reading the sections from v0.6.0 on.</li>
+<li>Read v0.8.0's <a href="https://nexthop-ai.github.io/openpsirt/0.8.0/configuration/#upgrading">upgrade notes</a>
+   from the section for your release on, and do what they say before upgrading
+   as well as after: the upgrade from v0.5.0 removes group mappings that have to
+   be carried into <code>OPENPSIRT_GROUP_ROLES</code> first.</li>
+<li>For a database v0.4.0 or an earlier release built, run <code>openpsirt migrate up</code>
+   with v0.6.0 against it. v0.8.0 refuses such a database, as this release does.</li>
+<li>Run <code>openpsirt migrate up</code> with v0.8.0 against it.</li>
+<li>Deploy this release, reading the sections from v0.8.0 on.</li>
 </ol>
-<h3 id="from-v050">From v0.5.0<a class="headerlink" href="#from-v050" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Change</th>
-<th>What to do</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Group mappings come from <code>OPENPSIRT_GROUP_ROLES</code> alone, and any mapping means roles come from groups. v0.5.0 kept mappings made through <code>/v1/roles/bindings</code>, and the upgrade removes those on a product. <code>POST</code> and <code>DELETE</code> on <code>/v1/roles/bindings</code> and <code>PUT</code> on <code>/v1/roles/mode</code> are gone</td>
-<td>Before upgrading, read <code>GET /v1/roles/mode</code>. If it answers <code>group-bound</code>, list the mappings with <code>GET /v1/roles/bindings</code> and write them into <code>OPENPSIRT_GROUP_ROLES</code>. If it answers <code>direct</code>, leave the variable unset: a mapping would switch the deployment to roles from groups and set aside every role assigned under People</td>
-</tr>
-<tr>
-<td><code>openpsirt migrate down</code> is gone, and a database a later release upgraded is refused at startup. v0.5.0 rolled a database back to an earlier release and served one ahead of it</td>
-<td>Take a backup before every upgrade, as <a href="#every-upgrade">Every upgrade</a> says; going back is restoring it</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr>
-<th>After the upgrade from v0.5.0</th>
-<th></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>A withdrawn API key's or personal token's name</td>
-<td>May be given to a new key, or to a new token of the same owner. What a key sent stays with the key that sent it</td>
-</tr>
-</tbody>
-</table>
-<h3 id="from-v060">From v0.6.0<a class="headerlink" href="#from-v060" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Change</th>
-<th>What to do</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Each replica fetches the CVE List's daily archive from <code>github.com</code>, which hands the download to <code>release-assets.githubusercontent.com</code> or <code>objects.githubusercontent.com</code>. About 620 MB a day, and about 1.3 GB on the scanner's volume while it is read</td>
-<td>Where those hosts cannot be reached, set <code>OPENPSIRT_RECORDS_UPDATE=false</code> and place a snapshot from <code>make cve-records</code> in <code>OPENPSIRT_RECORDS_DIR</code>; otherwise the fetch logs a failure every hour and nothing narrows. Size the scanner's volume for the 1.3 GB beside the scanner's own data</td>
-</tr>
-<tr>
-<td>The first scan of each build after the snapshot arrives closes the findings the records exclude, as <code>unaffected</code></td>
-<td>Nothing. They are listed in the register under that reason, with the record's lines. A kernel build may close thousands at once</td>
-</tr>
-<tr>
-<td>Compliance rate and the register's met column</td>
-<td>Nothing. A finding closed as invalid, unaffected or disclaimed is in neither, for every period, so a rate read before the upgrade may differ from the same period read after it</td>
-</tr>
-<tr>
-<td>A supplier's statement that its own product is not affected closes the finding inside that product, as <code>disclaimed</code>, where the product is in the build at the version the statement names</td>
-<td>Upload again each VEX document and advisory uploaded before the upgrade. A statement recorded by v0.6.0 kept no product, so it closes nothing and is evidence by package until it is read again. Read again, a claim it repeats stands where it stood and raises no notice; a claim the publisher has since changed is noticed as changed</td>
-</tr>
-<tr>
-<td>Every supplier read from its directory reads its advisories again from its window, a year before it was configured unless set otherwise</td>
-<td>Nothing. It is what configuring a new supplier costs, drained at the same per-pass bound, so a large publisher takes days</td>
-</tr>
-<tr>
-<td>A VEX document a build's page generates is this deployment's own unless <code>kind=with-suppliers</code> is asked for, which is a second document with an identifier and revisions of its own</td>
-<td>Nothing. Every document v0.6.0 recorded as gone out is this deployment's own, and keeps its revisions</td>
-</tr>
-<tr>
-<td>A generated VEX document names the build by the package identifier its SBOM gave its root, where that identifier names a version, and states a dismissal agreed at some places of a component one place at a time</td>
-<td>Tell anybody matching on the old product name, <code>product:stream:variant</code>, that the document now names what the SBOM does. A build whose SBOM gave its root no such identifier keeps the old name</td>
-</tr>
-<tr>
-<td>A claim the build sent with its SBOM about a component inside a product of the build applies beneath that product, rather than at every place of the component</td>
-<td>Nothing for a branch: its next upload restates each claim with its product. A tag is not uploaded again, so its claims keep applying across the build until it is</td>
-</tr>
-<tr>
-<td>A VEX document uploaded on its own whose statements name the build's root is the build's own claim</td>
-<td>Upload such a document again. A statement recorded by v0.6.0 kept no product, so it stays evidence until it is read again</td>
-</tr>
-</tbody>
-</table>
+<p>A database v0.7.0 built needs none of this, and reads the sections from v0.8.0
+on.</p>
 <h3 id="from-v080">From v0.8.0<a class="headerlink" href="#from-v080" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
