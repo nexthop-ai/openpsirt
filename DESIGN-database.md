@@ -542,8 +542,15 @@ in the gate.
 | The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, judgments and an approval, an assignment, and a recorded flaw |
 | What it held | Its status report's open findings per build, and every table's row count with it stopped. A build whose line carries no count is not settled, and the wait ends in a refusal naming it |
 | The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
-| The rows | Each table's count: a table both sides hold keeps its count, and a table only the upgrade holds starts empty. From a release before v0.9.0, the components, nodes and edges may hold fewer, by no more than the release held for container images, and the image versions start filled, with no more rows than the release held image nodes, because its upgrade merges the first three and fills the fourth from them |
+| The rows | Each table's count: a table both sides hold keeps its count, and a table only the upgrade holds starts empty. From a release before v0.9.0, the components, nodes and edges may hold fewer, by no more than the release held for container images, and the image versions start filled, with no more rows than the release held image nodes, because its upgrade merges the first three and fills the fourth from them. From a release before v0.9.0 the reasoning and recorded ratings reconcile exactly too, as the next table says |
 | Served | This tree's server on the upgraded database, started with the configuration the release's demo started its own with, reports the same open findings per build, and no GET its API document lists answers 5xx. The sweep names the build that sorts first. A GET with a path parameter the seed has no name for is skipped |
+
+| Table, from a release before v0.9.0 | What the counts reconcile against |
+|---|---|
+| `statement_text` | Starts with one row per distinct reasoning, word for word, across the claims and supplier statements the release held |
+| `recorded_rating` | Starts with one row per issue and product the release held a recorded flaw for, on an issue rated by a word or by a score naming no publisher. An issue that absorbed another in a merge may add one, as what the merge brought together says |
+| `issue_rating` | Gains exactly the recorded words whose issue and product held no word in force, and keeps every word that was |
+| `vulnerability_rating` | Loses exactly the unsourced ratings of issues now holding a recorded rating. No other issue's unsourced ratings move, none is gained, and no rating naming a publisher moves |
 
 | Rule | |
 |---|---|

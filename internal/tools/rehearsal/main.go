@@ -41,6 +41,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -266,6 +267,13 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	var words Words
+	var rated Ratings
+	if record.Last < wordsAndRatings {
+		if words, rated, err = r.heldWordsAndRatings(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
@@ -281,7 +289,17 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, Moved(record.Last, images)))...)
+	moved := Moved(record.Last, images)
+	if record.Last < wordsAndRatings {
+		left, err := r.ratings(ctx)
+		if err != nil {
+			return nil, err
+		}
+		restated, wrong := Restated(record.Last, words, rated, left)
+		maps.Copy(moved, restated)
+		faults = append(faults, prefix("upgrade", wrong)...)
+	}
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, moved))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -504,6 +522,115 @@ func (r *run) images(ctx context.Context) (Images, error) {
 	} {
 		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
 			return Images{}, fmt.Errorf("count the release's images: %w", err)
+		}
+	}
+	return out, nil
+}
+
+// heldWordsAndRatings reads what the release held that the upgrade stores
+// reasoning and recorded ratings from.
+func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return Words{}, Ratings{}, err
+	}
+	defer func() { _ = db.Close() }()
+	var words Words
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM (
+		SELECT "statement" AS "said" FROM "suppression" WHERE "statement" IS NOT NULL AND "statement" <> ''
+		UNION
+		SELECT "statement" FROM "vex_statement" WHERE "statement" IS NOT NULL AND "statement" <> ''
+	) AS "w"`).Scan(&words.Distinct); err != nil {
+		return Words{}, Ratings{}, fmt.Errorf("count the release's reasoning: %w", err)
+	}
+	rated, err := ratingsOf(ctx, db, false)
+	if err != nil {
+		return Words{}, Ratings{}, err
+	}
+	// A recorded flaw on an issue rated by a word or by a score naming no
+	// publisher, and whether the issue absorbed another in a merge.
+	const recorded = `SELECT DISTINCT "v"."id", "st"."product_id" FROM "finding" AS "f"
+		JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"
+		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
+		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
+		WHERE "f"."kind" = 'entered' AND `
+	const kept = `EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id")`
+	for _, each := range []struct {
+		query string
+		into  *int64
+	}{
+		{`SELECT COUNT(*) FROM (` + recorded + `NOT ` + kept + ` AND (COALESCE("v"."severity", '') <> ''
+			OR (COALESCE("v"."score_source", '') = '' AND "v"."score_centi" IS NOT NULL))) AS "p"`, &rated.Plain},
+		{`SELECT COUNT(*) FROM (` + recorded + kept + `) AS "k"`, &rated.Kept},
+	} {
+		if err := db.QueryRowContext(ctx, each.query).Scan(each.into); err != nil {
+			return Words{}, Ratings{}, fmt.Errorf("count the release's recorded flaws: %w", err)
+		}
+	}
+	return words, rated, nil
+}
+
+// ratings reads the ratings the upgrade moved, on the upgraded database.
+func (r *run) ratings(ctx context.Context) (Ratings, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return Ratings{}, err
+	}
+	defer func() { _ = db.Close() }()
+	return ratingsOf(ctx, db, true)
+}
+
+// ratingsOf reads each issue's unsourced ratings, the sourced ones, and the
+// words in force, and after the upgrade the recorded ratings too.
+func ratingsOf(ctx context.Context, db *database.DB, upgraded bool) (Ratings, error) {
+	out := Ratings{Unsourced: map[int64]int64{}, InForce: map[Pair]bool{}, Recorded: map[Pair]bool{}}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "vulnerability_rating"
+		WHERE COALESCE("score_source", '') <> ''`).Scan(&out.Sourced); err != nil {
+		return Ratings{}, fmt.Errorf("count the sourced ratings: %w", err)
+	}
+	rows, err := db.QueryContext(ctx, `SELECT "vulnerability_id", COUNT(*) FROM "vulnerability_rating"
+		WHERE COALESCE("score_source", '') = '' GROUP BY "vulnerability_id"`)
+	if err != nil {
+		return Ratings{}, fmt.Errorf("count the unsourced ratings: %w", err)
+	}
+	for rows.Next() {
+		var issue, n int64
+		if err := rows.Scan(&issue, &n); err != nil {
+			_ = rows.Close()
+			return Ratings{}, err
+		}
+		out.Unsourced[issue] = n
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return Ratings{}, err
+	}
+	pairs := []struct {
+		query string
+		into  map[Pair]bool
+	}{{`SELECT "vulnerability_id", "product_id", 1 FROM "issue_rating"`, out.InForce}}
+	if upgraded {
+		pairs = append(pairs, struct {
+			query string
+			into  map[Pair]bool
+		}{`SELECT "vulnerability_id", "product_id", CASE WHEN "severity" IS NULL THEN 0 ELSE 1 END
+			FROM "recorded_rating"`, out.Recorded})
+	}
+	for _, each := range pairs {
+		rows, err := db.QueryContext(ctx, each.query)
+		if err != nil {
+			return Ratings{}, fmt.Errorf("read the ratings by issue and product: %w", err)
+		}
+		for rows.Next() {
+			var p Pair
+			var worded int
+			if err := rows.Scan(&p.Issue, &p.Product, &worded); err != nil {
+				_ = rows.Close()
+				return Ratings{}, err
+			}
+			each.into[p] = worded == 1
+		}
+		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+			return Ratings{}, err
 		}
 	}
 	return out, nil
