@@ -259,8 +259,12 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 	row := held.rows[id]
 	wrote := false
 	if unfilled(row, named) {
-		if err := v.fill(ctx, id, named); err != nil {
+		worded, err := v.fill(ctx, id, named)
+		if err != nil {
 			return 0, err
+		}
+		if worded {
+			v.moved[id] = true
 		}
 		wrote = true
 	}
@@ -327,15 +331,16 @@ func (v *Vulnerabilities) interned(ctx context.Context, named Named, held *onRec
 	return id, nil
 }
 
-// unfilled is whether filling the description and the advisory would match
-// the row: a value reported where the row holds none.
+// unfilled is whether filling the description, the advisory and the severity
+// word would match the row: a value reported where the row holds none.
 //
 // Spaces alone count as none, because MySQL and MariaDB compare a run of
 // spaces equal to the empty string.
 func unfilled(row Vulnerability, named Named) bool {
 	empty := func(s string) bool { return strings.TrimRight(s, " ") == "" }
 	return (named.Description != "" && empty(row.Description)) ||
-		(named.Advisory != "" && empty(row.Advisory))
+		(named.Advisory != "" && empty(row.Advisory)) ||
+		(named.Severity != "" && row.Severity == "")
 }
 
 // unranked is whether raising the signals the order is worked out from would

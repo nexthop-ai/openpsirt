@@ -115,3 +115,52 @@ func TestARecordedFlawsRatingSortsFiltersAndCountsNothingInAnotherProduct(t *tes
 		}
 	})
 }
+
+func TestARecordedFlawFiledUnderAPublishedNameTakesTheFeedsWord(t *testing.T) {
+	// A recorded flaw's issue holds no word of its own. A scanner reporting
+	// it under a published name, with the minted one beside it, files the
+	// record there and gives the issue the scanner's word, so another product
+	// holding that name reads how the world rates it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.Clock(minting)
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "critical",
+			Summary: "The management socket accepts a request nobody authenticated.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := f.issueID(t, identifier)
+		f.applied(t, found("CVE-2026-9", swss, identifier))
+		if refiled := f.issueID(t, "CVE-2026-9"); refiled != issue {
+			t.Fatalf("the published name reaches issue %d, want the record's %d", refiled, issue)
+		}
+		var word string
+		if err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).Column("severity").
+			Where(`"id" = ?`, issue).Scan(ctx, &word); err != nil {
+			t.Fatal(err)
+		}
+		if word != "high" {
+			t.Errorf("the issue's word is %q, want the scanner's high", word)
+		}
+
+		// An issue already filed under the published name and holding no
+		// word, as an upgrade leaves one whose word was the record's, takes
+		// the word from the next report of it.
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Vulnerability)(nil)).
+			Set(`"severity" = NULL`).Where(`"id" = ?`, issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.applied(t, found("CVE-2026-9", swss))
+		if err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).Column("severity").
+			Where(`"id" = ?`, issue).Scan(ctx, &word); err != nil {
+			t.Fatal(err)
+		}
+		if word != "high" {
+			t.Errorf("the issue's word is %q after a rescan, want the scanner's high", word)
+		}
+	})
+}
