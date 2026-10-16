@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
@@ -213,10 +214,15 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
 		return startupFailed(err, "checking the schema version", cfg)
 	}
-	// A database last opened by a release that kept no statistics, or copied
-	// in from elsewhere, has none until a scan applies.
-	if err := database.RefreshStatistics(ctx, db); err != nil {
+	// A database last opened by a release that kept no statistics, copied in
+	// from elsewhere, or partly rebuilt by an upgrade, has estimates that
+	// describe nothing until the engine is asked.
+	started := time.Now()
+	if analyzed, err := database.AnalyzeEveryTable(ctx, db); err != nil {
 		logger.Error("could not refresh the planner's statistics", "error", err)
+	} else {
+		logger.Info("refreshed the planner's statistics", "tables", analyzed,
+			"took", time.Since(started).Round(time.Millisecond))
 	}
 
 	handler, beside, err := prepare(ctx, cfg, logger, db)

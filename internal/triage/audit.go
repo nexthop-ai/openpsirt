@@ -402,6 +402,16 @@ type what struct {
 // matching set is five independent answers, so a decision matching findings at
 // two components produced a row naming a component, a version and a consumer
 // that never appeared together.
+//
+// The earliest finding of every decision is found in one grouped read, and
+// the names are joined to it afterwards. A minimum correlated into the join
+// condition is evaluated once for every row the join reaches it with, which is
+// once per decision only while the planner starts from the decisions. Over a
+// v0.7.0 demo upgraded on MySQL 8.4, with the issues and products estimated as
+// empty, the planner started from a cross product of the issues, the products
+// and the issues again, and a page of 100 decisions ran for more than four
+// hours; the grouped read took 0.61 s over the same estimates, and 5 ms once
+// they were refreshed.
 func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]what, error) {
 	keys := make([]int64, 0, len(decisions))
 	for _, decision := range decisions {
@@ -416,29 +426,33 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		Product     string `bun:"product"`
 		ProductName string `bun:"product_name"`
 	}
-	err := s.db.NewSelect().
+	earliest := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(finding.DecisionIssue).
-		Join(`JOIN "finding" AS "f" ON "f"."id" = (
-			SELECT MIN("f2"."id") FROM "finding" AS "f2"
-			JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"
-			JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"
-			WHERE `+finding.DecisionAtPlace("f2")+`
-				AND "st2"."product_id" = "de"."product_id")`).
+		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionAtPlace("f2")).
+		Join(`JOIN "target" AS "tg2" ON "tg2"."id" = "f2"."target_id"`).
+		Join(`JOIN "stream" AS "st2" ON "st2"."id" = "tg2"."stream_id"`).
+		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
+		Where(`"st2"."product_id" = "de"."product_id"`).
+		Where(`"de"."id" IN (?)`, bun.List(keys)).
+		GroupExpr(`"de"."id"`)
+	err := s.db.NewSelect().
+		TableExpr(`(?) AS "earliest"`, earliest).
+		Join(`JOIN "finding" AS "f" ON "f"."id" = "earliest"."finding_id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		ColumnExpr(`"de"."id" AS "decision_id"`).
+		ColumnExpr(`"earliest"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
 		ColumnExpr(`"c"."name" AS "component"`).
 		ColumnExpr(`"c"."version" AS "version"`).
 		ColumnExpr(`COALESCE("uc"."name", ?) AS "consumer"`, "").
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
-		Where(`"de"."id" IN (?)`, bun.List(keys)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these judgments were about: %w", err)

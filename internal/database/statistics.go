@@ -6,6 +6,8 @@ package database
 import (
 	"context"
 	"fmt"
+
+	"github.com/uptrace/bun"
 )
 
 // RefreshStatistics brings the planner's statistics up to date where the
@@ -17,7 +19,8 @@ import (
 // took 4.0 s walking 297,405 of one component's findings when an index on
 // the place reached the few it wanted in 0.6 ms, and the list of what is
 // running out took 2.5 s where it takes 0.13 s. The servers keep statistics
-// current on their own, so on them this does nothing.
+// current on their own as rows change, so on them this does nothing; a start
+// asks them once through AnalyzeEveryTable.
 //
 // A whole ANALYZE rather than the pragma that analyzes only a table that has
 // grown several times over. A scan changes the shape of the tables more than
@@ -53,5 +56,71 @@ func RefreshStatistics(ctx context.Context, db *DB) error {
 	}
 	db.SetMaxIdleConns(0)
 	db.SetMaxIdleConns(idle)
+	return nil
+}
+
+// AnalyzeEveryTable asks the engine to refresh the planner's statistics of
+// every table in the database now, and reports how many tables it analyzed.
+// On SQLite it is RefreshStatistics, which analyzes the whole file and counts
+// no tables.
+//
+// A server refreshes a table's statistics on its own once about a tenth of
+// its rows have changed, in the background, and a database can still arrive
+// with estimates that describe nothing: loaded before the background work
+// ran, restored from elsewhere, or held by a server whose background work has
+// stalled. A release's upgrade makes that worse rather than better on MySQL
+// and MariaDB, because a table the upgrade rebuilds is analyzed as it is
+// rebuilt and every other table keeps what it had. A v0.7.0 demo upgraded to
+// v0.9.0's schema on MySQL 8.4 held 7,746 issues and 2 products under
+// estimates of none, beside an accurate 2,202 decisions; the planner put the
+// issues and products first as a cross product, and the decision audit ran
+// for more than four hours. Analyzed, the same statement takes 5 ms. All 87
+// tables of that database analyze in 140 ms.
+func AnalyzeEveryTable(ctx context.Context, db *DB) (int, error) {
+	if db.Server.Engine == SQLite {
+		return 0, RefreshStatistics(ctx, db)
+	}
+	var names []string
+	listing := db.NewRaw(`SELECT "table_name" AS "name" FROM "information_schema"."tables"
+		WHERE "table_schema" = DATABASE() AND "table_type" = 'BASE TABLE'`)
+	if db.Server.Engine == Postgres {
+		listing = db.NewRaw(`SELECT "tablename" AS "name" FROM "pg_catalog"."pg_tables"
+			WHERE "schemaname" = current_schema()`)
+	}
+	if err := listing.Scan(ctx, &names); err != nil {
+		return 0, fmt.Errorf("list the tables to analyze: %w", err)
+	}
+	for _, name := range names {
+		if err := analyzeTable(ctx, db, name); err != nil {
+			return 0, err
+		}
+	}
+	return len(names), nil
+}
+
+// analyzeTable refreshes the statistics of one table on a server.
+func analyzeTable(ctx context.Context, db *DB, table string) error {
+	if db.Server.Engine == Postgres {
+		if _, err := db.ExecContext(ctx, "ANALYZE ?", bun.Ident(table)); err != nil {
+			return fmt.Errorf("refresh the statistics of %s: %w", table, err)
+		}
+		return nil
+	}
+	// MySQL and MariaDB answer with a row per table rather than an error, so
+	// the answer is read: a table the server could not analyze says so there.
+	var rows []struct {
+		Table   string `bun:"Table"`
+		Op      string `bun:"Op"`
+		Kind    string `bun:"Msg_type"`
+		Message string `bun:"Msg_text"`
+	}
+	if err := db.NewRaw("ANALYZE TABLE ?", bun.Ident(table)).Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("refresh the statistics of %s: %w", table, err)
+	}
+	for _, row := range rows {
+		if row.Kind == "error" {
+			return fmt.Errorf("refresh the statistics of %s: %s", table, row.Message)
+		}
+	}
 	return nil
 }

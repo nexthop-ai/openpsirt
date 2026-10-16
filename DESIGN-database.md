@@ -26,6 +26,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Statement preparation](#statement-preparation)
 - [Bulk inserts](#bulk-inserts)
 - [SQLite settings](#sqlite-settings)
+- [Planner statistics](#planner-statistics)
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
 - [Column widths](#column-widths)
@@ -99,10 +100,10 @@ Engine-specific code is confined to these places:
 | Listing the harness's own databases | PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | Listing the tables of the harness's SQLite schema | SQLite keeps its schema in a catalog of its own. The servers are asked the same question through the information schema |
 | Commit durability on the harness servers | A global setting on the two MySQL-protocol servers, relaxed so the suite runs faster. PostgreSQL asks per session in the connection string, so it has nothing to branch on |
-| Refreshing planner statistics before a measurement | A server refreshes its statistics once about a tenth of a table has changed, and a measurement queries seconds after a bulk load, before that happens. PostgreSQL spells the request `ANALYZE` and the MySQL-protocol servers `ANALYZE TABLE`. SQLite is asked the way a deployment asks after a scan |
+| Refreshing planner statistics before a measurement | A server refreshes its statistics once about a tenth of a table has changed, and a measurement queries seconds after a bulk load, before that happens. It asks the way a start asks, through the row below |
 | Emptying a database for a measurement | Truncating gives a table new storage, and the engines spell it differently: PostgreSQL truncates every table in one statement, and MySQL and MariaDB one table a statement, refusing a table another references unless the session's foreign key checks are suspended. SQLite copies a migrated file per test and has nothing to truncate. `DESIGN-build.md` § Measurement databases has the measurement |
 | Reading a table's layout beside a measurement | PostgreSQL keeps a table's pages and each column's correlation in catalogs of its own. MySQL and MariaDB report a table's size through the information schema, in bytes of a page size each server sets |
-| Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and the servers keep their own. § SQLite settings has the measurement |
+| Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and is asked at start and after every scan. A server is asked once at start: PostgreSQL spells it `ANALYZE` and the MySQL-protocol servers `ANALYZE TABLE`, each table named from the catalog, which PostgreSQL keeps in one of its own and the others in the information schema. § Planner statistics has the measurement |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops a uniqueness rule as a constraint where MySQL and MariaDB drop the index of that name, MySQL and MariaDB name the table an index is dropped from, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
@@ -1181,11 +1182,23 @@ of three.
 | One connection while migrating | A migration's connection settings have to reach the transaction it opens. § Migration locks says why |
 | One connection in the test harness | A read through the root handle inside a transaction then waits for ever on the connection the transaction holds, and the test's deadline reports it. On a wider pool the read answers from a second connection, outside the transaction, and nothing reports it |
 | Write-ahead log, synchronous NORMAL | The default is a rollback journal synced twice per commit, and a scan applies hundreds of thousands of rows through it. In WAL mode a commit appends to the log, readers do not block the writer, and NORMAL syncs at a checkpoint. A process crash loses nothing; a power loss can lose the last commits, never consistency |
-| Planner statistics refreshed at start and after every scan | SQLite gathers none unless asked, and without them it picks an index by how many equalities it matches rather than how many rows lie behind it. On a demo of 361,429 findings the review queue took 4.1 s and the list of what is running out 2.5 s; with statistics, 0.08 s and 0.13 s. A whole analysis, 0.66 s for those findings, because a scan changes how rows divide more than how many there are: after a second build added a tenth to the findings, statistics analyzed only on growth still described one build, and the findings list took 2.1 s where it takes 0.57 s. Sampling the first rows of each index took 71 ms and misjudged which findings were assigned. The servers keep their own |
+| Planner statistics refreshed at start and after every scan | SQLite gathers none unless asked, and without them it picks an index by how many equalities it matches rather than how many rows lie behind it. On a demo of 361,429 findings the review queue took 4.1 s and the list of what is running out 2.5 s; with statistics, 0.08 s and 0.13 s. A whole analysis, 0.66 s for those findings, because a scan changes how rows divide more than how many there are: after a second build added a tenth to the findings, statistics analyzed only on growth still described one build, and the findings list took 2.1 s where it takes 0.57 s. Sampling the first rows of each index took 71 ms and misjudged which findings were assigned. The servers are asked at start alone: § Planner statistics |
 | A connection lives a minute, and a refresh closes the idle ones | A connection reads the statistics when it opens and never again, and a schema change does not make it read them again. On a pool open across a refresh, the review queue took 4.1 s on each connection but the one that ran the analysis. Closing the idle ones reaches the rest at once; the lifetime bounds the ones in use at the time |
 
 The pragmas are set on the connection string, and a URL may add its own after
 them. The test harness adds `synchronous(OFF)`.
+
+## Planner statistics
+
+| Rule | Reason |
+|---|---|
+| Every table is analyzed at start, on every engine | A server refreshes a table's estimates in the background once about a tenth of its rows have changed, so a database loaded before that ran, restored from elsewhere, or held by a server whose background work has stalled arrives with estimates that describe nothing |
+| An upgrade is followed by a start that analyzes | On MySQL and MariaDB an upgrade analyzes each table it rebuilds and leaves the rest as they were. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decisions. The planner started from the issues and products as a cross product, and a page of the decision audit ran for more than four hours. Analyzed, the same statement takes 5 ms |
+| A server is not asked again after a scan | Its own background refresh follows a scan's writes. SQLite has none, so it is asked after every scan (§ SQLite settings) |
+| A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
+
+All 87 tables of that MySQL database analyze in 140 ms: InnoDB samples a fixed
+number of pages per index rather than reading the table.
 
 ## Indexes
 

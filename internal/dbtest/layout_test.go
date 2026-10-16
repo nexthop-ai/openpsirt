@@ -41,7 +41,7 @@ func loadLeases(ctx context.Context, t *testing.T, db *database.DB, prefix strin
 func settled(ctx context.Context, t *testing.T, db *database.DB, prefix string) layout {
 	t.Helper()
 	loadLeases(ctx, t, db, prefix)
-	if err := analyze(ctx, db, "lease"); err != nil {
+	if _, err := database.AnalyzeEveryTable(ctx, db); err != nil {
 		t.Fatal(err)
 	}
 	l, err := readLayout(ctx, db, "lease")

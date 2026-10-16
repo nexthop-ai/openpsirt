@@ -5,6 +5,7 @@ package database_test
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -190,6 +191,64 @@ func TestRefreshingStatisticsSucceedsOnEveryEngine(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(t.Context(), db); err != nil {
 			t.Error(err)
+		}
+	})
+}
+
+// A start leaves the planner's estimate of a table describing the rows it
+// holds, on every engine. A server's own refresh runs in the background some
+// time after a load, and one that has not run yet estimates a loaded table as
+// empty: MySQL then joins such tables first, as a cross product, which is how
+// a page of the decision audit ran for hours over a v0.7.0 demo upgraded on
+// MySQL 8.4.
+func TestAStartLeavesThePlannerEstimatingTheRowsATableHolds(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		scratchTable(t, db, "estimated", `"n" INTEGER`)
+		const rows, batch = 2000, 500
+		for start := 0; start < rows; start += batch {
+			values := make([]string, batch)
+			args := make([]any, batch)
+			for i := range batch {
+				values[i] = "(?)"
+				args[i] = start + i
+			}
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO "estimated" ("n") VALUES `+strings.Join(values, ", "), args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		analyzed, err := database.AnalyzeEveryTable(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if db.Server.Engine != database.SQLite && analyzed == 0 {
+			t.Fatal("no table was analyzed, so this checked nothing")
+		}
+
+		var estimate float64
+		var read error
+		switch db.Server.Engine {
+		case database.Postgres:
+			read = db.QueryRowContext(ctx, `SELECT "reltuples" FROM "pg_catalog"."pg_class"
+				WHERE "relname" = 'estimated' AND "relnamespace" = current_schema()::regnamespace`).Scan(&estimate)
+		case database.MySQL, database.MariaDB:
+			read = db.QueryRowContext(ctx, `SELECT "n_rows" FROM "mysql"."innodb_table_stats"
+				WHERE "database_name" = DATABASE() AND "table_name" = 'estimated'`).Scan(&estimate)
+		default:
+			var stat string
+			read = db.QueryRowContext(ctx, `SELECT "stat" FROM "sqlite_stat1"
+				WHERE "tbl" = 'estimated'`).Scan(&stat)
+			if read == nil {
+				_, read = fmt.Sscan(stat, &estimate)
+			}
+		}
+		if read != nil {
+			t.Fatalf("read the planner's estimate: %v", read)
+		}
+		if estimate < rows/2 {
+			t.Errorf("the planner estimates %.0f rows in a table holding %d", estimate, rows)
 		}
 	})
 }
