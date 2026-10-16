@@ -23,8 +23,7 @@ func StatementsV080(engine database.Engine) map[string][]string {
 	}
 }
 
-// StatementsV090 is the untagged release's declaration of each table it
-// creates or changes.
+// StatementsV090 is v0.9.0's declaration of each table it creates or changes.
 func StatementsV090(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{

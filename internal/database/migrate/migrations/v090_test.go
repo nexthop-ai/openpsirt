@@ -20,8 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// v090 is the migration the untagged release carries v0.8.0's schema across
-// with.
+// v090 is the migration v0.9.0 carries v0.8.0's schema across with.
 const v090 = 43
 
 // v080World is what seedV080Images wrote, by identifier.
