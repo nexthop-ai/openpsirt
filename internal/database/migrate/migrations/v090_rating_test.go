@@ -17,8 +17,10 @@ import (
 // upgraded: the word, the score, the vector and its scheme are the recording
 // product's, the word is in force there, the issue holds none of them, and a
 // rating a feed published beside them stays. A scanned issue that absorbed a
-// record keeps its scanner's word and score, and a record filed under a
-// published name gives up its word and keeps a feed's sourced score.
+// record keeps its scanner's word and score, and gives up what the merge
+// copied from the record. A record filed under a published name and scanned
+// elsewhere gives up its word, records its own unsourced rating, and keeps a
+// feed's sourced score.
 func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -87,10 +89,29 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 		place("vulnerability", kept, "swss-scanned")
 		place("entered", kept, "swss-entered")
 
-		// A record filed under a published name that a feed later scored:
-		// the word is the record's, and the sourced score is the feed's.
+		// A scanned issue that absorbed a record whose word, score and
+		// rating the merge copied onto it: those are the record's.
+		copied := rated("CVE-2026-0004", "critical", 980, "")
+		exec(`UPDATE "vulnerability" SET "vector" = ? WHERE "id" = ?`, vector, copied)
+		copiedFrom := rated("SONIC-2026-0004", "critical", 980, "")
+		exec(`UPDATE "vulnerability" SET "vector" = ?, "issue_id" = ? WHERE "id" = ?`, vector, copied, copiedFrom)
+		exec(`INSERT INTO "vulnerability_merge" ("absorbed_id", "kept_id", "named", "merged_at")
+			VALUES (?, ?, ?, ?)`, copiedFrom, copied, "CVE-2026-0004 SONIC-2026-0004", at)
+		exec(`INSERT INTO "vulnerability_rating" ("vulnerability_id", "generation", "score_centi", "vector")
+			VALUES (?, ?, ?, ?)`, copied, 3, 980, vector)
+		place("vulnerability", copied, "swss-copied-scanned")
+		place("entered", copied, "swss-copied-entered")
+
+		// A record filed under a published name, scanned elsewhere, that a
+		// feed later scored on a newer scheme: the word is the record's, its
+		// own unsourced rating is its score, and the feed's score stays.
 		refiled := rated("CVE-2026-0003", "critical", 880, "nvd@nist.gov")
+		exec(`INSERT INTO "vulnerability_rating" ("vulnerability_id", "generation", "score_centi", "vector")
+			VALUES (?, ?, ?, ?)`, refiled, 3, 980, vector)
+		exec(`INSERT INTO "vulnerability_rating" ("vulnerability_id", "generation", "score_centi", "vector", "score_source")
+			VALUES (?, ?, ?, ?, ?)`, refiled, 4, 880, "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N", "nvd@nist.gov")
 		place("entered", refiled, "swss-refiled")
+		place("vulnerability", refiled, "swss-refiled-scanned")
 
 		dbtest.MigrateTo(t, db, v090)
 
@@ -156,8 +177,39 @@ func TestAV080RecordedRatingMovesToTheProductThatRecordedIt(t *testing.T) {
 			refiled).Scan(ctx, &fromRecord); err != nil {
 			t.Fatal(err)
 		}
-		if fromRecord.Severity == nil || *fromRecord.Severity != "critical" || fromRecord.ScoreCenti != nil {
-			t.Errorf("the refiled record's rating reads %+v, want its word critical and no score", fromRecord)
+		if fromRecord.Severity == nil || *fromRecord.Severity != "critical" ||
+			fromRecord.ScoreCenti == nil || *fromRecord.ScoreCenti != 980 {
+			t.Errorf("the refiled record's rating reads %+v, want its word critical and its own 9.80", fromRecord)
+		}
+		if left := id(`SELECT COUNT(*) FROM "vulnerability_rating" WHERE "vulnerability_id" = ?`, refiled); left != 1 {
+			t.Errorf("%d ratings are left on the refiled issue, want the feed's", left)
+		}
+
+		var copiedRecord struct {
+			Severity   *string `bun:"severity"`
+			ScoreCenti *int64  `bun:"score_centi"`
+		}
+		if err := db.DB.NewRaw(`SELECT "severity", "score_centi" FROM "recorded_rating" WHERE "vulnerability_id" = ?`,
+			copied).Scan(ctx, &copiedRecord); err != nil {
+			t.Fatal(err)
+		}
+		if copiedRecord.Severity == nil || *copiedRecord.Severity != "critical" ||
+			copiedRecord.ScoreCenti == nil || *copiedRecord.ScoreCenti != 980 {
+			t.Errorf("what a merge copied reads %+v as recorded, want critical and 9.80", copiedRecord)
+		}
+		var copiedRow struct {
+			Severity   *string `bun:"severity"`
+			ScoreCenti *int64  `bun:"score_centi"`
+		}
+		if err := db.DB.NewRaw(`SELECT "severity", "score_centi" FROM "vulnerability" WHERE "id" = ?`,
+			copied).Scan(ctx, &copiedRow); err != nil {
+			t.Fatal(err)
+		}
+		if copiedRow.Severity != nil || copiedRow.ScoreCenti != nil {
+			t.Errorf("the issue a merge copied a record onto still reads %+v", copiedRow)
+		}
+		if left := id(`SELECT COUNT(*) FROM "vulnerability_rating" WHERE "vulnerability_id" = ?`, copied); left != 0 {
+			t.Errorf("%d of the record's ratings are left on the issue a merge copied it onto", left)
 		}
 		var refiledRow struct {
 			Severity   *string `bun:"severity"`
