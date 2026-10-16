@@ -179,9 +179,9 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 	if err != nil {
 		return 0, err
 	}
-	// Refused before any work is read, as Assign and AssignMatching refuse:
-	// asked only per piece, a hand-over of nothing to somebody else answered
-	// that nothing moved.
+	// Refused before any work is read, as Assign and AssignMatching refuse,
+	// so a hand-over of nothing to somebody else is refused rather than
+	// answered as zero moved.
 	if err := mayMove(subject, productID, to, dispatches); err != nil {
 		return 0, err
 	}
