@@ -103,7 +103,8 @@ Engine-specific code is confined to these places:
 | Refreshing planner statistics before a measurement | A server refreshes its statistics once about a tenth of a table has changed, and a measurement queries seconds after a bulk load, before that happens. It asks the way a start asks, through the row below |
 | Emptying a database for a measurement | Truncating gives a table new storage, and the engines spell it differently: PostgreSQL truncates every table in one statement, and MySQL and MariaDB one table a statement, refusing a table another references unless the session's foreign key checks are suspended. SQLite copies a migrated file per test and has nothing to truncate. `DESIGN-build.md` § Measurement databases has the measurement |
 | Reading a table's layout beside a measurement | PostgreSQL keeps a table's pages and each column's correlation in catalogs of its own. MySQL and MariaDB report a table's size through the information schema, in bytes of a page size each server sets |
-| Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and is asked at start and after every scan. A server is asked once at start: PostgreSQL spells it `ANALYZE` and the MySQL-protocol servers `ANALYZE TABLE`, each table named from the catalog, which PostgreSQL keeps in one of its own and the others in the information schema. § Planner statistics has the measurement |
+| Refreshing planner statistics in a deployment | SQLite gathers none unless asked, and is asked at start and after every scan. A server is asked once at start: PostgreSQL spells it `ANALYZE` with `SKIP_LOCKED` and the MySQL-protocol servers `ANALYZE TABLE` under a session bound on waiting for a lock, each table named from the catalog, which PostgreSQL keeps in one of its own and the others in the information schema. § Planner statistics has the measurement |
+| Reading the planner's estimate of a table in a test | Each engine keeps its estimates somewhere of its own: PostgreSQL in its catalog, MySQL and MariaDB in InnoDB's statistics tables, SQLite in a table of its own |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
 | A release's upgrade | Changing an existing table is spelled per engine: PostgreSQL drops a uniqueness rule as a constraint where MySQL and MariaDB drop the index of that name, MySQL and MariaDB name the table an index is dropped from, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes and which columns a table already has |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone, and an index-only scan there reads the table for every page changed since the last vacuum. § Indexes has the measurement |
@@ -1196,9 +1197,20 @@ them. The test harness adds `synchronous(OFF)`.
 | An upgrade is followed by a start that analyzes | On MySQL and MariaDB an upgrade analyzes each table it rebuilds and leaves the rest as they were. A v0.7.0 demo upgraded on MySQL 8.4 held 7,746 issues and 2 products under estimates of none, beside an accurate 2,202 decisions. The planner started from the issues and products as a cross product, and a page of the decision audit ran for more than four hours. Analyzed, the same statement takes 5 ms |
 | A server is not asked again after a scan | Its own background refresh follows a scan's writes. SQLite has none, so it is asked after every scan (§ SQLite settings) |
 | A failed refresh is logged and the start goes on | Stale estimates make a statement slow, never wrong |
+| The refresh has a quarter of the startup deadline | One running long leaves the rest of the start its time |
+| A table something else holds is stepped over and named in the log | An analysis needs only a shared lock, so it waits only behind a schema change or a vacuum, and a start is never held by another replica's. PostgreSQL steps over it in the statement and says so as a warning alone. MySQL and MariaDB wait a second for the table's metadata lock, where the server's default is a year |
+| The startup deadline starts again once an auto-migration finishes | A migration is unbounded and can take minutes, and the steps after it are held to the deadline from there |
 
-All 87 tables of that MySQL database analyze in 140 ms: InnoDB samples a fixed
-number of pages per index rather than reading the table.
+Measured at start over the demo upgraded to v0.9.0's schema, every table
+included: 140 ms on MySQL 8.4 over 381,337 findings, and 683 ms on PostgreSQL
+16 over 381,305. InnoDB
+samples a fixed number of pages per index, and PostgreSQL a fixed number of
+rows per table, so neither grows with the table.
+
+MySQL 8.4 and MariaDB 11.4 analyze a table beside a long query reading it
+without waiting, and a query arriving after the analysis waits for nothing:
+the analysis, and a query after it, each took about 60 ms beside a 15 s read
+of the same table on both.
 
 ## Indexes
 

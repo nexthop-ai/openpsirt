@@ -4,10 +4,12 @@
 package database_test
 
 import (
+	"context"
 	"database/sql"
-	"fmt"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -195,60 +197,44 @@ func TestRefreshingStatisticsSucceedsOnEveryEngine(t *testing.T) {
 	})
 }
 
-// A start leaves the planner's estimate of a table describing the rows it
-// holds, on every engine. A server's own refresh runs in the background some
-// time after a load, and one that has not run yet estimates a loaded table as
-// empty: MySQL then joins such tables first, as a cross product, which is how
-// a page of the decision audit ran for hours over a v0.7.0 demo upgraded on
-// MySQL 8.4.
-func TestAStartLeavesThePlannerEstimatingTheRowsATableHolds(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+// A table something else holds is stepped over rather than waited for, so a
+// schema change or a vacuum on another replica never holds a start. MySQL and
+// MariaDB otherwise wait for the server's default of a year, and PostgreSQL
+// until the holder lets go.
+func TestAnalyzingStepsOverATableSomethingHolds(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		scratchTable(t, db, "estimated", `"n" INTEGER`)
-		const rows, batch = 2000, 500
-		for start := 0; start < rows; start += batch {
-			values := make([]string, batch)
-			args := make([]any, batch)
-			for i := range batch {
-				values[i] = "(?)"
-				args[i] = start + i
-			}
-			if _, err := db.ExecContext(ctx,
-				`INSERT INTO "estimated" ("n") VALUES `+strings.Join(values, ", "), args...); err != nil {
-				t.Fatal(err)
-			}
-		}
+		scratchTable(t, db, "held", `"n" INTEGER`)
 
-		analyzed, err := database.AnalyzeEveryTable(ctx, db)
+		holder, err := db.Conn(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if db.Server.Engine != database.SQLite && analyzed == 0 {
+		defer func() { _ = holder.Close() }()
+		hold, release := `LOCK TABLES "held" WRITE`, `UNLOCK TABLES`
+		if db.Server.Engine == database.Postgres {
+			if _, err := holder.ExecContext(ctx, `BEGIN`); err != nil {
+				t.Fatal(err)
+			}
+			hold, release = `LOCK TABLE "held" IN ACCESS EXCLUSIVE MODE`, `ROLLBACK`
+		}
+		if _, err := holder.ExecContext(ctx, hold); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = holder.ExecContext(context.WithoutCancel(ctx), release) }()
+
+		bounded, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		started := time.Now()
+		done, err := database.AnalyzeEveryTable(bounded, db)
+		if err != nil {
+			t.Fatalf("analyzing beside a held table failed after %s: %v", time.Since(started), err)
+		}
+		if done.Tables == 0 {
 			t.Fatal("no table was analyzed, so this checked nothing")
 		}
-
-		var estimate float64
-		var read error
-		switch db.Server.Engine {
-		case database.Postgres:
-			read = db.QueryRowContext(ctx, `SELECT "reltuples" FROM "pg_catalog"."pg_class"
-				WHERE "relname" = 'estimated' AND "relnamespace" = current_schema()::regnamespace`).Scan(&estimate)
-		case database.MySQL, database.MariaDB:
-			read = db.QueryRowContext(ctx, `SELECT "n_rows" FROM "mysql"."innodb_table_stats"
-				WHERE "database_name" = DATABASE() AND "table_name" = 'estimated'`).Scan(&estimate)
-		default:
-			var stat string
-			read = db.QueryRowContext(ctx, `SELECT "stat" FROM "sqlite_stat1"
-				WHERE "tbl" = 'estimated'`).Scan(&stat)
-			if read == nil {
-				_, read = fmt.Sscan(stat, &estimate)
-			}
-		}
-		if read != nil {
-			t.Fatalf("read the planner's estimate: %v", read)
-		}
-		if estimate < rows/2 {
-			t.Errorf("the planner estimates %.0f rows in a table holding %d", estimate, rows)
+		if db.Server.Engine != database.Postgres && !slices.Contains(done.Skipped, "held") {
+			t.Errorf("the held table was not reported as stepped over: %v", done.Skipped)
 		}
 	})
 }

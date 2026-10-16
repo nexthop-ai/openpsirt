@@ -5,6 +5,7 @@ package dbtest
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,14 +28,17 @@ func SettleStatistics(t *testing.T, db *database.DB) {
 	t.Helper()
 	ctx := t.Context()
 	started := time.Now()
-	analyzed, err := database.AnalyzeEveryTable(ctx, db)
+	done, err := database.AnalyzeEveryTable(ctx, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if db.Server.Engine != database.SQLite && analyzed == 0 {
+	if db.Server.Engine != database.SQLite && done.Tables == 0 {
 		t.Fatal("no table was analyzed, so no statistics were refreshed")
 	}
-	t.Logf("statistics refreshed on %s over %d tables in %s", db.Server.Engine, analyzed,
+	if len(done.Skipped) > 0 {
+		t.Fatalf("tables held by something else were not analyzed: %v", done.Skipped)
+	}
+	t.Logf("statistics refreshed on %s over %d tables in %s", db.Server.Engine, done.Tables,
 		time.Since(started).Round(time.Millisecond))
 
 	// The layout a plan was chosen over, printed beside the timings that
@@ -48,4 +52,34 @@ func SettleStatistics(t *testing.T, db *database.DB) {
 		t.Fatalf("read the layout a measurement runs over: %v", err)
 	}
 	t.Logf("layout on %s of %s", db.Server.Engine, l)
+}
+
+// EstimatedRows is how many rows the planner believes a table holds, read
+// from where each engine keeps its statistics: PostgreSQL's catalog, InnoDB's
+// persistent statistics on MySQL and MariaDB, and SQLite's statistics table.
+// PostgreSQL answers -1 for a table never analyzed, and SQLite fails for one
+// it has no row for.
+func EstimatedRows(t *testing.T, db *database.DB, table string) float64 {
+	t.Helper()
+	ctx := t.Context()
+	var estimate float64
+	var err error
+	switch db.Server.Engine {
+	case database.Postgres:
+		err = db.QueryRowContext(ctx, `SELECT "reltuples" FROM "pg_catalog"."pg_class"
+			WHERE "relname" = ? AND "relnamespace" = current_schema()::regnamespace`, table).Scan(&estimate)
+	case database.MySQL, database.MariaDB:
+		err = db.QueryRowContext(ctx, `SELECT "n_rows" FROM "mysql"."innodb_table_stats"
+			WHERE "database_name" = DATABASE() AND "table_name" = ?`, table).Scan(&estimate)
+	default:
+		var stat string
+		err = db.QueryRowContext(ctx, `SELECT "stat" FROM "sqlite_stat1" WHERE "tbl" = ?`, table).Scan(&stat)
+		if err == nil {
+			_, err = fmt.Sscan(stat, &estimate)
+		}
+	}
+	if err != nil {
+		t.Fatalf("read the planner's estimate of %s: %v", table, err)
+	}
+	return estimate
 }

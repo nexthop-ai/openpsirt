@@ -110,3 +110,41 @@ func TestAProviderWithNoAddressToReturnToIsRefused(t *testing.T) {
 		t.Errorf("no provider and no address was refused: %v", err)
 	}
 }
+
+// A start leaves the planner's estimate of a table describing the rows it
+// holds, on every engine. A server's own refresh runs in the background some
+// time after a load, and one that has not run yet estimates a loaded table as
+// empty: MySQL then joins such tables first, as a cross product, which is how
+// a page of the decision audit ran for hours over a v0.7.0 demo upgraded on
+// MySQL 8.4.
+func TestAStartLeavesThePlannerEstimatingTheRowsATableHolds(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		if _, err := db.ExecContext(ctx, `CREATE TABLE "estimated" ("n" INTEGER)`); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.WithoutCancel(ctx), `DROP TABLE "estimated"`)
+		})
+		const rows, batch = 2000, 500
+		for start := 0; start < rows; start += batch {
+			values := make([]string, batch)
+			args := make([]any, batch)
+			for i := range batch {
+				values[i] = "(?)"
+				args[i] = start + i
+			}
+			if _, err := db.ExecContext(ctx,
+				`INSERT INTO "estimated" ("n") VALUES `+strings.Join(values, ", "), args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if _, _, err := prepare(ctx, started(), discard(), db); err != nil {
+			t.Fatal(err)
+		}
+		if estimate := dbtest.EstimatedRows(t, db, "estimated"); estimate < rows/2 {
+			t.Errorf("after a start the planner estimates %.0f rows in a table holding %d", estimate, rows)
+		}
+	})
+}

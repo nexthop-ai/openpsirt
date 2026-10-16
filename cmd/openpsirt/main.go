@@ -168,7 +168,8 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	}
 
 	// Everything below this line is contacted before the server listens, and
-	// all of it under one deadline.
+	// all of it under one deadline, which starts again once an auto-migration
+	// has put the schema in place.
 	//
 	// Unbounded, a hang here is silent and total. An endpoint that accepts the
 	// connection and never answers holds PingContext for ever: the process is
@@ -211,20 +212,15 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		if err := schema.Up(migrating, db, logger); err != nil {
 			return fmt.Errorf("applying the schema: %w", err)
 		}
+		// The deadline counts from the schema being in place, so the steps
+		// after a long migration have the whole of it.
+		settled()
+		startup, settled = context.WithTimeout(migrating, cfg.StartupTimeout)
+		defer settled()
+		ctx = startup
 	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
 		return startupFailed(err, "checking the schema version", cfg)
 	}
-	// A database last opened by a release that kept no statistics, copied in
-	// from elsewhere, or partly rebuilt by an upgrade, has estimates that
-	// describe nothing until the engine is asked.
-	started := time.Now()
-	if analyzed, err := database.AnalyzeEveryTable(ctx, db); err != nil {
-		logger.Error("could not refresh the planner's statistics", "error", err)
-	} else {
-		logger.Info("refreshed the planner's statistics", "tables", analyzed,
-			"took", time.Since(started).Round(time.Millisecond))
-	}
-
 	handler, beside, err := prepare(ctx, cfg, logger, db)
 	if err != nil {
 		return err
@@ -232,15 +228,45 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	return serve(cfg, logger, handler, beside)
 }
 
+// refreshStatistics asks the engine to analyze every table. A database last
+// opened by a release that kept no statistics, copied in from elsewhere, or
+// partly rebuilt by an upgrade, has estimates that describe nothing until the
+// engine is asked.
+//
+// Stale estimates make a statement slow rather than wrong, so a refresh that
+// fails is logged and the start goes on. It has a quarter of the startup
+// deadline, so that one running long leaves the rest of the start its time.
+func refreshStatistics(ctx context.Context, cfg config.Config, logger *slog.Logger, db *database.DB) {
+	if cfg.StartupTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.StartupTimeout/4)
+		defer cancel()
+	}
+	started := time.Now()
+	done, err := database.AnalyzeEveryTable(ctx, db)
+	if err != nil {
+		logger.Error("could not refresh the planner's statistics", "error", err)
+		return
+	}
+	if len(done.Skipped) > 0 {
+		logger.Warn("tables held by something else were not analyzed", "tables", done.Skipped)
+	}
+	logger.Info("refreshed the planner's statistics", "tables", done.Tables,
+		"took", time.Since(started).Round(time.Millisecond))
+}
+
 // prepare is everything a start does after the schema is in place and before
-// the server listens: the administrators and group mappings named in
-// configuration, the sign-in providers, the stores, the queue and the passes.
+// the server listens: the planner's statistics, the administrators and group
+// mappings named in configuration, the sign-in providers, the stores, the
+// queue and the passes.
 //
 // Apart from run so that each refusal it makes is reachable by a test with a
 // database and a configuration in hand, rather than only by starting the
 // program.
 func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	db *database.DB) (http.Handler, passes, error) {
+
+	refreshStatistics(ctx, cfg, logger, db)
 
 	// Named administrators are granted at every start, which is what makes
 	// this the way back in rather than a one-time setup step.
