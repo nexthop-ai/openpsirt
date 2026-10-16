@@ -6,6 +6,8 @@ package main
 import (
 	"fmt"
 	"slices"
+	"strings"
+	"unicode/utf8"
 )
 
 // Counts is how many rows each table holds.
@@ -125,9 +127,28 @@ func (m Movement) size() string {
 // the issue row into the recording product's own.
 const wordsAndRatings = 43
 
+// mostWords is the bound the upgrade cuts reasoning to, in bytes.
+const mostWords = 64 << 10
+
+// KeptWords is reasoning as the upgrade stores it: valid UTF-8, without NUL,
+// and cut to the bound on a character boundary. Written apart from the
+// upgrade's own copy, so the count it gives checks that copy rather than
+// repeating it.
+func KeptWords(said string) string {
+	kept := strings.ReplaceAll(strings.ToValidUTF8(said, "\uFFFD"), "\x00", "")
+	if len(kept) <= mostWords {
+		return kept
+	}
+	cut := mostWords
+	for cut > 0 && !utf8.RuneStart(kept[cut]) {
+		cut--
+	}
+	return kept[:cut]
+}
+
 // Words is what the release held that the reasoning is stored from: the
-// distinct reasoning, word for word, across every claim and every supplier
-// statement. Each is stored once.
+// distinct reasoning, byte for byte as KeptWords keeps it, across every claim
+// and every supplier statement. Each is stored once.
 type Words struct {
 	Distinct int64
 }
@@ -145,12 +166,13 @@ type Ratings struct {
 	// whether it holds a word. Read after the upgrade.
 	Recorded map[Pair]bool
 	// Plain is the issues and products the release held a recorded flaw for,
-	// on an issue rated by a word or an unsourced score, that absorbed no
-	// other issue in a merge. Each one is moved. Read before the upgrade.
+	// on an issue rated by a word or an unsourced score, other than a scanned
+	// issue kept in a merge. Each one is moved. Read before the upgrade.
 	Plain int64
 	// Kept is the issues and products the release held a recorded flaw for,
-	// on an issue that absorbed another in a merge. Each one may be moved,
-	// as the issues the merge brought together say. Read before the upgrade.
+	// on an issue holding a scanned finding that absorbed another in a merge.
+	// Each one may be moved, as the issues the merge brought together say.
+	// Read before the upgrade.
 	Kept int64
 }
 

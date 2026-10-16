@@ -36,6 +36,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -535,26 +536,26 @@ func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
 		return Words{}, Ratings{}, err
 	}
 	defer func() { _ = db.Close() }()
-	var words Words
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM (
-		SELECT "statement" AS "said" FROM "suppression" WHERE "statement" IS NOT NULL AND "statement" <> ''
-		UNION
-		SELECT "statement" FROM "vex_statement" WHERE "statement" IS NOT NULL AND "statement" <> ''
-	) AS "w"`).Scan(&words.Distinct); err != nil {
-		return Words{}, Ratings{}, fmt.Errorf("count the release's reasoning: %w", err)
+	words, err := distinctWords(ctx, db)
+	if err != nil {
+		return Words{}, Ratings{}, err
 	}
 	rated, err := ratingsOf(ctx, db, false)
 	if err != nil {
 		return Words{}, Ratings{}, err
 	}
 	// A recorded flaw on an issue rated by a word or by a score naming no
-	// publisher, and whether the issue absorbed another in a merge.
+	// publisher, and whether the issue holds a scanned finding and absorbed
+	// another in a merge.
 	const recorded = `SELECT DISTINCT "v"."id", "st"."product_id" FROM "finding" AS "f"
 		JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"
 		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
 		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 		WHERE "f"."kind" = 'entered' AND `
-	const kept = `EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id")`
+	// A scanned issue kept in a merge, as the upgrade tells one apart.
+	const kept = `(EXISTS (SELECT 1 FROM "finding" AS "scanned"
+			WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" <> 'entered')
+		AND EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id"))`
 	for _, each := range []struct {
 		query string
 		into  *int64
@@ -568,6 +569,34 @@ func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
 		}
 	}
 	return words, rated, nil
+}
+
+// distinctWords counts the reasoning the release held across every claim and
+// every supplier statement, compared byte for byte once kept as the upgrade
+// keeps it. A comparison in SQL follows the column's collation, which on
+// MySQL and MariaDB ignores trailing spaces.
+func distinctWords(ctx context.Context, db *database.DB) (Words, error) {
+	rows, err := db.QueryContext(ctx, `SELECT "statement" FROM "suppression" WHERE "statement" IS NOT NULL
+		UNION ALL
+		SELECT "statement" FROM "vex_statement" WHERE "statement" IS NOT NULL`)
+	if err != nil {
+		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
+	}
+	seen := map[[sha256.Size]byte]bool{}
+	for rows.Next() {
+		var said string
+		if err := rows.Scan(&said); err != nil {
+			_ = rows.Close()
+			return Words{}, err
+		}
+		if kept := KeptWords(said); kept != "" {
+			seen[sha256.Sum256([]byte(kept))] = true
+		}
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return Words{}, fmt.Errorf("read the release's reasoning: %w", err)
+	}
+	return Words{Distinct: int64(len(seen))}, nil
 }
 
 // ratings reads the ratings the upgrade moved, on the upgraded database.

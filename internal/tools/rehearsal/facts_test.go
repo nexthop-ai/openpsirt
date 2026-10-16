@@ -6,6 +6,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestAnUpgradeThatKeepsEveryRowIsNotReported(t *testing.T) {
@@ -73,25 +74,28 @@ func TestAnUpgradeMergingImagesMayHoldFewerOfThemAndFillTheirVersions(t *testing
 }
 
 // The reasoning fills one row per distinct text, the recorded ratings one per
-// moved flaw, the words in force gain the recorded words where none was, and
-// the unsourced ratings lose what the recorded issues lost.
+// moved flaw, the words in force gain the recorded words where none was and
+// nothing for a recorded rating with no word, and the unsourced ratings lose
+// what the recorded issues lost.
 func TestStoringReasoningAndRecordedRatingsReconcilesExactly(t *testing.T) {
 	before := Ratings{
 		Unsourced: map[int64]int64{7: 2, 8: 1},
 		Sourced:   5,
 		InForce:   map[Pair]bool{{9, 1}: true},
-		Plain:     1,
+		Plain:     2,
 		Kept:      1,
 	}
+	// Issue 8's recorded rating is a score with no word, so nothing is put in
+	// force for it.
 	after := Ratings{
 		Unsourced: map[int64]int64{7: 1, 8: 1},
 		Sourced:   5,
 		InForce:   map[Pair]bool{{9, 1}: true, {7, 1}: true},
-		Recorded:  map[Pair]bool{{7, 1}: true, {9, 1}: true},
+		Recorded:  map[Pair]bool{{7, 1}: true, {9, 1}: true, {8, 2}: false},
 	}
 	held := Counts{"vulnerability_rating": 8, "issue_rating": 1, "finding": 3}
 	upgraded := Counts{"vulnerability_rating": 7, "issue_rating": 2, "finding": 3,
-		"statement_text": 4, "recorded_rating": 2}
+		"statement_text": 4, "recorded_rating": 3}
 	moved, faults := Restated(42, Words{Distinct: 4}, before, after)
 	if len(faults) != 0 {
 		t.Errorf("a faithful move was reported: %v", faults)
@@ -162,5 +166,31 @@ func TestARatingMovedOutsideTheRecordedFlawsIsReported(t *testing.T) {
 		if !found {
 			t.Errorf("nothing says %q: %v", each, faults)
 		}
+	}
+}
+
+// Reasoning is kept as the upgrade stores it: text differing only in trailing
+// spaces is two texts, a NUL is dropped, invalid UTF-8 is replaced, and text
+// past the bound is cut on a character boundary.
+func TestReasoningIsKeptByteForByteAsTheUpgradeStoresIt(t *testing.T) {
+	if KeptWords("fixed") == KeptWords("fixed ") {
+		t.Error("text differing in a trailing space was kept as one")
+	}
+	if got := KeptWords("fi\x00xed"); got != "fixed" {
+		t.Errorf("a NUL was kept: %q", got)
+	}
+	if got := KeptWords("a\xffb"); got != "a\uFFFDb" {
+		t.Errorf("invalid UTF-8 was kept as %q", got)
+	}
+	long := strings.Repeat("a", mostWords-1) + "é" + "tail"
+	got := KeptWords(long)
+	if got != strings.Repeat("a", mostWords-1) {
+		t.Errorf("text past the bound was cut to %d bytes, ending %q", len(got), got[len(got)-4:])
+	}
+	if !utf8.ValidString(got) {
+		t.Error("the cut split a character")
+	}
+	if got := KeptWords(strings.Repeat("a", mostWords)); len(got) != mostWords {
+		t.Errorf("text at the bound was cut to %d bytes", len(got))
 	}
 }
