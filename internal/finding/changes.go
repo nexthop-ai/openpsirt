@@ -27,9 +27,8 @@ type Change struct {
 
 // Changes reports what each of these runs opened and closed.
 //
-// A run that changed nothing is absent from the answer rather than present as
-// a zero, because a rebuild that finds exactly what the last one found is the
-// ordinary case and writing nothing is what the storage does.
+// Every run asked about is in the answer, a run that changed nothing and a run
+// this build never held as zeros.
 func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID int64,
 	runIDs []int64) (map[int64]Change, error) {
 
