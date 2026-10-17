@@ -28,6 +28,7 @@ REQ-69.
 - [Scanner environment](#scanner-environment)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
+- [Receipt cost](#receipt-cost)
 - [Document retrieval](#document-retrieval)
 - [Administrator-supplied VEX](#administrator-supplied-vex)
 - [Supplier advisories](#supplier-advisories)
@@ -895,6 +896,56 @@ to whoever may read the product, on the terms `DESIGN-notifications.md` § An
 inventory that moved sharply holds: the telling is worked out once the writes
 have committed, and a message that cannot be composed is logged rather than
 failing an upload whose inventory is stored.
+
+## Receipt cost
+
+A page of receipts reads the receipts, what each run on it opened and closed,
+the documents each upload sent, what each upload changed in the inventory, and
+the last run. The counts are the cost: each is the distinct issues at
+components among the findings naming a run, and every other read is a few
+milliseconds.
+
+| Rule | |
+|---|---|
+| The counts read the findings of the page's runs, through an index on each run column | The build's other findings are not read. Unindexed, the count read every finding the build ever had, open or closed, so it grew with the calendar |
+| Each index carries every column the count reads | The count is answered from the index without the table |
+| A page whose runs opened most of the build reads most of the build | A build's first scan opens all of its findings, so until fifty scans have followed it, the page holds the run that opened everything. Every engine reads that run's rows; what remains is the distinct count over them |
+
+Measured on the full-size switch image (`internal/sbom/testdata`) built
+nightly, with twenty issues arriving a night. The first night opens 241,279
+findings, 11,751 issues at components. Two histories:
+
+| Shape | Packages moving a night | Issues at components opened and closed a night | Findings after a year |
+|---|---:|---:|---:|
+| Quiet | A thousandth | About 20 opened, under 1 closed | 480,243 |
+| Restamped | A hundredth | About 350 opened, 330 closed | 1,159,943 |
+
+The restamped shape is what a build accumulated while its container images
+changed identity with every build.
+
+The page of fifty, first read discarded, best of three, in ms. Each cell is
+without the indexes and with them, on one engine at a time.
+
+| Engine | Shape | Night 1 | Night 30 | Night 365 |
+|---|---|---:|---:|---:|
+| PostgreSQL | Quiet | 103 / 81 | 125 / 58 | 145 / 20 |
+| PostgreSQL | Restamped | 108 / 71 | 284 / 308 | 510 / 74 |
+| MySQL | Quiet | 256 / 45 | 268 / 84 | 23 / 23 |
+| MySQL | Restamped | 233 / 47 | 1,075 / 262 | 2,923 / 515 |
+| MariaDB | Quiet | 83 / 50 | 111 / 90 | 18 / 19 |
+| MariaDB | Restamped | 86 / 49 | 382 / 260 | 730 / 160 |
+| SQLite | Quiet | 923 / 13 | 921 / 28 | 1,804 / 19 |
+| SQLite | Restamped | 914 / 17 | 1,952 / 67 | 4,984 / 60 |
+
+| Reading | |
+|---|---|
+| Night 30, restamped, PostgreSQL | Every finding of the build was opened by a run on the page, 458,895 rows. The planner reads the table, and the distinct count over them is the cost on both sides |
+| Night 365, quiet, MySQL and MariaDB | Without the indexes both read the runs' few rows through the index their foreign key carries |
+| Night 365, restamped, MySQL | Each count reads the other run column's index with the build alone as its prefix, every finding of the build, from the index rather than the table. A sixth of the cost without the indexes |
+
+A night costs up to 7 percent more with the two indexes, averaged over the year: 3.75 s and
+3.83 s on PostgreSQL in the restamped shape, 3.39 s and 3.42 s in the quiet
+one. `make measure` re-runs both shapes.
 
 ## Document retrieval
 

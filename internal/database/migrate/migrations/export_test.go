@@ -38,6 +38,12 @@ func StatementsV090(engine database.Engine) map[string][]string {
 	}
 }
 
+// StatementsV0100 is v0.10.0's declaration of each table it changes.
+func StatementsV0100(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{"finding": findingV0100(t)}
+}
+
 // StopV090AfterDropping runs the v0.9.0 upgrade's steps, each in a
 // transaction of its own as on MySQL and MariaDB, and stops once the named
 // claim tables have lost their copy of the reasoning: a start that died

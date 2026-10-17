@@ -274,6 +274,7 @@ The chain is the baseline, then one part per release.
 | 41 | The baseline: v0.7.0's schema, made at once on an empty database. § The baseline says what holds it |
 | 42 | v0.8.0: v0.7.0's schema changed into v0.8.0's. § The v0.8.0 upgrade says what it does. A database v0.8.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 43 | v0.9.0: v0.8.0's schema changed into v0.9.0's. § The v0.9.0 upgrade says what it does. A database v0.9.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 44 | v0.10.0: v0.9.0's schema changed into v0.10.0's, edited until v0.10.0 is tagged. § The v0.10.0 upgrade says what it does |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the
@@ -294,7 +295,7 @@ At 1.0 the baseline becomes 1.0's schema, beside one migration that upgrades a
 database the last 0.x release built. A database an earlier 0.x release built is
 upgraded to that release first.
 
-Migration 41 creates every table v0.7.0 had. Migrations 42 and 43 change existing tables and add the ones their release introduced.
+Migration 41 creates every table v0.7.0 had. Migrations 42, 43 and 44 change existing tables and add the ones their release introduced.
 
 ### The baseline
 
@@ -365,8 +366,8 @@ check-engines` fails when either did not run it.
 
 Each release after v0.7.0 that changes the schema carries one migration that
 changes the schema the release before it built into its own, and moves the rows
-with it: 42 carries a database from v0.7.0 to v0.8.0, and 43 from v0.8.0 to
-v0.9.0. A database a release built
+with it: 42 carries a database from v0.7.0 to v0.8.0, 43 from v0.8.0 to
+v0.9.0, and 44 from v0.9.0 to v0.10.0. A database a release built
 applies the ones after its own; a fresh install makes the baseline and applies
 every one after it. They are shaped the way every migration after 1.0 will be.
 
@@ -492,6 +493,23 @@ stopped attempt already did.
 | The same on SQLite, with a statement whose justification and version are longer than an indexed name, and a claim taken from it | The statement and the claim hold the same justification and version, each cut to the width |
 | The same on MySQL and MariaDB, the rows' move stopped part way | The next start steps over the table and columns already made and leaves what an upgrade that did not stop leaves |
 | The same on MySQL and MariaDB, stopped between the two removals, and after both | The next start moves and removes only what remains, and leaves what an upgrade that did not stop leaves |
+
+### The v0.10.0 upgrade
+
+Migration 44. Each change is an index; no column and no row moves. § Indexes
+says what each index serves.
+
+| Table | Gains | Every engine |
+|---|---|---|
+| `finding` | An index on the run that opened a finding, and one on the run that closed it | Made where the table stands by the release's statement. An index the database already holds under the name is replaced, because on MySQL and MariaDB a stopped upgrade leaves the indexes it made and the next start runs the migration from the top |
+
+| Check, on each of the four engines | What it holds |
+|---|---|
+| A v0.9.0 database | Upgraded, the finding table's declaration describes the table the migrations built |
+| A v0.9.0 database already holding one of the new indexes in another shape | Upgraded the same, each index in the release's shape |
+
+Each index takes 0.7 s to build on PostgreSQL over 1,159,943 findings, and
+is 21 to 29 MB beside a 306 MB table.
 
 ### Release records
 
@@ -1245,6 +1263,7 @@ The indexes on the finding, decision and notification tables that serve the hott
 | Deadlines running out | Closed, the build's claim, deadline | The deadline report across the deployment, which names no build: 248 ms through it, 343 to 392 ms without it |
 | Grouping | Build, closed, visibility, issue, component, the three urgency columns, opened, closing reason, holder | The findings list and its total, and the backlog trend, each from the index alone. Over 375,843 findings, with the last two columns and without them: the trend grouped in the database reads 578 pages and 16,500, and takes 88 ms and 172 ms; the index is 4.6 MB and 4.2 MB |
 | Decisions waiting, by claim | State, claim | The review queue's page and its count, with 33,150 decisions waiting among 133,549. With the index and without it: the page 22 ms and 81 ms, the count 22 ms and 40 ms |
+| What a run changed | Build, the run that opened a finding, issue, component, visibility, the run that closed it; and the same with the two runs swapped | The opened and closed counts on a page of receipts and on a run's own screen, from the index alone. The build leads. Led by the run, MySQL and MariaDB read a page whose runs opened most of the build through the component index and the table: 1.04 s and 599 ms for the count, against 231 ms and 237 ms in this order. MySQL a year in is the one case the other order wins, 134 ms against 467 ms. `DESIGN-ingest.md` § Receipt cost has the page on all four engines |
 | Who is being told | Kind, cleared, person | The notify sweep's read of who holds an open condition of each kind, once per kind. Kind and an open row are the prefix on all four engines, the null included, and MySQL and MariaDB group the people from the index without sorting them. With 152,859 open conditions over 204 people, without the index and with it: PostgreSQL 46 ms and 0.33 ms a read, averaged over every kind; the kind holding every row 106 ms and 15 ms on MySQL, 22 ms and 17 ms on MariaDB, 36 ms and 12 ms on SQLite; all 28 kinds once 2.9 s and 18 ms on MySQL. `DESIGN-notifications.md` § Delivery has the sweep |
 
 The measurements are PostgreSQL 16 with one processor, run on one database at a
