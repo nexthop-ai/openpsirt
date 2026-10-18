@@ -27,6 +27,9 @@ import { linkTo } from "../api/links";
 // A build quietly dropping out is the failure that makes everything else
 // wrong, so a build that has gone quiet is named at the top rather than being
 // invisible on the screen about it.
+// How often a page holding an unsettled upload is asked for again.
+const UNSETTLED = 15_000;
+
 export function Inventories() {
   const { product = "", stream = "", variant = "" } = useParams();
   const at = { product, stream, variant };
@@ -40,8 +43,15 @@ export function Inventories() {
           params: { path: { product, stream, variant } },
         }),
       ),
-    // Receipts move on their own while an upload is being read.
-    refetchInterval: 15_000,
+    // Asked again only while an upload on the page is still being read or
+    // scanned: a settled page has nothing to move, and a page of receipts is
+    // an expensive answer to ask for on a timer. An upload from here asks
+    // again through the drawer, and one from a pipeline is shown when the
+    // screen is opened or returned to.
+    refetchInterval: (query) =>
+      query.state.data?.items?.some((r) => r.state === "reading" || r.state === "scanning")
+        ? UNSETTLED
+        : false,
   });
   const scanning = useQuery({
     queryKey: ["scanning", product],
