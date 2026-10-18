@@ -20,6 +20,9 @@ import { sizeSaid } from "../ui/size";
 import { inventoryChangesAt, runAt } from "../app/routes";
 import { linkTo } from "../api/links";
 
+// How often a page holding an unsettled upload is asked for again.
+const UNSETTLED = 15_000;
+
 // Each build's uploads, and what the scan of them found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
 // what this list is of, is inventories.
@@ -27,9 +30,6 @@ import { linkTo } from "../api/links";
 // A build quietly dropping out is the failure that makes everything else
 // wrong, so a build that has gone quiet is named at the top rather than being
 // invisible on the screen about it.
-// How often a page holding an unsettled upload is asked for again.
-const UNSETTLED = 15_000;
-
 export function Inventories() {
   const { product = "", stream = "", variant = "" } = useParams();
   const at = { product, stream, variant };
