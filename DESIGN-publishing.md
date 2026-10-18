@@ -37,7 +37,7 @@ product publishes, and the document is about disclosed work in that product
 |---|---|---|---|
 | The deployment publishes | Deployment configuration | Off | Mounts nothing new: the paths answer either way. Off, every one of them answers as a path nothing is published at, and the pass that writes documents does not start |
 | A product publishes | The product, set by an administrator and recorded in the trail | Off | Its documents are written by the next pass and served from then on. Turned off, they stop being served at once, before anything is written again |
-| The statuses published | A setting an administrator changes | Every status | Limited, only statements that something is not affected or is fixed are published, and a document left with none is withdrawn |
+| The statuses published | A setting an administrator changes | Every status somebody decided | Limited, only statements that something is not affected or is fixed are published, and a document left with none is withdrawn |
 | The rate one client may ask at | Deployment configuration | 600 a minute | Requests past it are answered 429 with when to ask again |
 | The signing key | A secret in deployment configuration | None | With one, every document carries a detached OpenPGP signature and the provider claims the trusted provider role |
 
@@ -101,18 +101,21 @@ label lets it travel (`DESIGN-remediation.md` § The provider directory).
 
 ## Statements and statuses
 
-What is stated about one build is the document of one build
-(`DESIGN-remediation.md` § The VEX document) with the two statuses that
-document leaves to silence stated outright. A reader holding every revision of
-a published document reads a statement dropping out as a withdrawal, and a
-scanner reads silence as affected.
+What is stated about one build is what somebody decided: the document of one
+build (`DESIGN-remediation.md` § The VEX document), with a claim that an issue
+applies and stays stated outright. A component nobody has judged gets no
+statement, so a scanner reports it as it would without these documents.
 
 | Status | Stated where | What it carries |
 |---|---|---|
 | Not affected | Every open place of the component stands under an approved, live claim that it does not apply or that the match was wrong | The claim's reason, and what stops it where the claim named it |
 | Fixed | The same, for a claim that the fix is already here, and where a patch the build declares closed it | Nothing more |
 | Affected | Every open place stands under a claim in force that the issue applies, will be fixed, or will not be | What a holder can do where the claim named it; otherwise that no fix is planned, where every claim says it will not be fixed, or that none is available yet |
-| Under investigation | Every other component with the issue open in it | That nothing is available until it is decided |
+
+| Rule | |
+|---|---|
+| Nothing is stated about a component nobody judged | An issue open and undecided, a deferral, and a claim still waiting on a second person state nothing. A document about an issue with no statement left is not served |
+| Under investigation is never stated | No claim records that somebody is looking at an issue: a deferral says when somebody will look again rather than that anybody is looking, and a claim waiting on a second person is one person's opinion |
 
 | Rule | |
 |---|---|
@@ -137,7 +140,7 @@ as it stands (REQ-31).
 | The component or the vulnerable code is not present | Anybody shipping the component |
 | The code ships and is never called | This build: another build calls what it calls |
 | Nothing an attacker controls reaches it, or something stops it | This build |
-| Already fixed here, a patch the build declares, will not be fixed, affected, under investigation | This build |
+| Already fixed here, a patch the build declares, will not be fixed, affected | This build |
 
 | Rule | |
 |---|---|
@@ -160,7 +163,7 @@ issue, in what I ship from them.
 | Status | A component holding for anybody is listed by its own product identifier; anything else by the relationship. A product listed under two statuses keeps the more cautious |
 | Flags | The reason for every product not affected, one flag per reason |
 | Threats | What stops the flaw, for a product not affected where somebody named it |
-| Remediations | For an affected product, that no fix is planned or none is available, and what to do where the claim named it; for one under investigation, that nothing is available yet |
+| Remediations | For an affected product, that no fix is planned or none is available, and what to do where the claim named it |
 | Identifiers | The CVE where the issue has one among its names, and every other name, by the prefix it carries |
 | Notes | What the issue is, in the words of whoever reported it, or its name where nobody said |
 | References | The address the document is served at |
@@ -230,23 +233,24 @@ what moved.
 
 The full-size switch image as both variants of a branch on PostgreSQL, every
 component with a package identifier carrying one issue and the kernel the
-4,943 a real one did: 11,785 issues at components per build, 76 of them agreed
-not to apply.
+4,943 a real one did: 11,785 issues at components per build. A tenth of the
+distribution packages' own issues, 76, are agreed not to apply because the code
+is not there; nothing else is decided.
 
 | Measured | |
 |---|---|
-| CSAF VEX documents | 11,751, median 3,523 bytes, largest 4,588 |
-| OpenVEX documents | 1, 6,251,055 bytes |
-| Held in all | 47,645,337 bytes |
-| The feed | 13,629,057 bytes, answered in 78 to 95 ms |
-| The index | 411,285 bytes |
-| The provider description | Answered in 30 to 38 ms |
-| One document, or its digest | Answered in 9 to 14 ms |
-| The first pass | 14.2 s, writing every document |
-| A pass over nothing that moved | 4.5 s, writing nothing |
+| CSAF VEX documents | 76, one per issue decided, median 1,657 bytes, largest 1,842 |
+| OpenVEX documents | 1, 20,832 bytes |
+| Held in all | 145,778 bytes |
+| The feed | 88,601 bytes, answered in 7 to 8 ms |
+| The index | 2,660 bytes |
+| The provider description, one document, or its digest | Answered in 6 to 7 ms |
+| The first pass | 3.8 s, writing every document |
+| A pass over nothing that moved | 3.3 s, writing nothing |
 
-Nearly every document is an issue under investigation: an issue open and
-undecided is most of what a scanner reports.
+A document is an issue somebody decided about, so the number of documents
+grows with the decisions rather than with what a scanner reports. A pass reads
+every build's claims whatever is published, which is most of what it costs.
 
 ## Not built
 
@@ -263,6 +267,6 @@ undecided is most of what a scanner reports.
 |---|---|
 | The rate is per replica | Held in each process rather than in the database, so the request it limits writes nothing |
 | A document is as current as the last pass | Up to five minutes behind a claim agreed or a scan landing. Turning a product off and narrowing the statuses take effect at once, because what may be served is asked on every request |
-| Every document of a product is worked out on every pass | 4.5 s on the image above, nearly all of it reading what stands; a record of what moved would be a second copy of what the findings already say (REQ-74) |
+| Every document of a product is worked out on every pass | 3.3 s on the image above, nearly all of it reading what stands; a record of what moved would be a second copy of what the findings already say (REQ-74) |
 | The scope of a statement about one place is not published | A place is stated beneath the component pulling it in whatever the claim's scope, because the other places of the component disagree |
 | A signature is made per request | Signing at the pass and keeping the signature would make it a stored copy of something worked out from the bytes and the key |

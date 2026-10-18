@@ -768,8 +768,9 @@ signing in, as a standard CSAF provider at
 
 - each advisory that has gone out and may travel, as the directory above would
   write it;
-- a CSAF VEX document for each issue in each published product, across every
-  branch, tag and variant, saying for each component whether it is affected;
+- a CSAF VEX document for each issue somebody decided about in each published
+  product, across every branch, tag and variant, saying for each component
+  whether it is affected. An issue nobody has judged has no statement;
 - an OpenVEX document for each branch or tag, for a scanner holding one build.
 
 Nothing about a flaw in your own product is published before it is disclosed —
@@ -787,7 +788,7 @@ Two things are set inside the application, by an administrator:
 | Under | What it does |
 |---|---|
 | Products, the Published column | Which products' documents are served. Off for every product until somebody turns it on, and recorded in the administrative trail. Turned off, a product's documents stop being served at once |
-| Settings, Outbound, Published statuses | `all`, the default, publishes every status: not affected, fixed, affected and under investigation. `not-affected-and-fixed` publishes those two alone, and a document left with nothing is withdrawn |
+| Settings, Outbound, Published statuses | `all`, the default, publishes every status somebody decided: not affected, fixed and affected. `not-affected-and-fixed` publishes those two alone, and a document left with nothing is withdrawn |
 
 On the Helm chart these go through `extraEnv`. Give the key from a Secret of
 your own:

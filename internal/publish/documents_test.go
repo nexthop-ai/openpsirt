@@ -153,7 +153,7 @@ func TestAClaimStatesWhomItsStatementHoldsFor(t *testing.T) {
 
 // A statement the builds of one product disagree on is not stated about the
 // component alone: one build saying the component is not affected while
-// another has the same component open and undecided would contradict it.
+// another says it is affected would contradict it.
 func TestAStatementTheBuildsDisagreeOnIsStatedPerBuild(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
@@ -167,6 +167,7 @@ func TestAStatementTheBuildsDisagreeOnIsStatedPerBuild(t *testing.T) {
 		w.report(lab, reported{"CVE-2026-1001", openssl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
 			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.decide(lab, "CVE-2026-1001", openssl, claim{outcome: triage.Affected})
 		w.publishes(w.Product, true)
 		w.write()
 
@@ -177,19 +178,20 @@ func TestAStatementTheBuildsDisagreeOnIsStatedPerBuild(t *testing.T) {
 		if !slices.Equal(status.KnownNotAffected, []string{ours}) {
 			t.Errorf("known not affected %v, want %s alone", status.KnownNotAffected, ours)
 		}
-		if !slices.Equal(status.UnderInvestigation, []string{theirs}) {
-			t.Errorf("under investigation %v, want %s", status.UnderInvestigation, theirs)
+		if !slices.Equal(status.KnownAffected, []string{theirs}) {
+			t.Errorf("known affected %v, want %s", status.KnownAffected, theirs)
 		}
 		if slices.Contains(status.KnownNotAffected, openssl.Purl) {
-			t.Error("the component is stated not affected alone while a build of it is open")
+			t.Error("the component is stated not affected alone while a build of it is affected")
 		}
 	})
 }
 
-// Every status is published, until the deployment limits it to statements
-// that something is not affected or is fixed; a document left with nothing
-// is withdrawn, and one written under the wider setting is not served once
-// the setting narrows, before anything is written again.
+// What somebody decided is published, every status of it, until the
+// deployment limits it to statements that something is not affected or is
+// fixed; a document left with nothing is withdrawn, and one written under the
+// wider setting is not served once the setting narrows, before anything is
+// written again. An issue nobody decided about has no document at all.
 func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
@@ -202,9 +204,13 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 		w.publishes(w.Product, true)
 		w.write()
 
-		if doc := w.csafAbout(w.Product, "CVE-2026-1003"); doc == nil ||
-			len(doc.Vulnerabilities[0].Status.UnderInvestigation) != 1 {
-			t.Errorf("an issue nobody decided is not published as under investigation: %+v", doc)
+		if doc := w.csafAbout(w.Product, "CVE-2026-1003"); doc != nil {
+			t.Errorf("an issue nobody decided is published: %+v", doc.Vulnerabilities[0].Status)
+		}
+		for _, statement := range w.openVEXAbout(w.Product, fixture.BranchName).Statements {
+			if statement.Vulnerability.Name == "CVE-2026-1003" {
+				t.Errorf("an issue nobody decided is stated as %s", statement.Status)
+			}
 		}
 		affected := w.csafAbout(w.Product, "CVE-2026-1004")
 		if affected == nil || len(affected.Vulnerabilities[0].Status.KnownAffected) != 1 {
@@ -260,6 +266,10 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 		w := newWorld(t, f)
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		// The build's own reason, so the document names each build it holds
+		// for.
+		w.decide(w.Target, "CVE-2026-1001", openssl,
+			claim{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		w.publishes(w.Product, true)
 		first := w.write()
 		if first.Revised == 0 {
@@ -271,10 +281,14 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 				again.Revised, again.Withdrawn)
 		}
 
-		w.decide(w.Target, "CVE-2026-1001", openssl,
-			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		// The lab build ships the same openssl at the same place, and the
+		// claim reaches it: the document now speaks for a second build.
+		lab := w.TargetFor(w.Branch, w.Internal)
+		labRoot := graph.Described{Purl: "pkg:generic/sonic@lab.7", Name: "sonic", Version: "lab.7"}
+		w.ship(lab, labRoot, edge{labRoot, openssl})
+		w.report(lab, reported{"CVE-2026-1001", openssl})
 		if moved := w.write(); moved.Revised != 2 {
-			t.Errorf("a decision revised %d documents, want the CSAF and the OpenVEX one", moved.Revised)
+			t.Errorf("a second build revised %d documents, want the CSAF and the OpenVEX one", moved.Revised)
 		}
 		after := w.csafAbout(w.Product, "CVE-2026-1001")
 		was, now := before.Document.Tracking, after.Document.Tracking
@@ -301,6 +315,8 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 		w := newWorld(t, f)
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Target, "CVE-2026-1002", libnl,
+			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.publishes(w.Product, true)
 		w.write()
 		before := w.csafAbout(w.Product, "CVE-2026-1002")
@@ -310,8 +326,9 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 
 		// The scanner stops reporting it.
 		w.report(w.Target, reported{"CVE-2026-1001", openssl})
-		if wrote := w.write(); wrote.Withdrawn != 1 {
-			t.Errorf("withdrew %d documents, want the one about CVE-2026-1002", wrote.Withdrawn)
+		// The branch's OpenVEX document said nothing else, so it goes too.
+		if wrote := w.write(); wrote.Withdrawn != 2 {
+			t.Errorf("withdrew %d documents, want the CSAF and the OpenVEX one", wrote.Withdrawn)
 		}
 		if doc := w.csafAbout(w.Product, "CVE-2026-1002"); doc != nil {
 			t.Error("a withdrawn document is served")

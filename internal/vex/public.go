@@ -21,21 +21,18 @@ import (
 // The four statuses a statement states, as both formats this deployment
 // publishes spell them.
 const (
-	NotAffected        = "not_affected"
-	Fixed              = "fixed"
-	Affected           = "affected"
-	UnderInvestigation = "under_investigation"
+	NotAffected = "not_affected"
+	Fixed       = "fixed"
+	Affected    = "affected"
 )
 
-// The action an affected statement carries where the claim named none, and
-// what a statement under investigation says is available. The formats ask for
-// one, and these say what is true without promising anything: a date this
-// deployment is working to is its own plan rather than something a reader may
-// hold it to.
+// The action an affected statement carries where the claim named none. The
+// formats ask for one, and these say what is true without promising anything:
+// a date this deployment is working to is its own plan rather than something a
+// reader may hold it to.
 const (
-	NoFixPlanned  = "No fix is planned for this component in this build."
-	NoFixYet      = "No fix is available for this component in this build yet."
-	NotDecidedYet = "Whether this build is affected has not been decided."
+	NoFixPlanned = "No fix is planned for this component in this build."
+	NoFixYet     = "No fix is available for this component in this build yet."
 )
 
 // Fact is one statement about one issue in one component of one build, before
@@ -80,20 +77,21 @@ type Built struct {
 }
 
 // Public is what this deployment states about one build, for publishing to
-// anybody: every issue open or answered in a component of it, at disclosed
-// findings only.
+// anybody: what somebody decided about an issue in a component of it, at
+// disclosed findings only.
 //
-// It is the document of one build with the two statuses that document leaves
-// to silence stated outright: an issue that applies and stays, and one nobody
-// has decided. Silence reads as affected to a scanner holding one document,
-// and a reader holding every revision of a published one reads a statement
-// dropping out as a withdrawal.
+// It is the document of one build with what it leaves to silence about an
+// issue that applies and stays stated outright. An issue nobody has decided
+// about gets no statement, so a scanner reports it as it would without this.
 //
 //   - Not affected and fixed come from the same approved claims and declared
 //     patches the document of one build reads.
 //   - Affected is a component whose every open place stands under a claim in
 //     force that the issue applies, will be fixed, or will not.
-//   - Under investigation is every other component with an issue open in it.
+//
+// Nothing here states that an issue is under investigation. No claim records
+// that somebody is looking at an issue, and a deferral says when somebody will
+// look again rather than that anybody is looking.
 //
 // A supplier's statement about its own product is not among them. This
 // deployment passes it on only where somebody chose the document carrying
@@ -131,19 +129,6 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 		visible).Scan(ctx, &affected); err != nil {
 		return nil, fmt.Errorf("read what applies in this build: %w", err)
 	}
-	var open []struct {
-		VulnerabilityID int64     `bun:"vulnerability_id"`
-		Identifier      string    `bun:"identifier"`
-		Component       string    `bun:"component"`
-		Purl            string    `bun:"purl"`
-		Opened          time.Time `bun:"opened"`
-	}
-	if err := s.grouped(targetID, visible).
-		ColumnExpr(`MIN("f"."opened_at") AS "opened"`).
-		Where(`"f"."closed_at" IS NULL`).
-		Scan(ctx, &open); err != nil {
-		return nil, fmt.Errorf("read what is open in this build: %w", err)
-	}
 	fixed, err := s.patched(ctx, targetID, visible)
 	if err != nil {
 		return nil, err
@@ -155,7 +140,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	// Refused rather than truncated, for the reason the document of one build
 	// is: a document that stopped at a ceiling says nothing about everything
 	// past it.
-	if len(open)+len(placed)+len(fixed) > s.carrying() {
+	if len(rows)+len(affected)+len(placed)+len(fixed) > s.carrying() {
 		return nil, fmt.Errorf("%w: %s %s %s states more than %d statements",
 			ErrTooLarge, named.Product, named.Stream, named.Variant, s.carrying())
 	}
@@ -174,8 +159,11 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	if err != nil {
 		return nil, err
 	}
-	issues := make([]int64, 0, len(open)+len(fixed))
-	for _, row := range open {
+	issues := make([]int64, 0, len(rows)+len(affected)+len(placed)+len(fixed))
+	for _, row := range rows {
+		issues = append(issues, row.VulnerabilityID)
+	}
+	for _, row := range affected {
 		issues = append(issues, row.VulnerabilityID)
 	}
 	for _, row := range fixed {
@@ -254,17 +242,6 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 			Status: Affected, Action: action,
 			Scope: triage.ScopeOf(triage.Outcome(words.Outcome), "", triage.Scope(words.Scope)),
 			Since: words.ProposedAt.UTC(),
-		})
-	}
-	for _, row := range open {
-		if stated[group{row.VulnerabilityID, row.Component, row.Purl}] {
-			continue
-		}
-		built.Facts = append(built.Facts, Fact{
-			VulnerabilityID: row.VulnerabilityID, Issue: row.Identifier,
-			Aliases: alsoCalled[row.VulnerabilityID], Component: row.Component, Purl: row.Purl,
-			Status: UnderInvestigation, Action: NotDecidedYet, Scope: triage.BuildSpecific,
-			Since: row.Opened.UTC(),
 		})
 	}
 	sort.Slice(built.Facts, func(i, j int) bool { return built.Facts[i].before(built.Facts[j]) })

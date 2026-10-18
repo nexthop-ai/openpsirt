@@ -86,6 +86,8 @@ func publishedWorld(t *testing.T, f *fixture.World) (*world, string) {
 	w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
 	w.decide(w.Target, "CVE-2026-1001", openssl,
 		claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+	w.decide(w.Target, "CVE-2026-1002", libnl,
+		claim{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 	named, _ := w.issued(true)
 	w.publishes(w.Product, true)
 	w.write()

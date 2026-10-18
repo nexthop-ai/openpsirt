@@ -234,7 +234,7 @@ var settable = []struct {
 		setting.Switch, theSwitch, func(core.Deps) string { return setting.Off }, false},
 	{setting.PublishedStatuses, "Published statuses", setting.Outbound,
 		"Which statuses the security documents served to anybody state",
-		"All four by default. Limited, only statements that something is not affected or is fixed are published, and a document left with none is withdrawn. A flaw in your own product is never published before it is disclosed, either way.",
+		"Every status somebody decided, by default. Limited, only statements that something is not affected or is fixed are published, and a document left with none is withdrawn. A flaw in your own product is never published before it is disclosed, either way.",
 		setting.Word, setting.StatusLimits(), func(core.Deps) string { return setting.EveryStatus }, false},
 	{setting.AttachmentMaxSize, "Maximum attachment size", setting.Limits,
 		"The largest single file this deployment accepts",

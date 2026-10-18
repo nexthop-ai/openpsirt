@@ -242,10 +242,6 @@ type Status struct {
 	KnownAffected    []string `json:"known_affected,omitempty"`
 	KnownNotAffected []string `json:"known_not_affected,omitempty"`
 	Fixed            []string `json:"fixed,omitempty"`
-	// UnderInvestigation is what nobody has decided about yet. An advisory
-	// states none; a VEX document states it for every component with an
-	// issue open and undecided.
-	UnderInvestigation []string `json:"under_investigation,omitempty"`
 }
 
 // Flag is a machine-readable reason some releases are not affected.

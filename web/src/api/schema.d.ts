@@ -12308,7 +12308,6 @@ export interface components {
             fixed?: string[] | null;
             known_affected?: string[] | null;
             known_not_affected?: string[] | null;
-            under_investigation?: string[] | null;
         };
         StepBody: {
             component: string;

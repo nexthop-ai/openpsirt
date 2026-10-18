@@ -75,12 +75,13 @@ func TestWhatThisDeploymentPublishesIsReadBackByItsOwnReaders(t *testing.T) {
 			portable[0].Targets[0].Within != nil {
 			t.Errorf("read back %+v, want openssl alone not affected", portable)
 		}
-		undecided := statementsOf(t, s.body(pathOf(t, s, "CVE-2026-1002")))
-		if len(undecided) != 1 || undecided[0].Status != sbom.UnderInvestigation ||
-			len(undecided[0].Targets) != 1 || undecided[0].Targets[0].Purl != libnl.Purl ||
-			undecided[0].Targets[0].Within == nil ||
-			undecided[0].Targets[0].Within.Purl != sonicRoot.Purl {
-			t.Errorf("read back %+v, want libnl inside the build under investigation", undecided)
+		ours := statementsOf(t, s.body(pathOf(t, s, "CVE-2026-1002")))
+		if len(ours) != 1 || ours[0].Status != sbom.NotAffected ||
+			ours[0].Justification != "vulnerable_code_not_in_execute_path" ||
+			len(ours[0].Targets) != 1 || ours[0].Targets[0].Purl != libnl.Purl ||
+			ours[0].Targets[0].Within == nil ||
+			ours[0].Targets[0].Within.Purl != sonicRoot.Purl {
+			t.Errorf("read back %+v, want libnl inside the build not affected", ours)
 		}
 
 		// And from the OpenVEX document about the branch.

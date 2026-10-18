@@ -37,7 +37,7 @@ const partOf = "default_component_of"
 // statuses is refused by every validator, and a reader is better told the
 // cautious answer than a contradiction.
 var precedence = map[string]int{
-	vex.Affected: 0, vex.UnderInvestigation: 1, vex.Fixed: 2, vex.NotAffected: 3,
+	vex.Affected: 0, vex.Fixed: 1, vex.NotAffected: 2,
 }
 
 // vexDocuments is a CSAF VEX document for every issue anything is stated about
@@ -249,8 +249,6 @@ func (l *listing) settle() {
 			l.status.Fixed = append(l.status.Fixed, id)
 		case vex.Affected:
 			l.status.KnownAffected = append(l.status.KnownAffected, id)
-		case vex.UnderInvestigation:
-			l.status.UnderInvestigation = append(l.status.UnderInvestigation, id)
 		}
 	}
 }
@@ -289,20 +287,12 @@ func (l *listing) threats() []advisory.Threat {
 
 // remediations is what a holder of an affected product can do: that no fix is
 // planned, or none is available yet, and what to do instead where the claim
-// named it. A product under investigation has nothing available until it is
-// decided, and says so.
+// named it.
 func (l *listing) remediations() []advisory.Remediation {
 	type said struct{ category, details string }
 	by := map[said][]string{}
 	for _, id := range sortedKeys(l.at) {
 		fact := l.at[id]
-		if fact.Status == vex.UnderInvestigation {
-			// Nothing to do yet, said as the standard says it: a reader's
-			// tooling asks every product under investigation what is
-			// available for it.
-			by[said{"none_available", vex.NotDecidedYet}] = append(by[said{"none_available", vex.NotDecidedYet}], id)
-			continue
-		}
 		if fact.Status != vex.Affected {
 			continue
 		}
