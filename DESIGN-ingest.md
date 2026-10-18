@@ -943,6 +943,21 @@ without the indexes and with them, on one engine at a time.
 | Night 365, quiet, MySQL and MariaDB | Without the indexes both read the runs' few rows through the index their foreign key carries |
 | Night 365, restamped, MySQL | Each count reads the other run column's index with the build alone as its prefix, every finding of the build, from the index rather than the table. A sixth of the cost without the indexes |
 
+A deployment of twelve builds of the image, 3,497,476 findings, one build at
+its tenth night with every container image changing identity each night:
+about 1,050 issues at components opened and 1,000 closed a night, 11,300
+findings each way. The page holds the run that opened the build.
+
+| Count read through | Page | What the count reads |
+|---|---:|---|
+| No run index | 253 ms | 17,927 table pages, the build's every finding |
+| The run indexes, before a vacuum | 185 ms | 348,715 index entries and 301,897 table rows |
+| The run indexes, after a vacuum | 67 ms | The same entries, no table row |
+
+| Rule | |
+|---|---|
+| An index-only read depends on the visibility map | A finding written since the last vacuum is read from the table. The finding table is vacuumed after a fiftieth of it changes (`DESIGN-database.md` § Indexes) |
+
 A night costs up to 7 percent more with the two indexes, averaged over the year: 3.75 s and
 3.83 s on PostgreSQL in the restamped shape, 3.39 s and 3.42 s in the quiet
 one. `make measure` re-runs both shapes.
