@@ -80,6 +80,10 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, core.Refused(d.Logger, err, "cannot read when these were last scanned")
 		}
+		publishes, err := store.Publishes(ctx)
+		if err != nil {
+			return nil, core.WentWrong(d.Logger, "cannot read which products publish", err)
+		}
 
 		out := &core.ListOutput[core.ProductBody]{}
 		out.Body.Items = make([]core.ProductBody, 0, len(rows))
@@ -93,6 +97,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 				TriageFloor:   core.Line(core.OrBlank(row.TriageFloor)),
 				PairShare:     core.CountedOr(row.PairShare),
 				PairApprovers: core.CountedOr(row.PairApprovers),
+				Publishes:     publishes[row.ID],
 				EndOfLife:     core.OnDate(row.EOLOn),
 			})
 		}

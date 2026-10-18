@@ -164,6 +164,10 @@ const (
 	// nothing else — no reading, no triage, no reporting — which is what keeps
 	// the visibility rules out of a build server's reach entirely.
 	Pipeline Kind = "pipeline"
+	// Anonymous is anybody at all, reading the security documents this
+	// deployment publishes. It holds no credential and reads disclosed work
+	// in the products whose documents are published, and nothing else.
+	Anonymous Kind = "anonymous"
 )
 
 // ErrNoSubject is returned when a query is attempted with nobody attached.
@@ -253,6 +257,9 @@ type Subject struct {
 	// that the zero value acts, which is what every subject not narrowed this
 	// way should do.
 	casesReadOnly bool
+	// published is the products an anonymous reader reads disclosed work in:
+	// the ones whose documents are served. Empty for every other kind.
+	published map[int64]bool
 }
 
 // OnCase reports whether this subject was brought into one case: one issue, in
@@ -421,6 +428,27 @@ func Everything(what string) Subject {
 	return Subject{Kind: Person, Identity: what, unnarrowed: true}
 }
 
+// Published is anybody at all, reading what this deployment publishes about
+// the products given: the ones whose documents an administrator chose to
+// serve.
+//
+// It reads disclosed work in those products and nothing else. It holds no
+// role, so it triages, approves and decides nothing; it is no person, so every
+// read that asks for one refuses it; and it holds no case, no team and no
+// grant over the deployment. A read that serves it does so because it asks
+// Reads or Products, the two questions this answers.
+//
+// Nothing resolves a credential to this. The surface that serves published
+// documents builds one per request from the products whose documents are
+// published at that moment, and accepts no credential at all.
+func Published(products []int64) Subject {
+	held := make(map[int64]bool, len(products))
+	for _, id := range products {
+		held[id] = true
+	}
+	return Subject{Kind: Anonymous, Identity: "anybody", published: held}
+}
+
 // Unnarrowed reports whether this is the deployment itself rather than
 // anybody in it — what Everything makes, for a background pass that answers
 // nobody.
@@ -472,6 +500,11 @@ func (s Subject) Reads(visibility Visibility, productID int64) bool {
 	// check asking the question one product at a time.
 	if s.unnarrowed {
 		return true
+	}
+	// Anybody at all reads disclosed work where it is published, and that is
+	// the whole of it.
+	if s.Kind == Anonymous {
+		return visibility == Public && s.published[productID]
 	}
 	if visibility == Public {
 		return s.Holds(PublicRead, productID) || s.Holds(PublicTriage, productID)
@@ -662,6 +695,11 @@ func (s Subject) Sees(productID int64) bool {
 		// send to it. It knows nothing about any other.
 		return s.scope.ProductID == productID
 	}
+	// Anybody at all knows a product exists where its documents are
+	// published, because the documents name it.
+	if s.Kind == Anonymous {
+		return s.published[productID]
+	}
 	if s.Kind != Person {
 		return false
 	}
@@ -735,6 +773,13 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 // reads those only where they hold a role. The "all" flag is set only for the
 // unnarrowed subject Everything makes.
 func (s Subject) Products() (ids []int64, all bool) {
+	if s.Kind == Anonymous {
+		for id := range s.published {
+			ids = append(ids, id)
+		}
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		return ids, false
+	}
 	if s.Kind != Person {
 		return nil, false
 	}

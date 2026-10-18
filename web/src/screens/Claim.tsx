@@ -156,6 +156,17 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
             )}
           </div>
         )}
+        {claim.argument.holds_for && claim.argument.outcome !== "deferred" && (
+          <div>
+            <span className="l">Published as holding for</span>
+            <span className="v">
+              {claim.argument.holds_for === "portable"
+                ? "anyone shipping this version"
+                : "this build only"}
+            </span>
+            {!claim.argument.scope && <span className="hint">from the reason</span>}
+          </div>
+        )}
         {claim.argument.fixed_version && (
           <div>
             <span className="l">Fixed in</span>

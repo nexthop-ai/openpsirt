@@ -3,7 +3,7 @@
 Subject resolution, roles, visibility enforcement and disclosure control.
 
 Satisfies REQ-22, REQ-29, REQ-34, REQ-37, REQ-38, REQ-41, REQ-42, REQ-43,
-REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
+REQ-44, REQ-45, REQ-56, REQ-63, REQ-68, REQ-69's server half.
 
 ## Contents
 
@@ -22,6 +22,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Store methods with no subject](#store-methods-with-no-subject)
 - [Judgments about an issue](#judgments-about-an-issue)
 - [Subject kinds](#subject-kinds)
+- [Anybody at all](#anybody-at-all)
 - [Provider sign-in](#provider-sign-in)
 - [Outbound provider fetches](#outbound-provider-fetches)
 - [Trusted-header sign-in](#trusted-header-sign-in)
@@ -623,6 +624,7 @@ to ask.
 | A person | A session cookie, or a username a trusted proxy asserts on every request | What their roles allow |
 | A person's own script | A token they minted | A narrowed view of what they may do |
 | A pipeline | An API key | Send scans, and read back what became of its own |
+| Anybody at all | None, and none is looked at | Read the security documents of the products that publish. § Anybody at all |
 
 A pipeline may send and nothing else — no reading findings, no triage, no
 reporting. A build server has no business holding a person's permissions, and
@@ -637,6 +639,23 @@ being applied correctly to it.
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
 | A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |
+
+## Anybody at all
+
+The subject the published documents are read as (REQ-63). It is built per
+request, by the surface that serves them, from the products that publish at
+that moment, and by the pass that writes them; no credential, header or
+cookie resolves to it.
+
+| Rule | |
+|---|---|
+| It reads disclosed work in a product that publishes, and nothing else | Asked whether it reads a product, it answers yes for the disclosed visibility of a publishing product and no for everything else. Every list, count and lookup narrowed by those two questions narrows it the same way, so a product that does not publish is not listed, not counted and not named |
+| It is nobody | It holds no role, no case, no team and nothing over the deployment, so it triages, approves and decides nothing, and every read asking for a person refuses it |
+| Two reads are open to it | The documents published, and what advisories went out, the one read of an issuance it may make. Each asks for it by name; every other read refuses it as it refuses a pipeline |
+| Which products publish takes no subject | It is what builds this subject, and it is the deployment's configuration, the same for everybody who asks |
+| A signed-in person does not read the published documents through it | They read findings through the API, where their own grants answer; the store of published documents refuses anybody but this subject and the deployment itself |
+
+`DESIGN-publishing.md` says what is read and served.
 
 ## Provider sign-in
 

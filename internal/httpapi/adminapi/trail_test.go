@@ -161,6 +161,11 @@ var administrativeActs = []trailedAct{
 		body: `{"floor":"high"}`, kind: "setting", about: "triage floor of mine",
 	},
 	{
+		id: "set-product-publication", what: "whether a product's documents are published",
+		method: http.MethodPut, path: "/v1/products/mine/publication",
+		body: `{"publishes":true}`, kind: "setting", about: "publication of mine",
+	},
+	{
 		id: "set-product-pair-thresholds", what: "when one pair's agreements are raised",
 		method: http.MethodPut, path: "/v1/products/mine/pair-thresholds",
 		body: `{"share":90,"approvers":4}`, kind: "setting", about: "pair thresholds of mine",

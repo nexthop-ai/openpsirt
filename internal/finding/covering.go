@@ -127,12 +127,65 @@ func covered(q *bun.SelectQuery, productID int64, visible []access.Visibility,
 		Where(`"f"."closed_at" IS NULL`)
 }
 
+// AffectedOutcomes is every outcome that says an issue applies and stays: a
+// claim that it does, the two that promise work, and a claim that it will not
+// be fixed.
+func AffectedOutcomes() []string {
+	return []string{OutcomeAffected, OutcomeUpgradeNeeded, OutcomePatchNeeded, OutcomeWontFix}
+}
+
+// Affected is what one group of places wholly under claims that the issue
+// applies stands under: the least and the greatest of their outcomes, which
+// are equal where every place says the same, and the earliest decision.
+type Affected struct {
+	Least     string `bun:"least"`
+	Greatest  string `bun:"greatest"`
+	DecidedBy int64  `bun:"decided_by"`
+}
+
+// WhollyAffected narrows a grouped read of findings to the groups whose every
+// open place stands under a decision in force that says the issue applies,
+// and adds the columns Affected reads.
+//
+// In force rather than approved. Saying an issue applies hides nothing, so a
+// claim of it needs nobody, and the review that guards a dismissal has nothing
+// to guard here. The read is over findings `f` grouped by what one statement
+// is about, as WhollyCovered's is.
+func WhollyAffected(q *bun.SelectQuery, productID int64, visible []access.Visibility) *bun.SelectQuery {
+	standing, args := InForce()
+	quoted := make([]string, 0, len(AffectedOutcomes()))
+	for _, outcome := range AffectedOutcomes() {
+		quoted = append(quoted, "'"+outcome+"'")
+	}
+	bound := append([]any{productID}, args...)
+	bound = append(bound, bun.List(visible))
+	return q.
+		Join(`LEFT JOIN (`+Decisions+`) ON `+DecisionAt("?")+`
+			AND `+standing+`
+			AND "de"."live_key" IS NOT NULL
+			AND "de"."visibility" IN (?)
+			AND `+keyMatchesOn("de", `(SELECT "mc"."outcome" FROM "claim" AS "mc"
+				WHERE "mc"."id" = "de"."claim_id")`), bound...).
+		Join(`LEFT JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id" AND "cl"."outcome" IN (` +
+			strings.Join(quoted, ", ") + `)`).
+		ColumnExpr(`MIN("cl"."outcome") AS "least"`).
+		ColumnExpr(`MAX("cl"."outcome") AS "greatest"`).
+		ColumnExpr(`MIN("de"."id") AS "decided_by"`).
+		Where(`"f"."closed_at" IS NULL`).
+		Having(`COUNT("cl"."id") = COUNT(*)`)
+}
+
 // Stated is what one decision claims, as a published statement repeats it.
 type Stated struct {
+	// Outcome is what the claim says.
+	Outcome string
 	// Justification is the reason, in the vocabulary both formats share.
 	Justification string
 	// Mitigation is what stops the flaw, where somebody named it.
 	Mitigation string
+	// Scope is whom a published statement holds for, where the claim states
+	// it, and empty where the outcome and the reason decide.
+	Scope      string
 	ProposedAt time.Time
 }
 
@@ -152,8 +205,10 @@ func StatedBy(ctx context.Context, db bun.IDB, decisions []int64) (map[int64]Sta
 	}
 	var rows []struct {
 		ID            int64     `bun:"id"`
+		Outcome       string    `bun:"outcome"`
 		Justification string    `bun:"justification"`
 		Mitigation    string    `bun:"mitigation"`
+		Scope         string    `bun:"scope"`
 		ProposedAt    time.Time `bun:"proposed_at"`
 	}
 	where, args := database.InAnyOf(`"de"."id"`, decisions)
@@ -161,8 +216,10 @@ func StatedBy(ctx context.Context, db bun.IDB, decisions []int64) (map[int64]Sta
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		ColumnExpr(`"de"."id" AS "id"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COALESCE("cl"."justification", '') AS "justification"`).
 		ColumnExpr(`COALESCE("cl"."mitigation", '') AS "mitigation"`).
+		ColumnExpr(`COALESCE("cl"."scope", '') AS "scope"`).
 		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
 		Where(where, args...).
 		Scan(ctx, &rows); err != nil {
@@ -170,8 +227,8 @@ func StatedBy(ctx context.Context, db bun.IDB, decisions []int64) (map[int64]Sta
 	}
 	for _, row := range rows {
 		out[row.ID] = Stated{
-			Justification: row.Justification, Mitigation: row.Mitigation,
-			ProposedAt: row.ProposedAt,
+			Outcome: row.Outcome, Justification: row.Justification, Mitigation: row.Mitigation,
+			Scope: row.Scope, ProposedAt: row.ProposedAt,
 		}
 	}
 	return out, nil

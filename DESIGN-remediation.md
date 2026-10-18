@@ -525,9 +525,11 @@ on them. Saying which releases the work is meant to reach is done to the work.
 
 ## Publication
 
-One destination is built: the documents that have gone out are written as a
+Two destinations are built. The documents that have gone out are written as a
 static directory somebody else's web server serves, which `The provider
-directory` below describes. Nothing is sent anywhere, and no adapter to
+directory` below describes; and where the deployment publishes, it serves them
+itself, beside a VEX document per issue and per branch or tag, which
+`DESIGN-publishing.md` describes. Nothing is sent anywhere, and no adapter to
 anybody's platform exists. The rules below are what those adapters would be,
 kept here because the document they are about exists and the shape it would be
 published in is what makes its content right.
@@ -835,7 +837,10 @@ Every advisory that has gone out, written as the static directory the standard
 defines for a CSAF provider. This deployment writes files into a store an
 operator configured; their web server serves them. Nothing here answers a
 request for one, and nothing in the application can reach the package that
-writes them (REQ-63).
+writes them. The documents this deployment serves itself are a surface of
+their own (`DESIGN-publishing.md`), and a deployment may have both: an advisory
+then states the address this deployment serves it at, and the directory is a
+copy.
 
 | Rule | |
 |---|---|
@@ -920,13 +925,12 @@ it points at. The signed outbound request is built and is described in
 
 Every adapter that would send an advisory to somebody's platform, which is the
 whole of Publication above. What exists is `The provider directory`: files
-written where an operator pointed, for their own web server.
+written where an operator pointed, for their own web server; and the documents
+this deployment serves itself (`DESIGN-publishing.md`).
 
-Signatures, and the public key that verifies them. They are what the
-standard's trusted provider role adds on top of the directory, and key
-material is a class of configuration this deployment does not take. The layout
-leaves room: a signature sits beside the document under the same name, and the
-feed already names the file beside each entry that answers for it.
+Signatures in the static directory. The documents this deployment serves
+itself are signed where an operator configured a key; the directory writer
+writes none, and its provider description claims the provider role alone.
 
 A version 4 score in the document. CSAF 2.1 gains a field for one, and the
 document is written as CSAF 2.0 until 2.1 is an OASIS standard. The note that

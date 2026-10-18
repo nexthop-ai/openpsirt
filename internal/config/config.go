@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/redact"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
+	"github.com/nexthop-ai/openpsirt/internal/signing"
 )
 
 // Config is everything the process needs to start.
@@ -228,6 +229,25 @@ type Config struct {
 	DirectoryList   bool
 	DirectoryMirror bool
 
+	// Publish is whether this deployment serves the security documents of
+	// the products an administrator chose to anybody who asks, without
+	// signing in (REQ-63). Off by default: a route that needs no sign-in is
+	// one more thing to defend, and the person who deployed this decides
+	// whether there is one.
+	//
+	// It needs a publisher and an https address to be served at, which is
+	// the deployment's own: every address the documents state is built from
+	// it, an advisory's own included, where a directory is written as well.
+	Publish bool
+	// PublishRate is how many requests a minute one client may make of the
+	// published documents.
+	PublishRate int
+	// PublishKey is the armored OpenPGP private key the published documents
+	// are signed with, and PublishPassphrase what unlocks it. Absent is
+	// ordinary: the documents go out with their digests and unsigned.
+	PublishKey        string
+	PublishPassphrase string
+
 	// UpstreamInternal are names this deployment never sends to a public
 	// package index, on top of the ones derived from the publisher's
 	// namespace and from what the scans were about.
@@ -404,6 +424,10 @@ func load(given map[string]string) (Config, error) {
 		// The standard's own reading of an answer nobody gave.
 		DirectoryList:          r.boolean("DIRECTORY_LIST", true),
 		DirectoryMirror:        r.boolean("DIRECTORY_MIRROR", false),
+		Publish:                r.boolean("PUBLISH", false),
+		PublishRate:            r.number("PUBLISH_RATE", DefaultPublishRate),
+		PublishKey:             r.text("PUBLISH_KEY", ""),
+		PublishPassphrase:      r.text("PUBLISH_KEY_PASSPHRASE", ""),
 		PublisherName:          r.text("PUBLISHER_NAME", ""),
 		PublisherNamespace:     r.text("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      r.text("PUBLISHER_CATEGORY", "vendor"),
@@ -601,6 +625,9 @@ func load(given map[string]string) (Config, error) {
 	if err := apart(c.Directory, c.Attachments); err != nil {
 		return Config{}, err
 	}
+	if err := publishing(c, given); err != nil {
+		return Config{}, err
+	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
 	}
@@ -621,6 +648,51 @@ func load(given map[string]string) (Config, error) {
 		return Config{}, err
 	}
 	return c, nil
+}
+
+// DefaultPublishRate is how many requests a minute one client may make of the
+// published documents where nothing says otherwise.
+//
+// Ten a second: a reader taking a provider of three thousand documents whole,
+// each with a digest beside it, takes about ten minutes, and a client asking
+// faster than that is asking more than any reader of these needs.
+const DefaultPublishRate = 600
+
+// publishing refuses a deployment that serves its documents without what
+// serving them needs, and a publishing setting nothing would read.
+//
+// Each is a deployment that starts and then serves documents nobody can
+// identify, or at an address that answers nothing, or that holds a key and
+// signs nothing.
+func publishing(c Config, given map[string]string) error {
+	if !c.Publish {
+		for _, key := range []string{"PUBLISH_RATE", "PUBLISH_KEY", "PUBLISH_KEY_PASSPHRASE"} {
+			if _, set := given[key]; set {
+				return fmt.Errorf("%s%s: set alongside OPENPSIRT_PUBLISH=true — with "+
+					"publishing off nothing reads it", envPrefix, key)
+			}
+		}
+		return nil
+	}
+	if strings.TrimSpace(c.PublisherName) == "" || strings.TrimSpace(c.PublisherNamespace) == "" {
+		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_PUBLISHER_NAME and " +
+			"OPENPSIRT_PUBLISHER_NAMESPACE too — every published document names its publisher")
+	}
+	if !strings.HasPrefix(c.BaseURL, "https://") {
+		return fmt.Errorf("OPENPSIRT_PUBLISH: set OPENPSIRT_BASE_URL to the https address " +
+			"this deployment is reached at — the documents state addresses built from it, " +
+			"and the standard requires them served over TLS")
+	}
+	if c.PublishPassphrase != "" && c.PublishKey == "" {
+		return fmt.Errorf("OPENPSIRT_PUBLISH_KEY_PASSPHRASE: set alongside " +
+			"OPENPSIRT_PUBLISH_KEY — with no key it unlocks nothing")
+	}
+	if c.PublishKey != "" {
+		if _, err := signing.Read(c.PublishKey, c.PublishPassphrase); err != nil {
+			return fmt.Errorf("OPENPSIRT_PUBLISH_KEY: %w", err)
+		}
+	}
+	return nil
 }
 
 // absoluteBase refuses a deployment address that is not one.

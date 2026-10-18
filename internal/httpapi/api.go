@@ -34,6 +34,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/assignapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/reportsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/scansapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/triageapi"
@@ -184,6 +185,13 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 				next.ServeHTTP(w, r)
 				return
 			}
+			// The published documents take no credential and look at none,
+			// so one sent along is never resolved: a request carrying a
+			// session is answered exactly as one carrying nothing.
+			if publishing(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			// A path this server has no route for belongs to the interface,
 			// which does its own routing — and the page has to load for
@@ -282,6 +290,21 @@ func New(logger *slog.Logger, ready Ready, in core.Deps) (http.Handler, huma.API
 	// X-Forwarded-For and similar, which any caller can set, so it is only
 	// safe behind a proxy known to overwrite them. Trusting proxy-supplied
 	// headers happens in one place, guarded by a trusted-source check.
+
+	// The security documents this deployment publishes, served to anybody
+	// without a credential, outside the documented API: their shapes and
+	// their paths are the standards', which a reader follows from the
+	// provider description rather than from this API's document. Mounted
+	// whether or not anything is published, so a deployment publishing
+	// nothing answers there as a path nothing is published at, rather than
+	// with the interface's page.
+	surface := in.Published
+	if surface == nil {
+		surface = published.Off()
+	}
+	for _, prefix := range published.Prefixes() {
+		router.Handle(prefix+"*", surface)
+	}
 
 	// Liveness and readiness are deliberately outside the documented API and
 	// carry no authentication: a container probe cannot sign in, and these
@@ -393,6 +416,17 @@ var open = map[string]bool{
 // A route added here is checked against what sign-in touches. Nothing under
 // this prefix is harmless by construction.
 const openPrefix = "/v1/sign-in/"
+
+// publishing reports whether a path is one the published documents are served
+// below.
+func publishing(path string) bool {
+	for _, prefix := range published.Prefixes() {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 // unconfigured answers every request but the probes for a process built
 // without a database or a queue, before a caller is resolved.

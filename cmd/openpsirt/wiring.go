@@ -8,17 +8,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/directory"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
+	"github.com/nexthop-ai/openpsirt/internal/signing"
 )
 
 // returnsTo refuses a provider with no address to send people back to.
@@ -43,12 +49,60 @@ func returnsTo(providers map[string]signin.Provider, baseURL string) error {
 // and states its own address, and the directory names the publisher and states
 // every file's, so two constructions of this are two deployments the first
 // time either grows a field.
+//
+// A deployment that serves its own documents publishes them at its own
+// address, in the folder the standard reserves for them, and that is the
+// address a document states. A directory written as well is a copy kept
+// somewhere else, whose lists name its own files: writtenAs is the publisher
+// it is written under.
 func publishesAs(cfg config.Config) publisher.Named {
+	at := cfg.DirectoryURL
+	if cfg.Publish {
+		at = strings.TrimRight(cfg.BaseURL, "/") + publish.DirectoryPath
+	}
 	return publisher.Named{
 		Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
 		Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
-		Published: cfg.DirectoryURL,
+		Published: at,
 	}
+}
+
+// writtenAs is the publisher the static directory is written under: the one
+// every document names, at the address the directory is served from.
+func writtenAs(cfg config.Config) publisher.Named {
+	who := publishesAs(cfg)
+	who.Published = cfg.DirectoryURL
+	return who
+}
+
+// publishing is the surface that serves the published documents and the pass
+// that writes them, or neither where the deployment publishes nothing.
+//
+// The key is read again here rather than carried from where the setting was
+// checked, because the check refuses a key that does not read and this is
+// the one place a signer is held.
+func publishing(cfg config.Config, db *bun.DB, name string,
+	logger *slog.Logger) (http.Handler, *publish.Pass, error) {
+
+	if !cfg.Publish {
+		return nil, nil, nil
+	}
+	var signer *signing.Signer
+	if cfg.PublishKey != "" {
+		var err error
+		if signer, err = signing.Read(cfg.PublishKey, cfg.PublishPassphrase); err != nil {
+			return nil, nil, fmt.Errorf("OPENPSIRT_PUBLISH_KEY: %w", err)
+		}
+	}
+	who := publishesAs(cfg)
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	surface := published.Handler(published.Config{
+		DB: db, Who: who, Base: base, Rate: cfg.PublishRate, Signer: signer,
+		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror, Logger: logger,
+	})
+	logger.Info("security documents are published to anybody, for the products an "+
+		"administrator chose", "at", base+publish.WellKnown, "signed", signer != nil)
+	return surface, publish.NewPass(db, publish.NewGenerator(db, who, base), name, logger), nil
 }
 
 // onlyTheBoundProvider refuses a provider change that nobody re-granted.

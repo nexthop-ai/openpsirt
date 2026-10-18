@@ -60,6 +60,7 @@ type FindingDecisionBody struct {
 	Outcome       core.OutcomeOneAtATime `json:"outcome"`
 	Justification core.Justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
 	Mitigation    string                 `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
+	Scope         core.StatementScope    `json:"scope,omitempty" doc:"Whom a published statement made from this claim holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral. An extension keeps the scope of the claim it carries"`
 	DeferredUntil string                 `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one
@@ -284,6 +285,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 					Outcome:       triage.Outcome(input.Body.Outcome),
 					Justification: triage.Justification(input.Body.Justification),
 					Mitigation:    input.Body.Mitigation,
+					Scope:         triage.Scope(input.Body.Scope),
 					FixedVersion:  input.Body.FixedVersion,
 					Reasoning:     input.Body.Reasoning,
 					By:            subject.ID,

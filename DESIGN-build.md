@@ -66,7 +66,10 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
 | `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
 | `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
-| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, which the directory writes. The supplier reader reads the fields it uses under the names these declare. See `DESIGN-remediation.md` |
+| `internal/csaf/` | The shapes of a CSAF provider description and ROLIE feed, and the lists a provider serves, which the directory writes and the published surface serves. The supplier reader reads the fields it uses under the names these declare. See `DESIGN-remediation.md` |
+| `internal/publish/` | The security documents served to anybody: what each states, the revisions kept, and the pass that writes them. See `DESIGN-publishing.md` |
+| `internal/httpapi/published/` | The surface that serves them, beside the API rather than in it. See `DESIGN-publishing.md` |
+| `internal/signing/` | Signing what is published with the key an operator supplied. See `DESIGN-publishing.md` |
 | `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `DESIGN-ingest.md` |
 | `internal/cverecord/` | The CVE record snapshot: fetching it, reading it, and what a record says about a component's version. See `DESIGN-findings.md` § CVE record ranges and `DESIGN-ingest.md` § CVE records |
 | `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `DESIGN-findings.md` |
@@ -1062,8 +1065,10 @@ documented API and must never grow a response body describing the system's
 contents.
 
 They are not the only routes answering without a credential; the sign-in paths
-and the interface's assets do too. None of them reads anything from the
-database about what this deployment holds (REQ-43).
+and the interface's assets do too, and none of those reads anything from the
+database about what this deployment holds (REQ-43). The published security
+documents are the one surface that does, as anybody at all
+(`DESIGN-publishing.md`).
 
 ## Documentation
 

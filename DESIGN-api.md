@@ -56,16 +56,18 @@ document is wrong the first time somebody is in a hurry — silently.
 
 ## Unauthenticated surfaces
 
-The application serves no documentation of its own, leaving no unauthenticated
-route that reads domain data: no product, finding, issue, person or credential
-is readable without a credential.
+The application serves no documentation of its own (REQ-63). The one route
+that reads domain data without a credential is the published security
+documents, off until an operator turns it on and then limited to the products
+an administrator chose; no product, finding, issue, person or credential is
+readable without a credential through anything else.
 
 Sign-in is not nothing. It reads and writes the deployment's own sign-in key,
 the session it is creating and the account row a first arrival needs — its own
 machinery, and nothing beyond it. A route added under that prefix is checked
 against that rather than assumed harmless.
 
-Four surfaces answer without a credential. The list is written out rather than
+Five surfaces answer without a credential. The list is written out rather than
 inferred from a rule, so adding a route never adds an exception.
 
 | Surface | Answers |
@@ -74,6 +76,12 @@ inferred from a rule, so adding a route never adds an exception.
 | `/v1/sign-in` | The providers an operator configured. A sign-in page draws a button per provider and cannot ask for that list while holding nothing |
 | `/v1/sign-in/…` | Redirects to a provider, or refuses. What it reads and writes is its own: the sign-in key, the session, and the account a first arrival needs. A route added here is checked against that rather than assumed harmless |
 | The interface | The built assets. They contain no data; everything drawn in them is fetched with a credential. A path naming a directory of them is answered with the page, never a listing |
+| `/.well-known/csaf/…`, `/openvex/…` | The security documents of the products that publish, read as anybody at all. No credential is looked at, GET and HEAD are the only methods, and a deployment publishing nothing answers every path as one nothing is published at. `DESIGN-publishing.md` holds the rest |
+
+The published documents are not in the API document. Their shapes and their
+paths are the standards' — the provider description, the feed, the documents
+and the files beside them — and a reader finds them from the provider
+description, which is the one thing a reader of these asks for first.
 
 ## Operation descriptions
 

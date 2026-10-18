@@ -660,6 +660,65 @@ func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
 	return counted(res, "product", productID, "record this product's thresholds for one pair")
 }
 
+// SetPublishes records whether a product's security documents are served to
+// anybody, and answers whether that moved anything.
+func (s *Store) SetPublishes(ctx context.Context, productID int64, publishes bool) error {
+	res, err := s.db.NewUpdate().Model((*Product)(nil)).
+		Set(`"publishes" = ?`, publishes).
+		Where(`"id" = ?`, productID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record whether this product publishes: %w", err)
+	}
+	return counted(res, "product", productID, "record whether this product publishes")
+}
+
+// Publishing is every product in use whose security documents are served to
+// anybody, by identifier.
+//
+// It takes no subject. It is what builds the subject the published documents
+// are read as, and the answer is the deployment's configuration, the same for
+// everybody who asks.
+func (s *Store) Publishing(ctx context.Context) ([]int64, error) {
+	return s.publishing(ctx, true)
+}
+
+// Publishes is every product whose documents an administrator chose to
+// publish, in use or not, as a set. What a catalog listing reads.
+func (s *Store) Publishes(ctx context.Context) (map[int64]bool, error) {
+	ids, err := s.publishing(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// publishing is the products whose documents are published, in use only or
+// every one.
+//
+// Read by its column rather than through the product's model. Whether a
+// product publishes is asked by the published surface, the pass that writes
+// its documents and the catalog listing, and nowhere a product is otherwise
+// read or declared.
+func (s *Store) publishing(ctx context.Context, inUse bool) ([]int64, error) {
+	q := s.db.NewSelect().TableExpr(`"product" AS "p"`).
+		ColumnExpr(`"p"."id"`).
+		Where(`"p"."publishes" = ?`, true).
+		OrderExpr(`"p"."id"`)
+	if inUse {
+		q = q.Where(`"p"."retired_at" IS NULL`)
+	}
+	var ids []int64
+	if err := q.Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which products publish: %w", err)
+	}
+	return ids, nil
+}
+
 // SetTriageFloor records what a product considers worth triaging, or clears it
 // so the product follows the deployment again.
 //

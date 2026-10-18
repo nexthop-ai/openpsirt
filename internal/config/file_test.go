@@ -131,6 +131,9 @@ var everySetting = map[string]string{
 	"DIRECTORY_ALLOW_HTTP": "true", "DIRECTORY_DIR": "/srv/csaf",
 	"DIRECTORY_LIST": "false", "DIRECTORY_MIRROR": "true",
 
+	"PUBLISH": "true", "PUBLISH_RATE": "120",
+	"PUBLISH_KEY": lockedKey, "PUBLISH_KEY_PASSPHRASE": keyPassphrase,
+
 	"UPSTREAM_INTERNAL": "corp,internal-lib", "OUTBOUND_EXCLUDED": "corp.example.test,203.0.113.0/24",
 	"PATCH_BRANCHES": "true", "PATCH_DIR": "/srv/copies", "PATCH_QUOTA": "1073741824",
 	"RECORDS_DIR": "/srv/records", "RECORDS_UPDATE": "false",

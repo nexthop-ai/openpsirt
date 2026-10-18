@@ -99,6 +99,10 @@ type Deps struct {
 	// Uploads counts the forms this server is reading at once, across every
 	// upload route. One per server, made where the routes are.
 	Uploads *Uploads
+	// Published serves the security documents this deployment publishes to
+	// anybody. Nil is a deployment that publishes nothing, whose every path
+	// there answers as one nothing is published at.
+	Published http.Handler
 }
 
 // Attachments returns a store over the files this deployment holds. A nil

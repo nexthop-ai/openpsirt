@@ -224,6 +224,7 @@ type Answered = {
   fixedVersion?: string;
   mitigation?: string;
   lands?: string;
+  scope?: string;
 };
 
 // The suffix that separates the answer from the prose. Two keys rather than

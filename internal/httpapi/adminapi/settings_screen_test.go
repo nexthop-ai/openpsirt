@@ -161,7 +161,7 @@ func TestEverySettingOfferedReportsWhatIsInForce(t *testing.T) {
 					each.name, value)
 			}
 		case setting.Word:
-			if !slices.Contains(theFloor, value) {
+			if !slices.Contains(each.words, value) {
 				t.Errorf("%s ships %q, which is not one of the words it takes", each.name, value)
 			}
 		case setting.Switch:

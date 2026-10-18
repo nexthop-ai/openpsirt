@@ -32,6 +32,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Attachments](#attachment-storage) | Off | `OPENPSIRT_ATTACHMENT_BUCKET`, or `OPENPSIRT_ATTACHMENT_DIR` for a trial |
 | [Advisory generation](#advisory-publication) | Off | `OPENPSIRT_PUBLISHER_NAME` and `OPENPSIRT_PUBLISHER_NAMESPACE`, both |
 | [The published advisory directory](#the-published-advisory-directory) | Off | `OPENPSIRT_DIRECTORY_URL` and a bucket or directory to write to, with advisory generation on |
+| [Published documents](#published-documents) | Off | `OPENPSIRT_PUBLISH`, with advisory generation on, and a product turned on under Products |
 
 A sign-in method is not in this list because one is required: the process
 refuses to start without one. [Sign-in](#sign-in) says which.
@@ -754,11 +755,64 @@ than this application's:
   writes into it successfully. Give whatever serves the address a policy that
   lets it read, or put a front end with credentials of its own in front.
 
-Nothing is signed. Signatures and a public key are what the standard's trusted
-provider role adds, and key material is configuration of a kind this deployment
-does not yet take. The layout leaves room for it: a signature sits beside the
-document under the same name, and the feed already names the file beside each
-entry that answers for it.
+Nothing in the directory is signed. The documents this deployment serves
+itself are, where a key is configured: [Published documents](#published-documents).
+
+### Published documents
+
+Off unless you turn it on. With it on, this deployment serves the security
+documents of the products an administrator chose to anybody who asks, without
+signing in, as a standard CSAF provider at
+`/.well-known/csaf/provider-metadata.json` and a folder of OpenVEX documents at
+`/openvex/`:
+
+- each advisory that has gone out and may travel, as the directory above would
+  write it;
+- a CSAF VEX document for each issue in each published product, across every
+  branch, tag and variant, saying for each component whether it is affected;
+- an OpenVEX document for each branch or tag, for a scanner holding one build.
+
+Nothing about a flaw in your own product is published before it is disclosed —
+not its identifier, not that there is one.
+
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_PUBLISH` | `publishing.enabled` | Serve the published documents. Needs `OPENPSIRT_BASE_URL` to be the `https` address this deployment is reached at, and a publisher's name and namespace; refused at startup without them. Read at startup | `false` |
+| `OPENPSIRT_PUBLISH_RATE` | `publishing.rate` | How many requests a minute one client address may make of the published documents, on each replica. Past it, a client is answered 429 with when to ask again. Refused where publishing is off | `600` |
+| `OPENPSIRT_PUBLISH_KEY` | `publishing.key` | An armored OpenPGP private key to sign every published document with. With one, each document carries an `.asc` signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off | unset |
+| `OPENPSIRT_PUBLISH_KEY_PASSPHRASE` | `publishing.key_passphrase` | What unlocks the key, where it is locked. Refused where the key is not locked, and without a key | unset |
+
+Two things are set inside the application, by an administrator:
+
+| Under | What it does |
+|---|---|
+| Products, the Published column | Which products' documents are served. Off for every product until somebody turns it on, and recorded in the administrative trail. Turned off, a product's documents stop being served at once |
+| Settings, Outbound, Published statuses | `all`, the default, publishes every status: not affected, fixed, affected and under investigation. `not-affected-and-fixed` publishes those two alone, and a document left with nothing is withdrawn |
+
+On the Helm chart these go through `extraEnv`. Give the key from a Secret of
+your own:
+
+```yaml
+extraEnv:
+  - name: OPENPSIRT_PUBLISH
+    value: "true"
+  - name: OPENPSIRT_PUBLISH_KEY
+    valueFrom:
+      secretKeyRef: {name: openpsirt-signing, key: private.asc}
+```
+
+The documents are worked out every five minutes, so a decision agreed or a
+scan landing reaches readers within that. A reader keeping a copy is told what
+has not moved: every answer carries an entity tag and a date, and a request
+repeating either is answered 304.
+
+The rate is counted per client address, as the connection arrived. Behind a
+proxy or a load balancer every reader arriving through it shares one
+allowance, so set the rate for what the proxy passes on, or limit readers at
+the proxy.
+
+Where the published advisory directory is written as well, an advisory states
+the address this deployment serves it at, and the directory is a copy of it.
 
 ## Upstream currency
 
@@ -1178,3 +1232,11 @@ on.
 | A flaw recorded here is rated by the product that recorded it, and its rating is no longer on the issue every product holding it reads. The upgrade moves it there | Nothing. Where another product holds the same issue, its findings read no severity word from the record, and keep the deadline v0.8.0 worked out from it until the next scan reporting the issue with a word works it out again |
 | `attachment.max-size` takes no value above 512 MiB, and a larger value is refused when set. v0.8.0 took any size | Nothing. A larger value v0.8.0 stored is read as 512 MiB, so a file past it is refused at upload. Set it again at 512 MiB or below, so the settings screen shows the size that applies |
 | `triage.deferral-threshold` and `scanning.quiet-after` are whole numbers of days, and a part-day value is refused when set | Nothing. A value v0.8.0 stored between two days is read as the later whole day everywhere: `12h` is one day |
+
+### From v0.9.0
+
+| Change | What to do |
+|---|---|
+| This deployment can serve its own security documents to anybody, with `OPENPSIRT_PUBLISH`. Off by default, and off for every product | Nothing, unless you want it: [Published documents](#published-documents) |
+| A claim may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No claim the upgrade carries states one, and the reason decides | Nothing |
+| A path below `/.well-known/csaf/` or `/openvex/` is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page | Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on |

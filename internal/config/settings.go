@@ -99,6 +99,11 @@ var settings = []setting{
 	{"DIRECTORY_LIST", "directory.list", boolean},
 	{"DIRECTORY_MIRROR", "directory.mirror", boolean},
 
+	{"PUBLISH", "publishing.enabled", boolean},
+	{"PUBLISH_RATE", "publishing.rate", number},
+	{"PUBLISH_KEY", "publishing.key", text},
+	{"PUBLISH_KEY_PASSPHRASE", "publishing.key_passphrase", text},
+
 	{"UPSTREAM_INTERNAL", "upstream.internal", list},
 	{"OUTBOUND_EXCLUDED", "outbound.excluded", list},
 

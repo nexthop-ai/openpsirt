@@ -115,6 +115,17 @@ export function Products({ who }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
   });
 
+  const setPublishes = useMutation({
+    mutationFn: async ({ product, publishes }: { product: string; publishes: boolean }) =>
+      unwrap(
+        await api.PUT("/v1/products/{product}/publication", {
+          params: { path: { product } },
+          body: { publishes },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
+  });
+
   const setPairs = useMutation({
     mutationFn: async ({
       product,
@@ -174,6 +185,9 @@ export function Products({ who }: { who: Who }) {
       {setPairs.isError && (
         <Failed error={setPairs.error} what="Those pair thresholds could not be set." />
       )}
+      {setPublishes.isError && (
+        <Failed error={setPublishes.error} what="Whether it is published could not be set." />
+      )}
 
       {items.length === 0 ? (
         <Empty
@@ -205,6 +219,9 @@ export function Products({ who }: { who: Who }) {
                   One pair
                 </th>
                 <th>Out of support</th>
+                <th title="Its advisories and VEX documents are served to anyone, without signing in, where this deployment publishes">
+                  Published
+                </th>
                 <th>Last inventory</th>
                 <th />
               </tr>
@@ -265,6 +282,26 @@ export function Products({ who }: { who: Who }) {
                         admin={who.admin}
                         onSet={(on) => setEndOfLife.mutate({ product: product.name ?? "", on })}
                       />
+                    </td>
+                    <td>
+                      {who.admin ? (
+                        <input
+                          type="checkbox"
+                          aria-label={`Publish ${product.name}'s security documents`}
+                          checked={!!product.publishes}
+                          disabled={setPublishes.isPending}
+                          onChange={(event) =>
+                            setPublishes.mutate({
+                              product: product.name ?? "",
+                              publishes: event.target.checked,
+                            })
+                          }
+                        />
+                      ) : product.publishes ? (
+                        "yes"
+                      ) : (
+                        <span className="hint">no</span>
+                      )}
                     </td>
                     <td
                       className={stale ? "" : "hint"}

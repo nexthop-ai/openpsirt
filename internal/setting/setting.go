@@ -315,6 +315,16 @@ const (
 	// having taken it.
 	QueuedAfter = "triage.queued-after"
 
+	// PublishedStatuses is which statuses the security documents served to
+	// anybody state: every one of them, or only that something is not
+	// affected or is fixed.
+	//
+	// Deployment-wide rather than per product. What it limits is what this
+	// organization says in public about what it ships, and two products of
+	// one organization saying different kinds of thing is a policy nobody can
+	// state in a sentence.
+	PublishedStatuses = "publishing.statuses"
+
 	// AbsentAfter is how long somebody may go without signing in before
 	// work they are holding is worth an administrator's attention.
 	//
@@ -542,6 +552,20 @@ const DefaultDiscloseAfter = 90 * 24 * time.Hour
 // noticing. Like the deferral threshold it ships as a starting point rather
 // than a rule, because how long is too long is a judgment about a product.
 const DefaultMovementThreshold = 30 * 24 * time.Hour
+
+// The two words PublishedStatuses takes. EveryStatus is the default: a reader
+// holding a document that states only some statuses reads silence about the
+// rest as nothing being known, and every status is what the record holds.
+const (
+	EveryStatus = "all"
+	// SettledStatuses is the statements that something is not affected or is
+	// fixed, and no others.
+	SettledStatuses = "not-affected-and-fixed"
+)
+
+// StatusLimits is the words PublishedStatuses takes, in the order to offer
+// them.
+func StatusLimits() []string { return []string{EveryStatus, SettledStatuses} }
 
 // On and Off are what a setting that is a switch may be set to.
 //

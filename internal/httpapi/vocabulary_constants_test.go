@@ -63,6 +63,7 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 	for _, each := range []vocabulary{
 		listed(triage.Outcomes()),
 		listed(triage.Justifications()),
+		listed(triage.Scopes()),
 		listed(triage.WhatHappenedAll()),
 		listed(triage.States()),
 		listed(triage.QueueReasons()),

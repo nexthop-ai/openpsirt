@@ -76,6 +76,10 @@ type Statements struct {
 	// variable something has to remember to set.
 	Tooling   string    `json:"tooling"`
 	Timestamp time.Time `json:"timestamp"`
+	// LastUpdated is when this revision was released, where the document has
+	// had more than the one moment it was assembled at: a published document
+	// first went out at its timestamp and was last revised at this.
+	LastUpdated *time.Time `json:"last_updated,omitempty"`
 	// Version is which revision of this document this is, counting from one.
 	// It is one past what has gone out: a document nobody has published is
 	// the first, and the next one generated after an issuance is the second.

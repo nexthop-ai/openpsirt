@@ -235,7 +235,10 @@ type Proposal struct {
 	// that mitigations already exist, because that claim rests on
 	// configuration rather than on code, and configuration can be removed
 	// with no version moving and nothing asking again.
-	Mitigation    string
+	Mitigation string
+	// Scope is whom a statement published from this claim holds for, where
+	// the proposer states it. Empty lets the outcome and the reason decide.
+	Scope         Scope
 	DeferredUntil *time.Time
 	// FixedVersion is the package version whoever packages this states the
 	// fix arrived in. Required where the claim is that the fix is already
@@ -549,6 +552,8 @@ func oneArgument(proposals []Proposal) error {
 			return refusal.New("one action records one justification")
 		case strings.TrimSpace(p.Mitigation) != strings.TrimSpace(first.Mitigation):
 			return refusal.New("one action records one mitigation")
+		case p.Scope != first.Scope:
+			return refusal.New("one action records one statement of whom it holds for")
 		case version(p.FixedVersion) != version(first.FixedVersion):
 			return refusal.New("one action records one fixed version")
 		case version(p.UpgradeTo) != version(first.UpgradeTo):
@@ -686,6 +691,9 @@ func (p Proposal) valid(now time.Time) error {
 		return err
 	}
 	if err := Reasons(p.Outcome, p.Justification, p.Mitigation); err != nil {
+		return err
+	}
+	if err := scoped(p.Outcome, p.Scope); err != nil {
 		return err
 	}
 	if p.Outcome == Deferred && p.DeferredUntil == nil {

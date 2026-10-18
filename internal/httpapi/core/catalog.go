@@ -87,6 +87,9 @@ type ProductBody struct {
 	// the deployment.
 	PairShare     int `json:"pair_share,omitempty" doc:"The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment"`
 	PairApprovers int `json:"pair_approvers,omitempty" doc:"The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment"`
+	// Publishes says this product's security documents are served to anybody,
+	// where the deployment publishes at all.
+	Publishes bool `json:"publishes,omitempty" doc:"Whether this product's security documents are served to anybody who asks, without signing in, where the deployment publishes at all"`
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
 	EndOfLife string `json:"end_of_life,omitempty" doc:"The date support ends for releases that have not stated their own, as YYYY-MM-DD"`
@@ -114,6 +117,12 @@ func CountedOr(n *int) int {
 		return 0
 	}
 	return *n
+}
+
+// PublicationBody is whether a product's security documents are served to
+// anybody.
+type PublicationBody struct {
+	Publishes bool `json:"publishes" doc:"Whether this product's security documents are served to anybody who asks, without signing in"`
 }
 
 // TriageFloorBody is what a product considers worth triaging.

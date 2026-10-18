@@ -31,11 +31,25 @@ func upV0100(ctx context.Context, sqldb *sql.DB) error {
 //
 //   - A build's findings are indexed by the run that opened them and by the
 //     run that closed them, each with what counting a run's changes reads.
+//   - A product records whether its security documents are served to anybody.
+//   - A claim records whom a statement published from it holds for.
+//   - The security documents served to anybody are kept, one row per
+//     document, holding the revision a reader is handed now.
 func upgradeV0100(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
 		return err
 	}
 	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
-	return u.index(findingV0100(t), "finding", "finding_opened_run_idx", "finding_closed_run_idx")
+	if err := u.index(findingV0100(t), "finding", "finding_opened_run_idx", "finding_closed_run_idx"); err != nil {
+		return err
+	}
+	for _, step := range []func(context.Context, bun.Tx) error{
+		productPublishesV0100, claimScopeV0100, createPublishedDocumentV0100,
+	} {
+		if err := step(ctx, tx); err != nil {
+			return err
+		}
+	}
+	return nil
 }

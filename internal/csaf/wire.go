@@ -29,7 +29,9 @@ type ProviderMetadata struct {
 	Version       string         `json:"metadata_version"`
 	Mirrored      bool           `json:"mirror_on_CSAF_aggregators"`
 	Publisher     Issuer         `json:"publisher"`
-	Role          string         `json:"role"`
+	// PublicKeys is the keys the documents are signed with, where they are.
+	PublicKeys []PublicKey `json:"public_openpgp_keys,omitempty"`
+	Role       string      `json:"role"`
 }
 
 // Distribution is one way the documents are reachable.

@@ -70,6 +70,48 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "set-product-publication", Method: http.MethodPut,
+		Path:    "/v1/products/{product}/publication",
+		Summary: "Set whether a product's security documents are published",
+		Description: "Sets whether this product's security documents are served to anybody " +
+			"who asks, without signing in: its advisories once they have gone out and may " +
+			"travel, a CSAF VEX document per issue, and an OpenVEX document per branch or tag. " +
+			"Nothing is served for any product while the deployment does not publish at all, " +
+			"and nothing about an undisclosed flaw is ever served.\n\n" +
+			"Turned off, the product's documents stop being served at once. Turned on, they " +
+			"are written within the next pass, a few minutes later. Recorded in the " +
+			"administrative trail.",
+		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
+	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
+		Product string `path:"product"`
+		Body    core.PublicationBody
+	}) (*struct{}, error) {
+		if err := core.Administrating(ctx); err != nil {
+			return nil, err
+		}
+		return &struct{}{}, core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
+			if err != nil {
+				return err
+			}
+			held, err := store.Publishes(ctx)
+			if err != nil {
+				return core.WentWrong(d.Logger, "whether it publishes could not be read", err)
+			}
+			before := held[product.ID]
+			if err := store.SetPublishes(ctx, product.ID, in.Body.Publishes); err != nil {
+				return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
+			}
+			if err := core.Noted(ctx, tx, trail.Setting, "publication of "+product.Name,
+				trail.Said(publishing(before), true),
+				trail.Said(publishing(in.Body.Publishes), true)); err != nil {
+				return core.NotRecorded(d.Logger, err)
+			}
+			return nil
+		})
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "set-product-triage-floor", Method: http.MethodPut,
 		Path:    "/v1/products/{product}/triage-floor",
 		Summary: "Set what a product considers worth triaging",
@@ -320,4 +362,12 @@ func thresholdsSaid(share, approvers *int) string {
 		parts = append(parts, fmt.Sprintf("%d approvers", *approvers))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// publishing is whether a product publishes, as the trail records it.
+func publishing(publishes bool) string {
+	if publishes {
+		return "published"
+	}
+	return "not published"
 }

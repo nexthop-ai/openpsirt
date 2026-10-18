@@ -117,8 +117,25 @@ type Note struct {
 }
 
 // ProductTree names everything the document can make a statement about.
+//
+// An advisory names its releases in branches alone. A VEX document also names
+// the components it speaks about, which belong to nobody this deployment
+// names as a vendor, and the component as part of one build of a release,
+// which is a relationship between the two.
 type ProductTree struct {
-	Branches []Branch `json:"branches,omitempty"`
+	Branches      []Branch       `json:"branches,omitempty"`
+	FullNames     []Named        `json:"full_product_names,omitempty"`
+	Relationships []Relationship `json:"relationships,omitempty"`
+}
+
+// Relationship is one product as part of another, named as a product of its
+// own.
+type Relationship struct {
+	Category string `json:"category"`
+	Named    Named  `json:"full_product_name"`
+	// Reference is the part, and Within what it is part of.
+	Reference string `json:"product_reference"`
+	Within    string `json:"relates_to_product_reference"`
 }
 
 // Branch is one level of that naming.
@@ -225,6 +242,10 @@ type Status struct {
 	KnownAffected    []string `json:"known_affected,omitempty"`
 	KnownNotAffected []string `json:"known_not_affected,omitempty"`
 	Fixed            []string `json:"fixed,omitempty"`
+	// UnderInvestigation is what nobody has decided about yet. An advisory
+	// states none; a VEX document states it for every component with an
+	// issue open and undecided.
+	UnderInvestigation []string `json:"under_investigation,omitempty"`
 }
 
 // Flag is a machine-readable reason some releases are not affected.

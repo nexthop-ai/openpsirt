@@ -646,6 +646,7 @@ func registerProposing(api huma.API, in core.Deps) {
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Justification),
 			Mitigation:    input.Body.Mitigation,
+			Scope:         triage.Scope(input.Body.Scope),
 			FixedVersion:  input.Body.FixedVersion,
 			// Carried through so the store refuses it rather than dropping
 			// it: a request naming a version under an outcome that moves none

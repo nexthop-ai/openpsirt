@@ -70,6 +70,12 @@ type Justification string
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
+// StatementScope is whom a statement published from a claim holds for.
+type StatementScope string
+
+// Schema answers with the scopes a claim may state.
+func (StatementScope) Schema(huma.Registry) *huma.Schema { return words(triage.Scopes()) }
+
 // plainly is a repeatable query parameter's words as plain strings, which is
 // the form the stores take.
 func plainly[T ~string](all []T) []string {

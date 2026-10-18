@@ -135,6 +135,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 			if old.Mitigation != nil {
 				proposal.Mitigation = *old.Mitigation
 			}
+			proposal.Scope = scopeOf(old.Scope)
 			if old.FixedVersion != nil {
 				proposal.FixedVersion = *old.FixedVersion
 			}

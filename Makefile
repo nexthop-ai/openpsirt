@@ -358,7 +358,7 @@ web-check:
 # Which packages hold a measurement. Named here rather than globbed, because a
 # package with no measurement in it is a run that reports "no tests to run",
 # which -run already refuses for the whole invocation.
-MEASURED := ./internal/finding/ ./internal/notify/ ./internal/triage/ ./internal/database/migrate/migrations/
+MEASURED := ./internal/finding/ ./internal/notify/ ./internal/triage/ ./internal/database/migrate/migrations/ ./internal/publish/
 
 measure:
 ifneq ($(ENGINES_MISSING),)

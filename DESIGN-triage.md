@@ -53,6 +53,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Tags](#tags)
 - [Rule-prepared claims](#rule-prepared-claims)
 - [Decisions on a new branch](#decisions-on-a-new-branch)
+- [Statement scope](#statement-scope)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -523,7 +524,8 @@ Three things hold, read inside the transaction that writes:
    asked of every row of the source rather than of its first: a claim covers as
    many issues as the act that wrote it.
 3. The outcome and justification are the source's. A different conclusion is
-   a different claim.
+   a different claim. So is whom its statement holds for: an extension stating
+   none takes the source's, and one stating another is refused.
 
 It needs a second person like any other dismissal. The queue marks it as an
 extension and names its source, so the approver knows the argument was read once
@@ -1581,6 +1583,22 @@ reasoning at all.
 | What is carried is checked like anything else written | The place it builds records whether the new line is a tag, so a dated judgment carried onto a release built once is refused as it is when proposed there. Who may write it is asked at the visibility the place has on the new line |
 | A place the carrier may not argue about on the new line is neither offered nor counted | The new line's visibility there may be undisclosed where the old line's was not. A judgment carried onto it would be written on work its carrier may not argue about, and a count of such places says what the new line holds |
 | Bounded, and written in one transaction | Carrying six judgments is one act, and half of it landing is a line nobody can tell from one somebody chose that way |
+
+## Statement scope
+
+Whom a statement published from a claim holds for: anybody shipping the
+component at that version, or this product's own build. `DESIGN-publishing.md`
+holds what it decides in a published document and what the reason decides
+where a claim states none.
+
+| Rule | |
+|---|---|
+| A stated property of the claim, beside its outcome and its reason | It is part of what is published in the deployment's name, so it is part of what the second person agrees to |
+| Stated when a claim is proposed, or not at all | Empty is the ordinary case, and the reason decides. Changing it is proposing again, as changing the reason is |
+| Refused on a deferral | A deferral says nothing about the component a reader could take, so a scope on one would be a value nothing reads |
+| Carried with the rest of the argument | A re-affirmation, a claim carried to another line and the rows an approver sets aside keep it; an extension keeps its source's |
+| Not offered on a bulk answer | One sentence answering many issues states the reason, and the reason decides |
+| Read back as stated and as it holds | A claim answers with the scope it states, where it states one, and whom its statement holds for either way |
 
 ## Not built
 

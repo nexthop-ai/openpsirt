@@ -496,16 +496,19 @@ stopped attempt already did.
 
 ### The v0.10.0 upgrade
 
-Migration 44. Each change is an index; no column and no row moves. § Indexes
-says what each index serves.
+Migration 44. No row moves. § Indexes says what each index serves, and
+`DESIGN-publishing.md` what the published documents are.
 
 | Table | Gains | Every engine |
 |---|---|---|
 | `finding` | An index on the run that opened a finding, and one on the run that closed it | Made where the table stands by the release's statement. An index the database already holds under the name is replaced, because on MySQL and MariaDB a stopped upgrade leaves the indexes it made and the next start runs the migration from the top |
+| `product` | Whether its security documents are published, false for every product | Added where the table stands, with a default of false, and stepped over where a stopped upgrade added it already |
+| `claim` | Whom a statement published from it holds for, empty for every claim | Added where the table stands, and stepped over where it is already there |
+| `published_document` | A new table: one row per published document, holding the revision a reader is handed | Made by the release's statement, and stepped over where it is already there |
 
 | Check, on each of the four engines | What it holds |
 |---|---|
-| A v0.9.0 database | Upgraded, the finding table's declaration describes the table the migrations built |
+| A v0.9.0 database | Upgraded, and each changed or new table's declaration describes the table the migrations built |
 | A v0.9.0 database already holding one of the new indexes in another shape | Upgraded the same, each index in the release's shape |
 
 Each index takes 0.7 s to build on PostgreSQL over 1,159,943 findings, and

@@ -409,6 +409,13 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// The chat platforms this deployment holds a credential for, which a
 	// destination and a person's own settings are checked against.
 	chats := chatPlatforms(cfg, logger)
+	// The security documents served to anybody, and the pass that writes
+	// them. Neither where the deployment publishes nothing, which is the
+	// default.
+	surface, documents, err := publishing(cfg, db.DB, name, logger)
+	if err != nil {
+		return nil, passes{}, err
+	}
 	handler, _ := httpapi.New(logger, db.Validate, core.Deps{
 		DB: db, Queue: work, Replica: name,
 		Interface: core.Interface{Files: pages},
@@ -440,6 +447,7 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		Excluded:      cfg.OutboundExcluded,
 		PatchBranches: cfg.PatchBranches,
 		Chats:         notify.Offering(chats),
+		Published:     surface,
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -535,7 +543,7 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// Writes the advisories that have gone out where somebody else's web
 	// server can serve them. Nil where this deployment publishes no
 	// directory, which is ordinary.
-	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
+	writer := directory.New(db.DB, published, writtenAs(cfg), directory.Config{
 		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
 	}, logger)
 	// A store configured and nothing written to it. The address is refused
@@ -551,8 +559,9 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer, suppliers: suppliers,
-		branches: branches,
-		records:  records,
+		branches:  branches,
+		records:   records,
+		documents: documents,
 	}, nil
 }
 

@@ -71,6 +71,10 @@ type Claim struct {
 	// management network only — and the published document has a field for
 	// exactly that. Meaningless with any other outcome.
 	Mitigation *string `bun:"mitigation"`
+	// Scope is whom a statement published from this claim holds for, where
+	// the proposer stated it. Nil lets the outcome and the reason decide, which
+	// is what nearly every claim does.
+	Scope *Scope `bun:"scope"`
 	// DeferredUntil is when somebody will look again, for the one outcome that
 	// expires on a date rather than on the code changing.
 	DeferredUntil *time.Time `bun:"deferred_until"`
@@ -152,6 +156,9 @@ func (c Claim) argument() Proposal {
 		FixedVersion:  orEmpty(c.FixedVersion),
 		UpgradeTo:     orEmpty(c.UpgradeTo),
 	}
+	if c.Scope != nil {
+		p.Scope = *c.Scope
+	}
 	if c.Justification != nil {
 		p.Justification = Justification(*c.Justification)
 	}
@@ -218,6 +225,10 @@ func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
 	if strings.TrimSpace(p.Mitigation) != "" {
 		named := strings.TrimSpace(p.Mitigation)
 		claim.Mitigation = &named
+	}
+	if p.Scope != "" {
+		stated := p.Scope
+		claim.Scope = &stated
 	}
 	// The version an upgrade moves to, carried on the claim rather than in a
 	// record beside it, so what somebody decided and what the release is
@@ -305,7 +316,12 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject, from int64,
 		if err := within.gate(ctx, subject, proposals); err != nil {
 			return err
 		}
-		claim, err := within.newClaim(ctx, ExtensionClaim, subject.ID, &source.ID, "", proposals[0])
+		// The source's statement of whom it holds for travels with its
+		// conclusion. A proposal carrying none takes it; one stating another
+		// was refused above as a different claim.
+		carried := proposals[0]
+		carried.Scope = scopeOf(source.Scope)
+		claim, err := within.newClaim(ctx, ExtensionClaim, subject.ID, &source.ID, "", carried)
 		if err != nil {
 			return err
 		}
@@ -370,6 +386,9 @@ func (s *Store) extendable(ctx context.Context, subject access.Subject, from int
 		}
 		if p.Outcome != source.Outcome || string(p.Justification) != orEmpty(source.Justification) {
 			return nil, fmt.Errorf("%w: an extension keeps the outcome and justification it carries", ErrNotExtendable)
+		}
+		if p.Scope != "" && p.Scope != scopeOf(source.Scope) {
+			return nil, fmt.Errorf("%w: an extension keeps whom the claim it carries holds for", ErrNotExtendable)
 		}
 	}
 	return source, nil

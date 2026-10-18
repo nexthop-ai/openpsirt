@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
@@ -90,6 +91,9 @@ type passes struct {
 	// publish writes the advisories that have gone out as a directory
 	// somebody else serves. Nil where this deployment writes none.
 	publish *directory.Writer
+	// documents writes the security documents this deployment serves to
+	// anybody. Nil where it publishes none.
+	documents *publish.Pass
 }
 
 // background starts every pass that has something to work on, and answers
@@ -159,6 +163,9 @@ func (p passes) loops() []loop {
 	}
 	if p.records != nil {
 		all = append(all, loop{"fetch the CVE records", p.records.Run, 0})
+	}
+	if p.documents != nil {
+		all = append(all, loop{"write the published documents", p.documents.Run, 0})
 	}
 	return all
 }

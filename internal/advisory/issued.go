@@ -239,8 +239,16 @@ type Sent struct {
 //
 // Narrowed the way every other read of an issuance is, which for the
 // deployment looking at itself narrows to everything.
+//
+// Anybody at all, reading what is published, reads it too: what went out about
+// the products whose documents are published, narrowed by the same clauses,
+// which is the one read of an issuance open to them.
 func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error) {
-	if proceed, err := readsIssuances(subject); !proceed {
+	if subject.Kind == access.Anonymous {
+		if products, _ := subject.Products(); len(products) == 0 {
+			return nil, nil
+		}
+	} else if proceed, err := readsIssuances(subject); !proceed {
 		return nil, err
 	}
 	q := s.db.NewSelect().

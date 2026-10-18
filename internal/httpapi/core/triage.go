@@ -35,8 +35,13 @@ type DecisionBody struct {
 	// Mitigation is the one claim here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the claim checkable.
-	Mitigation    string `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
-	DeferredUntil string `json:"deferred_until,omitempty" doc:"The date a deferral returns. Required for a deferral"`
+	Mitigation string `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
+	// Scope is whom a statement published from this claim holds for, where
+	// the claim states it, and HoldsFor is that or what the outcome and the
+	// reason decide.
+	Scope         StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from this claim holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral"`
+	HoldsFor      StatementScope `json:"holds_for,omitempty" doc:"Whom a published statement made from this claim holds for: the scope the claim states, or the one its outcome and reason decide where it states none. Ignored in a request"`
+	DeferredUntil string         `json:"deferred_until,omitempty" doc:"The date a deferral returns. Required for a deferral"`
 	// FixedVersion makes the already-fixed claim checkable against whoever
 	// packages the component, rather than something taken on trust.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping"`
@@ -290,6 +295,13 @@ func ClaimArgument(c triage.Claim, reasoning string) DecisionBody {
 	if c.Mitigation != nil {
 		body.Mitigation = *c.Mitigation
 	}
+	var stated triage.Scope
+	if c.Scope != nil {
+		stated = *c.Scope
+		body.Scope = StatementScope(stated)
+	}
+	body.HoldsFor = StatementScope(triage.ScopeOf(c.Outcome,
+		triage.Justification(body.Justification), stated))
 	if c.FixedVersion != nil {
 		body.FixedVersion = *c.FixedVersion
 	}

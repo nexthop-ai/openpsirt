@@ -152,6 +152,7 @@ export type Recorded = {
 // one. Both are compile errors rather than a screen offering something the
 // route refuses.
 type OneAtATime = Body<"FindingDecisionBody">["outcome"];
+type Scope = NonNullable<Body<"FindingDecisionBody">["scope"]>;
 
 const OFFERS: Record<OneAtATime, true> = {
   affected: true,
@@ -324,6 +325,9 @@ export function Decide({
       "",
   );
   const [mitigation, setMitigation] = useState(kept.mitigation ?? "");
+  // Whom a published statement made from this holds for, where somebody says.
+  // Unchosen lets the reason decide, which is the ordinary case.
+  const [scope, setScope] = useState<Scope | "">((kept.scope as Scope | undefined) ?? "");
   // Counted from now rather than from when the rule was saved, which is the
   // whole reason a prepared deferral is kept as a number of days. Without this
   // one opened the form with the outcome chosen and no date, which cannot be
@@ -350,8 +354,8 @@ export function Decide({
   // A draft that keeps three paragraphs and loses what they argued for is one
   // somebody has to read to find out what they meant.
   useEffect(() => {
-    keepAnswer(draftKey, { outcome, justification, until, fixedVersion, mitigation, lands });
-  }, [draftKey, outcome, justification, until, fixedVersion, mitigation, lands]);
+    keepAnswer(draftKey, { outcome, justification, until, fixedVersion, mitigation, lands, scope });
+  }, [draftKey, outcome, justification, until, fixedVersion, mitigation, lands, scope]);
 
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;
@@ -369,6 +373,9 @@ export function Decide({
   const reasons = reasonsFor(outcome);
   const reason = reasonOffered(outcome, justification) as Justification | "";
   const needsDate = outcome === "deferred";
+  // A deferral says nothing a reader could take, so it states nobody it holds
+  // for, and the server refuses one that does.
+  const offerScope = outcome !== "" && outcome !== "deferred";
   // A claim that the fix is already here is a fact somebody can check against
   // whoever packages the component, and it is required for that reason . The
   // server refuses it empty; asking here means the person finds out while they
@@ -507,6 +514,7 @@ export function Decide({
       // chosen, so the empty case cannot reach here.
       ...(needsJustification && reason !== "" ? { justification: reason } : {}),
       ...(offerMitigation && mitigation.trim() !== "" ? { mitigation } : {}),
+      ...(offerScope && scope !== "" ? { scope } : {}),
       ...(needsDate ? { deferred_until: until } : {}),
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
       ...(needsLanding ? { committed_to: lands } : {}),
@@ -694,6 +702,22 @@ export function Decide({
               ? "Won't lapse if the mitigation is removed. Say what to check."
               : "Optional. If given, customers are told what they can do about it."}
           </span>
+        </div>
+      )}
+
+      {offerScope && (
+        <div className="field">
+          <label htmlFor={`${draftKey}-scope`}>Published as holding for</label>
+          <select
+            id={`${draftKey}-scope`}
+            value={scope}
+            title="Code or a component that isn't there, or a wrong match, holds for anyone shipping it. Anything else holds for this build."
+            onChange={(event) => setScope(event.target.value as Scope | "")}
+          >
+            <option value="">What the reason says</option>
+            <option value="portable">Anyone shipping this version</option>
+            <option value="build">This build only</option>
+          </select>
         </div>
       )}
 
