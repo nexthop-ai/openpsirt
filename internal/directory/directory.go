@@ -25,7 +25,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -50,12 +49,7 @@ import (
 const betweenWrites = time.Hour
 
 // travels is the one label this directory carries.
-//
-// The standard puts anything above it under a different path, behind an
-// authentication this deployment does not do: a document nobody outside has
-// been told about must not be reachable, and a directory that is served
-// without a credential cannot hold one.
-const travels = "WHITE"
+const travels = advisory.Travelable
 
 // The names the standard gives the files beside the documents, and the terms
 // it gives the feed. Written out rather than assembled, because each of them
@@ -286,101 +280,13 @@ func fingerprint(published []entry) string {
 }
 
 // entry is one published document, as every file that names it reads it.
-type entry struct {
-	// Body is the bytes as they went out, and is what the hash is taken
-	// over. The document is re-read from them rather than re-marshaled from
-	// what was parsed: what a reader fetches and what the hash answers for
-	// have to be one string of bytes.
-	Body []byte
-	// Path is where the file sits in the directory, which is the year folder
-	// and the filename the standard's rule gives.
-	Path string
-	// Released is when the document says this revision was released, which
-	// is what the list of changes is ordered by.
-	Released time.Time
-	// Opened is when the document says the flaw was first recorded here.
-	Opened time.Time
-	Title  string
-	ID     string
-	// Summary is what the document's newest revision says about itself,
-	// which is the one sentence somebody wrote about these exact bytes.
-	Summary string
-}
+type entry = advisory.Travels
 
 // publishable is the newest document of each advisory that this directory may
 // carry, how many were held back, and why each document that could not be read
 // back could not.
-//
-// A document that cannot be read leaves its advisory out of the directory, and
-// nothing older is carried in its place. Every revision has the same path, so
-// carrying the one before would write it over a revision that may already have
-// gone out, and put the lists back to that revision's release date.
-//
-// Walked per advisory rather than taking the newest of each outright. Whether
-// a document may be served is a property of the bytes, and an advisory whose
-// newest revision went to a coordinating body under embargo has a revision
-// before it that is already public — so the directory keeps carrying that one
-// rather than dropping the advisory out of every list it is in.
 func publishable(sent []advisory.Sent) (out []entry, held int, unread []error) {
-	seen := map[string]bool{}
-	// Counted per advisory rather than per revision walked past. An advisory
-	// with two revisions that may not travel over one that may is in the
-	// directory, so counting the revisions reports two missing from a
-	// directory that is missing none.
-	walked := map[string]bool{}
-	for _, one := range sent {
-		if seen[one.Advisory] {
-			continue
-		}
-		walked[one.Advisory] = true
-		var doc advisory.Document
-		if err := json.Unmarshal([]byte(one.Document), &doc); err != nil {
-			unread = append(unread, fmt.Errorf(
-				"read what %s issuance %d published: %w", one.Advisory, one.Ordinal, err))
-			seen[one.Advisory] = true
-			continue
-		}
-		if !mayTravel(&doc) {
-			continue
-		}
-		seen[one.Advisory] = true
-		out = append(out, entry{
-			Body:     []byte(one.Document),
-			Path:     advisory.PathFor(&doc),
-			Released: doc.Document.Tracking.CurrentReleaseDate,
-			Opened:   doc.Document.Tracking.InitialReleaseDate,
-			Title:    doc.Document.Title,
-			ID:       doc.Document.Tracking.ID,
-			Summary:  newestRevision(&doc),
-		})
-	}
-	for name := range walked {
-		if !seen[name] {
-			held++
-		}
-	}
-	return out, held, unread
-}
-
-// mayTravel reports whether these bytes may be served from a directory
-// anybody can read.
-//
-// Asked of the label the document carries rather than of the record it came
-// from. The record moves and the bytes do not, and what a reader is handed is
-// the bytes — so a document that said it may be passed on says so for ever,
-// and one that says nothing at all is not read as permission.
-func mayTravel(doc *advisory.Document) bool {
-	at := doc.Document.Distribution
-	return at != nil && at.TLP != nil && at.TLP.Label == travels
-}
-
-// newestRevision is what the document's last revision entry says about itself.
-func newestRevision(doc *advisory.Document) string {
-	history := doc.Document.Tracking.RevisionHistory
-	if len(history) == 0 {
-		return ""
-	}
-	return history[len(history)-1].Summary
+	return advisory.Travelling(sent)
 }
 
 // document writes one advisory and the hash beside it.

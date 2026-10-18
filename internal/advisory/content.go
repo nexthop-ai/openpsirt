@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -79,9 +80,15 @@ var notFilename = regexp.MustCompile(`[^+\-a-z0-9]+`)
 // the document states its own address from it. Spelled in two places, a
 // document would cite an address the directory does not serve.
 func PathFor(doc *Document) string {
-	name := notFilename.ReplaceAllString(strings.ToLower(doc.Document.Tracking.ID), "_")
-	return strconv.Itoa(doc.Document.Tracking.InitialReleaseDate.UTC().Year()) +
-		"/" + name + ".json"
+	return PathOf(doc.Document.Tracking.ID, doc.Document.Tracking.InitialReleaseDate)
+}
+
+// PathOf is where a document with this tracking identifier, first released at
+// this moment, sits among published documents: the year folder and the
+// filename the standard's rule gives.
+func PathOf(trackingID string, initial time.Time) string {
+	name := notFilename.ReplaceAllString(strings.ToLower(trackingID), "_")
+	return strconv.Itoa(initial.UTC().Year()) + "/" + name + ".json"
 }
 
 // selfReference is where this document is published, as the document states
@@ -444,7 +451,7 @@ func isPackageIdentifier(s string) bool { return packageIdentifier.MatchString(s
 
 var packageIdentifier = regexp.MustCompile(`^pkg:[A-Za-z.\-+][A-Za-z0-9.\-+]*/.+`)
 
-// distributionFor is how far the document may travel.
+// DistributionFor is how far the document may travel.
 //
 // The embargo, read from the issues rather than from the tracking status.
 // Handing a document about a flaw nobody outside has been told about to
@@ -454,8 +461,8 @@ var packageIdentifier = regexp.MustCompile(`^pkg:[A-Za-z.\-+][A-Za-z0-9.\-+]*/.+
 //
 // The labels are the standard's four, which is why a disclosed document is
 // WHITE rather than the word the protocol renamed it to.
-func distributionFor(undisclosed bool) *Distribution {
-	label := "WHITE"
+func DistributionFor(undisclosed bool) *Distribution {
+	label := Travelable
 	if undisclosed {
 		label = "RED"
 	}

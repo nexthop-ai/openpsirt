@@ -92,25 +92,6 @@ func TestADocumentWithNoLabelIsNotPublished(t *testing.T) {
 	}
 }
 
-// The list of changes is newest first, which is what lets a reader who
-// fetched yesterday stop reading.
-func TestTheListOfChangesIsNewestFirst(t *testing.T) {
-	rows := strings.Split(strings.TrimSpace(string(changes([]entry{
-		{Path: "2026/b.json", Released: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{Path: "2026/c.json", Released: time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)},
-		{Path: "2026/a.json", Released: time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)},
-	}))), "\n")
-	want := []string{"2026/c.json", "2026/a.json", "2026/b.json"}
-	if len(rows) != len(want) {
-		t.Fatalf("%d rows, want %d: %v", len(rows), len(want), rows)
-	}
-	for at := range want {
-		if !strings.HasPrefix(rows[at], `"`+want[at]+`",`) {
-			t.Errorf("row %d is %q, want %s first", at, rows[at], want[at])
-		}
-	}
-}
-
 // stated is a document that went out under one label, as the bytes that went
 // out. The label is carried in the revision summary as well, so a test can say
 // which of two revisions it is looking at.

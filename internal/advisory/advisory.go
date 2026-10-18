@@ -203,7 +203,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	if who.Publishes() {
 		doc.Document.References = append(doc.Document.References, selfReference(who, doc))
 	}
-	doc.Document.Distribution = distributionFor(assembled.undisclosed)
+	doc.Document.Distribution = DistributionFor(assembled.undisclosed)
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name, Branches: assembled.products,
 	}}}
@@ -359,9 +359,9 @@ func summaryOf(issue *finding.Vulnerability, identifier string) string {
 	return identifier
 }
 
-// isCVE says the issue is filed under a CVE rather than under an identifier
+// IsCVE says the issue is filed under a CVE rather than under an identifier
 // this deployment minted.
-func isCVE(identifier string) bool {
+func IsCVE(identifier string) bool {
 	return len(identifier) > 4 && identifier[:4] == "CVE-"
 }
 
