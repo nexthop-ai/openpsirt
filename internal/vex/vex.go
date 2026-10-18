@@ -466,6 +466,19 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
+	// A document of disclosed work publishes no other name of an issue that
+	// is also a flaw of ours held back somewhere: one of them is the name we
+	// minted for it. A preview including undisclosed work is for somebody who
+	// may read that work, and keeps them.
+	if len(visible) == 1 && visible[0] == access.Public {
+		withheld, err := s.undisclosedFlaws(ctx, issues)
+		if err != nil {
+			return nil, err
+		}
+		for issue := range withheld {
+			delete(alsoCalled, issue)
+		}
+	}
 
 	shipped, err := s.rootOf(ctx, named, target.ID)
 	if err != nil {

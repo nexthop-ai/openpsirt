@@ -77,6 +77,45 @@ func TestAnybodyIsHandedOnlyWhatIsPublished(t *testing.T) {
 	})
 }
 
+// A flaw of ours nobody has disclosed keeps its name out of a document even
+// where a report names it beside an issue that is published: the issue's other
+// names are not published while one of its places is a flaw held back.
+func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		ctx := t.Context()
+		w := newWorld(t, f)
+		w.shipped()
+		_, flaw, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
+			TargetIDs: []int64{w.Target.ID}, Component: swss.Name,
+			Summary: "The management socket answers anybody.",
+			Told:    finding.Told{FoundHere: true},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A report learns the flaw's name for a CVE it finds in openssl.
+		run, err := w.findings.Begin(ctx, finding.Run{TargetID: w.Target.ID, Scanner: "grype", RanHere: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.findings.Apply(ctx, w.Target.ID, run.ID, []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-3001", Aliases: []string{flaw}, Severity: "high"},
+			Component: openssl,
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		w.publishes(w.Product, true)
+		w.write()
+		all := w.everything()
+		if !strings.Contains(all, "CVE-2026-3001") {
+			t.Fatalf("the disclosed issue is not published:\n%s", all)
+		}
+		if strings.Contains(all, flaw) {
+			t.Errorf("anybody is handed %s, the name of a flaw nobody has disclosed", flaw)
+		}
+	})
+}
+
 // Only anybody at all, and the deployment itself, read the published
 // documents here. A signed-in person reads findings through the API, where
 // their own grants answer.

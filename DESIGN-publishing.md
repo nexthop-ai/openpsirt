@@ -117,6 +117,7 @@ scanner reads silence as affected.
 | Rule | |
 |---|---|
 | Disclosed findings only | Read at the public visibility, in a product anybody at all reads. A flaw of ours nobody has disclosed is in no statement, no document, no list and no count (REQ-37) |
+| No other name of an issue that is also a flaw held back | Where a report names a flaw of ours beside an issue that is published, the issue's other names are left out while any finding of the flaw is undisclosed, in any product: the name minted for it is the flaw |
 | A claim in force states affected | Saying an issue applies hides nothing, so a claim of it needs nobody; the statuses that hide risk come from approved claims only, as in the document of one build |
 | A supplier's statement about its own product is not passed on | Passing on a supplier's word under this deployment's name is the document carrying suppliers' statements, which somebody chooses |
 | Each build is read at what it last scanned | Every branch and tag in use, as every variant in use, once it has been scanned. A build out of support is still published, because a reader still runs it (REQ-15) |

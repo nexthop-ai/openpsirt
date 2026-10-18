@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -187,6 +188,16 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	if err != nil {
 		return nil, err
 	}
+	// An issue that is also a flaw of ours nobody has disclosed, anywhere,
+	// publishes none of its other names: one of them is the name we minted
+	// for it, which is the one thing about it that must not travel.
+	withheld, err := s.undisclosedFlaws(ctx, issues)
+	if err != nil {
+		return nil, err
+	}
+	for issue := range withheld {
+		delete(alsoCalled, issue)
+	}
 	root, err := s.rootOf(ctx, named, targetID)
 	if err != nil {
 		return nil, err
@@ -314,4 +325,32 @@ func (f Fact) before(other Fact) bool {
 		return f.Subject() < other.Subject()
 	}
 	return f.Within < other.Within
+}
+
+// undisclosedFlaws is the issues among these that are a flaw recorded here
+// with an undisclosed finding in any product.
+//
+// Asked across every product rather than the one being published, because a
+// name is the issue's in every product at once: the name minted for a flaw
+// held back in one product is the same string beside a statement in another.
+func (s *Store) undisclosedFlaws(ctx context.Context, issues []int64) (map[int64]bool, error) {
+	out := map[int64]bool{}
+	if len(issues) == 0 {
+		return out, nil
+	}
+	var held []int64
+	where, args := database.InAnyOf(`"f"."vulnerability_id"`, issues)
+	if err := s.idb().NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`DISTINCT "f"."vulnerability_id"`).
+		Where(where, args...).
+		Where(`"f"."kind" = ?`, finding.Entered).
+		Where(`"f"."visibility" = ?`, access.Private).
+		Scan(ctx, &held); err != nil {
+		return nil, fmt.Errorf("read which issues are flaws nobody has disclosed: %w", err)
+	}
+	for _, id := range held {
+		out[id] = true
+	}
+	return out, nil
 }
