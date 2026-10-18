@@ -98,7 +98,8 @@ func publishing(cfg config.Config, db *bun.DB, name string,
 	base := strings.TrimRight(cfg.BaseURL, "/")
 	surface := published.Handler(published.Config{
 		DB: db, Who: who, Base: base, Rate: cfg.PublishRate, Signer: signer,
-		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror, Logger: logger,
+		Proxies: access.Trust{From: cfg.TrustedSources},
+		List:    cfg.DirectoryList, Mirror: cfg.DirectoryMirror, Logger: logger,
 	})
 	logger.Info("security documents are published to anybody, for the products an "+
 		"administrator chose", "at", base+publish.WellKnown, "signed", signer != nil)

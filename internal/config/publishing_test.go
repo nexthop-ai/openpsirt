@@ -73,10 +73,11 @@ func publishingWith(extra map[string]string) map[string]string {
 // key that reads.
 func TestPublishingStartsWithWhatItNeeds(t *testing.T) {
 	for name, given := range map[string]map[string]string{
-		"unsigned":       publishingWith(nil),
-		"signed":         publishingWith(map[string]string{"PUBLISH_KEY": plainKey}),
-		"signed, locked": publishingWith(map[string]string{"PUBLISH_KEY": lockedKey, "PUBLISH_KEY_PASSPHRASE": keyPassphrase}),
-		"a rate":         publishingWith(map[string]string{"PUBLISH_RATE": "30"}),
+		"unsigned":                      publishingWith(nil),
+		"signed":                        publishingWith(map[string]string{"PUBLISH_KEY": plainKey}),
+		"signed, locked":                publishingWith(map[string]string{"PUBLISH_KEY": lockedKey, "PUBLISH_KEY_PASSPHRASE": keyPassphrase}),
+		"a rate":                        publishingWith(map[string]string{"PUBLISH_RATE": "30"}),
+		"trusted proxies and no header": publishingWith(map[string]string{"TRUSTED_SOURCES": "10.0.0.0/8"}),
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, err := load(given)
@@ -148,6 +149,14 @@ func TestPublishingIsRefusedWithoutWhatItNeeds(t *testing.T) {
 		"a rate with publishing off": {
 			map[string]string{"PUBLISH_RATE": "30"},
 			"OPENPSIRT_PUBLISH_RATE",
+		},
+		"every address a trusted proxy": {
+			publishingWith(map[string]string{"TRUSTED_SOURCES": "0.0.0.0/0"}),
+			"OPENPSIRT_TRUSTED_SOURCES",
+		},
+		"trusted proxies and no header with publishing off": {
+			map[string]string{"TRUSTED_SOURCES": "10.0.0.0/8"},
+			"OPENPSIRT_TRUSTED_HEADER",
 		},
 		"a key with publishing off": {
 			map[string]string{"PUBLISH_KEY": plainKey},

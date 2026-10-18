@@ -4,6 +4,9 @@
 package access_test
 
 import (
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"testing"
 
@@ -48,5 +51,42 @@ func TestAnybodyReadsOnlyDisclosedWorkWhereItIsPublished(t *testing.T) {
 	}
 	if nobody := access.Published(nil); nobody.Reads(access.Public, published) {
 		t.Error("anybody reads a product where nothing publishes")
+	}
+}
+
+// The client a request is counted against is the connection, unless the
+// connection is a trusted proxy: then it is the first address from the right
+// of what the proxies forwarded that is not itself a trusted proxy. What a
+// client wrote to the left of that, and anything an untrusted connection
+// sends, is never read.
+func TestTheClientIsTheRightmostAddressNoTrustedProxyHolds(t *testing.T) {
+	_, proxies, err := net.ParseCIDR("10.0.0.0/8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	trust := access.Trust{From: []net.IPNet{*proxies}}
+	for _, tc := range []struct {
+		what, remote string
+		forwarded    []string
+		want         string
+	}{
+		{"a connection with nothing forwarded", "198.51.100.7:4000", nil, "198.51.100.7"},
+		{"an untrusted connection forging a header", "198.51.100.7:4000", []string{"203.0.113.1"}, "198.51.100.7"},
+		{"a trusted proxy forwarding a client", "10.0.0.5:4000", []string{"203.0.113.1"}, "203.0.113.1"},
+		{"a client forging the left of what the proxy forwards", "10.0.0.5:4000",
+			[]string{"192.0.2.66, 203.0.113.1"}, "203.0.113.1"},
+		{"two trusted proxies in a row", "10.0.0.5:4000", []string{"203.0.113.1, 10.1.1.1"}, "203.0.113.1"},
+		{"the hops in two headers", "10.0.0.5:4000", []string{"192.0.2.66", "203.0.113.1"}, "203.0.113.1"},
+		{"a hop that is not an address", "10.0.0.5:4000", []string{"203.0.113.1, unknown"}, "10.0.0.5"},
+		{"a trusted proxy forwarding nothing", "10.0.0.5:4000", nil, "10.0.0.5"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = tc.remote
+		for _, line := range tc.forwarded {
+			req.Header.Add("X-Forwarded-For", line)
+		}
+		if got := trust.Client(req); got != tc.want {
+			t.Errorf("%s: counted as %s, want %s", tc.what, got, tc.want)
+		}
 	}
 }

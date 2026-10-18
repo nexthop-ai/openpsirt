@@ -295,7 +295,7 @@ half of one, and the process stops rather than accept a header anybody can set.
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
 | `OPENPSIRT_TRUSTED_HEADER` | `signin.trusted_header.name` | The header an identity-aware proxy sets to say who somebody is | unset |
-| `OPENPSIRT_TRUSTED_SOURCES` | `signin.trusted_header.sources` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored | unset |
+| `OPENPSIRT_TRUSTED_SOURCES` | `signin.trusted_header.sources` | Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored. Also the proxies whose `X-Forwarded-For` names the client the [published documents](#published-documents) count a rate against, and settable without a header where this deployment publishes | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_HEADER` | `signin.trusted_header.groups_header` | Where that proxy reports group membership, if it does | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | `signin.trusted_header.groups_delimiter` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
 
@@ -806,10 +806,13 @@ scan landing reaches readers within that. A reader keeping a copy is told what
 has not moved: every answer carries an entity tag and a date, and a request
 repeating either is answered 304.
 
-The rate is counted per client address, as the connection arrived. Behind a
-proxy or a load balancer every reader arriving through it shares one
-allowance, so set the rate for what the proxy passes on, or limit readers at
-the proxy.
+The rate is counted per client address. Behind a proxy or a load balancer,
+name it in `OPENPSIRT_TRUSTED_SOURCES`, which is the same list trusted-header
+sign-in reads, and may be set without a trusted header where this deployment
+publishes. From one of those addresses, the client is the rightmost address in
+`X-Forwarded-For` that is not itself a trusted source; from any other address
+the header is ignored, so a client cannot spend another's allowance. Without
+it, every reader arriving through the proxy shares one allowance.
 
 Where the published advisory directory is written as well, an advisory states
 the address this deployment serves it at, and the directory is a copy of it.

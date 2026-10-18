@@ -56,16 +56,61 @@ func (t Trust) Configured() error {
 	case len(t.From) == 0:
 		return refusal.Errorf("a trusted header is named but no source is trusted, and honoring it from anywhere would let anyone reaching this process be anyone")
 	}
-	// Naming every address reaches the same place as naming none, by the one
-	// setting that is supposed to be the guard. Halting on the empty case and
-	// accepting this one would be a guard that only catches the honest
-	// mistake.
+	return t.Bounded()
+}
+
+// Bounded refuses trusting every address.
+//
+// Naming every address reaches the same place as naming none, by the one
+// setting that is supposed to be the guard. Halting on the empty case and
+// accepting this one would be a guard that only catches the honest mistake.
+// Asked on its own where the sources are read for the client a proxy names
+// rather than for a header.
+func (t Trust) Bounded() error {
 	for _, network := range t.From {
 		if ones, _ := network.Mask.Size(); ones == 0 {
-			return refusal.Errorf("a trusted header is honored from every address, which is the same as trusting it from anywhere")
+			return refusal.Errorf("a trusted source is every address, which is the same as trusting anybody")
 		}
 	}
 	return nil
+}
+
+// Client is the address a request came from: the connection's own, or, where
+// the connection is from a trusted source, the address the proxy says it
+// forwarded for.
+//
+// Read from the right of X-Forwarded-For. Each proxy appends the address it
+// received from, so the rightmost entries are the trusted proxies' own and the
+// first address from the right that is not a trusted source is the client as
+// the nearest trusted proxy saw it. Everything left of it is whatever that
+// client wrote, and taking the leftmost would let any client be any client. A
+// header from a connection nothing trusts is not read at all.
+func (t Trust) Client(req *http.Request) string {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		host = req.RemoteAddr
+	}
+	if !t.trusts(req.RemoteAddr) {
+		return host
+	}
+	var hops []string
+	for _, line := range req.Header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(line, ",")...)
+	}
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		ip := net.ParseIP(hop)
+		if ip == nil {
+			// Not an address: nothing past it can be told apart from what a
+			// client wrote, so the last trusted hop stands for it.
+			return host
+		}
+		if !t.trusts(hop) {
+			return ip.String()
+		}
+		host = ip.String()
+	}
+	return host
 }
 
 // groupsFrom reads the membership a proxy reported.

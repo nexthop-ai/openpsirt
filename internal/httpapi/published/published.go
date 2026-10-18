@@ -53,8 +53,10 @@ type Config struct {
 	// Base is the address this deployment is reached at, with no trailing
 	// slash.
 	Base string
-	// Rate is how many requests a minute one client may make.
-	Rate int
+	// Rate is how many requests a minute one client may make, and Proxies
+	// the sources whose forwarded client address names the client.
+	Rate    int
+	Proxies access.Trust
 	// Signer signs every document, where a key was supplied.
 	Signer *signing.Signer
 	// List and Mirror are what the provider description tells aggregators
@@ -89,7 +91,7 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusMethodNotAllowed, "only GET and HEAD are answered here")
 		return
 	}
-	if wait, ok := s.limits.allow(clientOf(r)); !ok {
+	if wait, ok := s.limits.allow(s.Proxies.Client(r)); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
 		problem(w, http.StatusTooManyRequests, "too many requests from this address; try again shortly")
 		return

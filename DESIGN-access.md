@@ -746,6 +746,12 @@ not already extended: anybody able to forge the group header could forge the
 username header and claim to be an administrator outright. Both the header name
 and the separator are configured, because neither is standardized.
 
+The sources are also the proxies whose forwarded client the published
+documents count a rate against (`DESIGN-publishing.md`), so a deployment names
+its proxies once. Where it publishes, they may be named with no header: the
+sources are then read for that alone, and every address is still refused as a
+source.
+
 ## Name and identifier
 
 An administrator grants access to a person they can name. A provider reports a

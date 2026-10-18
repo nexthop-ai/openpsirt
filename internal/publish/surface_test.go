@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -41,9 +43,14 @@ type surface struct {
 
 // surfaceOver is the surface a deployment publishing this world serves.
 func surfaceOver(w *world, rate int, signer *signing.Signer) *surface {
+	return surfaceBehind(w, rate, signer, access.Trust{})
+}
+
+// surfaceBehind is the same, trusting the proxies given to name the client.
+func surfaceBehind(w *world, rate int, signer *signing.Signer, proxies access.Trust) *surface {
 	return &surface{t: w.t, h: published.Handler(published.Config{
-		DB: w.DB.DB, Who: who, Base: base, Rate: rate, Signer: signer, List: true,
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DB: w.DB.DB, Who: who, Base: base, Rate: rate, Proxies: proxies, Signer: signer,
+		List: true, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})}
 }
 
@@ -268,6 +275,54 @@ func TestAClientAskingTooFastIsToldToWait(t *testing.T) {
 		s.h.ServeHTTP(other, req)
 		if other.Code != http.StatusOK {
 			t.Errorf("another client = %d, want it answered", other.Code)
+		}
+	})
+}
+
+// Behind a trusted proxy each client it forwards for has an allowance of its
+// own, and a client reaching the deployment directly cannot name another
+// client to spend theirs.
+func TestEachClientBehindATrustedProxyIsCountedApart(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		_, proxies, err := net.ParseCIDR("10.0.0.0/8")
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := surfaceBehind(w, 2, nil, access.Trust{From: []net.IPNet{*proxies}})
+		ask := func(remote, forwarded string) int {
+			req := httptest.NewRequest(http.MethodGet, publish.MetadataPath, nil)
+			req.RemoteAddr = remote
+			if forwarded != "" {
+				req.Header.Set("X-Forwarded-For", forwarded)
+			}
+			rec := httptest.NewRecorder()
+			s.h.ServeHTTP(rec, req)
+			return rec.Code
+		}
+		for range 2 {
+			if code := ask("10.0.0.5:4000", "203.0.113.1"); code != http.StatusOK {
+				t.Fatalf("the first client inside its allowance = %d", code)
+			}
+		}
+		if code := ask("10.0.0.5:4000", "203.0.113.1"); code != http.StatusTooManyRequests {
+			t.Errorf("the first client past its allowance = %d, want 429", code)
+		}
+		if code := ask("10.0.0.5:4000", "203.0.113.2"); code != http.StatusOK {
+			t.Errorf("a second client through the same proxy = %d, want its own allowance", code)
+		}
+
+		// Directly, naming the second client: counted as itself.
+		for range 2 {
+			if code := ask("198.51.100.7:4000", "203.0.113.2"); code != http.StatusOK {
+				t.Fatalf("a direct client inside its allowance = %d", code)
+			}
+		}
+		if code := ask("198.51.100.7:4000", "203.0.113.9"); code != http.StatusTooManyRequests {
+			t.Errorf("a direct client naming yet another client = %d, want it counted as itself", code)
+		}
+		if code := ask("10.0.0.5:4000", "203.0.113.2"); code != http.StatusOK {
+			t.Errorf("the second client after a direct one named it = %d, want its allowance untouched", code)
 		}
 	})
 }

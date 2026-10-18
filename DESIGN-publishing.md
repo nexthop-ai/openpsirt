@@ -79,7 +79,7 @@ changes, and a ROLIE feed naming the same documents.
 | A tag and a date on every answer | Each answer carries an entity tag over its bytes and the moment it last moved, and a request repeating either is answered 304. `Cache-Control: public, no-cache`: a reader asks every time and fetches only what changed |
 | A list is read from every document's name and dates | A document is read alone. A reader taking the provider whole asks for every document and the files beside it, and none of those lists the rest |
 | The lists date themselves from the documents | The feed, the description and the lists are dated by the newest document in them, never by the clock, so an unchanged provider answers the same bytes every time |
-| A client is the address its connection came from | Never a header naming another. Behind a proxy every reader arriving through it shares one allowance |
+| A client is the address its connection came from, or the one a trusted proxy forwarded for | The proxies are the trusted sources sign-in reads, so a deployment has one list of them. From one of those, the client is the first address from the right of `X-Forwarded-For` that is not itself a trusted source: each proxy appends what it received from, and everything left of that hop is whatever the client wrote. From anywhere else the header is not read |
 | The allowance is per replica | Each process holds a bucket per client, refilling at the configured rate and holding a minute of it, and forgets a client whose bucket is full again once ten thousand are held |
 
 A path below `/.well-known/csaf/white/` that names no document and a request
@@ -261,7 +261,7 @@ undecided is most of what a scanner reports.
 
 | | |
 |---|---|
-| The rate is per replica and per connection address | Held in each process rather than in the database, so the request it limits writes nothing; a deployment behind one proxy limits every reader through it together |
+| The rate is per replica | Held in each process rather than in the database, so the request it limits writes nothing |
 | A document is as current as the last pass | Up to five minutes behind a claim agreed or a scan landing. Turning a product off and narrowing the statuses take effect at once, because what may be served is asked on every request |
 | Every document of a product is worked out on every pass | 4.5 s on the image above, nearly all of it reading what stands; a record of what moved would be a second copy of what the findings already say (REQ-74) |
 | The scope of a statement about one place is not published | A place is stated beneath the component pulling it in whatever the claim's scope, because the other places of the component disagree |

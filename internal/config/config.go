@@ -510,7 +510,16 @@ func load(given map[string]string) (Config, error) {
 	// A half-configuration is the dangerous state, so it stops the process
 	// rather than being quietly ignored: a header named with nothing to trust
 	// it from is either a mistake or the first half of one.
-	if err := (access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}).Configured(); err != nil {
+	//
+	// Sources with no header are the one exception, where the deployment
+	// publishes: the published documents read the client a trusted proxy
+	// forwards for, so the sources are read with no header named.
+	trust := access.Trust{Header: c.TrustedHeader, From: c.TrustedSources}
+	if c.Publish && strings.TrimSpace(c.TrustedHeader) == "" {
+		if err := trust.Bounded(); err != nil {
+			return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_SOURCES: %w", err)
+		}
+	} else if err := trust.Configured(); err != nil {
 		return Config{}, fmt.Errorf("OPENPSIRT_TRUSTED_HEADER: %w", err)
 	}
 	// The same rule, for the same reason. A server with nobody to send as is

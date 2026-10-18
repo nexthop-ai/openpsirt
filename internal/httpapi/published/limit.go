@@ -4,8 +4,6 @@
 package published
 
 import (
-	"net"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -85,18 +83,4 @@ func (l *limiter) forget(now time.Time) {
 	if len(l.clients) >= mostClients {
 		l.clients = map[string]*bucket{}
 	}
-}
-
-// clientOf is who is asking, by the address the connection came from.
-//
-// The connection's own address, and never a header naming another. A header
-// is whatever the client wrote, so trusting one lets any client be every
-// client. Behind a proxy every reader arriving through it shares one
-// allowance.
-func clientOf(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
