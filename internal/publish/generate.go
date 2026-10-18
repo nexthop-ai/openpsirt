@@ -36,14 +36,6 @@ func NewGenerator(db *bun.DB, who publisher.Named, base string) *Generator {
 	return &Generator{db: db, vex: vex.NewStore(db), who: who, base: base}
 }
 
-// NewGeneratorCarrying returns a generator whose builds each state at most
-// most statements. Zero or less is the ceiling a document of one build holds.
-func NewGeneratorCarrying(db *bun.DB, who publisher.Named, base string, most int) *Generator {
-	g := NewGenerator(db, who, base)
-	g.vex = vex.NewStoreCarrying(db, most)
-	return g
-}
-
 // built is one build of a product, as the documents name it, and what is
 // stated about it.
 type built struct {

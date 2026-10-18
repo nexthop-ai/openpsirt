@@ -32,7 +32,7 @@ func TestThePublishedDocumentsTakeNoCredential(t *testing.T) {
 	for _, path := range []string{"/.well-known/csaf/provider-metadata.json", "/openvex/index.txt"} {
 		for name, dress := range map[string]func(*http.Request){
 			"nothing":   func(*http.Request) {},
-			"a session": func(r *http.Request) { r.AddCookie(&http.Cookie{Name: "openpsirt_session", Value: "x"}) },
+			"a session": func(r *http.Request) { r.Header.Set("Cookie", "openpsirt_session=x") },
 			"a key":     func(r *http.Request) { r.Header.Set("Authorization", "Bearer opk_nothing") },
 		} {
 			req := httptest.NewRequest(http.MethodGet, path, nil)

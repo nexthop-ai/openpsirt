@@ -26,10 +26,6 @@ const (
 	UnderInvestigation = "under_investigation"
 )
 
-// Statuses is every status a published statement states, in the order a
-// document lists them.
-func Statuses() []string { return []string{NotAffected, Fixed, Affected, UnderInvestigation} }
-
 // The action an affected statement carries where the claim named none, and
 // what a statement under investigation says is available. The formats ask for
 // one, and these say what is true without promising anything: a date this

@@ -37,9 +37,6 @@ const (
 	OpenVEX = "openvex"
 )
 
-// Kinds is every kind of document kept here.
-func Kinds() []string { return []string{CSAFVEX, OpenVEX} }
-
 // The paths documents are served at, below the address the deployment is
 // reached at. The CSAF ones are the standard's: the provider description at
 // the well-known address, and the documents that may travel in a folder of

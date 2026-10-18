@@ -292,3 +292,40 @@ func TestADocumentIsRevisedOnlyWhenItsAnswerMoves(t *testing.T) {
 		}
 	})
 }
+
+// A document about an issue the product has nothing to say about any more is
+// withdrawn and not served, and served again as the revision it was when the
+// issue comes back saying the same thing.
+func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.publishes(w.Product, true)
+		w.write()
+		before := w.csafAbout(w.Product, "CVE-2026-1002")
+		if before == nil {
+			t.Fatal("no document about CVE-2026-1002")
+		}
+
+		// The scanner stops reporting it.
+		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		if wrote := w.write(); wrote.Withdrawn != 1 {
+			t.Errorf("withdrew %d documents, want the one about CVE-2026-1002", wrote.Withdrawn)
+		}
+		if doc := w.csafAbout(w.Product, "CVE-2026-1002"); doc != nil {
+			t.Error("a withdrawn document is served")
+		}
+		path := publish.DirectoryPath + advisory.PathFor(before)
+		if _, err := w.documents.At(t.Context(), w.anybody(), path, "all"); err == nil {
+			t.Errorf("a withdrawn document is served at %s", path)
+		}
+
+		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.write()
+		after := w.csafAbout(w.Product, "CVE-2026-1002")
+		if after == nil || after.Document.Tracking.Version != before.Document.Tracking.Version {
+			t.Errorf("the document came back as %+v, want the revision it was", after)
+		}
+	})
+}
