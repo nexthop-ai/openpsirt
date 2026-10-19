@@ -809,6 +809,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#upstream-statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upstream statements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patch-branches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1490,6 +1501,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#upstream-statements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upstream statements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patch-branches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1741,6 +1763,11 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <td><a href="#supplier-advisories">Supplier advisories</a></td>
 <td>Off</td>
 <td>Naming a supplier under Settings</td>
+</tr>
+<tr>
+<td><a href="#upstream-statements">Upstream statements</a></td>
+<td>Off</td>
+<td>Naming an upstream from a product's row under Products</td>
 </tr>
 <tr>
 <td><a href="#mail">Mail</a></td>
@@ -3461,6 +3488,74 @@ stopped, no further back than the same window.</p>
 <p>Each document is checked against the SHA-256 or SHA-512 file its publisher
 serves beside it, and one that does not match is not read. A publisher serving
 neither is read unchecked.</p>
+<h2 id="upstream-statements">Upstream statements<a class="headerlink" href="#upstream-statements" title="Permanent link">&para;</a></h2>
+<p>A product that forks another project may trust the VEX statements that
+project publishes. Off unless an administrator names an upstream, from the
+product's row under Products. One upstream per product.</p>
+<p>The upstream is named by the address of its CSAF provider description, for
+example <code>https://psirt.example.org/.well-known/csaf/provider-metadata.json</code>
+for another OpenPSIRT deployment that publishes. Naming it reads the
+description and shows whose statements they are and the fingerprint of the key
+its documents are signed with; trusting it confirms that key.</p>
+<table>
+<thead>
+<tr>
+<th>A statement the upstream publishes</th>
+<th>What happens here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Not affected or fixed, for anybody shipping the component, in a document OpenPSIRT generated</td>
+<td>Closes the findings of that issue on that component, at exactly that version, the next time a build is scanned. Shown on the finding with the upstream's name and a link to its document</td>
+</tr>
+<tr>
+<td>The same shape in a document other software generated</td>
+<td>Offered in the review queue, as below. CSAF has no word for whom a statement holds for, so only this deployment's own convention is read as saying it</td>
+</tr>
+<tr>
+<td>One depending on the upstream's own build</td>
+<td>Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary claim citing it, which goes through approval</td>
+</tr>
+<tr>
+<td>Anything else</td>
+<td>Evidence beside the finding</td>
+</tr>
+</tbody>
+</table>
+<p>A place somebody here decided about is left as they decided. Anybody who may
+triage the product can decline one statement, which stops it closing anything
+or being offered; stopping trusting the upstream sets aside everything it said.
+Each of these, and the upstream withdrawing a statement, opens what it closed:
+the product's builds are queued to be scanned again. Trusting, stopping
+trusting and declining are in the administrative trail.</p>
+<p>Every request goes to the host the upstream's address names and no other,
+over https, following no redirect. That host is reached wherever it is,
+inside this network included, so an egress rule for this is that one host on
+its port. Every document is checked against the SHA-256 or SHA-512 file served
+beside it, and against its signature where the upstream signs; a document
+failing either is not taken. An upstream that names another set of keys —
+one added, dropped or replaced — is read no further until an administrator
+trusts it again, from the same drawer; an upstream rotating keys is trusted
+with both.</p>
+<p>A read that fails withdraws nothing, whatever failed: the description or a
+listing answering 404, a TLS fault, a timeout. What the upstream said stands
+until a read that works says otherwise; a statement is withdrawn only when a
+complete read finds its document gone from every listing, or the document
+itself drops or revises it. Once nothing has been read for two read intervals,
+administrators are told, in the application and on any mail, webhook or chat
+destination taking administrators' notices, and told once more when it is
+read again. The upstream's drawer shows when it was last read and the last
+error.</p>
+<p>An upstream that moved is followed by naming its new address in the same
+drawer; a redirect is never followed. The key already trusted still checks
+every document, and the new address is not read if it names another key until
+that key is trusted. What the upstream said stands until the first complete
+read of the new address, which keeps what it repeats, replaces what it revises
+and withdraws what it no longer lists.</p>
+<p>How often an upstream is read again is the setting <code>upstream.every</code>, an hour
+unless set. A read whose listings have not moved is one request per listing,
+answered that nothing moved.</p>
 <h2 id="patch-branches">Patch branches<a class="headerlink" href="#patch-branches" title="Permanent link">&para;</a></h2>
 <p>A patch link to a commit is labeled with the branches of its repository that
 contain the commit, on the finding it belongs to. A fix backported to five

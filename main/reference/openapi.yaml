@@ -1614,6 +1614,7 @@ components:
             - catalog
             - exploited-here
             - merge
+            - upstream
           type: string
         unset:
           description: Whether nothing had been set before this, as distinct from a value stored empty
@@ -4666,6 +4667,43 @@ components:
       required:
         - "@id"
       type: object
+    Inspect-upstreamRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Inspect-upstreamRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        url:
+          description: The address of the upstream's CSAF provider description
+          maxLength: 1000
+          minLength: 1
+          type: string
+      required:
+        - url
+      type: object
+    InspectedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/InspectedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        fingerprint:
+          description: The fingerprint of the key its documents are signed with. Empty where it names none
+          type: string
+        publisher:
+          description: Whose statements they are, as the provider description names its publisher
+          type: string
+      required:
+        - publisher
+      type: object
     InventoryBody:
       additionalProperties: false
       properties:
@@ -5782,6 +5820,28 @@ components:
       required:
         - items
       type: object
+    ListBodyOfferBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyOfferBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/OfferBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyOutboundBody:
       additionalProperties: false
       properties:
@@ -6213,6 +6273,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/TokenBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyUpstreamSaidBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyUpstreamSaidBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/UpstreamSaidBody"
           type:
             - array
             - "null"
@@ -6957,6 +7039,8 @@ components:
             - risk-unagreed
             - pairs-concentrated
             - supplier-silent
+            - upstream-failing
+            - upstream-recovered
             - inventory-moved
             - obligation-open
             - obligation-near
@@ -7100,6 +7184,70 @@ components:
       required:
         - items
       type: object
+    OfferBody:
+      additionalProperties: false
+      properties:
+        component:
+          description: The component
+          type: string
+        document:
+          description: The address of the document it is in
+          type: string
+        document_id:
+          description: The tracking identifier of that document
+          type: string
+        finding:
+          description: The open finding it speaks about
+          format: int64
+          type: integer
+        issue:
+          description: The issue
+          type: string
+        justification:
+          description: The reason the upstream gives for a status of not affected
+          type: string
+        product:
+          description: The product the finding is in, by name
+          type: string
+        publisher:
+          description: The upstream that published it
+          type: string
+        reasoning:
+          description: The upstream's own words
+          type: string
+        statement:
+          description: The statement, by its identifier. Pass as from_statement when proposing a claim from it
+          format: int64
+          type: integer
+        status:
+          description: What the upstream says, in the VEX format's own words
+          type: string
+        stream:
+          description: The branch or tag of the build the finding is in
+          type: string
+        variant:
+          description: The variant of the build the finding is in
+          type: string
+        version:
+          description: The version the upstream and this product both ship
+          type: string
+        within:
+          description: "What of the upstream's the statement depends on: its build, or what pulls the component in there"
+          type: string
+      required:
+        - statement
+        - finding
+        - product
+        - stream
+        - variant
+        - publisher
+        - issue
+        - component
+        - version
+        - status
+        - document
+        - document_id
+      type: object
     OursOutputBody:
       additionalProperties: false
       properties:
@@ -7173,6 +7321,8 @@ components:
             - risk-unagreed
             - pairs-concentrated
             - supplier-silent
+            - upstream-failing
+            - upstream-recovered
             - inventory-moved
             - obligation-open
             - obligation-near
@@ -9772,9 +9922,15 @@ components:
         at:
           description: The moment it was uploaded here
           type: string
+        declined:
+          description: Whether somebody here declined it, so it closes nothing and is offered to nobody
+          type: boolean
         document:
           description: The document it came from
           type: string
+        for_anybody:
+          description: Whether an upstream this product trusts publishes it as holding for anybody shipping the component. Such a statement saying not affected or fixed closes the findings of that issue on that component, at that version, at the next scan
+          type: boolean
         id:
           description: Pass as from_statement when starting a decision from this, so a later revision can be noticed
           format: int64
@@ -9799,6 +9955,7 @@ components:
           enum:
             - vex
             - advisory
+            - upstream
           type: string
         statement:
           description: Their reasoning. What a triager otherwise types from memory
@@ -11213,6 +11370,28 @@ components:
       required:
         - floor
       type: object
+    Trust-upstreamRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Trust-upstreamRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        fingerprint:
+          description: The fingerprint of the key its documents are signed with, as inspecting it answered. Empty for an upstream that signs nothing
+          maxLength: 191
+          type: string
+        url:
+          description: The address of the upstream's CSAF provider description
+          maxLength: 1000
+          minLength: 1
+          type: string
+      required:
+        - url
+      type: object
     UnagreedBody:
       additionalProperties: false
       properties:
@@ -11484,6 +11663,92 @@ components:
       required:
         - scan_id
         - outcome
+      type: object
+    UpstreamBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/UpstreamBody.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: The reason the last attempt stopped, or what it could not take
+          type: string
+        fingerprint:
+          description: The fingerprint of the key the upstream's documents are signed with, where it signs them
+          type: string
+        key_offered:
+          description: A key the upstream now names in place of the trusted one. Nothing is read while the upstream names a key other than the trusted one, and the reason says so
+          type: string
+        publisher:
+          description: Whose statements they are, as the provider description names its publisher
+          type: string
+        read:
+          description: When a read of the upstream last succeeded
+          type: string
+        tried:
+          description: When the upstream was last tried
+          type: string
+        trusted_at:
+          description: When the upstream, or its key, was last trusted
+          type: string
+        url:
+          description: The address of the upstream's CSAF provider description
+          type: string
+      required:
+        - url
+        - publisher
+        - trusted_at
+      type: object
+    UpstreamSaidBody:
+      additionalProperties: false
+      properties:
+        declined:
+          description: Whether somebody here declined it, so it closes nothing and is offered to nobody
+          type: boolean
+        document:
+          description: The address of the document it is in
+          type: string
+        document_id:
+          description: The tracking identifier of that document
+          type: string
+        for_anybody:
+          description: Whether it holds for anybody shipping the component, rather than depending on the upstream's own build
+          type: boolean
+        issue:
+          description: The issue, as the upstream named it
+          type: string
+        justification:
+          description: The reason the upstream gives for a status of not affected
+          type: string
+        publisher:
+          description: The upstream that published it
+          type: string
+        reasoning:
+          description: The upstream's own words
+          type: string
+        statement:
+          description: The statement, by its identifier
+          format: int64
+          type: integer
+        status:
+          description: What the upstream says, in the VEX format's own words
+          type: string
+        version:
+          description: The version of the component it is about
+          type: string
+      required:
+        - statement
+        - publisher
+        - issue
+        - status
+        - for_anybody
+        - declined
+        - document
+        - document_id
       type: object
     UpwardBody:
       additionalProperties: false
@@ -12200,6 +12465,7 @@ paths:
               - catalog
               - exploited-here
               - merge
+              - upstream
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false
@@ -12299,6 +12565,7 @@ paths:
               - catalog
               - exploited-here
               - merge
+              - upstream
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false
@@ -18409,6 +18676,47 @@ paths:
         scope: product
         any_of:
           - public-triage
+          - private-triage
+  /v1/products/{product}/components/{component}/upstream-statements:
+    get:
+      description: |-
+        The statements the upstream this product trusts publishes about a component of this name, at any version, newest first, declined ones included. A statement holding for anybody that says not affected or fixed closes the findings of its issue on the component at its version at the next scan, unless it is declined. At most 200.
+
+        Requires: public-read or public-triage or private-read or private-triage on the product
+      operationId: list-upstream-statements
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: component
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyUpstreamSaidBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what an upstream says about a component
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
           - private-triage
   /v1/products/{product}/end-of-life:
     put:
@@ -26728,6 +27036,146 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}/upstream:
+    delete:
+      description: |-
+        Stops this product trusting its upstream. Nothing more is read from it, and everything it said stops closing findings and stops being offered: the product's builds are queued to be scanned again, which opens what its statements closed. The statements stay readable where a decision cites one.
+
+        Answered 404 where the product trusts none. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: withdraw-upstream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Stop trusting an upstream
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+    get:
+      description: |-
+        The upstream this product trusts the published statements of, the key its documents are checked against, and how reading it is going. Answered 404 where the product trusts none.
+
+        Requires: administrator
+      operationId: get-upstream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpstreamBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get a product's upstream
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+    put:
+      description: |-
+        Records that this product trusts an upstream's published VEX statements, or trusts the upstream's key again after it changed.
+
+        The upstream is read again on the interval upstream.every names. A statement it publishes as holding for anybody shipping a component closes the findings of that issue on that component, at the version it names, the next time a build is scanned, unless somebody here decided about the place. It closes only where it says not affected or fixed. A statement that depends on the upstream's own build is offered for review and closes nothing.
+
+        The fingerprint must be the one the upstream names now, which inspecting it answers; another is refused with 409 naming the one served. Leave it empty for an upstream that signs nothing. Every document is checked against the digest served beside it, and against its signature where a key is trusted. A key the upstream changes stops it being read until it is trusted again.
+
+        Another address is the same upstream moved: the fingerprint is not asked for, the key already trusted still checks every document, and a different key the new address names stops reading until it is trusted. What the upstream said stands until the first complete read of the new address, which keeps what it repeats, replaces what it revises and withdraws what it no longer lists. A read that fails withdraws nothing. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: trust-upstream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Trust-upstreamRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpstreamBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Trust an upstream
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/products/{product}/upstream/inspection:
+    post:
+      description: |-
+        Reads an upstream's CSAF provider description and the key it names, and answers whose statements they are and the key's fingerprint, for an administrator to confirm before trusting it. Nothing is recorded.
+
+        The address must be https with a host and no user. Every request goes to that host and follows no redirect. An upstream that cannot be read, or whose key does not carry the fingerprint its description names, is answered 422 saying why.
+
+        Requires: administrator
+      operationId: inspect-upstream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Inspect-upstreamRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectedBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Inspect an upstream
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/variants:
     get:
       description: |-
@@ -28243,6 +28691,71 @@ paths:
         - Access
       x-openpsirt-requires:
         scope: none
+  /v1/statements/{statement}/declined:
+    delete:
+      description: |-
+        Takes back declining one statement an upstream published, so it closes and is offered again. The product's builds are queued to be scanned again. Recorded in the administrative trail.
+
+        A statement in a product the caller does not triage is answered 404.
+
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+      operationId: restore-statement
+      parameters:
+        - in: path
+          name: statement
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Restore a declined statement
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
+    put:
+      description: |-
+        Stops one statement an upstream published closing anything here, or being offered for review. The product's builds are queued to be scanned again, which opens what it closed. Recorded in the administrative trail.
+
+        Only a statement an upstream published may be declined; another is refused with 422; answer a supplier's statement by proposing a claim about the place. A statement in a product the caller does not triage is answered 404.
+
+        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+      operationId: decline-statement
+      parameters:
+        - in: path
+          name: statement
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Decline an upstream's statement
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
   /v1/teams:
     get:
       description: |-
@@ -28942,6 +29455,42 @@ paths:
       summary: List findings nobody is dealing with
       tags:
         - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/upstream-offers:
+    get:
+      description: |-
+        The statements the upstreams of the products here publish that depend on their own build, beside each open finding they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
+
+        A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-upstream-offers
+      parameters:
+        - description: Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyOfferBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what upstreams offer for review
+      tags:
+        - Triage
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
