@@ -79,8 +79,19 @@ func Read(armored, passphrase string) (*Signer, error) {
 		return nil, fmt.Errorf("write the public key: %w", err)
 	}
 	public.WriteByte('\n')
+	// Valid from the latest of the key's creation and the self-signatures
+	// that vouch for it now: a signature dated before the newest of those is
+	// refused by the reader's library as by this one, and an operator
+	// extending a key's expiry or adding a name re-signs it.
+	from := key.PublicKey.CreationTime
+	if key.SelfSignature != nil && key.SelfSignature.CreationTime.After(from) {
+		from = key.SelfSignature.CreationTime
+	}
+	if primary, _ := entity.PrimarySelfSignature(); primary != nil && primary.CreationTime.After(from) {
+		from = primary.CreationTime
+	}
 	return &Signer{
-		entity: entity, from: key.PublicKey.CreationTime.UTC(),
+		entity: entity, from: from.UTC(),
 		fingerprint: strings.ToUpper(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint)),
 		public:      public.Bytes(),
 	}, nil

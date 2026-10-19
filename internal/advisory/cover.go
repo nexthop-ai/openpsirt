@@ -144,7 +144,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		// into the field the root is declared in would fail a customer's
 		// validator on the whole document rather than on this field, which
 		// is a worse outcome than the field being absent.
-		if isPackageIdentifier(release.Identifier) {
+		if IsPackageIdentifier(release.Identifier) {
 			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
 		}
 		a.release(one, release, leaf)

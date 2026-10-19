@@ -26,6 +26,9 @@ export type Claim = {
   product: string;
   outcome: string;
   justification: string;
+  // Whom a published statement made from it holds for, where the claim states
+  // it. Empty lets the reason decide.
+  scope: string;
   deferredUntil: string;
   // What a promise says: the date the work lands by, and for an upgrade the
   // version it moves to.
@@ -63,6 +66,7 @@ export function claimOf(row: QueueRow): Claim {
     product: row.place.product_name || row.place.product || "",
     outcome: row.decision.outcome ?? "",
     justification: row.decision.justification ?? "",
+    scope: row.decision.scope ?? "",
     deferredUntil: row.decision.deferred_until ?? "",
     committedTo: row.decision.committed_to ?? "",
     upgradeTo: row.decision.upgrade_to ?? "",

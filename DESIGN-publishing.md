@@ -36,7 +36,7 @@ product publishes, and the document is about disclosed work in that product
 | Switch | Held | Default | What it does |
 |---|---|---|---|
 | The deployment publishes | Deployment configuration | Off | Mounts nothing new: the paths answer either way. Off, every one of them answers as a path nothing is published at, and the pass that writes documents does not start |
-| A product publishes | The product, set by an administrator and recorded in the trail | Off | Its documents are written by the next pass and served from then on. Turned off, they stop being served at once, before anything is written again |
+| A product publishes | The product, set by an administrator and recorded in the trail | Off | Its documents are written by the next pass and served from then on. Turned off, they are withdrawn in the same act and stop being served at once; turned on again, nothing is served until the next pass, and a document stating what it stated before comes back as the revision it was |
 | The statuses published | A setting an administrator changes | Every status somebody decided | Limited, only statements that something is not affected or is fixed are published, and a document left with none is withdrawn |
 | The rate one client may ask at | Deployment configuration | 600 a minute | Requests past it are answered 429 with when to ask again |
 | The signing key | A secret in deployment configuration | None | With one, every document carries a detached OpenPGP signature and the provider claims the trusted provider role |
@@ -76,11 +76,13 @@ changes, and a ROLIE feed naming the same documents.
 | GET and HEAD only | Every other method is answered 405, naming the two, before anything is read |
 | One answer for nothing | Publishing off, no product publishing, a product that stopped, a document withdrawn or never written, and a document written under wider statuses than are published now all answer the same 404, so nothing tells a reader what exists |
 | Nothing names a row | Paths, product identifiers and tracking identifiers are built from names, never from an identifier this deployment holds |
-| A tag and a date on every answer | Each answer carries an entity tag over its bytes and the moment it last moved, and a request repeating either is answered 304. `Cache-Control: public, no-cache`: a reader asks every time and fetches only what changed |
-| A list is read from every document's name and dates | A document is read alone. A reader taking the provider whole asks for every document and the files beside it, and none of those lists the rest |
-| The lists date themselves from the documents | The feed, the description and the lists are dated by the newest document in them, never by the clock, so an unchanged provider answers the same bytes every time |
+| A tag on every answer, and a date on a document | Each answer carries an entity tag, and a document and the files beside it the moment it last moved; a request repeating either is answered 304. A list carries no date: one that shrank, by a document withdrawn or a product turned off, is newer than its newest document. `Cache-Control: public, no-cache`: a reader asks every time and fetches only what changed |
+| A signature is tagged by the document it signs | Its own bytes carry a random salt and differ every time, so a reader holding the signature of an unchanged document is told so, and the key is not used again |
+| A list is read from every document's name and dates | A document is read alone, and advisories' issued bytes are read only for the CSAF lists and a path in their folder. A reader taking the provider whole asks for every document and the files beside it, and none of those lists the rest |
+| The lists state dates from the documents | The feed and the description state the newest document's release, never the clock, so an unchanged provider answers the same bytes every time |
 | A client is the address its connection came from, or the one a trusted proxy forwarded for | The proxies are the trusted sources sign-in reads, so a deployment has one list of them. From one of those, the client is the first address from the right of `X-Forwarded-For` that is not itself a trusted source: each proxy appends what it received from, and everything left of that hop is whatever the client wrote. From anywhere else the header is not read |
-| The allowance is per replica | Each process holds a bucket per client, refilling at the configured rate and holding a minute of it, and forgets a client whose bucket is full again once ten thousand are held |
+| The allowance is per replica | Each process holds a bucket per client, refilling at the configured rate and holding a minute of it. Once ten thousand are held it forgets the clients whose bucket is full again, and then the half holding the most of theirs, so a flood of addresses never gives a client being held back its allowance back |
+| An IPv6 client is its /64 | One host is handed a /64 and may rotate through it |
 
 A path below `/.well-known/csaf/white/` that names no document and a request
 for `index.txt` with nothing to list answer the same 404. The description and
@@ -97,7 +99,7 @@ label lets it travel (`DESIGN-remediation.md` § The provider directory).
 |---|---|
 | Read as anybody at all | The read of what went out is narrowed by the clauses every reader's is: every issue the advisory covers, now and when it went out, at a disclosed place in a product the reader reads. Anybody at all reads only the products that publish, so an advisory covering one product that does not is not served |
 | Only what may travel | A revision labeled RED, about a flaw nobody outside has been told about, is never served, whatever came after it |
-| An advisory states the address it is served at | Where the deployment publishes, the address a document states for itself is the one this surface serves it at |
+| An advisory states the address it is served at, where it is | Generated where the deployment publishes and every product it covers publishes, the address it states for itself is this surface's; otherwise the static directory's, where one is written, or none, since this surface would answer it with nothing. Issued bytes never change, so an advisory issued before its products published keeps the address it went out with |
 
 ## Statements and statuses
 
@@ -120,7 +122,7 @@ statement, so a scanner reports it as it would without these documents.
 | Rule | |
 |---|---|
 | Disclosed findings only | Read at the public visibility, in a product anybody at all reads. A flaw of ours nobody has disclosed is in no statement, no document, no list and no count (REQ-37) |
-| No other name of an issue that is also a flaw held back | Where a report names a flaw of ours beside an issue that is published, the issue's other names are left out while any finding of the flaw is undisclosed, in any product: the name minted for it is the flaw |
+| No other name and no description of an issue a flaw held back wrote onto | Where a flaw of ours recorded about an issue sits out of anybody's reach — undisclosed, or in a product that does not publish — the issue's other names and its description are left out: the flaw wrote its minted name and its summary onto the issue row every product shares |
 | A claim in force states affected | Saying an issue applies hides nothing, so a claim of it needs nobody; the statuses that hide risk come from approved claims only, as in the document of one build |
 | A supplier's statement about its own product is not passed on | Passing on a supplier's word under this deployment's name is the document carrying suppliers' statements, which somebody chooses |
 | Each build is read at what it last scanned | Every branch and tag in use, as every variant in use, once it has been scanned. A build out of support is still published, because a reader still runs it (REQ-15) |
@@ -152,14 +154,14 @@ as it stands (REQ-31).
 ## The CSAF VEX document
 
 One document per issue per product, across every branch, tag and variant: this
-issue, in what I ship from them.
+issue, in everything the product ships.
 
 | Element | What fills it |
 |---|---|
 | Category and version | `csaf_vex`, CSAF 2.0 |
 | Tracking identifier | `VEX-<product>-<issue>`, which never moves while the issue keeps its name |
 | Title | The issue and the product's display name |
-| Product tree | The publisher, the product and one leaf per build a statement names, with the package identifier the build's inventory gave itself; every component and every component pulling one in, by its package identifier; and a relationship naming each component as part of a build or beneath the component pulling it in |
+| Product tree | The publisher, the product and one leaf per build a statement names, with the package identifier the build's inventory gave itself; every component and every component pulling one in, by its package identifier; and a relationship naming each component as part of a build or beneath the component pulling it in. A value that is not a package identifier is not stated as one: the schema refuses it, and one refused helper fails the whole document |
 | Status | A component holding for anybody is listed by its own product identifier; anything else by the relationship. A product listed under two statuses keeps the more cautious |
 | Flags | The reason for every product not affected, one flag per reason |
 | Threats | What stops the flaw, for a product not affected where somebody named it |
@@ -198,7 +200,9 @@ request is a read of what was recorded.
 
 | Rule | |
 |---|---|
-| A new revision only where what it states moved | A digest over the title, the product tree and the statements is kept with the revision, and one worked out again and equal writes nothing |
+| A new revision only where what it states moved | A digest over the address it states, its publisher, the title, the product tree and the statements is kept with the revision, and one worked out again and equal writes nothing. Moving the deployment's address or its publisher revises every document |
+| Two products folded alike cannot share a path | The standard's filename rule folds `edge.os` and `edge os` alike. The second product's document there is refused in words naming the first, and the pass carries on with the rest of that product's documents and its withdrawals |
+| A product, release or variant whose documents were served keeps its name | A rename is refused once any document about it was served, withdrawn ones included, because a reader holds each by an address and an identifier built from the names |
 | The next revision is one past the last | Its history is every revision before it with this one appended, and its first release never moves, so neither does its year folder |
 | A revision is written in a transaction that reads what it replaces | Two replicas writing one document, the second matches nothing on the version it read and goes again |
 | A document the product has nothing to say about any more is withdrawn | Kept, not served, and continued by its next revision if the issue comes back. Stating again what it stated when it was withdrawn, it is served again as that revision |
@@ -213,8 +217,10 @@ request is a read of what was recorded.
 | `.asc` | An armored detached OpenPGP signature over the bytes served, made on request with the key configured, and dated when the document was released, never before the key became valid |
 
 The library adds a random salt to every signature, so two signatures over one
-revision differ in their bytes; each verifies. Digests are worked out on
-request from the bytes held.
+revision differ in their bytes; each verifies. A signature is dated no earlier
+than the newest self-signature vouching for the key, so extending a key's
+expiry or adding a name to it leaves every older document signable. Digests
+are worked out on request from the bytes held.
 
 ## The publishing pass
 

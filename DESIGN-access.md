@@ -651,7 +651,7 @@ cookie resolves to it.
 |---|---|
 | It reads disclosed work in a product that publishes, and nothing else | Asked whether it reads a product, it answers yes for the disclosed visibility of a publishing product and no for everything else. Every list, count and lookup narrowed by those two questions narrows it the same way, so a product that does not publish is not listed, not counted and not named |
 | It is nobody | It holds no role, no case, no team and nothing over the deployment, so it triages, approves and decides nothing, and every read asking for a person refuses it |
-| Two reads are open to it | The documents published, and what advisories went out, the one read of an issuance it may make. Each asks for it by name; every other read refuses it as it refuses a pipeline |
+| Three reads are open to it | The documents published and the advisories that went out, each asking for it by name; and disclosed findings, decisions and patches in a publishing product, which the pass that writes the documents reads through it. Every read asking for a person refuses it |
 | Which products publish takes no subject | It is what builds this subject, and it is the deployment's configuration, the same for everybody who asks |
 | A signed-in person does not read the published documents through it | They read findings through the API, where their own grants answer; the store of published documents refuses anybody but this subject and the deployment itself |
 

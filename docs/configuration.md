@@ -804,10 +804,10 @@ extraEnv:
 
 The documents are worked out every five minutes, so a decision agreed or a
 scan landing reaches readers within that. A reader keeping a copy is told what
-has not moved: every answer carries an entity tag and a date, and a request
-repeating either is answered 304.
+has not moved: every answer carries an entity tag, and a document a date as
+well, and a request repeating either is answered 304.
 
-The rate is counted per client address. Behind a proxy or a load balancer,
+The rate is counted per client address, and an IPv6 client by the /64 it sits in. Behind a proxy or a load balancer,
 name it in `OPENPSIRT_TRUSTED_SOURCES`, which is the same list trusted-header
 sign-in reads, and may be set without a trusted header where this deployment
 publishes. From one of those addresses, the client is the rightmost address in
@@ -815,8 +815,18 @@ publishes. From one of those addresses, the client is the rightmost address in
 the header is ignored, so a client cannot spend another's allowance. Without
 it, every reader arriving through the proxy shares one allowance.
 
-Where the published advisory directory is written as well, an advisory states
-the address this deployment serves it at, and the directory is a copy of it.
+An advisory states the address this deployment serves it at where every
+product it covers publishes when it goes out; otherwise it states the published
+advisory directory's address, where one is written, or none. What went out
+never changes, so an advisory issued before its products published keeps the
+address it was issued with.
+
+Turning a product's publishing off withdraws its documents at once. Turned on
+again, they are served after the next pass has worked them out again.
+
+A product, release or variant whose documents have been served keeps its
+name: a rename is refused, since readers hold the documents by addresses built
+from it.
 
 ## Upstream currency
 

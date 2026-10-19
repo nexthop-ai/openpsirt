@@ -24,10 +24,12 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
@@ -183,22 +185,44 @@ func TestTheSurfaceIsAStandardProvider(t *testing.T) {
 func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 	two(t, func(t *testing.T, f *fixture.World) {
 		w, _ := publishedWorld(t, f)
-		s := surfaceOver(w, 1000, nil)
-		for _, path := range []string{publish.MetadataPath, publish.FeedPath, publish.IndexPath,
-			publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json"} {
-			first := s.get(http.MethodGet, path, nil)
+		signer, err := signing.Read(testKey(t), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := surfaceOver(w, 1000, signer)
+		document := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json"
+		for _, one := range []struct {
+			path  string
+			dated bool
+		}{
+			{publish.MetadataPath, false}, {publish.FeedPath, false}, {publish.IndexPath, false},
+			{publish.OpenVEXIndex, false}, {document, true}, {document + publish.SignatureSuffix, true},
+		} {
+			first := s.get(http.MethodGet, one.path, nil)
 			tag, modified := first.Header().Get("ETag"), first.Header().Get("Last-Modified")
-			if tag == "" || modified == "" {
-				t.Fatalf("GET %s carries tag %q and date %q", path, tag, modified)
+			if tag == "" {
+				t.Fatalf("GET %s carries no tag", one.path)
 			}
-			if rec := s.get(http.MethodGet, path, map[string]string{"If-None-Match": tag}); rec.Code != http.StatusNotModified {
-				t.Errorf("GET %s with its tag = %d, want 304", path, rec.Code)
+			if rec := s.get(http.MethodGet, one.path, map[string]string{"If-None-Match": tag}); rec.Code != http.StatusNotModified {
+				t.Errorf("GET %s with its tag = %d, want 304", one.path, rec.Code)
 			}
-			if rec := s.get(http.MethodGet, path, map[string]string{"If-Modified-Since": modified}); rec.Code != http.StatusNotModified {
-				t.Errorf("GET %s since its date = %d, want 304", path, rec.Code)
+			if !one.dated {
+				// A list that shrank is newer than its newest document, so it
+				// is revalidated by its tag alone.
+				if modified != "" {
+					t.Errorf("GET %s carries the date %q, which a list that shrank would not move",
+						one.path, modified)
+				}
+				if again := s.get(http.MethodGet, one.path, nil); !bytes.Equal(again.Body.Bytes(), first.Body.Bytes()) {
+					t.Errorf("GET %s twice over nothing that moved answered two different bodies", one.path)
+				}
+				continue
 			}
-			if again := s.get(http.MethodGet, path, nil); !bytes.Equal(again.Body.Bytes(), first.Body.Bytes()) {
-				t.Errorf("GET %s twice over nothing that moved answered two different bodies", path)
+			if modified == "" {
+				t.Fatalf("GET %s carries no date", one.path)
+			}
+			if rec := s.get(http.MethodGet, one.path, map[string]string{"If-Modified-Since": modified}); rec.Code != http.StatusNotModified {
+				t.Errorf("GET %s since its date = %d, want 304", one.path, rec.Code)
 			}
 		}
 	})
@@ -438,6 +462,88 @@ func TestAnAdvisoryIsServedOnlyWhereItMayTravel(t *testing.T) {
 		w.publishes(w.Product, false)
 		if rec := s.get(http.MethodGet, publish.IndexPath, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("the index of a deployment whose one product stopped publishing = %d", rec.Code)
+		}
+	})
+}
+
+// An advisory states the address this deployment serves it at only where
+// every product it covers publishes when it goes out; otherwise it states
+// none, since this surface would answer that address with nothing.
+func TestAnAdvisoryStatesTheServedAddressOnlyWhereItIsServed(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		unpublished, _ := w.issued(true)
+		w.publishes(w.Product, true)
+		served, _ := w.issued(true)
+		sent, err := advisory.NewStore(w.DB.DB).Sent(t.Context(), access.Everything("reading what went out"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		self := map[string]string{}
+		for _, one := range sent {
+			var doc advisory.Document
+			if err := json.Unmarshal([]byte(one.Document), &doc); err != nil {
+				t.Fatal(err)
+			}
+			for _, ref := range doc.Document.References {
+				if ref.Category == "self" {
+					self[one.Advisory] = ref.URL
+				}
+			}
+		}
+		if want := base + publish.DirectoryPath; !strings.HasPrefix(self[served], want) {
+			t.Errorf("an advisory issued while its product publishes states %q, want an address under %s",
+				self[served], want)
+		}
+		if got, ok := self[unpublished]; ok {
+			t.Errorf("an advisory issued while its product did not publish states %q", got)
+		}
+	})
+}
+
+// The surface reads as anybody at all, built from the products that publish
+// at that moment: with two publishing and one turned off, the one turned off
+// is in no answer — not its documents, not a list, not the feed — before
+// anything is written again.
+func TestTheSurfaceReadsOnlyTheProductsThatPublishNow(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		other := w.DeclareProduct("other-os", "Other OS")
+		w.hold(other)
+		target := w.TargetFor(w.DeclareStream(other, "main", catalog.Branch, nil),
+			w.DeclareVariant(other, "x86", true))
+		root := graph.Described{Purl: "pkg:generic/other-os@1.0", Name: "other-os", Version: "1.0"}
+		w.ship(target, root, edge{root, zlib})
+		w.report(target, reported{"CVE-2026-2001", zlib})
+		w.decide(target, "CVE-2026-2001", zlib,
+			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(other, true)
+		w.write()
+		s := surfaceOver(w, 1000, nil)
+		lists := []string{publish.IndexPath, publish.ChangesPath, publish.FeedPath, publish.OpenVEXIndex}
+		docs := []string{pathOf(t, s, "CVE-2026-2001"), publish.OpenVEXPath + "other-os/main.json"}
+		for _, path := range lists {
+			if !strings.Contains(string(s.body(path)), "other-os") {
+				t.Fatalf("%s does not list the second product while it publishes", path)
+			}
+		}
+		for _, path := range docs {
+			s.body(path)
+		}
+		nothing := s.get(http.MethodGet, publish.DirectoryPath+"2026/vex-nothing.json", nil).Body.String()
+
+		w.publishes(other, false)
+		for _, path := range lists {
+			if strings.Contains(string(s.body(path)), "other-os") {
+				t.Errorf("%s still lists the product that stopped publishing", path)
+			}
+		}
+		for _, path := range docs {
+			if rec := s.get(http.MethodGet, path, nil); rec.Code != http.StatusNotFound ||
+				rec.Body.String() != nothing {
+				t.Errorf("%s answers %d %q, want the answer for nothing", path, rec.Code, rec.Body.String())
+			}
 		}
 	})
 }

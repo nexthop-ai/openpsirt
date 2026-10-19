@@ -45,12 +45,13 @@ type JudgedBody struct {
 	Version   string `json:"version,omitempty"`
 	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 
-	Outcome       core.Outcome       `json:"outcome"`
-	Justification core.Justification `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Mitigation    string             `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
-	DeferredUntil string             `json:"deferred_until,omitempty"`
-	FixedVersion  string             `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
-	Reasoning     string             `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers"`
+	Outcome       core.Outcome        `json:"outcome"`
+	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
+	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
+	DeferredUntil string              `json:"deferred_until,omitempty"`
+	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
+	Reasoning     string              `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers"`
 
 	State    core.ClaimState `json:"state"`
 	Standing bool            `json:"standing" doc:"Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it"`
@@ -91,12 +92,13 @@ type JudgedClaimBody struct {
 	Decisions   int    `json:"decisions" doc:"How many decisions match"`
 	Places      int    `json:"places" doc:"How many places the matching decisions are at"`
 
-	Outcome       core.Outcome       `json:"outcome"`
-	Justification core.Justification `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Mitigation    string             `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
-	DeferredUntil string             `json:"deferred_until,omitempty"`
-	FixedVersion  string             `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in"`
-	Reasoning     string             `json:"reasoning" doc:"The words the claim currently rests on. Editing them withdraws every agreement"`
+	Outcome       core.Outcome        `json:"outcome"`
+	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
+	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it. Absent where the reason decides"`
+	DeferredUntil string              `json:"deferred_until,omitempty"`
+	FixedVersion  string              `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in"`
+	Reasoning     string              `json:"reasoning" doc:"The words the claim currently rests on. Editing them withdraws every agreement"`
 
 	State    core.ClaimStates `json:"state" doc:"The state the matching decisions share, or mixed where they differ"`
 	States   StatesBody       `json:"states" doc:"How many matching decisions are in each state"`
@@ -280,6 +282,7 @@ func judgedBody(row triage.Judged) JudgedBody {
 		Approvals: agreedBodies(row.Approvals),
 	}
 	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Claim)
+	body.Scope = statedScope(row.Claim)
 	if row.EndedAt != nil {
 		body.EndedAt = core.Stamp(*row.EndedAt)
 	}
@@ -304,6 +307,15 @@ func argued(claim *triage.Claim) (justification core.Justification, mitigation, 
 		fixed = *claim.FixedVersion
 	}
 	return justification, mitigation, deferred, fixed
+}
+
+// statedScope is whom a claim says its published statement holds for, where it
+// says. A claim that widened a public statement is one an auditor looks for.
+func statedScope(claim *triage.Claim) core.StatementScope {
+	if claim == nil || claim.Scope == nil {
+		return ""
+	}
+	return core.StatementScope(*claim.Scope)
 }
 
 func registerAuditClaims(api huma.API, in core.Deps) {
@@ -367,6 +379,7 @@ func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
 		Approvals: agreedBodies(row.Approvals),
 	}
 	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Claim)
+	body.Scope = statedScope(&row.Claim)
 	return body
 }
 

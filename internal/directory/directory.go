@@ -5,9 +5,9 @@
 // provider directory.
 //
 // Files, never a route. This deployment writes them into a store an operator
-// configured and somebody else's web server serves them, which is what keeps
-// the application with no unauthenticated route on it (REQ-63). Nothing here
-// answers a request, and nothing in the API reaches this package.
+// configured and somebody else's web server serves them. Nothing here answers
+// a request, and nothing in the API reaches this package: the documents this
+// deployment serves itself are a surface of their own.
 //
 // What is written is what went out. A document is generated when an advisory
 // is issued and kept as the bytes it was, so the file a reader fetches today

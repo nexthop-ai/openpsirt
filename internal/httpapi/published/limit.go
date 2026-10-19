@@ -4,6 +4,8 @@
 package published
 
 import (
+	"net"
+	"sort"
 	"sync"
 	"time"
 )
@@ -12,9 +14,9 @@ import (
 //
 // A client is remembered while it has spent part of its allowance, and one that
 // has waited long enough to have all of it back is forgotten as room is
-// needed. A flood of addresses each asking once fills the table with clients
-// holding nearly all of theirs, so past this many the table starts again
-// rather than growing.
+// needed. Past this many, the half holding the most of their allowance are
+// forgotten too: a flood of addresses each asking once holds nearly all of
+// theirs, and a client being held back holds little and is kept.
 const mostClients = 10000
 
 // limiter bounds how fast one client may ask, as a bucket per client that
@@ -48,7 +50,8 @@ func newLimiter(perMinute int, now func() time.Time) *limiter {
 
 // allow takes one request from a client's allowance, or answers how long until
 // one is there.
-func (l *limiter) allow(client string) (time.Duration, bool) {
+func (l *limiter) allow(address string) (time.Duration, bool) {
+	client := clientKey(address)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
@@ -72,15 +75,38 @@ func (l *limiter) allow(client string) (time.Duration, bool) {
 	return 0, true
 }
 
-// forget drops every client whose allowance is whole again, and starts again
-// where that leaves the table full.
+// forget drops every client whose allowance is whole again, and where that
+// leaves the table full, the half holding the most of theirs.
 func (l *limiter) forget(now time.Time) {
-	for client, held := range l.clients {
-		if held.left+now.Sub(held.at).Seconds()*l.perSec >= l.burst {
+	type holding struct {
+		client string
+		left   float64
+	}
+	held := make([]holding, 0, len(l.clients))
+	for client, one := range l.clients {
+		left := one.left + now.Sub(one.at).Seconds()*l.perSec
+		if left >= l.burst {
 			delete(l.clients, client)
+			continue
 		}
+		held = append(held, holding{client, left})
 	}
-	if len(l.clients) >= mostClients {
-		l.clients = map[string]*bucket{}
+	if len(l.clients) < mostClients {
+		return
 	}
+	sort.Slice(held, func(i, j int) bool { return held[i].left > held[j].left })
+	for _, one := range held[:len(held)/2] {
+		delete(l.clients, one.client)
+	}
+}
+
+// clientKey is what a client's allowance is kept under: its address, and for
+// IPv6 the /64 it sits in. One host is handed a /64 and may rotate through it,
+// so counted per address it would hold a fresh allowance for every address.
+func clientKey(address string) string {
+	ip := net.ParseIP(address)
+	if ip == nil || ip.To4() != nil {
+		return address
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }

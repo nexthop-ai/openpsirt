@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -78,8 +79,8 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			"travel, a CSAF VEX document per issue, and an OpenVEX document per branch or tag. " +
 			"Nothing is served for any product while the deployment does not publish at all, " +
 			"and nothing about an undisclosed flaw is ever served.\n\n" +
-			"Turned off, the product's documents stop being served at once. Turned on, they " +
-			"are written within the next pass, a few minutes later. Recorded in the " +
+			"Turned off, the product's documents are withdrawn and stop being served at once. " +
+			"Turned on, they are written again by the next pass, a few minutes later. Recorded in the " +
 			"administrative trail.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
@@ -101,6 +102,11 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 			before := held[product.ID]
 			if err := store.SetPublishes(ctx, product.ID, in.Body.Publishes); err != nil {
 				return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
+			}
+			if !in.Body.Publishes {
+				if err := publish.NewStore(tx).WithdrawProduct(ctx, product.ID); err != nil {
+					return core.WentWrong(d.Logger, "its documents could not be withdrawn", err)
+				}
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, "publication of "+product.Name,
 				trail.Said(publishing(before), true),

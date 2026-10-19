@@ -50,28 +50,18 @@ func returnsTo(providers map[string]signin.Provider, baseURL string) error {
 // every file's, so two constructions of this are two deployments the first
 // time either grows a field.
 //
-// A deployment that serves its own documents publishes them at its own
-// address, in the folder the standard reserves for them, and that is the
-// address a document states. A directory written as well is a copy kept
-// somewhere else, whose lists name its own files: writtenAs is the publisher
-// it is written under.
+// A deployment that serves its own documents does so at its own address, in
+// the folder the standard reserves for them, and an advisory every product of
+// which publishes states that address; any other states the directory's.
 func publishesAs(cfg config.Config) publisher.Named {
-	at := cfg.DirectoryURL
-	if cfg.Publish {
-		at = strings.TrimRight(cfg.BaseURL, "/") + publish.DirectoryPath
-	}
-	return publisher.Named{
+	who := publisher.Named{
 		Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
 		Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
-		Published: at,
+		Published: cfg.DirectoryURL,
 	}
-}
-
-// writtenAs is the publisher the static directory is written under: the one
-// every document names, at the address the directory is served from.
-func writtenAs(cfg config.Config) publisher.Named {
-	who := publishesAs(cfg)
-	who.Published = cfg.DirectoryURL
+	if cfg.Publish {
+		who.Served = strings.TrimRight(cfg.BaseURL, "/") + publish.DirectoryPath
+	}
 	return who
 }
 

@@ -439,7 +439,7 @@ func weaknessOf(ctx context.Context, db bun.IDB, issueID int64) (*Weakness, erro
 	return &Weakness{ID: held[0], Name: name}, nil
 }
 
-// isPackageIdentifier says the string is the shape the standard states for a
+// IsPackageIdentifier says the string is the shape the standard states for a
 // product identification helper.
 //
 // The standard's own pattern, which a consumer's validator applies to the whole
@@ -447,7 +447,7 @@ func weaknessOf(ctx context.Context, db bun.IDB, issueID int64) (*Weakness, erro
 // after the separator. Nothing here interprets it further — what is being
 // refused is a value that is not an identifier at all, not one naming something
 // unexpected.
-func isPackageIdentifier(s string) bool { return packageIdentifier.MatchString(s) }
+func IsPackageIdentifier(s string) bool { return packageIdentifier.MatchString(s) }
 
 var packageIdentifier = regexp.MustCompile(`^pkg:[A-Za-z.\-+][A-Za-z0-9.\-+]*/.+`)
 

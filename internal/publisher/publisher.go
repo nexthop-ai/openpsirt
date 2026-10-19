@@ -39,6 +39,10 @@ type Named struct {
 	// file's, and two spellings of one join are two answers to "where is this
 	// document" the first time either moves.
 	Published string
+	// Served is where this deployment serves the documents it publishes
+	// itself, ending in a slash, where it does. An advisory every product of
+	// which publishes states this address instead of the directory's.
+	Served string
 }
 
 // Stated reports whether enough is configured to name a publisher.

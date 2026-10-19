@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -77,9 +78,10 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			if ctx.Err() == nil {
 				p.logger.Error("writing the published documents", "error", err)
 			}
-		case wrote.Revised > 0 || wrote.Withdrawn > 0:
+		case wrote.Revised > 0 || wrote.Withdrawn > 0 || wrote.Skipped > 0:
 			p.logger.Info("wrote the published documents", "products", wrote.Products,
-				"documents", wrote.Documents, "revised", wrote.Revised, "withdrawn", wrote.Withdrawn)
+				"documents", wrote.Documents, "revised", wrote.Revised, "withdrawn", wrote.Withdrawn,
+				"products not worked out", wrote.Skipped)
 		}
 	})
 }
@@ -147,6 +149,7 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 		return wrote, err
 	}
 	kept := map[key]bool{}
+	var failed []error
 	for _, one := range generated {
 		at := key{one.Kind, one.Subject}
 		kept[at] = true
@@ -159,7 +162,10 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 		}
 		revised, err := p.documents.revise(ctx, product.ID, one, statuses)
 		if err != nil {
-			return wrote, err
+			// One document that cannot be written says nothing about the
+			// rest, and the withdrawals below still run.
+			failed = append(failed, err)
+			continue
 		}
 		if revised {
 			wrote.Revised++
@@ -171,14 +177,20 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 		}
 		withdrawn, err := p.documents.withdraw(ctx, was.ID, was.Version)
 		if err != nil {
-			return wrote, err
+			failed = append(failed, err)
+			continue
 		}
 		if withdrawn {
 			wrote.Withdrawn++
 		}
 	}
-	return wrote, nil
+	return wrote, errors.Join(failed...)
 }
+
+// ErrPathTaken is a document whose path another product's document already
+// holds: two product names the standard's filename rule folds alike. Retrying
+// never clears it, so it is refused in words, naming both.
+var ErrPathTaken = refusal.New("another product's document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
 func Statuses(ctx context.Context, db bun.IDB) (string, error) {
@@ -270,6 +282,18 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 			return err
 		}
 		path := one.path(at)
+		var holder Document
+		switch err := tx.NewSelect().Model(&holder).Column("product_id", "kind", "subject").
+			Where(`"pub"."path_digest" = ?`, digestOf(path)).
+			Where(`NOT ("pub"."product_id" = ? AND "pub"."kind" = ? AND "pub"."subject" = ?)`,
+				productID, one.Kind, one.Subject).
+			Scan(ctx); {
+		case err == nil:
+			return fmt.Errorf("%w: %s, held by the %s about %s in product %d; rename one of the "+
+				"two products", ErrPathTaken, path, holder.Kind, holder.Subject, holder.ProductID)
+		case !database.IsNoRows(err):
+			return fmt.Errorf("read who publishes at %s: %w", path, err)
+		}
 		row := &Document{
 			ProductID: productID, Kind: one.Kind, Subject: one.Subject,
 			Path: path, PathDigest: digestOf(path), TrackingID: one.TrackingID, Title: one.Title,

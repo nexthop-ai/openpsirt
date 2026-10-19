@@ -91,11 +91,16 @@ func (g *Generator) vexDocument(product *catalog.Product, facts []placed, descri
 	vulnerability.Threats = statuses.threats()
 	vulnerability.Remediations = statuses.remediations()
 
+	// The address it states and the publisher it names are part of what it
+	// says: moved, every document is revised to say the new ones rather than
+	// the feed alone.
 	stated := struct {
+		Address         string                   `json:"address"`
+		Publisher       advisory.Issuer          `json:"publisher"`
 		Title           string                   `json:"title"`
 		ProductTree     advisory.ProductTree     `json:"product_tree"`
 		Vulnerabilities []advisory.Vulnerability `json:"vulnerabilities"`
-	}{title, tree, []advisory.Vulnerability{vulnerability}}
+	}{g.base, advisory.IssuerOf(g.who), title, tree, []advisory.Vulnerability{vulnerability}}
 	// A struct of strings and slices of strings marshals without fault.
 	digestOver, _ := json.Marshal(stated)
 
@@ -104,7 +109,7 @@ func (g *Generator) vexDocument(product *catalog.Product, facts []placed, descri
 	}
 	return Generated{
 		Kind: CSAFVEX, Subject: issue.Issue, TrackingID: tracking, Title: title,
-		Settled: settled(digestOver), path: path, Statements: len(facts),
+		Settled: settled(digestOver), path: path,
 		render: func(at revision) ([]byte, error) {
 			doc := advisory.Document{
 				Document: advisory.Meta{
@@ -188,10 +193,7 @@ func (g *Generator) treeFor(product *catalog.Product, facts []placed) (advisory.
 			within = one.build.id(product.Name)
 			withinName = product.DisplayName + " " + one.build.streamShown + " (" + one.build.variantShown + ")"
 			if _, ok := versions[within]; !ok {
-				leaf := &advisory.Named{Name: withinName, ID: within}
-				if one.build.root != "" {
-					leaf.Helper = &advisory.IdentificationHelper{Purl: one.build.root}
-				}
+				leaf := &advisory.Named{Name: withinName, ID: within, Helper: helperOf(one.build.root)}
 				versions[within] = advisory.Branch{
 					Category: "product_version",
 					Name:     one.build.stream + " (" + one.build.variant + ")",
@@ -338,8 +340,12 @@ func sortedKeys[V any](m map[string]V) []string {
 
 // helperOf is what a reader matches a component by: its package identifier,
 // where the build stated one.
+//
+// A value from somebody else's inventory that is not a package identifier is
+// left out rather than stated: the standard's schema refuses it, and one
+// refused helper fails the whole document.
 func helperOf(purl string) *advisory.IdentificationHelper {
-	if purl == "" {
+	if !advisory.IsPackageIdentifier(purl) {
 		return nil
 	}
 	return &advisory.IdentificationHelper{Purl: purl}

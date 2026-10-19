@@ -4,11 +4,16 @@
 package publish_test
 
 import (
+	"errors"
+	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
@@ -197,19 +202,29 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 		w := newWorld(t, f)
 		w.shipped()
 		w.report(w.Target, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1003", zlibUnder(w)},
-			reported{"CVE-2026-1004", libnl})
+			reported{"CVE-2026-1004", libnl}, reported{"CVE-2026-1005", openssl},
+			reported{"CVE-2026-1006", libnl})
 		w.decide(w.Target, "CVE-2026-1001", openssl,
 			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
 		w.decide(w.Target, "CVE-2026-1004", libnl, claim{outcome: triage.Affected})
+		// A dismissal nobody has agreed to yet, and a deferral: neither is a
+		// decision that the issue applies, and neither is published.
+		w.decide(w.Target, "CVE-2026-1005", openssl, claim{outcome: triage.NotApplicable,
+			justification: triage.CodeNotPresent, waiting: true})
+		later := time.Now().UTC().Add(30 * 24 * time.Hour).Truncate(24 * time.Hour)
+		w.decide(w.Target, "CVE-2026-1006", libnl, claim{outcome: triage.Deferred, deferredUntil: &later})
 		w.publishes(w.Product, true)
 		w.write()
 
-		if doc := w.csafAbout(w.Product, "CVE-2026-1003"); doc != nil {
-			t.Errorf("an issue nobody decided is published: %+v", doc.Vulnerabilities[0].Status)
-		}
-		for _, statement := range w.openVEXAbout(w.Product, fixture.BranchName).Statements {
-			if statement.Vulnerability.Name == "CVE-2026-1003" {
-				t.Errorf("an issue nobody decided is stated as %s", statement.Status)
+		for _, undecided := range []string{"CVE-2026-1003", "CVE-2026-1005", "CVE-2026-1006"} {
+			if doc := w.csafAbout(w.Product, undecided); doc != nil {
+				t.Errorf("%s, which nobody decided, is published: %+v", undecided,
+					doc.Vulnerabilities[0].Status)
+			}
+			for _, statement := range w.openVEXAbout(w.Product, fixture.BranchName).Statements {
+				if statement.Vulnerability.Name == undecided {
+					t.Errorf("%s, which nobody decided, is stated as %s", undecided, statement.Status)
+				}
 			}
 		}
 		affected := w.csafAbout(w.Product, "CVE-2026-1004")
@@ -343,6 +358,97 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 		after := w.csafAbout(w.Product, "CVE-2026-1002")
 		if after == nil || after.Document.Tracking.Version != before.Document.Tracking.Version {
 			t.Errorf("the document came back as %+v, want the revision it was", after)
+		}
+	})
+}
+
+// Two products whose names the standard's filename rule folds alike cannot
+// both publish a CSAF document about one issue. The second is refused in
+// words naming the first, and everything else it publishes is still written.
+func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		var targets []*catalog.Target
+		for _, name := range []string{"edge.os", "edge os"} {
+			product := w.DeclareProduct(name, name)
+			w.hold(product)
+			target := w.TargetFor(w.DeclareStream(product, "main", catalog.Branch, nil),
+				w.DeclareVariant(product, "x86", true))
+			root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(len(targets)), Name: "edge",
+				Version: "1." + fmt.Sprint(len(targets))}
+			w.ship(target, root, edge{root, openssl})
+			w.report(target, reported{"CVE-2026-1001", openssl})
+			w.decide(target, "CVE-2026-1001", openssl,
+				claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+			w.publishes(product, true)
+			targets = append(targets, target)
+		}
+		wrote, err := w.pass.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Skipped != 1 {
+			t.Errorf("%d products were not worked out, want the second", wrote.Skipped)
+		}
+		openvex := 0
+		csafCount := 0
+		for _, one := range w.listed("all") {
+			switch one.Kind {
+			case publish.OpenVEX:
+				openvex++
+			case publish.CSAFVEX:
+				csafCount++
+			}
+		}
+		if openvex != 2 || csafCount != 1 {
+			t.Errorf("published %d OpenVEX and %d CSAF documents, want both OpenVEX and one CSAF",
+				openvex, csafCount)
+		}
+		// And it stays that way rather than going round again.
+		again, err := w.pass.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.Skipped != 1 || again.Revised != 0 {
+			t.Errorf("the next pass skipped %d and revised %d", again.Skipped, again.Revised)
+		}
+		_, err = w.pass.Product(t.Context(), w.anybody(), mustProduct(t, w, "edge os"), "all")
+		if !errors.Is(err, publish.ErrPathTaken) {
+			t.Errorf("the second product's document was refused as %v, want the path taken", err)
+		}
+	})
+}
+
+// mustProduct is a product by name.
+func mustProduct(t *testing.T, w *world, name string) *catalog.Product {
+	t.Helper()
+	product, err := w.Catalog.ProductByName(t.Context(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return product
+}
+
+// A document names the address it is served at and its publisher, so moving
+// either revises every document rather than leaving the old ones saying what
+// the feed no longer does.
+func TestMovingTheAddressRevisesEveryDocument(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Target, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Target, "CVE-2026-1001", openssl,
+			claim{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+		moved := publish.NewPass(w.DB.DB, publish.NewGenerator(w.DB.DB, who, "https://elsewhere.example.test"),
+			"test", slog.New(slog.DiscardHandler))
+		wrote, err := moved.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Revised != 2 {
+			t.Errorf("moving the address revised %d documents, want both", wrote.Revised)
 		}
 	})
 }

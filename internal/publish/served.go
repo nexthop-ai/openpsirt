@@ -130,3 +130,62 @@ func served(q *bun.SelectQuery, subject access.Subject, statuses string) (*bun.S
 	}
 	return q.Where(`"pub"."product_id" IN (?)`, bun.List(readable)), true, nil
 }
+
+// AnyPublishedForProduct reports whether a document about this product has
+// been served to anybody, withdrawn or not: a reader holds it by an address
+// and an identifier built from the product's name.
+func AnyPublishedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
+	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
+		Where(`"pub"."product_id" = ?`, productID))
+}
+
+// AnyPublishedForStream reports whether a document naming this branch or tag
+// has been served, withdrawn or not.
+//
+// Its own OpenVEX document names it, and every CSAF document about an issue in
+// its product may: one names each build it states anything about, and which
+// builds a revision named is not kept apart from the bytes. So any CSAF
+// document of the product counts, which refuses a rename that might have been
+// safe rather than allowing one that breaks a reader's address.
+func AnyPublishedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
+		Join(`JOIN "stream" AS "st" ON "st"."product_id" = "pub"."product_id"`).
+		Where(`"st"."id" = ?`, streamID).
+		Where(`("pub"."kind" = ? OR "pub"."subject" = "st"."name")`, CSAFVEX))
+}
+
+// AnyPublishedForVariant reports whether a document of this variant's product
+// has been served, withdrawn or not. A variant's name is in every build a
+// document names, and which builds those were is in the bytes alone.
+func AnyPublishedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
+	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
+		Join(`JOIN "variant" AS "va" ON "va"."product_id" = "pub"."product_id"`).
+		Where(`"va"."id" = ?`, variantID))
+}
+
+// anyPublished reports whether the read finds a row.
+func anyPublished(ctx context.Context, q *bun.SelectQuery) (bool, error) {
+	found, err := q.Limit(1).Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether a document was published: %w", err)
+	}
+	return found, nil
+}
+
+// WithdrawProduct stops every document of a product being served, in the
+// transaction that turns the product's publishing off.
+//
+// Turned on again, a product serves nothing until the next pass has worked
+// its documents out again: what it said when it was turned off may since have
+// stopped being true. A document stating again what it stated then comes back
+// as the revision it was.
+func (s *Store) WithdrawProduct(ctx context.Context, productID int64) error {
+	if _, err := s.db.NewUpdate().Model((*Document)(nil)).
+		Set(`"withdrawn_at" = ?`, s.now().UTC().Truncate(time.Microsecond)).
+		Where(`"product_id" = ?`, productID).
+		Where(`"withdrawn_at" IS NULL`).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("withdraw what product %d publishes: %w", productID, err)
+	}
+	return nil
+}

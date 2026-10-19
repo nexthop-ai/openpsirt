@@ -31,7 +31,7 @@ const base = "https://psirt.example.test"
 // who is the publisher every document names.
 var who = publisher.Named{
 	Name: "Example Networks", Namespace: "https://example.test", Category: "vendor",
-	Prefix: "EXN", Published: base + publish.DirectoryPath,
+	Prefix: "EXN", Served: base + publish.DirectoryPath,
 }
 
 // The components a build ships, by what its inventory calls them.
@@ -161,6 +161,9 @@ type claim struct {
 	scope         triage.Scope
 	fixedVersion  string
 	committedTo   *time.Time
+	deferredUntil *time.Time
+	// waiting leaves a claim that needs a second person without one.
+	waiting bool
 }
 
 // decide records a claim at every open place of an issue in one component of
@@ -204,7 +207,8 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 			},
 			Outcome: said.outcome, Justification: said.justification, Mitigation: said.mitigation,
 			Scope: said.scope, FixedVersion: said.fixedVersion, CommittedTo: said.committedTo,
-			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
+			DeferredUntil: said.deferredUntil,
+			Reasoning:     "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
 			BindingAcross: []int64{target.ID},
 		})
 	}
@@ -212,7 +216,7 @@ func (w *world) decide(target *catalog.Target, issue string, component graph.Des
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	if recorded[0].NeedsApproval {
+	if recorded[0].NeedsApproval && !said.waiting {
 		if _, err := w.decisions.ApproveClaim(ctx, w.approver, recorded[0].ClaimID, "", nil, ""); err != nil {
 			w.t.Fatal(err)
 		}

@@ -1109,6 +1109,7 @@ Every tab carries its count, read from its own list without the filters.
 | | |
 |---|---|
 | **A card names its reason** | The state mark on an expired deferral or a missed fix date says which, and the outcome is drawn as what was promised: "Upgrade to 3.0.15 by 2026-09-01", "Patch by 2026-09-01", "Deferred until 2026-09-01" |
+| A card says whom a stated scope holds for | Beside the outcome, where the claim states one: it is part of what the approver agrees to. Absent where the reason decides |
 | **A card offers only the acts that answer its reason** | Approving is refused on anything but an approval, so the two dated lists carry no Approve, no selection and no batch |
 | **Deciding again opens the finding** | Where its decision form is. A claim over many issues opens the claim page instead |
 | **Changing a promise is done on the card** | The version for an upgrade, the date, and the reason, which is required. The confirmation stays on the card until put away, because the promise leaves the list once its date moves |

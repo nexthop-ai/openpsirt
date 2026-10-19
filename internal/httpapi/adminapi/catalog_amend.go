@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -402,9 +403,9 @@ func renameGuard(ctx context.Context, tx bun.IDB, logger *slog.Logger, level cat
 //
 // One answer for the three levels, because the rule is one rule: a name a
 // customer already holds a document by is not this deployment's to correct.
-// Asked of both kinds of document — a VEX document is issued per build and an
-// advisory per issue across releases, and either one carries the build's
-// identifier.
+// Asked of every kind of document — a VEX document is issued per build, an
+// advisory per issue across releases, and a document served to anybody is
+// held by an address built from these names, withdrawn or not.
 //
 // Given the handle the rename will be written on, so both run inside its
 // transaction. A document issued between asking and renaming would otherwise
@@ -414,15 +415,15 @@ func published(ctx context.Context, db bun.IDB, level catalogLevel, id int64) (b
 	switch level {
 	case levelProduct:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
-			vex.AnyIssuedForProduct, advisory.AnyIssuedForProduct,
+			vex.AnyIssuedForProduct, advisory.AnyIssuedForProduct, publish.AnyPublishedForProduct,
 		}
 	case levelRelease:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
-			vex.AnyIssuedForStream, advisory.AnyIssuedForStream,
+			vex.AnyIssuedForStream, advisory.AnyIssuedForStream, publish.AnyPublishedForStream,
 		}
 	case levelVariant:
 		asked = []func(context.Context, bun.IDB, int64) (bool, error){
-			vex.AnyIssuedForVariant,
+			vex.AnyIssuedForVariant, publish.AnyPublishedForVariant,
 		}
 	default:
 		return false, fmt.Errorf("no part of the catalog is called %q", level)

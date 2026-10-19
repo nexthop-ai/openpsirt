@@ -543,7 +543,7 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// Writes the advisories that have gone out where somebody else's web
 	// server can serve them. Nil where this deployment publishes no
 	// directory, which is ordinary.
-	writer := directory.New(db.DB, published, writtenAs(cfg), directory.Config{
+	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
 		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
 	}, logger)
 	// A store configured and nothing written to it. The address is refused

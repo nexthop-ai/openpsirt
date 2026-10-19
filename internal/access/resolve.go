@@ -99,6 +99,10 @@ func (t Trust) Client(req *http.Request) string {
 	}
 	for i := len(hops) - 1; i >= 0; i-- {
 		hop := strings.TrimSpace(hops[i])
+		// Some proxies write the port they received from beside the address.
+		if host, _, err := net.SplitHostPort(hop); err == nil {
+			hop = host
+		}
 		ip := net.ParseIP(hop)
 		if ip == nil {
 			// Not an address: nothing past it can be told apart from what a

@@ -78,6 +78,8 @@ func TestTheClientIsTheRightmostAddressNoTrustedProxyHolds(t *testing.T) {
 		{"two trusted proxies in a row", "10.0.0.5:4000", []string{"203.0.113.1, 10.1.1.1"}, "203.0.113.1"},
 		{"the hops in two headers", "10.0.0.5:4000", []string{"192.0.2.66", "203.0.113.1"}, "203.0.113.1"},
 		{"a hop that is not an address", "10.0.0.5:4000", []string{"203.0.113.1, unknown"}, "10.0.0.5"},
+		{"a hop carrying its port", "10.0.0.5:4000", []string{"203.0.113.1:51234"}, "203.0.113.1"},
+		{"an IPv6 hop carrying its port", "10.0.0.5:4000", []string{"[2001:db8::7]:51234"}, "2001:db8::7"},
 		{"a trusted proxy forwarding nothing", "10.0.0.5:4000", nil, "10.0.0.5"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)

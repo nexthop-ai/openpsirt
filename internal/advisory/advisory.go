@@ -29,6 +29,8 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
@@ -200,8 +202,12 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	// deployment has said where that is. It is built from what the document
 	// already carries, so the address it states and the file the directory
 	// writes are one rule rather than two.
-	if who.Publishes() {
-		doc.Document.References = append(doc.Document.References, selfReference(who, doc))
+	at, err := s.servedAt(ctx, who, held)
+	if err != nil {
+		return nil, nil, err
+	}
+	if at.Publishes() {
+		doc.Document.References = append(doc.Document.References, selfReference(at, doc))
 	}
 	doc.Document.Distribution = DistributionFor(assembled.undisclosed)
 	doc.ProductTree = ProductTree{Branches: []Branch{{
@@ -337,8 +343,9 @@ func (s *Store) here(ctx context.Context, subject access.Subject,
 	return count > 0, nil
 }
 
-// CSAFVersion is the version of the standard every document here meets.
-const CSAFVersion = "2.0"
+// CSAFVersion is the version of the standard every document here meets, the
+// one every feed names beside it.
+const CSAFVersion = csaf.Version
 
 // IssuerOf is this deployment's publisher as a document names it, and as the
 // provider description names it beside the documents. One with no category is
@@ -381,4 +388,30 @@ func (s *Store) namesOf(ctx context.Context, id int64) ([]string, error) {
 		return nil, fmt.Errorf("read what this issue is also called: %w", err)
 	}
 	return names, nil
+}
+
+// servedAt is the publisher with the address this advisory is reachable at:
+// where this deployment serves its documents and every product the advisory
+// covers publishes, that surface; otherwise the directory, where one is
+// written, or nowhere.
+//
+// Asked per advisory because the surface serves an advisory only where every
+// product it covers publishes, and an address that answers nothing is worse
+// than none: a reader's tooling follows it, and the bytes that go out never
+// change.
+func (s *Store) servedAt(ctx context.Context, who publisher.Named, held []Covered) (publisher.Named, error) {
+	if who.Served == "" {
+		return who, nil
+	}
+	publishes, err := catalog.NewStore(s.db).Publishes(ctx)
+	if err != nil {
+		return who, err
+	}
+	for _, one := range held {
+		if !publishes[one.ProductID] {
+			return who, nil
+		}
+	}
+	who.Published = who.Served
+	return who, nil
 }

@@ -125,14 +125,19 @@ func (g *Generator) openVEXDocument(product *catalog.Product, stream, streamShow
 	})
 	// Statements carry their own moments, and those are part of what the
 	// document states: a statement made again later is a different statement.
-	digestOver, _ := json.Marshal(statements)
+	// So are the address it names itself by and its author.
+	digestOver, _ := json.Marshal(struct {
+		Address    string          `json:"address"`
+		Author     string          `json:"author"`
+		Statements []vex.Statement `json:"statements"`
+	}{g.base, g.who.Name, statements})
 
 	path := OpenVEXPath + segment(product.Name) + "/" + segment(stream) + ".json"
 	title := product.DisplayName + " " + streamShown
 	return Generated{
 		Kind: OpenVEX, Subject: stream, TrackingID: g.base + path, Title: title,
-		Settled: settled(digestOver), Statements: len(statements),
-		path: func(revision) string { return path },
+		Settled: settled(digestOver),
+		path:    func(revision) string { return path },
 		render: func(at revision) ([]byte, error) {
 			updated := at.Current
 			doc := vex.Statements{

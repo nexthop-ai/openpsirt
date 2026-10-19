@@ -3452,7 +3452,7 @@ export interface paths {
          * Set whether a product's security documents are published
          * @description Sets whether this product's security documents are served to anybody who asks, without signing in: its advisories once they have gone out and may travel, a CSAF VEX document per issue, and an OpenVEX document per branch or tag. Nothing is served for any product while the deployment does not publish at all, and nothing about an undisclosed flaw is ever served.
          *
-         *     Turned off, the product's documents stop being served at once. Turned on, they are written within the next pass, a few minutes later. Recorded in the administrative trail.
+         *     Turned off, the product's documents are withdrawn and stop being served at once. Turned on, they are written again by the next pass, a few minutes later. Recorded in the administrative trail.
          *
          *     Requires: administrator
          */
@@ -8998,6 +8998,11 @@ export interface components {
             proposed_by: string;
             /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers */
             reasoning: string;
+            /**
+             * @description Whom a published statement made from the claim holds for, where the claim stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides
+             * @enum {string}
+             */
+            scope?: "portable" | "build";
             /** @description Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it */
             standing: boolean;
             /** @enum {string} */
@@ -9064,6 +9069,11 @@ export interface components {
             proposed_by: string;
             /** @description The words the claim currently rests on. Editing them withdraws every agreement */
             reasoning: string;
+            /**
+             * @description Whom a published statement made from the claim holds for, where the claim stated it. Absent where the reason decides
+             * @enum {string}
+             */
+            scope?: "portable" | "build";
             /**
              * Format: int64
              * @description How many matching decisions apply now

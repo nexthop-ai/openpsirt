@@ -223,3 +223,22 @@ describe("a product's page", () => {
     expect(waiting?.getAttribute("href")).toBe("/review-queue?product=sonic");
   });
 });
+
+describe("what an approver agrees to", () => {
+  it("shows whom the published statement holds for where the claim states it", async () => {
+    const stated = waiting(7);
+    stated.decision = { ...stated.decision, scope: "portable" } as typeof stated.decision;
+    serve((path) =>
+      path === "/v1/review-queue"
+        ? { data: { items: [stated, waiting(8)], total: 2 } }
+        : { data: { items: [], total: 0 } },
+    );
+    mount.render(screen(<Queue />, "/review-queue"));
+    await settle();
+    const cards = Array.from(mount.host().querySelectorAll(".claimed"));
+    expect(cards.map((card) => card.textContent ?? "")).toEqual([
+      expect.stringContaining("for anyone shipping this version"),
+      expect.not.stringContaining("for"),
+    ]);
+  });
+});

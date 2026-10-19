@@ -9,8 +9,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/publish"
 )
 
 // TestRenamingAVariantIsRefusedOnceADocumentHasGoneOut pins the rule the whole
@@ -445,6 +447,77 @@ func TestACaseOnlyRenameMovesTheSpellingShown(t *testing.T) {
 		if built.Items[0].Name != "broadcom" || built.Items[0].Spelled != "Broadcom" {
 			t.Errorf("the variant is matched as %q and shown as %q",
 				built.Items[0].Name, built.Items[0].Spelled)
+		}
+	})
+}
+
+// A product, a release and a variant whose documents have been served to
+// anybody keep their names, withdrawn documents included: a reader holds each
+// by an address and an identifier built from them.
+func TestRenamingIsRefusedOnceADocumentWasServedToAnybody(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		var product int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"product"`).Column("id").
+			Where(`"name" = ?`, "mine").Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().UTC().Truncate(time.Microsecond)
+		if _, err := r.DB.DB.NewInsert().Model(&publish.Document{
+			ProductID: product, Kind: publish.OpenVEX, Subject: "master",
+			Path: "/openvex/mine/master.json", PathDigest: strings.Repeat("a", 64),
+			TrackingID: "x", Title: "x", Version: 1, FirstAt: at, CurrentAt: at,
+			Statuses: "all", Settled: strings.Repeat("b", 64), WithdrawnAt: &at, Body: "{}",
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, refused := range []struct{ what, at, body string }{
+			{"the product", "/v1/products/mine", `{"name":"ours"}`},
+			{"the release", "/v1/products/mine/streams/master", `{"name":"main"}`},
+			{"the variant", "/v1/products/mine/variants/broadcom", `{"name":"bcm"}`},
+		} {
+			got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, refused.at, refused.body)
+			if got.Code != http.StatusConflict {
+				t.Fatalf("renaming %s after a document was served answered %d: %s",
+					refused.what, got.Code, got.Body.String())
+			}
+		}
+	})
+}
+
+// Turning a product's publishing off withdraws what it publishes in the same
+// act, so turning it on again serves nothing the next pass has not worked out
+// again.
+func TestTurningPublishingOffWithdrawsTheProductsDocuments(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		var product int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"product"`).Column("id").
+			Where(`"name" = ?`, "mine").Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Now().UTC().Truncate(time.Microsecond)
+		row := &publish.Document{
+			ProductID: product, Kind: publish.OpenVEX, Subject: "master",
+			Path: "/openvex/mine/master.json", PathDigest: strings.Repeat("a", 64),
+			TrackingID: "x", Title: "x", Version: 1, FirstAt: at, CurrentAt: at,
+			Statuses: "all", Settled: strings.Repeat("b", 64), Body: "{}",
+		}
+		if _, err := r.DB.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for _, on := range []string{"true", "false", "true"} {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/products/mine/publication",
+				`{"publishes":`+on+`}`); got.Code != http.StatusNoContent {
+				t.Fatalf("setting publication %s answered %d: %s", on, got.Code, got.Body.String())
+			}
+		}
+		held := new(publish.Document)
+		if err := r.DB.DB.NewSelect().Model(held).Where(`"pub"."id" = ?`, row.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if held.WithdrawnAt == nil {
+			t.Error("a document of a product turned off and on again is still served before the next pass")
 		}
 	})
 }

@@ -553,9 +553,9 @@ const DefaultDiscloseAfter = 90 * 24 * time.Hour
 // than a rule, because how long is too long is a judgment about a product.
 const DefaultMovementThreshold = 30 * 24 * time.Hour
 
-// The two words PublishedStatuses takes. EveryStatus is the default: a reader
-// holding a document that states only some statuses reads silence about the
-// rest as nothing being known, and every status is what the record holds.
+// The two words PublishedStatuses takes. EveryStatus, the default, publishes
+// every status somebody decided: that a component is not affected, is fixed,
+// or is affected.
 const (
 	EveryStatus = "all"
 	// SettledStatuses is the statements that something is not affected or is

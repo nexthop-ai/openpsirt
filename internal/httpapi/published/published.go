@@ -96,7 +96,7 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 		problem(w, http.StatusTooManyRequests, "too many requests from this address; try again shortly")
 		return
 	}
-	file, err := s.find(r.Context(), r.URL.EscapedPath())
+	file, err := s.find(r.Context(), r.URL.EscapedPath(), r.Header.Get("If-None-Match"))
 	switch {
 	case errors.Is(err, publish.ErrNotPublished):
 		notFound(w)
@@ -109,16 +109,27 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", file.kind)
-	sum := sha256.Sum256(file.body)
-	h.Set("ETag", `"`+hex.EncodeToString(sum[:16])+`"`)
+	tag := file.tag
+	if tag == "" {
+		tag = tagOf(file.body)
+	}
+	h.Set("ETag", tag)
 	// Asked again every time, and answered "not modified" where nothing
 	// moved: a reader keeping a copy fetches only what changed.
 	h.Set("Cache-Control", "public, no-cache")
 	http.ServeContent(w, r, "", file.modified, bytes.NewReader(file.body))
 }
 
-// file is one answer: its bytes, what they are, and when they last moved.
+// tagOf is the entity tag of a body: a digest of its bytes.
+func tagOf(body []byte) string {
+	sum := sha256.Sum256(body)
+	return `"` + hex.EncodeToString(sum[:16]) + `"`
+}
+
+// file is one answer: its bytes, what they are, and when they last moved,
+// which is zero for a list, and its tag where the bytes do not decide it.
 type file struct {
+	tag      string
 	body     []byte
 	kind     string
 	modified time.Time
@@ -138,7 +149,10 @@ const (
 // A list reads every document's name and dates; a document reads itself. A
 // reader taking a provider whole asks for every document and the files beside
 // it, so a request for one is answered without listing the rest.
-func (s *server) find(ctx context.Context, path string) (*file, error) {
+//
+// asked is the entity tag the request already holds, which a signature is
+// answered from without signing again.
+func (s *server) find(ctx context.Context, path, asked string) (*file, error) {
 	now, err := s.read(ctx)
 	if err != nil {
 		return nil, err
@@ -151,6 +165,12 @@ func (s *server) find(ctx context.Context, path string) (*file, error) {
 		publish.OpenVEXIndex: func(v *view) (*file, error) { return listing(v.openvex, csaf.Index, textKind) },
 	}
 	if list, ok := lists[path]; ok {
+		// The OpenVEX list names no advisory, so it reads none.
+		if path != publish.OpenVEXIndex {
+			if err := s.travelling(ctx, now); err != nil {
+				return nil, err
+			}
+		}
 		if err := s.list(ctx, now); err != nil {
 			return nil, err
 		}
@@ -165,7 +185,7 @@ func (s *server) find(ctx context.Context, path string) (*file, error) {
 	}{
 		{publish.SHA256Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha256Of), nil }},
 		{publish.SHA512Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha512Of), nil }},
-		{publish.SignatureSuffix, s.signature},
+		{publish.SignatureSuffix, func(f *file) (*file, error) { return s.signature(f, asked) }},
 	} {
 		if named, ok := strings.CutSuffix(path, beside.suffix); ok {
 			document, err := s.document(ctx, now, named)
@@ -194,7 +214,7 @@ type view struct {
 }
 
 // read is who anybody at all is at this moment and what statuses are
-// published, with every advisory that may travel.
+// published.
 func (s *server) read(ctx context.Context) (*view, error) {
 	products, err := catalog.NewStore(s.DB).Publishing(ctx)
 	if err != nil {
@@ -207,12 +227,19 @@ func (s *server) read(ctx context.Context) (*view, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := &view{subject: access.Published(products), statuses: statuses,
-		advisories: map[string]advisory.Travels{}}
+	return &view{subject: access.Published(products), statuses: statuses}, nil
+}
 
+// travelling adds every advisory that may travel to the view.
+//
+// Read only by the CSAF lists and by a path below the folder of documents
+// that may travel, because it reads every advisory's issued bytes: an
+// OpenVEX document, a key or a path nothing is published at asks none of it.
+func (s *server) travelling(ctx context.Context, v *view) error {
+	v.advisories = map[string]advisory.Travels{}
 	sent, err := advisory.NewStore(s.DB).Sent(ctx, v.subject)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	travels, _, unread := advisory.Travelling(sent)
 	for _, one := range unread {
@@ -222,7 +249,7 @@ func (s *server) read(ctx context.Context) (*view, error) {
 		v.advisories[one.Path] = one
 		v.csaf = append(v.csaf, one.Listed)
 	}
-	return v, nil
+	return nil
 }
 
 // list adds every VEX document to the view, as the lists name them.
@@ -254,7 +281,11 @@ func listing(listed []csaf.Listed, write func([]csaf.Listed) []byte, kind string
 	if len(listed) == 0 {
 		return nil, publish.ErrNotPublished
 	}
-	return &file{body: write(listed), kind: kind, modified: csaf.Newest(listed)}, nil
+	// No date: a list that shrank, by a document withdrawn or a product
+	// turned off, is newer than its newest document, and a reader asking
+	// whether it moved since a date would be told it had not. The tag
+	// answers that.
+	return &file{body: write(listed), kind: kind}, nil
 }
 
 // described is the provider description.
@@ -292,7 +323,7 @@ func (s *server) described(v *view) (*file, error) {
 		Publisher:   advisory.IssuerOf(s.Who),
 		PublicKeys:  keys,
 		Role:        role,
-	}, newest)
+	}, time.Time{})
 }
 
 // feed is every CSAF document as one ROLIE feed, each entry naming the files
@@ -310,7 +341,7 @@ func (s *server) feed(v *view) (*file, error) {
 	at := func(path string) string { return s.Base + publish.DirectoryPath + path }
 	return jsonFile(csaf.FeedOf(csaf.FeedName(s.Who.Prefix),
 		s.Who.Name+" CSAF documents (TLP:"+advisory.Travelable+")",
-		s.Base+publish.FeedPath, at, beside, v.csaf), csaf.Newest(v.csaf))
+		s.Base+publish.FeedPath, at, beside, v.csaf), time.Time{})
 }
 
 // key is the public key the documents are signed with, served under its
@@ -325,6 +356,9 @@ func (s *server) key(path string) (*file, error) {
 // document is one document by its path.
 func (s *server) document(ctx context.Context, v *view, path string) (*file, error) {
 	if below, ok := strings.CutPrefix(path, publish.DirectoryPath); ok {
+		if err := s.travelling(ctx, v); err != nil {
+			return nil, err
+		}
 		if one, ok := v.advisories[below]; ok {
 			return &file{body: one.Body, kind: jsonKind, modified: one.Released}, nil
 		}
@@ -340,15 +374,23 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 
 // signature is the detached signature over one document, dated when the
 // document was released.
-func (s *server) signature(document *file) (*file, error) {
+//
+// Tagged by the document it signs rather than by its own bytes, which carry a
+// random salt and differ every time: a reader holding the signature of an
+// unchanged document is told so, without the key being used again.
+func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished
+	}
+	tag := strings.TrimSuffix(tagOf(document.body), `"`) + `.asc"`
+	if asked == tag {
+		return &file{tag: tag, kind: signatureKind, modified: document.modified}, nil
 	}
 	signed, err := s.Signer.Sign(document.body, document.modified)
 	if err != nil {
 		return nil, err
 	}
-	return &file{body: signed, kind: signatureKind, modified: document.modified}, nil
+	return &file{tag: tag, body: signed, kind: signatureKind, modified: document.modified}, nil
 }
 
 // digestFile is the file holding a document's digest: the value and then the

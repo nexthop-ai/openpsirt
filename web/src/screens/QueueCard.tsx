@@ -280,6 +280,7 @@ export function Card({
           outcome={claim.outcome}
           justification={claim.justification}
           until={claim.deferredUntil}
+          scope={claim.scope}
         />
         <span style={{ color: "var(--muted)" }}>
           {f?.component && (
@@ -615,16 +616,23 @@ function Outcome({
   outcome,
   justification,
   until,
+  scope,
 }: {
   outcome: string;
   justification?: string;
   until?: string;
+  scope?: string;
 }) {
   return (
     <span className={`claimed ${outcome}`}>
       <b>{labeled(outcome)}</b>
       {justification && <span className="why mono">{justification}</span>}
       {until && <span className="why">until {until}</span>}
+      {scope && (
+        <span className="why">
+          {scope === "portable" ? "for anyone shipping this version" : "for this build only"}
+        </span>
+      )}
     </span>
   );
 }
