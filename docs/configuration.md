@@ -816,7 +816,7 @@ the header is ignored, so a client cannot spend another's allowance. Without
 it, every reader arriving through the proxy shares one allowance.
 
 An advisory states the address this deployment serves it at where every
-product it covers publishes when it goes out; otherwise it states the published
+product it covers publishes and is in use when it goes out; otherwise it states the published
 advisory directory's address, where one is written, or none. What went out
 never changes, so an advisory issued before its products published keeps the
 address it was issued with.
@@ -824,9 +824,17 @@ address it was issued with.
 Turning a product's publishing off withdraws its documents at once. Turned on
 again, they are served after the next pass has worked them out again.
 
-A product, release or variant whose documents have been served keeps its
-name: a rename is refused, since readers hold the documents by addresses built
-from it.
+A product keeps its name once a document about it has been served, withdrawn
+or not, since readers hold the documents by addresses built from it. A release
+or variant keeps its name once it has a scanned build and a document of its
+product has been served, and a release also once its own OpenVEX document has
+been. A release or variant nothing was scanned for may be renamed.
+
+A document's filename is built from its product's name, lower-cased, with
+every run of characters other than letters, digits, a plus and a hyphen made
+one underscore. Turning publishing on for a product, or renaming one that
+publishes, is refused where another product that publishes or has published
+gets the same filename this way.
 
 ## Upstream currency
 

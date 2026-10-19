@@ -457,6 +457,8 @@ func TestACaseOnlyRenameMovesTheSpellingShown(t *testing.T) {
 func TestRenamingIsRefusedOnceADocumentWasServedToAnybody(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
+		r.Scanned(t)
+		done(t, r, http.MethodPost, "/v1/products/mine/variants", `{"name":"lab"}`)
 		var product int64
 		if err := r.DB.DB.NewSelect().TableExpr(`"product"`).Column("id").
 			Where(`"name" = ?`, "mine").Scan(ctx, &product); err != nil {
@@ -481,6 +483,38 @@ func TestRenamingIsRefusedOnceADocumentWasServedToAnybody(t *testing.T) {
 				t.Fatalf("renaming %s after a document was served answered %d: %s",
 					refused.what, got.Code, got.Body.String())
 			}
+		}
+		// A variant nothing was scanned for is in no document.
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine/variants/lab",
+			`{"name":"bench"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("renaming a variant nothing was scanned for answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// Two product names the standard's filename rule folds alike give their CSAF
+// VEX documents one path per issue, so a product is refused publishing, and a
+// product that publishes is refused a name, where another that publishes
+// folds alike. The refusal names the other product.
+func TestAProductFoldedLikeOneThatPublishesIsRefusedPublishing(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		done(t, r, http.MethodPost, "/v1/products", `{"name":"edge.os","display_name":"Edge OS"}`)
+		done(t, r, http.MethodPost, "/v1/products", `{"name":"edge os"}`)
+		done(t, r, http.MethodPut, "/v1/products/edge.os/publication", `{"publishes":true}`)
+
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/products/edge%20os/publication",
+			`{"publishes":true}`)
+		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), "Edge OS") {
+			t.Fatalf("publishing a product folded like one that publishes answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		done(t, r, http.MethodPut, "/v1/products/mine/publication", `{"publishes":true}`)
+		got = httpapitest.AsPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine",
+			`{"name":"EDGE_OS"}`)
+		if got.Code != http.StatusConflict || !strings.Contains(got.Body.String(), "Edge OS") {
+			t.Fatalf("renaming a publishing product to a name folded like another's answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }

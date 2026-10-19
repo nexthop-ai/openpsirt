@@ -87,8 +87,13 @@ func PathFor(doc *Document) string {
 // this moment, sits among published documents: the year folder and the
 // filename the standard's rule gives.
 func PathOf(trackingID string, initial time.Time) string {
-	name := notFilename.ReplaceAllString(strings.ToLower(trackingID), "_")
-	return strconv.Itoa(initial.UTC().Year()) + "/" + name + ".json"
+	return strconv.Itoa(initial.UTC().Year()) + "/" + Filename(trackingID) + ".json"
+}
+
+// Filename is a value under the standard's filename rule, without the
+// extension.
+func Filename(value string) string {
+	return notFilename.ReplaceAllString(strings.ToLower(value), "_")
 }
 
 // selfReference is where this document is published, as the document states

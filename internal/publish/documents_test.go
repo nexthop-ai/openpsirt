@@ -363,8 +363,9 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 }
 
 // Two products whose names the standard's filename rule folds alike cannot
-// both publish a CSAF document about one issue. The second is refused in
-// words naming the first, and everything else it publishes is still written.
+// both publish a CSAF document about one issue. Both turned on at once, past
+// the refusal an administrator's write meets, the second is refused in words
+// naming the first, and everything else it publishes is still written.
 func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
@@ -413,8 +414,9 @@ func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 			t.Errorf("the next pass skipped %d and revised %d", again.Skipped, again.Revised)
 		}
 		_, err = w.pass.Product(t.Context(), w.anybody(), mustProduct(t, w, "edge os"), "all")
-		if !errors.Is(err, publish.ErrPathTaken) {
-			t.Errorf("the second product's document was refused as %v, want the path taken", err)
+		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(err.Error(), "of edge.os,") ||
+			!strings.Contains(err.Error(), "turn publishing off for this product") {
+			t.Errorf("the second product's document was refused as %v, want the path taken by edge.os", err)
 		}
 	})
 }

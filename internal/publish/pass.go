@@ -189,7 +189,10 @@ func (p *Pass) Product(ctx context.Context, subject access.Subject, product *cat
 
 // ErrPathTaken is a document whose path another product's document already
 // holds: two product names the standard's filename rule folds alike. Retrying
-// never clears it, so it is refused in words, naming both.
+// never clears it, and neither does withdrawing the other product's, which
+// keeps its path; it is refused in words, naming the other product. Turning
+// publishing on for a product is refused where this would happen, so it is
+// reached only by two products turned on at once.
 var ErrPathTaken = refusal.New("another product's document is published at the same path")
 
 // Statuses is which statuses the deployment publishes now.
@@ -282,15 +285,17 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 			return err
 		}
 		path := one.path(at)
-		var holder Document
-		switch err := tx.NewSelect().Model(&holder).Column("product_id", "kind", "subject").
+		var other string
+		switch err := tx.NewSelect().Model((*Document)(nil)).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "pub"."product_id"`).
+			ColumnExpr(`"p"."display_name"`).
 			Where(`"pub"."path_digest" = ?`, digestOf(path)).
 			Where(`NOT ("pub"."product_id" = ? AND "pub"."kind" = ? AND "pub"."subject" = ?)`,
 				productID, one.Kind, one.Subject).
-			Scan(ctx); {
+			Scan(ctx, &other); {
 		case err == nil:
-			return fmt.Errorf("%w: %s, held by the %s about %s in product %d; rename one of the "+
-				"two products", ErrPathTaken, path, holder.Kind, holder.Subject, holder.ProductID)
+			return fmt.Errorf("%w: %s is held by a document of %s, whose name folds to the same "+
+				"filename; turn publishing off for this product", ErrPathTaken, path, other)
 		case !database.IsNoRows(err):
 			return fmt.Errorf("read who publishes at %s: %w", path, err)
 		}

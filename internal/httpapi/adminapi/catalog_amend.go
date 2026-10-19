@@ -38,8 +38,10 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 		Summary: "Amend a build variant",
 		Description: "Corrects what a variant is called and whether it reaches customers. " +
 			"Both are left alone where the request omits them.\n\n" +
-			"A name is refused once an OpenVEX document has been published for any release " +
-			"built as this variant. Retire the variant and declare the intended one instead.\n\n" +
+			"A name is refused once a VEX document has gone out for a build of this variant, " +
+			"or once the variant has a scanned build and a document of its product has been " +
+			"served, withdrawn or not. Retire the variant and declare the intended one " +
+			"instead.\n\n" +
 			"A name another variant of this product holds is refused, including a retired " +
 			"one. Whether it reaches customers feeds how its findings rank and may be " +
 			"corrected at any time.",
@@ -171,10 +173,12 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		Description: "Corrects what a product is called. Both names are left alone where the " +
 			"request omits them.\n\n" +
 			"The name is what scans, paths and published documents use. It is refused once a " +
-			"VEX document has gone out for any build of this product, or a published advisory " +
-			"covers it. Retire the product and declare the intended one instead. It is also " +
+			"VEX document has gone out for any build of this product, a published advisory " +
+			"covers it, or a document about it has been served, withdrawn or not. Retire the " +
+			"product and declare the intended one instead. It is also " +
 			"refused where a group mapping in configuration names the product or the new name; " +
-			"change the mapping first.\n\n" +
+			"change the mapping first. Where the product publishes, a name folding to the same " +
+			"filename as another product that publishes, or has published, is refused.\n\n" +
 			"The displayed name is what screens show and what a document names the product in " +
 			"prose. It may be corrected at any time.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
@@ -214,6 +218,15 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 					return huma.Error409Conflict("OPENPSIRT_GROUP_ROLES maps a group to this " +
 						"product or to the new name. Change the mapping in configuration first, " +
 						"then rename the product")
+				}
+				held, err := store.Publishes(ctx)
+				if err != nil {
+					return core.WentWrong(d.Logger, "that product could not be renamed", err)
+				}
+				if held[product.ID] {
+					if err := pathsFree(ctx, tx, d.Logger, product.ID, name); err != nil {
+						return err
+					}
 				}
 				if err := store.RenameProduct(ctx, product.ID, name); err != nil {
 					return declineRename(d.Logger, err)
@@ -288,8 +301,10 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		Path:    "/v1/products/{product}/streams/{stream}",
 		Summary: "Amend a branch or tag",
 		Description: "Corrects what a release is called.\n\n" +
-			"Refused once a VEX document has gone out for any build of this release, or a " +
-			"published advisory named it. Declare the intended name as a release of its own: " +
+			"Refused once a VEX document has gone out for any build of this release, a " +
+			"published advisory named it, its OpenVEX document has been served, or it has a " +
+			"scanned build and a CSAF VEX document of its product has been served, withdrawn " +
+			"or not. Declare the intended name as a release of its own: " +
 			"retiring this one and declaring it again returns this same release under this " +
 			"same name.\n\n" +
 			"Whether it is a branch or a tag does not move here, and neither does the branch " +
@@ -456,7 +471,7 @@ func heldByReaders(level catalogLevel) error {
 			"name readers hold it by."
 	}
 	return huma.NewError(http.StatusConflict,
-		"a document naming this "+string(level)+" has been published, so its name is what "+
+		"a document that may name this "+string(level)+" has been published, so its name is what "+
 			"readers already hold it by. "+remedy)
 }
 

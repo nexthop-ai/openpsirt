@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -139,28 +140,76 @@ func AnyPublishedForProduct(ctx context.Context, db bun.IDB, productID int64) (b
 		Where(`"pub"."product_id" = ?`, productID))
 }
 
-// AnyPublishedForStream reports whether a document naming this branch or tag
-// has been served, withdrawn or not.
+// AnyPublishedForStream reports whether a document that may name this branch
+// or tag has been served, withdrawn or not.
 //
-// Its own OpenVEX document names it, and every CSAF document about an issue in
-// its product may: one names each build it states anything about, and which
-// builds a revision named is not kept apart from the bytes. So any CSAF
-// document of the product counts, which refuses a rename that might have been
-// safe rather than allowing one that breaks a reader's address.
+// Its own OpenVEX document names it. A CSAF document about an issue in its
+// product names each build it states anything about, and which builds a
+// revision named is kept in the bytes alone, so once the release has a
+// scanned build every CSAF document of its product counts. That refuses a
+// rename that might have been safe rather than allowing one that breaks a
+// reader's address. A release with no scanned build is in no document.
 func AnyPublishedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
 	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
 		Join(`JOIN "stream" AS "st" ON "st"."product_id" = "pub"."product_id"`).
 		Where(`"st"."id" = ?`, streamID).
-		Where(`("pub"."kind" = ? OR "pub"."subject" = "st"."name")`, CSAFVEX))
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where(`"pub"."kind" = ? AND "pub"."subject" = "st"."name"`, OpenVEX).
+				WhereOr(`"pub"."kind" = ? AND EXISTS (?)`, CSAFVEX, scanned(db, "stream_id", "st"))
+		}))
 }
 
-// AnyPublishedForVariant reports whether a document of this variant's product
-// has been served, withdrawn or not. A variant's name is in every build a
+// AnyPublishedForVariant reports whether a document that may name this
+// variant has been served, withdrawn or not: a document of its product, once
+// the variant has a scanned build. A variant's name is in every build a
 // document names, and which builds those were is in the bytes alone.
 func AnyPublishedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
 	return anyPublished(ctx, db.NewSelect().Model((*Document)(nil)).
 		Join(`JOIN "variant" AS "va" ON "va"."product_id" = "pub"."product_id"`).
-		Where(`"va"."id" = ?`, variantID))
+		Where(`"va"."id" = ?`, variantID).
+		Where("EXISTS (?)", scanned(db, "variant_id", "va")))
+}
+
+// scanned asks for a scanned build of the release or variant the outer read
+// joins under alias. A build is named by a document only once a scan has
+// been filed against it, and the scan it names is never taken away.
+func scanned(db bun.IDB, column, alias string) *bun.SelectQuery {
+	return db.NewSelect().TableExpr(`"target" AS "tg"`).ColumnExpr("1").
+		Where(`"tg".? = ?.?`, bun.Ident(column), bun.Ident(alias), bun.Ident("id")).
+		Where(`"tg"."last_scan_id" IS NOT NULL`)
+}
+
+// FoldsLike is the displayed name of another product whose documents would be
+// published at this product's paths, or empty where there is none.
+//
+// A CSAF VEX document's filename is built from its product's name under the
+// standard's filename rule, so two names that fold alike under it are given
+// one path per issue. The other product counts while it publishes, and once
+// it has published anything, because a withdrawn document keeps its path.
+func FoldsLike(ctx context.Context, db bun.IDB, productID int64, name string) (string, error) {
+	var others []struct {
+		Name        string `bun:"name"`
+		DisplayName string `bun:"display_name"`
+	}
+	held := db.NewSelect().Model((*Document)(nil)).ColumnExpr("1").
+		Where(`"pub"."product_id" = "p"."id"`)
+	if err := db.NewSelect().TableExpr(`"product" AS "p"`).
+		Column("p.name", "p.display_name").
+		Where(`"p"."id" <> ?`, productID).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where(`"p"."publishes" = ?`, true).WhereOr("EXISTS (?)", held)
+		}).
+		OrderExpr(`"p"."id"`).
+		Scan(ctx, &others); err != nil {
+		return "", fmt.Errorf("read which products publish: %w", err)
+	}
+	folded := advisory.Filename(name)
+	for _, other := range others {
+		if advisory.Filename(other.Name) == folded {
+			return other.DisplayName, nil
+		}
+	}
+	return "", nil
 }
 
 // anyPublished reports whether the read finds a row.

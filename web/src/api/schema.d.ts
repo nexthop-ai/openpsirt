@@ -2287,7 +2287,7 @@ export interface paths {
          * Amend a product
          * @description Corrects what a product is called. Both names are left alone where the request omits them.
          *
-         *     The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or a published advisory covers it. Retire the product and declare the intended one instead. It is also refused where a group mapping in configuration names the product or the new name; change the mapping first.
+         *     The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, a published advisory covers it, or a document about it has been served, withdrawn or not. Retire the product and declare the intended one instead. It is also refused where a group mapping in configuration names the product or the new name; change the mapping first. Where the product publishes, a name folding to the same filename as another product that publishes, or has published, is refused.
          *
          *     The displayed name is what screens show and what a document names the product in prose. It may be corrected at any time.
          *
@@ -3452,7 +3452,7 @@ export interface paths {
          * Set whether a product's security documents are published
          * @description Sets whether this product's security documents are served to anybody who asks, without signing in: its advisories once they have gone out and may travel, a CSAF VEX document per issue, and an OpenVEX document per branch or tag. Nothing is served for any product while the deployment does not publish at all, and nothing about an undisclosed flaw is ever served.
          *
-         *     Turned off, the product's documents are withdrawn and stop being served at once. Turned on, they are written again by the next pass, a few minutes later. Recorded in the administrative trail.
+         *     Turned off, the product's documents are withdrawn and stop being served at once. Turned on, they are written again by the next pass, a few minutes later. Turning it on is refused where another product that publishes, or has published, has a name that folds to the same filename: a document's filename is built from the product's name, lower-cased with everything but letters, digits, plus and hyphen made an underscore. Recorded in the administrative trail.
          *
          *     Requires: administrator
          */
@@ -3891,7 +3891,7 @@ export interface paths {
          * Amend a branch or tag
          * @description Corrects what a release is called.
          *
-         *     Refused once a VEX document has gone out for any build of this release, or a published advisory named it. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
+         *     Refused once a VEX document has gone out for any build of this release, a published advisory named it, its OpenVEX document has been served, or it has a scanned build and a CSAF VEX document of its product has been served, withdrawn or not. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
          *
          *     Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
          *
@@ -5011,7 +5011,7 @@ export interface paths {
          * Amend a build variant
          * @description Corrects what a variant is called and whether it reaches customers. Both are left alone where the request omits them.
          *
-         *     A name is refused once an OpenVEX document has been published for any release built as this variant. Retire the variant and declare the intended one instead.
+         *     A name is refused once a VEX document has gone out for a build of this variant, or once the variant has a scanned build and a document of its product has been served, withdrawn or not. Retire the variant and declare the intended one instead.
          *
          *     A name another variant of this product holds is refused, including a retired one. Whether it reaches customers feeds how its findings rank and may be corrected at any time.
          *

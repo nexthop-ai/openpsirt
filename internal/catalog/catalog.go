@@ -702,8 +702,8 @@ func (s *Store) Publishes(ctx context.Context) (map[int64]bool, error) {
 //
 // Read by its column rather than through the product's model. Whether a
 // product publishes is asked by the published surface, the pass that writes
-// its documents and the catalog listing, and nowhere a product is otherwise
-// read or declared.
+// its documents, the catalog listing and the refusal of a name folding like a
+// publishing product's, and nowhere a product is otherwise read or declared.
 func (s *Store) publishing(ctx context.Context, inUse bool) ([]int64, error) {
 	q := s.db.NewSelect().TableExpr(`"product" AS "p"`).
 		ColumnExpr(`"p"."id"`).
