@@ -2572,6 +2572,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/components/{component}/upstream-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what an upstream says about a component
+         * @description The statements the upstream this product trusts publishes about a component of this name, at any version, newest first, declined ones included. A statement holding for anybody that says not affected or fixed closes the findings of its issue on the component at its version at the next scan, unless it is declined. At most 200.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product
+         */
+        get: operations["list-upstream-statements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/end-of-life": {
         parameters: {
             query?: never;
@@ -4996,30 +5018,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/upstream-offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List what an upstream offers for review
-         * @description The statements this product's upstream publishes that depend on its own build, beside each open finding here they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
-         *
-         *     A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
-         *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product
-         */
-        get: operations["list-upstream-offers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/upstream/inspection": {
         parameters: {
             query?: never;
@@ -6096,6 +6094,30 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-unassigned"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/upstream-offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what upstreams offer for review
+         * @description The statements the upstreams of the products here publish that depend on their own build, beside each open finding they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
+         *
+         *     A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-upstream-offers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9791,6 +9813,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyUpstreamSaidBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyUpstreamSaidBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UpstreamSaidBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyVariantBody: {
             /**
              * Format: uri
@@ -10288,6 +10321,8 @@ export interface components {
             issue: string;
             /** @description The reason the upstream gives for a status of not affected */
             justification?: string;
+            /** @description The product the finding is in, by name */
+            product: string;
             /** @description The upstream that published it */
             publisher: string;
             /** @description The upstream's own words */
@@ -10299,6 +10334,10 @@ export interface components {
             statement: number;
             /** @description What the upstream says, in the VEX format's own words */
             status: string;
+            /** @description The branch or tag of the build the finding is in */
+            stream: string;
+            /** @description The variant of the build the finding is in */
+            variant: string;
             /** @description The version the upstream and this product both ship */
             version: string;
             /** @description What of the upstream's the statement depends on: its build, or what pulls the component in there */
@@ -11906,8 +11945,12 @@ export interface components {
             about?: string;
             /** @description The moment it was uploaded here */
             at: string;
+            /** @description Whether somebody here declined it, so it closes nothing and is offered to nobody */
+            declined?: boolean;
             /** @description The document it came from */
             document: string;
+            /** @description Whether an upstream this product trusts publishes it as holding for anybody shipping the component. Such a statement saying not affected or fixed closes the findings of that issue on that component, at that version, at the next scan */
+            for_anybody?: boolean;
             /**
              * Format: int64
              * @description Pass as from_statement when starting a decision from this, so a later revision can be noticed
@@ -12881,6 +12924,33 @@ export interface components {
             trusted_at: string;
             /** @description The address of the upstream's CSAF provider description */
             url: string;
+        };
+        UpstreamSaidBody: {
+            /** @description Whether somebody here declined it, so it closes nothing and is offered to nobody */
+            declined: boolean;
+            /** @description The address of the document it is in */
+            document: string;
+            /** @description The tracking identifier of that document */
+            document_id: string;
+            /** @description Whether it holds for anybody shipping the component, rather than depending on the upstream's own build */
+            for_anybody: boolean;
+            /** @description The issue, as the upstream named it */
+            issue: string;
+            /** @description The reason the upstream gives for a status of not affected */
+            justification?: string;
+            /** @description The upstream that published it */
+            publisher: string;
+            /** @description The upstream's own words */
+            reasoning?: string;
+            /**
+             * Format: int64
+             * @description The statement, by its identifier
+             */
+            statement: number;
+            /** @description What the upstream says, in the VEX format's own words */
+            status: string;
+            /** @description The version of the component it is about */
+            version?: string;
         };
         UpwardBody: {
             /**
@@ -17103,6 +17173,38 @@ export interface operations {
             };
         };
     };
+    "list-upstream-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyUpstreamSaidBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "set-product-end-of-life": {
         parameters: {
             query?: never;
@@ -21246,37 +21348,6 @@ export interface operations {
             };
         };
     };
-    "list-upstream-offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyOfferBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "inspect-upstream": {
         parameters: {
             query?: never;
@@ -22853,6 +22924,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnassignedPageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-upstream-offers": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty */
+                product?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyOfferBody"];
                 };
             };
             /** @description Error */

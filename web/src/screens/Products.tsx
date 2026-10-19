@@ -17,6 +17,7 @@ import { Unread } from "../ui/Reading";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 import { productAt, streamsAt } from "../app/routes";
+import { UpstreamDrawer } from "./Upstream";
 
 // You pick a product first, and everything below is bound to it. What each one
 // holds is on the row, so the list answers the question it exists to answer
@@ -30,6 +31,8 @@ export function Products({ who }: { who: Who }) {
   // closed, so one piece of state answers both which row and whether.
   const [editing, setEditing] = useState("");
   const [renameTo, setRenameTo] = useState("");
+  // The product whose upstream drawer is open, empty for none.
+  const [upstreamOf, setUpstreamOf] = useState("");
   const [showAs, setShowAs] = useState("");
   // Counted, and keyed as counted. What is open against each row is asked for
   // rather than always done, and a read that asked shares nothing with one
@@ -330,6 +333,14 @@ export function Products({ who }: { who: Who }) {
                           <button
                             type="button"
                             className="linkish"
+                            title="The project this forks, whose published statements it takes."
+                            onClick={() => setUpstreamOf(product.name ?? "")}
+                          >
+                            Upstream
+                          </button>
+                          <button
+                            type="button"
+                            className="linkish"
                             style={{ color: "var(--muted)" }}
                             title="Take it out of use, with its releases and variants. Findings, decisions and published documents keep naming it."
                             disabled={retire.isPending}
@@ -347,6 +358,12 @@ export function Products({ who }: { who: Who }) {
           </table>
         </Wide>
       )}
+
+      <UpstreamDrawer
+        product={upstreamOf}
+        open={upstreamOf !== ""}
+        onClose={() => setUpstreamOf("")}
+      />
 
       <Declare
         title={`Edit ${editing}`}

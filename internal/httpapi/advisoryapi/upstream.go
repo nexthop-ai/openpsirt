@@ -39,6 +39,9 @@ type InspectedBody struct {
 type OfferBody struct {
 	Statement     int64  `json:"statement" doc:"The statement, by its identifier. Pass as from_statement when proposing a claim from it"`
 	Finding       int64  `json:"finding" doc:"The open finding it speaks about"`
+	Product       string `json:"product" doc:"The product the finding is in, by name"`
+	Stream        string `json:"stream" doc:"The branch or tag of the build the finding is in"`
+	Variant       string `json:"variant" doc:"The variant of the build the finding is in"`
 	Publisher     string `json:"publisher" doc:"The upstream that published it"`
 	Issue         string `json:"issue" doc:"The issue"`
 	Component     string `json:"component" doc:"The component"`
@@ -47,6 +50,21 @@ type OfferBody struct {
 	Justification string `json:"justification,omitempty" doc:"The reason the upstream gives for a status of not affected"`
 	Reasoning     string `json:"reasoning,omitempty" doc:"The upstream's own words"`
 	Within        string `json:"within,omitempty" doc:"What of the upstream's the statement depends on: its build, or what pulls the component in there"`
+	Document      string `json:"document" doc:"The address of the document it is in"`
+	DocumentID    string `json:"document_id" doc:"The tracking identifier of that document"`
+}
+
+// UpstreamSaidBody is one statement an upstream publishes about a component.
+type UpstreamSaidBody struct {
+	Statement     int64  `json:"statement" doc:"The statement, by its identifier"`
+	Publisher     string `json:"publisher" doc:"The upstream that published it"`
+	Issue         string `json:"issue" doc:"The issue, as the upstream named it"`
+	Version       string `json:"version,omitempty" doc:"The version of the component it is about"`
+	Status        string `json:"status" doc:"What the upstream says, in the VEX format's own words"`
+	Justification string `json:"justification,omitempty" doc:"The reason the upstream gives for a status of not affected"`
+	Reasoning     string `json:"reasoning,omitempty" doc:"The upstream's own words"`
+	ForAnybody    bool   `json:"for_anybody" doc:"Whether it holds for anybody shipping the component, rather than depending on the upstream's own build"`
+	Declined      bool   `json:"declined" doc:"Whether somebody here declined it, so it closes nothing and is offered to nobody"`
 	Document      string `json:"document" doc:"The address of the document it is in"`
 	DocumentID    string `json:"document_id" doc:"The tracking identifier of that document"`
 }
@@ -220,19 +238,67 @@ func registerUpstream(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-upstream-offers", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/upstream-offers",
-		Summary: "List what an upstream offers for review",
-		Description: "The statements this product's upstream publishes that depend on its own " +
-			"build, beside each open finding here they speak about: the same issue, at a " +
+		OperationID: "list-upstream-offers", Method: http.MethodGet, Path: "/v1/upstream-offers",
+		Summary: "List what upstreams offer for review",
+		Description: "The statements the upstreams of the products here publish that depend on " +
+			"their own build, beside each open finding they speak about: the same issue, at a " +
 			"component of the same name and version. None of these closes anything by itself. " +
 			"Propose a claim from one, passing it as from_statement, or decline it.\n\n" +
 			"A finding somebody here has decided about, or a statement somebody declined, is " +
 			"not listed. At most 200, oldest statement first.",
 		Tags: []string{"Triage"},
-	}, core.PerProduct, "", core.ReadRights()...), func(ctx context.Context, input *struct {
-		Product string `path:"product"`
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`
 	}) (*core.ListOutput[OfferBody], error) {
+		subject, err := core.Requester(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var productID int64
+		if input.Product != "" {
+			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			productID = product.ID
+		}
+		offers, err := finding.NewStore(in.DB.DB).Offers(ctx, subject, productID)
+		if err != nil {
+			return nil, core.Asked(in.Logger, err)
+		}
+		named, err := productNames(ctx, in, offers)
+		if err != nil {
+			return nil, err
+		}
+		out := &core.ListOutput[OfferBody]{}
+		out.Body.Items = make([]OfferBody, 0, len(offers))
+		for _, one := range offers {
+			out.Body.Items = append(out.Body.Items, OfferBody{
+				Statement: one.Statement, Finding: one.Finding, Product: named[one.Product],
+				Stream: one.Stream, Variant: one.Variant,
+				Publisher: one.Publisher, Issue: one.Issue, Component: one.Component,
+				Version: one.Version, Status: one.Status, Justification: one.Justified,
+				Reasoning: one.Reasoning, Within: one.Within, Document: one.Document,
+				DocumentID: one.Identifier,
+			})
+		}
+		return out, nil
+	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-upstream-statements", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/components/{component}/upstream-statements",
+		Summary: "List what an upstream says about a component",
+		Description: "The statements the upstream this product trusts publishes about a " +
+			"component of this name, at any version, newest first, declined ones included. A " +
+			"statement holding for anybody that says not affected or fixed closes the findings " +
+			"of its issue on the component at its version at the next scan, unless it is " +
+			"declined. At most 200.",
+		Tags: []string{"Triage"},
+	}, core.PerProduct, "", core.ReadRights()...), func(ctx context.Context, input *struct {
+		Product   string `path:"product"`
+		Component string `path:"component"`
+	}) (*core.ListOutput[UpstreamSaidBody], error) {
 		subject, err := core.Requester(ctx)
 		if err != nil {
 			return nil, err
@@ -241,18 +307,18 @@ func registerUpstream(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		offers, err := finding.NewStore(in.DB.DB).Offers(ctx, subject, product.ID)
+		said, err := finding.NewStore(in.DB.DB).UpstreamSaid(ctx, subject, product.ID, input.Component)
 		if err != nil {
 			return nil, core.Asked(in.Logger, err)
 		}
-		out := &core.ListOutput[OfferBody]{}
-		out.Body.Items = make([]OfferBody, 0, len(offers))
-		for _, one := range offers {
-			out.Body.Items = append(out.Body.Items, OfferBody{
-				Statement: one.Statement, Finding: one.Finding, Publisher: one.Publisher,
-				Issue: one.Issue, Component: one.Component, Version: one.Version,
-				Status: one.Status, Justification: one.Justified, Reasoning: one.Reasoning,
-				Within: one.Within, Document: one.Document, DocumentID: one.Identifier,
+		out := &core.ListOutput[UpstreamSaidBody]{}
+		out.Body.Items = make([]UpstreamSaidBody, 0, len(said))
+		for _, one := range said {
+			out.Body.Items = append(out.Body.Items, UpstreamSaidBody{
+				Statement: one.ID, Publisher: one.Publisher, Issue: one.Vulnerability,
+				Version: one.About, Status: one.Status, Justification: one.Justification,
+				Reasoning: one.Statement, ForAnybody: one.Placement == finding.PlacedAnybody,
+				Declined: one.DeclinedAt != nil, Document: one.Document, DocumentID: one.Identifier,
 			})
 		}
 		return out, nil
@@ -323,6 +389,22 @@ func declineHandler(in core.Deps, decline bool) func(context.Context, *struct {
 		}
 		return &struct{}{}, nil
 	}
+}
+
+// productNames is the name of each product the offers are in.
+func productNames(ctx context.Context, in core.Deps, offers []finding.Offer) (map[int64]string, error) {
+	named := map[int64]string{}
+	for _, one := range offers {
+		if _, ok := named[one.Product]; ok {
+			continue
+		}
+		product, err := in.Catalog(in.DB.DB).ProductByID(ctx, one.Product)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "the products could not be named", err)
+		}
+		named[one.Product] = product.Name
+	}
+	return named, nil
 }
 
 // inspect reads an upstream's description, answering a refusal a caller can

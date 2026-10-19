@@ -735,6 +735,7 @@ and the act hangs off it.
 | It carries where the component sits in the graph | What pulls it in, what it pulls in, and twelve weeks of what opened and closed under it. Somebody arriving from the tree asked a question about the graph, and answering it on a page they have to leave to reach is the same page drawn twice |
 | Where to read about the package is built from its identifier | An identifier already names the ecosystem and the name within it, and each ecosystem has one address where a package is read about. Nothing is fetched and nothing is stored — the same way the issue records are worked out. An ecosystem with no address offers none rather than a guess, and a name is encoded into the path because it came out of a scan file |
 | The graph is answered for one build, picked from the rows above | An edge is a fact about one build: the same library is pulled in by different things in different builds. A link naming a build arrives on it, so the tree opens the component on the graph somebody was already looking at |
+| What the product's upstream says about the component is a card of its own | Every statement standing about a component of this name, at any version: the issue, the version, what it says, and the statement's mark, link and decline control. Drawn only where the upstream says something |
 | A container image lists the versions each build stated for it | An image is identified by its name and carries no version of its own (`DESIGN-data-model.md` § Container images), so what each build stamped it with, newest first, is listed beside the package with the dates each was stated across. The first five are shown and the rest counted, because a nightly build stamps a new one every night |
 
 It is where an upgrade is promised, on the terms `DESIGN-triage.md` sets: the
@@ -865,6 +866,12 @@ applies, the words are labeled as the workaround: the finding stays work, and
 those words are the thing to apply. The words are a third party's and shown,
 never rendered, as a publisher's are. The findings list asks for these with
 "Build says", whose "affected" gathers the workarounds.
+
+An upstream's statement carries what it is here, beside the publisher: applying
+here by itself, offered for review, or declined; a link to the document the
+upstream published, where the address is one to send a reader to; and, for
+somebody who triages, a control that declines it or takes that back
+(`DESIGN-upstream.md` § Declined statements).
 
 A publisher's claim carries the version it was made about. A supplier's
 advisory names the version that carries the fix, which is not the version
@@ -1120,6 +1127,7 @@ Every tab carries its count, read from its own list without the filters.
 | **A To reaffirm tab lists the reader's own lapsed claims** | Work handed back, which the lapse message links to. One row per claim with why it lapsed — the code moved, rated worse and between which bands, or both — its outcome and justification, the issue, the component, the product, how many places and when. Rows are ticked across pages; Reaffirm N opens one box for the reason every claim shares, and the result says how many were re-made and how many wait for a second person. The tab carries its count like every other tab |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
 | **Rulings on vulnerability reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may read reports in, and narrowed with the rest where the address names a product |
+| **What upstreams offer for review sits underneath, with the other sections** | One entry per statement and open finding it speaks about: the issue and component, which opens the finding, where the statement starts a claim; the build; what the upstream says; and the statement's mark, link and decline control. Across the products the reader reads, narrowed with the rest where the address names a product, and drawn only where something is offered (`DESIGN-upstream.md` § Offers for review) |
 | **A section named in the address is brought into view** | The ratings, the disclosure dates and the rulings each carry a name, and a link to one of them lands on it |
 
 The queue narrows to one product, which is what a figure on the home screen
@@ -1240,6 +1248,7 @@ is what the screen is about.
 | **What is open is counted when it is asked for** | It is counted over the findings and is the whole cost of a catalog read: 0.39s for a list of two products against 1ms for a liveness probe, and 0.39s against 0.24s for a product holding 8,839 findings against one holding 28. The three screens that draw the column ask for it; the pickers that read the same lists for their names do not, and were paying it on every open. **Absent rather than zero where nobody asked** — these screens render a missing number as "0", and a variant holding twenty-five reported as clean is the failure the count was added to fix |
 | A product row says what it triages from | An administrator changes it there. Everybody sees it because it explains a number, and "deployment's" is shown rather than the deployment's current word, because following it and stating it are different things |
 | A product row says whether its documents are published | A box an administrator ticks, and a word for everybody else. What publishing serves is `DESIGN-publishing.md`'s |
+| A product row opens the upstream it trusts | An administrator's row action opens a drawer: the upstream as trusted, how reading it is going, a key it offers in place of the trusted one, a control to stop trusting it, and a field to name one. Naming one is two steps, check and then trust, so the key documents will be checked against is shown before anything is read. What an upstream is, is `DESIGN-upstream.md`'s |
 | A product, a release and a variant are each corrected and retired from the list that declares them | An administrator edits a name, or takes the thing out of use, from the row. The release list of variants is what a release was built as rather than what the product declares, so it carries no control: correcting one thing in two places is how the two come to disagree |
 | A product's edit offers both of its names and says which one is fixed by publication | The name scans and documents use, and the name screens show. They move independently and only the first can be refused, so offering them together with one sentence beside them is what makes the difference visible at the moment somebody types |
 | A retired product says so on its own page | Nothing lists it, so the page is reached by a link somebody kept. Unmarked it reads as a product in use whose scans have quietly stopped. It is not the out-of-support date shown beside it: that is a date support ended on, and this is not tracked here at all |

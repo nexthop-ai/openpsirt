@@ -6282,6 +6282,28 @@ components:
       required:
         - items
       type: object
+    ListBodyUpstreamSaidBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyUpstreamSaidBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/UpstreamSaidBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyVariantBody:
       additionalProperties: false
       properties:
@@ -7182,6 +7204,9 @@ components:
         justification:
           description: The reason the upstream gives for a status of not affected
           type: string
+        product:
+          description: The product the finding is in, by name
+          type: string
         publisher:
           description: The upstream that published it
           type: string
@@ -7195,6 +7220,12 @@ components:
         status:
           description: What the upstream says, in the VEX format's own words
           type: string
+        stream:
+          description: The branch or tag of the build the finding is in
+          type: string
+        variant:
+          description: The variant of the build the finding is in
+          type: string
         version:
           description: The version the upstream and this product both ship
           type: string
@@ -7204,6 +7235,9 @@ components:
       required:
         - statement
         - finding
+        - product
+        - stream
+        - variant
         - publisher
         - issue
         - component
@@ -9884,9 +9918,15 @@ components:
         at:
           description: The moment it was uploaded here
           type: string
+        declined:
+          description: Whether somebody here declined it, so it closes nothing and is offered to nobody
+          type: boolean
         document:
           description: The document it came from
           type: string
+        for_anybody:
+          description: Whether an upstream this product trusts publishes it as holding for anybody shipping the component. Such a statement saying not affected or fixed closes the findings of that issue on that component, at that version, at the next scan
+          type: boolean
         id:
           description: Pass as from_statement when starting a decision from this, so a later revision can be noticed
           format: int64
@@ -11658,6 +11698,53 @@ components:
         - url
         - publisher
         - trusted_at
+      type: object
+    UpstreamSaidBody:
+      additionalProperties: false
+      properties:
+        declined:
+          description: Whether somebody here declined it, so it closes nothing and is offered to nobody
+          type: boolean
+        document:
+          description: The address of the document it is in
+          type: string
+        document_id:
+          description: The tracking identifier of that document
+          type: string
+        for_anybody:
+          description: Whether it holds for anybody shipping the component, rather than depending on the upstream's own build
+          type: boolean
+        issue:
+          description: The issue, as the upstream named it
+          type: string
+        justification:
+          description: The reason the upstream gives for a status of not affected
+          type: string
+        publisher:
+          description: The upstream that published it
+          type: string
+        reasoning:
+          description: The upstream's own words
+          type: string
+        statement:
+          description: The statement, by its identifier
+          format: int64
+          type: integer
+        status:
+          description: What the upstream says, in the VEX format's own words
+          type: string
+        version:
+          description: The version of the component it is about
+          type: string
+      required:
+        - statement
+        - publisher
+        - issue
+        - status
+        - for_anybody
+        - declined
+        - document
+        - document_id
       type: object
     UpwardBody:
       additionalProperties: false
@@ -18585,6 +18672,47 @@ paths:
         scope: product
         any_of:
           - public-triage
+          - private-triage
+  /v1/products/{product}/components/{component}/upstream-statements:
+    get:
+      description: |-
+        The statements the upstream this product trusts publishes about a component of this name, at any version, newest first, declined ones included. A statement holding for anybody that says not affected or fixed closes the findings of its issue on the component at its version at the next scan, unless it is declined. At most 200.
+
+        Requires: public-read or public-triage or private-read or private-triage on the product
+      operationId: list-upstream-statements
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: component
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyUpstreamSaidBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what an upstream says about a component
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
           - private-triage
   /v1/products/{product}/end-of-life:
     put:
@@ -27005,44 +27133,6 @@ paths:
         - Administration
       x-openpsirt-requires:
         scope: deployment
-  /v1/products/{product}/upstream-offers:
-    get:
-      description: |-
-        The statements this product's upstream publishes that depend on its own build, beside each open finding here they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
-
-        A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
-
-        Requires: public-read or public-triage or private-read or private-triage on the product
-      operationId: list-upstream-offers
-      parameters:
-        - in: path
-          name: product
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListBodyOfferBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: List what an upstream offers for review
-      tags:
-        - Triage
-      x-openpsirt-requires:
-        scope: product
-        any_of:
-          - public-read
-          - public-triage
-          - private-read
-          - private-triage
   /v1/products/{product}/upstream/inspection:
     post:
       description: |-
@@ -29361,6 +29451,42 @@ paths:
       summary: List findings nobody is dealing with
       tags:
         - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/upstream-offers:
+    get:
+      description: |-
+        The statements the upstreams of the products here publish that depend on their own build, beside each open finding they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
+
+        A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-upstream-offers
+      parameters:
+        - description: Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyOfferBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what upstreams offer for review
+      tags:
+        - Triage
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.

@@ -31,6 +31,11 @@ type SaidBody struct {
 	// it does not apply, so that offers a will-not-fix and never a dismissal.
 	// A statement naming a version offers nothing against a different one.
 	Offers OutcomeOffered `json:"offers,omitempty" doc:"The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself"`
+	// ForAnybody and Declined are what an upstream's statement is here: one
+	// holding for anybody shipping the component closes what it speaks for,
+	// unless somebody here declined it.
+	ForAnybody bool `json:"for_anybody,omitempty" doc:"Whether an upstream this product trusts publishes it as holding for anybody shipping the component. Such a statement saying not affected or fixed closes the findings of that issue on that component, at that version, at the next scan"`
+	Declined   bool `json:"declined,omitempty" doc:"Whether somebody here declined it, so it closes nothing and is offered to nobody"`
 }
 
 // Cited is a VEX statement's identifier as a citation, or none where

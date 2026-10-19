@@ -76,6 +76,26 @@ type world struct {
 // later openssl, with both issues reported.
 func newWorld(t *testing.T, f *fixture.World) *world {
 	t.Helper()
+	w := bare(t, f)
+	w.ship(w.Target, sonicRoot, sonicRoot, openssl, sonicRoot, swss, swss, libnl)
+	w.report(w.Target, portable, openssl, ownBuild, libnl)
+	w.decide(w.Target, portable, openssl.Name, triage.CodeNotPresent)
+	w.decide(w.Target, ownBuild, libnl.Name, triage.CodeNotInExecutePath)
+	if err := w.Catalog.SetPublishes(t.Context(), w.Product.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	w.write()
+
+	w.ship(w.forkBuild, forkRoot, forkRoot, openssl, forkRoot, swss, swss, libnl)
+	w.ship(w.forkLater, forkNext, forkNext, opensslNext, forkNext, swss, swss, libnl)
+	w.rescan()
+	return w
+}
+
+// bare is the two products, the people, the fork's two builds declared and
+// nothing shipped, and the upstream's surface standing.
+func bare(t *testing.T, f *fixture.World) *world {
+	t.Helper()
 	db := f.DB.DB
 	w := &world{
 		World: f, t: t, findings: finding.NewStore(db), decisions: triage.NewStore(db),
@@ -95,25 +115,11 @@ func newWorld(t *testing.T, f *fixture.World) *world {
 	}
 	w.proposer, w.approver = person("ana@example.com", false), person("ben@example.com", false)
 	w.admin = person("root@example.com", true)
-
-	w.ship(w.Target, sonicRoot, sonicRoot, openssl, sonicRoot, swss, swss, libnl)
-	w.report(w.Target, portable, openssl, ownBuild, libnl)
-	w.decide(w.Target, portable, openssl.Name, triage.CodeNotPresent)
-	w.decide(w.Target, ownBuild, libnl.Name, triage.CodeNotInExecutePath)
-	if err := w.Catalog.SetPublishes(t.Context(), w.Product.ID, true); err != nil {
-		t.Fatal(err)
-	}
 	w.server = serve(t, w)
-	w.write()
-
 	w.forkBuild = w.TargetFor(w.DeclareStream(w.fork, "main", catalog.Branch, nil),
 		w.DeclareVariant(w.fork, "x86", true))
 	w.forkLater = w.TargetFor(w.DeclareStream(w.fork, "next", catalog.Branch, nil),
 		w.DeclareVariant(w.fork, "arm", true))
-	w.ship(w.forkBuild, forkRoot, forkRoot, openssl, forkRoot, swss, swss, libnl)
-	w.ship(w.forkLater, forkNext, forkNext, opensslNext, forkNext, swss, swss, libnl)
-	w.rescan()
-
 	w.reader = upstream.NewReader(db, sbom.Limits{})
 	w.reader.Roots = w.server.roots
 	return w
@@ -188,8 +194,8 @@ func (w *world) decide(target *catalog.Target, issue, component string, why tria
 	w.claim(target, issue, component, triage.NotApplicable, why)
 }
 
-// claim records a claim at every open place of an issue in one component of a
-// build, agreed by the second person where it needs one.
+// claim records one claim at every open place of an issue in one component of
+// a build, agreed by the second person where it needs one.
 func (w *world) claim(target *catalog.Target, issue, component string, outcome triage.Outcome,
 	why triage.Justification) {
 
@@ -209,21 +215,30 @@ func (w *world) claim(target *catalog.Target, issue, component string, outcome t
 		Scan(ctx); err != nil || len(open) == 0 {
 		w.t.Fatalf("%s is open at %d places of %s: %v", issue, len(open), component, err)
 	}
-	at, err := w.findings.PlaceFor(ctx, w.proposer, target.ID, vulnerability, open[0].PlaceIdentity)
-	if err != nil {
-		w.t.Fatal(err)
+	var proposals []triage.Proposal
+	placed := map[string]bool{}
+	for _, one := range open {
+		if placed[one.PlaceIdentity] {
+			continue
+		}
+		placed[one.PlaceIdentity] = true
+		at, err := w.findings.PlaceFor(ctx, w.proposer, target.ID, vulnerability, one.PlaceIdentity)
+		if err != nil {
+			w.t.Fatal(err)
+		}
+		proposals = append(proposals, triage.Proposal{
+			Place: triage.Place{
+				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
+				PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
+				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
+				OnTag: at.OnTag,
+			},
+			Outcome: outcome, Justification: why,
+			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
+			BindingAcross: []int64{target.ID},
+		})
 	}
-	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, []triage.Proposal{{
-		Place: triage.Place{
-			ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-			PlaceIdentity: at.PlaceIdentity, Visibility: at.Visibility,
-			ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
-			OnTag: at.OnTag,
-		},
-		Outcome: outcome, Justification: why,
-		Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
-		BindingAcross: []int64{target.ID},
-	}})
+	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, proposals)
 	if err != nil {
 		w.t.Fatal(err)
 	}

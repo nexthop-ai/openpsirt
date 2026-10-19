@@ -26,7 +26,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
 | [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
-| [Upstream statements](#upstream-statements) | Off | Naming an upstream on a product's page under Products |
+| [Upstream statements](#upstream-statements) | Off | Naming an upstream from a product's row under Products |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
 | [Chat](#chat) | Off | `OPENPSIRT_SLACK_TOKEN`, or the three Zulip settings |
@@ -971,8 +971,8 @@ neither is read unchecked.
 ## Upstream statements
 
 A product that forks another project may trust the VEX statements that
-project publishes. Off unless an administrator names an upstream, on the
-product's page under Products. One upstream per product.
+project publishes. Off unless an administrator names an upstream, from the
+product's row under Products. One upstream per product.
 
 The upstream is named by the address of its CSAF provider description, for
 example `https://psirt.example.org/.well-known/csaf/provider-metadata.json`

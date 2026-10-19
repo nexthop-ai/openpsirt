@@ -752,7 +752,9 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 				Status: one.Status, About: one.About,
 				Justification: one.Justification, Statement: one.Statement,
 				Document: one.Document, At: one.UploadedAt.UTC().Format(time.DateOnly),
-				Offers: core.OutcomeOffered(offers),
+				Offers:     core.OutcomeOffered(offers),
+				ForAnybody: one.Placement == finding.PlacedAnybody,
+				Declined:   one.DeclinedAt != nil,
 			})
 		}
 		return &struct{ Body EvidenceBody }{Body: body}, nil

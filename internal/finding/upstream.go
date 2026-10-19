@@ -103,6 +103,9 @@ func (s *Store) setDeclined(ctx context.Context, subject access.Subject, stateme
 // same name and version. It is offered for review and never applied by itself.
 type Offer struct {
 	Statement  int64  `bun:"statement_id"`
+	Product    int64  `bun:"product_id"`
+	Stream     string `bun:"stream"`
+	Variant    string `bun:"variant"`
 	Finding    int64  `bun:"finding_id"`
 	Publisher  string `bun:"publisher"`
 	Issue      string `bun:"issue"`
@@ -122,32 +125,53 @@ type Offer struct {
 // page past this is not read.
 const MostOffers = 200
 
-// Offers is what an upstream this product trusts says about open findings
-// here that depends on its own build, and nobody here has decided or
-// declined, oldest statement first.
+// Offers is what the upstreams of the products here say about their open
+// findings that depends on their own build, and nobody here has decided or
+// declined, oldest statement first. One product where productID names one,
+// and every product the subject reads disclosed work in where it is zero.
 //
 // Matched on the issue's own name or any name it goes by, the component's
 // name and its version: the upstream named a build of its own, and a fork
 // shipping the same component at the same version is where a reviewer asks
-// whether the same reasoning holds.
+// whether the same reasoning holds. Disclosed findings only: a scanner's
+// finding is disclosed, and an upstream speaks about nothing else.
 func (s *Store) Offers(ctx context.Context, subject access.Subject, productID int64) ([]Offer, error) {
-	visible, err := access.Readable(subject, productID)
-	if err != nil {
-		return nil, err
+	var products []int64
+	all := false
+	if productID != 0 {
+		if !subject.Reads(access.Public, productID) {
+			return nil, access.Denied("read what an upstream offers")
+		}
+		products = []int64{productID}
+	} else {
+		var known []int64
+		known, all = subject.Products()
+		for _, id := range known {
+			if subject.Reads(access.Public, id) {
+				products = append(products, id)
+			}
+		}
+		if !all && len(products) == 0 {
+			return nil, nil
+		}
 	}
 	issued := `SELECT "vv"."id" FROM "vulnerability" AS "vv" WHERE "vv"."identifier_folded" = "ss"."vulnerability"
 		UNION SELECT "vl"."vulnerability_id" FROM "vulnerability_alias" AS "vl"
 		WHERE "vl"."identifier_folded" = "ss"."vulnerability"`
 	var out []Offer
-	err = s.db.NewSelect().
+	q := s.db.NewSelect().
 		TableExpr(`"vex_statement" AS "ss"`).
 		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
 		Join(`JOIN "finding" AS "f" ON "f"."component_id" = "c"."id"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" AND "st"."product_id" = "ss"."product_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(WordsJoin("ss")).
 		ColumnExpr(`"ss"."id" AS "statement_id"`).
+		ColumnExpr(`"st"."name" AS "stream"`).
+		ColumnExpr(`"va"."name" AS "variant"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."id" AS "finding_id"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
@@ -161,22 +185,48 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		ColumnExpr(`COALESCE("ss"."within", '') AS "within"`).
 		ColumnExpr(`COALESCE("ss"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn+` AS "reasoning"`).
-		Where(`"ss"."product_id" = ?`, productID).
 		Where(`"ss"."source" = ?`, FromUpstream).
 		Where(`"ss"."placement" IS NULL`).
 		Where(`"ss"."superseded_at" IS NULL`).
 		Where(`"ss"."declined_at" IS NULL`).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`"f"."visibility" = ?`, access.Public).
 		Where(`"f"."vulnerability_id" IN (`+issued+`)`).
-		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+` WHERE `+DecisionAt("?")+`
+		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+` WHERE `+DecisionAt(`"st"."product_id"`)+`
 			AND "de"."live_key" IS NOT NULL AND "de"."state" IN (?))`,
-			productID, bun.List([]string{"approved", "proposed"})).
+			bun.List([]string{"approved", "proposed"})).
 		OrderExpr(`"ss"."id", "f"."id"`).
-		Limit(MostOffers).
-		Scan(ctx, &out)
+		Limit(MostOffers)
+	if !all {
+		q = q.Where(`"ss"."product_id" IN (?)`, bun.List(products))
+	}
+	err := q.Scan(ctx, &out)
 	if err != nil {
 		return nil, fmt.Errorf("read what an upstream offers for review: %w", err)
 	}
 	return out, nil
+}
+
+// UpstreamSaid is what an upstream this product trusts says about a component
+// of one name, standing statements only, declined ones included, newest
+// first.
+func (s *Store) UpstreamSaid(ctx context.Context, subject access.Subject, productID int64,
+	component string) ([]Statement, error) {
+
+	if !subject.Reads(access.Public, productID) {
+		return nil, access.Denied("read what an upstream says")
+	}
+	var said []Statement
+	err := withWords(s.db.NewSelect().Model(&said)).
+		Where(`"ss"."product_id" = ?`, productID).
+		Where(`"ss"."source" = ?`, FromUpstream).
+		Where(`"ss"."component" = ?`, folded(component)).
+		Where(`"ss"."superseded_at" IS NULL`).
+		OrderExpr(`"ss"."id" DESC`).
+		Limit(MostOffers).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read what an upstream says about a component: %w", err)
+	}
+	return said, nil
 }

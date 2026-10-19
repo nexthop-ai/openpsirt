@@ -3,6 +3,7 @@
 
 import { notACredential } from "../ui/noautofill";
 import { WaitingRulings } from "./InboxRuling";
+import { UpstreamOffers } from "./QueueOffers";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -448,6 +449,10 @@ export function Queue() {
           dismissal does, and this is where somebody goes to be one. Narrowed
           to the products the reader may work reports in. */}
       <WaitingRulings product={product || undefined} />
+
+      {/* An upstream's statement that depends on its own build waits for a
+          person the way a claim does, and this is where somebody finds it. */}
+      <UpstreamOffers product={product || undefined} />
     </>
   );
 }

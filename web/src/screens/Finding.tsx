@@ -37,6 +37,7 @@ import { useDecisionPrefill } from "./findingPrefill";
 import { FindingWhich } from "./FindingWhich";
 import { buildFindingsAt, claimAt, componentAt, issueAt, productFindingsAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
+import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
 // sits, the evidence — and the working screen for deciding it, before and
@@ -872,7 +873,7 @@ export function Finding() {
               <div className="card">
                 <h3>Publisher statements</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  Evidence only. Nothing here is decided or counted from it.
+                  Evidence. Only what is marked as applying here closes anything.
                 </p>
                 {publishers.map((one, i) => (
                   <div key={`${one.publisher} ${i}`} className="prior">
@@ -888,7 +889,16 @@ export function Finding() {
                         {one.justification && <> · {one.justification.replaceAll("_", " ")}</>}
                         {one.identifier && <> · {one.identifier}</>}
                         {one.at && <> · {on(one.at)}</>}
-                      </span>
+                      </span>{" "}
+                      {one.source === "upstream" && (
+                        <UpstreamSaid
+                          statement={one.id ?? 0}
+                          forAnybody={!!one.for_anybody}
+                          declined={!!one.declined}
+                          document={one.document ?? ""}
+                          mayTriage={mayTriage}
+                        />
+                      )}
                     </header>
                     {/* The publisher's own prose, arriving in a document they
                       published: a third party's text reaching the people who

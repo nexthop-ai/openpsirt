@@ -23,6 +23,7 @@ reasons; the outbound client is in `DESIGN-access.md`.
 - [Offers for review](#offers-for-review)
 - [Declined statements](#declined-statements)
 - [Settings](#settings)
+- [Measurements](#measurements)
 - [Choices beyond the decisions](#choices-beyond-the-decisions)
 - [Limits](#limits)
 
@@ -159,6 +160,22 @@ never applied by itself.
 | Setting | Default | What it does |
 |---|---|---|
 | How often an upstream is read again | One hour | What an upstream withdraws stops closing findings here after the next read. A read whose listings have not moved is one request per listing |
+
+## Measurements
+
+The full-size switch image shipped by the upstream and by a fork on
+PostgreSQL, every component with a package identifier carrying one issue:
+6,843 issues at components. The upstream agrees 76 of the distribution packages'
+issues do not apply because the code is not there, and publishes, signed. The
+fork reads it over TLS from a server on the same machine.
+
+| Measured | |
+|---|---|
+| Documents read and recorded on the first read | 76, every one holding for anybody, each checked against its digest and its signature |
+| The first read | 0.40 s |
+| A read over nothing that moved | 18 ms, one request for the description and one for the feed, answered that nothing moved |
+| The fork's run over its build | 0.58 s before it trusts the upstream, 0.60 s with the 76 statements standing |
+| Findings that run closes | 508: the 76 issues at every place the image ships them |
 
 ## Choices beyond the decisions
 

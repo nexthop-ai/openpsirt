@@ -24,6 +24,9 @@ import { ExploitedHere, Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
 import { binaries, findingsAt, openIssues, promiseLinks } from "./componentLinks";
+import { useUpstreamSaid } from "../api/upstream";
+import { mayOf, useWho } from "../app/session";
+import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One source package, and the one piece of work it is.
 //
@@ -359,8 +362,62 @@ export function Component() {
 
       <Ships product={product} rows={rows} here={here} />
 
+      <UpstreamStatements product={product} component={component} />
+
       <History product={product} pkg={pkg} here={here} />
     </>
+  );
+}
+
+// What the upstream this product trusts says about this component, at any
+// version. Drawn only where it says something.
+function UpstreamStatements({ product, component }: { product: string; component: string }) {
+  const said = useUpstreamSaid(product, component);
+  const who = useWho();
+  const mayTriage = !!mayOf(who.data, product)?.triages_public;
+  const rows = said.data?.items ?? [];
+  if (said.isError)
+    return <Failed error={said.error} what="What the upstream says could not be read." />;
+  if (rows.length === 0) return null;
+  return (
+    <div className="card">
+      <h3>Upstream statements</h3>
+      <Wide>
+        <table>
+          <thead>
+            <tr>
+              <th>Issue</th>
+              <th>Version</th>
+              <th>Says</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((one) => (
+              <tr key={one.statement} className="row">
+                <td className="id">{one.issue.toUpperCase()}</td>
+                <td className="id">{one.version || "any"}</td>
+                <td title={one.reasoning || undefined}>
+                  {one.publisher}: {one.status.replace("_", " ")}
+                  {one.justification && (
+                    <span className="hint"> · {one.justification.replaceAll("_", " ")}</span>
+                  )}
+                </td>
+                <td>
+                  <UpstreamSaid
+                    statement={one.statement}
+                    forAnybody={one.for_anybody}
+                    declined={one.declined}
+                    document={one.document}
+                    mayTriage={mayTriage}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Wide>
+    </div>
   );
 }
 
