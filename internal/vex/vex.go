@@ -42,6 +42,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
@@ -743,6 +744,10 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Where(`"ss"."superseded_at" IS NULL`).
+		// Said as not affected, so only what said that. An upstream's
+		// statement that a component is fixed closes a place too, and is
+		// not a statement that it is unaffected.
+		Where(`"ss"."status" = ?`, string(sbom.NotAffected)).
 		// What the place holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
 		Where(finding.LatestAtItsPlace).

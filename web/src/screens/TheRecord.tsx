@@ -636,6 +636,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
   catalog: "Catalog",
   "exploited-here": "Exploited here",
   merge: "Merged issues",
+  upstream: "Upstreams",
 };
 const CHANGE_KINDS = Object.entries(CHANGE_SAID) as [ChangeKind, string][];
 

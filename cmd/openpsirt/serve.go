@@ -29,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
+	"github.com/nexthop-ai/openpsirt/internal/upstream"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 )
 
@@ -73,6 +74,8 @@ type passes struct {
 	upstream *currency.Refresher
 	// suppliers reads what configured publishers say about their own flaws.
 	suppliers *supplier.Pass
+	// forks reads what the upstream each product trusts publishes.
+	forks *upstream.Pass
 	// branches looks up which branches the commits patch links name are on.
 	branches *patchbranch.Pass
 	// records keeps the CVE record snapshot current. Nil where fetching is
@@ -137,6 +140,7 @@ func (p passes) loops() []loop {
 		{"schedule rescans", p.schedule.Run, scheduleInterval},
 		{"ask upstream what is current", p.upstream.Run, askInterval},
 		{"read what suppliers publish", p.suppliers.Run, scheduleInterval},
+		{"read what upstreams publish", p.forks.Run, scheduleInterval},
 		{"look up the branches patches are on", p.branches.Run, 0},
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},

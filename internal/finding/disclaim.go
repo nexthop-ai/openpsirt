@@ -58,6 +58,10 @@ type disclaiming struct {
 	said     []Statement
 	byIssue  map[string][]int
 	affected map[affectedAt]bool
+	// decided is every place a person has decided about, whatever they
+	// decided, read only where an upstream's statement could close one. A
+	// local decision stands over an upstream's word either way.
+	decided map[affectedAt]bool
 	*placer
 }
 
@@ -229,7 +233,7 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	err := db.NewSelect().Model(&d.said).
 		Where(`"ss"."product_id" = ?`, productID).
 		Where(`"ss"."superseded_at" IS NULL`).
-		Where(`"ss"."status" = ?`, string(sbom.NotAffected)).
+		Where(`"ss"."declined_at" IS NULL`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			for from := 0; from < len(names); from += database.BatchSize {
 				q = q.WhereOr(`"ss"."vulnerability" IN (?)`,
@@ -238,8 +242,15 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 			return q
 		}).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr(`"ss"."placement" = ? AND "ss"."within_about" IS NOT NULL`, PlacedInside).
-				WhereOr(`"ss"."placement" = ? AND "ss"."about" <> ?`, PlacedProduct, "")
+			// A supplier's word about its own product closes only where it
+			// says not affected. An upstream's word about a component closes
+			// where it says not affected or fixed, at the version it names.
+			return q.WhereOr(`"ss"."status" = ? AND "ss"."placement" = ? AND "ss"."within_about" IS NOT NULL`,
+				string(sbom.NotAffected), PlacedInside).
+				WhereOr(`"ss"."status" = ? AND "ss"."placement" = ? AND "ss"."about" <> ?`,
+					string(sbom.NotAffected), PlacedProduct, "").
+				WhereOr(`"ss"."status" IN (?) AND "ss"."placement" = ? AND "ss"."source" = ? AND "ss"."about" <> ?`,
+					bun.List(UpstreamCloses()), PlacedAnybody, FromUpstream, "")
 		}).
 		Order("ss.id").
 		Scan(ctx)
@@ -252,21 +263,35 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	for i, one := range d.said {
 		d.byIssue[one.Vulnerability] = append(d.byIssue[one.Vulnerability], i)
 	}
-	d.affected, err = affectedPlaces(ctx, db, productID, issueIDs)
+	d.affected, err = standingPlaces(ctx, db, productID, issueIDs, OutcomeAffected)
 	if err != nil {
 		return nil, err
+	}
+	if slices.ContainsFunc(d.said, func(one Statement) bool { return one.Placement == PlacedAnybody }) {
+		if d.decided, err = standingPlaces(ctx, db, productID, issueIDs, ""); err != nil {
+			return nil, err
+		}
 	}
 	return d, nil
 }
 
-// affectedPlaces is every place in this product a person has said one of these
-// issues applies at, by a decision that stands, keyed by the issue a decision
-// is about now, merged issues included.
+// UpstreamCloses is what an upstream's statement says where it closes a
+// finding: that the component at that version is not affected, or is fixed.
+// Nothing else it says closes anything (REQ-31).
+func UpstreamCloses() []string {
+	return []string{string(sbom.NotAffected), string(sbom.AlreadyFixed)}
+}
+
+// standingPlaces is every place in this product a person has decided one of
+// these issues at, by a decision that stands, keyed by the issue a decision is
+// about now, merged issues included. Only decisions of the outcome given,
+// where one is given.
 //
 // A disagreement with a supplier goes through the ordinary route: somebody
-// marks the place affected, and the statement does not close it there.
-func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
-	issueIDs []int64) (map[affectedAt]bool, error) {
+// marks the place affected, and the statement does not close it there. Any
+// decision at all stands over an upstream's statement.
+func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
+	issueIDs []int64, outcome string) (map[affectedAt]bool, error) {
 
 	var rows []struct {
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -276,7 +301,7 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 	}
 	standing, held := InForce()
 	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
-	err := db.NewSelect().
+	q := db.NewSelect().
 		TableExpr(Decisions).
 		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		ColumnExpr(`"dv"."issue_id" AS "vulnerability_id"`).
@@ -284,11 +309,13 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "component"`).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer"`).
 		Where(`"de"."product_id" = ?`, productID).
-		Where(`"cl"."outcome" = ?`, OutcomeAffected).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(standing, held...).
-		Where(issues, ids...).
-		Scan(ctx, &rows)
+		Where(issues, ids...)
+	if outcome != "" {
+		q = q.Where(`"cl"."outcome" = ?`, outcome)
+	}
+	err := q.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where people have said an issue applies: %w", err)
 	}
@@ -307,7 +334,7 @@ func affectedPlaces(ctx context.Context, db bun.IDB, productID int64,
 func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component graph.Component,
 	consumerID int64) (*int64, answer) {
 
-	if len(d.said) == 0 || consumerID == 0 {
+	if len(d.said) == 0 {
 		return nil, answersNone
 	}
 	var candidates []int
@@ -320,9 +347,12 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 	slices.Sort(candidates)
 	candidates = slices.Compact(candidates)
 
+	// Zero is the build's root, which no supplier's product holds; an
+	// upstream speaks for the component wherever it sits, the root included.
 	consumer := d.inv.byID[consumerID]
-	if d.affected[affectedAt{vulnerabilityID, PlaceIdentity(component.Name, consumer.Name),
-		upstreamOf(component), upstreamOf(consumer)}] {
+	here := affectedAt{vulnerabilityID, PlaceIdentity(component.Name, consumer.Name),
+		upstreamOf(component), upstreamOf(consumer)}
+	if d.affected[here] {
 		return nil, answersNone
 	}
 
@@ -330,6 +360,19 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 	described := describedOf(component)
 	for _, i := range candidates {
 		one := d.said[i]
+		if one.Placement == PlacedAnybody {
+			// An upstream speaks for the component wherever it ships, at the
+			// version it names and no other, and never where somebody here
+			// decided.
+			if d.decided[here] || !sameComponent(one, d.asStated(component)) {
+				continue
+			}
+			id := one.ID
+			return &id, answersAll
+		}
+		if consumerID == 0 {
+			continue
+		}
 		product := suppliedProduct(one)
 		if one.Placement == PlacedInside {
 			// A statement about a component inside the product is about that
@@ -360,6 +403,21 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 		return some, answersSome
 	}
 	return nil, answersNone
+}
+
+// sameComponent reports whether an upstream's statement names this component:
+// the same package identifier, its version aside, and the same version. A
+// statement naming no package identifier names nothing here.
+func sameComponent(one Statement, c graph.Component) bool {
+	base, version := graph.PackageOf(one.Purl)
+	if version == "" {
+		version = one.About
+	}
+	held, heldVersion := graph.PackageOf(c.Purl)
+	if heldVersion == "" {
+		heldVersion = c.Version
+	}
+	return base != "" && base == held && version != "" && version == heldVersion
 }
 
 // suppliedProduct is the supplier's product a statement names: the product the

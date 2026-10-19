@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -342,6 +343,40 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "advisory source · mine · ExampleLinux",
 	},
 	{
+		id: "trust-upstream", what: "an upstream trusted", kind: "upstream", about: "upstream · mine",
+		drive: func(t *testing.T, r *httpapitest.Reach, _ *seeded) *httptest.ResponseRecorder {
+			// An upstream to trust, over TLS, and a handler that trusts its
+			// certificate.
+			address, roots := httpapitest.UpstreamAt(t)
+			trusting := r.Rebuilt(func(d *core.Deps) { d.UpstreamRoots = roots })
+			return httpapitest.AsPerson(t, trusting, "admin", http.MethodPut, "/v1/products/mine/upstream",
+				`{"url":"`+address+`"}`)
+		},
+	},
+	{
+		id: "decline-statement", what: "an upstream's statement declined", who: "triager",
+		kind: "upstream", about: "statement · example upstream · cve-2026-0001 · zlib 1.2.11",
+		drive: func(t *testing.T, r *httpapitest.Reach, _ *seeded) *httptest.ResponseRecorder {
+			id := r.UpstreamStatement(t)
+			return httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+				"/v1/statements/"+httpapitest.Itoa(id)+"/declined", "")
+		},
+	},
+	{
+		id: "restore-statement", what: "an upstream's statement restored", who: "triager",
+		kind: "upstream", about: "statement · example upstream · cve-2026-0001 · zlib 1.2.11",
+		drive: func(t *testing.T, r *httpapitest.Reach, _ *seeded) *httptest.ResponseRecorder {
+			id := r.UpstreamStatement(t)
+			return httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
+				"/v1/statements/"+httpapitest.Itoa(id)+"/declined", "")
+		},
+	},
+	{
+		id: "withdraw-upstream", what: "an upstream no longer trusted",
+		method: http.MethodDelete, path: "/v1/products/mine/upstream",
+		kind: "upstream", about: "upstream · mine",
+	},
+	{
 		id: "add-collaborator", what: "somebody brought into a case", who: "private-triage",
 		method: http.MethodPut,
 		path:   "/v1/products/mine/issues/{issue}/collaborators/reader",
@@ -526,6 +561,9 @@ var administrativeActs = []trailedAct{
 // trailed is the failure this whole table exists to make visible, and the way
 // it would happen is somebody adding a line rather than a call.
 var outsideTheTrail = map[string]string{
+	// Reads an upstream's description for somebody to confirm, and writes
+	// nothing.
+	"inspect-upstream": "writes nothing",
 	// The decision record (REQ-22). Every one of these is a triage judgment
 	// or an argument about one, kept beside the decision it belongs to with
 	// who made it and when.

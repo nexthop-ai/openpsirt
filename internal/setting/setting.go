@@ -325,6 +325,11 @@ const (
 	// state in a sentence.
 	PublishedStatuses = "publishing.statuses"
 
+	// UpstreamEvery is how often the upstream a product trusts is read
+	// again. Shorter than the scan schedule: what an upstream withdraws
+	// should stop closing findings here within hours rather than a day.
+	UpstreamEvery = "upstream.every"
+
 	// AbsentAfter is how long somebody may go without signing in before
 	// work they are holding is worth an administrator's attention.
 	//
@@ -523,6 +528,11 @@ const DefaultScanEvery = 24 * time.Hour
 // bad day is not an alert, and one that stopped answering is noticed in the
 // week it stopped.
 const DefaultSupplierSilentAfter = 7 * 24 * time.Hour
+
+// DefaultUpstreamEvery is how often an upstream is read again where nobody has
+// said. Each read whose listings have not moved is one request per listing,
+// answered that nothing moved.
+const DefaultUpstreamEvery = time.Hour
 
 // DefaultSupplierHistory is how many days before its configuration a supplier
 // is first read from, where nobody has said.

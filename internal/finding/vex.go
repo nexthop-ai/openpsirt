@@ -89,6 +89,11 @@ type Statement struct {
 	UploadedBy int64      `bun:"uploaded_by,notnull"`
 	UploadedAt time.Time  `bun:"uploaded_at,notnull"`
 	Superseded *time.Time `bun:"superseded_at"`
+	// DeclinedAt and DeclinedBy are when somebody here declined the
+	// statement, and who. A declined statement closes nothing and is offered
+	// to nobody, and stays readable.
+	DeclinedAt *time.Time `bun:"declined_at"`
+	DeclinedBy *int64     `bun:"declined_by"`
 }
 
 // withWords reads every column of the statements a query selects, and the
@@ -131,6 +136,9 @@ const (
 	// PlacedProduct is a product named alone, by no package identifier: an
 	// equipment vendor's appliance, or a product spelled as a source tree.
 	PlacedProduct = "product"
+	// PlacedAnybody is a statement an upstream this product trusts publishes
+	// as holding for anybody shipping the component at that version (REQ-84).
+	PlacedAnybody = "anybody"
 )
 
 // packaged reports whether a target is named by the package identifier of an
@@ -151,6 +159,10 @@ const (
 	FromVex = "vex"
 	// FromAdvisory is a supplier's CSAF security advisory.
 	FromAdvisory = "advisory"
+	// FromUpstream is a VEX document an upstream this product trusts
+	// publishes. Like an advisory, it is one document among many and is
+	// replaced by its own name.
+	FromUpstream = "upstream"
 )
 
 // Supplied is where a set of statements came from.
@@ -182,7 +194,7 @@ type Supplied struct {
 // Named here because the API offers it as a closed vocabulary, and a list
 // retyped beside a route is one that drifts from what the store writes.
 func Sources() []string {
-	return []string{FromVex, FromAdvisory}
+	return []string{FromVex, FromAdvisory, FromUpstream}
 }
 
 // VexStatuses are the statuses the exchange format defines, in its own order.
@@ -282,7 +294,7 @@ func (from Supplied) valid() error {
 			return refusal.Errorf("a statement set is a publisher's whole answer and is " +
 				"replaced as one, so it is not identified by a document name")
 		}
-	case FromAdvisory:
+	case FromAdvisory, FromUpstream:
 		if strings.TrimSpace(from.Identifier) == "" {
 			return refusal.Errorf("an advisory is replaced by the name its publisher gave " +
 				"it, and this one carries none")
@@ -397,7 +409,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
 			Where(`"superseded_at" IS NULL`)
-		if from.Source == FromAdvisory {
+		if from.Source != FromVex {
 			heldBy = heldBy.Where(`"document_id" = ?`, identifier)
 		}
 		if err := heldBy.Scan(ctx); err != nil {

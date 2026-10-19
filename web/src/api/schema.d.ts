@@ -4954,6 +4954,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/upstream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a product's upstream
+         * @description The upstream this product trusts the published statements of, the key its documents are checked against, and how reading it is going. Answered 404 where the product trusts none.
+         *
+         *     Requires: administrator
+         */
+        get: operations["get-upstream"];
+        /**
+         * Trust an upstream
+         * @description Records that this product trusts an upstream's published VEX statements, or trusts the upstream's key again after it changed.
+         *
+         *     The upstream is read again on the interval upstream.every names. A statement it publishes as holding for anybody shipping a component closes the findings of that issue on that component, at the version it names, the next time a build is scanned, unless somebody here decided about the place. It closes only where it says not affected or fixed. A statement that depends on the upstream's own build is offered for review and closes nothing.
+         *
+         *     The fingerprint must be the one the upstream names now, which inspecting it answers; another is refused with 409 naming the one served. Leave it empty for an upstream that signs nothing. Every document is checked against the digest served beside it, and against its signature where a key is trusted. A key the upstream changes stops it being read until it is trusted again.
+         *
+         *     Another address replaces the upstream, and everything the one before it said stops closing anything. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        put: operations["trust-upstream"];
+        post?: never;
+        /**
+         * Stop trusting an upstream
+         * @description Stops this product trusting its upstream. Nothing more is read from it, and everything it said stops closing findings and stops being offered: the product's builds are queued to be scanned again, which opens what its statements closed. The statements stay readable where a decision cites one.
+         *
+         *     Answered 404 where the product trusts none. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["withdraw-upstream"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/upstream-offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what an upstream offers for review
+         * @description The statements this product's upstream publishes that depend on its own build, beside each open finding here they speak about: the same issue, at a component of the same name and version. None of these closes anything by itself. Propose a claim from one, passing it as from_statement, or decline it.
+         *
+         *     A finding somebody here has decided about, or a statement somebody declined, is not listed. At most 200, oldest statement first.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product
+         */
+        get: operations["list-upstream-offers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/upstream/inspection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inspect an upstream
+         * @description Reads an upstream's CSAF provider description and the key it names, and answers whose statements they are and the key's fingerprint, for an administrator to confirm before trusting it. Nothing is recorded.
+         *
+         *     The address must be https with a host and no user. Every request goes to that host and follows no redirect. An upstream that cannot be read, or whose key does not carry the fingerprint its description names, is answered 422 saying why.
+         *
+         *     Requires: administrator
+         */
+        post: operations["inspect-upstream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/variants": {
         parameters: {
             query?: never;
@@ -5677,6 +5767,38 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/statements/{statement}/declined": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Decline an upstream's statement
+         * @description Stops one statement an upstream published closing anything here, or being offered for review. The product's builds are queued to be scanned again, which opens what it closed. Recorded in the administrative trail.
+         *
+         *     Only a statement an upstream published may be declined; another is refused with 422. A statement in a product the caller does not triage is answered 404.
+         *
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+         */
+        put: operations["decline-statement"];
+        post?: never;
+        /**
+         * Restore a declined statement
+         * @description Takes back declining one statement an upstream published, so it closes and is offered again. The product's builds are queued to be scanned again. Recorded in the administrative trail.
+         *
+         *     A statement in a product the caller does not triage is answered 404.
+         *
+         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+         */
+        delete: operations["restore-statement"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7091,7 +7213,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -8849,6 +8971,28 @@ export interface components {
         Inside: {
             "@id": string;
         };
+        "Inspect-upstreamRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Inspect-upstreamRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The address of the upstream's CSAF provider description */
+            url: string;
+        };
+        InspectedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/InspectedBody.json
+             */
+            readonly $schema?: string;
+            /** @description The fingerprint of the key its documents are signed with. Empty where it names none */
+            fingerprint?: string;
+            /** @description Whose statements they are, as the provider description names its publisher */
+            publisher: string;
+        };
         InventoryBody: {
             /**
              * Format: int64
@@ -9413,6 +9557,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["NameableBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyOfferBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyOfferBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["OfferBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -10116,6 +10271,38 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ObligationBody"][] | null;
+        };
+        OfferBody: {
+            /** @description The component */
+            component: string;
+            /** @description The address of the document it is in */
+            document: string;
+            /** @description The tracking identifier of that document */
+            document_id: string;
+            /**
+             * Format: int64
+             * @description The open finding it speaks about
+             */
+            finding: number;
+            /** @description The issue */
+            issue: string;
+            /** @description The reason the upstream gives for a status of not affected */
+            justification?: string;
+            /** @description The upstream that published it */
+            publisher: string;
+            /** @description The upstream's own words */
+            reasoning?: string;
+            /**
+             * Format: int64
+             * @description The statement, by its identifier. Pass as from_statement when proposing a claim from it
+             */
+            statement: number;
+            /** @description What the upstream says, in the VEX format's own words */
+            status: string;
+            /** @description The version the upstream and this product both ship */
+            version: string;
+            /** @description What of the upstream's the statement depends on: its build, or what pulls the component in there */
+            within?: string;
         };
         OursOutputBody: {
             /**
@@ -11740,7 +11927,7 @@ export interface components {
              * @description Which kind of document carried it
              * @enum {string}
              */
-            source: "vex" | "advisory";
+            source: "vex" | "advisory" | "upstream";
             /** @description Their reasoning. What a triager otherwise types from memory */
             statement?: string;
             /** @description Their statement, in the format's own vocabulary */
@@ -12501,6 +12688,18 @@ export interface components {
              */
             floor: "everything" | "low" | "medium" | "high" | "critical" | "";
         };
+        "Trust-upstreamRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Trust-upstreamRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The fingerprint of the key its documents are signed with, as inspecting it answered. Empty for an upstream that signs nothing */
+            fingerprint?: string;
+            /** @description The address of the upstream's CSAF provider description */
+            url: string;
+        };
         UnagreedBody: {
             /**
              * Format: int64
@@ -12658,6 +12857,30 @@ export interface components {
             scan_id: number;
             /** @description The identity the inventory carries for itself */
             serial?: string;
+        };
+        UpstreamBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UpstreamBody.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the last attempt stopped, or what it could not take */
+            because?: string;
+            /** @description The fingerprint of the key the upstream's documents are signed with, where it signs them */
+            fingerprint?: string;
+            /** @description A key the upstream now names in place of the trusted one. Nothing is read while the upstream names a key other than the trusted one, and the reason says so */
+            key_offered?: string;
+            /** @description Whose statements they are, as the provider description names its publisher */
+            publisher: string;
+            /** @description When a read of the upstream last succeeded */
+            read?: string;
+            /** @description When the upstream was last tried */
+            tried?: string;
+            /** @description When the upstream, or its key, was last trusted */
+            trusted_at: string;
+            /** @description The address of the upstream's CSAF provider description */
+            url: string;
         };
         UpwardBody: {
             /**
@@ -13070,7 +13293,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -13110,7 +13333,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -20928,6 +21151,167 @@ export interface operations {
             };
         };
     };
+    "get-upstream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "trust-upstream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Trust-upstreamRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpstreamBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-upstream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-upstream-offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyOfferBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "inspect-upstream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Inspect-upstreamRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-variants": {
         parameters: {
             query?: {
@@ -21925,6 +22309,64 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ListBodyProviderBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "decline-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                statement: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "restore-statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                statement: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

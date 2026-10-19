@@ -9,6 +9,7 @@ package core
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -99,6 +100,10 @@ type Deps struct {
 	// Uploads counts the forms this server is reading at once, across every
 	// upload route. One per server, made where the routes are.
 	Uploads *Uploads
+	// UpstreamRoots are the certificate authorities an upstream a product
+	// trusts is checked against when an administrator names it. Nil is the
+	// system's, which is what a deployment uses.
+	UpstreamRoots *x509.CertPool
 	// Published serves the security documents this deployment publishes to
 	// anybody. Nil is a deployment that publishes nothing, whose every path
 	// there answers as one nothing is published at.

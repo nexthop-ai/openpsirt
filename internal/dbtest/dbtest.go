@@ -933,6 +933,10 @@ var tables = []string{
 	"recorded_rating",
 	// Before product, which it points at.
 	"published_document",
+	// Before upstream, which it points at.
+	"upstream_document",
+	// Before product and person, which it points at.
+	"upstream",
 	"personal_token",
 	"person_identity",
 	"group_admin",

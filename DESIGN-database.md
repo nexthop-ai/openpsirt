@@ -496,8 +496,9 @@ stopped attempt already did.
 
 ### The v0.10.0 upgrade
 
-Migration 44. No row moves. § Indexes says what each index serves, and
-`DESIGN-publishing.md` what the published documents are.
+Migration 44. No row moves. § Indexes says what each index serves,
+`DESIGN-publishing.md` what the published documents are, and
+`DESIGN-upstream.md` what an upstream is.
 
 | Table | Gains | Every engine |
 |---|---|---|
@@ -505,6 +506,9 @@ Migration 44. No row moves. § Indexes says what each index serves, and
 | `product` | Whether its security documents are published, false for every product | Added where the table stands, with a default of false, and stepped over where a stopped upgrade added it already |
 | `claim` | Whom a statement published from it holds for, empty for every claim | Added where the table stands, and stepped over where it is already there |
 | `published_document` | A new table: one row per published document, holding the revision a reader is handed | Made by the release's statement, and stepped over where it is already there |
+| `upstream` | A new table: the upstream a product trusts, the key it confirmed, and how reading it went | Made by the release's statement, and stepped over where it is already there |
+| `upstream_document` | A new table: one row per document an upstream lists, at the revision last recorded | Made by the release's statement, and stepped over where it is already there |
+| `vex_statement` | Who here declined a statement and when, empty for every statement | Added where the table stands, and stepped over where it is already there |
 
 | Check, on each of the four engines | What it holds |
 |---|---|

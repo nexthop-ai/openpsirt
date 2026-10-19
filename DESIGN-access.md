@@ -728,6 +728,7 @@ it re-resolves the issuer's name each time.
 | The return address is stated in configuration, not taken from the request | Otherwise it is whatever a caller claimed the host was. A deployment that configured a provider without stating its address does not start |
 | Every request out carries one User-Agent, set where every request passes | A receiver sees one name and somewhere to read about it, and a caller that forgets to set it sends the library's default |
 | An address an administrator configured, a webhook or a chat server, goes through the same client without the address check | https only, no user in the address, no redirect followed. It was typed by the operator rather than read from a document, and REQ-69 lets it reach wherever that is |
+| An upstream an administrator named goes through the same client pinned to its host, without the address check | Its description and feeds name further addresses, and any naming another host is refused before anything is resolved; the host itself is reached wherever it is, as an address typed by the operator is (`DESIGN-upstream.md` § Requests) |
 | An answer read back from a provider is bounded | A profile is a few hundred bytes; a body that never ends is a sign-in that allocates until the process dies |
 
 ## Trusted-header sign-in

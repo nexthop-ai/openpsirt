@@ -46,6 +46,9 @@ func StatementsV0100(engine database.Engine) map[string][]string {
 		"product":            productV0100(t),
 		"claim":              claimV0100(t),
 		"published_document": publishedDocumentV0100(t),
+		"upstream":           upstreamV0100(t),
+		"upstream_document":  upstreamDocumentV0100(t),
+		"vex_statement":      vexStatementV0100(t),
 	}
 }
 

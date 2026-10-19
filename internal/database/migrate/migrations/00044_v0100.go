@@ -35,6 +35,8 @@ func upV0100(ctx context.Context, sqldb *sql.DB) error {
 //   - A claim records whom a statement published from it holds for.
 //   - The security documents served to anybody are kept, one row per
 //     document, holding the revision a reader is handed now.
+//   - A product may trust an upstream, whose documents are read and recorded.
+//   - A third party's statement records who here declined it.
 func upgradeV0100(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -46,6 +48,7 @@ func upgradeV0100(ctx context.Context, tx bun.Tx) error {
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
 		productPublishesV0100, claimScopeV0100, createPublishedDocumentV0100,
+		createUpstreamV0100, statementDeclinedV0100,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

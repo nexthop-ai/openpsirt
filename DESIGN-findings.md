@@ -1103,7 +1103,7 @@ estimate, the scanned build's order and the tag's order.
 | Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: this build never shipped it, the entry named the wrong product, or it duplicates an issue already tracked |
 | Unaffected | The issue's CVE record states the upstream release this place holds is not affected (§ CVE record ranges) |
-| Disclaimed | A supplier states the product this place sits in, at the version the build ships, is not affected, and every route up the tree from the place runs through that product (`DESIGN-triage.md` § Evidence from publishers) |
+| Disclaimed | A supplier states the product this place sits in, at the version the build ships, is not affected, and every route up the tree from the place runs through that product (`DESIGN-triage.md` § Evidence from publishers); or an upstream this product trusts states the component, at the version the build ships, is not affected or is fixed, for anybody shipping it (`DESIGN-upstream.md` § Statements applied) |
 
 Superseded is told apart from Upgraded because they are opposite answers to "was
 this fixed", and conflating them put one issue in a release comparison as both

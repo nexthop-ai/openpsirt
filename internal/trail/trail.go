@@ -85,6 +85,11 @@ const (
 	// withdrawn, or a record of being attacked cleared. Nobody chose which of
 	// the two stands, so what the product lost is asked about afterwards.
 	Merge Kind = "merge"
+	// Upstream is a product starting or stopping trusting an upstream, its
+	// key trusted again, or one of its statements declined or taken back.
+	// Each changes what closes findings here without anybody deciding about
+	// a finding, so who did it is asked afterwards.
+	Upstream Kind = "upstream"
 )
 
 // Kinds is every kind there is, in the order the API offers them.
@@ -96,7 +101,7 @@ const (
 func Kinds() []Kind {
 	return []Kind{
 		Setting, Role, Routing, Support, Release,
-		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere, Merge,
+		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere, Merge, Upstream,
 	}
 }
 

@@ -34,6 +34,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/upstream"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/webui"
 )
@@ -488,7 +489,7 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// Started on every replica and asking on one: the politeness this pass
 	// is built around is a rate per deployment, so which replica asks is
 	// settled by a lease rather than by all of them asking at once.
-	upstream := currency.NewRefresher(db.DB, logger, name, ours)
+	current := currency.NewRefresher(db.DB, logger, name, ours)
 	// Places work nobody holds onto the team a standing rule names. Queued
 	// work rather than part of the request that saved the rule: one rule
 	// sweeps thousands of findings, and saving a form must not hold a
@@ -512,6 +513,11 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// above hold theirs: the politeness it keeps to is a rate per deployment
 	// rather than per replica.
 	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits(), cfg.OutboundExcluded)
+	// Reads what the upstream each product trusts publishes, and runs that
+	// product's builds again where it moved. Started whatever is configured
+	// and doing nothing where no product trusts one; one replica reaches out,
+	// by a lease of its own.
+	forks := upstream.NewPass(db.DB, work, logger, name, cfg.Limits())
 	// Fetches the repositories patch links point into and records which
 	// branches each linked commit is on. Started either way and doing nothing
 	// unless the deployment turned it on. One replica fetches, settled by a
@@ -556,9 +562,9 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"written to it: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE")
 	}
 	return handler, passes{
-		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
+		reader: reader, runner: runner, schedule: schedule, upstream: current,
 		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
-		undertaker: undertaker, publish: writer, suppliers: suppliers,
+		undertaker: undertaker, publish: writer, suppliers: suppliers, forks: forks,
 		branches:  branches,
 		records:   records,
 		documents: documents,

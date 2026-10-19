@@ -1316,9 +1316,10 @@ and it has a home there already.
 
 ## Evidence from publishers
 
-Two kinds of document arrive, and the layer is named for what it holds rather
-than for either of them (REQ-31): a publisher's VEX statement set, and a
-supplier's security advisory about their own products. The screen says "what
+Three kinds of document arrive, and the layer is named for what it holds
+rather than for any of them (REQ-31): a publisher's VEX statement set, a
+supplier's security advisory about their own products, and a VEX document an
+upstream this product trusts publishes (`DESIGN-upstream.md`). The screen says "what
 publishers say" and the field is named the same, because a name taken from one
 format is wrong about the other every time the other arrives.
 
@@ -1338,8 +1339,10 @@ attachment's is, because every statement the document makes carries it.
 
 A supplier's statement about its own product closes the finding at the places
 that product occupies (REQ-31), applied by the run beside the build's own
-patches and the issue's CVE record. Every other statement is shown and offered
-as a prefill, and closes nothing.
+patches and the issue's CVE record. So does an upstream's statement holding for
+anybody shipping the component, at that component and version (REQ-84,
+`DESIGN-upstream.md` § Statements applied). Every other statement is shown and
+offered as a prefill, and closes nothing.
 
 ### Supplier statements applied
 

@@ -26,6 +26,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
 | [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
+| [Upstream statements](#upstream-statements) | Off | Naming an upstream on a product's page under Products |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
 | [Chat](#chat) | Off | `OPENPSIRT_SLACK_TOKEN`, or the three Zulip settings |
@@ -966,6 +967,43 @@ stopped, no further back than the same window.
 Each document is checked against the SHA-256 or SHA-512 file its publisher
 serves beside it, and one that does not match is not read. A publisher serving
 neither is read unchecked.
+
+## Upstream statements
+
+A product that forks another project may trust the VEX statements that
+project publishes. Off unless an administrator names an upstream, on the
+product's page under Products. One upstream per product.
+
+The upstream is named by the address of its CSAF provider description, for
+example `https://psirt.example.org/.well-known/csaf/provider-metadata.json`
+for another OpenPSIRT deployment that publishes. Naming it reads the
+description and shows whose statements they are and the fingerprint of the key
+its documents are signed with; trusting it confirms that key.
+
+| A statement the upstream publishes | What happens here |
+|---|---|
+| Not affected or fixed, for anybody shipping the component | Closes the findings of that issue on that component, at exactly that version, the next time a build is scanned. Shown on the finding with the upstream's name and a link to its document |
+| One depending on the upstream's own build | Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary claim citing it, which goes through approval |
+| Anything else | Evidence beside the finding |
+
+A place somebody here decided about is left as they decided. Anybody who may
+triage the product can decline one statement, which stops it closing anything
+or being offered; stopping trusting the upstream sets aside everything it said.
+Each of these, and the upstream withdrawing a statement, opens what it closed:
+the product's builds are queued to be scanned again. All of them are in the
+administrative trail.
+
+Every request goes to the host the upstream's address names and no other,
+over https, following no redirect. That host is reached wherever it is,
+inside this network included, so an egress rule for this is that one host on
+its port. Every document is checked against the SHA-256 or SHA-512 file served
+beside it, and against its signature where the upstream signs; a document
+failing either is not taken. An upstream that starts naming another key is
+read no further until an administrator trusts it again, on the same page.
+
+How often an upstream is read again is the setting `upstream.every`, an hour
+unless set. A read whose listings have not moved is one request per listing,
+answered that nothing moved.
 
 ## Patch branches
 

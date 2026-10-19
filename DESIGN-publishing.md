@@ -9,7 +9,7 @@ Satisfies REQ-31, REQ-37, REQ-39, REQ-42, REQ-43, REQ-63, REQ-69, REQ-74.
 Neighboring pieces: what an advisory and the VEX document of one build say is
 in `DESIGN-remediation.md`; the subject anybody at all reads as is in
 `DESIGN-access.md`; the routes beside the API are in `DESIGN-api.md`; how
-another deployment reads these documents is in `DESIGN-ingest.md`.
+another deployment reads these documents is in `DESIGN-upstream.md`.
 
 ## Contents
 
@@ -267,7 +267,6 @@ every build's claims whatever is published, which is most of what it costs.
 | A ROLIE service document and a category document | Both optional. The provider description lists the one feed, and a checker reports each absence as a warning |
 | Directory listings | A path naming a folder answers 404. The index and the list of changes name every document |
 | A score in a VEX document | The CSAF VEX document carries none, and the validator's optional test asking for one on an affected product warns |
-| Upstream statements read back | A fork's deployment reading these documents as statements about what it ships, applying the ones that hold for anybody |
 
 ## Limits
 

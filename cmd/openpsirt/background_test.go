@@ -29,6 +29,7 @@ var alwaysRuns = []string{
 	"schedule rescans",
 	"ask upstream what is current",
 	"read what suppliers publish",
+	"read what upstreams publish",
 	"look up the branches patches are on",
 	"watch for quiet builds",
 	"send what is owed outward",
