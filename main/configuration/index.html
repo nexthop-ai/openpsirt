@@ -759,6 +759,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#published-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published documents
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -958,6 +969,17 @@
     <span class="md-ellipsis">
       
         From v0.8.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v090" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.9.0
       
     </span>
   </a>
@@ -1418,6 +1440,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#published-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published documents
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1623,6 +1656,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v090" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.9.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1727,6 +1771,11 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <td><a href="#the-published-advisory-directory">The published advisory directory</a></td>
 <td>Off</td>
 <td><code>OPENPSIRT_DIRECTORY_URL</code> and a bucket or directory to write to, with advisory generation on</td>
+</tr>
+<tr>
+<td><a href="#published-documents">Published documents</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_PUBLISH</code>, with advisory generation on, and a product turned on under Products</td>
 </tr>
 </tbody>
 </table>
@@ -2294,7 +2343,7 @@ half of one, and the process stops rather than accept a header anybody can set.<
 <tr>
 <td><code>OPENPSIRT_TRUSTED_SOURCES</code></td>
 <td><code>signin.trusted_header.sources</code></td>
-<td>Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored</td>
+<td>Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored. Also the proxies whose <code>X-Forwarded-For</code> names the client the <a href="#published-documents">published documents</a> count a rate against, and settable without a header where this deployment publishes</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -3100,11 +3149,116 @@ than this application's:</p>
   writes into it successfully. Give whatever serves the address a policy that
   lets it read, or put a front end with credentials of its own in front.</li>
 </ul>
-<p>Nothing is signed. Signatures and a public key are what the standard's trusted
-provider role adds, and key material is configuration of a kind this deployment
-does not yet take. The layout leaves room for it: a signature sits beside the
-document under the same name, and the feed already names the file beside each
-entry that answers for it.</p>
+<p>Nothing in the directory is signed. The documents this deployment serves
+itself are, where a key is configured: <a href="#published-documents">Published documents</a>.</p>
+<h3 id="published-documents">Published documents<a class="headerlink" href="#published-documents" title="Permanent link">&para;</a></h3>
+<p>Off unless you turn it on. With it on, this deployment serves the security
+documents of the products an administrator chose to anybody who asks, without
+signing in, as a standard CSAF provider at
+<code>/.well-known/csaf/provider-metadata.json</code> and a folder of OpenVEX documents at
+<code>/openvex/</code>:</p>
+<ul>
+<li>each advisory that has gone out and may travel, as the directory above would
+  write it;</li>
+<li>a CSAF VEX document for each issue somebody decided about in each published
+  product, across every branch, tag and variant, saying for each component
+  whether it is affected. An issue nobody has judged has no statement;</li>
+<li>an OpenVEX document for each branch or tag, for a scanner holding one build.</li>
+</ul>
+<p>Nothing about a flaw in your own product is published before it is disclosed —
+not its identifier, not that there is one.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>File key</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PUBLISH</code></td>
+<td><code>publishing.enabled</code></td>
+<td>Serve the published documents. Needs <code>OPENPSIRT_BASE_URL</code> to be the <code>https</code> address this deployment is reached at, and a publisher's name and namespace; refused at startup without them. Read at startup</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISH_RATE</code></td>
+<td><code>publishing.rate</code></td>
+<td>How many requests a minute one client address may make of the published documents, on each replica. Past it, a client is answered 429 with when to ask again. Refused where publishing is off</td>
+<td><code>600</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISH_KEY</code></td>
+<td><code>publishing.key</code></td>
+<td>An armored OpenPGP private key to sign every published document with. With one, each document carries an <code>.asc</code> signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISH_KEY_PASSPHRASE</code></td>
+<td><code>publishing.key_passphrase</code></td>
+<td>What unlocks the key, where it is locked. Refused where the key is not locked, and without a key</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>Two things are set inside the application, by an administrator:</p>
+<table>
+<thead>
+<tr>
+<th>Under</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Products, the Published column</td>
+<td>Which products' documents are served. Off for every product until somebody turns it on, and recorded in the administrative trail. Turned off, a product's documents stop being served at once</td>
+</tr>
+<tr>
+<td>Settings, Outbound, Published statuses</td>
+<td><code>all</code>, the default, publishes every status somebody decided: not affected, fixed and affected. <code>not-affected-and-fixed</code> publishes those two alone, and a document left with nothing is withdrawn</td>
+</tr>
+</tbody>
+</table>
+<p>On the Helm chart these go through <code>extraEnv</code>. Give the key from a Secret of
+your own:</p>
+<pre><code class="language-yaml">extraEnv:
+  - name: OPENPSIRT_PUBLISH
+    value: &quot;true&quot;
+  - name: OPENPSIRT_PUBLISH_KEY
+    valueFrom:
+      secretKeyRef: {name: openpsirt-signing, key: private.asc}
+</code></pre>
+<p>The documents are worked out every five minutes, so a decision agreed or a
+scan landing reaches readers within that. A reader keeping a copy is told what
+has not moved: every answer carries an entity tag, and a document a date as
+well, and a request repeating either is answered 304.</p>
+<p>The rate is counted per client address, and an IPv6 client by the /64 it sits in. Behind a proxy or a load balancer,
+name it in <code>OPENPSIRT_TRUSTED_SOURCES</code>, which is the same list trusted-header
+sign-in reads, and may be set without a trusted header where this deployment
+publishes. From one of those addresses, the client is the rightmost address in
+<code>X-Forwarded-For</code> that is not itself a trusted source; from any other address
+the header is ignored, so a client cannot spend another's allowance. Without
+it, every reader arriving through the proxy shares one allowance.</p>
+<p>An advisory states the address this deployment serves it at where every
+product it covers publishes and is in use when it goes out; otherwise it states the published
+advisory directory's address, where one is written, or none. What went out
+never changes, so an advisory issued before its products published keeps the
+address it was issued with.</p>
+<p>Turning a product's publishing off withdraws its documents at once. Turned on
+again, they are served after the next pass has worked them out again.</p>
+<p>A product keeps its name once a document about it has been served, withdrawn
+or not, since readers hold the documents by addresses built from it. A release
+or variant keeps its name once it has a scanned build and a document of its
+product has been served, and a release also once its own OpenVEX document has
+been. A release or variant nothing was scanned for may be renamed.</p>
+<p>A document's filename is built from its product's name, lower-cased, with
+every run of characters other than letters, digits, a plus and a hyphen made
+one underscore. Turning publishing on for a product, or renaming one that
+publishes, is refused where another product that publishes or has published
+gets the same filename this way.</p>
 <h2 id="upstream-currency">Upstream currency<a class="headerlink" href="#upstream-currency" title="Permanent link">&para;</a></h2>
 <p>Off unless an administrator turns it on, under Settings. Everything a scan
 needs arrives as a file somebody imported, so a deployment that cannot reach out
@@ -3846,6 +4000,29 @@ on.</p>
 <tr>
 <td><code>triage.deferral-threshold</code> and <code>scanning.quiet-after</code> are whole numbers of days, and a part-day value is refused when set</td>
 <td>Nothing. A value v0.8.0 stored between two days is read as the later whole day everywhere: <code>12h</code> is one day</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v090">From v0.9.0<a class="headerlink" href="#from-v090" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>This deployment can serve its own security documents to anybody, with <code>OPENPSIRT_PUBLISH</code>. Off by default, and off for every product</td>
+<td>Nothing, unless you want it: <a href="#published-documents">Published documents</a></td>
+</tr>
+<tr>
+<td>A claim may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No claim the upgrade carries states one, and the reason decides</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td>A path below <code>/.well-known/csaf/</code> or <code>/openvex/</code> is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page</td>
+<td>Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on</td>
 </tr>
 </tbody>
 </table>

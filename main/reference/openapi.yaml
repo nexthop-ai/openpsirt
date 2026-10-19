@@ -2620,6 +2620,12 @@ components:
           description: A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on
           format: int64
           type: integer
+        holds_for:
+          description: "Whom a published statement made from this claim holds for: the scope the claim states, or the one its outcome and reason decide where it states none. Ignored in a request"
+          enum:
+            - portable
+            - build
+          type: string
         id:
           description: The name for this decision in a later request
           format: int64
@@ -2659,6 +2665,12 @@ components:
         reasoning:
           description: The reasoning, in markdown. Somebody else has to agree with this
           minLength: 1
+          type: string
+        scope:
+          description: "Whom a published statement made from this claim holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral"
+          enum:
+            - portable
+            - build
           type: string
         selected_by:
           description: The narrowing behind a claim recorded as one of many. Never part of the claim itself
@@ -4049,6 +4061,12 @@ components:
         remaining:
           description: Decide only the places nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its places are already reached by lookup
           type: boolean
+        scope:
+          description: "Whom a published statement made from this claim holds for: portable for anybody shipping the component at that version, build for this product's own build only. Omit to let the outcome and the reason decide. Refused on a deferral. An extension keeps the scope of the claim it carries"
+          enum:
+            - portable
+            - build
+          type: string
       required:
         - outcome
         - reasoning
@@ -4955,6 +4973,12 @@ components:
         reasoning:
           description: The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers
           type: string
+        scope:
+          description: "Whom a published statement made from the claim holds for, where the claim stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"
+          enum:
+            - portable
+            - build
+          type: string
         standing:
           description: Whether it applies now. A judgment can be approved and no longer standing — the code moved out from under it
           type: boolean
@@ -5067,6 +5091,12 @@ components:
           type: string
         reasoning:
           description: The words the claim currently rests on. Editing them withdraws every agreement
+          type: string
+        scope:
+          description: Whom a published statement made from the claim holds for, where the claim stated it. Absent where the reason decides
+          enum:
+            - portable
+            - build
           type: string
         standing:
           description: How many matching decisions apply now
@@ -8179,6 +8209,9 @@ components:
           description: The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment
           format: int64
           type: integer
+        publishes:
+          description: Whether this product's security documents are served to anybody who asks, without signing in, where the deployment publishes at all
+          type: boolean
         tags:
           description: The number of tags declared
           format: int64
@@ -8208,6 +8241,18 @@ components:
           type:
             - array
             - "null"
+        full_product_names:
+          items:
+            $ref: "#/components/schemas/Named"
+          type:
+            - array
+            - "null"
+        relationships:
+          items:
+            $ref: "#/components/schemas/Relationship"
+          type:
+            - array
+            - "null"
       type: object
     ProviderBody:
       additionalProperties: false
@@ -8221,6 +8266,22 @@ components:
       required:
         - name
         - path
+      type: object
+    PublicationBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PublicationBody.json
+          format: uri
+          readOnly: true
+          type: string
+        publishes:
+          description: Whether this product's security documents are served to anybody who asks, without signing in
+          type: boolean
+      required:
+        - publishes
       type: object
     QueueOutputBody:
       additionalProperties: false
@@ -8877,6 +8938,23 @@ components:
       required:
         - url
         - kind
+      type: object
+    Relationship:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        full_product_name:
+          $ref: "#/components/schemas/Named"
+        product_reference:
+          type: string
+        relates_to_product_reference:
+          type: string
+      required:
+        - category
+        - full_product_name
+        - product_reference
+        - relates_to_product_reference
       type: object
     ReleaseBody:
       additionalProperties: false
@@ -10679,6 +10757,9 @@ components:
         "@id":
           type: string
         author:
+          type: string
+        last_updated:
+          format: date-time
           type: string
         statements:
           items:
@@ -17636,7 +17717,7 @@ paths:
       description: |-
         Corrects what a product is called. Both names are left alone where the request omits them.
 
-        The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or a published advisory covers it. Retire the product and declare the intended one instead. It is also refused where a group mapping in configuration names the product or the new name; change the mapping first.
+        The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, a published advisory covers it, or a document about it has been served, withdrawn or not. Retire the product and declare the intended one instead. It is also refused where a group mapping in configuration names the product or the new name; change the mapping first. Where the product publishes, a name folding to the same filename as another product that publishes, or has published, is refused.
 
         The displayed name is what screens show and what a document names the product in prose. It may be corrected at any time.
 
@@ -22819,6 +22900,41 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}/publication:
+    put:
+      description: |-
+        Sets whether this product's security documents are served to anybody who asks, without signing in: its advisories once they have gone out and may travel, a CSAF VEX document per issue, and an OpenVEX document per branch or tag. Nothing is served for any product while the deployment does not publish at all, and nothing about an undisclosed flaw is ever served.
+
+        Turned off, the product's documents are withdrawn and stop being served at once. Turned on, they are written again by the next pass, a few minutes later. Turning it on is refused where another product that publishes, or has published, has a name that folds to the same filename: a document's filename is built from the product's name, lower-cased with everything but letters, digits, plus and hyphen made an underscore. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: set-product-publication
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublicationBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Set whether a product's security documents are published
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/releases:
     get:
       description: |-
@@ -23714,7 +23830,7 @@ paths:
       description: |-
         Corrects what a release is called.
 
-        Refused once a VEX document has gone out for any build of this release, or a published advisory named it. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
+        Refused once a VEX document has gone out for any build of this release, a published advisory named it, its OpenVEX document has been served, or it has a scanned build and a CSAF VEX document of its product has been served, withdrawn or not. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
 
         Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
 
@@ -26729,7 +26845,7 @@ paths:
       description: |-
         Corrects what a variant is called and whether it reaches customers. Both are left alone where the request omits them.
 
-        A name is refused once an OpenVEX document has been published for any release built as this variant. Retire the variant and declare the intended one instead.
+        A name is refused once a VEX document has gone out for a build of this variant, or once the variant has a scanned build and a document of its product has been served, withdrawn or not. Retire the variant and declare the intended one instead.
 
         A name another variant of this product holds is refused, including a retired one. Whether it reaches customers feeds how its findings rank and may be corrected at any time.
 
