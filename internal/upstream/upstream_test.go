@@ -5,6 +5,8 @@ package upstream_test
 
 import (
 	"bytes"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -14,7 +16,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/upstream"
 )
@@ -175,11 +180,6 @@ func TestADocumentThatFailsItsChecksIsNotTaken(t *testing.T) {
 		what   string
 		break_ func(w *world, path string)
 	}{
-		{"altered after its digest", func(w *world, path string) {
-			w.server.change(path, func(body []byte) []byte {
-				return bytes.Replace(body, []byte(`"category"`), []byte(`"category" `), 1)
-			})
-		}},
 		{"served with no digest", func(w *world, path string) {
 			w.server.drop(path + publish.SHA256Suffix)
 			w.server.drop(path + publish.SHA512Suffix)
@@ -236,6 +236,9 @@ func TestAnUpstreamWhoseKeyChangedIsNotRead(t *testing.T) {
 		}
 	})
 }
+
+// keysListed is where a provider description lists its keys.
+var keysListed = regexp.MustCompile(`("public_openpgp_keys"\s*:\s*\[)`)
 
 // fingerprinted is where a provider description states its key's
 // fingerprint.
@@ -431,6 +434,213 @@ func TestAMovedUpstreamKeepsTheTrustedKey(t *testing.T) {
 		}
 		if w.statement(portable, finding.PlacedAnybody) == nil {
 			t.Error("a moved upstream naming another key withdrew a statement")
+		}
+	})
+}
+
+// A component named alone holds for anybody only by this deployment's own
+// convention, so the same shape in a document another piece of software
+// generated is offered for review and closes nothing.
+func TestOnlyADocumentThisSoftwareGeneratedAppliesByItself(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		other := mirrorWith(t, w, mirroring{every: func(body []byte) []byte {
+			return bytes.ReplaceAll(body, []byte(`"name":"OpenPSIRT"`), []byte(`"name":"Another Tool"`))
+		}})
+		w.readingBoth(other)
+		w.trustAt(other.address())
+		w.read()
+		w.rescan()
+		if got := w.state(w.forkBuild, portable, openssl); !got.open {
+			t.Errorf("another tool's statement closed the fork's finding by itself: %+v", got)
+		}
+		if w.statement(portable, finding.PlacedAnybody) != nil {
+			t.Error("another tool's statement was recorded as holding for anybody")
+		}
+		offers, err := w.findings.Offers(t.Context(), w.proposer, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		offered := false
+		for _, one := range offers {
+			offered = offered || one.Issue == portable
+		}
+		if !offered {
+			t.Errorf("another tool's statement is not offered for review: %+v", offers)
+		}
+	})
+}
+
+// A read that stops at its bound leaves the upstream due and withdraws
+// nothing; the next read takes the rest.
+func TestAReadStoppedAtItsBoundLeavesTheUpstreamDue(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		upstream.TakingAtMost(w.reader, 1)
+		w.trust()
+		took := w.read()
+		if !took.Filled || took.Documents != 1 {
+			t.Fatalf("a read bounded at one took %+v", took)
+		}
+		due, err := upstream.NewStore(w.DB.DB).Due(t.Context(),
+			access.Everything("reading what upstreams publish"), time.Now().UTC().Add(-time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Errorf("an upstream whose read stopped at its bound is not due: %d due", len(due))
+		}
+		if took := w.read(); took.Documents != 1 {
+			t.Errorf("the next read took %+v, want the rest", took)
+		}
+	})
+}
+
+// An upstream naming a second key beside the one trusted is read no further
+// until the set it names now is trusted.
+func TestAnUpstreamNamingAnotherKeyBesideTheTrustedOneIsNotRead(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		up := w.trust()
+		w.server.change(publish.MetadataPath, func(body []byte) []byte {
+			return keysListed.ReplaceAll(body, []byte(`${1}{"fingerprint":"00FF","url":"/k.asc"},`))
+		})
+		if took := w.read(); took.Documents != 0 {
+			t.Errorf("an upstream naming another key beside the trusted one was read: %+v", took)
+		}
+		held, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := upstream.FingerprintOf("00FF," + up.Fingerprint); held.KeyOffered != want {
+			t.Errorf("the upstream records %q offered, want %q", held.KeyOffered, want)
+		}
+	})
+}
+
+// A listing entry naming no document this can read leaves the listing unread
+// in full, so a document it no longer names is not withdrawn.
+func TestAListingWithAnEntryThatCannotBeReadWithdrawsNothing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		first := mirror(t, w, nil, nil, nil)
+		gone := mirrorWith(t, w, mirroring{omit: []string{portable}, junk: true})
+		w.readingBoth(first, gone)
+		w.trustAt(first.address())
+		w.read()
+		w.trustAt(gone.address())
+		w.read()
+		if w.statement(portable, finding.PlacedAnybody) == nil {
+			t.Error("a statement was withdrawn by a read with an entry it could not read")
+		}
+	})
+}
+
+// A claim here that the match is wrong stands at whatever version the place
+// holds, so an upstream's word closes nothing there when the version moves
+// to the one it speaks about.
+func TestAWrongMatchClaimStandsOverAnUpstreamAtAnyVersion(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.claim(w.forkLater, portable, opensslNext.Name, triage.Mismatched, triage.ComponentNotPresent)
+		w.trust()
+		w.read()
+		w.ship(w.forkLater, forkNext, forkNext, openssl, forkNext, swss, swss, libnl)
+		w.report(w.forkLater, portable, openssl, ownBuild, libnl)
+		if got := w.state(w.forkLater, portable, openssl); !got.open {
+			t.Errorf("the upstream closed a place somebody here said is a wrong match: %+v", got)
+		}
+	})
+}
+
+// A pass that finds what the upstream says moved queues the product's builds
+// to be scanned again, so a withdrawn statement stops closing anything without
+// waiting for the schedule.
+func TestAPassThatMovedQueuesTheProductsBuilds(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		work := queue.New(w.DB, queue.DefaultOptions())
+		pass := upstream.NewPass(w.DB.DB, work, slog.New(slog.DiscardHandler), "test", sbom.Limits{},
+			w.server.roots)
+		if _, err := pass.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var queued []string
+		if err := w.DB.DB.NewSelect().Model((*queue.Job)(nil)).Column("reference").
+			Where(`"kind" = ?`, queue.Scan).Scan(t.Context(), &queued); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]bool{fmt.Sprint(w.forkBuild.ID): true, fmt.Sprint(w.forkLater.ID): true}
+		for _, one := range queued {
+			delete(want, one)
+		}
+		if len(want) != 0 {
+			t.Errorf("the pass queued %v, missing the fork's builds %v", queued, want)
+		}
+	})
+}
+
+// A decision started from an upstream's statement is told the upstream stopped
+// being trusted in those words, and the notice clears once the upstream is
+// trusted again and says the same thing.
+func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		review := w.statement(ownBuild, "")
+		if err := w.Access.GrantRole(t.Context(), w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		w.claimCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+			triage.CodeNotInExecutePath, &review.ID)
+		said := func() []string {
+			t.Helper()
+			if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.DiscardHandler)).Once(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(w.DB.DB).Waiting(t.Context(), w.proposer, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out []string
+			for _, row := range rows {
+				if row.Kind == notify.StatementRevised && row.ClearedAt == nil {
+					out = append(out, row.Body)
+				}
+			}
+			return out
+		}
+		if _, err := upstream.NewStore(w.DB.DB).Withdraw(t.Context(), w.admin, w.fork.ID); err != nil {
+			t.Fatal(err)
+		}
+		got := said()
+		if len(got) != 1 || !strings.Contains(got[0], "stopped trusting its upstream") {
+			t.Fatalf("a decision citing an upstream no longer trusted is told %v", got)
+		}
+		w.trust()
+		w.read()
+		if got := said(); len(got) != 0 {
+			t.Errorf("trusted again and saying the same, the decision is still told %v", got)
+		}
+	})
+}
+
+// A document that does not match the digest served beside it is not taken,
+// from an upstream that signs nothing, so only the digest stands in the way.
+func TestADocumentNotMatchingItsDigestIsNotTaken(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		unsigned := mirror(t, w, nil, nil, []string{portable})
+		w.readingBoth(unsigned)
+		w.trustAt(unsigned.address())
+		if took := w.read(); took.Refused != 1 {
+			t.Errorf("the read refused %d documents, want the one not matching its digest", took.Refused)
+		}
+		w.rescan()
+		if w.statement(portable, finding.PlacedAnybody) != nil {
+			t.Error("a document not matching its digest was recorded")
 		}
 	})
 }

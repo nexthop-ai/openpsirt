@@ -26,6 +26,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -82,23 +83,27 @@ func Inspect(ctx context.Context, client *http.Client, address string) (Describe
 	if named == "" {
 		return out, nil
 	}
-	where, err := resolve(address, at)
-	if err != nil {
-		return Described{}, refusal.Errorf("the key that provider description names is at no address: %v", err)
+	var armored []string
+	for _, one := range at {
+		where, err := resolve(address, one)
+		if err != nil {
+			return Described{}, refusal.Errorf("a key that provider description names is at no address: %v", err)
+		}
+		body, err := fetch(ctx, client, where, mostKeyBytes, nil)
+		if err != nil {
+			return Described{}, fmt.Errorf("read a key the upstream names: %w", err)
+		}
+		armored = append(armored, string(body))
 	}
-	armored, err := fetch(ctx, client, where, mostKeyBytes, nil)
-	if err != nil {
-		return Described{}, fmt.Errorf("read the key the upstream names: %w", err)
-	}
-	_, fingerprint, err := keyringOf(string(armored))
+	_, fingerprint, err := keyringOf(strings.Join(armored, "\n"))
 	if err != nil {
 		return Described{}, err
 	}
 	if fingerprint != named {
-		return Described{}, refusal.Errorf("the key served is %s, and the provider description names %s",
+		return Described{}, refusal.Errorf("the keys served are %s, and the provider description names %s",
 			fingerprint, named)
 	}
-	out.Fingerprint, out.PublicKey = fingerprint, string(armored)
+	out.Fingerprint, out.PublicKey = fingerprint, strings.Join(armored, "\n")
 	return out, nil
 }
 
@@ -116,15 +121,17 @@ func described(ctx context.Context, client *http.Client, address string) (*csaf.
 	return meta, nil
 }
 
-// keyIn is the fingerprint of the first key a provider description names, and
-// where it is, or empty where it names none.
-func keyIn(meta *csaf.ProviderMetadata) (fingerprint, at string) {
+// keyIn is the set of keys a provider description names, as FingerprintOf
+// writes it, and where each is, or empty where it names none.
+func keyIn(meta *csaf.ProviderMetadata) (fingerprints string, at []string) {
+	var named []string
 	for _, key := range meta.PublicKeys {
-		if named := FingerprintOf(key.Fingerprint); named != "" {
-			return named, key.URL
+		if one := FingerprintOf(key.Fingerprint); one != "" {
+			named = append(named, one)
+			at = append(at, key.URL)
 		}
 	}
-	return "", ""
+	return FingerprintOf(strings.Join(named, ",")), at
 }
 
 // resolve is an address a document names, read against the document's own
@@ -152,6 +159,8 @@ type cached struct {
 type listed struct {
 	address string
 	at      string
+	// skipped is an entry naming no document this can read.
+	skipped bool
 }
 
 // Read is what reading one upstream did.
@@ -176,13 +185,19 @@ type Reader struct {
 	// roots are the certificate authorities an upstream is checked against,
 	// nil for the system's.
 	roots *x509.CertPool
-	now   func() time.Time
+	// keep reports whether this replica still holds the lease on reading, and
+	// is asked before each document. Nil reads without asking.
+	keep func(context.Context) (bool, error)
+	// most is how many documents one read takes: MostPerPass.
+	most int
+	now  func() time.Time
 }
 
 // NewReader returns a reader over db, checking an upstream's certificate
 // against roots, nil for the system's authorities.
 func NewReader(db bun.IDB, limits sbom.Limits, roots *x509.CertPool) *Reader {
-	return &Reader{db: db, limits: limits, roots: roots, now: func() time.Time { return time.Now().UTC() }}
+	return &Reader{db: db, limits: limits, roots: roots, most: MostPerPass,
+		now: func() time.Time { return time.Now().UTC() }}
 }
 
 // From reads one upstream: its description, its listings, and every document
@@ -200,19 +215,19 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		// However the description failed — not found, refused, a TLS fault,
 		// a timeout — nothing is withdrawn. What the upstream said stands
 		// until a read that succeeds says otherwise.
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, err)
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, err, false)
 	}
 	if offered, _ := keyIn(meta); offered != up.Fingerprint {
 		recorded := offered
 		if recorded == "" {
 			recorded = NoKey
 		}
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, recorded, describe(offered, up.Fingerprint))
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, recorded, describe(offered, up.Fingerprint), false)
 	}
 	var keyring openpgp.EntityList
 	if up.PublicKey != "" {
 		if keyring, _, err = keyringOf(up.PublicKey); err != nil {
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err)
+			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
 	}
 
@@ -220,12 +235,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	if up.Listings != "" {
 		_ = json.Unmarshal([]byte(up.Listings), &held)
 	}
-	entries, kept, moved, err := r.listings(ctx, client, up.URL, meta, held)
+	entries, kept, moved, skipped, err := r.listings(ctx, client, up.URL, meta, held)
 	if err != nil {
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err)
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 	}
 	if !moved {
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", nil)
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, "", nil, false)
 	}
 
 	var documents []Document
@@ -244,9 +259,18 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		if was, ok := recorded[one.address]; ok && was.ListedAt == one.at {
 			continue
 		}
-		if took.Documents+took.Refused >= MostPerPass {
+		if took.Documents+took.Refused >= r.most {
 			took.Filled = true
 			break
+		}
+		// The lease is asked for again before each document, so a slow read
+		// never runs on past it beside a second replica's. One lost leaves the
+		// read incomplete and the upstream due.
+		if r.keep != nil {
+			if mine, err := r.keep(ctx); err != nil || !mine {
+				took.Filled = true
+				break
+			}
 		}
 		changed, err := r.document(ctx, client, up, one, keyring)
 		var refusedDoc unreadable
@@ -256,7 +280,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			refused = append(refused, fmt.Errorf("%s: %w", one.address, err))
 			continue
 		case err != nil:
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err)
+			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
 		took.Documents++
 		took.Moved = took.Moved || changed
@@ -266,13 +290,13 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	// withdraws nothing, so a document cannot read as absent because the
 	// pass stopped short of it. In order, so two reads withdrawing the same
 	// documents do it alike.
-	complete := !took.Filled && took.Refused == 0
+	complete := !took.Filled && took.Refused == 0 && skipped == 0
 	for _, address := range slices.Sorted(maps.Keys(recorded)) {
 		if current[address] || !complete {
 			continue
 		}
 		if err := r.withdraw(ctx, up, address); err != nil {
-			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err)
+			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err, false)
 		}
 		took.Withdrawn++
 		took.Moved = true
@@ -285,11 +309,15 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		listings = ""
 	}
 	var failed error
-	if len(refused) > 0 {
+	switch {
+	case len(refused) > 0:
 		failed = refusal.Errorf("%d of what the upstream lists could not be taken; the last: %v",
 			len(refused), refused[len(refused)-1])
+	case skipped > 0:
+		failed = refusal.Errorf("%d entries of what the upstream lists name no document this can read, "+
+			"so nothing it stopped listing is withdrawn", skipped)
 	}
-	return took, NewStore(r.db).reached(ctx, up, listings, "", failed)
+	return took, NewStore(r.db).reached(ctx, up, listings, "", failed, took.Filled)
 }
 
 // listings reads every listing a provider description names, answering the
@@ -301,7 +329,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 // listing moved, every listing is read whole, because a document no listing
 // names any more is withdrawn and that is only known from all of them.
 func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
-	meta *csaf.ProviderMetadata, held map[string]cached) ([]listed, string, bool, error) {
+	meta *csaf.ProviderMetadata, held map[string]cached) ([]listed, string, bool, int, error) {
 
 	var addresses []string
 	for _, dist := range meta.Distributions {
@@ -330,7 +358,7 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 		}
 	}
 	if len(addresses) == 0 {
-		return nil, "", false, refusal.New("that provider description names no feed and no directory served to everybody")
+		return nil, "", false, 0, refusal.New("that provider description names no feed and no directory served to everybody")
 	}
 	slices.Sort(addresses)
 	addresses = slices.Compact(addresses)
@@ -372,19 +400,26 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 	out, kept, unchanged, err := read(true)
 	switch {
 	case err != nil:
-		return nil, "", false, err
+		return nil, "", false, 0, err
 	case unchanged == len(addresses):
-		return nil, encoded(kept), false, nil
+		return nil, encoded(kept), false, 0, nil
 	case unchanged > 0:
 		// One listing answered that nothing moved and another that something
 		// did: every one is read whole.
 		if out, kept, _, err = read(false); err != nil {
-			return nil, "", false, err
+			return nil, "", false, 0, err
 		}
 	}
+	skipped := 0
+	out = slices.DeleteFunc(out, func(one listed) bool {
+		if one.skipped {
+			skipped++
+		}
+		return one.skipped
+	})
 	slices.SortFunc(out, func(a, b listed) int { return strings.Compare(a.address, b.address) })
 	out = slices.CompactFunc(out, func(a, b listed) bool { return a.address == b.address })
-	return out, encoded(kept), true, nil
+	return out, encoded(kept), true, skipped, nil
 }
 
 // encoded is the validators as they are stored.
@@ -421,14 +456,23 @@ func fromFeed(address string, body []byte) ([]listed, error) {
 				}
 			}
 		}
-		if at == "" || named == "" {
-			continue
-		}
-		if where, err := resolve(address, named); err == nil && len(where) <= MostURL {
-			out = append(out, listed{address: where, at: bound.HeadRunes(at, database.NameWidth)})
-		}
+		out = append(out, entryOf(address, named, at))
 	}
 	return out, nil
+}
+
+// entryOf is one document a listing names, or an entry that cannot be read
+// where it names no document or no moment, or an address this cannot record.
+// An entry that cannot be read leaves the listing unread in full.
+func entryOf(listing, named, at string) listed {
+	if at == "" || named == "" {
+		return listed{skipped: true}
+	}
+	where, err := resolve(listing, named)
+	if err != nil || len(where) > MostURL {
+		return listed{skipped: true}
+	}
+	return listed{address: where, at: bound.HeadRunes(at, database.NameWidth)}
 }
 
 // fromChanges reads the documents a directory's list of changes names: a path
@@ -445,15 +489,10 @@ func fromChanges(address string, body []byte) ([]listed, error) {
 		case err != nil:
 			return nil, unreadable{err: refusal.Errorf("that list of changes does not read: %v", err)}
 		case len(row) < 2:
+			out = append(out, listed{skipped: true})
 			continue
 		}
-		at := strings.TrimSpace(row[1])
-		if at == "" {
-			continue
-		}
-		if where, err := resolve(address, strings.TrimSpace(row[0])); err == nil && len(where) <= MostURL {
-			out = append(out, listed{address: where, at: bound.HeadRunes(at, database.NameWidth)})
-		}
+		out = append(out, entryOf(address, strings.TrimSpace(row[0]), strings.TrimSpace(row[1])))
 	}
 }
 
@@ -479,7 +518,7 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 			return false, err
 		}
 	}
-	tracking, err := trackingOf(body)
+	tracking, ours, err := trackingOf(body)
 	if err != nil {
 		return false, err
 	}
@@ -492,7 +531,7 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	case err != nil:
 		return false, unreadable{err: err}
 	}
-	statements := statementsOf(said)
+	statements := statementsOf(said, ours)
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])
 	moved := false
@@ -616,40 +655,52 @@ func recordedAs(up Upstream) access.Subject {
 	return access.Subject{Kind: access.Person, ID: up.TrustedBy}
 }
 
-// trackingOf is the tracking identifier a document names itself by.
-func trackingOf(body []byte) (string, error) {
+// trackingOf is the tracking identifier a document names itself by, and
+// whether it names this deployment's software as what generated it.
+func trackingOf(body []byte) (string, bool, error) {
 	var named struct {
 		Document struct {
 			Tracking struct {
-				ID string `json:"id"`
+				ID        string `json:"id"`
+				Generator struct {
+					Engine struct {
+						Name string `json:"name"`
+					} `json:"engine"`
+				} `json:"generator"`
 			} `json:"tracking"`
 		} `json:"document"`
 	}
 	if err := json.Unmarshal(body, &named); err != nil {
-		return "", unreadable{err: refusal.Errorf("that document does not read: %v", err)}
+		return "", false, unreadable{err: refusal.Errorf("that document does not read: %v", err)}
 	}
 	tracking := strings.TrimSpace(bound.Text(named.Document.Tracking.ID))
 	if tracking == "" || len([]rune(tracking)) > finding.MostDocumentName {
-		return "", unreadable{err: refusal.Errorf("that document names itself in none of the "+
+		return "", false, unreadable{err: refusal.Errorf("that document names itself in none of the "+
 			"%d characters this records", finding.MostDocumentName)}
 	}
-	return tracking, nil
+	ours := strings.EqualFold(strings.TrimSpace(named.Document.Tracking.Generator.Engine.Name),
+		advisory.EngineName)
+	return tracking, ours, nil
 }
 
 // statementsOf is what an upstream's document says, as it is recorded.
 //
 // A statement naming a component alone, by its package identifier, holds for
 // anybody shipping that component, and is applied at that component and
-// version (REQ-84). A statement naming the component inside something of the
-// upstream's — its build, or what pulls the component in there — depends on
-// that, and places nothing here: it is offered for review.
-func statementsOf(said []sbom.Suppression) []finding.Statement {
+// version (REQ-84) — where the document was written by this deployment's
+// software, whose convention that is. The format has no word for whom a
+// statement holds for, so the same shape from any other software says nothing
+// about it, and is offered for review. A statement naming the component
+// inside something of the upstream's — its build, or what pulls the component
+// in there — depends on that, and places nothing here: it is offered for
+// review.
+func statementsOf(said []sbom.Suppression, ours bool) []finding.Statement {
 	var out []finding.Statement
 	for _, claim := range said {
 		for _, at := range claim.Targets {
 			one := finding.StatementOf(claim, at)
 			one.Placement = ""
-			if at.Within == nil && graph.PartsOfPurl(at.Purl).Name != "" {
+			if ours && at.Within == nil && graph.PartsOfPurl(at.Purl).Name != "" {
 				one.Placement = finding.PlacedAnybody
 			}
 			out = append(out, one)

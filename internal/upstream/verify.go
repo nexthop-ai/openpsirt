@@ -14,11 +14,13 @@ import (
 	"hash"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -75,6 +77,8 @@ func fetch(ctx context.Context, client *http.Client, address string, most int64,
 		return nil, errNotModified
 	case res.StatusCode == http.StatusNotFound, res.StatusCode == http.StatusGone:
 		return nil, unreadable{err: fmt.Errorf("%w: %s answered %s", errGone, address, bound.Text(res.Status))}
+	case res.StatusCode == http.StatusForbidden:
+		return nil, fmt.Errorf("%w: %s answered %s", errForbidden, address, bound.Text(res.Status))
 	case res.StatusCode != http.StatusOK:
 		return nil, refusal.Errorf("%s answered %s", address, bound.Text(res.Status))
 	}
@@ -94,6 +98,9 @@ func fetch(ctx context.Context, client *http.Client, address string, most int64,
 
 // mostValidator bounds an entity tag or a date kept to ask with again.
 const mostValidator = 200
+
+// errForbidden says an address answered 403.
+var errForbidden = refusal.New("refused")
 
 // errGone says an address answered that nothing is published there.
 var errGone = refusal.New("nothing is published there")
@@ -128,19 +135,21 @@ func checkDigest(ctx context.Context, client *http.Client, address string, body 
 		served, err := fetch(ctx, client, address+kind.suffix, mostSumBytes, nil)
 		var refused unreadable
 		switch {
-		case errors.As(err, &refused):
+		case errors.As(err, &refused), errors.Is(err, errForbidden):
+			// Not served: a store answering 403 for an object it does not
+			// hold is as common as 404.
 			continue
 		case err != nil:
 			return err
 		}
-		fields := strings.Fields(string(served))
-		if len(fields) == 0 {
+		sum := kind.sum()
+		want, held := csaf.DigestIn(served, sum.Size())
+		if !held {
+			// A page in place of a digest is no digest.
 			continue
 		}
-		want, err := hex.DecodeString(fields[0])
-		sum := kind.sum()
 		sum.Write(body)
-		if err != nil || !bytes.Equal(sum.Sum(nil), want) {
+		if !bytes.Equal(sum.Sum(nil), want) {
 			return errMismatched
 		}
 		return nil
@@ -172,24 +181,40 @@ func checkSignature(ctx context.Context, client *http.Client, address string, bo
 	return nil
 }
 
-// keyringOf reads an armored public key and answers it with its fingerprint,
-// in upper-case hexadecimal.
+// keyringOf reads the armored public keys an upstream signs with and answers
+// them with their fingerprints as a set.
 func keyringOf(armored string) (openpgp.EntityList, string, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(strings.NewReader(armored))
 	if err != nil {
-		return nil, "", refusal.Errorf("that public key does not read: %v", err)
+		return nil, "", refusal.Errorf("those public keys do not read: %v", err)
 	}
-	if len(keyring) != 1 {
-		return nil, "", refusal.Errorf("a public key file holds one key, and this holds %d", len(keyring))
+	if len(keyring) == 0 || len(keyring) > MostKeys {
+		return nil, "", refusal.Errorf("an upstream signs with one to %d keys, and this names %d",
+			MostKeys, len(keyring))
 	}
-	return keyring, FingerprintOf(hex.EncodeToString(keyring[0].PrimaryKey.Fingerprint)), nil
+	fingerprints := make([]string, 0, len(keyring))
+	for _, key := range keyring {
+		fingerprints = append(fingerprints, hex.EncodeToString(key.PrimaryKey.Fingerprint))
+	}
+	return keyring, FingerprintOf(strings.Join(fingerprints, ",")), nil
 }
 
-// FingerprintOf is a fingerprint as it is compared: upper-case hexadecimal,
-// without spaces. A provider description and a person typing one each space
-// it their own way.
+// MostKeys is how many keys an upstream may sign with at once: one, and the
+// one it is rotating to, with room to spare.
+const MostKeys = 4
+
+// FingerprintOf is a set of fingerprints as it is compared: each in
+// upper-case hexadecimal without spaces, in order, separated by commas. A
+// provider description and a person typing one each space it their own way.
 func FingerprintOf(said string) string {
-	return strings.ToUpper(strings.Join(strings.Fields(said), ""))
+	var out []string
+	for _, one := range strings.Split(said, ",") {
+		if fingerprint := strings.ToUpper(strings.Join(strings.Fields(one), "")); fingerprint != "" {
+			out = append(out, fingerprint)
+		}
+	}
+	slices.Sort(out)
+	return strings.Join(slices.Compact(out), ",")
 }
 
 // errKeyMoved says an upstream names a key other than the one trusted.

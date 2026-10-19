@@ -119,7 +119,7 @@ func (g *Generator) vexDocument(product *catalog.Product, facts []placed, descri
 						ID: tracking, Status: "final", Version: fmt.Sprint(at.Version),
 						InitialReleaseDate: at.First, CurrentReleaseDate: at.Current,
 						Generator: &advisory.Generator{
-							Engine: advisory.Engine{Name: "OpenPSIRT", Version: version.Get().Version},
+							Engine: advisory.Engine{Name: advisory.EngineName, Version: version.Get().Version},
 							Date:   at.Current,
 						},
 						RevisionHistory: at.History,

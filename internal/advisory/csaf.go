@@ -96,6 +96,12 @@ type Generator struct {
 	Date   time.Time `json:"date"`
 }
 
+// EngineName is what every document this deployment writes names as the
+// software that generated it. An upstream's document naming it is one written
+// by this convention, where a component named alone holds for anybody shipping
+// it.
+const EngineName = "OpenPSIRT"
+
 // Engine is the software that generated it.
 type Engine struct {
 	Name    string `json:"name"`

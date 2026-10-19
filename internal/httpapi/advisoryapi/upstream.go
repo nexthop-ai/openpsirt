@@ -156,8 +156,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			Fingerprint string `json:"fingerprint,omitempty" maxLength:"191" doc:"The fingerprint of the key its documents are signed with, as inspecting it answered. Empty for an upstream that signs nothing"`
 		}
 	}) (*struct{ Body UpstreamBody }, error) {
-		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
-		if err != nil {
+		if _, _, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product); err != nil {
 			return nil, err
 		}
 		described, err := inspect(ctx, in, input.Body.URL)
@@ -165,20 +164,6 @@ func registerUpstream(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		address, _ := upstream.Address(input.Body.URL)
-		held, err := upstream.NewStore(in.DB.DB).For(ctx, by, product.ID)
-		if err != nil {
-			return nil, core.Asked(in.Logger, err)
-		}
-		// Moving to another address keeps the key trusted, so what the new
-		// address names is recorded rather than confirmed here.
-		moving := held != nil && held.URL != address.String()
-		if !moving && upstream.FingerprintOf(input.Body.Fingerprint) != described.Fingerprint {
-			if described.Fingerprint == "" {
-				return nil, huma.Error409Conflict("that upstream names no signing key; send no fingerprint")
-			}
-			return nil, huma.Error409Conflict("that upstream signs with the key " +
-				described.Fingerprint + "; send that fingerprint to trust it")
-		}
 		var out *upstream.Upstream
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
@@ -188,6 +173,18 @@ func registerUpstream(api huma.API, in core.Deps) {
 			was, err := upstream.NewStore(tx).For(ctx, by, product.ID)
 			if err != nil {
 				return core.Asked(in.Logger, err)
+			}
+			// Moving to another address keeps the keys trusted, so what the
+			// new address names is recorded rather than confirmed here. Asked
+			// of what the transaction read: an upstream stopped being trusted
+			// meanwhile is a first trust, and its keys are confirmed.
+			moving := was != nil && was.URL != address.String()
+			if !moving && upstream.FingerprintOf(input.Body.Fingerprint) != described.Fingerprint {
+				if described.Fingerprint == "" {
+					return huma.Error409Conflict("that upstream names no signing key; send no fingerprint")
+				}
+				return huma.Error409Conflict("that upstream signs with " +
+					described.Fingerprint + "; send that fingerprint to trust it")
 			}
 			out, err = upstream.NewStore(tx).Trust(ctx, by, product.ID, upstream.Trusting{
 				URL: address.String(), Publisher: described.Publisher,
@@ -341,7 +338,8 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"offered for review. The product's builds are queued to be scanned again, which " +
 			"opens what it closed. Recorded in the administrative trail.\n\n" +
 			"Only a statement an upstream published may be declined; another is refused with " +
-			"422. A statement in a product the caller does not triage is answered 404.",
+			"422; answer a supplier's statement by proposing a claim about the place. A " +
+			"statement in a product the caller does not triage is answered 404.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, "", core.TriageRights()...), declineHandler(in, true))
 

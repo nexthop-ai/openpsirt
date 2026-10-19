@@ -35,7 +35,7 @@ reasons; the outbound client is in `DESIGN-access.md`.
 | One upstream per product | A fork descends from one project. A product is its own catalog entry, so a fork is a product of its own |
 | The upstream is named by its CSAF provider description | The address of `provider-metadata.json`, over https, with a host and no user |
 | An administrator inspects it, then trusts it | Inspecting reads the description and the key it names and answers whose statements they are and the key's fingerprint. Trusting sends the fingerprint back, and one other than what the upstream names now is refused naming the one it names |
-| The key is the one the description names, at the address it gives | The key served must carry the fingerprint the description states; one that does not is refused. The armored key is kept with the upstream |
+| The keys are the ones the description names, at the addresses it gives | The keys served must carry the fingerprints the description states; a set that does not is refused. The whole set is trusted, so an upstream rotating from one key to the next is trusted with both, up to four. The armored keys are kept with the upstream |
 | An upstream naming no key is trusted unsigned | Documents are then checked against their digests alone |
 | The publisher is fixed when the upstream is trusted | What the description named then is whose name every statement carries |
 | Trusting the same address again keeps what was read | It clears a key the upstream offered in place of the trusted one, which is how a changed key is trusted again |
@@ -65,7 +65,8 @@ ordinarily on the same network.
 | A digest file | 4 KiB |
 | A signature | 64 KiB |
 | A public key | 1 MiB |
-| Documents per pass per upstream | 200. A pass that took that many leaves the upstream due, so a first read drains over several passes |
+| Documents per pass per upstream | 200. A pass that took that many leaves the upstream due, so a first read drains over several passes rather than one each interval |
+| The lease | Asked for again before every document, so a slow read never runs on past it beside a second replica's. A pass that lost it stops, leaves the upstream due and withdraws nothing |
 
 ## Reading
 
@@ -75,10 +76,10 @@ setting names. One replica reaches out, settled by a lease.
 | Step | What happens |
 |---|---|
 | A read that fails | Withdraws nothing, however it failed: a description or listing answering 404 or another error, a TLS fault, a timeout. What the upstream said stands, and the failure is recorded and raised (§ Failure notices) |
-| The description | Read every pass. A key it names other than the one trusted, or a key where none was trusted, or none where one was, stops the read and is recorded as the key offered, until an administrator trusts the upstream again |
+| The description | Read every pass. A set of keys it names other than the set trusted — one added, one dropped, one replaced, or any where none was trusted, or none where some were — stops the read and is recorded as the keys offered, until an administrator trusts the upstream again. Trusting again does not clear what stopped the last read: a read that succeeds does |
 | The listings | Each feed labeled WHITE or CLEAR, and otherwise each directory's list of changes. Asked with the entity tag and date each last answered with; where every listing answers that nothing moved, nothing else is asked. Where one moved, every listing is read whole |
 | What moved | A document listed at a moment other than the one last recorded is read, and what it says replaces what it said: a statement it repeats stays as it is, declined or not, one it revises is replaced, and one it drops is withdrawn |
-| What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, and every document that moved taken and checked. A pass that left any behind withdraws nothing |
+| What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, every entry in it naming a document and a moment, and every document that moved taken and checked. A pass that left any behind, refused one, or met an entry it could not read withdraws nothing, and an entry it could not read is recorded as what stopped the read |
 | A moved upstream | Its first complete read reconciles what it said: a document the new address serves under the same tracking identifier replaces the one read at the old address, as a revision does, and one the new address does not list is withdrawn |
 | A document | Fetched, compared against the digest served beside it, and checked against its signature where a key is trusted. A document failing either is not taken, and the listings are read whole on the next pass so it is asked for again |
 | Its name | The tracking identifier it names itself by. Its statements are recorded under that name and replaced by its next revision |
@@ -87,6 +88,7 @@ setting names. One replica reaches out, settled by a lease.
 | Outcome recorded | |
 |---|---|
 | When the upstream was last tried, and when a read last worked | Two moments, so how long one has been failing is the gap between them |
+| All of it only while the upstream is trusted at the address the pass read | A pass running against an address an administrator just moved from leaves the move alone |
 | What stopped the last attempt, or what it could not take | Bounded, because it carries the upstream's own address and a server's own reason phrase |
 
 Where what the upstream says moved — a document recorded at a new digest, or
@@ -101,13 +103,15 @@ replaced by its own name.
 
 | The document names | Recorded as |
 |---|---|
-| A component alone, by its package identifier | Holding for anybody shipping that component, at the version the identifier names |
+| A component alone, by its package identifier, in a document this deployment's software generated | Holding for anybody shipping that component, at the version the identifier names. The document says so by naming OpenPSIRT as the engine that generated it |
 | A component inside something of the upstream's: its build, or what pulls the component in there | Depending on the upstream's own build. It places nothing here |
+| A component alone, in a document other software generated | Offered for review. The format has no word for whom a statement holds for, so the shape says it only by this deployment's convention |
 | A product named by no package identifier | Evidence, placing nothing |
 
 This deployment's own CSAF VEX document says the first shape for a statement
 whose reason holds for anybody, and the second for one whose reason is the
-build's (`DESIGN-publishing.md` § Statement scope).
+build's (`DESIGN-publishing.md` § Statement scope), and names OpenPSIRT as the
+engine that generated it.
 
 | Rule | |
 |---|---|
@@ -128,11 +132,11 @@ the statement (REQ-31, REQ-84).
 | The component is matched by its package identifier, its version aside, and then at exactly the version the statement names | A statement about one version says nothing about the next |
 | A statement naming no package identifier or no version closes nothing | |
 | Wherever the component sits, the build's root included | The upstream speaks for the component, not for what pulls it in |
-| A place somebody here decided about stays as they decided, whatever they decided | A local decision stands over an upstream's word. A place the statement closed can be decided about, and the next run opens it again |
+| A place somebody here decided about stays as they decided, whatever they decided | A local decision stands over an upstream's word. A claim that the match is wrong stands at whatever version the place holds; every other decision at the versions it was made at. A place the statement closed can be decided about, and the next run opens it again |
 | A declined statement closes nothing | § Declined statements |
 | The build's own patch and the issue's CVE record are asked first | Both say the code is not vulnerable here |
 | What closes is worked out on every run | A statement set aside, revised away, declined or of an upstream no longer trusted closes nothing at the next run, which opens what it closed |
-| A statement that the component is fixed is not stated as not affected | The VEX document of one build carrying suppliers' statements states only what said not affected |
+| A statement that the component is fixed is not stated as not affected | The VEX document of one build carrying suppliers' statements states a component only where every statement closing a place of it said not affected |
 
 ## Offers for review
 
@@ -144,6 +148,8 @@ never applied by itself.
 | Offered beside each open finding of the product it speaks about | The same issue, by its name or another it goes by, at a component of the same name and version |
 | Listed in the review queue | Beside the claims waiting for a second person, in the product the reader reads |
 | Not offered where somebody here decided about the place | A claim proposed or agreed takes it out of the list |
+| A component named alone in a document other software generated is offered too | It closes nothing by itself (§ Statements recorded) |
+| A declined statement offers no prefill on the finding | |
 | Accepting one proposes an ordinary claim, citing the statement | The claim goes through approval as any other, and a later revision of the statement raises the alert a cited statement raises |
 | Dismissing one declines it | § Declined statements |
 | At most 200, oldest statement first | The list is read by a person |
@@ -156,6 +162,7 @@ never applied by itself.
 | Only a statement an upstream published | A supplier's statement is answered by deciding about the place |
 | To anybody who may not triage the product, the statement does not exist | Authorized before anything about it is told |
 | Recorded in the administrative trail, and the product's builds are queued to be scanned again | |
+| A decision started from a statement is told when the statement is set aside | Stopping trusting the upstream is said as that, and the notice clears once the upstream, trusted again, says the same thing again |
 | A decline stays with the statement while the upstream repeats it word for word | A statement the upstream revises is a new statement, and is not declined |
 
 ## Failure notices
@@ -195,6 +202,7 @@ fork reads it over TLS from a server on the same machine.
 
 | Choice | |
 |---|---|
+| A statement applies by itself only from a document OpenPSIRT generated | Another publisher's statements are offered for review |
 | OpenVEX documents are not read | A provider description names CSAF documents and nothing else, and nothing standard says where an OpenVEX document is |
 | The key is confirmed by sending its fingerprint back | The administrator sees which key the documents will be checked against before anything is read |
 | A changed key stops reading and closes nothing new | What was recorded under the trusted key stands until the upstream is trusted again or stopped being trusted |

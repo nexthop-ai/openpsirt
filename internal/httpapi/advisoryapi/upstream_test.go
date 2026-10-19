@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // An administrator inspects an upstream and trusts it with the key it names
@@ -77,5 +78,51 @@ func TestAnUpstreamsStatementIsDeclinedBySomebodyWhoTriages(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete, path, ""); got.Code != http.StatusNoContent {
 			t.Errorf("restoring a statement answered %d: %s", got.Code, got.Body.String())
 		}
+	})
+}
+
+// Declining, restoring and stopping trusting each change what closes the
+// product's findings, so each queues the product's scanned builds to be
+// scanned again in the act itself.
+func TestEachUpstreamReversalQueuesTheProductsBuilds(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		address, roots := httpapitest.UpstreamAt(t)
+		r = r.Rebuilt(func(d *core.Deps) { d.UpstreamRoots = roots })
+		r.Scanned(t)
+		statement := "/v1/statements/" + httpapitest.Itoa(r.UpstreamStatement(t)) + "/declined"
+		queued := func(what string) {
+			t.Helper()
+			var waiting []string
+			if err := r.DB.DB.NewSelect().Model((*queue.Job)(nil)).Column("reference").
+				Where(`"kind" = ?`, queue.Scan).Where(`"state" = ?`, queue.Pending).
+				Scan(t.Context(), &waiting); err != nil {
+				t.Fatal(err)
+			}
+			if len(waiting) == 0 {
+				t.Errorf("%s queued no scan of the product's build", what)
+			}
+			if _, err := r.DB.DB.NewDelete().Model((*queue.Job)(nil)).Where("1 = 1").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := r.DB.DB.NewDelete().Model((*queue.Job)(nil)).Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, statement, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("declining answered %d", got.Code)
+		}
+		queued("declining a statement")
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete, statement, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("restoring answered %d", got.Code)
+		}
+		queued("restoring a statement")
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/products/mine/upstream",
+			`{"url":"`+address+`"}`); got.Code != http.StatusOK {
+			t.Fatalf("trusting answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete, "/v1/products/mine/upstream", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("stopping trusting answered %d", got.Code)
+		}
+		queued("stopping trusting the upstream")
 	})
 }

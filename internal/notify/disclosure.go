@@ -78,6 +78,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Vulnerability   string `bun:"vulnerability"`
 		Publisher       string `bun:"publisher"`
 		Undisclosed     bool   `bun:"undisclosed"`
+		Untrusted       bool   `bun:"untrusted"`
 	}
 	undisclosed, private := access.AnyPrivate(`"de"."visibility"`)
 	err := w.db.NewSelect().
@@ -100,6 +101,22 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where(`"de"."state" = ?`, triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where(`"ss"."superseded_at" IS NOT NULL`).
+		// An upstream's statement the upstream says again, word for word, is
+		// current again: trusting an upstream once more records what it says
+		// as new rows, and the ground under the decision has not moved.
+		Where(`NOT ("ss"."source" = ? AND EXISTS (SELECT 1 FROM "vex_statement" AS "sn"
+			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
+			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
+			  AND "sn"."component" = "ss"."component" AND "sn"."about" = "ss"."about"
+			  AND "sn"."status" = "ss"."status"
+			  AND COALESCE("sn"."justification", '') = COALESCE("ss"."justification", '')
+			  AND "sn"."superseded_at" IS NULL))`, finding.FromUpstream).
+		// Whether it was set aside because the product stopped trusting its
+		// upstream, which is said as that rather than as the upstream
+		// changing its mind.
+		ColumnExpr(`MAX(CASE WHEN "ss"."source" = ? AND NOT EXISTS (SELECT 1 FROM "upstream" AS "un"
+			WHERE "un"."product_id" = "ss"."product_id") THEN 1 ELSE 0 END) = 1 AS "untrusted"`,
+			finding.FromUpstream).
 		// Grouped exactly as the condition is identified, so one condition is
 		// one row and its link does not depend on which of several came last.
 		GroupExpr(`"de"."product_id", "v"."id", "ss"."publisher"`).
@@ -119,13 +136,19 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 
 	for _, row := range rows {
 		private := row.Undisclosed
+		said := fmt.Sprintf("%s has changed what they published about %s in %s, "+
+			"and a standing decision was made after reading the old statement. "+
+			"The decision stands; somebody should look.",
+			row.Publisher, row.Vulnerability, row.Product)
+		if row.Untrusted {
+			said = fmt.Sprintf("%s stopped trusting its upstream %s, and a standing decision about %s "+
+				"was made after reading what that upstream said. The decision stands; somebody "+
+				"should look.", row.Product, row.Publisher, row.Vulnerability)
+		}
 		holds := Holds{
 			About: identify(fmt.Sprintf("statement-revised %d %s %s",
 				row.ProductID, row.Vulnerability, row.Publisher)),
-			Body: fmt.Sprintf("%s has changed what they published about %s in %s, "+
-				"and a standing decision was made after reading the old statement. "+
-				"The decision stands; somebody should look.",
-				row.Publisher, row.Vulnerability, row.Product),
+			Body:            said,
 			Link:            weblink.Decision(row.DecisionID),
 			Private:         private,
 			ProductID:       &row.ProductID,

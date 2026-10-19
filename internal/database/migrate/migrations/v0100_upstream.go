@@ -119,15 +119,28 @@ func createUpstreamV0100(ctx context.Context, tx bun.Tx) error {
 }
 
 // statementDeclinedV0100 adds who declined a statement. No statement v0.9.0
-// held was declined. Stepped over where it is already there.
+// held was declined.
+//
+// Each column is added on its own and stepped over where it is already there:
+// on MySQL and MariaDB each addition commits by itself, so a start that
+// stopped between the two leaves the first and not the second.
 func statementDeclinedV0100(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	if present, err := u.hasColumn("vex_statement", "declined_at"); err != nil || present {
-		return err
+	for _, column := range []string{"declined_at", "declined_by"} {
+		present, err := u.hasColumn("vex_statement", column)
+		if err != nil {
+			return err
+		}
+		if present {
+			continue
+		}
+		if err := u.change(vexStatementV0100(u.t), change{table: "vex_statement",
+			add: []added{{column: column}}}); err != nil {
+			return err
+		}
 	}
-	return u.change(vexStatementV0100(u.t), change{table: "vex_statement",
-		add: []added{{column: "declined_at"}, {column: "declined_by"}}})
+	return nil
 }

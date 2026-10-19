@@ -10,7 +10,8 @@
 // refuses to connect inside this network; the open client, for a host a
 // document chooses, also refuses anywhere an administrator excluded (REQ-69).
 // The configured client, for a webhook or chat server an administrator typed
-// in, reaches that address wherever it is, inside this network included. Mail
+// in, and the pinned client, for an upstream an administrator named, reach
+// that host wherever it is, inside this network included. Mail
 // and the object store do not reach out through here, and each governs its own
 // address.
 //

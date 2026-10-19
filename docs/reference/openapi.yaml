@@ -28728,7 +28728,7 @@ paths:
       description: |-
         Stops one statement an upstream published closing anything here, or being offered for review. The product's builds are queued to be scanned again, which opens what it closed. Recorded in the administrative trail.
 
-        Only a statement an upstream published may be declined; another is refused with 422. A statement in a product the caller does not triage is answered 404.
+        Only a statement an upstream published may be declined; another is refused with 422; answer a supplier's statement by proposing a claim about the place. A statement in a product the caller does not triage is answered 404.
 
         Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
       operationId: decline-statement

@@ -59,9 +59,11 @@ type Statement struct {
 	Within      string `bun:"within,nullzero"`
 	WithinAbout string `bun:"within_about,nullzero"`
 	// Placement is what the statement names its supplier's product as:
-	// PlacedInside, PlacedProduct, or empty for a package named alone and for
-	// a statement recorded before it was read. Only a placed statement closes
-	// anything (REQ-31).
+	// PlacedInside or PlacedProduct; PlacedAnybody for an upstream's
+	// statement holding for anybody shipping the component; or empty for a
+	// package named alone, for an upstream's statement depending on its own
+	// build, and for a statement recorded before it was read. Only a placed
+	// statement closes anything (REQ-31, REQ-84).
 	Placement string `bun:"placement,nullzero"`
 	// Status is what they said in the format's own vocabulary, Justification
 	// the term they gave for it, and Statement the reasoning — which is the

@@ -44,3 +44,31 @@ func TestTheV0100UpgradeRunsAgainOverIndexesItMade(t *testing.T) {
 		leaveAtLatest(t, ctx, db)
 	})
 }
+
+// A start that stopped after adding who declined a statement and before adding
+// when is carried on: on MySQL and MariaDB each column commits by itself.
+func TestTheV0100UpgradeAddsWhatAStoppedStartLeftOut(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v090)
+		if _, err := db.ExecContext(ctx,
+			`ALTER TABLE "vex_statement" ADD COLUMN "declined_at" `+timestampOf(db)+` NULL`); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		dbtest.MigrateTo(t, db, v0100)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0100(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// timestampOf is how an engine declares a moment.
+func timestampOf(db *database.DB) string {
+	switch db.Server.Engine {
+	case database.Postgres:
+		return "TIMESTAMPTZ"
+	case database.MySQL, database.MariaDB:
+		return "DATETIME(6)"
+	}
+	return "DATETIME"
+}

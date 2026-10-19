@@ -197,10 +197,13 @@ func (s *Store) Trust(ctx context.Context, subject access.Subject, productID int
 				}
 			}
 		}
-		held.Failed, held.TrustedBy, held.TrustedAt = "", subject.ID, now
+		// What stopped the last read stays until a read succeeds: trusting
+		// again is not a read, and an upstream said to be failing is said to
+		// be read again only once it is.
+		held.TrustedBy, held.TrustedAt = subject.ID, now
 		if _, err := tx.NewUpdate().Model(held).
 			Column("url", "listings", "fetched_at", "fingerprint", "public_key", "key_offered",
-				"failed", "trusted_by", "trusted_at").
+				"trusted_by", "trusted_at").
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("trust an upstream again: %w", err)
 		}
@@ -304,14 +307,24 @@ func standing(ctx context.Context, tx bun.IDB, held Upstream) (*Upstream, error)
 
 // reached records how a pass over an upstream went: when it was tried, when
 // it last worked, what stopped it, what each listing answered with, and a key
-// offered in place of the trusted one.
-func (s *Store) reached(ctx context.Context, held Upstream, listings, offered string, failed error) error {
+// offered in place of the trusted one. A pass that stopped at its bound
+// leaves the upstream due, so the rest is read on the next wake rather than
+// after the interval.
+//
+// Written only while the upstream is trusted at the address the pass read: a
+// pass still running against an address an administrator just moved from
+// leaves what the move set alone.
+func (s *Store) reached(ctx context.Context, held Upstream, listings, offered string, failed error,
+	due bool) error {
 	now := s.now().Truncate(time.Microsecond)
 	q := s.db.NewUpdate().Model((*Upstream)(nil)).
-		Set(`"fetched_at" = ?`, now).
 		Set(`"listings" = ?`, nullable(listings)).
 		Set(`"key_offered" = ?`, nullable(offered)).
-		Where(`"id" = ?`, held.ID)
+		Where(`"id" = ?`, held.ID).
+		Where(`"url" = ?`, held.URL)
+	if !due {
+		q = q.Set(`"fetched_at" = ?`, now)
+	}
 	if failed != nil {
 		q = q.Set(`"failed" = ?`, bound.HeadRunes(bound.Text(failed.Error()), MostReason))
 	} else {

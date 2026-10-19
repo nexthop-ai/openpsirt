@@ -50,11 +50,13 @@ type Pass struct {
 // authorities an upstream is checked against, nil for the system's.
 func NewPass(db *bun.DB, q *queue.Queue, logger *slog.Logger, replica string, limits sbom.Limits,
 	roots *x509.CertPool) *Pass {
-	return &Pass{
+	p := &Pass{
 		db: db, read: NewReader(db, limits, roots), queue: q, logger: logger,
 		leases: queue.NewLeases(db), replica: replica,
 		now: func() time.Time { return time.Now().UTC() },
 	}
+	p.read.keep = p.reaching
+	return p
 }
 
 // Run reads until the context ends.

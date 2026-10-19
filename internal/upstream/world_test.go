@@ -203,6 +203,14 @@ func (w *world) claim(target *catalog.Target, issue, component string, outcome t
 	why triage.Justification) {
 
 	w.t.Helper()
+	w.claimCiting(target, issue, component, outcome, why, nil)
+}
+
+// claimCiting is claim, started from the statement cited where one is.
+func (w *world) claimCiting(target *catalog.Target, issue, component string, outcome triage.Outcome,
+	why triage.Justification, cited *int64) {
+
+	w.t.Helper()
 	ctx := w.t.Context()
 	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
 	if err != nil {
@@ -236,7 +244,7 @@ func (w *world) claim(target *catalog.Target, issue, component string, outcome t
 				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
 				OnTag: at.OnTag,
 			},
-			Outcome: outcome, Justification: why,
+			Outcome: outcome, Justification: why, FromStatement: cited,
 			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{target.ID},
 			BindingAcross: []int64{target.ID},
 		})
@@ -538,6 +546,25 @@ func (m *mirrored) fail() {
 // digest is served wrong.
 func mirror(t *testing.T, w *world, alter map[string]func([]byte) []byte, omit, corrupt []string) *mirrored {
 	t.Helper()
+	return mirrorWith(t, w, mirroring{alter: alter, omit: omit, corrupt: corrupt})
+}
+
+// mirroring is how a mirror differs from what the upstream publishes: the
+// documents about the issues alter names changed, those about the issues omit
+// names left out, those about the issues corrupt names served a wrong digest,
+// every document changed by every where it is set, and a feed entry naming no
+// moment beside the rest where junk is.
+type mirroring struct {
+	alter         map[string]func([]byte) []byte
+	omit, corrupt []string
+	every         func([]byte) []byte
+	junk          bool
+}
+
+// mirrorWith is mirror, differing as it says.
+func mirrorWith(t *testing.T, w *world, how mirroring) *mirrored {
+	t.Helper()
+	alter, omit, corrupt := how.alter, how.omit, how.corrupt
 	bodies := map[string][]byte{}
 	sums := map[string]string{}
 	for _, path := range w.server.documents(t) {
@@ -562,6 +589,9 @@ func mirror(t *testing.T, w *world, alter map[string]func([]byte) []byte, omit, 
 				body = change(body)
 			}
 		}
+		if how.every != nil {
+			body = how.every(body)
+		}
 		bodies[path] = body
 		sum := sha256.Sum256(body)
 		sums[path] = hex.EncodeToString(sum[:])
@@ -583,6 +613,9 @@ func mirror(t *testing.T, w *world, alter map[string]func([]byte) []byte, omit, 
 				`{"feeds":[{"tlp_label":"WHITE","url":"`+m.base+`/feed.json"}]}}],"role":"csaf_provider"}`)
 		case path == "/feed.json" && !gone:
 			var entries []string
+			if how.junk {
+				entries = append(entries, `{"id":"junk","content":{"src":"`+m.base+`/junk.json"}}`)
+			}
 			for _, doc := range slices.Sorted(maps.Keys(bodies)) {
 				entries = append(entries, `{"id":"`+doc+`","updated":"`+sums[doc]+`",`+
 					`"content":{"src":"`+m.base+doc+`"}}`)

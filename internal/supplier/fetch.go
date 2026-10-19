@@ -25,6 +25,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -867,7 +868,7 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 	case err != nil:
 		return false, err
 	}
-	want, held := stated(served, kind)
+	want, held := csaf.DigestIn(served, algorithms[kind].sum().Size())
 	if !held {
 		// A server answering every address with a page of its own serves no
 		// digest, whatever status it gives. Refused, every document such a
@@ -887,23 +888,6 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 // publisher whose digests keep disagreeing is said to be one.
 var errMismatched = unreadable{err: refusal.New(
 	"that document does not match the digest its publisher serves beside it")}
-
-// stated is the digest a digest file holds, and whether it holds one.
-//
-// The file is what the usual checksum tools write: the digest in hexadecimal,
-// then optionally the file name. Only the first field is read, because the name
-// is the publisher's own and says nothing about the bytes.
-func stated(served []byte, kind int) ([]byte, bool) {
-	fields := strings.Fields(string(served))
-	if len(fields) == 0 {
-		return nil, false
-	}
-	want, err := hex.DecodeString(strings.ToLower(fields[0]))
-	if err != nil || len(want) != algorithms[kind].sum().Size() {
-		return nil, false
-	}
-	return want, true
-}
 
 // recording is what identifies this recording of a document.
 //

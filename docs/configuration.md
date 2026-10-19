@@ -982,7 +982,8 @@ its documents are signed with; trusting it confirms that key.
 
 | A statement the upstream publishes | What happens here |
 |---|---|
-| Not affected or fixed, for anybody shipping the component | Closes the findings of that issue on that component, at exactly that version, the next time a build is scanned. Shown on the finding with the upstream's name and a link to its document |
+| Not affected or fixed, for anybody shipping the component, in a document OpenPSIRT generated | Closes the findings of that issue on that component, at exactly that version, the next time a build is scanned. Shown on the finding with the upstream's name and a link to its document |
+| The same shape in a document other software generated | Offered in the review queue, as below. CSAF has no word for whom a statement holds for, so only this deployment's own convention is read as saying it |
 | One depending on the upstream's own build | Offered in the review queue beside each open finding it speaks about. Accepting it proposes an ordinary claim citing it, which goes through approval |
 | Anything else | Evidence beside the finding |
 
@@ -990,16 +991,18 @@ A place somebody here decided about is left as they decided. Anybody who may
 triage the product can decline one statement, which stops it closing anything
 or being offered; stopping trusting the upstream sets aside everything it said.
 Each of these, and the upstream withdrawing a statement, opens what it closed:
-the product's builds are queued to be scanned again. All of them are in the
-administrative trail.
+the product's builds are queued to be scanned again. Trusting, stopping
+trusting and declining are in the administrative trail.
 
 Every request goes to the host the upstream's address names and no other,
 over https, following no redirect. That host is reached wherever it is,
 inside this network included, so an egress rule for this is that one host on
 its port. Every document is checked against the SHA-256 or SHA-512 file served
 beside it, and against its signature where the upstream signs; a document
-failing either is not taken. An upstream that starts naming another key is
-read no further until an administrator trusts it again, on the same page.
+failing either is not taken. An upstream that names another set of keys —
+one added, dropped or replaced — is read no further until an administrator
+trusts it again, from the same drawer; an upstream rotating keys is trusted
+with both.
 
 A read that fails withdraws nothing, whatever failed: the description or a
 listing answering 404, a TLS fault, a timeout. What the upstream said stands

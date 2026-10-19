@@ -717,8 +717,9 @@ func (s statedBySupplier) attributed() string {
 	return said
 }
 
-// disclaimed reads what suppliers' statements about their own products close
-// in this build, which the document carrying them says as not affected.
+// disclaimed reads what suppliers' statements about their own products, and an
+// upstream's statements that a component is not affected, close in this
+// build, which the document carrying them says as not affected.
 //
 // Under the guard the build's own patches stand under, and for the same
 // reason: the format says "this product, this component, not affected", so a
@@ -744,10 +745,6 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 	err := s.closedInBuild(targetID, visible, finding.Disclaimed).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Where(`"ss"."superseded_at" IS NULL`).
-		// Said as not affected, so only what said that. An upstream's
-		// statement that a component is fixed closes a place too, and is
-		// not a statement that it is unaffected.
-		Where(`"ss"."status" = ?`, string(sbom.NotAffected)).
 		// What the place holds now: a later row at it, patched by the build
 		// or open again, is what the document goes by.
 		Where(finding.LatestAtItsPlace).
@@ -755,7 +752,14 @@ func (s *Store) disclaimed(ctx context.Context, targetID int64,
 		// places of one component each spoke for their own product, and the
 		// format names the component once: credited to either, the document
 		// says one of them spoke for the other's.
-		Having(`COUNT(DISTINCT "f"."stated_by") = 1`).
+		//
+		// And only a statement that said not affected, counted over every
+		// statement closing a place of the component: an upstream's
+		// statement that a component is fixed closes places too, and is not a
+		// statement that it is unaffected, and counted out before grouping it
+		// would leave one supplier answering for a place it did not close.
+		Having(`COUNT(DISTINCT "f"."stated_by") = 1 AND SUM(CASE WHEN "ss"."status" <> ? THEN 1 ELSE 0 END) = 0`,
+			string(sbom.NotAffected)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what suppliers' statements close: %w", err)

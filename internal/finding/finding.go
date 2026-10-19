@@ -150,15 +150,17 @@ const (
 	Unaffected Closure = "unaffected"
 	// Disclaimed means a supplier stated that its own product, at the version
 	// this build ships, is not affected, and every route up the tree from this
-	// place runs through that product (REQ-31). The closed row names the
-	// statement, and the finding opens again once a run no longer reads it
-	// there: the statement set aside, the product at another version, or the
-	// place reachable outside it.
+	// place runs through that product (REQ-31); or an upstream this product
+	// trusts stated that the component, at the version shipped, is not
+	// affected or is fixed, for anybody shipping it (REQ-84). The closed row
+	// names the statement, and the finding opens again once a run no longer
+	// reads it there.
 	//
 	// Neither a resolution nor never present. Nothing in the build changed, so
-	// it counts toward no fix; the vulnerable code is in the release, so the
-	// release still held the issue. It is the footing a decision of
-	// `not-applicable` stands on, made by the supplier rather than here.
+	// it counts toward no fix, and the release is counted as having held the
+	// issue, an upstream's word that the component is fixed included: it is a
+	// third party's judgment, not a change made here. It is the footing a
+	// decision of `not-applicable` stands on, made by somebody else.
 	Disclaimed Closure = "disclaimed"
 )
 

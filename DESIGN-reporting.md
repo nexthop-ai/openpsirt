@@ -66,7 +66,7 @@ measures churn:
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 | `invalid` | A record taken back as a mistake was never present. The backlog trend leaves it out of every open set as well |
 | `unaffected` | The issue's CVE record states the release was never affected. Left out of every open set the same way |
-| `disclaimed` | A supplier states the product the place sits in is not affected. Nothing in the build changed, so nothing was fixed. The vulnerable code is still in the release, so the release still held the issue: the place is in the open sets up to its closure, and in the releases an issue was in |
+| `disclaimed` | A supplier states the product the place sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing in the build changed, so nothing was fixed, and the release is counted as having held the issue, whatever the statement says: the place is in the open sets up to its closure, and in the releases an issue was in (`DESIGN-findings.md` § Closure reasons) |
 
 The other five — removed, upgraded, revised, patched, and a recorded flaw
 declared fixed — are counted.

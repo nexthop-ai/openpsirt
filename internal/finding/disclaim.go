@@ -204,8 +204,10 @@ const (
 )
 
 // disclaimers reads what can close a finding in this build: the product's
-// standing statements that its own product is not affected, about any of the
-// issues the run reported, naming that product at a version.
+// standing statements that a supplier's own product is not affected, and an
+// upstream's statements that a component is not affected or is fixed for
+// anybody shipping it, about any of the issues the run reported, naming a
+// version.
 //
 // A statement naming a product with no version is about every release of it,
 // past and future, and stays evidence. Matched on every name the issues go by,
@@ -298,6 +300,7 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 		PlaceIdentity   string `bun:"place_identity"`
 		Component       string `bun:"component"`
 		Consumer        string `bun:"consumer"`
+		Outcome         string `bun:"outcome"`
 	}
 	standing, held := InForce()
 	issues, ids := database.InAnyOf(`"dv"."issue_id"`, issueIDs)
@@ -308,6 +311,7 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 		ColumnExpr(`"de"."place_identity" AS "place_identity"`).
 		ColumnExpr(`COALESCE("de"."component_upstream_version", '') AS "component"`).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer"`).
+		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(standing, held...).
@@ -321,6 +325,12 @@ func standingPlaces(ctx context.Context, db bun.IDB, productID int64,
 	}
 	out := make(map[affectedAt]bool, len(rows))
 	for _, row := range rows {
+		if row.Outcome == OutcomeMismatched {
+			// A claim that the match is wrong stands at whatever version the
+			// place holds, so it is keyed on the place alone.
+			out[affectedAt{vulnerabilityID: row.VulnerabilityID, placeIdentity: row.PlaceIdentity}] = true
+			continue
+		}
 		out[affectedAt{row.VulnerabilityID, row.PlaceIdentity, row.Component, row.Consumer}] = true
 	}
 	return out, nil
@@ -364,7 +374,8 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 			// An upstream speaks for the component wherever it ships, at the
 			// version it names and no other, and never where somebody here
 			// decided.
-			if d.decided[here] || !sameComponent(one, d.asStated(component)) {
+			anyVersion := affectedAt{vulnerabilityID: here.vulnerabilityID, placeIdentity: here.placeIdentity}
+			if d.decided[here] || d.decided[anyVersion] || !sameComponent(one, d.asStated(component)) {
 				continue
 			}
 			id := one.ID
