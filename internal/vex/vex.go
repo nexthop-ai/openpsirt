@@ -466,12 +466,15 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	if err != nil {
 		return nil, err
 	}
-	// A document of disclosed work publishes no other name of an issue that
-	// is also a flaw of ours held back somewhere: one of them is the name we
-	// minted for it. A preview including undisclosed work is for somebody who
-	// may read that work, and keeps them.
+	// A document of disclosed work publishes no other name of an issue that a
+	// flaw of ours recorded out of a reader's reach wrote onto it: one of them
+	// is the name minted for it. The reader is whoever the document reaches,
+	// who may read disclosed work in this product and nothing else. A preview
+	// including undisclosed work is for somebody who may read that work, and
+	// keeps them.
 	if len(visible) == 1 && visible[0] == access.Public {
-		withheld, err := s.undisclosedFlaws(ctx, issues)
+		withheld, err := finding.RecordedOutOfReach(ctx, s.idb(),
+			access.Published([]int64{named.ProductID}), issues)
 		if err != nil {
 			return nil, err
 		}

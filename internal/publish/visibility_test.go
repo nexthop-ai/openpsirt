@@ -80,9 +80,10 @@ func TestAnybodyIsHandedOnlyWhatIsPublished(t *testing.T) {
 	})
 }
 
-// A flaw of ours nobody has disclosed keeps its name out of a document even
-// where a report names it beside an issue that is published: the issue's other
-// names are not published while one of its places is a flaw held back.
+// A flaw of ours nobody has disclosed keeps its name and its summary out of a
+// document even where a report names it beside an issue that is published:
+// the issue's other names and its description are not published while a flaw
+// recorded about it sits out of anybody's reach.
 func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		ctx := t.Context()
@@ -117,6 +118,9 @@ func TestAnUndisclosedFlawsNameIsNotPublishedAsAnotherIssuesAlias(t *testing.T) 
 		}
 		if strings.Contains(all, flaw) {
 			t.Errorf("anybody is handed %s, the name of a flaw nobody has disclosed", flaw)
+		}
+		if strings.Contains(all, "management socket") {
+			t.Error("anybody is handed the summary of a flaw nobody has disclosed")
 		}
 	})
 }

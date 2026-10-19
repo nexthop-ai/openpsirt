@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -67,9 +68,6 @@ type Generated struct {
 	path func(first revision) string
 	// render is the bytes of one revision of it.
 	render func(at revision) ([]byte, error)
-	// Statements is how many statements it carries, which the measurement
-	// of a deployment's documents reads.
-	Statements int
 }
 
 // Product is every document one product publishes, under the statuses given.
@@ -88,7 +86,7 @@ func (g *Generator) Product(ctx context.Context, subject access.Subject, product
 	if err != nil {
 		return nil, err
 	}
-	descriptions, err := g.described(ctx, builds)
+	descriptions, err := g.described(ctx, subject, builds)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +160,12 @@ func limited(status, statuses string) bool {
 
 // described is what each issue stated about is, in the words of whoever
 // reported it, keyed by issue.
-func (g *Generator) described(ctx context.Context, builds []*built) (map[int64]string, error) {
+//
+// Left out where a flaw of ours recorded out of the subject's reach wrote
+// onto the issue: its summary is the description every product shares, and
+// it is the flaw's own words.
+func (g *Generator) described(ctx context.Context, subject access.Subject,
+	builds []*built) (map[int64]string, error) {
 	seen := map[int64]bool{}
 	var issues []int64
 	for _, one := range builds {
@@ -190,8 +193,14 @@ func (g *Generator) described(ctx context.Context, builds []*built) (map[int64]s
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what these issues are: %w", err)
 	}
+	withheld, err := finding.RecordedOutOfReach(ctx, g.db, subject, issues)
+	if err != nil {
+		return nil, err
+	}
 	for _, row := range rows {
-		out[row.ID] = row.Description
+		if !withheld[row.ID] {
+			out[row.ID] = row.Description
+		}
 	}
 	return out, nil
 }
