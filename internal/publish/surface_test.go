@@ -467,8 +467,8 @@ func TestAnAdvisoryIsServedOnlyWhereItMayTravel(t *testing.T) {
 }
 
 // An advisory states the address this deployment serves it at only where
-// every product it covers publishes when it goes out; otherwise it states
-// none, since this surface would answer that address with nothing.
+// every product it covers publishes and is in use when it goes out; otherwise
+// it states none, since this surface would answer that address with nothing.
 func TestAnAdvisoryStatesTheServedAddressOnlyWhereItIsServed(t *testing.T) {
 	two(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
@@ -476,6 +476,10 @@ func TestAnAdvisoryStatesTheServedAddressOnlyWhereItIsServed(t *testing.T) {
 		unpublished, _ := w.issued(true)
 		w.publishes(w.Product, true)
 		served, _ := w.issued(true)
+		if err := w.Catalog.RetireProduct(t.Context(), w.Product.ID); err != nil {
+			t.Fatal(err)
+		}
+		retired, _ := w.issued(true)
 		sent, err := advisory.NewStore(w.DB.DB).Sent(t.Context(), access.Everything("reading what went out"))
 		if err != nil {
 			t.Fatal(err)
@@ -498,6 +502,9 @@ func TestAnAdvisoryStatesTheServedAddressOnlyWhereItIsServed(t *testing.T) {
 		}
 		if got, ok := self[unpublished]; ok {
 			t.Errorf("an advisory issued while its product did not publish states %q", got)
+		}
+		if got, ok := self[retired]; ok {
+			t.Errorf("an advisory issued while its publishing product was retired states %q", got)
 		}
 	})
 }

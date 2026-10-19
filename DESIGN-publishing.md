@@ -100,7 +100,7 @@ label lets it travel (`DESIGN-remediation.md` § The provider directory).
 |---|---|
 | Read as anybody at all | The read of what went out is narrowed by the clauses every reader's is: every issue the advisory covers, now and when it went out, at a disclosed place in a product the reader reads. Anybody at all reads only the products that publish, so an advisory covering one product that does not is not served |
 | Only what may travel | A revision labeled RED, about a flaw nobody outside has been told about, is never served, whatever came after it |
-| An advisory states the address it is served at, where it is | Generated where the deployment publishes and every product it covers publishes, the address it states for itself is this surface's; otherwise the static directory's, where one is written, or none, since this surface would answer it with nothing. Issued bytes never change, so an advisory issued before its products published keeps the address it went out with |
+| An advisory states the address it is served at, where it is | Generated where the deployment publishes and every product it covers publishes and is in use, the address it states for itself is this surface's; otherwise the static directory's, where one is written, or none, since this surface would answer it with nothing. Issued bytes never change, so an advisory issued before its products published keeps the address it went out with |
 
 ## Statements and statuses
 

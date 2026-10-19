@@ -403,9 +403,15 @@ func (s *Store) servedAt(ctx context.Context, who publisher.Named, held []Covere
 	if who.Served == "" {
 		return who, nil
 	}
-	publishes, err := catalog.NewStore(s.db).Publishes(ctx)
+	// A retired product is not served, so it is read as one that does not
+	// publish.
+	ids, err := catalog.NewStore(s.db).Publishing(ctx)
 	if err != nil {
 		return who, err
+	}
+	publishes := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		publishes[id] = true
 	}
 	for _, one := range held {
 		if !publishes[one.ProductID] {
