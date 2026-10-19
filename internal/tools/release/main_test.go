@@ -75,14 +75,15 @@ func TestAReleaseFreezingWouldRefuseIsRefusedBeforeAnythingIsWritten(t *testing.
 	record(t, dir, "v0.8.0")
 	for _, c := range []struct{ tag, says string }{
 		{"v0.7.0", "older than v0.8.0"},
-		{"v0.10.0", "part past nine"},
 	} {
 		if err := guard(dir, c.tag); err == nil || !strings.Contains(err.Error(), c.says) {
 			t.Errorf("guarding %s answered %v, want %q", c.tag, err, c.says)
 		}
 	}
-	if err := guard(dir, "v0.9.0"); err != nil {
-		t.Errorf("guarding the next release was refused: %v", err)
+	for _, tag := range []string{"v0.9.0", "v0.10.0"} {
+		if err := guard(dir, tag); err != nil {
+			t.Errorf("guarding %s, a newer release, was refused: %v", tag, err)
+		}
 	}
 }
 

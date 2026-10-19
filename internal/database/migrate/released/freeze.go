@@ -115,6 +115,17 @@ func prepare(root, migrations, tag string) (*freezing, error) {
 				version, r.Version, version, r.Version)
 		}
 	}
+	// One code names one release's declarations, so a release whose code a
+	// recorded release carries would claim that release's files.
+	for _, r := range records {
+		if r.Version == version {
+			continue
+		}
+		if other, err := Code(r.Version); err == nil && other == code {
+			return nil, fmt.Errorf("%s reads as %s, the code %s already carries, so the declarations of one "+
+				"would be held as the other's", version, code, r.Version)
+		}
+	}
 	names, err := migrationNames(migrations)
 	if err != nil {
 		return nil, err

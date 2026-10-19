@@ -293,18 +293,55 @@ func TestAFileTheReleaseShippedAndIsGoneIsRefused(t *testing.T) {
 	}
 }
 
-// A release's code is one digit per part, so a version with a part past nine
-// is refused rather than given a code another release already reads as.
-func TestAReleaseCodeNamesOneReleaseOnly(t *testing.T) {
-	for tag, want := range map[string]string{"v0.3.0": "v030", "v1.2.9-rc.1": "v129"} {
+// A release's code is its parts written one after another, so a part past
+// nine widens it rather than leaving the release without one.
+func TestAReleaseCodeIsEveryPartOfItsVersion(t *testing.T) {
+	for tag, want := range map[string]string{"v0.3.0": "v030", "v1.2.9-rc.1": "v129", "v0.10.0": "v0100", "v10.0.12": "v10012"} {
 		if got, err := Code(tag); err != nil || got != want {
 			t.Errorf("%s has code %q (%v), want %q", tag, got, err, want)
 		}
 	}
-	for _, tag := range []string{"v0.1.10", "v0.11.0", "v10.0.0"} {
-		if got, err := Code(tag); err == nil {
-			t.Errorf("%s was given the code %q, which another release also reads as", tag, got)
-		}
+}
+
+// A release with a part past nine owns the declarations carrying its code, and
+// what it records is what the check accepts.
+func TestFreezingAReleaseWithAPartPastNineRecordsItsDeclarations(t *testing.T) {
+	root, migrations := tree(t)
+	frozen(t, root, migrations, "v0.2.0", 3)
+	write(t, filepath.Join(migrations, "00004_v0100.go"), header+"package migrations\n\n// four\n")
+	write(t, filepath.Join(migrations, "v0100_finding.go"), header+"package migrations\n\n// declared\n")
+	if err := os.MkdirAll(filepath.Join(root, "v0.10.0"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, "v0.10.0", Schema(string(engine))), "column t.c int\n")
+	}
+	r, err := Freeze(root, migrations, "v0.10.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for name := range r.Digests {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	if r.Last != 4 || !slices.Equal(names, []string{"00004_v0100.go", "v0100_finding.go"}) {
+		t.Errorf("froze through %d: %v", r.Last, names)
+	}
+	if faults := check(t, root, migrations, "v0.10.0"); len(faults) != 0 {
+		t.Errorf("the release just frozen was refused: %v", faults)
+	}
+}
+
+// Two versions whose parts read the same have one code between them, so a
+// release whose code a recorded release carries is refused rather than
+// claiming that release's declarations.
+func TestFreezingAReleaseWhoseCodeIsRecordedIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	frozen(t, root, migrations, "v0.1.10", 2)
+	if _, err := Freeze(root, migrations, "v0.11.0"); err == nil ||
+		!strings.Contains(err.Error(), "the code v0.1.10 already carries") {
+		t.Errorf("v0.11.0 after v0.1.10 answered %v", err)
 	}
 }
 

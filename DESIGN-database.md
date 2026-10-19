@@ -528,7 +528,7 @@ anything.
 
 | Step | What happens |
 |---|---|
-| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0: one digit per part of the version, so a release with a part past nine has no code and is refused, since v0.1.10 and v0.11.0 would both read as `v0110`. Every schema change before the tag edits that migration and those declarations |
+| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it by its code, the parts of the version written one after another: `v030` for v0.3.0, `v0100` for v0.10.0. Every schema change before the tag edits that migration and those declarations |
 | 2. Rehearse, from every earlier release the baseline upgrades, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
 | 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration. A version older than one already recorded is refused: the last migration in the tree is the newer release's, and would be claimed |
 | 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
@@ -553,7 +553,7 @@ last migration as its own.
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
 | A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists in the checkout, before anything is written, and refuses where git cannot say whether it does. A schema change is a migration numbered after its last, for the next release |
-| A release the tree cannot freeze | Refused before anything is written, the schema records included: a version older than one recorded, a version with a part past nine, and a tree whose last migration is behind the release before. A checkout without tags is refused there too |
+| A release the tree cannot freeze | Refused before anything is written, the schema records included: a version older than one recorded, a version whose code a recorded release already carries, as v0.11.0 would after v0.1.10 since both read as `v0110`, and a tree whose last migration is behind the release before. A checkout without tags is refused there too |
 | A patch to an older line, after a newer release is recorded | Not cut. A tag is refused unless it is on `main`, and `main` holds the newer release's record and migrations, so every release is newer than the last one recorded |
 
 ### Upgrade rehearsal

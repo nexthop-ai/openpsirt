@@ -61,21 +61,14 @@ func Base(tag string) (string, error) {
 	return "v" + m[1] + "." + m[2] + "." + m[3], nil
 }
 
-// Code is the prefix a release's table declarations carry: v030 for v0.3.0.
-//
-// One digit per part, so a version with a part past nine has no code: v0.1.10
-// and v0.11.0 would both read as v0110 and each claim the other's files. Such
-// a release is refused here until the scheme is widened.
+// Code is the prefix a release's table declarations carry: v030 for v0.3.0,
+// v0100 for v0.10.0. The parts are written one after another, so two versions
+// can read the same, as v0.1.10 and v0.11.0 both read as v0110; freezing
+// refuses a release whose code a recorded release already carries.
 func Code(version string) (string, error) {
 	base, err := Base(version)
 	if err != nil {
 		return "", err
-	}
-	for _, part := range order(base) {
-		if part > 9 {
-			return "", fmt.Errorf("%s has a part past nine, which a release's code "+
-				"cannot carry without reading as another release's", base)
-		}
 	}
 	return "v" + strings.ReplaceAll(strings.TrimPrefix(base, "v"), ".", ""), nil
 }
@@ -133,8 +126,8 @@ func codeOf(name string) (string, bool) {
 	return code, true
 }
 
-// releaseCode is a code as Code writes one: a v and one digit per part.
-var releaseCode = regexp.MustCompile(`^v\d{3}$`)
+// releaseCode is a code as Code writes one: a v and the digits of every part.
+var releaseCode = regexp.MustCompile(`^v\d{3,}$`)
 
 // Owned is the files of a migrations directory that belong to one release:
 // the migrations numbered after the previous release's last up to its own,
