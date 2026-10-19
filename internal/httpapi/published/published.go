@@ -146,9 +146,10 @@ const (
 
 // find is the file served at path, or ErrNotPublished.
 //
-// A list reads every document's name and dates; a document reads itself. A
-// reader taking a provider whole asks for every document and the files beside
-// it, so a request for one is answered without listing the rest.
+// A list reads every document's name and dates; a VEX document reads itself,
+// and an advisory is looked for only where no VEX document is. A reader taking
+// a provider whole asks for every document and the files beside it, so a
+// request for one is answered without listing the rest.
 //
 // asked is the entity tag the request already holds, which a signature is
 // answered from without signing again.
@@ -232,9 +233,9 @@ func (s *server) read(ctx context.Context) (*view, error) {
 
 // travelling adds every advisory that may travel to the view.
 //
-// Read only by the CSAF lists and by a path below the folder of documents
-// that may travel, because it reads every advisory's issued bytes: an
-// OpenVEX document, a key or a path nothing is published at asks none of it.
+// Read only by the CSAF lists and by a path in their folder that holds no VEX
+// document, because it reads every advisory's issued bytes: a VEX document,
+// the files beside one, an OpenVEX path and a key ask none of it.
 func (s *server) travelling(ctx context.Context, v *view) error {
 	v.advisories = map[string]advisory.Travels{}
 	sent, err := advisory.NewStore(s.DB).Sent(ctx, v.subject)
@@ -355,21 +356,24 @@ func (s *server) key(path string) (*file, error) {
 
 // document is one document by its path.
 func (s *server) document(ctx context.Context, v *view, path string) (*file, error) {
-	if below, ok := strings.CutPrefix(path, publish.DirectoryPath); ok {
-		if err := s.travelling(ctx, v); err != nil {
-			return nil, err
-		}
-		if one, ok := v.advisories[below]; ok {
-			return &file{body: one.Body, kind: jsonKind, modified: one.Released}, nil
-		}
-	} else if !strings.HasPrefix(path, publish.OpenVEXPath) {
+	below, inFolder := strings.CutPrefix(path, publish.DirectoryPath)
+	if !inFolder && !strings.HasPrefix(path, publish.OpenVEXPath) {
 		return nil, publish.ErrNotPublished
 	}
 	doc, err := publish.NewStore(s.DB).At(ctx, v.subject, path, v.statuses)
-	if err != nil {
+	switch {
+	case err == nil:
+		return &file{body: []byte(doc.Body), kind: jsonKind, modified: doc.CurrentAt}, nil
+	case !errors.Is(err, publish.ErrNotPublished) || !inFolder:
 		return nil, err
 	}
-	return &file{body: []byte(doc.Body), kind: jsonKind, modified: doc.CurrentAt}, nil
+	if err := s.travelling(ctx, v); err != nil {
+		return nil, err
+	}
+	if one, ok := v.advisories[below]; ok {
+		return &file{body: one.Body, kind: jsonKind, modified: one.Released}, nil
+	}
+	return nil, publish.ErrNotPublished
 }
 
 // signature is the detached signature over one document, dated when the
