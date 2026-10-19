@@ -139,6 +139,21 @@ jobs:
           if [ "$line" = "$GITHUB_REF_NAME" ]; then newest_on_line=true; else newest_on_line=false; fi
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
           echo "newest_on_line=$newest_on_line" >> "$GITHUB_OUTPUT"
+          # The release the notes count from: the newest stable tag below this
+          # one for a stable release, and the newest tag of any kind below it
+          # for a prerelease. Empty for the first release, where the notes
+          # count from the start of the history. A hyphen becomes a tilde for
+          # the sort, which orders 0.1.0-rc.1 below 0.1.0 as semantic
+          # versioning does; a ref name cannot hold a tilde, so nothing else
+          # is changed by the round trip.
+          case "$version" in
+            *-*) candidates=$(git tag -l 'v*') ;;
+            *)   candidates=$(git tag -l 'v*' | grep -v -- -) ;;
+          esac
+          previous=$(printf '%s\n%s\n' "$candidates" "$GITHUB_REF_NAME" | grep . \
+            | sed 's/-/~/' | sort -uV | sed 's/~/-/' \
+            | awk -v tag="$GITHUB_REF_NAME" '$0 == tag { print prev; exit } { prev = $0 }')
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
 
       # Every asset, and the check that each names one version: the version
       # and the image this workflow pushes, handed to the build rather than
@@ -270,9 +285,19 @@ jobs:
           CHARTS: ${{ steps.release.outputs.charts }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
           LATEST: ${{ steps.release.outputs.latest }}
+          PREVIOUS: ${{ steps.release.outputs.previous }}
         run: |
           version=$VERSION
+          # The list of what changed is GitHub's, built from the titles of the
+          # pull requests merged between the previous tag and this one and
+          # grouped as .github/release.yml says. The previous tag is named
+          # rather than left to GitHub, so the range is the one chosen above.
+          if [ -n "$PREVIOUS" ]; then set -- -f previous_tag_name="$PREVIOUS"; else set --; fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$GITHUB_REF_NAME" "$@" --jq .body > /tmp/changes.md
           {
+            cat /tmp/changes.md
+            echo
             echo "## Container image"
             echo
             echo '```'

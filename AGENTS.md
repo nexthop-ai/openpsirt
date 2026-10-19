@@ -622,6 +622,7 @@ somebody working out later why the code looks like this. Both are in a hurry.
 
 | Rule | |
 |---|---|
+| **A title is a line in the release notes** | An imperative verb, then the feature, screen or defect by the name a reader would search for: one clause naming the outcome, with no "and" joining two halves, in about 50 characters. "Speed up the Inventories page", "Publish CSAF and OpenVEX documents", "Make v0.7.0 the oldest supported schema". Not "Make v0.7.0's schema in one migration, and refuse a database older than it", and not a paraphrase that names nothing, such as "Report failures as what they are", "Hold the web's copies of server vocabulary to one source", "Serve a product's security documents to anybody, where an operator turns it on" or "Index findings by the runs that opened and closed them". Squash-merge makes it the commit subject on `main` and the line an operator reads when deciding whether to upgrade |
 | **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § Screen copy has the whole of it |
 | **Lists, tables and examples before prose** | A before-and-after pair says what a paragraph about the change does not. A paragraph is for the one thing that is neither a list nor a table |
 | **A measurement where there is one** | "3 ms on PostgreSQL, 11 ms on MySQL", "335,021 findings for one image": a number describing something outside this repository is why the change has the shape it has, and somebody can re-run it |

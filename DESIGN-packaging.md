@@ -29,6 +29,7 @@ requires, and the storage REQ-78 needs.
 - [Chart version stamping](#chart-version-stamping)
 - [Signing and provenance](#signing-and-provenance)
 - [The release procedure](#the-release-procedure)
+- [Release notes](#release-notes)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -570,7 +571,7 @@ Everything after the tag is the `Release` workflow.
 | Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything. The version and the image name are the ones this workflow pushes, handed to it rather than worked out again, so what is pushed is what was built |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
-| Creates the release and uploads every asset | Marked the repository's Latest only where this is the newest release, since GitHub marks a new release Latest unless told |
+| Creates the release and uploads every asset | Marked the repository's Latest only where this is the newest release, since GitHub marks a new release Latest unless told. The notes open with what changed, as § Release notes says |
 | Publishes the documentation under the version | And moves `latest`, and makes it the site's default, where this is the newest release |
 
 | Rule | Why |
@@ -584,6 +585,32 @@ When a step fails, the tag stays and the release does not exist yet. Fix what
 failed, delete the tag on the remote and locally, and tag again — the only case
 where a tag is allowed to move, because nothing has been published under it.
 Once assets exist under a tag, that tag is spent.
+
+## Release notes
+
+A release's notes open with a list of what changed since the previous release,
+then the image, the chart, the downloads and how to verify them.
+
+The list is GitHub's release-notes generator, run by the workflow with this tag
+and the previous one. Each line is one pull request merged in that range, and
+the line is the pull request's title. That is why a title follows the rule in
+`AGENTS.md` § Pull request descriptions: it is read here by an operator
+deciding whether to upgrade.
+
+| Release | Previous tag |
+|---|---|
+| Stable | The newest stable tag that sorts below this one by version. Prereleases are skipped |
+| Prerelease | The newest tag of any kind that sorts below this one |
+| The first of its kind | None. The list covers the history up to this tag |
+
+| Rule | Why |
+|---|---|
+| The previous tag is chosen by the workflow and named in the request | Left to GitHub, the range starts at the most recent release, which for a fix to an older line is a newer one |
+| Versions sort with a prerelease below its release | `0.1.0-rc.1` sorts below `0.1.0`, as semantic versioning orders them |
+| Pull requests fall into two groups, `Changes` and then `Dependencies` | A dependency update is one a reader skims past. `.github/release.yml` sets the groups |
+| `Dependencies` holds every pull request Dependabot opened, and every one labeled `dependencies` | Dependabot applies that label, and a pull request matching neither group would be dropped from the list |
+| The generator needs no permission beyond `contents: write` | The job already holds it to create the release |
+| Notes are written once, when the release is created | A release is never rebuilt under its tag, and its notes are not rewritten either. Releases created before the list existed carry none |
 
 ## Not built
 

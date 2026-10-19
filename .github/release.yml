@@ -1,0 +1,14 @@
+# The groups GitHub's release-notes generator sorts merged pull requests into.
+#
+# A pull request goes to the first category it matches. Dependency updates are
+# excluded from the first, so the second catches every one of them: those
+# Dependabot opened, and any other carrying the label Dependabot applies.
+changelog:
+  categories:
+    - title: Changes
+      labels: ["*"]
+      exclude:
+        labels: [dependencies]
+        authors: [dependabot, "dependabot[bot]", app/dependabot]
+    - title: Dependencies
+      labels: ["*"]
