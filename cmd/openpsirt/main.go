@@ -517,7 +517,9 @@ func prepare(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// product's builds again where it moved. Started whatever is configured
 	// and doing nothing where no product trusts one; one replica reaches out,
 	// by a lease of its own.
-	forks := upstream.NewPass(db.DB, work, logger, name, cfg.Limits())
+	// The system's certificate authorities check an upstream, as they check
+	// every host this process reaches.
+	forks := upstream.NewPass(db.DB, work, logger, name, cfg.Limits(), nil)
 	// Fetches the repositories patch links point into and records which
 	// branches each linked commit is on. Started either way and doing nothing
 	// unless the deployment turned it on. One replica fetches, settled by a

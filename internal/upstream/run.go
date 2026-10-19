@@ -5,6 +5,7 @@ package upstream
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,18 +46,16 @@ type Pass struct {
 }
 
 // NewPass returns the pass over db, reaching out as whichever replica this is
-// and queueing builds to run again on q.
-func NewPass(db *bun.DB, q *queue.Queue, logger *slog.Logger, replica string, limits sbom.Limits) *Pass {
+// and queueing builds to run again on q. roots are the certificate
+// authorities an upstream is checked against, nil for the system's.
+func NewPass(db *bun.DB, q *queue.Queue, logger *slog.Logger, replica string, limits sbom.Limits,
+	roots *x509.CertPool) *Pass {
 	return &Pass{
-		db: db, read: NewReader(db, limits), queue: q, logger: logger,
+		db: db, read: NewReader(db, limits, roots), queue: q, logger: logger,
 		leases: queue.NewLeases(db), replica: replica,
 		now: func() time.Time { return time.Now().UTC() },
 	}
 }
-
-// Reading is the reader the pass reads with, for a caller to point at
-// certificate authorities of its own.
-func (p *Pass) Reading() *Reader { return p.read }
 
 // Run reads until the context ends.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {

@@ -8,12 +8,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
+	"database/sql"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -171,15 +173,16 @@ type Read struct {
 type Reader struct {
 	db     bun.IDB
 	limits sbom.Limits
-	// Roots are the certificate authorities an upstream is checked against,
+	// roots are the certificate authorities an upstream is checked against,
 	// nil for the system's.
-	Roots *x509.CertPool
+	roots *x509.CertPool
 	now   func() time.Time
 }
 
-// NewReader returns a reader over db.
-func NewReader(db bun.IDB, limits sbom.Limits) *Reader {
-	return &Reader{db: db, limits: limits, now: func() time.Time { return time.Now().UTC() }}
+// NewReader returns a reader over db, checking an upstream's certificate
+// against roots, nil for the system's authorities.
+func NewReader(db bun.IDB, limits sbom.Limits, roots *x509.CertPool) *Reader {
+	return &Reader{db: db, limits: limits, roots: roots, now: func() time.Time { return time.Now().UTC() }}
 }
 
 // From reads one upstream: its description, its listings, and every document
@@ -191,7 +194,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	if err != nil {
 		return took, err
 	}
-	client := Client(address, r.Roots)
+	client := Client(address, r.roots)
 	meta, err := described(ctx, client, up.URL)
 	switch {
 	case errors.Is(err, errGone):
@@ -249,7 +252,7 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 			took.Filled = true
 			break
 		}
-		changed, err := r.document(ctx, client, up, one, recorded[one.address], keyring)
+		changed, err := r.document(ctx, client, up, one, keyring)
 		var refusedDoc unreadable
 		switch {
 		case errors.As(err, &refusedDoc):
@@ -262,11 +265,12 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		took.Documents++
 		took.Moved = took.Moved || changed
 	}
-	for address, was := range recorded {
+	// In order, so two reads withdrawing the same documents do it alike.
+	for _, address := range slices.Sorted(maps.Keys(recorded)) {
 		if current[address] {
 			continue
 		}
-		if err := r.withdraw(ctx, up, was); err != nil {
+		if err := r.withdraw(ctx, up, address); err != nil {
 			return took, NewStore(r.db).reached(ctx, up, up.Listings, "", err)
 		}
 		took.Withdrawn++
@@ -464,7 +468,7 @@ var errWithdrawn = refusal.New("that upstream is no longer trusted as it was")
 // served beside it, and records what it says, answering whether what it says
 // moved.
 func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream, one listed,
-	was Document, keyring openpgp.EntityList) (bool, error) {
+	keyring openpgp.EntityList) (bool, error) {
 
 	body, err := fetch(ctx, client, one.address, mostDocumentBytes, nil)
 	if err != nil {
@@ -491,9 +495,10 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	case err != nil:
 		return false, unreadable{err: err}
 	}
-	statements := StatementsOf(said)
+	statements := statementsOf(said)
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])
+	moved := false
 	err = database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
 		still, err := standing(ctx, tx, up)
 		if err != nil {
@@ -502,6 +507,11 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 		if still == nil {
 			return errWithdrawn
 		}
+		was, err := recordedAt(ctx, tx, up, one.address)
+		if err != nil {
+			return err
+		}
+		moved = was.Digest != digest
 		if was.ID != 0 && was.TrackingID != tracking {
 			// The address now holds another document: what the one
 			// before it said is set aside.
@@ -534,12 +544,29 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	if err != nil {
 		return false, err
 	}
-	return was.Digest != digest, nil
+	return moved, nil
+}
+
+// recordedAt is what was last recorded of the document at an address, read
+// inside the transaction that replaces it; empty where nothing was.
+func recordedAt(ctx context.Context, tx bun.IDB, up Upstream, address string) (Document, error) {
+	var was Document
+	err := tx.NewSelect().Model(&was).
+		Where(`"ud"."upstream_id" = ?`, up.ID).
+		Where(`"ud"."url_digest" = ?`, digestOf(address)).
+		Scan(ctx)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return Document{}, nil
+	case err != nil:
+		return Document{}, fmt.Errorf("read what was recorded of a document: %w", err)
+	}
+	return was, nil
 }
 
 // withdraw sets aside everything a document the upstream stopped listing said,
 // and forgets it was read.
-func (r *Reader) withdraw(ctx context.Context, up Upstream, was Document) error {
+func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) error {
 	return database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
 		still, err := standing(ctx, tx, up)
 		if err != nil {
@@ -547,6 +574,10 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, was Document) error 
 		}
 		if still == nil {
 			return errWithdrawn
+		}
+		was, err := recordedAt(ctx, tx, up, address)
+		if err != nil || was.ID == 0 {
+			return err
 		}
 		if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
 			supplied(up, was.TrackingID, was.URL, was.Digest), nil); err != nil {
@@ -568,7 +599,7 @@ func (r *Reader) withdrawAll(ctx context.Context, up Upstream) (int, error) {
 		return 0, fmt.Errorf("read what was read of an upstream: %w", err)
 	}
 	for i, was := range documents {
-		if err := r.withdraw(ctx, up, was); err != nil {
+		if err := r.withdraw(ctx, up, was.URL); err != nil {
 			return i, err
 		}
 	}
@@ -609,14 +640,14 @@ func trackingOf(body []byte) (string, error) {
 	return tracking, nil
 }
 
-// StatementsOf is what an upstream's document says, as it is recorded.
+// statementsOf is what an upstream's document says, as it is recorded.
 //
 // A statement naming a component alone, by its package identifier, holds for
 // anybody shipping that component, and is applied at that component and
 // version (REQ-84). A statement naming the component inside something of the
 // upstream's — its build, or what pulls the component in there — depends on
 // that, and places nothing here: it is offered for review.
-func StatementsOf(said []sbom.Suppression) []finding.Statement {
+func statementsOf(said []sbom.Suppression) []finding.Statement {
 	var out []finding.Statement
 	for _, claim := range said {
 		for _, at := range claim.Targets {

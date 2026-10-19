@@ -250,7 +250,7 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 				WhereOr(`"ss"."status" = ? AND "ss"."placement" = ? AND "ss"."about" <> ?`,
 					string(sbom.NotAffected), PlacedProduct, "").
 				WhereOr(`"ss"."status" IN (?) AND "ss"."placement" = ? AND "ss"."source" = ? AND "ss"."about" <> ?`,
-					bun.List(UpstreamCloses()), PlacedAnybody, FromUpstream, "")
+					bun.List(upstreamCloses()), PlacedAnybody, FromUpstream, "")
 		}).
 		Order("ss.id").
 		Scan(ctx)
@@ -275,10 +275,10 @@ func disclaimers(ctx context.Context, db bun.IDB, productID int64, issues []Name
 	return d, nil
 }
 
-// UpstreamCloses is what an upstream's statement says where it closes a
+// upstreamCloses is what an upstream's statement says where it closes a
 // finding: that the component at that version is not affected, or is fixed.
 // Nothing else it says closes anything (REQ-31).
-func UpstreamCloses() []string {
+func upstreamCloses() []string {
 	return []string{string(sbom.NotAffected), string(sbom.AlreadyFixed)}
 }
 

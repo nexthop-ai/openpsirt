@@ -120,8 +120,7 @@ func bare(t *testing.T, f *fixture.World) *world {
 		w.DeclareVariant(w.fork, "x86", true))
 	w.forkLater = w.TargetFor(w.DeclareStream(w.fork, "next", catalog.Branch, nil),
 		w.DeclareVariant(w.fork, "arm", true))
-	w.reader = upstream.NewReader(db, sbom.Limits{})
-	w.reader.Roots = w.server.roots
+	w.reader = upstream.NewReader(db, sbom.Limits{}, w.server.roots)
 	return w
 }
 
