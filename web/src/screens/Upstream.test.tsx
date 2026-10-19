@@ -70,6 +70,8 @@ describe("the upstream drawer", () => {
     mount.render(screen(<UpstreamDrawer product="fork-os" open onClose={() => undefined} />));
     await settle();
     expect(document.body.textContent).toContain("now signs with EEEE9999");
+    expect(document.body.textContent).toContain("Last error");
+    expect(document.body.textContent).toContain("names a signing key other than the one trusted");
     expect(button("Stop trusting")).toBeDefined();
   });
 });

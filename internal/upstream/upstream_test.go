@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -121,16 +122,15 @@ func TestWhatAnUpstreamClosedOpensWhenItsWordStopsHolding(t *testing.T) {
 			t.Errorf("a statement whose decline was taken back does not close the finding: %+v", got)
 		}
 
-		// The upstream stops publishing: its documents are withdrawn, and its
-		// listing stops naming them.
-		if err := w.Catalog.SetPublishes(t.Context(), w.Product.ID, false); err != nil {
-			t.Fatal(err)
-		}
-		if err := publish.NewStore(w.DB.DB).WithdrawProduct(t.Context(), w.Product.ID); err != nil {
+		// The upstream withdraws its document about the issue, and its
+		// listing stops naming it while it still lists the other.
+		if _, err := w.DB.DB.NewUpdate().Model((*publish.Document)(nil)).
+			Set(`"withdrawn_at" = ?`, time.Now().UTC()).
+			Where(`"subject" = ?`, portable).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		took := w.read()
-		if took.Withdrawn != 2 || !took.Moved {
+		if took.Withdrawn != 1 || !took.Moved {
 			t.Fatalf("the read after the upstream withdrew its statement took %+v", took)
 		}
 		w.rescan()
@@ -303,6 +303,134 @@ func TestDecliningAStatementAsksForTriage(t *testing.T) {
 			map[int64][]access.Role{w.fork.ID: {access.PublicRead}}, 0)
 		if _, err := w.findings.Decline(t.Context(), reader, said.ID); err != finding.ErrStatementNotFound {
 			t.Errorf("somebody who only reads the fork declined a statement: %v", err)
+		}
+	})
+}
+
+// A description that cannot be read withdraws nothing, however it failed:
+// what the upstream said stands, and the failure is recorded for an
+// administrator to see.
+func TestAFailedDescriptionWithdrawsNothing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		w.server.drop(publish.MetadataPath)
+		took := w.read()
+		if took.Withdrawn != 0 {
+			t.Errorf("a description answering 404 withdrew %d documents", took.Withdrawn)
+		}
+		w.rescan()
+		if w.statement(portable, finding.PlacedAnybody) == nil {
+			t.Error("a statement stopped standing because the description could not be read")
+		}
+		if got := w.state(w.forkBuild, portable, openssl); got.open {
+			t.Errorf("the fork's finding opened because the description could not be read: %+v", got)
+		}
+		up, err := upstream.NewStore(w.DB.DB).For(t.Context(), w.admin, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(up.Failed, "404") || up.ReachedAt == nil {
+			t.Errorf("the failed read records %q, last read %v", up.Failed, up.ReachedAt)
+		}
+	})
+}
+
+// An upstream moved to another address keeps what it said until the first
+// complete read there: a statement repeated stays as it is, declined or not;
+// one revised replaces it; one the new address does not list is withdrawn;
+// and nothing is withdrawn while the new address cannot be read whole.
+func TestAMovedUpstreamIsReconciledByItsFirstCompleteRead(t *testing.T) {
+	relabel := func(body []byte) []byte {
+		return bytes.ReplaceAll(body, []byte("vulnerable_code_not_present"), []byte("component_not_present"))
+	}
+	for _, c := range []struct {
+		what    string
+		alter   map[string]func([]byte) []byte
+		omit    []string
+		corrupt []string
+		fails   bool
+		// stays says the portable statement stands as the row it was;
+		// revised that another row stands in its place; withdrawn that none
+		// does.
+		stays, revised, withdrawn bool
+	}{
+		{what: "unchanged", stays: true},
+		{what: "revised", alter: map[string]func([]byte) []byte{portable: relabel}, revised: true},
+		{what: "absent", omit: []string{portable}, withdrawn: true},
+		{what: "absent, the read incomplete", omit: []string{portable}, corrupt: []string{ownBuild}, stays: true},
+		{what: "unreadable", fails: true, stays: true},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				first := mirror(t, w, nil, nil, nil)
+				moved := mirror(t, w, c.alter, c.omit, c.corrupt)
+				w.readingBoth(first, moved)
+				w.trustAt(first.address())
+				w.read()
+				w.rescan()
+				before := w.statement(portable, finding.PlacedAnybody)
+				review := w.statement(ownBuild, "")
+				if before == nil || review == nil {
+					t.Fatal("the first address recorded nothing")
+				}
+				if _, err := w.findings.Decline(t.Context(), w.proposer, review.ID); err != nil {
+					t.Fatal(err)
+				}
+
+				w.trustAt(moved.address())
+				if c.fails {
+					// Readable when it was named, and not since.
+					moved.fail()
+				}
+				w.read()
+				w.rescan()
+				after := w.statement(portable, finding.PlacedAnybody)
+				switch {
+				case c.stays && (after == nil || after.ID != before.ID):
+					t.Errorf("the statement is %+v, want the row it was", after)
+				case c.revised && (after == nil || after.ID == before.ID ||
+					after.Justification != "component_not_present"):
+					t.Errorf("the statement is %+v, want the revision in its place", after)
+				case c.withdrawn && after != nil:
+					t.Errorf("a statement the new address does not list still stands: %+v", after)
+				}
+				got := w.state(w.forkBuild, portable, openssl)
+				if got.open != c.withdrawn {
+					t.Errorf("the fork's finding stands %+v", got)
+				}
+				if c.withdrawn || c.fails {
+					return
+				}
+				kept := w.statement(ownBuild, "")
+				if c.corrupt == nil && (kept == nil || kept.ID != review.ID || kept.DeclinedAt == nil) {
+					t.Errorf("the statement repeated at the new address is %+v, want it as it was, declined", kept)
+				}
+			})
+		})
+	}
+}
+
+// A moved upstream naming a key other than the one trusted is not read until
+// an administrator trusts it again.
+func TestAMovedUpstreamKeepsTheTrustedKey(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		moved := mirror(t, w, nil, []string{portable}, nil)
+		w.readingBoth(moved)
+		w.trust()
+		w.read()
+		up := w.trustAt(moved.address())
+		if up.Fingerprint == "" || up.KeyOffered != upstream.NoKey {
+			t.Fatalf("the moved upstream holds key %q, offered %q", up.Fingerprint, up.KeyOffered)
+		}
+		if took := w.read(); took.Withdrawn != 0 || took.Documents != 0 {
+			t.Errorf("a moved upstream naming another key was read: %+v", took)
+		}
+		if w.statement(portable, finding.PlacedAnybody) == nil {
+			t.Error("a moved upstream naming another key withdrew a statement")
 		}
 	})
 }

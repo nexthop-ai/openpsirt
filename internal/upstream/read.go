@@ -196,22 +196,18 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 	}
 	client := Client(address, r.roots)
 	meta, err := described(ctx, client, up.URL)
-	switch {
-	case errors.Is(err, errGone):
-		// An upstream publishing nothing at all serves no description, so
-		// everything it said before is withdrawn. Over TLS to the host an
-		// administrator named, nobody else can answer this.
-		withdrawn, werr := r.withdrawAll(ctx, up)
-		took.Withdrawn, took.Moved = withdrawn, withdrawn > 0
-		if werr != nil {
-			err = werr
-		}
-		return took, NewStore(r.db).reached(ctx, up, "", up.KeyOffered, err)
-	case err != nil:
+	if err != nil {
+		// However the description failed — not found, refused, a TLS fault,
+		// a timeout — nothing is withdrawn. What the upstream said stands
+		// until a read that succeeds says otherwise.
 		return took, NewStore(r.db).reached(ctx, up, up.Listings, up.KeyOffered, err)
 	}
 	if offered, _ := keyIn(meta); offered != up.Fingerprint {
-		return took, NewStore(r.db).reached(ctx, up, up.Listings, offered, describe(offered, up.Fingerprint))
+		recorded := offered
+		if recorded == "" {
+			recorded = NoKey
+		}
+		return took, NewStore(r.db).reached(ctx, up, up.Listings, recorded, describe(offered, up.Fingerprint))
 	}
 	var keyring openpgp.EntityList
 	if up.PublicKey != "" {
@@ -265,9 +261,14 @@ func (r *Reader) From(ctx context.Context, up Upstream) (Read, error) {
 		took.Documents++
 		took.Moved = took.Moved || changed
 	}
-	// In order, so two reads withdrawing the same documents do it alike.
+	// Withdrawn only from a complete read: every listing read whole and every
+	// document that moved taken and checked. A pass that left any behind
+	// withdraws nothing, so a document cannot read as absent because the
+	// pass stopped short of it. In order, so two reads withdrawing the same
+	// documents do it alike.
+	complete := !took.Filled && took.Refused == 0
 	for _, address := range slices.Sorted(maps.Keys(recorded)) {
-		if current[address] {
+		if current[address] || !complete {
 			continue
 		}
 		if err := r.withdraw(ctx, up, address); err != nil {
@@ -350,10 +351,6 @@ func (r *Reader) listings(ctx context.Context, client *http.Client, base string,
 			case errors.Is(err, errNotModified):
 				kept[address] = held[address]
 				unchanged++
-				continue
-			case errors.Is(err, errGone):
-				// A listing with nothing in it is not served: it lists
-				// nothing.
 				continue
 			case err != nil:
 				return nil, nil, 0, err
@@ -579,6 +576,21 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) erro
 		if err != nil || was.ID == 0 {
 			return err
 		}
+		// The same document read at another address — an upstream that
+		// moved — already replaced what this one said, so only the record
+		// of where it was read goes.
+		elsewhere, err := tx.NewSelect().Model((*Document)(nil)).
+			Where(`"ud"."upstream_id" = ?`, up.ID).
+			Where(`"ud"."tracking_id" = ?`, was.TrackingID).
+			Where(`"ud"."id" <> ?`, was.ID).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("read whether a document moved: %w", err)
+		}
+		if elsewhere {
+			_, err := tx.NewDelete().Model((*Document)(nil)).Where(`"id" = ?`, was.ID).Exec(ctx)
+			return err
+		}
 		if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
 			supplied(up, was.TrackingID, was.URL, was.Digest), nil); err != nil {
 			return err
@@ -588,22 +600,6 @@ func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) erro
 		}
 		return nil
 	})
-}
-
-// withdrawAll withdraws every document read of an upstream, answering how
-// many it withdrew.
-func (r *Reader) withdrawAll(ctx context.Context, up Upstream) (int, error) {
-	var documents []Document
-	if err := r.db.NewSelect().Model(&documents).Where(`"ud"."upstream_id" = ?`, up.ID).
-		OrderExpr(`"ud"."id"`).Scan(ctx); err != nil {
-		return 0, fmt.Errorf("read what was read of an upstream: %w", err)
-	}
-	for i, was := range documents {
-		if err := r.withdraw(ctx, up, was.URL); err != nil {
-			return i, err
-		}
-	}
-	return len(documents), nil
 }
 
 // supplied is where an upstream's statements came from: one of its documents.

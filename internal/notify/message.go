@@ -69,6 +69,8 @@ var called = map[Kind]string{
 	RiskUnagreed:           "Something is hidden with nobody agreeing",
 	PairsConcentrated:      "One pair is agreeing to most of a product's work",
 	SupplierSilent:         "A supplier has stopped answering",
+	UpstreamFailing:        "An upstream cannot be read",
+	UpstreamRecovered:      "An upstream is read again",
 }
 
 // generalSubject is what a notification of no known kind is called.

@@ -69,6 +69,7 @@ func Kinds() []Kind {
 		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, MergeSuperseded, BroughtIn, Disclosed,
 		Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
+		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
@@ -278,6 +279,14 @@ const (
 	// administrators, and cleared by a read succeeding or the supplier being
 	// withdrawn.
 	SupplierSilent Kind = "supplier-silent"
+	// UpstreamFailing is the upstream a product trusts failing to be read,
+	// past a threshold that rides out one failed read. Told to
+	// administrators, and cleared by a read succeeding or the upstream no
+	// longer being trusted.
+	UpstreamFailing Kind = "upstream-failing"
+	// UpstreamRecovered is an upstream read again after it was said to be
+	// failing. An event, told to whoever was told it was failing, once.
+	UpstreamRecovered Kind = "upstream-recovered"
 )
 
 // Notification is one thing somebody was told.
@@ -453,6 +462,17 @@ type Holds struct {
 // reports "nothing changed" is how somebody notices it has stopped working.
 func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 	holding []Holds) (opened, cleared int, err error) {
+	return s.ReconcileTelling(ctx, personID, kind, holding, nil)
+}
+
+// ReconcileTelling is Reconcile, telling the person what ended says about each
+// condition that stopped being true, as an event, in the transaction that
+// clears it. ended answers nil for a condition that ends with nothing to say.
+//
+// Told once however many replicas reconcile at once: a condition is cleared
+// one row at a time, and only the reconcile whose write cleared it tells.
+func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
+	holding []Holds, ended func(Notification) *Telling) (opened, cleared int, err error) {
 
 	if personID == 0 || kind == "" {
 		return 0, 0, refusal.New("a condition needs somebody and a kind")
@@ -484,7 +504,8 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 
 		now := s.now()
 		held := make(map[string]bool, len(open))
-		var ended []int64
+		var stopped []int64
+		var stoppedRows []Notification
 		var moved []restated
 		for _, row := range open {
 			held[row.About] = true
@@ -510,19 +531,48 @@ func (s *Store) Reconcile(ctx context.Context, personID int64, kind Kind,
 			// It stopped being true. The row is kept and marked rather than
 			// deleted, so "this cleared" stays answerable and a condition that
 			// returns is a new row rather than an edit of an old one.
-			ended = append(ended, row.ID)
+			stopped = append(stopped, row.ID)
+			stoppedRows = append(stoppedRows, row)
 		}
 
-		if err := database.IDsInBatches(ctx, ended, func(ctx context.Context, ids []int64) error {
-			_, err := tx.NewUpdate().Model((*Notification)(nil)).
-				Set(`"cleared_at" = ?`, now).
-				Set(`"about_open" = NULL`).
-				Where(`"id" IN (?)`, bun.List(ids)).Exec(ctx)
-			return err
-		}); err != nil {
-			return fmt.Errorf("clear the conditions that ended: %w", err)
+		if ended == nil {
+			if err := database.IDsInBatches(ctx, stopped, func(ctx context.Context, ids []int64) error {
+				_, err := tx.NewUpdate().Model((*Notification)(nil)).
+					Set(`"cleared_at" = ?`, now).
+					Set(`"about_open" = NULL`).
+					Where(`"id" IN (?)`, bun.List(ids)).Exec(ctx)
+				return err
+			}); err != nil {
+				return fmt.Errorf("clear the conditions that ended: %w", err)
+			}
+			cleared = len(stopped)
+		} else {
+			for _, row := range stoppedRows {
+				res, err := tx.NewUpdate().Model((*Notification)(nil)).
+					Set(`"cleared_at" = ?`, now).
+					Set(`"about_open" = NULL`).
+					Where(`"id" = ?`, row.ID).
+					Where(`"cleared_at" IS NULL`).Exec(ctx)
+				if err != nil {
+					return fmt.Errorf("clear a condition that ended: %w", err)
+				}
+				if n, err := res.RowsAffected(); err != nil || n == 0 {
+					continue
+				}
+				cleared++
+				said := ended(row)
+				if said == nil {
+					continue
+				}
+				if _, err := tx.NewInsert().Model(&Notification{
+					PersonID: personID, Kind: said.Kind, Lifetime: Event,
+					Body: said.Body, Link: said.Link, ProductID: said.ProductID,
+					Together: said.Together, CreatedAt: now,
+				}).Exec(ctx); err != nil {
+					return fmt.Errorf("say what ended: %w", err)
+				}
+			}
 		}
-		cleared = len(ended)
 
 		if err := restate(ctx, tx, moved); err != nil {
 			return fmt.Errorf("say what the standing conditions say now: %w", err)

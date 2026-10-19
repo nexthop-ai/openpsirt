@@ -156,6 +156,7 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"AssignmentsTeam":     weblink.AssignmentsTeam,
 		"AssignmentsPerson":   weblink.AssignmentsPerson,
 		"Settings":            func(string) string { return weblink.Settings() },
+		"Products":            func(string) string { return weblink.Products() },
 		"System":              func(string) string { return weblink.System() },
 		"ExploitedHere":       func(string) string { return weblink.ExploitedHere() },
 		"Claim":               func(string) string { return weblink.Claim(7) },

@@ -55,6 +55,8 @@ const WORDS: Record<Kind, string> = {
   "risk-unagreed": "hidden with nobody agreeing",
   "pairs-concentrated": "one pair agreeing to most of the work",
   "supplier-silent": "supplier stopped answering",
+  "upstream-failing": "upstream cannot be read",
+  "upstream-recovered": "upstream read again",
   // An upload that changed much of what a build is made of. Said as what it
   // was rather than as what it might mean: nothing here knows whether the
   // base image moved or the pipeline broke.

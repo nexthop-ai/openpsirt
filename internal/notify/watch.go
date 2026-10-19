@@ -131,6 +131,44 @@ func (w *sweep) tellAdministrators(ctx context.Context, admins []int64) (opened,
 			return opened, cleared, err
 		}
 	}
+	o, c, err := w.upstreams(ctx, admins)
+	return opened + o, cleared + c, err
+}
+
+// upstreams tells administrators which upstreams cannot be read, and tells
+// whoever heard that one was failing when it is read again.
+func (w *sweep) upstreams(ctx context.Context, admins []int64) (opened, cleared int, err error) {
+	var failing []Holds
+	recovered := map[string]Holds{}
+	if len(admins) > 0 {
+		if failing, recovered, err = w.upstreamsFailing(ctx); err != nil {
+			return 0, 0, err
+		}
+	}
+	out, err := w.everybody(ctx, UpstreamFailing)
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, admin := range admins {
+		if _, told := out[admin]; told || len(failing) > 0 {
+			out[admin] = failing
+		}
+	}
+	ended := func(row Notification) *Telling {
+		again, ok := recovered[row.About]
+		if !ok {
+			return nil
+		}
+		return &Telling{Kind: UpstreamRecovered, Body: again.Body, Link: again.Link,
+			ProductID: again.ProductID, Together: "upstream-recovered " + row.About}
+	}
+	for person, told := range out {
+		o, c, err := NewStore(w.db).ReconcileTelling(ctx, person, UpstreamFailing, told, ended)
+		if err != nil {
+			return opened, cleared, fmt.Errorf("tell %d which upstreams cannot be read: %w", person, err)
+		}
+		opened, cleared = opened+o, cleared+c
+	}
 	return opened, cleared, nil
 }
 

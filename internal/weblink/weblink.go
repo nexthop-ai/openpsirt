@@ -58,6 +58,10 @@ func AssignmentsPerson(identity string) string {
 // Settings is the deployment's settings.
 func Settings() string { return "/settings" }
 
+// Products is the products this deployment declares, where each one's upstream
+// is reached from its row.
+func Products() string { return "/products" }
+
 // System is the deployment's own health.
 func System() string { return "/system" }
 

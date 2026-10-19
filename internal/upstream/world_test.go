@@ -5,11 +5,15 @@ package upstream_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -506,4 +510,137 @@ func otherSignature(t *testing.T) []byte {
 		t.Fatal(err)
 	}
 	return signed
+}
+
+// mirrored is another upstream address serving the upstream's documents,
+// unsigned, each altered or left out as a test says, with a digest beside
+// every one it serves.
+type mirrored struct {
+	server *httptest.Server
+	base   string
+	mu     sync.Mutex
+	gone   bool
+}
+
+// address is where the mirror describes what it publishes.
+func (m *mirrored) address() string { return m.base + publish.MetadataPath }
+
+// fail has the mirror answer its description as nothing published there.
+func (m *mirrored) fail() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.gone = true
+}
+
+// mirror stands up another address serving what the upstream publishes now,
+// with alter applied to the documents about the issues it names and the
+// documents about the issues in omit left out. corrupt names issues whose
+// digest is served wrong.
+func mirror(t *testing.T, w *world, alter map[string]func([]byte) []byte, omit, corrupt []string) *mirrored {
+	t.Helper()
+	bodies := map[string][]byte{}
+	sums := map[string]string{}
+	for _, path := range w.server.documents(t) {
+		res, err := w.server.server.Client().Get(w.server.base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		skip := false
+		for _, issue := range omit {
+			skip = skip || strings.Contains(path, strings.ToLower(issue))
+		}
+		if skip {
+			continue
+		}
+		for issue, change := range alter {
+			if strings.Contains(path, strings.ToLower(issue)) {
+				body = change(body)
+			}
+		}
+		bodies[path] = body
+		sum := sha256.Sum256(body)
+		sums[path] = hex.EncodeToString(sum[:])
+		for _, issue := range corrupt {
+			if strings.Contains(path, strings.ToLower(issue)) {
+				sums[path] = strings.Repeat("0", 64)
+			}
+		}
+	}
+	m := &mirrored{}
+	m.server = httptest.NewUnstartedServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		m.mu.Lock()
+		gone := m.gone
+		m.mu.Unlock()
+		switch path := req.URL.Path; {
+		case path == publish.MetadataPath && !gone:
+			_, _ = io.WriteString(rw, `{"canonical_url":"`+m.address()+`","publisher":{"category":"vendor",`+
+				`"name":"SONiC Project","namespace":"https://sonic.example.test"},"distributions":[{"rolie":`+
+				`{"feeds":[{"tlp_label":"WHITE","url":"`+m.base+`/feed.json"}]}}],"role":"csaf_provider"}`)
+		case path == "/feed.json" && !gone:
+			var entries []string
+			for _, doc := range slices.Sorted(maps.Keys(bodies)) {
+				entries = append(entries, `{"id":"`+doc+`","updated":"`+sums[doc]+`",`+
+					`"content":{"src":"`+m.base+doc+`"}}`)
+			}
+			_, _ = io.WriteString(rw, `{"feed":{"id":"feed","entry":[`+strings.Join(entries, ",")+`]}}`)
+		case strings.HasSuffix(path, publish.SHA256Suffix):
+			sum, ok := sums[strings.TrimSuffix(path, publish.SHA256Suffix)]
+			if !ok {
+				http.NotFound(rw, req)
+				return
+			}
+			_, _ = io.WriteString(rw, sum+"\n")
+		default:
+			body, ok := bodies[path]
+			if !ok || gone {
+				http.NotFound(rw, req)
+				return
+			}
+			_, _ = rw.Write(body)
+		}
+	}))
+	m.server.StartTLS()
+	t.Cleanup(m.server.Close)
+	m.base = m.server.URL
+	return m
+}
+
+// readingBoth points the fork's reader at certificate authorities trusting
+// the upstream's surface and the mirrors given.
+func (w *world) readingBoth(mirrors ...*mirrored) {
+	roots := x509.NewCertPool()
+	roots.AddCert(w.server.server.Certificate())
+	for _, m := range mirrors {
+		roots.AddCert(m.server.Certificate())
+	}
+	w.server.roots = roots
+	w.reader = upstream.NewReader(w.DB.DB, sbom.Limits{}, roots)
+}
+
+// trustAt has the fork trust the upstream at an address, confirming the key
+// that address names, as the API does for a first address or the same one;
+// for another address the key trusted already stays.
+func (w *world) trustAt(address string) *upstream.Upstream {
+	w.t.Helper()
+	parsed, err := upstream.Address(address)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	described, err := upstream.Inspect(w.t.Context(), upstream.Client(parsed, w.server.roots), address)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	up, err := upstream.NewStore(w.DB.DB).Trust(w.t.Context(), w.admin, w.fork.ID, upstream.Trusting{
+		URL: address, Publisher: described.Publisher,
+		Fingerprint: described.Fingerprint, PublicKey: described.PublicKey,
+	})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return up
 }

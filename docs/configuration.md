@@ -1001,6 +1001,23 @@ beside it, and against its signature where the upstream signs; a document
 failing either is not taken. An upstream that starts naming another key is
 read no further until an administrator trusts it again, on the same page.
 
+A read that fails withdraws nothing, whatever failed: the description or a
+listing answering 404, a TLS fault, a timeout. What the upstream said stands
+until a read that works says otherwise; a statement is withdrawn only when a
+complete read finds its document gone from every listing, or the document
+itself drops or revises it. Once nothing has been read for two read intervals,
+administrators are told, in the application and on any mail, webhook or chat
+destination taking administrators' notices, and told once more when it is
+read again. The upstream's drawer shows when it was last read and the last
+error.
+
+An upstream that moved is followed by naming its new address in the same
+drawer; a redirect is never followed. The key already trusted still checks
+every document, and the new address is not read if it names another key until
+that key is trusted. What the upstream said stands until the first complete
+read of the new address, which keeps what it repeats, replaces what it revises
+and withdraws what it no longer lists.
+
 How often an upstream is read again is the setting `upstream.every`, an hour
 unless set. A read whose listings have not moved is one request per listing,
 answered that nothing moved.

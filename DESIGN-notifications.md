@@ -270,6 +270,7 @@ sent when it does not reaches somebody who was not looking.
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
 | Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
+| An upstream cannot be read | Raised once the last read of the upstream a product trusts failed and nothing has been read for longer than two read intervals, so one failed read the next answers raises nothing; names the product, the address, the last error and when it was last read. Cleared by a read succeeding, which tells whoever held it, once, that it is read again, or by the upstream no longer being trusted (`DESIGN-upstream.md` § Failure notices) |
 | A supplier has stopped answering | One that stopped and one that published nothing look the same everywhere but the supplier's own panel. Raised once a configured supplier has gone unread past a setting, a week by default and never shorter than two scan intervals; cleared by a read succeeding, the supplier being withdrawn or its product being retired, since a retired product's suppliers are never read again |
 | One pair is agreeing to most of a product's work | The second person is there, and in form only. Not a report that must be empty, and it carries thresholds for that reason: below them one pair doing everything is what a small team looks like |
 
@@ -617,7 +618,7 @@ which, and a test holds the table against the list of kinds.
 | Kind of notification | Examples | Where it goes |
 |---|---|---|
 | Somebody's own | Assigned, named in a note, a claim sent back or waiting on them, an approval withdrawn or undone, a decision that lapsed, brought into a case, an issue they hold disclosed, a deferral running out | To them directly. Never to a channel |
-| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, a judgment a merge of two issues superseded, the vulnerability data stale, a supplier silent | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
+| Shared, disclosed | A critical on a release, a build gone quiet, an inventory that moved sharply, work sitting in a team's queue, a judgment a merge of two issues superseded, the vulnerability data stale, a supplier silent, an upstream failing or read again | To the most specific channel covering it. To a person directly only where no channel on an offered platform covers it, or where they asked for what the channels carry |
 | Shared, undisclosed | An embargo approaching or due, an obligation window, a queue holding undisclosed work | To each person it names directly. The deployment's channel is told that there is something |
 
 | Person's setting | Default | Effect |

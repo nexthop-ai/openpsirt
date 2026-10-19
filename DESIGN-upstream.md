@@ -22,6 +22,7 @@ reasons; the outbound client is in `DESIGN-access.md`.
 - [Statements applied](#statements-applied)
 - [Offers for review](#offers-for-review)
 - [Declined statements](#declined-statements)
+- [Failure notices](#failure-notices)
 - [Settings](#settings)
 - [Measurements](#measurements)
 - [Choices beyond the decisions](#choices-beyond-the-decisions)
@@ -38,7 +39,8 @@ reasons; the outbound client is in `DESIGN-access.md`.
 | An upstream naming no key is trusted unsigned | Documents are then checked against their digests alone |
 | The publisher is fixed when the upstream is trusted | What the description named then is whose name every statement carries |
 | Trusting the same address again keeps what was read | It clears a key the upstream offered in place of the trusted one, which is how a changed key is trusted again |
-| Another address replaces the upstream | Everything the one before it said is set aside, as stopping trusting it does |
+| Another address is the same upstream moved | Its fingerprint is not asked for: the key trusted still checks every document, and a different key the new address names stops reading until it is trusted. What the upstream said stands until the first complete read of the new address (§ Reading) |
+| A redirect is never followed | An upstream that moved is followed by an administrator naming the new address |
 | Stopping trusting sets aside everything it said | The statements stay readable, because a decision citing one has to stay explicable. The product's builds are queued to be scanned again |
 | Every one of these is in the administrative trail | Under its own kind, with the address and the key |
 
@@ -72,14 +74,15 @@ setting names. One replica reaches out, settled by a lease.
 
 | Step | What happens |
 |---|---|
+| A read that fails | Withdraws nothing, however it failed: a description or listing answering 404 or another error, a TLS fault, a timeout. What the upstream said stands, and the failure is recorded and raised (§ Failure notices) |
 | The description | Read every pass. A key it names other than the one trusted, or a key where none was trusted, or none where one was, stops the read and is recorded as the key offered, until an administrator trusts the upstream again |
 | The listings | Each feed labeled WHITE or CLEAR, and otherwise each directory's list of changes. Asked with the entity tag and date each last answered with; where every listing answers that nothing moved, nothing else is asked. Where one moved, every listing is read whole |
-| What moved | A document listed at a moment other than the one last recorded is read. One no listing names any more is withdrawn |
+| What moved | A document listed at a moment other than the one last recorded is read, and what it says replaces what it said: a statement it repeats stays as it is, declined or not, one it revises is replaced, and one it drops is withdrawn |
+| What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, and every document that moved taken and checked. A pass that left any behind withdraws nothing |
+| A moved upstream | Its first complete read reconciles what it said: a document the new address serves under the same tracking identifier replaces the one read at the old address, as a revision does, and one the new address does not list is withdrawn |
 | A document | Fetched, compared against the digest served beside it, and checked against its signature where a key is trusted. A document failing either is not taken, and the listings are read whole on the next pass so it is asked for again |
 | Its name | The tracking identifier it names itself by. Its statements are recorded under that name and replaced by its next revision |
 | A security advisory | Listed beside the VEX documents; read, recorded as read, and nothing kept |
-| A description answering that nothing is published there | Everything read of the upstream is withdrawn. An upstream publishing nothing serves no description |
-| A listing answering that nothing is published there | It lists nothing |
 
 | Outcome recorded | |
 |---|---|
@@ -155,6 +158,17 @@ never applied by itself.
 | Recorded in the administrative trail, and the product's builds are queued to be scanned again | |
 | A decline stays with the statement while the upstream repeats it word for word | A statement the upstream revises is a new statement, and is not declined |
 
+## Failure notices
+
+| Rule | |
+|---|---|
+| Raised once the last read failed and nothing has been read for longer than two read intervals | One failed read the next answers raises nothing |
+| Told to administrators, in the area inside the application and wherever administrators' notices are carried | The area inside the application is the channel that always exists |
+| One notice while it fails, however many reads fail | It is a condition, which clears itself |
+| It names the product, the address, the last error and when it was last read | What an administrator needs to fix it |
+| Read again, it clears, and whoever held it is told once that it is read again | Stopping trusting the upstream clears it with nothing said |
+| The drawer on the product's row shows when it was last read and the last error | |
+
 ## Settings
 
 | Setting | Default | What it does |
@@ -184,12 +198,11 @@ fork reads it over TLS from a server on the same machine.
 | OpenVEX documents are not read | A provider description names CSAF documents and nothing else, and nothing standard says where an OpenVEX document is |
 | The key is confirmed by sending its fingerprint back | The administrator sees which key the documents will be checked against before anything is read |
 | A changed key stops reading and closes nothing new | What was recorded under the trusted key stands until the upstream is trusted again or stopped being trusted |
-| An upstream that answers 404 for its description publishes nothing | Over TLS to the host an administrator named, nobody else can answer that. A misconfigured address withdraws everything, which reopens work rather than hiding it |
 
 ## Limits
 
 | | |
 |---|---|
 | What an upstream says is applied at the next scan | A read that moved queues every build of the product, so that is minutes rather than a day; a statement withdrawn stays applied until then |
-| A pass that could not read the upstream keeps what it recorded | An upstream unreachable says nothing about what it withdrew, and holding the last answer is what a supplier's statements do too |
+| An upstream that withdrew everything and stopped serving a description keeps what it last said | A failed read cannot be told from an outage, and withdrawal is taken only from a read that worked; stopping trusting the upstream sets it aside |
 | Offers match a component by name and version | The upstream named its own build, and a component of the same name at the same version is where the same reasoning may hold; whether it does is the reviewer's question |

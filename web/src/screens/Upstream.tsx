@@ -148,21 +148,24 @@ function Trusted({ held, onRetrust }: { held: Upstream; onRetrust: () => void })
         <dt>Signing key</dt>
         <dd className="id">{held.fingerprint || "none — checked by digest only"}</dd>
         <dt>Last read</dt>
-        <dd>
-          {held.because ? (
-            <span className="state bad" title={held.because}>
-              {held.read ? <>failing, last read {since(held.read)}</> : <>never read</>}
-            </span>
-          ) : held.read ? (
-            since(held.read)
-          ) : (
-            <span className="hint">not yet</span>
-          )}
-        </dd>
+        <dd>{held.read ? since(held.read) : <span className="hint">never</span>}</dd>
+        {held.because && (
+          <>
+            <dt>Last error</dt>
+            <dd>
+              <span className="state bad">{held.tried ? since(held.tried) : "failing"}</span>{" "}
+              {held.because}
+            </dd>
+          </>
+        )}
       </dl>
       {held.key_offered && (
         <div className="alert" role="status">
-          <strong>The upstream now signs with {held.key_offered}.</strong>
+          <strong>
+            {held.key_offered === "none"
+              ? "The upstream now names no signing key."
+              : `The upstream now signs with ${held.key_offered}.`}
+          </strong>
           <span>Nothing is read until you trust it.</span>
           <button type="button" className="linkish" onClick={onRetrust}>
             Check it

@@ -143,11 +143,15 @@ type Trusting struct {
 	PublicKey   string
 }
 
-// Trust records that a product trusts an upstream, or trusts its key again.
+// Trust records that a product trusts an upstream, trusts its key again, or
+// reads it at another address.
 //
-// The same address again keeps what has been read and clears a key offered in
-// place of the trusted one. Another address is another upstream: what the one
-// before it said is set aside, as stopping trusting it does.
+// The same address again trusts the key given and clears a key offered in
+// place of the one trusted. Another address is the same upstream moved: what
+// it said stands, the key trusted stays the one documents are checked
+// against, and a key the new address names that differs is recorded as
+// offered, so nothing is read until it is trusted. What the upstream said is
+// reconciled against the new address by its first complete read.
 func (s *Store) Trust(ctx context.Context, subject access.Subject, productID int64,
 	trusting Trusting) (*Upstream, error) {
 
@@ -170,13 +174,8 @@ func (s *Store) Trust(ctx context.Context, subject access.Subject, productID int
 		if err != nil {
 			return err
 		}
-		if held != nil && (held.URL != trusting.URL || held.Publisher != trusting.Publisher) {
-			if err := s.forget(ctx, tx, held, now); err != nil {
-				return err
-			}
-			held = nil
-		}
-		if held == nil {
+		switch {
+		case held == nil:
 			out = &Upstream{
 				ProductID: productID, URL: trusting.URL, Publisher: trusting.Publisher,
 				Fingerprint: trusting.Fingerprint, PublicKey: trusting.PublicKey,
@@ -186,11 +185,22 @@ func (s *Store) Trust(ctx context.Context, subject access.Subject, productID int
 				return fmt.Errorf("trust an upstream: %w", err)
 			}
 			return nil
+		case held.URL == trusting.URL:
+			held.Fingerprint, held.PublicKey, held.KeyOffered = trusting.Fingerprint, trusting.PublicKey, ""
+		default:
+			held.URL, held.Listings, held.FetchedAt = trusting.URL, "", nil
+			held.KeyOffered = ""
+			if trusting.Fingerprint != held.Fingerprint {
+				held.KeyOffered = trusting.Fingerprint
+				if held.KeyOffered == "" {
+					held.KeyOffered = NoKey
+				}
+			}
 		}
-		held.Fingerprint, held.PublicKey, held.KeyOffered = trusting.Fingerprint, trusting.PublicKey, ""
 		held.Failed, held.TrustedBy, held.TrustedAt = "", subject.ID, now
 		if _, err := tx.NewUpdate().Model(held).
-			Column("fingerprint", "public_key", "key_offered", "failed", "trusted_by", "trusted_at").
+			Column("url", "listings", "fetched_at", "fingerprint", "public_key", "key_offered",
+				"failed", "trusted_by", "trusted_at").
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("trust an upstream again: %w", err)
 		}
@@ -199,6 +209,10 @@ func (s *Store) Trust(ctx context.Context, subject access.Subject, productID int
 	})
 	return out, err
 }
+
+// NoKey is the key an upstream offers where it names none, recorded where a
+// key was trusted.
+const NoKey = "none"
 
 // Withdraw stops a product trusting its upstream, answering the upstream it
 // trusted, or nil where it trusted none.

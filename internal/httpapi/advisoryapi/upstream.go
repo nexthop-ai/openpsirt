@@ -142,8 +142,12 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"upstream that signs nothing. Every document is checked against the digest served " +
 			"beside it, and against its signature where a key is trusted. A key the upstream " +
 			"changes stops it being read until it is trusted again.\n\n" +
-			"Another address replaces the upstream, and everything the one before it said stops " +
-			"closing anything. Recorded in the administrative trail.",
+			"Another address is the same upstream moved: the fingerprint is not asked for, the " +
+			"key already trusted still checks every document, and a different key the new " +
+			"address names stops reading until it is trusted. What the upstream said stands " +
+			"until the first complete read of the new address, which keeps what it repeats, " +
+			"replaces what it revises and withdraws what it no longer lists. A read that fails " +
+			"withdraws nothing. Recorded in the administrative trail.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -152,21 +156,29 @@ func registerUpstream(api huma.API, in core.Deps) {
 			Fingerprint string `json:"fingerprint,omitempty" maxLength:"191" doc:"The fingerprint of the key its documents are signed with, as inspecting it answered. Empty for an upstream that signs nothing"`
 		}
 	}) (*struct{ Body UpstreamBody }, error) {
-		if _, _, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product); err != nil {
+		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
+		if err != nil {
 			return nil, err
 		}
 		described, err := inspect(ctx, in, input.Body.URL)
 		if err != nil {
 			return nil, err
 		}
-		if upstream.FingerprintOf(input.Body.Fingerprint) != described.Fingerprint {
+		address, _ := upstream.Address(input.Body.URL)
+		held, err := upstream.NewStore(in.DB.DB).For(ctx, by, product.ID)
+		if err != nil {
+			return nil, core.Asked(in.Logger, err)
+		}
+		// Moving to another address keeps the key trusted, so what the new
+		// address names is recorded rather than confirmed here.
+		moving := held != nil && held.URL != address.String()
+		if !moving && upstream.FingerprintOf(input.Body.Fingerprint) != described.Fingerprint {
 			if described.Fingerprint == "" {
 				return nil, huma.Error409Conflict("that upstream names no signing key; send no fingerprint")
 			}
 			return nil, huma.Error409Conflict("that upstream signs with the key " +
 				described.Fingerprint + "; send that fingerprint to trust it")
 		}
-		address, _ := upstream.Address(input.Body.URL)
 		var out *upstream.Upstream
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
@@ -191,9 +203,6 @@ func registerUpstream(api huma.API, in core.Deps) {
 			if err := core.Noted(ctx, tx, trail.Upstream, "upstream · "+product.Name,
 				before, trail.Said(trusted(out), true)); err != nil {
 				return core.NotRecorded(in.Logger, err)
-			}
-			if was != nil && was.URL != out.URL {
-				return again(ctx, in, tx, product.ID)
 			}
 			return nil
 		}); err != nil {
