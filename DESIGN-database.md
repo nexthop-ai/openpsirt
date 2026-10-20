@@ -274,7 +274,7 @@ The chain is the baseline, then one part per release.
 | 41 | The baseline: v0.7.0's schema, made at once on an empty database. § The baseline says what holds it |
 | 42 | v0.8.0: v0.7.0's schema changed into v0.8.0's. § The v0.8.0 upgrade says what it does. A database v0.8.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 | 43 | v0.9.0: v0.8.0's schema changed into v0.9.0's. § The v0.9.0 upgrade says what it does. A database v0.9.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
-| 44 | v0.10.0: v0.9.0's schema changed into v0.10.0's, edited until v0.10.0 is tagged. § The v0.10.0 upgrade says what it does |
+| 44 | v0.10.0: v0.9.0's schema changed into v0.10.0's. § The v0.10.0 upgrade says what it does. A database v0.10.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
 
 Each tagged release keeps a record of its migrations: the files it shipped for
 them, the digest of each below its license header, its last migration, and the

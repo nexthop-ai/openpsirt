@@ -1,0 +1,6 @@
+# The migrations v0.10.0 tagged, and the digest of each file below its license header.
+last 44
+173661daa52aa9b6b972c0b3cc578d48dca1147862ea434ddaa73ceb13d9cc08  00044_v0100.go
+57903546836035dfffe3da0bbf3f7bedef599f722d4a59cfeae06e44f32fb468  v0100_finding.go
+5e30e930fcacbee5cb71aa1552609a500015e0aca19d84ba034680fd7ab4ff4f  v0100_publish.go
+bb8c3b034faa27e89284f3e14d628f605f3be6c71a9c543c65d26384ab3135db  v0100_upstream.go
