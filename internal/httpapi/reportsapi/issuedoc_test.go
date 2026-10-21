@@ -16,9 +16,10 @@ import (
 func TestTheIssueDocumentCountsOnlyTheJudgmentsInForceAsStanding(t *testing.T) {
 	// A withdrawn judgment is on the record and stands nowhere, so the
 	// sentence over a page of the record counts it as recorded and not as
-	// standing.
+	// standing. Lowering the page size changes it for the whole package, so
+	// this test runs alone.
 	defer reportsapi.JudgmentsShown(1)()
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.ReachOn(t, httpapitest.CastSeed.Alone, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
 		taken, _ := r.DecidedAt(t, place)
 		if _, err := r.DB.DB.NewUpdate().Table("decision").
