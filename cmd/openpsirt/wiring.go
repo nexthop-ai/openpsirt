@@ -66,23 +66,13 @@ func publishesAs(cfg config.Config) publisher.Named {
 }
 
 // publishing is the surface that serves the published documents and the pass
-// that writes them, or neither where the deployment publishes nothing.
-//
-// The key is read again here rather than carried from where the setting was
-// checked, because the check refuses a key that does not read and this is
-// the one place a signer is held.
+// that writes them, or neither where the deployment publishes nothing. The
+// signer is read by publishingKey, before the database is needed.
 func publishing(cfg config.Config, db *bun.DB, name string,
-	logger *slog.Logger) (http.Handler, *publish.Pass, error) {
+	logger *slog.Logger, signer *signing.Signer) (http.Handler, *publish.Pass) {
 
 	if !cfg.Publish {
-		return nil, nil, nil
-	}
-	var signer *signing.Signer
-	if cfg.PublishKey != "" {
-		var err error
-		if signer, err = signing.Read(cfg.PublishKey, cfg.PublishPassphrase); err != nil {
-			return nil, nil, fmt.Errorf("OPENPSIRT_PUBLISH_KEY: %w", err)
-		}
+		return nil, nil
 	}
 	who := publishesAs(cfg)
 	base := strings.TrimRight(cfg.BaseURL, "/")
@@ -93,7 +83,20 @@ func publishing(cfg config.Config, db *bun.DB, name string,
 	})
 	logger.Info("security documents are published to anybody, for the products an "+
 		"administrator chose", "at", base+publish.WellKnown, "signed", signer != nil)
-	return surface, publish.NewPass(db, publish.NewGenerator(db, who, base), name, logger), nil
+	return surface, publish.NewPass(db, publish.NewGenerator(db, who, base), name, logger)
+}
+
+// publishingKey reads the key published documents are signed with, or answers
+// nil where the deployment publishes nothing or publishes unsigned.
+func publishingKey(cfg config.Config) (*signing.Signer, error) {
+	if !cfg.Publish || cfg.PublishKey == "" {
+		return nil, nil
+	}
+	signer, err := signing.Read(cfg.PublishKey, cfg.PublishPassphrase)
+	if err != nil {
+		return nil, fmt.Errorf("OPENPSIRT_PUBLISH_KEY: %w", err)
+	}
+	return signer, nil
 }
 
 // onlyTheBoundProvider refuses a provider change that nobody re-granted.

@@ -271,3 +271,35 @@ func TestAnAddressSomebodyHoldsIsRefusedBeforeMigrating(t *testing.T) {
 		t.Error("the schema was applied on an address somebody else holds")
 	}
 }
+
+// A refusal that reads no database comes before the migration, so a bad value
+// is refused in seconds rather than after a migration that may run for many
+// minutes. A scanner allowed to outlast the queue's hold is one.
+func TestARefusalOfTheConfigurationAloneComesBeforeTheMigration(t *testing.T) {
+	t.Setenv("OPENPSIRT_QUEUE_MAX_HOLD", "1h")
+	t.Setenv("OPENPSIRT_SCANNER_TIMEOUT", "1h")
+	addr := freeAddress(t)
+	var migrated atomic.Bool
+	s := startHeld(t, addr, func(context.Context, *database.DB, *slog.Logger) error {
+		migrated.Store(true)
+		return nil
+	})
+	select {
+	case err := <-s.done:
+		s.done <- err
+		if err == nil || !strings.Contains(err.Error(), "OPENPSIRT_SCANNER_TIMEOUT") {
+			t.Errorf("a scanner timeout at the hold's ceiling answered %v", err)
+		}
+	case <-s.entered:
+		t.Fatal("the migration began before a refusal of the configuration alone")
+	case <-time.After(30 * time.Second):
+		t.Fatal("a start that should have been refused was still running after 30s")
+	}
+	if migrated.Load() {
+		t.Error("the schema was applied before a refusal of the configuration alone")
+	}
+	if conn, err := net.DialTimeout("tcp", addr, time.Second); err == nil {
+		_ = conn.Close()
+		t.Error("the port opened before a refusal of the configuration alone")
+	}
+}

@@ -154,10 +154,13 @@ lock. Where the holder stops part way, the waiter applies the schema itself.
 
 A check on `/readyz` that ends the process ends a long migration part way, and
 the next process starts it again from the beginning. An AWS Application Load
-Balancer in front of ECS has one health check for both purposes: point it at
-`/healthz`. A process applying the schema then receives traffic and answers it
-with the 503 above, and the load balancer keeps sending traffic to a process
-whose database has stopped answering.
+Balancer in front of ECS has one health check, which both routes traffic and
+decides whether ECS keeps the task. Either of two arrangements works:
+
+| Load balancer health check | ECS service | Trade-off |
+|---|---|---|
+| `/healthz` | Any health check grace period | A task applying the schema receives traffic and answers it with the 503 above. A task whose database stops answering keeps receiving traffic |
+| `/readyz` | A health check grace period longer than the longest migration | No traffic reaches a task until it serves. A long migration needs a long grace period, and a task that hangs during start-up is replaced only once the grace period ends |
 
 ## Database
 
