@@ -422,6 +422,7 @@ which reads as no attempt in flight.
 | The image version table is made | By v0.9.0's declaration. On MySQL and MariaDB in a transaction of its own, as is every step after it: both commit a data-definition statement as it runs, so steps sharing a transaction would run a statement at a time and a merge stopped part way would stay part done. The next start steps over the table, and each later step steps over what a stopped attempt finished |
 | Every build's row is taken | The lock a scan's apply and a run's apply take, so on a server a replica of v0.8.0 still running waits rather than writing a graph part way through the upgrade |
 | Images are found by their package identifier | A component whose identifier is of type `oci` or `docker`. v0.8.0 kept nothing saying the format called a component a container, so one with no identifier is not found, and its next upload stores it by name |
+| On PostgreSQL, the columns pointing at what the merge removes are indexed while it runs | Where v0.8.0 held an image: the component a finding is against and what pulls it in, a tag's component, a node's component, and an edge's parent. PostgreSQL checks the references to a removed row by reading each table holding them, and a column no index leads with makes that read the whole table, once per row removed. Each index has a name of its own and is made only where none of that name exists, so an index an operator made on the same column is left alone. All are removed once the findings have moved, so the schema the upgrade builds is v0.9.0's. MySQL and MariaDB index every column a foreign key names, and SQLite checks no reference while an upgrade runs, so neither needs them |
 | Each image's components are grouped by name | The identifier with no version, reduced the way identity reduces it |
 | A name some build held at two versions at once is left as it is, in every build | Two of its nodes in one build with intervals that overlap. v0.9.0 keeps such images apart by version too. A build holding that name once moves to the name on its next upload, once, as a version moving would |
 | One component is kept per name | The one already identified by the name where there is one, and otherwise the earliest. It takes the name's identity, no version, the identifier with no version, and the fold key that follows; a supplier, license or platform enumeration it lacks is taken from the others |
@@ -450,6 +451,7 @@ as v0.9.0 stores the same image.
 | Check, on each of the four engines | What it holds |
 |---|---|
 | A v0.8.0 build whose image was restamped between two scans, with findings beneath it and against it, a tag, a commitment on each stamp's fold, and decisions beneath it and about it; an image that left and came back; and two layers of one name held at once | Upgraded, the image is one component stored as v0.9.0 stores it, one node and one edge above and below it across both scans, two image versions on that node, every finding and one tag on it, one commitment on its fold, the decision proposed last live on the merged key over an earlier one, an approved one live over a proposed one, the decision about the image live with no version, the one already lapsed as recorded, the image that came back on two nodes, and both layers left by version |
+| The same on PostgreSQL, a trigger on every table refusing a removal while a column pointing at the table leads no index, and an index made by hand on one such column | Migrations 42, 43 and 44 remove nothing the trigger refuses, components and nodes are removed under it, the index made by hand is still there, and none of the merge's own remains |
 | The same on MySQL and MariaDB, the merge stopped at its last step | No version is recorded, no image version written and every stamp is still its own component. The next start steps over the table and leaves what an upgrade that did not stop leaves |
 | The nodes of that build, one component carrying a source package | Upgraded, that component's node holds its source package and version, and every other node holds none |
 | A recorded flaw with its word, score and vector on the issue row; a scanned issue that absorbed a record with a different rating; a scanned issue a merge copied a record's rating onto; a record filed under a published name, scanned elsewhere, that a feed scored on a newer scheme | Upgraded, the first's rating is the recording product's and in force there, and its issue holds none of it beside the feed's sourced rating; the second keeps the scanner's word and score; the third's copied word, score and rating are the recording product's and gone from the issue; the fourth's word and its own unsourced rating are the recording product's and its issue keeps the feed's score |
@@ -466,6 +468,12 @@ throughout (`DESIGN-packaging.md` § Starting and stopping), so a platform
 checking that path lets it finish. A check on `/readyz` fails for as long as
 the upgrade runs, and a platform that ends the process on it undoes the
 upgrade on every engine.
+
+The same data in a PostgreSQL 16 container limited to 400 MB of memory, beside
+a 470 MB finding table: the upgrade takes 10 min 21 s without the merge's
+indexes and 2 min 56 s with them. Without them the two statements removing
+components take most of the time and read about 200 GB from disk. Limited to
+1 GB, where the table fits in memory, it takes 2 min 25 s and 1 min 38 s.
 
 Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
@@ -556,6 +564,7 @@ last migration as its own.
 |---|---|
 | The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
 | A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists in the checkout, before anything is written, and refuses where git cannot say whether it does. A schema change is a migration numbered after its last, for the next release |
+| A tagged release's migration cannot finish on a deployment, and the owner approves a fix building the same schema | The file is edited, its digest in the release's record rewritten, and a comment line in the record names the file as amended. The schema records are left as they are: the schema test holds the edited migration to building what the tag built, on every engine. A fix changing the schema is refused by that test, and goes in a later migration |
 | A release the tree cannot freeze | Refused before anything is written, the schema records included: a version older than one recorded, a version whose code a recorded release already carries, as v0.11.0 would after v0.1.10 since both read as `v0110`, and a tree whose last migration is behind the release before. A checkout without tags is refused there too |
 | A patch to an older line, after a newer release is recorded | Not cut. A tag is refused unless it is on `main`, and `main` holds the newer release's record and migrations, so every release is newer than the last one recorded |
 

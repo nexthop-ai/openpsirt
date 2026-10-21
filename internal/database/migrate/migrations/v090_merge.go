@@ -17,6 +17,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 // The rows v0.8.0 holds for container images, moved to an image identified by
@@ -126,6 +129,12 @@ func mergeImagesV090(ctx context.Context, tx bun.Tx) error {
 			all = append(all, row.ID)
 		}
 	}
+	indexed := len(all) > 0 && migrate.EngineFrom(ctx) == database.Postgres
+	if indexed {
+		if err := indexForMergeV090(ctx, tx); err != nil {
+			return err
+		}
+	}
 	if err := m.readPlaces(all); err != nil {
 		return err
 	}
@@ -137,7 +146,55 @@ func mergeImagesV090(ctx context.Context, tx bun.Tx) error {
 	if err := m.joinEdges(); err != nil {
 		return err
 	}
-	return m.moveFindings()
+	if err := m.moveFindings(); err != nil {
+		return err
+	}
+	if indexed {
+		return dropMergeIndexesV090(ctx, tx)
+	}
+	return nil
+}
+
+// mergeIndexesV090 is an index on each column that points at a row the merge
+// removes, where no index in v0.8.0's schema leads with it: the components
+// merged into one, and the nodes joined into one.
+//
+// PostgreSQL checks the references to a removed row by reading each table
+// that holds them, and with no index leading with the column that read is the
+// whole table, once per row removed. MySQL and MariaDB index every column a
+// foreign key names, and SQLite checks no reference while an upgrade runs.
+// The same indexes serve the merge's own reads and moves by component.
+//
+// Each is made under a name of its own, so an index an operator made on the
+// same column is left as it is, and each is removed once the merge is done:
+// the schema the upgrade builds is v0.9.0's.
+var mergeIndexesV090 = []struct{ name, table, column string }{
+	{"v090_merge_finding_component", "finding", "component_id"},
+	{"v090_merge_finding_consumer", "finding", "consumer_id"},
+	{"v090_merge_finding_tag_component", "finding_tag", "component_id"},
+	{"v090_merge_graph_node_component", "graph_node", "component_id"},
+	{"v090_merge_graph_edge_parent", "graph_edge", "parent_id"},
+}
+
+// indexForMergeV090 makes the merge's indexes, on PostgreSQL.
+func indexForMergeV090(ctx context.Context, tx bun.Tx) error {
+	for _, ix := range mergeIndexesV090 {
+		if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS "`+ix.name+`" ON "`+ix.table+
+			`" ("`+ix.column+`")`); err != nil {
+			return fmt.Errorf("index %s.%s for the merge: %w", ix.table, ix.column, err)
+		}
+	}
+	return nil
+}
+
+// dropMergeIndexesV090 removes the merge's indexes.
+func dropMergeIndexesV090(ctx context.Context, tx bun.Tx) error {
+	for _, ix := range mergeIndexesV090 {
+		if _, err := tx.ExecContext(ctx, `DROP INDEX IF EXISTS "`+ix.name+`"`); err != nil {
+			return fmt.Errorf("remove the merge's index %s: %w", ix.name, err)
+		}
+	}
+	return nil
 }
 
 // readPlaces reads every place a finding against or beneath one of these

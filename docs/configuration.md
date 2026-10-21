@@ -1325,6 +1325,7 @@ on.
 | Change | What to do |
 |---|---|
 | A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check `/healthz` for whether to keep the process, as the chart does ([Health checks](#health-checks)), or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
+| On PostgreSQL the upgrade indexes each column pointing at an image's components and nodes while it merges them, and removes those indexes when it is done. v0.10.1 and earlier read the whole finding table for every component the merge removed, which stalled the upgrade on a database larger than the server's memory | Nothing. An index made by hand on `finding.component_id`, `finding.consumer_id`, `finding_tag.component_id`, `graph_node.component_id` or `graph_edge.parent_id` to get past a stalled upgrade is harmless, and may be dropped once the upgrade is done |
 | A live judgment beneath an image is keyed on the image with no version | Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
 | Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
 | A name some build held at two versions at once is not merged in any build, and a build holding two images of one name at once keeps them apart by version, as before | Nothing. A build that holds such a name once moves it to the name on its next upload, once: the image's node closes and opens, the findings beneath it close and open again, and judgments beneath it lapse and are asked again |
@@ -1360,3 +1361,8 @@ on.
 |---|---|
 | The process opens its port before it applies the schema, and answers `/healthz` while it does. `/readyz` and every other path answer 503 until it serves. v0.10.0 opened its port once the schema was in place | Point a check that replaces the process at `/healthz`, and a check that routes traffic at `/readyz` ([Health checks](#health-checks)). The chart's startup probe asks `/healthz` |
 | A process waiting for another's migration waits for as long as the migration runs, and logs about once a minute which process holds the lock. v0.10.0 gave up after five minutes | Nothing |
+
+### From v0.10.1
+
+Nothing changes for a database v0.9.0 or a later release built. This release
+changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.

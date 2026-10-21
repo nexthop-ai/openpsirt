@@ -1,10 +1,11 @@
 # The migrations v0.9.0 tagged, and the digest of each file below its license header.
+# v090_merge.go is amended after the tag, with the same schema recorded below: DESIGN-database.md § Release records.
 last 43
 c8a890aeebe7950f2cb2d0199496053aa5c9d82a83ef4fb4e8dbefe8cc9a5428  00043_v090.go
 8e9d37e15e3048f073980d7172f12bf3c2a44ce2e165424fe67e287f7c09e4ec  v090_delivery.go
 ae089289dc45b328474a82f7822010cf4069f7c6f3a7611bd773b3751a1482b9  v090_finding.go
 b91cc89f0978675c562e6d963c70910fc65380f44b4818063023890bb9982052  v090_image.go
-f3f82c6cd8fb2c5bd04a4173b1fa0118f4e920fb651cf2f34361f696fb39cca9  v090_merge.go
+0dd7605e340071c0c1a7e948c5658dfc170c12d3eb4b2fe97ae19476149d8687  v090_merge.go
 6d221295a5c387ffc230604922199c7b992e2bf2aff076a0b3859e83c2dfccfe  v090_node.go
 02d3fba7fcd9078011e285e236dd02829214ad6765f209f77a5d1642361046c0  v090_outbound.go
 dd2d5c9ac674478306601169ff569d86e9be69c58d55f6fedab674a728bd7c20  v090_patch.go
