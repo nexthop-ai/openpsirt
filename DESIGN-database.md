@@ -262,6 +262,7 @@ the registered migrations with a file beside them.
 | On an empty database | The failure alone: there is nothing to recover |
 | On MySQL or MariaDB | That the schema is left part changed, and the backup taken before the upgrade is what recovers it; and that a database an unreleased build made is recreated rather than migrated |
 | On PostgreSQL or SQLite | That a database an unreleased build made is recreated rather than migrated. Data definition is transactional there, so a failed migration leaves nothing part changed |
+| Stopped by its caller, on any engine | That it stopped part way, and nothing about recovering: the next start applies the schema again (§ Migrations that stop half way) |
 
 The version a database holds cannot say whether a release or an unreleased
 build made it, so both recoveries are named rather than one chosen by a
@@ -635,7 +636,10 @@ connection, and neither engine reports that as an error — it fails to release 
 the lock is held for the life of the process. The release result is read rather
 than assumed, because both engines report "you did not hold this" as a value.
 
-A waiter waits for as long as the lock is held, on every engine. It asks in
+A waiter waits for as long as the lock is held, on every engine. A bound of
+five minutes was taken to be long enough for a real migration; migration 43
+took 873 s on a production-shaped PostgreSQL database, and a replica started
+beside it gave up at 300 s. It asks in
 attempts of five seconds, and between two it checks whether it has been told to
 stop. A process waiting answers its health check meanwhile, as one migrating
 does, so a replica started beside a long migration waits it out.

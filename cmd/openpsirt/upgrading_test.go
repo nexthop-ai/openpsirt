@@ -303,3 +303,27 @@ func TestARefusalOfTheConfigurationAloneComesBeforeTheMigration(t *testing.T) {
 		t.Error("the port opened before a refusal of the configuration alone")
 	}
 }
+
+// A stop signal before the port opens ends the start cleanly, as one after it
+// does: a supervisor stopping a starting process reads no failure.
+func TestAStopBeforeThePortOpensExitsCleanly(t *testing.T) {
+	t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://"+filepath.Join(t.TempDir(), "stopped.db"))
+	t.Setenv("OPENPSIRT_ADDR", freeAddress(t))
+	t.Setenv("OPENPSIRT_AUTO_MIGRATE", "false")
+	t.Setenv("OPENPSIRT_RECORDS_UPDATE", "false")
+	t.Setenv("OPENPSIRT_BOOTSTRAP_ADMINS", "root")
+	stopped, stop := context.WithCancel(context.Background())
+	stop()
+	restore := startedFrom
+	startedFrom = func() context.Context { return stopped }
+	t.Cleanup(func() { startedFrom = restore })
+	quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = quiet.Close() }()
+
+	if err := run(nil, quiet, quiet); err != nil {
+		t.Errorf("a start stopped before its port opened answered %v", err)
+	}
+}

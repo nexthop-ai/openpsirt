@@ -119,10 +119,11 @@ setting.
 
 ## Upgrades
 
-| Value | Effect |
+| Setting | Effect |
 |---|---|
 | `strategy` | `Recreate` by default, so every pod of the earlier release stops before a pod of this one starts |
 | `autoMigrate` | `true` by default: the schema is upgraded at startup. With `false`, run `openpsirt migrate up` before the upgrade |
+| `helm upgrade --timeout` | `helm upgrade --wait` gives up after five minutes, and `--atomic` then rolls back, which stops a migration part way. Pass a `--timeout` longer than the longest migration the [upgrade notes](configuration.md#upgrading) name. `kubectl rollout status` reports the progress deadline exceeded after ten minutes while `/healthz` still answers, and the migration carries on |
 
 [Upgrading](configuration.md#upgrading) holds what each release needs.
 

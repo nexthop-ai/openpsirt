@@ -329,7 +329,9 @@ securityContext:
 # The startup probe asks /healthz, which answers once the port opens: after
 # the database connects and before the schema is applied, so a migration runs
 # under it for as long as it takes. failureThreshold x periodSeconds is how
-# long connecting may take, which OPENPSIRT_STARTUP_TIMEOUT bounds first.
+# long the start may take before the port opens: connecting to the database,
+# sign-in provider discovery and the store checks, which
+# OPENPSIRT_STARTUP_TIMEOUT bounds first.
 # Readiness asks /readyz, which answers once the migration and the rest of
 # the start are done.
 startupProbe:

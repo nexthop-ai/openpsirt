@@ -45,7 +45,7 @@ func types(ctx context.Context) (*columnTypes, error) {
 // statement N leaves 1 to N-1 committed, the rollback removes nothing, and no version row is written — so
 // the next start runs the same migration from statement 1 and fails on "table
 // already exists". Nothing recovers from that on its own, and every
-// replacement process fails its startup probe in turn.
+// replacement process fails the same way in turn.
 //
 // So on those two engines each statement is preceded by a question: does the
 // thing it creates already exist? If it does, the statement is skipped and the

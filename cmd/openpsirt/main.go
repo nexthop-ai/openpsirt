@@ -194,6 +194,15 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	// transaction is rolled back, and the next start applies it again.
 	stopping, stopped := signal.NotifyContext(startedFrom(), os.Interrupt, syscall.SIGTERM)
 	defer stopped()
+	// A start a stop signal ended is a clean stop, wherever it was. What the
+	// step it ended said about being stopped is logged rather than returned,
+	// so a supervisor stopping a starting process does not read a failure.
+	defer func() {
+		if err != nil && stopping.Err() != nil {
+			logger.Info("stopped before the start completed", "interrupted", err)
+			err = nil
+		}
+	}()
 	startup, settled := context.WithTimeout(stopping, cfg.StartupTimeout)
 	defer settled()
 	ctx = startup
@@ -251,7 +260,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	}
 	logger.Info("applying the schema")
 	if err := applySchema(stopping, db, logger); err != nil {
-		return server.abandon(stopping, cfg, logger, fmt.Errorf("applying the schema: %w", err))
+		return server.abandon(cfg, logger, fmt.Errorf("applying the schema: %w", err))
 	}
 	// The deadline counts from the schema being in place, so the steps
 	// after a long migration have the whole of it.
@@ -260,7 +269,7 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	defer settled()
 	handler, beside, err := prepareFrom(startup, cfg, logger, db, from)
 	if err != nil {
-		return server.abandon(stopping, cfg, logger, err)
+		return server.abandon(cfg, logger, err)
 	}
 	server.answer(handler)
 	logger.Info("serving")
@@ -693,7 +702,7 @@ func closeQuietly(db *database.DB, logger *slog.Logger) {
 //
 // A deadline reached says only "context deadline exceeded", which names
 // nothing an operator can go and look at. What they need is which of the
-// things contacted before the server listens did not answer.
+// things contacted before the server serves did not answer.
 func startupFailed(err error, doing string, cfg config.Config) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("gave up %s after %s: %w", doing, cfg.StartupTimeout, err)

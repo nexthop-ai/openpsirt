@@ -35,7 +35,7 @@ func TestAMigrationThatFailedPartWayThroughCanBeRunAgain(t *testing.T) {
 	// committed, the rollback removes nothing, and no version row is written
 	// — so the next start runs the same migration from statement 1 and fails
 	// on "table already exists", for ever, with every replacement process
-	// failing its startup probe in turn.
+	// failing the same way in turn.
 	//
 	// PostgreSQL and SQLite have transactional data definition and never
 	// reach this, which is why a four-engine run that only exercises the

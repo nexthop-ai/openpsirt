@@ -216,7 +216,11 @@ func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
 // A waiter stops waiting when its context ends, during an attempt or between
 // two, so a shutdown reaches a process waiting on another's migration.
 func TestAWaitForTheLockEndsWhenItsContextDoes(t *testing.T) {
-	shortAttempts(t)
+	// Attempts of the length the application uses, so a wait that noticed
+	// its context only between attempts would run past the bound below.
+	restore := lockAttemptSeconds
+	lockAttemptSeconds = 5
+	t.Cleanup(func() { lockAttemptSeconds = restore })
 
 	servers(t, func(t *testing.T, _ database.Engine, address string) {
 		holder := open(t, address)
@@ -236,8 +240,8 @@ func TestAWaitForTheLockEndsWhenItsContextDoes(t *testing.T) {
 			_ = again(ctx)
 			t.Fatal("a waiter took the lock while it was held")
 		}
-		if waited := time.Since(started); waited > 5*time.Second {
-			t.Errorf("a waiter asked to stop after 1.5s stopped after %s", waited)
+		if waited := time.Since(started); waited > 4*time.Second {
+			t.Errorf("a waiter asked to stop after 1.5s stopped after %s, past an attempt's 5s", waited)
 		}
 	})
 }
@@ -629,6 +633,25 @@ func TestAFailedUpgradeNamesTheRecoveryItsEngineNeeds(t *testing.T) {
 		if got := strings.Contains(err.Error(), "recreated"); got != c.recover {
 			t.Errorf("%s from %d: names recreating = %v, want %v: %v", c.engine, c.before, got, c.recover, err)
 		}
+	}
+}
+
+// An upgrade its caller stopped part way is reported as stopped, with no
+// recovery named: the next start applies the schema again on every engine. A
+// failure with its caller still waiting names the recovery as above.
+func TestAStoppedUpgradeNamesNoRecovery(t *testing.T) {
+	cause := errors.New("context canceled")
+	stopped, cancel := context.WithCancel(t.Context())
+	cancel()
+	for _, engine := range []database.Engine{database.MySQL, database.MariaDB, database.Postgres} {
+		err := upEnded(stopped, engine, 43, cause)
+		if !errors.Is(err, cause) || !strings.Contains(err.Error(), "stopped part way") ||
+			strings.Contains(err.Error(), "restore the backup") || strings.Contains(err.Error(), "recreated") {
+			t.Errorf("%s: a stopped upgrade answered %v", engine, err)
+		}
+	}
+	if err := upEnded(t.Context(), database.MySQL, 43, cause); !strings.Contains(err.Error(), "restore the backup") {
+		t.Errorf("a failed upgrade with its caller waiting answered %v", err)
 	}
 }
 

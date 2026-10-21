@@ -203,8 +203,10 @@ file; left alone, it reads the environment and asks port 8080.
 
 The startup probe asks `/healthz`, which answers from the moment the port opens
 and for the whole of a migration (§ Starting and stopping). It allows ten
-minutes by default, which bounds connecting to the database and nothing
-after it; the startup deadline ends a start that hangs there first.
+minutes by default, which bounds what comes before the port opens: connecting
+to the database and the refusals that read no database, sign-in provider
+discovery and the store checks among them. The startup deadline ends a start
+that hangs there first.
 
 ### Platform health checks
 
@@ -231,7 +233,7 @@ upgrading response below.
 | Every refusal that reads no database comes before the port opens | The sign-in providers and the address they return to, the stores, the interface, the queue's sizes against the scanner's timeout, and the signing key. A bad value is refused in seconds rather than after a migration |
 | A refusal after the port opened closes it and exits 1 | The refusals that read the schema come after the migration: the administrators, the group mappings, and a sign-in provider other than the one identities were bound under |
 | An address somebody else holds is refused as the port opens, before the migration | A start that cannot serve does not spend a migration finding out |
-| A stop signal once the port is open ends the start and exits 0 | It reaches the migration, or a wait for another process's, through its context. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`DESIGN-database.md` § Migrations that stop half way). The next start applies it again |
+| A stop signal during the start ends it and exits 0, before the port opens or after | It reaches the migration, or a wait for another process's, through its context, and the error a stopped step answers is logged. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`DESIGN-database.md` § Migrations that stop half way). The next start applies it again |
 | A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations starts a server instead, against whatever schema is there |
 | Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
 | Every exit waits for the background work, including a failure to serve | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure becomes failed scans and jobs retried for no reason |

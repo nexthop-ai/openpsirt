@@ -94,7 +94,7 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			return fmt.Errorf("read schema version: %w", err)
 		}
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
-			return upFailed(db.Server.Engine, before, err)
+			return upEnded(ctx, db.Server.Engine, before, err)
 		}
 		after, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {
@@ -107,6 +107,20 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 		}
 		return nil
 	})
+}
+
+// upEnded says why an upgrade ended part way: stopped by its caller, or
+// failed.
+//
+// A stop is not a failure, and says nothing about recovering. On PostgreSQL
+// and SQLite the migration's transaction rolls back, and on MySQL and MariaDB
+// the next start steps over what the stopped migration made, so in both cases
+// the next start applies the schema again.
+func upEnded(ctx context.Context, engine database.Engine, before int64, err error) error {
+	if ctx.Err() != nil {
+		return fmt.Errorf("stopped part way through the migrations: %w", err)
+	}
+	return upFailed(engine, before, err)
 }
 
 // upFailed says what a failed upgrade leaves behind, and what recovers it.

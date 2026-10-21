@@ -42,9 +42,10 @@ type Config struct {
 	// ShutdownGrace is how long in-flight requests get to finish.
 	ShutdownGrace time.Duration
 
-	// StartupTimeout bounds everything contacted before the server listens:
+	// StartupTimeout bounds everything contacted before the server serves:
 	// the database, the schema, the administrators named in configuration and
-	// the attachment store.
+	// the attachment store. It starts again once an automatic migration
+	// finishes, and the migration itself has no bound.
 	//
 	// Bounded because an endpoint that accepts a connection and never answers
 	// — a stale load-balancer target, a paused instance — held the process for

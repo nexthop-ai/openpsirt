@@ -228,20 +228,14 @@ func (l *listening) answer(handler http.Handler) {
 	l.handler.Store(&handler)
 }
 
-// abandon closes the port of a start that did not complete.
-//
-// A start ended by a stop signal is a clean stop, and the error is what the
-// step it ended said about being stopped, so it is logged rather than
-// returned. Anything else fails the start as it did before the port opened.
-func (l *listening) abandon(stopping context.Context, cfg config.Config, logger *slog.Logger, err error) error {
+// abandon closes the port of a start that did not complete, and answers the
+// error that ended it. Whether that error fails the start is the caller's to
+// decide: a start a stop signal ended is a clean stop.
+func (l *listening) abandon(cfg config.Config, logger *slog.Logger, err error) error {
 	closing, cancel := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
 	defer cancel()
 	if closeErr := l.srv.Shutdown(closing); closeErr != nil {
 		logger.Warn("closing the port of a start that did not complete", "error", closeErr)
-	}
-	if stopping.Err() != nil {
-		logger.Info("stopped before the start completed", "interrupted", err)
-		return nil
 	}
 	return err
 }
