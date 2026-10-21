@@ -1501,7 +1501,8 @@ from first.</p>
    it has moved.</li>
 <li>Where <code>database.auto_migrate</code> is <code>false</code>, migrate as the service user:
    <code>sudo -u openpsirt openpsirt migrate up --config /etc/openpsirt/openpsirt.toml</code>.
-   Otherwise the process migrates as it starts.</li>
+   Otherwise the process migrates as it starts, and answers 503 on every
+   path but <code>/healthz</code> until it serves (<a href="../configuration/#health-checks">Health checks</a>).</li>
 <li>Start the service: <code>sudo systemctl start openpsirt</code>.</li>
 </ol>
 <p><code>sudo -u openpsirt openpsirt migrate status --config /etc/openpsirt/openpsirt.toml</code> says which

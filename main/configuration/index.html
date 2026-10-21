@@ -500,6 +500,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Serving">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -991,6 +1008,17 @@
     <span class="md-ellipsis">
       
         From v0.9.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.0
       
     </span>
   </a>
@@ -1192,6 +1220,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Serving">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#health-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1683,6 +1728,17 @@
     <span class="md-ellipsis">
       
         From v0.9.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.0
       
     </span>
   </a>
@@ -1977,7 +2033,7 @@ starts read them, so they stay in the environment beside a file.</p>
 <tr>
 <td><code>OPENPSIRT_STARTUP_TIMEOUT</code></td>
 <td><code>server.startup_timeout</code></td>
-<td>How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. <code>openpsirt migrate</code> connects within it too, and migrates without a bound. Past it the process stops and names what it was waiting on</td>
+<td>How long everything contacted before the server serves has to answer: the database, the schema, the administrators named here, and the attachment store. It starts again once an automatic migration finishes, and the migration itself has no bound. <code>openpsirt migrate</code> connects within it too. Past it the process stops and names what it was waiting on</td>
 <td><code>60s</code></td>
 </tr>
 <tr>
@@ -1997,6 +2053,85 @@ starts read them, so they stay in the environment beside a file.</p>
 <p>The defaults above are the binary's. The chart sets a log format of <code>json</code>,
 because a cluster's collector parses the logs; run the binary yourself and it
 writes <code>text</code>.</p>
+<h3 id="health-checks">Health checks<a class="headerlink" href="#health-checks" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Answers 200</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/healthz</code></td>
+<td>While the process runs, including while it applies the schema</td>
+<td>A check that restarts or replaces the process: a liveness probe, a startup probe, a container health check, an ECS task health check</td>
+</tr>
+<tr>
+<td><code>/readyz</code></td>
+<td>Once the process serves, and while its database answers</td>
+<td>A check that decides whether to send it traffic: a readiness probe, a load balancer's target check</td>
+</tr>
+</tbody>
+</table>
+<p>Neither needs a credential. The chart and the image use them this way.</p>
+<p>With <code>OPENPSIRT_AUTO_MIGRATE</code> on, the process opens its port once it has
+connected to the database, and then applies the schema. Until it serves:</p>
+<table>
+<thead>
+<tr>
+<th>Request</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/healthz</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>/readyz</code></td>
+<td>503</td>
+</tr>
+<tr>
+<td>A path under <code>/v1/</code></td>
+<td>503 with <code>Retry-After</code>, in the API's error shape: "OpenPSIRT is upgrading its database"</td>
+</tr>
+<tr>
+<td>A page</td>
+<td>503 with <code>Retry-After</code>, a page saying the same, which reloads itself</td>
+</tr>
+</tbody>
+</table>
+<p>A second process started while one applies the schema waits for it, answers
+the same way, and logs about once a minute which process holds the migration
+lock. Where the holder stops part way, the waiter applies the schema itself.</p>
+<p>A check on <code>/readyz</code> that ends the process ends a long migration part way, and
+the next process starts it again from the beginning. An AWS Application Load
+Balancer in front of ECS has one health check, which both routes traffic and
+decides whether ECS keeps the task. Either of two arrangements works:</p>
+<table>
+<thead>
+<tr>
+<th>Load balancer health check</th>
+<th>ECS service</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/healthz</code></td>
+<td>Any health check grace period</td>
+<td>A task applying the schema receives traffic and answers it with the 503 above. A task whose database stops answering keeps receiving traffic</td>
+</tr>
+<tr>
+<td><code>/readyz</code></td>
+<td>A health check grace period longer than the longest migration</td>
+<td>No traffic reaches a task until it serves. A long migration needs a long grace period, and a task that hangs during start-up is replaced only once the grace period ends</td>
+</tr>
+</tbody>
+</table>
 <h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3977,7 +4112,7 @@ from, and every section after it.</p>
 </tr>
 <tr>
 <td>Deploy this release</td>
-<td>It migrates at startup. With <code>autoMigrate: false</code>, run <code>openpsirt migrate up</code> first</td>
+<td>It migrates at startup, answering its health check on <code>/healthz</code> meanwhile (<a href="#health-checks">Health checks</a>). With <code>autoMigrate: false</code>, run <code>openpsirt migrate up</code> first</td>
 </tr>
 </tbody>
 </table>
@@ -4014,7 +4149,7 @@ on.</p>
 <tbody>
 <tr>
 <td>A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands</td>
-<td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held. The chart's startup probe allows ten minutes, and a probe that stops the upgrade undoes it, so the next pod starts it again. With more than about three weeks of nightly history, raise <code>startupProbe.failureThreshold</code> for the upgrade, or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
+<td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check <code>/healthz</code> for whether to keep the process, as the chart does (<a href="#health-checks">Health checks</a>), or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
 </tr>
 <tr>
 <td>A live judgment beneath an image is keyed on the image with no version</td>
@@ -4034,7 +4169,7 @@ on.</p>
 </tr>
 <tr>
 <td>The upgrade also stores each claim's and each supplier statement's explanation once, keys every claim on it, and keys every reference on its whole address. It reads every claim, statement and reference a batch at a time</td>
-<td>Allow for it beside the image rewrite above: the time grows with the claims and statements held. The same startup-probe advice applies, and a database holding large VEX documents needs more headroom than the image figures alone suggest</td>
+<td>Allow for it beside the image rewrite above: the time grows with the claims and statements held. The same health-check advice applies</td>
 </tr>
 <tr>
 <td>A scan file, a VEX document or a supplier advisory with anything but whitespace after its document is refused. v0.8.0 read the first document and ignored the rest</td>
@@ -4118,6 +4253,25 @@ on.</p>
 <tr>
 <td>A path below <code>/.well-known/csaf/</code> or <code>/openvex/</code> is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page</td>
 <td>Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v0100">From v0.10.0<a class="headerlink" href="#from-v0100" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The process opens its port before it applies the schema, and answers <code>/healthz</code> while it does. <code>/readyz</code> and every other path answer 503 until it serves. v0.10.0 opened its port once the schema was in place</td>
+<td>Point a check that replaces the process at <code>/healthz</code>, and a check that routes traffic at <code>/readyz</code> (<a href="#health-checks">Health checks</a>). The chart's startup probe asks <code>/healthz</code></td>
+</tr>
+<tr>
+<td>A process waiting for another's migration waits for as long as the migration runs, and logs about once a minute which process holds the lock. v0.10.0 gave up after five minutes</td>
+<td>Nothing</td>
 </tr>
 </tbody>
 </table>

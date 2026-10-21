@@ -1018,7 +1018,7 @@ setting.</p>
 <table>
 <thead>
 <tr>
-<th>Value</th>
+<th>Setting</th>
 <th>Effect</th>
 </tr>
 </thead>
@@ -1030,6 +1030,10 @@ setting.</p>
 <tr>
 <td><code>autoMigrate</code></td>
 <td><code>true</code> by default: the schema is upgraded at startup. With <code>false</code>, run <code>openpsirt migrate up</code> before the upgrade</td>
+</tr>
+<tr>
+<td><code>helm upgrade --timeout</code></td>
+<td><code>helm upgrade --wait</code> gives up after five minutes, and <code>--atomic</code> then rolls back, which stops a migration part way. Pass a <code>--timeout</code> longer than the longest migration the <a href="../configuration/#upgrading">upgrade notes</a> name. <code>kubectl rollout status</code> reports the progress deadline exceeded after ten minutes while <code>/healthz</code> still answers, and the migration carries on</td>
 </tr>
 </tbody>
 </table>
