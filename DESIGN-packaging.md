@@ -185,7 +185,7 @@ throwaway database, and asked for the page.
 
 | Probe | Question | Path |
 |---|---|---|
-| Startup | Has it finished starting? | `/readyz` |
+| Startup | Has the port opened? | `/healthz` |
 | Liveness | Is the process running? | `/healthz` |
 | Readiness | Can it serve? | `/readyz` |
 
@@ -201,19 +201,39 @@ takes `--config` as every other command does. The image's check passes none,
 so a container configured by file replaces that check with one naming the same
 file; left alone, it reads the environment and asks port 8080.
 
-The startup probe allows ten minutes by default. Migrations run before the
-service answers, and a probe that gives up part way kills the pod and restarts
-the migration from the beginning.
+The startup probe asks `/healthz`, which answers from the moment the port opens
+and for the whole of a migration (§ Starting and stopping). It allows ten
+minutes by default, which bounds connecting to the database and nothing
+after it; the startup deadline ends a start that hangs there first.
+
+### Platform health checks
+
+| Check | Path | Why |
+|---|---|---|
+| Whether to keep the process | `/healthz` | It answers while the schema is applied. A check that fails during a migration ends it part way, and the next process starts it again from the beginning |
+| Whether to send it traffic | `/readyz` | It answers only once the router serves, and only while the database answers |
+
+A load balancer whose one health check decides both, such as an AWS
+Application Load Balancer in front of ECS, is pointed at `/healthz`. A
+process applying the schema then receives traffic, and answers it with the
+upgrading response below.
 
 ## Starting and stopping
 
 | Rule | Reason |
 |---|---|
-| Everything contacted before the server listens is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers holds the process for ever with no log line written and no port listening, which from outside is a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
-| Migrating is outside that deadline | A schema change on a large table legitimately takes longer than a deployment starts in, which is what the ten-minute startup probe above is for |
+| Everything contacted before the server serves is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers holds the process for ever with no log line written and nothing served, which from outside is a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
+| Migrating is outside that deadline | A schema change on a large table legitimately takes longer than a deployment starts in. The deadline starts again once the schema is in place |
+| With automatic migration on, the port opens after the database connects and before the schema is applied | A platform's health check is answered for as long as the migration runs, so nothing ends it part way. 873 s for migration 43 on a production-shaped PostgreSQL database |
+| Until the start is complete, `/healthz` answers 200, `/readyz` 503, and every other path 503 with `Retry-After` | The API answers in the shape every refusal takes, a browser asking for a page gets a page, and anything else a sentence: "OpenPSIRT is upgrading its database". Nothing in that answer reads the database |
+| The router replaces the upgrading answer in one step, after everything else in the start | A request reaches one or the other whole. The background passes start after the swap, as they would without it |
+| With automatic migration off, the port opens after every start-up check | Nothing is waited on that takes long, so every refusal comes before anything listens |
+| A refusal after the port opened closes it and exits 1 | The refusals that read the schema come after the migration: the administrators, the group mappings, the sign-in providers and the stores. Configuration that fails to read is refused before the database is contacted |
+| An address somebody else holds is refused as the port opens, before the migration | A start that cannot serve does not spend a migration finding out |
+| A stop signal once the port is open ends the start and exits 0 | It reaches the migration, or a wait for another process's, through its context. On PostgreSQL and SQLite the migration's transaction rolls back, and on MySQL and MariaDB the schema is left part changed (`DESIGN-database.md` § Migrations that stop half way). The next start applies it again |
 | A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations starts a server instead, against whatever schema is there |
 | Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
-| Every exit waits for the background work, including a failure to listen | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure to listen becomes failed scans and jobs retried for no reason |
+| Every exit waits for the background work, including a failure to serve | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure becomes failed scans and jobs retried for no reason |
 | Both halves of the shutdown grace answer the same way | One setting bounds them both, so an overrun request exiting 1 and an overrun worker exiting 0 tells a supervisor reading the exit code that half of an unfinished shutdown finished |
 | The chart stops every pod of the earlier release before it starts one of this one | Below 1.0 an upgrade may drop and reshape tables the earlier release reads (REQ-76), so a replica of it left serving fails on them. A ReadWriteOnce claim moves to the new pod too, where a rolling update leaves that pod waiting for a volume the old one holds |
 | A rolling update is the operator's choice | Nothing answers between the old pods stopping and a new one passing readiness, and an upgrade that fails to start leaves nothing serving. A deployment that has to stay up chooses it, and scales to zero by hand before an upgrade that changes the schema |

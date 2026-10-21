@@ -342,7 +342,7 @@ each migration is given is decorative there. A failure at statement N leaves 1
 to N-1 committed, the rollback removes nothing, and no version is recorded — so
 the next start runs the same migration from statement 1 and fails on a name
 already taken. Nothing recovers from that on its own; every replacement process
-fails its startup probe in turn.
+fails the same way in turn.
 
 So on those two engines a statement is preceded by a question: does the thing
 it creates already exist? If it does, it is stepped over and the step is
@@ -460,9 +460,11 @@ night over 600 packages, 1,632,000 findings and 204,000 edges beneath them, and
 leaves 34 image components, 340 image versions and 20,400 edges. `make measure`
 re-runs it. The time is mostly rewriting the findings, which grow with images
 times stamps, so a deployment with a month of nightly history takes three times
-as long. The chart's startup probe allows ten minutes (`DESIGN-packaging.md`),
-and a probe that ends the upgrade undoes it on every engine, so the
-upgrade notes say to give it longer or to run it before deploying.
+as long. A process applying it answers its health check on `/healthz`
+throughout (`DESIGN-packaging.md` § Starting and stopping), so a platform
+checking that path lets it finish. A check on `/readyz` fails for as long as
+the upgrade runs, and a platform that ends the process on it undoes the
+upgrade on every engine.
 
 Findings a rebuild closed before the upgrade stay closed. They are history: a
 row is closed, never deleted, and joining them would rewrite when each one
@@ -633,17 +635,26 @@ connection, and neither engine reports that as an error — it fails to release 
 the lock is held for the life of the process. The release result is read rather
 than assumed, because both engines report "you did not hold this" as a value.
 
-The wait is bounded on both engines. An unbounded wait means an instance wedged
-mid-migration blocks every replacement silently, and the startup probe kills each
-in turn.
+A waiter waits for as long as the lock is held, on every engine. It asks in
+attempts of five seconds, and between two it checks whether it has been told to
+stop. A process waiting answers its health check meanwhile, as one migrating
+does, so a replica started beside a long migration waits it out.
+
+| Rule | |
+|---|---|
+| A waiter names the holder at its first attempt that times out and about once a minute after | A holder wedged part way through a migration holds every replacement behind it. The line naming it is how that is seen |
+| A holder that dies releases the lock | PostgreSQL, MySQL and MariaDB release a session lock with the session, and the kernel a file lock with the process. The waiter takes it at its next attempt and applies the schema from where the rolled-back migration left it |
+| A stop ends a wait at once | An attempt in progress is canceled through its context |
+| `openpsirt migrate up` waits the same way | It runs the same code, so a job started beside a migrating replica waits for it and then finds the work done |
 
 Any account that can connect may take the lock. A named lock on MySQL and
 MariaDB needs no privilege and is shared by every database on the server, and a
-PostgreSQL advisory lock has no permissions. A refusal after the wait names the
-session holding it: the connection number on MySQL and MariaDB, and on
-PostgreSQL the server process with its user and application where the role may
-see them. An operator told only that another instance holds it looks for a
-replica that may not exist.
+PostgreSQL advisory lock has no permissions. The wait names the session holding
+it: the connection number on MySQL and MariaDB, and on PostgreSQL the server
+process with its user and application where the role may see them. An operator
+told only that another instance holds it looks for a replica that may not
+exist. SQLite's file lock names nobody, so the holder writes its process and
+host into the file as it takes the lock, and a waiter reads that.
 
 | Rule | |
 |---|---|
@@ -652,11 +663,12 @@ replica that may not exist.
 | A lock not held at its release fails the migration | The session was lost part way, and another instance may have migrated alongside. The work finished; what it ran under is not certain, and that is an error rather than a warning |
 | A pool of one connection is refused before the lock is taken, on the three servers | The lock holds one connection and the migration runs on another, so a pool of one waits for ever with nothing logged. The refusal names `OPENPSIRT_DB_MAX_OPEN` |
 
-The bound is a session setting, and it is unwound before the connection goes
-back — on every path, including the failing ones. Left set, one pooled
-connection carries a five-minute bound while the others carry the server
-default, and the same query afterwards either waits or is canceled depending
-on which connection the pool hands out.
+On PostgreSQL the bound on an attempt is a session setting, and it is unwound
+before the connection goes back — on every path, including the failing ones.
+Left set, one pooled connection carries a five-second bound while the others
+carry the server default, and the same query afterwards either waits or is
+canceled depending on which connection the pool hands out. `GET_LOCK` takes its
+bound as an argument, so MySQL and MariaDB set nothing.
 
 ## Identifier quoting
 

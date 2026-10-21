@@ -326,10 +326,12 @@ securityContext:
   capabilities:
     drop: [ALL]
 
-# Migrations run before the service starts answering. A schema change over a
-# large table can take a while, and a startup probe that gives up part way
-# through kills the pod and starts the migration again from the beginning.
-# failureThreshold x periodSeconds is how long a migration may take.
+# The startup probe asks /healthz, which answers once the port opens: after
+# the database connects and before the schema is applied, so a migration runs
+# under it for as long as it takes. failureThreshold x periodSeconds is how
+# long connecting may take, which OPENPSIRT_STARTUP_TIMEOUT bounds first.
+# Readiness asks /readyz, which answers once the migration and the rest of
+# the start are done.
 startupProbe:
   periodSeconds: 5
   failureThreshold: 120

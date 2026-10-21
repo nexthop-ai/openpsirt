@@ -6,7 +6,6 @@ package migrate
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -32,6 +31,11 @@ import (
 // Nothing was corrupted and the schema ended correct. What the lock changes is
 // that the three wait their turn and find the work already done, rather than
 // crashing on a message about the migration library's bookkeeping.
+//
+// A waiter waits for as long as the lock is held, as on the other three
+// engines, naming the holder about once a minute. The holder writes its
+// process and host into the file as it takes the lock, because the operating
+// system's lock names nobody.
 func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
 	path, err := sqliteFile(ctx, db)
 	if err != nil {
@@ -42,7 +46,7 @@ func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
 		// is no file to lock and no second process that could reach it.
 		return func(context.Context) error { return nil }, nil
 	}
-	return lockFile(ctx, path+lockSuffix, time.Duration(lockWaitSeconds)*time.Second)
+	return lockFile(ctx, path+lockSuffix, LoggerFrom(ctx))
 }
 
 // lockSuffix names the lock beside the database rather than locking the

@@ -8,11 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
+	"sync/atomic"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/attach"
@@ -174,26 +173,36 @@ func (p passes) loops() []loop {
 	return all
 }
 
-func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside passes) error {
-	return serveBeside(context.Background(), cfg, logger, handler, beside.background)
+// listening is the HTTP server once its port is open, answering through
+// whichever handler it holds now.
+//
+// Where the process applies the schema itself, the port opens before it does,
+// answering through the handler for that phase, and the router replaces it
+// once the start is complete. A platform that asks whether the process is
+// alive then hears that it is while a long migration runs, rather than ending
+// it part way.
+type listening struct {
+	srv     *http.Server
+	handler atomic.Pointer[http.Handler]
+	// failed carries a failure to serve after the port opened.
+	failed chan error
 }
 
-// serveBeside serves, with whatever start begins running beside the server
-// stopped and waited for on every way out.
+// listen opens the port and serves through first until answer replaces it.
 //
-// It shuts down on an interrupt, a SIGTERM, or parent ending, and all three
-// take the same path.
-func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger, handler http.Handler,
-	start func(context.Context) *sync.WaitGroup) error {
-	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Reading stops when the signal arrives, before the server drains, so a
-	// scan is not picked up during the seconds we are on our way out.
-	workers := start(ctx)
-	srv := &http.Server{
-		Addr:    cfg.Addr,
-		Handler: handler,
+// The port is opened here rather than in the goroutine that serves it, so an
+// address somebody else holds is refused before anything else starts.
+func listen(cfg config.Config, logger *slog.Logger, first http.Handler) (*listening, error) {
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return nil, err
+	}
+	l := &listening{failed: make(chan error, 1)}
+	l.handler.Store(&first)
+	l.srv = &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			(*l.handler.Load()).ServeHTTP(w, r)
+		}),
 		// Without these a client can hold a connection, a goroutine and a file
 		// descriptor open indefinitely by sending headers slowly. Enough such
 		// connections exhaust every replica while the liveness probe keeps
@@ -203,22 +212,61 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
-	errs := make(chan error, 1)
-
+	v := version.Get()
+	logger.Info("listening", "addr", ln.Addr().String(), "version", v.Version, "commit", v.Commit)
 	go func() {
-		v := version.Get()
-		logger.Info("listening", "addr", cfg.Addr, "version", v.Version, "commit", v.Commit)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errs <- err
+		if err := l.srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			l.failed <- err
 		}
 	}()
+	return l, nil
+}
+
+// answer replaces the handler every request after this one reaches. A request
+// already being answered finishes with the handler it began with.
+func (l *listening) answer(handler http.Handler) {
+	l.handler.Store(&handler)
+}
+
+// abandon closes the port of a start that did not complete.
+//
+// A start ended by a stop signal is a clean stop, and the error is what the
+// step it ended said about being stopped, so it is logged rather than
+// returned. Anything else fails the start as it did before the port opened.
+func (l *listening) abandon(stopping context.Context, cfg config.Config, logger *slog.Logger, err error) error {
+	closing, cancel := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
+	defer cancel()
+	if closeErr := l.srv.Shutdown(closing); closeErr != nil {
+		logger.Warn("closing the port of a start that did not complete", "error", closeErr)
+	}
+	if stopping.Err() != nil {
+		logger.Info("stopped before the start completed", "interrupted", err)
+		return nil
+	}
+	return err
+}
+
+// serveBeside serves, with whatever start begins running beside the server
+// stopped and waited for on every way out.
+//
+// It shuts down when parent ends, which is a stop signal in a running process.
+func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger, server *listening,
+	start func(context.Context) *sync.WaitGroup) error {
+	ctx, stop := context.WithCancel(parent)
+	defer stop()
+
+	// Reading stops when the signal arrives, before the server drains, so a
+	// scan is not picked up during the seconds we are on our way out.
+	workers := start(ctx)
+	srv := server.srv
+	errs := server.failed
 
 	select {
 	case err := <-errs:
 		// The workers are already running, each of them beginning with a
 		// timer that fires at once. Returning without waiting would leave
 		// them mid-query while the caller's deferred close takes the database
-		// away, turning an orderly failure to listen into failed scans and
+		// away, turning an orderly failure to serve into failed scans and
 		// jobs retried for no reason. Stopping them is what ctx's cancel
 		// does; waiting is what this adds.
 		stop()

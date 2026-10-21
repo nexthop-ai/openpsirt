@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -168,13 +170,13 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 		return runRecords(ctx, cfg, logger, stdout, action, operand)
 	}
 
-	// Everything below this line is contacted before the server listens, and
+	// Everything below this line is contacted before the server serves, and
 	// all of it under one deadline, which starts again once an auto-migration
 	// has put the schema in place.
 	//
 	// Unbounded, a hang here is silent and total. An endpoint that accepts the
 	// connection and never answers holds PingContext for ever: the process is
-	// up, no port is listening, and not one log line has been written — from
+	// up, nothing is served, and not one log line has been written — from
 	// outside, the same thing as a slow image pull. A crash
 	// loop that names what it could not reach is the failure a supervisor can
 	// act on. Migrating is outside it — both the subcommand above and the
@@ -183,8 +185,13 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	//
 	// Each step says what it is about to do, for the same reason: a hang has
 	// to name what it is hanging on.
-	migrating := ctx
-	startup, settled := context.WithTimeout(ctx, cfg.StartupTimeout)
+	//
+	// A stop signal ends the start as well as serving, from here on. The
+	// migration is the step it matters for: an interrupted migration's
+	// transaction is rolled back, and the next start applies it again.
+	stopping, stopped := signal.NotifyContext(startedFrom(), os.Interrupt, syscall.SIGTERM)
+	defer stopped()
+	startup, settled := context.WithTimeout(stopping, cfg.StartupTimeout)
 	defer settled()
 	ctx = startup
 	logger.Info("starting", "timeout", cfg.StartupTimeout)
@@ -196,38 +203,71 @@ func run(args []string, stdout, stderr *os.File) (err error) {
 	}
 	defer closeQuietly(db, logger)
 
+	// The `migrate` subcommand above returns before any of this; what runs
+	// below is the same work under `auto-migrate`, which the chart defaults
+	// on. With it off, nothing listens until everything else has been
+	// checked, so every refusal comes before the port opens.
+	if !cfg.AutoMigrate {
+		if err := schemaIsCurrent(ctx, db, logger); err != nil {
+			return startupFailed(err, "checking the schema version", cfg)
+		}
+		handler, beside, err := prepare(ctx, cfg, logger, db)
+		if err != nil {
+			return err
+		}
+		server, err := listen(cfg, logger, handler)
+		if err != nil {
+			return err
+		}
+		return serveBeside(stopping, cfg, logger, server, beside.background)
+	}
+
 	// Migrating before serving means a request never arrives against a schema
-	// the code does not expect.
+	// the code does not expect. The port opens first, answering only that
+	// the process is alive and upgrading, so a platform's health check passes
+	// for as long as the migration runs, and a migration nobody ends is one
+	// that finishes.
 	//
 	// Outside the startup deadline, and the deadline is why: a migration
 	// adding an index to a large finding table takes longer than a deployment
 	// starts in, so bounded at 60s it gives up, restarts, and begins the
-	// migration again — for ever. A second replica waits on the advisory lock
-	// and dies under the same bound. What bounds this instead is the chart's
-	// startup probe, which allows ten minutes and says so.
+	// migration again — for ever. A second replica waits on the migration
+	// lock for as long as the first holds it, answering the same way.
 	//
-	// The `migrate` subcommand above returns before any of this; what runs
-	// here is the same work under `auto-migrate`, which the chart defaults on.
-	if cfg.AutoMigrate {
-		logger.Info("applying the schema")
-		if err := schema.Up(migrating, db, logger); err != nil {
-			return fmt.Errorf("applying the schema: %w", err)
-		}
-		// The deadline counts from the schema being in place, so the steps
-		// after a long migration have the whole of it.
-		settled()
-		startup, settled = context.WithTimeout(migrating, cfg.StartupTimeout)
-		defer settled()
-		ctx = startup
-	} else if err := schemaIsCurrent(ctx, db, logger); err != nil {
-		return startupFailed(err, "checking the schema version", cfg)
-	}
-	handler, beside, err := prepare(ctx, cfg, logger, db)
+	// Configuration that fails to read is refused before the database is
+	// contacted. The refusals prepare makes come after the migration, because
+	// most of them read the schema: each closes the port and fails the start.
+	server, err := listen(cfg, logger, httpapi.Upgrading())
 	if err != nil {
 		return err
 	}
-	return serve(cfg, logger, handler, beside)
+	logger.Info("applying the schema")
+	if err := applySchema(stopping, db, logger); err != nil {
+		return server.abandon(stopping, cfg, logger, fmt.Errorf("applying the schema: %w", err))
+	}
+	// The deadline counts from the schema being in place, so the steps
+	// after a long migration have the whole of it.
+	settled()
+	startup, settled = context.WithTimeout(stopping, cfg.StartupTimeout)
+	defer settled()
+	handler, beside, err := prepare(startup, cfg, logger, db)
+	if err != nil {
+		return server.abandon(stopping, cfg, logger, err)
+	}
+	server.answer(handler)
+	logger.Info("serving")
+	return serveBeside(stopping, cfg, logger, server, beside.background)
 }
+
+// applySchema brings the database up to the schema this build expects as a
+// start begins. A variable only so a test can hold a migration open; nothing
+// in the application changes it.
+var applySchema = schema.Up
+
+// startedFrom is the context a start and the server under it descend from. A
+// variable only so a test can stand a canceled context in for a stop signal,
+// which takes the same path; nothing in the application changes it.
+var startedFrom = context.Background
 
 // refreshStatistics asks the engine to analyze every table. A database last
 // opened by a release that kept no statistics, copied in from elsewhere, or

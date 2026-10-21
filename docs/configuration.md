@@ -121,13 +121,43 @@ starts read them, so they stay in the environment beside a file.
 | `OPENPSIRT_BASE_URL` | `server.base_url` | The address people arrive on, **written in full, with no path below it and no query, fragment or credentials**: `https://psirt.example.com`. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured | unset |
 | `OPENPSIRT_PLAIN_HTTP` | `server.plain_http` | Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not | `false` |
 | `OPENPSIRT_SHUTDOWN_GRACE` | `server.shutdown_grace` | How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that | `15s` |
-| `OPENPSIRT_STARTUP_TIMEOUT` | `server.startup_timeout` | How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. `openpsirt migrate` connects within it too, and migrates without a bound. Past it the process stops and names what it was waiting on | `60s` |
+| `OPENPSIRT_STARTUP_TIMEOUT` | `server.startup_timeout` | How long everything contacted before the server serves has to answer: the database, the schema, the administrators named here, and the attachment store. It starts again once an automatic migration finishes, and the migration itself has no bound. `openpsirt migrate` connects within it too. Past it the process stops and names what it was waiting on | `60s` |
 | `OPENPSIRT_LOG_LEVEL` | `log.level` | `debug`, `info`, `warn` or `error` | `info` |
 | `OPENPSIRT_LOG_FORMAT` | `log.format` | `text` or `json` | `text` |
 
 The defaults above are the binary's. The chart sets a log format of `json`,
 because a cluster's collector parses the logs; run the binary yourself and it
 writes `text`.
+
+### Health checks
+
+| Path | Answers 200 | Use it for |
+|---|---|---|
+| `/healthz` | While the process runs, including while it applies the schema | A check that restarts or replaces the process: a liveness probe, a startup probe, a container health check, an ECS task health check |
+| `/readyz` | Once the process serves, and while its database answers | A check that decides whether to send it traffic: a readiness probe, a load balancer's target check |
+
+Neither needs a credential. The chart and the image use them this way.
+
+With `OPENPSIRT_AUTO_MIGRATE` on, the process opens its port once it has
+connected to the database, and then applies the schema. Until it serves:
+
+| Request | Answer |
+|---|---|
+| `/healthz` | 200 |
+| `/readyz` | 503 |
+| A path under `/v1/` | 503 with `Retry-After`, in the API's error shape: "OpenPSIRT is upgrading its database" |
+| A page | 503 with `Retry-After`, a page saying the same, which reloads itself |
+
+A second process started while one applies the schema waits for it, answers
+the same way, and logs about once a minute which process holds the migration
+lock. Where the holder stops part way, the waiter applies the schema itself.
+
+A check on `/readyz` that ends the process ends a long migration part way, and
+the next process starts it again from the beginning. An AWS Application Load
+Balancer in front of ECS has one health check for both purposes: point it at
+`/healthz`. A process applying the schema then receives traffic and answers it
+with the 503 above, and the load balancer keeps sending traffic to a process
+whose database has stopped answering.
 
 ## Database
 
@@ -1260,7 +1290,7 @@ from, and every section after it.
 |---|---|
 | Back the database up | It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
 | Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
-| Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
+| Deploy this release | It migrates at startup, answering its health check on `/healthz` meanwhile ([Health checks](#health-checks)). With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back to the earlier release is restoring that backup and deploying the
 earlier release against it. Every release before this one starts against a
@@ -1291,12 +1321,12 @@ on.
 
 | Change | What to do |
 |---|---|
-| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held. The chart's startup probe allows ten minutes, and a probe that stops the upgrade undoes it, so the next pod starts it again. With more than about three weeks of nightly history, raise `startupProbe.failureThreshold` for the upgrade, or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
+| A container image is tracked by its name. Its version, a tag, build stamp or digest, is recorded per build and shown on the component page. A rebuilt image closes and reopens nothing beneath it, and a judgment made beneath it stands | The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check `/healthz` for whether to keep the process, as the chart does ([Health checks](#health-checks)), or set `autoMigrate: false` and run `openpsirt migrate up` before deploying |
 | A live judgment beneath an image is keyed on the image with no version | Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed |
 | Findings a rebuild closed before the upgrade stay closed | Nothing. They are history, listed in the register with the reason they closed |
 | A name some build held at two versions at once is not merged in any build, and a build holding two images of one name at once keeps them apart by version, as before | Nothing. A build that holds such a name once moves it to the name on its next upload, once: the image's node closes and opens, the findings beneath it close and open again, and judgments beneath it lapse and are asked again |
 | An image the inventory states with no package identifier is not found by the upgrade | Nothing. The next upload of each build stores it by name, which closes the old node and opens the new one once, as a version moving would |
-| The upgrade also stores each claim's and each supplier statement's explanation once, keys every claim on it, and keys every reference on its whole address. It reads every claim, statement and reference a batch at a time | Allow for it beside the image rewrite above: the time grows with the claims and statements held. The same startup-probe advice applies, and a database holding large VEX documents needs more headroom than the image figures alone suggest |
+| The upgrade also stores each claim's and each supplier statement's explanation once, keys every claim on it, and keys every reference on its whole address. It reads every claim, statement and reference a batch at a time | Allow for it beside the image rewrite above: the time grows with the claims and statements held. The same health-check advice applies |
 | A scan file, a VEX document or a supplier advisory with anything but whitespace after its document is refused. v0.8.0 read the first document and ignored the rest | Upload one document per file. A pipeline that appends output to the file it sends sees the scan fail, or the import refused, with the reason |
 | An SPDX 3 file carrying several document elements that its imports do not settle is refused. v0.8.0 took the last one read | Nothing for a file with one document. A file inlining documents it imports names each in the importing document's imports |
 | An upload waits for a place among the uploads one server reads at once, `upload.max-concurrent`, four by default. Past it the request is answered 503 with `Retry-After`. v0.8.0 read every upload as it arrived | Retry on a 503, as `curl --retry 5` does ([Build pipelines](pipeline.md#the-upload)). The temporary directory must hold that many of the largest requests a route takes. The chart's `tmp.sizeLimit` default is 3Gi, from 1Gi, for the shipped values; a value set in your own values file stays as it was and needs raising to match |
@@ -1320,3 +1350,10 @@ on.
 | This deployment can serve its own security documents to anybody, with `OPENPSIRT_PUBLISH`. Off by default, and off for every product | Nothing, unless you want it: [Published documents](#published-documents) |
 | A claim may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No claim the upgrade carries states one, and the reason decides | Nothing |
 | A path below `/.well-known/csaf/` or `/openvex/` is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page | Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on |
+
+### From v0.10.0
+
+| Change | What to do |
+|---|---|
+| The process opens its port before it applies the schema, and answers `/healthz` while it does. `/readyz` and every other path answer 503 until it serves. v0.10.0 opened its port once the schema was in place | Point a check that replaces the process at `/healthz`, and a check that routes traffic at `/readyz` ([Health checks](#health-checks)). The chart's startup probe asks `/healthz` |
+| A process waiting for another's migration waits for as long as the migration runs, and logs about once a minute which process holds the lock. v0.10.0 gave up after five minutes | Nothing |

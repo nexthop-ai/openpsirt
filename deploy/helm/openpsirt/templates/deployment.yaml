@@ -294,11 +294,11 @@ spec:
               value: {{ .Values.log.level | quote }}
             - name: OPENPSIRT_LOG_FORMAT
               value: {{ .Values.log.format | quote }}
-          # Migrations run before the service answers, so the startup probe has
-          # to allow for one taking a long time. Giving up part way through
-          # kills the pod and starts the migration over.
+          # Liveness, until it first passes. The process answers it from the
+          # moment its port opens, including while it applies the schema, so
+          # a long migration is not ended part way and started over.
           startupProbe:
-            httpGet: {path: /readyz, port: http}
+            httpGet: {path: /healthz, port: http}
             periodSeconds: {{ .Values.startupProbe.periodSeconds }}
             failureThreshold: {{ .Values.startupProbe.failureThreshold }}
           # Liveness asks whether the process is running. Restarting will not

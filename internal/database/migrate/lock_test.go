@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,11 +56,9 @@ func open(t *testing.T, url string) *database.DB {
 // through Up passes with the entire advisory lock deleted. It proves the mutex
 // and nothing else. This drives acquire directly, from two separate pools.
 func TestLockExcludesAnotherConnection(t *testing.T) {
-	// Otherwise the second attempt waits five minutes. The bound is whole
-	// seconds, and one is the least that still waits.
-	restore := lockWaitSeconds
-	lockWaitSeconds = 1
-	t.Cleanup(func() { lockWaitSeconds = restore })
+	// Attempts of one second, so the second instance tries several times
+	// within the few seconds it is given.
+	shortAttempts(t)
 
 	for name, env := range map[database.Engine]string{
 		database.Postgres: postgresURLEnv,
@@ -87,19 +86,24 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 			}
 
 			// The whole point: while one holds it, another must not get it.
-			// And the refusal names the session in the way, because any
+			// And the wait names the session in the way, because any
 			// account that can connect may take the lock and an operator
 			// told "another instance" looks for a replica.
-			if release2, err := acquire(ctx, second); err == nil {
+			said := &lines{}
+			waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 3*time.Second)
+			defer cancel()
+			if release2, err := acquire(waiting, second); err == nil {
 				_ = release2(ctx)
 				_ = release(ctx)
 				t.Fatal("a second instance took the migration lock while it was held")
-			} else if want := map[database.Engine]string{
-				database.Postgres: "by server process ",
-				database.MySQL:    "by connection ",
-				database.MariaDB:  "by connection ",
-			}[name]; !strings.Contains(err.Error(), want) {
-				t.Errorf("the refusal does not name the holder: %v", err)
+			}
+			if want := map[database.Engine]string{
+				database.Postgres: "server process ",
+				database.MySQL:    "connection ",
+				database.MariaDB:  "connection ",
+			}[name]; !strings.Contains(said.String(), "waiting for the migration lock") ||
+				!strings.Contains(said.String(), want) {
+				t.Errorf("the wait does not name the holder: %q", said.String())
 			}
 
 			if err := release(ctx); err != nil {
@@ -119,11 +123,130 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 	}
 }
 
+// shortAttempts makes each attempt at the lock one second and each line about
+// a wait due at once, for one test.
+func shortAttempts(t *testing.T) {
+	t.Helper()
+	attempt, every := lockAttemptSeconds, waitLogEvery
+	lockAttemptSeconds, waitLogEvery = 1, 0
+	t.Cleanup(func() { lockAttemptSeconds, waitLogEvery = attempt, every })
+}
+
+// lines is what a logger wrote, safe to read while the logger writes.
+type lines struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (l *lines) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.Write(p)
+}
+
+func (l *lines) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.buf.String()
+}
+
+func (l *lines) logger() *slog.Logger { return slog.New(slog.NewTextHandler(l, nil)) }
+
+// A process waiting on the migration lock waits for as long as the lock is
+// held, through many attempts, and takes it and migrates once the holder's
+// session ends. The holder dying part way through a migration is the case:
+// the server releases the lock with the session, and the waiter resumes the
+// migration rather than failing and being restarted.
+func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
+	shortAttempts(t)
+
+	servers(t, func(t *testing.T, _ database.Engine, address string) {
+		holder := open(t, address)
+		waiter := open(t, address)
+		killer := open(t, address)
+		ctx := t.Context()
+
+		release, err := acquire(ctx, holder)
+		if err != nil {
+			t.Fatalf("the first instance could not take the lock: %v", err)
+		}
+		// Released after the holder's session has ended, which fails and
+		// stops its keep-alive.
+		defer func() { _ = release(ctx) }()
+
+		said := &lines{}
+		migrated := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			done <- withLock(ctx, waiter, said.logger(), func(context.Context) error {
+				close(migrated)
+				return nil
+			})
+		}()
+
+		// Several attempts, each of which times out. A wait bounded by one
+		// attempt's length would have failed here.
+		select {
+		case err := <-done:
+			t.Fatalf("the waiter stopped waiting while the lock was held: %v", err)
+		case <-migrated:
+			t.Fatal("the waiter migrated while the lock was held")
+		case <-time.After(4 * time.Second):
+		}
+		if got := strings.Count(said.String(), "waiting for the migration lock"); got < 2 {
+			t.Errorf("a wait of several attempts said so %d times: %q", got, said.String())
+		}
+
+		if err := endHolder(ctx, killer); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-migrated:
+		case err := <-done:
+			t.Fatalf("the waiter gave up once the holder died: %v", err)
+		case <-time.After(30 * time.Second):
+			t.Fatal("the waiter did not take the lock within 30s of its holder dying")
+		}
+		if err := <-done; err != nil {
+			t.Errorf("the waiter's migration answered %v", err)
+		}
+	})
+}
+
+// A waiter stops waiting when its context ends, during an attempt or between
+// two, so a shutdown reaches a process waiting on another's migration.
+func TestAWaitForTheLockEndsWhenItsContextDoes(t *testing.T) {
+	shortAttempts(t)
+
+	servers(t, func(t *testing.T, _ database.Engine, address string) {
+		holder := open(t, address)
+		waiter := open(t, address)
+		ctx := t.Context()
+
+		release, err := acquire(ctx, holder)
+		if err != nil {
+			t.Fatalf("the first instance could not take the lock: %v", err)
+		}
+		defer func() { _ = release(ctx) }()
+
+		stopping, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+		defer cancel()
+		started := time.Now()
+		if again, err := acquire(stopping, waiter); err == nil {
+			_ = again(ctx)
+			t.Fatal("a waiter took the lock while it was held")
+		}
+		if waited := time.Since(started); waited > 5*time.Second {
+			t.Errorf("a waiter asked to stop after 1.5s stopped after %s", waited)
+		}
+	})
+}
+
 func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
-	// The bound on the lock wait is a session setting, and Close returns the
+	// The bound on an attempt at the lock is a session setting, and Close returns the
 	// connection to the pool rather than closing it — which is why the
 	// connection is pinned in the first place. Left set, one pooled connection
-	// carries a 300-second bound and the others carry the server's default, so
+	// carries a five-second bound and the others carry the server's default, so
 	// the same query afterwards either waits indefinitely or is canceled,
 	// decided by which connection the pool happens to hand out.
 	engines.SkipUnless(t, database.Postgres)
@@ -326,19 +449,25 @@ func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 	second := open(t, "sqlite://"+path)
 	ctx := context.Background()
 
-	// Otherwise the second attempt waits five minutes.
-	restore := lockWaitSeconds
-	lockWaitSeconds = 1
-	t.Cleanup(func() { lockWaitSeconds = restore })
+	shortAttempts(t)
 
 	release, err := acquire(ctx, first)
 	if err != nil {
 		t.Fatalf("the first migration could not take the lock: %v", err)
 	}
-	if _, err := acquire(ctx, second); err == nil {
+	// The second waits for as long as it is let, and the wait names the
+	// holder the file records, because the operating system's lock names
+	// nobody.
+	said := &lines{}
+	waiting, cancel := context.WithTimeout(WithEngine(ctx, database.SQLite, said.logger()), 300*time.Millisecond)
+	defer cancel()
+	if _, err := acquire(waiting, second); err == nil {
 		t.Error("two processes were allowed to migrate one file at the same time")
-	} else if !strings.Contains(err.Error(), "another process") {
-		t.Errorf("the refusal does not say what is in the way: %v", err)
+	} else if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("a wait ended by its context answered %v", err)
+	}
+	if want := fmt.Sprintf("process %d on ", os.Getpid()); !strings.Contains(said.String(), want) {
+		t.Errorf("the wait does not name the holder: %q", said.String())
 	}
 
 	// And once it is released, the next one gets it — a lock that is never
@@ -431,9 +560,10 @@ func TestAPoolOfOneIsRefusedRatherThanWaitedOn(t *testing.T) {
 // timeout. It is used while held, so a server that ends idle sessions does not
 // end this one and hand the lock to a waiting replica.
 func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
-	restoreWait, restoreEvery := lockWaitSeconds, keepAliveEvery
-	lockWaitSeconds, keepAliveEvery = 1, 250*time.Millisecond
-	t.Cleanup(func() { lockWaitSeconds, keepAliveEvery = restoreWait, restoreEvery })
+	shortAttempts(t)
+	restoreEvery := keepAliveEvery
+	keepAliveEvery = 250 * time.Millisecond
+	t.Cleanup(func() { keepAliveEvery = restoreEvery })
 
 	servers(t, func(t *testing.T, engine database.Engine, address string) {
 		// Every session of the holder's pool is ended after one idle second,
@@ -459,7 +589,9 @@ func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
 		time.Sleep(2 * time.Second)
-		if again, err := acquire(ctx, waiting); err == nil {
+		asking, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+		defer cancel()
+		if again, err := acquire(asking, waiting); err == nil {
 			_ = again(ctx)
 			t.Fatal("the holder's session was ended while idle and a waiting instance took the lock")
 		}

@@ -8,8 +8,13 @@ import (
 	"crypto/sha1" //nolint:gosec // G505: a name, not a signature; the choice is the length of the hex, and the input is a database name
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -40,12 +45,22 @@ func namedLock(ctx context.Context, conn *sql.Conn) (string, error) {
 	return name, nil
 }
 
-// lockWaitSeconds bounds how long we wait for another instance to finish. A
-// variable rather than a constant only so tests can shorten it; nothing in the
-// application changes it.
-// Long enough for a real migration, short enough that a stuck one is noticed
-// rather than blocking every replacement pod indefinitely.
-var lockWaitSeconds = 300
+// lockAttemptSeconds is how long one attempt at the migration lock waits.
+// A variable rather than a constant only so tests can shorten it; nothing in
+// the application changes it.
+//
+// A waiter waits for as long as somebody holds the lock, in attempts of this
+// length rather than in one wait. Between attempts it says who holds the lock
+// and looks at whether it has been asked to stop, so a process waiting on a
+// long migration stays one that a shutdown reaches and an operator can read.
+var lockAttemptSeconds = 5
+
+// waitLogEvery is how often a process waiting on the migration lock names the
+// session holding it. A variable only so tests can shorten it.
+//
+// A holder wedged part way through a migration holds every replacement
+// behind it. This line, naming the holder, is how that is noticed.
+var waitLogEvery = time.Minute
 
 // resetWait bounds unwinding the session before the connection goes back to
 // the pool. It is one round trip against a server that has just answered.
@@ -147,20 +162,28 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 		}
 	}
 
+	waits := waiting{logger: LoggerFrom(ctx), since: time.Now()}
 	switch db.Server.Engine {
 	case database.Postgres:
-		// Bound the wait. Without this, pg_advisory_lock waits forever: an
-		// instance wedged mid-migration blocks every replacement silently,
-		// and the startup probe kills each one in turn.
+		// Each attempt is bounded, and a bounded attempt that times out is
+		// tried again. Unbounded, pg_advisory_lock waits in one statement
+		// that says nothing for as long as it waits.
 		if _, err := conn.ExecContext(ctx,
-			fmt.Sprintf("SET lock_timeout = '%ds'", lockWaitSeconds)); err != nil {
+			fmt.Sprintf("SET lock_timeout = '%ds'", lockAttemptSeconds)); err != nil {
 			closeConn()
-			return nil, fmt.Errorf("bound the migration lock wait: %w", err)
+			return nil, fmt.Errorf("bound an attempt at the migration lock: %w", err)
 		}
-		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", lockID); err != nil {
-			holder := holderOf(ctx, conn, db.Server.Engine, "")
-			closeConn()
-			return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
+		for {
+			_, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", lockID)
+			if err == nil {
+				break
+			}
+			if !lockNotAvailable(err) || ctx.Err() != nil {
+				holder := holderOf(ctx, conn, db.Server.Engine, "")
+				closeConn()
+				return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
+			}
+			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, "") })
 		}
 		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
@@ -178,24 +201,34 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 		}, nil
 
 	case database.MySQL, database.MariaDB:
-		// GET_LOCK returns 1 when granted, 0 on timeout, NULL on error. A
-		// timeout means another instance is migrating, which is not our
-		// failure but does mean we must not proceed.
+		// GET_LOCK returns 1 when granted, 0 when the attempt timed out, and
+		// NULL on error. A timeout means another session holds the lock, and
+		// the next attempt follows.
 		name, err := namedLock(ctx, conn)
 		if err != nil {
 			closeConn()
 			return nil, err
 		}
-		var granted *int
-		row := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", name, lockWaitSeconds)
-		if err := row.Scan(&granted); err != nil {
-			closeConn()
-			return nil, fmt.Errorf("take migration lock: %w", err)
-		}
-		if granted == nil || *granted != 1 {
-			holder := holderOf(ctx, conn, db.Server.Engine, name)
-			closeConn()
-			return nil, fmt.Errorf("the migration lock %q is held%s", name, holder)
+		for {
+			var granted *int
+			row := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", name, lockAttemptSeconds)
+			if err := row.Scan(&granted); err != nil {
+				holder := holderOf(ctx, conn, db.Server.Engine, name)
+				closeConn()
+				return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
+			}
+			if granted == nil {
+				closeConn()
+				return nil, fmt.Errorf("take migration lock %q: the server answered no result", name)
+			}
+			if *granted == 1 {
+				break
+			}
+			if err := ctx.Err(); err != nil {
+				closeConn()
+				return nil, err
+			}
+			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, name) })
 		}
 		stop := keepAlive(ctx, conn)
 		return func(ctx context.Context) error {
@@ -228,8 +261,41 @@ func heldWhenReleased(released *int) error {
 	return nil
 }
 
-// holderOf names the session holding the migration lock, for a refusal to
-// wait any longer, or says nothing where the server will not tell.
+// waiting reports a wait on the migration lock: at the first attempt that
+// times out, and then about once every waitLogEvery, naming the holder each
+// time.
+type waiting struct {
+	logger *slog.Logger
+	since  time.Time
+	said   time.Time
+}
+
+// still says the lock is still held, where a line is due. The holder is asked
+// only then, so an attempt that times out costs no query of its own.
+func (w *waiting) still(holder func() string) {
+	now := time.Now()
+	if !w.said.IsZero() && now.Sub(w.said) < waitLogEvery {
+		return
+	}
+	w.said = now
+	held := strings.TrimPrefix(holder(), " by ")
+	if held == "" {
+		held = "a session the server does not name"
+	}
+	w.logger.Info("waiting for the migration lock", "holder", held,
+		"waited", now.Sub(w.since).Round(time.Second))
+}
+
+// lockNotAvailable reports whether PostgreSQL ended an attempt at a lock
+// because the attempt's bound passed.
+func lockNotAvailable(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "55P03"
+}
+
+// holderOf names the session holding the migration lock, for a wait that is
+// still going on or a failure to take the lock, or says nothing where the
+// server will not tell.
 //
 // Any account that can connect may take the lock: a named lock on MySQL and
 // MariaDB needs no privilege and is shared by every database on the server,

@@ -458,7 +458,8 @@ from first.
    it has moved.
 4. Where `database.auto_migrate` is `false`, migrate as the service user:
    `sudo -u openpsirt openpsirt migrate up --config /etc/openpsirt/openpsirt.toml`.
-   Otherwise the process migrates as it starts.
+   Otherwise the process migrates as it starts, and answers 503 on every
+   path but `/healthz` until it serves ([Health checks](configuration.md#health-checks)).
 5. Start the service: `sudo systemctl start openpsirt`.
 
 `sudo -u openpsirt openpsirt migrate status --config /etc/openpsirt/openpsirt.toml` says which

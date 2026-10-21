@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -37,12 +38,13 @@ func taken(t *testing.T) config.Config {
 	return config.Config{Addr: held.Addr().String(), ShutdownGrace: 2 * time.Second}
 }
 
-// A server that cannot listen stops what it started beside it and waits for it
-// before returning, so the caller's deferred close does not take the database
-// from under a worker mid-query.
-func TestAFailedListenStopsTheWorkersBeforeReturning(t *testing.T) {
+// A server that fails to serve after its port opened stops what it started
+// beside it and waits for it before returning, so the caller's deferred close
+// does not take the database from under a worker mid-query.
+func TestAFailureToServeStopsTheWorkersBeforeReturning(t *testing.T) {
+	server := opened(t, config.Config{Addr: "127.0.0.1:0", ShutdownGrace: 2 * time.Second})
 	var stopped atomic.Bool
-	err := serveBeside(t.Context(), taken(t), discard(), http.NotFoundHandler(),
+	err := serveBeside(t.Context(), server.cfg, discard(), server.l,
 		func(ctx context.Context) *sync.WaitGroup {
 			var workers sync.WaitGroup
 			workers.Add(1)
@@ -52,24 +54,24 @@ func TestAFailedListenStopsTheWorkersBeforeReturning(t *testing.T) {
 				time.Sleep(50 * time.Millisecond) // a query finishing
 				stopped.Store(true)
 			}()
+			server.l.failed <- errors.New("accept: the listener failed")
 			return &workers
 		})
 	if err == nil {
-		t.Fatal("a server whose address was taken reported no error")
+		t.Fatal("a server that failed to serve reported no error")
 	}
 	if !stopped.Load() {
 		t.Error("serve returned while a worker it started was still running")
 	}
 }
 
-// A worker that does not stop within the grace after a failed listen fails the
-// exit, rather than being waited on for ever.
-func TestAWorkerThatOverrunsTheGraceAfterAFailedListenFailsTheExit(t *testing.T) {
-	cfg := taken(t)
-	cfg.ShutdownGrace = 50 * time.Millisecond
+// A worker that does not stop within the grace after a failure to serve fails
+// the exit, rather than being waited on for ever.
+func TestAWorkerThatOverrunsTheGraceAfterAFailureToServeFailsTheExit(t *testing.T) {
+	server := opened(t, config.Config{Addr: "127.0.0.1:0", ShutdownGrace: 50 * time.Millisecond})
 	release := make(chan struct{})
 	defer close(release)
-	err := serveBeside(t.Context(), cfg, discard(), http.NotFoundHandler(),
+	err := serveBeside(t.Context(), server.cfg, discard(), server.l,
 		func(context.Context) *sync.WaitGroup {
 			var workers sync.WaitGroup
 			workers.Add(1)
@@ -77,11 +79,38 @@ func TestAWorkerThatOverrunsTheGraceAfterAFailedListenFailsTheExit(t *testing.T)
 				defer workers.Done()
 				<-release
 			}()
+			server.l.failed <- errors.New("accept: the listener failed")
 			return &workers
 		})
 	if err == nil || !strings.Contains(err.Error(), "did not stop within") {
 		t.Errorf("an overrunning worker answered %v", err)
 	}
+}
+
+// An address somebody else holds is refused as the port is opened, before
+// anything is started beside it.
+func TestAnAddressSomebodyHoldsIsRefusedAsThePortOpens(t *testing.T) {
+	if l, err := listen(taken(t), discard(), http.NotFoundHandler()); err == nil {
+		_ = l.srv.Close()
+		t.Fatal("an address somebody else holds was listened on")
+	}
+}
+
+// openPort is a server whose port is open, and the configuration it was opened
+// under, closed when the test ends.
+type openPort struct {
+	cfg config.Config
+	l   *listening
+}
+
+func opened(t *testing.T, cfg config.Config) openPort {
+	t.Helper()
+	l, err := listen(cfg, discard(), http.NotFoundHandler())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.srv.Close() })
+	return openPort{cfg: cfg, l: l}
 }
 
 // A signal ends serving. The parent ending stands in for it here, because it
@@ -90,8 +119,8 @@ func signalled(t *testing.T, worker func(ctx context.Context)) error {
 	t.Helper()
 	parent, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	cfg := config.Config{Addr: "127.0.0.1:0", ShutdownGrace: 50 * time.Millisecond}
-	return serveBeside(parent, cfg, discard(), http.NotFoundHandler(),
+	server := opened(t, config.Config{Addr: "127.0.0.1:0", ShutdownGrace: 50 * time.Millisecond})
+	return serveBeside(parent, server.cfg, discard(), server.l,
 		func(ctx context.Context) *sync.WaitGroup {
 			var workers sync.WaitGroup
 			workers.Add(1)
