@@ -13,7 +13,7 @@ update on roughly the same schedule.
 
 | Document | |
 |---|---|
-| The SBOM | The release's inventory, as the vendor built it. CycloneDX 1.x, SPDX 2.x or SPDX 3.x |
+| The SBOM | The release's inventory, as the vendor built it. CycloneDX 1.x as JSON or XML, or SPDX 2.x or SPDX 3.x as JSON |
 | The VEX document | The vendor's VEX for the same build. OpenVEX or CSAF VEX |
 
 An OpenPSIRT deployment offers two VEX documents per build. Either loads here:

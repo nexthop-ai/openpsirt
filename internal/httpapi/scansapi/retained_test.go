@@ -190,3 +190,94 @@ func TestADocumentABuildSentReadsBackAsItArrived(t *testing.T) {
 		}
 	})
 }
+
+func TestARetainedDocumentIsNamedByItsEncoding(t *testing.T) {
+	// A copy named for the other encoding is misread by anything that opens it
+	// by its extension: a validator, an editor, somebody double-clicking it.
+	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		for i, tc := range []struct {
+			sent, named string
+		}{
+			{httpapitest.Inventory(httpapitest.Nowish(), "libc6"), ".json"},
+			{cyclonedxXMLInventory(httpapitest.Nowish().Add(time.Minute), "zlib"), ".xml"},
+		} {
+			code, result := f.Send(t, httpapitest.Upload(t, f.Path, tc.sent))
+			if code != http.StatusAccepted {
+				t.Fatalf("upload %d answered %d", i, code)
+			}
+			inventoryID := sentInventory(t, f, result.ScanID)
+			back := httptest.NewRecorder()
+			f.Handler.ServeHTTP(back, f.Sending(httptest.NewRequest(http.MethodGet,
+				f.Path+"/"+httpapitest.Itoa(result.ScanID)+"/documents/"+httpapitest.Itoa(inventoryID), nil)))
+			if back.Code != http.StatusOK {
+				t.Fatalf("reading upload %d back answered %d: %s", i, back.Code, back.Body.String())
+			}
+			// Looking at the first character to name it takes nothing away
+			// from what is sent.
+			if back.Body.String() != tc.sent {
+				t.Errorf("what came back of upload %d is not what was sent", i)
+			}
+			want := "attachment; filename=\"inventory-" + httpapitest.Itoa(inventoryID) + tc.named + "\""
+			if got := back.Header().Get("Content-Disposition"); got != want {
+				t.Errorf("upload %d is named %q, want %q", i, got, want)
+			}
+		}
+	})
+}
+
+func TestADocumentLetGoAsItIsReadAnswersGone(t *testing.T) {
+	// Its record still says it is held and its parts are gone, which is what
+	// a reader meets when the contents are let go between the two. The first
+	// character is looked at before anything is sent, so this is answered as
+	// gone rather than as a transfer that stops short.
+	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		code, result := f.Send(t, httpapitest.Upload(t, f.Path,
+			httpapitest.Inventory(httpapitest.Nowish(), "libc6")))
+		if code != http.StatusAccepted {
+			t.Fatalf("upload answered %d", code)
+		}
+		inventoryID := sentInventory(t, f, result.ScanID)
+		if _, err := f.DB.ExecContext(context.Background(),
+			`DELETE FROM "scan_document_chunk" WHERE "document_id" = ?`, inventoryID); err != nil {
+			t.Fatal(err)
+		}
+		gone := httptest.NewRecorder()
+		f.Handler.ServeHTTP(gone, f.Sending(httptest.NewRequest(http.MethodGet,
+			f.Path+"/"+httpapitest.Itoa(result.ScanID)+"/documents/"+httpapitest.Itoa(inventoryID), nil)))
+		if gone.Code != http.StatusGone {
+			t.Errorf("a document let go as it was read answered %d, wanted 410: %s",
+				gone.Code, gone.Body.String())
+		}
+	})
+}
+
+// sentInventory is the inventory a scan arrived with, as its receipt names it.
+func sentInventory(t *testing.T, f *httpapitest.IngestFixture, scan int64) int64 {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	f.Handler.ServeHTTP(rec, f.Sending(httptest.NewRequest(http.MethodGet, f.Path, nil)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the receipts answered %d: %s", rec.Code, rec.Body.String())
+	}
+	var receipts struct {
+		Items []struct {
+			ScanID int64 `json:"scan_id"`
+			Sent   []struct {
+				DocumentID int64  `json:"document_id"`
+				Kind       string `json:"kind"`
+			} `json:"sent"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &receipts); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range receipts.Items {
+		for _, doc := range item.Sent {
+			if item.ScanID == scan && doc.Kind == "inventory" {
+				return doc.DocumentID
+			}
+		}
+	}
+	t.Fatalf("no receipt names the inventory scan %d arrived with", scan)
+	return 0
+}

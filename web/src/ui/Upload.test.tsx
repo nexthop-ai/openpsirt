@@ -77,3 +77,23 @@ describe("an upload that is already held", () => {
     expect(host.textContent).toContain("sonic · master · broadcom already holds this inventory");
   });
 });
+
+describe("the inventory picker", () => {
+  it("offers an inventory in either encoding the server reads", async () => {
+    serve(() => ({ data: { items: [] } }));
+    mount.render(
+      screen(
+        <UploadDrawer open onClose={() => undefined} />,
+        "/products/sonic/streams/master/variants/broadcom/inventories",
+        "/products/:product/streams/:stream/variants/:variant/inventories",
+      ),
+    );
+    await settle();
+    const input = mount.host().querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input, "no file input").not.toBeNull();
+    const offered = input?.accept.split(",") ?? [];
+    for (const kind of [".json", ".xml"]) {
+      expect(offered, `the picker does not offer ${kind}`).toContain(kind);
+    }
+  });
+});

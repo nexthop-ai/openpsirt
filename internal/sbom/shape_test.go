@@ -7,9 +7,12 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -188,7 +191,7 @@ func fixtureNames(t *testing.T) []string {
 	}
 	var names []string
 	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".json") {
+		if strings.HasSuffix(e.Name(), ".json") || strings.HasSuffix(e.Name(), ".xml") {
 			names = append(names, e.Name())
 		}
 	}
@@ -225,6 +228,9 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 		}
 		defer f.Close()
 		r = f
+	}
+	if strings.Contains(name, ".xml") {
+		return xmlDocumentPaths(t, name, r)
 	}
 
 	paths := map[string]int{}
@@ -287,6 +293,103 @@ func documentPaths(t *testing.T, name string, from ...io.Reader) (map[string]int
 		}
 	}
 	return paths, shapes, components
+}
+
+// xmlDocumentPaths is documentPaths for a document encoded as XML.
+//
+// A path is the elements leading to a value and what the value is: the text of
+// an element, or one of its attributes. They are written apart from the JSON
+// encoding's paths, behind "xml:", because one field of one format is at two
+// different paths in its two encodings, and a decision about one is not a
+// decision about the other. Elements are named without their namespace, as
+// the reader matches them.
+//
+// The walk is a stream of tokens, holding the elements open at any one time
+// and the paths one component carries, so a full-size document costs what it
+// does in JSON.
+func xmlDocumentPaths(t *testing.T, name string, r io.Reader) (map[string]int, map[string]int, int) {
+	t.Helper()
+	paths := map[string]int{}
+	shapes := map[string]int{}
+	components := 0
+
+	var (
+		open []string
+		// text says, for each element open, whether it held text.
+		text []bool
+		// own is what the component being walked carries, and outside one,
+		// what the document does.
+		outside = map[string]bool{}
+		own     = outside
+	)
+	at := func() string { return "xml:" + strings.Join(collapsed(open), ".") }
+
+	dec := xml.NewDecoder(r) //nolint:gosec // G709: a fixture of this repository, or the document a developer named in OPENPSIRT_TEST_SBOM
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		switch v := tok.(type) {
+		case xml.StartElement:
+			// A component of the document is an element directly in the list
+			// at the top, as one is an element of the array in JSON.
+			if slices.Equal(open, []string{"bom", "components"}) && v.Name.Local == "component" {
+				own = map[string]bool{}
+			}
+			open = append(open, v.Name.Local)
+			text = append(text, false)
+			for _, a := range v.Attr {
+				if a.Name.Space == "xmlns" || a.Name.Local == "xmlns" {
+					continue
+				}
+				own[at()+"@"+a.Name.Local+":attribute"] = true
+			}
+		case xml.CharData:
+			if len(text) > 0 && strings.TrimSpace(string(v)) != "" {
+				text[len(text)-1] = true
+			}
+		case xml.EndElement:
+			if text[len(text)-1] {
+				own[at()+":text"] = true
+			}
+			open, text = open[:len(open)-1], text[:len(text)-1]
+			if slices.Equal(open, []string{"bom", "components"}) && v.Name.Local == "component" {
+				components++
+				carried := slices.Sorted(maps.Keys(own))
+				for _, path := range carried {
+					paths[path]++
+				}
+				shapes[strings.Join(carried, " ")]++
+				own = outside
+			}
+		}
+	}
+	for path := range outside {
+		paths[path]++
+	}
+	return paths, shapes, components
+}
+
+// collapsed is a list of elements with the nesting a document repeats taken
+// out, as join takes it out of a JSON path: a dependency inside a dependency,
+// or a component in the list inside a component.
+func collapsed(open []string) []string {
+	var out []string
+	for _, element := range open {
+		out = append(out, element)
+		n := len(out)
+		switch {
+		case n >= 2 && out[n-1] == out[n-2]:
+			out = out[:n-1]
+		case n >= 4 && out[n-1] == out[n-3] && out[n-2] == out[n-4]:
+			out = out[:n-2]
+		}
+	}
+	return out
 }
 
 // walkPaths returns every key path in a value, with the type found at it and

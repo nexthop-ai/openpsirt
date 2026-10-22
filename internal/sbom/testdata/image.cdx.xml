@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:1c9f4b6a-6a2e-5a0d-9b4a-2f1c7d3e8a55" version="1">
+  <metadata>
+    <timestamp>2026-08-14T09:12:33Z</timestamp>
+    <component type="application" bom-ref="pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64">
+      <name>sonic-broadcom.bin</name>
+      <version>master.0-dirty-20260814.091233</version>
+      <purl>pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64</purl>
+    </component>
+  </metadata>
+  <components>
+    <component type="container" bom-ref="pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64">
+      <name>docker-fpm-frr</name>
+      <version>sha256:a1b2c3</version>
+      <purl>pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64</purl>
+      <properties>
+        <property name="sonic:scope">dockers/docker-fpm-frr</property>
+      </properties>
+    </component>
+    <component type="container" bom-ref="pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64">
+      <name>docker-swss</name>
+      <version>sha256:d4e5f6</version>
+      <purl>pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64</purl>
+      <properties>
+        <property name="sonic:scope">dockers/docker-swss</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64">
+      <supplier>
+        <name>SONiC build (forked upstream)</name>
+      </supplier>
+      <name>frr</name>
+      <version>10.5.4-sonic-0</version>
+      <purl>pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64</purl>
+      <pedigree>
+        <ancestors>
+          <component type="library">
+            <name>frr</name>
+            <version>10.5.4</version>
+            <purl>pkg:github/FRRouting/frr@frr-10.5.4</purl>
+            <externalReferences>
+              <reference type="vcs">
+                <url>https://github.com/FRRouting/frr</url>
+              </reference>
+            </externalReferences>
+          </component>
+        </ancestors>
+        <patches>
+          <patch type="unofficial">
+            <diff>
+              <url>file://src/sonic-frr/patch/0007-cve-2026-31951.patch</url>
+            </diff>
+            <resolves>
+              <issue type="security">
+                <id>CVE-2026-31951</id>
+                <references>
+                  <url>https://nvd.nist.gov/vuln/detail/CVE-2026-31951</url>
+                </references>
+              </issue>
+            </resolves>
+          </patch>
+        </patches>
+        <notes>patch-set sha1: 6f1b7c0d9e8a5b4c3d2e1f0a9b8c7d6e5f4a3b2c</notes>
+      </pedigree>
+    </component>
+    <component type="library" bom-ref="pkg:deb/debian/libc6@2.41-12?arch=amd64">
+      <name>libc6</name>
+      <version>2.41-12</version>
+      <cpe>cpe:2.3:a:gnu:glibc:2.41:*:*:*:*:*:*:*</cpe>
+      <purl>pkg:deb/debian/libc6@2.41-12?arch=amd64</purl>
+      <properties>
+        <property name="sonic:scope">host-image dockers/docker-fpm-frr dockers/docker-swss</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:cargo/tokio@1.47.1">
+      <name>tokio</name>
+      <version>1.47.1</version>
+      <purl>pkg:cargo/tokio@1.47.1</purl>
+      <properties>
+        <property name="sonic:source_deb">sonic-swss_1.0.0_amd64.deb</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:pypi/paramiko@3.5.1">
+      <name>paramiko</name>
+      <version>3.5.1</version>
+      <purl>pkg:pypi/paramiko@3.5.1</purl>
+    </component>
+  </components>
+  <dependencies>
+    <dependency ref="pkg:generic/sonic-broadcom@master.0-dirty-20260814.091233?arch=amd64">
+      <dependency ref="pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64"/>
+      <dependency ref="pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64"/>
+      <dependency ref="pkg:deb/debian/libc6@2.41-12?arch=amd64"/>
+    </dependency>
+    <dependency ref="pkg:oci/docker-fpm-frr@sha256%3Aa1b2c3?arch=amd64">
+      <dependency ref="pkg:deb/sonic/frr@10.5.4-sonic-0?arch=amd64"/>
+      <dependency ref="pkg:deb/debian/libc6@2.41-12?arch=amd64"/>
+    </dependency>
+    <dependency ref="pkg:oci/docker-swss@sha256%3Ad4e5f6?arch=amd64">
+      <dependency ref="pkg:cargo/tokio@1.47.1"/>
+      <dependency ref="pkg:deb/debian/libc6@2.41-12?arch=amd64"/>
+    </dependency>
+  </dependencies>
+</bom>

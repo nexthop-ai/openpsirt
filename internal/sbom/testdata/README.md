@@ -9,6 +9,7 @@ nobody can tell a producer quirk from a typo in.
 | `build-fragment.cdx.json` | Real output. One artifact a build step produced, on its way into an inventory. It names no component of its own, which is why it is refused |
 | `suppression-from-patch.openvex.json` | Real output. One claim a build extracted from a patch of its own. It names a source tree rather than a package, which is what makes matching a claim to a component something that can fail |
 | `image.cdx.json` | Written by hand, in the shape of the aggregate inventory a switch operating-system build emits: an image at the root, containers under it, packages under those, a shared library reached from several of them, and a forked component whose pedigree carries the version it was forked from. Not a producer's output, and not a substitute for one |
+| `image.cdx.xml` | Written by hand: `image.cdx.json` in the **XML encoding**, fact for fact, so that the pedigree, the carried patch and the supplier only that fixture has are read from XML too. The patch's diff carries no hashes here, because the XML schema has nowhere to put them |
 | `openpsirt-image.cdx.json` | Real output, and the only fixture at **CycloneDX 1.7**. The inventory this deployment's own image carries of itself: the scanner's description of the container, composed from its parts by the tool that builds it. It is what the image ships and what the demo ingests, so the revision every shipped inventory now states is read here by evidence rather than by construction |
 | `switch-image.cdx.json.xz` | Real output, and the full-size one. The public SONiC network operating-system image, 6,866 components and 18,948 edges over 18 MB, from a build of sonic-buildimage at `5acba0313`. Compressed because the shape is the point and 18 MB of it is not. See below |
 | `alpine-image.spdx.json` | Real output, and the rich **SPDX** one. syft 1.51.1 — the same producer the 1.7 CycloneDX fixture came from — scanning `alpine:3.20`. It states the root as a relationship from the document, up to twelve spellings of one database key on a single package, and 77 files against 15 packages, which is what makes "a file is not a component" a rule rather than an opinion |
@@ -31,6 +32,7 @@ nobody can tell a producer quirk from a typo in.
 | `oe-linked.spdx.json` | Real output. OpenEmbedded's `create-spdx` class, SPDX 2.2: one document of a set that link to each other through `externalDocumentRefs`, stating no `DESCRIBES`, so the build stands in as its root. **CC0-1.0**, stated in the document. From the OpenChain Telco working group's examples |
 | `sbom-tool-hello.spdx3.json` | The specification's own example 12, at SPDX 3.0.1, written by sbom-tool. Its only package is the document's subject, so it holds nothing to scan. CC0-1.0, as the other SPDX examples |
 | `maven-dropwizard.cdx.json` | Real output. The CycloneDX Maven plugin 2.0.2 describing Dropwizard 1.3.15, **CycloneDX 1.2**, the oldest revision here. Its dependency graph has 29 roots besides the document's own, which hang from the root. **CC0-1.0**, from [CycloneDX/bom-examples](https://github.com/CycloneDX/bom-examples) |
+| `maven-dropwizard.cdx.xml` | Real output, and the **XML encoding** of the same build: the plugin writes both by default, and `bom.xml` sits beside the `bom.json` above in the same directory. Unmodified. See below for the two things the plugin wrote differently in the two. **CC0-1.0**, from [CycloneDX/bom-examples](https://github.com/CycloneDX/bom-examples) |
 | `saasbom-services.cdx.json` | A SaaSBOM from [CycloneDX/bom-examples](https://github.com/CycloneDX/bom-examples): services and data flows, and no components at all. What is read is the root alone. **CC0-1.0** |
 | `trivy-ubuntu.cdx.json` | Real output. Trivy 0.48 scanning `ubuntu:latest`, CycloneDX 1.5, carrying the producer's own vulnerabilities, which are not read: vulnerability data is produced here. **BSD-3-Clause**, from the DefectDojo test data, which `NOTICE` records |
 | `snyk-juice-shop.cdx.json` | Real output. Snyk's SBOM export of OWASP Juice Shop, CycloneDX 1.4, 1,004 components with dependency chains sixteen deep, the deepest among 41 public inventories. **MIT**, which `NOTICE` records |
@@ -79,7 +81,25 @@ discovery.
 `producer-paths.txt` records every key path these documents contain and what
 the reader does with it. Regenerate with `go test ./internal/sbom -update`,
 which adds paths it has not seen before as deliberately skipped and leaves
-every decision already made alone.
+every decision already made alone. A path in an XML document is written behind
+`xml:`, as the elements leading to it and then its text or one of its
+attributes, because one field is at two different paths in the two encodings
+and a decision about one is not a decision about the other.
+
+## The XML fixtures
+
+Two, each the twin of a JSON fixture, so that what is asserted is that an
+inventory reads the same whichever encoding it arrived in rather than anything
+about XML on its own.
+
+The Maven plugin's pair is one build written twice, and it was not written the
+same way twice. The XML states a scope of `required` on all 168 components and
+the JSON states none, so every edge read from the XML carries the scope and
+none read from the JSON does. And the XML leaves out the one license the JSON
+states as an expression, on `osgi-resource-locator`. Both are in the files as
+published. The test comparing the pair asserts each difference is there and
+then takes it out, so that everything else is compared exactly and a
+difference the reader introduced has nowhere to hide.
 
 
 ## The SPDX 3.0 fixtures

@@ -47,7 +47,8 @@ A build sends two things, in one request:
 | Inventory | Every component that ships, with its dependency edges |
 | Suppressions | What the build says it fixed with a patch of its own, or argues does not apply |
 
-CycloneDX, SPDX 2.x and SPDX 3.x are the formats read (REQ-05). A document says
+CycloneDX, SPDX 2.x and SPDX 3.x are the formats read (REQ-05): CycloneDX
+encoded as JSON or as XML, and both versions of SPDX as JSON. A document says
 which it is and the reader is chosen from that, so an upload takes any of them
 and nothing about the endpoint names one.
 
@@ -338,6 +339,37 @@ it, and so does every creation record; a producer need not emit the first. Read
 from one place only, a document stating it in the other would be refused as
 saying nothing.
 
+### CycloneDX encoded as XML
+
+CycloneDX defines two encodings, and its Maven plugin — the producer an XML
+inventory most likely comes from — writes both by default. The XML one is a
+second walk over the same reader rather than a fourth vocabulary. The elements
+and attributes it reads are where the schema puts the facts the JSON keys hold,
+and everything a fact means once it is read — which of two suppliers wins, how
+licenses combine, what a patch claims, where a bound is charged — is the JSON
+reader's, called from the XML walk. So the two encodings of one build read as
+one build, and a test holds the Maven plugin's two encodings of one build to
+that.
+
+Where the XML encoding puts things differently: a component's identifier
+within the file and its kind are attributes, `bom-ref` and `type`; the
+document's identity is the `serialNumber` attribute of the top-level element;
+and what a component depends on is a `dependency` element nested inside its
+own, each naming one by its `ref` attribute, rather than a list of identifiers.
+
+| Rule | Reason |
+|---|---|
+| **The encoding is told from the document's first character** | For the reason the format is: the content type a pipeline sends is whatever its HTTP client defaults to. JSON opens with a brace and XML with an angle bracket, after layout and, in XML, a byte-order mark |
+| **The declaration is the top-level element's namespace** | `http://cyclonedx.org/schema/bom/1.6` states the format and its revision at once, so there is no half a declaration to refuse, and it cannot arrive late. A top-level element in any other namespace is refused by name — SPDX's RDF encoding among them, which turned up once in 41 public inventories, as a conversion |
+| **An element in another namespace is walked past** | It is an extension, whatever it is called: a component a producer defines in a namespace of its own is not one the format defines. Version 1.1 stated dependencies through an extension of that kind, so a 1.1 document reads with its components and without its edges |
+| **A document type declaration is refused where it is met** | It is where XML defines entities, and an entity is how a document makes its reader fetch a file or a URL, or expand a few hundred bytes into gigabytes by defining each entity as ten of the one before. The decoder does neither, but no producer writes a declaration into an inventory, and a reader that never accepts one cannot be talked into processing one by a later change to the decoder or to how it is set up |
+| **UTF-8 only** | A document declaring another encoding is refused rather than translated. Every producer seen writes UTF-8 |
+| **The same bounds, charged at the same points** | Size, depth, components, edges, licenses and claims, through the functions the JSON walk charges them through. Depth is counted per element, inside elements nothing reads as well |
+| **A dependency nested in a nested dependency is an edge from the one it is nested in** | The schema nests the element in itself without saying where that stops, and that is the only reading the nesting has. How deep it goes is the depth bound's business |
+| **A NUL is refused, where the JSON reader drops one** | XML forbids the character, written or by reference, so a document carrying one is not XML. JSON allows it |
+| **An element's text is trimmed** | A producer laying its document out may put the text on lines of its own, and the layout is not the value |
+| **What the decoder says is bounded like anything else quoted** | Its complaints quote the document: a whole element name, an entity's, the encoding or version a declaration names. Passed on as they were, a 1 MiB element name came back as a refusal of about the same size |
+
 ## Format spellings
 
 The internal shape is the same from either, because it is the shape the graph
@@ -536,7 +568,8 @@ stable build to build, so a change says the producer changed.
 | Two components sharing one identifier | Every edge naming it is ambiguous |
 | A build time nothing can read | The build time orders scans against each other |
 | Past any of the bounds | A broken or hostile file has to fail rather than exhaust the process |
-| Anything but whitespace after the top-level value, in an inventory, a suppression document or an advisory | Two documents written one after the other read as the first, and an inventory missing what the second held reads as a product that shrank |
+| Anything but whitespace after the top-level value, in an inventory, a suppression document or an advisory — or in an XML inventory, anything but layout and comments after the top-level element | Two documents written one after the other read as the first, and an inventory missing what the second held reads as a product that shrank |
+| A document type declaration in an XML inventory | See [CycloneDX encoded as XML](#cyclonedx-encoded-as-xml) |
 
 Reading is all or nothing. A partial inventory is indistinguishable from a
 product that shrank, and acting on one closes findings that are still somebody's
@@ -973,6 +1006,7 @@ the build system, which is the copy that may have moved since.
 | The bytes as they arrived, not parsed and not re-serialized | The hash on the receipt covers what was received, so anything rewritten on the way out would fail the check the hash exists for |
 | Named through the scan it belongs to | Whoever may read the receipt may read what it describes. A document identifier resolving on its own would be a second way in that has to remember the same rule |
 | Narrowed in the store, not the handler | A key reads what was filed on a build it may upload to, and the two endpoints cannot come to differ |
+| Named by its encoding, `.xml` or `.json` | Told from its first character by the reader's own rule, before anything is sent. A copy named for the other encoding is misread by any tool that goes by the extension |
 
 ## Administrator-supplied VEX
 

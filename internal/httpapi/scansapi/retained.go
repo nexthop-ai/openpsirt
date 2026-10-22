@@ -4,6 +4,7 @@
 package scansapi
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
 // registerRetained reads back a document a build sent.
@@ -82,7 +84,26 @@ func registerRetained(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that document could not be read", err)
 		}
 
-		body := documents.Open(ctx, doc)
+		// Named by its encoding, told from its first character the way the
+		// reader tells it, so a tool opening the copy by its extension reads
+		// it as what it is. Looked at before anything is sent, while a
+		// document let go meanwhile can still be answered 410 rather than
+		// with a short transfer. Looking consumes nothing: every byte is
+		// still sent.
+		body := bufio.NewReader(documents.Open(ctx, doc))
+		asXML, err := sbom.EncodedAsXML(body)
+		switch {
+		case errors.Is(err, ingest.ErrReleased):
+			return nil, huma.Error410Gone("the contents of that document were let go while it " +
+				"was read, which is what happens to a branch build's. The receipt still says " +
+				"what arrived and what its bytes hashed to")
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "that document could not be read", err)
+		}
+		extension := ".json"
+		if asXML {
+			extension = ".xml"
+		}
 		return &huma.StreamResponse{Body: func(hc huma.Context) {
 			// The bytes as they arrived, and named as such. Not parsed and not
 			// re-serialized: the hash on the receipt is over what was
@@ -90,7 +111,7 @@ func registerRetained(api huma.API, in core.Deps) {
 			// hash exists for.
 			hc.SetHeader("Content-Type", "application/octet-stream")
 			hc.SetHeader("Content-Disposition", "attachment; filename=\""+
-				string(doc.Kind)+"-"+strconv.FormatInt(doc.ID, 10)+".json\"")
+				string(doc.Kind)+"-"+strconv.FormatInt(doc.ID, 10)+extension+"\"")
 			hc.SetHeader("Content-Length", strconv.FormatInt(doc.SizeBytes, 10))
 			hc.SetHeader("Cache-Control", "private, no-store")
 			hc.SetStatus(http.StatusOK)

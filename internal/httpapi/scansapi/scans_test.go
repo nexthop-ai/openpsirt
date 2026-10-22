@@ -452,6 +452,44 @@ func TestAnUploadInEitherFormatIsTaken(t *testing.T) {
 	})
 }
 
+// cyclonedxXMLInventory is the same inventory in CycloneDX's other encoding,
+// the one the Maven plugin writes by default.
+func cyclonedxXMLInventory(builtAt time.Time, component string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<bom xmlns="http://cyclonedx.org/schema/bom/1.6" serialNumber="urn:uuid:%x" version="1">
+  <metadata>
+    <timestamp>%s</timestamp>
+    <component type="application" bom-ref="root"><name>sonic-broadcom.bin</name><version>1.0</version></component>
+  </metadata>
+  <components>
+    <component type="library" bom-ref="a"><name>%s</name><version>2.41</version><purl>pkg:deb/debian/%s@2.41</purl></component>
+  </components>
+  <dependencies><dependency ref="root"><dependency ref="a"/></dependency></dependencies>
+</bom>`, builtAt.UnixNano(), builtAt.UTC().Format(time.RFC3339), component, component)
+}
+
+func TestAnUploadEncodedAsXMLIsTaken(t *testing.T) {
+	// An inventory encoded as XML is read like one encoded as JSON: the
+	// encoding is told from the document as the format is, so the endpoint
+	// names neither.
+	httpapitest.EachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		built := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		code, result := f.Send(t, httpapitest.Upload(t, f.Path, cyclonedxXMLInventory(built, "libc6")))
+		if code != http.StatusAccepted {
+			t.Fatalf("POST returned %d, want 202", code)
+		}
+		if result.Outcome != "queued" || result.Serial != fmt.Sprintf("urn:uuid:%x", built.UnixNano()) {
+			t.Errorf("result is %+v", result)
+		}
+		if result.BuiltAt != built.Format(time.RFC3339) {
+			t.Errorf("reported build time %q, want %q", result.BuiltAt, built.Format(time.RFC3339))
+		}
+		if depth, _ := f.Queue.Depth(t.Context(), queue.Parse); depth != 1 {
+			t.Errorf("%d jobs waiting, want 1", depth)
+		}
+	})
+}
+
 func TestAnInventoryThatStatesNoBuildTimeIsDatedOnArrival(t *testing.T) {
 	// Both formats leave the build time optional, and cyclonedx-maven writes
 	// none. Dated as the zero time it would be older than every real one, so

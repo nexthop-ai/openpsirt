@@ -105,9 +105,12 @@ func (s *source) Read(p []byte) (int, error) {
 // refused states what went wrong reading the document under what, as a
 // refusal where the document is at fault and as a fault where the reader
 // beneath it failed.
-func (b *bounded) refused(what string, err error) error {
-	if b.src.err != nil {
-		return fmt.Errorf("%s: %w", what, b.src.err)
+func (b *bounded) refused(what string, err error) error { return b.src.refused(what, err) }
+
+// refused is the decision itself, shared by both encodings' streams.
+func (s *source) refused(what string, err error) error {
+	if s.err != nil {
+		return fmt.Errorf("%s: %w", what, s.err)
 	}
 	return refusal.Errorf("%s: %w", what, err)
 }

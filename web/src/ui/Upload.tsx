@@ -206,11 +206,11 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         </label>
         <Dropzone
           files={inventory ? [inventory] : []}
-          accept=".json,.cdx.json,.spdx.json,.spdx3.json,application/json"
+          accept=".json,.xml,.cdx.json,.cdx.xml,.spdx.json,.spdx3.json,application/json,application/xml,text/xml"
           onChange={(chosen) => setInventory(chosen[0] ?? null)}
         >
-          <b>A CycloneDX or SPDX JSON file</b> (CycloneDX 1.4–1.7, SPDX 2.2, 2.3 and 3.x). The scan
-          runs here.
+          <b>A CycloneDX file as JSON or XML, or an SPDX JSON file</b> (CycloneDX 1.4–1.7, SPDX 2.2,
+          2.3 and 3.x). The scan runs here.
         </Dropzone>
       </div>
 

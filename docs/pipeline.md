@@ -94,7 +94,7 @@ curl --retry 5 -X POST \
 
 | | |
 |---|---|
-| `inventory` | The SBOM. CycloneDX 1.x, SPDX 2.x or SPDX 3.x — the format is read from the document, not declared |
+| `inventory` | The SBOM. CycloneDX 1.x as JSON or XML, or SPDX 2.x or SPDX 3.x as JSON — the format and its encoding are read from the document, not declared |
 | `suppressions` | Optional, repeatable. OpenVEX documents stating what this build has already dealt with |
 
 A 202 means accepted, not valid. The documents are parsed afterwards, so the

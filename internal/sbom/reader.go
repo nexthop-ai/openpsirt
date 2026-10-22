@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"bufio"
 	"io"
 	"strings"
 
@@ -71,7 +72,12 @@ func scopeWord(stated string) string {
 // bound is charged, and neither of those halves is allowed to learn the
 // other's business.
 type reader struct {
+	// in is the document, buffered so that its first character can be looked
+	// at before either encoding's stream is started on it. b reads it as JSON
+	// and x as XML, and only one of the two is ever set.
+	in         *bufio.Reader
 	b          *bounded
+	x          *boundedXML
 	lim        Limits
 	headerOnly bool
 
@@ -182,7 +188,7 @@ type reader struct {
 func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 	lim = lim.OrDefault()
 	return &reader{
-		b:          newBounded(r, lim.MaxBytes, lim.MaxDepth),
+		in:         bufio.NewReader(r),
 		lim:        lim,
 		headerOnly: headerOnly,
 		fired:      map[int]bool{},
@@ -235,6 +241,11 @@ func (c *reader) builtAt() error {
 	if err != nil {
 		return err
 	}
+	return c.dated(raw)
+}
+
+// dated records the time a build was made, however the document encoded it.
+func (c *reader) dated(raw string) error {
 	built, err := buildTime(raw)
 	if err != nil {
 		return err

@@ -37,6 +37,7 @@ var producerFixtures = []struct {
 	{file: "oe-linked.spdx.json", components: 1, unidentified: 1},
 	{file: "sbom-tool-hello.spdx3.json", components: 0, root: "hello"},
 	{file: "maven-dropwizard.cdx.json", components: 167, root: "dropwizard-parent"},
+	{file: "maven-dropwizard.cdx.xml", components: 167, root: "dropwizard-parent"},
 	{file: "saasbom-services.cdx.json", components: 0, root: "Acme Cloud Example"},
 	{file: "trivy-ubuntu.cdx.json", components: 102, root: "ubuntu:latest",
 		unidentified: 1, distros: 101},

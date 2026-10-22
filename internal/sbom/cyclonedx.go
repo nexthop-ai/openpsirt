@@ -76,10 +76,20 @@ func (c *reader) cyclonedxFormatVersion() error {
 	if err := c.into(&spec); err != nil {
 		return err
 	}
+	if err := cyclonedxRevision(spec); err != nil {
+		return err
+	}
+	c.declared, c.versioned = CycloneDX, true
+	return nil
+}
+
+// cyclonedxRevision refuses a revision this reader was not written against,
+// however the document stated it: in a key of its own, or in the namespace its
+// elements are in.
+func cyclonedxRevision(spec string) error {
 	if major, _, _ := strings.Cut(spec, "."); major != cyclonedxMajor {
 		return refusal.Errorf("%s version %q is not one this reads", CycloneDX, trim(spec))
 	}
-	c.declared, c.versioned = CycloneDX, true
 	return nil
 }
 
@@ -107,17 +117,15 @@ func (c *reader) rootComponent() error {
 	if err != nil {
 		return err
 	}
+	return c.holdRoot(described, ref, nested)
+}
+
+// holdRoot records the component the document is about, however it was
+// encoded.
+func (c *reader) holdRoot(described graph.Described, ref string, nested []graph.Described) error {
 	c.doc.Root = described
 	c.doc.RootDeclared = true
-	if err := c.bind(ref, described); err != nil {
-		return err
-	}
-	for _, member := range nested {
-		if err := c.contain(described, member); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.hold(described, ref, nested)
 }
 
 // componentArray reads an array of components and returns the ones directly in
@@ -133,24 +141,39 @@ func (c *reader) componentArray() ([]graph.Described, error) {
 		if err != nil {
 			return err
 		}
-		if err := c.add(described); err != nil {
-			return err
-		}
-		if err := c.bind(ref, described); err != nil {
-			return err
-		}
-		for _, member := range nested {
-			if err := c.contain(described, member); err != nil {
-				return err
-			}
-		}
-		if c.headerOnly {
-			return nil
-		}
-		members = append(members, described)
-		return nil
+		return c.member(&members, described, ref, nested)
 	})
 	return members, err
+}
+
+// member records one component of a list, however it was encoded, and adds it
+// to the members the list returns.
+func (c *reader) member(members *[]graph.Described, described graph.Described, ref string, nested []graph.Described) error {
+	if err := c.add(described); err != nil {
+		return err
+	}
+	if err := c.hold(described, ref, nested); err != nil {
+		return err
+	}
+	if c.headerOnly {
+		return nil
+	}
+	*members = append(*members, described)
+	return nil
+}
+
+// hold binds a component's own identifier and records the components the
+// producer nested inside it.
+func (c *reader) hold(described graph.Described, ref string, nested []graph.Described) error {
+	if err := c.bind(ref, described); err != nil {
+		return err
+	}
+	for _, member := range nested {
+		if err := c.contain(described, member); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // component reads one component and any nested underneath it.
@@ -159,25 +182,7 @@ func (c *reader) componentArray() ([]graph.Described, error) {
 // document is only ever walked once, and so that the containment a producer
 // declared by nesting survives.
 func (c *reader) component() (graph.Described, string, []graph.Described, error) {
-	var (
-		described graph.Described
-		ref       string
-		nested    []graph.Described
-		carried   []Suppression
-		// The supplier, stated two ways. Resolved after the object rather
-		// than during it, because a producer chooses the order of its own keys
-		// and which field wins must not.
-		supplier  string
-		publisher string
-		// The producer's own scope for the component, read like the two
-		// above rather than acted on during the object: key order is the
-		// producer's choice.
-		scope string
-		// The licenses, split by what the producer says it did: declared, or
-		// concluded by somebody reading the source. Resolved after the object
-		// like the others.
-		declared, concluded []string
-	)
+	var s cdxComponent
 	// Charged on the way in, before anything is held, for the reason the
 	// count itself records.
 	if err := c.count(); err != nil {
@@ -186,15 +191,15 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	err := c.b.object(func(key string) error {
 		switch key {
 		case "bom-ref":
-			return c.into(&ref)
+			return c.into(&s.ref)
 		case "name":
-			return c.into(&described.Name)
+			return c.into(&s.described.Name)
 		case "version":
-			return c.into(&described.Version)
+			return c.into(&s.described.Version)
 		case "purl":
-			return c.into(&described.Purl)
+			return c.into(&s.described.Purl)
 		case "cpe":
-			return c.into(&described.CPE)
+			return c.into(&s.described.CPE)
 		case "type":
 			// The format's word for what kind of thing this is. Only one is
 			// read: a container image is identified by its name (IsImage).
@@ -202,39 +207,30 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			if err := c.into(&kind); err != nil {
 				return err
 			}
-			described.Container = kind == "container"
+			s.described.Container = kind == "container"
 			return nil
 		case "supplier":
 			// An object naming who supplied it.
 			return c.b.object(func(field string) error {
 				if field == "name" {
-					return c.into(&supplier)
+					return c.into(&s.supplier)
 				}
 				return c.b.skip()
 			})
 		case "publisher":
-			// A plain string, and the weaker of the two. Kept aside rather
-			// than written straight in: which field wins must not depend on
-			// which one the producer happened to write first, and key order is
-			// the producer's choice.
-			return c.into(&publisher)
+			return c.into(&s.publisher)
 		case "licenses":
-			return c.cdxLicenses(&declared, &concluded)
+			return c.cdxLicenses(&s.declared, &s.concluded)
 		case "scope":
-			// The producer's own words about the component, which is where this
-			// format states it: "required", "optional", or "excluded", which
-			// the specification defines as not distributed. Recorded against
-			// the component and carried to the edges arriving at it, because
-			// the graph is where a scope can be asked about.
-			return c.into(&scope)
+			return c.into(&s.scope)
 		case "pedigree":
-			return c.pedigree(&described, &carried)
+			return c.pedigree(&s.described, &s.carried)
 		case "components":
 			members, err := c.componentArray()
 			if err != nil {
 				return err
 			}
-			nested = append(nested, members...)
+			s.nested = append(s.nested, members...)
 			return nil
 		default:
 			return c.b.skip()
@@ -243,6 +239,45 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	if err != nil {
 		return graph.Described{}, "", nil, err
 	}
+	return c.settle(s)
+}
+
+// cdxComponent is what one CycloneDX component states, whichever encoding
+// stated it, gathered before any of it is acted on.
+type cdxComponent struct {
+	described graph.Described
+	ref       string
+	nested    []graph.Described
+	carried   []Suppression
+	// The supplier, stated two ways. Resolved after the component rather than
+	// during it, because a producer chooses the order of its own keys and
+	// which field wins must not.
+	supplier string
+	// A plain string, and the weaker of the two. Kept aside rather than
+	// written straight in: which field wins must not depend on which one the
+	// producer happened to write first.
+	publisher string
+	// The producer's own words about the component, which is where this format
+	// states it: "required", "optional", or "excluded", which the
+	// specification defines as not distributed. Recorded against the component
+	// and carried to the edges arriving at it, because the graph is where a
+	// scope can be asked about. Read like the two above rather than acted on
+	// during the component: key order is the producer's choice.
+	scope string
+	// The licenses, split by what the producer says it did: declared, or
+	// concluded by somebody reading the source. Resolved after the component
+	// like the others.
+	declared, concluded []string
+}
+
+// settle turns what one component stated into the component, once all of it
+// has been read.
+//
+// Shared by the two encodings, so that what a component means is decided in
+// one place: an encoding decides where a producer wrote each fact, and nothing
+// else.
+func (c *reader) settle(s cdxComponent) (graph.Described, string, []graph.Described, error) {
+	described := s.described
 	printable(&described)
 	if err := described.Valid(); err != nil {
 		return graph.Described{}, "", nil, refusal.Errorf("%w, so it cannot be tracked", err)
@@ -250,15 +285,15 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 
 	// The supplier where a producer stated one, whatever order it wrote the two
 	// fields in. Resolved during the scan instead, whichever came first won.
-	described.Supplier = strings.TrimSpace(supplier)
+	described.Supplier = strings.TrimSpace(s.supplier)
 	if described.Supplier == "" {
-		described.Supplier = strings.TrimSpace(publisher)
+		described.Supplier = strings.TrimSpace(s.publisher)
 	}
 	// The license the component declares, and what somebody concluded where
 	// it declares none.
-	described.License = conjunction(declared)
+	described.License = conjunction(s.declared)
 	if described.License == "" {
-		described.License = conjunction(concluded)
+		described.License = conjunction(s.concluded)
 	}
 
 	// Where a pedigree states what this was built from, it stands: it is the
@@ -272,7 +307,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	// which is only fully known now: key order is the producer's business, so
 	// the patches may well have been read before the name they belong to. A
 	// header-only read keeps none: a header carries no claims.
-	for _, claim := range carried {
+	for _, claim := range s.carried {
 		if c.headerOnly {
 			break
 		}
@@ -282,8 +317,8 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	// Recorded once the component is fully read, for the same reason the
 	// supplier is: identity is what it is keyed by, and identity is not known
 	// until the fields it is derived from have all arrived.
-	c.scoped(described, scope)
-	return described, ref, nested, nil
+	c.scoped(described, s.scope)
+	return described, s.ref, s.nested, nil
 }
 
 // cdxLicenses reads the licenses a component states.
@@ -326,18 +361,24 @@ func (c *reader) cdxLicenses(declared, concluded *[]string) error {
 		}); err != nil {
 			return err
 		}
-		// Charged as each entry is kept. Without a charge one component can
-		// hold as many as the byte bound allows.
-		if err := c.license(); err != nil {
-			return err
-		}
-		if strings.EqualFold(strings.TrimSpace(acknowledged), "concluded") {
-			*concluded = append(*concluded, said)
-		} else {
-			*declared = append(*declared, said)
-		}
-		return nil
+		return c.cdxLicense(said, acknowledged, declared, concluded)
 	})
+}
+
+// cdxLicense keeps one license entry, however it was encoded.
+//
+// Charged as each entry is kept. Without a charge one component can hold as
+// many as the byte bound allows.
+func (c *reader) cdxLicense(said, acknowledged string, declared, concluded *[]string) error {
+	if err := c.license(); err != nil {
+		return err
+	}
+	if strings.EqualFold(strings.TrimSpace(acknowledged), "concluded") {
+		*concluded = append(*concluded, said)
+	} else {
+		*declared = append(*declared, said)
+	}
+	return nil
 }
 
 // pedigree reads where a component came from, and what its patches say they
@@ -424,12 +465,18 @@ func (c *reader) patches(carried *[]Suppression) error {
 		if err != nil {
 			return err
 		}
-		for _, claim := range claimed {
-			claim.Statement = "resolved by a patch the build carries: " + trim(diff)
-			*carried = append(*carried, claim)
-		}
+		patched(diff, claimed, carried)
 		return nil
 	})
+}
+
+// patched carries what one patch claims, however it was encoded, saying which
+// patch claimed it.
+func patched(diff string, claimed []Suppression, carried *[]Suppression) {
+	for _, claim := range claimed {
+		claim.Statement = "resolved by a patch the build carries: " + trim(diff)
+		*carried = append(*carried, claim)
+	}
 }
 
 // resolved reads one thing a patch says it fixes.
@@ -437,16 +484,13 @@ func (c *reader) patches(carried *[]Suppression) error {
 // A patch may resolve a defect or an improvement as readily as a
 // vulnerability, and only the last of those is a claim about security.
 func (c *reader) resolved() (Suppression, error) {
-	var (
-		kind  string
-		claim = Suppression{Status: AlreadyFixed, Origin: FromPedigree}
-	)
+	var kind, id string
 	err := c.b.object(func(key string) error {
 		switch key {
 		case "type":
 			return c.into(&kind)
 		case "id":
-			return c.into(&claim.Vulnerability)
+			return c.into(&id)
 		default:
 			return c.b.skip()
 		}
@@ -454,10 +498,17 @@ func (c *reader) resolved() (Suppression, error) {
 	if err != nil {
 		return Suppression{}, err
 	}
+	return resolvedClaim(kind, id), nil
+}
+
+// resolvedClaim is what one issue a patch resolves claims, however it was
+// encoded: that a vulnerability is already fixed, where the issue is a
+// security one, and nothing where it is not.
+func resolvedClaim(kind, id string) Suppression {
 	if kind != "security" {
-		return Suppression{}, nil
+		return Suppression{}
 	}
-	return claim, nil
+	return Suppression{Status: AlreadyFixed, Origin: FromPedigree, Vulnerability: id}
 }
 
 // dependencies reads the declared edges.

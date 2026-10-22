@@ -13,7 +13,7 @@ database built by a release candidate or any other earlier build is recreated.
 | Build and validation | The pipeline, and a gate that runs the checks a change touches |
 | Database | PostgreSQL, MySQL, MariaDB and SQLite, with the schema created and migrated at startup |
 | Catalog and graph | Products, branches and tags, variants, and the dependency graph. Each is renamed and retired in place |
-| Ingest | CycloneDX, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved |
+| Ingest | CycloneDX as JSON or XML, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved |
 | Scanning | Run here on a schedule, findings tracked over intervals, CVSS 3 and 4.0 ratings kept side by side |
 | Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default. A supplier's statement that its own product is not affected closes the finding inside that product |
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |

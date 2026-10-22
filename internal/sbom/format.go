@@ -4,6 +4,10 @@
 package sbom
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -77,6 +81,10 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // read walks the document once, routing each top-level key to the vocabulary
 // that owns it.
 //
+// A document encoded as XML is walked by readXML instead. Only CycloneDX is
+// read in that encoding, and its top-level element says so before anything
+// else does, so there is no routing to do.
+//
 // A key is read by the format that owns it rather than by the format the
 // document has declared so far, because the declaration arrives in no
 // guaranteed position: a producer sorting its keys puts SPDX's `packages`
@@ -91,7 +99,16 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // under whichever came last, which is a different identity for the same bytes
 // depending only on how its producer sorted them.
 func (c *reader) read() error {
-	err := c.b.object(func(key string) error {
+	asXML, err := EncodedAsXML(c.in)
+	if err != nil {
+		return fmt.Errorf("reading scan file: %w", err)
+	}
+	if asXML {
+		c.x = newBoundedXML(c.in, c.lim.MaxBytes, c.lim.MaxDepth)
+		return c.readXML()
+	}
+	c.b = newBounded(c.in, c.lim.MaxBytes, c.lim.MaxDepth)
+	err = c.b.object(func(key string) error {
 		for at, v := range vocabularies {
 			handler, ours := v.top[key]
 			if !ours {
@@ -122,6 +139,36 @@ func (c *reader) read() error {
 		return refusal.Errorf("reading scan file: %w", c.settleErr)
 	}
 	return nil
+}
+
+// EncodedAsXML reports whether a document is encoded as XML rather than JSON,
+// from its first character. Nothing is consumed: what is looked at is still
+// there for whatever reads the document next.
+//
+// Told from the document rather than from anything the upload says about it,
+// for the reason the format is: the content type a pipeline sends is whatever
+// its HTTP client defaults to. A JSON document opens with a brace and an XML
+// one with an angle bracket, and neither encoding allows anything else to come
+// first but whitespace — and, in XML, a byte-order mark.
+//
+// Exported because the reader is not the only thing that has to tell: a
+// document handed back is named by its encoding, and two copies of the rule
+// would come to disagree about a document the reader took.
+//
+// Only what is already buffered is looked at. A document opening with more
+// whitespace than that is read as JSON and refused there, and no producer
+// writes one.
+//
+// A failure of the reader beneath is returned as it is, so that it is reported
+// as a fault rather than as something wrong with the file.
+func EncodedAsXML(in *bufio.Reader) (bool, error) {
+	head, err := in.Peek(in.Size())
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	head = bytes.TrimPrefix(head, []byte("\xef\xbb\xbf"))
+	head = bytes.TrimLeft(head, " \t\r\n")
+	return len(head) > 0 && head[0] == '<', nil
 }
 
 // checkFormat refuses a document that did not say what it is, said it was two
