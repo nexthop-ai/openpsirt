@@ -203,7 +203,15 @@ func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
 		select {
 		case <-migrated:
 		case err := <-done:
-			t.Fatalf("the waiter gave up once the holder died: %v", err)
+			// The waiter returns straight after it migrates, so both can be
+			// ready by the time this looks, and a select picks between ready
+			// cases at random. Returning without migrating is giving up.
+			select {
+			case <-migrated:
+			default:
+				t.Fatalf("the waiter gave up once the holder died: %v", err)
+			}
+			done <- err
 		case <-time.After(30 * time.Second):
 			t.Fatal("the waiter did not take the lock within 30s of its holder dying")
 		}
