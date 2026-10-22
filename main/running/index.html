@@ -1004,17 +1004,17 @@ openpsirt -version
 that tag. <code>--ignore-missing</code> checks the files you downloaded and skips the rest.</p>
 <h2 id="the-scanner">The scanner<a class="headerlink" href="#the-scanner" title="Permanent link">&para;</a></h2>
 <p>The deployment runs the scan itself, with the scanner the image carries:
-Grype 0.120.1. Install that version. A different one reads a different
+Grype 0.121.0. Install that version. A different one reads a different
 database format and answers differently, so findings stop being comparable
 with a deployment running the image.</p>
-<pre><code>curl -fsSLO https://github.com/anchore/grype/releases/download/v0.120.1/grype_0.120.1_linux_amd64.tar.gz
-echo &quot;0a9ee97ef5ae2ee953b0a80098105052e846cdbe319a57d808b519c33cd1343d  grype_0.120.1_linux_amd64.tar.gz&quot; | sha256sum -c -
-tar -xzf grype_0.120.1_linux_amd64.tar.gz grype
+<pre><code>curl -fsSLO https://github.com/anchore/grype/releases/download/v0.121.0/grype_0.121.0_linux_amd64.tar.gz
+echo &quot;64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519  grype_0.121.0_linux_amd64.tar.gz&quot; | sha256sum -c -
+tar -xzf grype_0.121.0_linux_amd64.tar.gz grype
 sudo install -m 0755 grype /usr/local/bin/grype
 </code></pre>
 <p>The checksum is the one the image build verifies its own download against. On
 arm64 the archive ends <code>_linux_arm64.tar.gz</code>, and its checksum is
-<code>29f47391dc283aa79fcc38e65224cd61f64dec0ecfd0db7074128ebf8ff23514</code>.</p>
+<code>86f570f75ca947ea3dd6486309232bcff6d78e44ba081ae75ab14eab72be3dae</code>.</p>
 <p>The process finds it on <code>PATH</code>. <code>scanner.path</code> in the configuration file names
 it anywhere else.</p>
 <h3 id="vulnerability-data">Vulnerability data<a class="headerlink" href="#vulnerability-data" title="Permanent link">&para;</a></h3>
