@@ -79,7 +79,7 @@ func startHeld(t *testing.T, addr string, migrate func(context.Context, *databas
 	t.Cleanup(func() {
 		stop()
 		select {
-		case <-s.done:
+		case <-s.done: //nolint:errcheck // a wait: each test judges the error and puts it back
 		case <-time.After(30 * time.Second):
 			t.Error("the server did not stop within 30s of being told to")
 		}
