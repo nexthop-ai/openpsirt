@@ -1025,6 +1025,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v0101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.1
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1739,6 +1750,17 @@
     <span class="md-ellipsis">
       
         From v0.10.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0101" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.10.1
       
     </span>
   </a>
@@ -4152,6 +4174,10 @@ on.</p>
 <td>The upgrade merges the components v0.8.0 made per version of each image into one, joins its nodes and edges across the scans that rebuilt it, and records each build's version. It rewrites every finding beneath an image: 2 min 41 s on PostgreSQL for ten nightly builds of a SONiC image, 1.6 million findings and 122,400 judgments, and longer in proportion to the nightly history held: 873 s on a copy of one production deployment's PostgreSQL database. A health check that stops the upgrade undoes it, so the next process starts it again. Check <code>/healthz</code> for whether to keep the process, as the chart does (<a href="#health-checks">Health checks</a>), or set <code>autoMigrate: false</code> and run <code>openpsirt migrate up</code> before deploying</td>
 </tr>
 <tr>
+<td>On PostgreSQL the upgrade indexes each column pointing at an image's components and nodes while it merges them, and removes those indexes when it is done. v0.10.1 and earlier read the whole finding table for every component the merge removed, which stalled the upgrade on a database larger than the server's memory</td>
+<td>Nothing. An index made by hand on <code>finding.component_id</code>, <code>finding.consumer_id</code>, <code>finding_tag.component_id</code>, <code>graph_node.component_id</code> or <code>graph_edge.parent_id</code> to get past a stalled upgrade is harmless, and may be dropped once the upgrade is done</td>
+</tr>
+<tr>
 <td>A live judgment beneath an image is keyed on the image with no version</td>
 <td>Nothing. Where two live judgments at one place differed only in the image's version, the approved one, then the one proposed last, stays, and the other is marked lapsed</td>
 </tr>
@@ -4275,6 +4301,9 @@ on.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="from-v0101">From v0.10.1<a class="headerlink" href="#from-v0101" title="Permanent link">&para;</a></h3>
+<p>Nothing changes for a database v0.9.0 or a later release built. This release
+changes the upgrade from v0.8.0 alone, as <a href="#from-v080">From v0.8.0</a> says.</p>
 
 
 
