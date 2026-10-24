@@ -330,6 +330,41 @@ func TestAResultOnAnotherBuildCarriesThePlaceItWasJudgedAt(t *testing.T) {
 	})
 }
 
+func TestAResultTheBaselineHoldsElsewhereIsInTheBaselineOnANewBuild(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		tag, err := w.Catalog.TargetFor(t.Context(), w.Tag.ID, w.Customer.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.inventory(t, tag.ID)
+		built := time.Now().UTC().Add(-time.Hour)
+		w.send(t, w.Target.ID, built, document([]sent{inFRR}, 10))
+		run, _ := w.send(t, tag.ID, built, document([]sent{inFRR, inSWSS}, 10))
+		if run.Baseline {
+			t.Fatal("the series' second comparable run is not its baseline")
+		}
+		var rows []struct {
+			Path     string `bun:"path"`
+			Baseline bool   `bun:"baseline"`
+		}
+		if err := w.DB.DB.NewSelect().TableExpr(`"sighting" AS "si"`).
+			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "si"."finding_id"`).
+			Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
+			ColumnExpr(`"ar"."path", "si"."baseline"`).
+			Where(`"f"."target_id" = ?`, tag.ID).Scan(t.Context(), &rows); err != nil {
+			t.Fatal(err)
+		}
+		in := map[string]bool{}
+		for _, r := range rows {
+			in[r.Path] = r.Baseline
+		}
+		if len(rows) != 2 || !in["src/sonic-frr/frr/bgpd/bgp_attr.c"] || in[inSWSS.uri] {
+			t.Errorf("baseline by path %v; want the result the baseline holds in it and the new one not", in)
+		}
+	})
+}
+
 func TestAnUploadOfAScannerAloneFails(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)

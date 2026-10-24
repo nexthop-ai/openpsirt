@@ -304,7 +304,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		ruleIDs[name] = id
 	}
 
-	carried, err := carriedIdentities(ctx, tx, set.ID, fresh)
+	held, err := baselined(ctx, tx, set.ID, fresh)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +312,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	if err != nil {
 		return "", err
 	}
-	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, carried, components, inventory.root)
+	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, held, components, inventory.root)
 	if err != nil {
 		return "", err
 	}
@@ -320,8 +320,8 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		return "", err
 	}
 
-	// A finding carried from one that arrived in the baseline is in it too:
-	// it is the same result, seen first by another build.
+	// A result the baseline holds on another build is in it here too: it is
+	// the same result, seen first by another build.
 	carriedIn := make(map[int64]bool, len(inBaseline))
 	for _, id := range inBaseline {
 		carriedIn[id] = true

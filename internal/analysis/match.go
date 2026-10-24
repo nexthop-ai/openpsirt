@@ -116,17 +116,10 @@ func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keye
 	return matched, fresh, missed, returned, nil
 }
 
-// carried is the place another build holds a result at, and whether that
-// build's finding arrived in the series' baseline.
-type carried struct {
-	place    string
-	baseline bool
-}
-
-// carriedIdentities is, for each result new to this build, the place another
-// build the series reports holds the same result at. Carrying the place
-// carries every decision keyed on it.
-func carriedIdentities(ctx context.Context, db bun.IDB, seriesID int64, fresh []Keyed) (map[string]carried, error) {
+// baselined is the results new to this build that a lead in the series'
+// baseline already reports on another build. Such a lead is the same result,
+// and is in the baseline too.
+func baselined(ctx context.Context, db bun.IDB, seriesID int64, fresh []Keyed) (map[string]bool, error) {
 	keys := make([]string, 0, len(fresh))
 	seen := map[string]bool{}
 	for _, k := range fresh {
@@ -135,41 +128,36 @@ func carriedIdentities(ctx context.Context, db bun.IDB, seriesID int64, fresh []
 			keys = append(keys, k.Key)
 		}
 	}
-	out := map[string]carried{}
+	out := map[string]bool{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
 	for start := 0; start < len(keys); start += database.BatchSize {
 		end := min(start+database.BatchSize, len(keys))
-		var rows []struct {
-			Key      string `bun:"match_key"`
-			Place    string `bun:"place_identity"`
-			Baseline bool   `bun:"baseline"`
-		}
+		var found []string
 		if err := db.NewSelect().
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"ar"."match_key", "f"."place_identity", "si"."baseline"`).
+			ColumnExpr(`"ar"."match_key"`).
 			Where(`"si"."series_id" = ?`, seriesID).
+			Where(`"si"."baseline" = ?`, true).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
-			OrderExpr(`"f"."id" ASC`).
-			Scan(ctx, &rows); err != nil {
-			return nil, fmt.Errorf("read where the product holds these results: %w", err)
+			Scan(ctx, &found); err != nil {
+			return nil, fmt.Errorf("read which of these results the baseline holds: %w", err)
 		}
-		for _, r := range rows {
-			if _, ok := out[r.Key]; !ok {
-				out[r.Key] = carried{place: r.Place, baseline: r.Baseline}
-			}
+		for _, k := range found {
+			out[k] = true
 		}
 	}
 	return out, nil
 }
 
 // open records each result new to this build as a finding, with what the run
-// said about it. It returns the findings, and those carried from a finding
-// that arrived in the series' baseline.
+// said about it, at the place its series and key name: one result is one
+// place on every build of the series, so a decision on it reaches each. It
+// returns the findings, and those the baseline already holds elsewhere.
 func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fresh []Keyed,
-	rules map[string]int64, from map[string]carried, components map[string]int64, root int64) (
+	rules map[string]int64, inBaseline map[string]bool, components map[string]int64, root int64) (
 	[]int64, []int64, error) {
 
 	if len(fresh) == 0 {
@@ -179,9 +167,6 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 	rows := make([]finding.Finding, len(fresh))
 	for i, k := range fresh {
 		place := identity(seriesID, k.Key)
-		if c, ok := from[k.Key]; ok {
-			place = c.place
-		}
 		component := root
 		if id, ok := components[k.Remote]; ok {
 			component = id
@@ -201,7 +186,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 	for i := range rows {
 		ids[i] = rows[i].ID
 		said[rows[i].ID] = fresh[i]
-		if from[fresh[i].Key].baseline {
+		if inBaseline[fresh[i].Key] {
 			baseline = append(baseline, rows[i].ID)
 		}
 	}

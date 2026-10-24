@@ -152,7 +152,8 @@ Not reproduced is absence, and a lead stays open (`DESIGN-kinds.md` § Kinds).
 A not-comparable run opens and updates leads and marks none.
 
 A run is the baseline where it is the series' first comparable run on any
-build of the product. A lead carried from a baseline lead is in the baseline.
+build of the product. A lead opened for a result the baseline already holds on
+another build is in the baseline too.
 
 ## Matching
 
@@ -173,8 +174,7 @@ The match key is a digest of:
 | Rule | |
 |---|---|
 | Results pair with open leads one to one on an equal key | Two results with one key are two leads |
-| A result nothing on the build matched takes the place of a lead with the same key on another build of the series | Carrying the place carries every decision keyed on it (REQ-25) |
-| A result matched nowhere is minted a place from the series and the key | One result in two builds is one place |
+| A result nothing on the build matched opens a lead at a place derived from the series and the key | One result is one place on every build of the series, so a decision keyed on it reaches each (REQ-25) |
 
 ## Placement
 
