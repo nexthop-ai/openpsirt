@@ -310,8 +310,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN("v"."identifier") AS "identifier"`).
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
-		// Anything not public carries no detail out of the deployment.
-		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" <> ? THEN 1 END) AS "undisclosed"`, access.Public).
+		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "undisclosed")).
 		Where(`"fr"."acknowledged_at" IS NULL`).
 		// A flaw found here has nobody outside to answer.
 		Where(`"fr"."found_here" = ?`, false).

@@ -665,14 +665,28 @@ func VisibleWhere(product, visibility string, r Readings) (string, []any) {
 // Asked wherever a read is about one issue rather than about a product. A
 // collaborator reads that issue at any visibility and reads nothing else of
 // the product, so the two questions have different answers and both are real.
+// caseVisibilities is what a case reaches. A case is about undisclosed work
+// and the record it becomes once disclosed, and internal material is not part
+// of one.
+var caseVisibilities = []Visibility{Public, Private}
+
+// CaseReaches reports whether a case grant reaches material of this
+// visibility.
+func CaseReaches(v Visibility) bool {
+	for _, have := range caseVisibilities {
+		if have == v {
+			return true
+		}
+	}
+	return false
+}
+
 func VisibleOn(s Subject, productID, vulnerabilityID int64) []Visibility {
 	visible := Visible(s, productID)
 	if !s.OnCase(productID, vulnerabilityID) {
 		return visible
 	}
-	// A case is about undisclosed work and the record it becomes once
-	// disclosed. Internal material is not part of one.
-	for _, want := range []Visibility{Public, Private} {
+	for _, want := range caseVisibilities {
 		held := false
 		for _, have := range visible {
 			held = held || have == want

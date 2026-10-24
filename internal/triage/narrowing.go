@@ -154,7 +154,7 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 }
 
 // orBrought widens a narrowing by the cases this subject was brought into: one
-// issue in one product, at the visibilities caseReaches allows.
+// issue in one product, at the visibilities access.CaseReaches allows.
 //
 // Only where the product's own grant is not already wider. A case adds nothing
 // where somebody reads the product at every visibility a case reaches, and the
@@ -166,7 +166,7 @@ func orBrought(subject access.Subject, where string, args []any,
 
 	var reached []access.Visibility
 	for _, v := range access.Visibilities() {
-		if caseReaches(v) {
+		if access.CaseReaches(v) {
 			reached = append(reached, v)
 		}
 	}
@@ -211,7 +211,7 @@ func mayDecideOn(subject access.Subject, productID, vulnerabilityID int64,
 	visibility access.Visibility) bool {
 
 	return mayDecide(subject, productID, visibility) ||
-		(caseReaches(visibility) && subject.OnCaseToAct(productID, vulnerabilityID))
+		(access.CaseReaches(visibility) && subject.OnCaseToAct(productID, vulnerabilityID))
 }
 
 // readsAll reports whether this subject reads every one of these visibilities
@@ -223,14 +223,6 @@ func readsAll(subject access.Subject, productID int64, visibilities []access.Vis
 		}
 	}
 	return true
-}
-
-// caseReaches reports whether a case grant reaches findings of this
-// visibility. A case is about undisclosed work and the record it becomes once
-// disclosed, so it reaches public and private findings and never an internal
-// one; access.VisibleOn holds the same rule for reading.
-func caseReaches(visibility access.Visibility) bool {
-	return visibility == access.Public || visibility == access.Private
 }
 
 // readableOn is readable with the case grant asked beside the product-wide
