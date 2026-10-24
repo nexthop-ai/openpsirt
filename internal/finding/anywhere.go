@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -138,9 +139,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 				q = q.Where(`"st"."id" NOT IN (?)`, bun.List(pastEOL))
 			}
 		}
+		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`)
 		return onlyReadable(q, subject, products, all)
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -234,7 +235,8 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 	// anywhere cannot walk claim identifiers. The narrower question — the
 	// role on this claim's own product — is asked below, once the claim is in
 	// hand, and it answers in the same words as a claim that is not there.
-	if !subject.HoldsAnywhere(access.Approver, access.PublicTriage, access.PrivateTriage) {
+	if !subject.HoldsAnywhere(access.Approver, access.PublicTriage, access.PrivateTriage,
+		access.InternalTriage) {
 		return nil, access.Denied("agree to a rating")
 	}
 	var agreed *Assessment
@@ -301,7 +303,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		return nil, refusal.New("withdrawing is something a person does")
 	}
 	// Before the identifier is resolved, for the reason Agree gives.
-	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
+	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage, access.InternalTriage) {
 		return nil, access.Denied("take a rating back")
 	}
 	claim := new(Assessment)
@@ -528,8 +530,10 @@ func (r Rating) rest() Rank {
 // them is read here: this is the one statement the packed number is written
 // again by, whichever signal moved.
 func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.UpdateQuery {
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	return tx.NewUpdate().
 		Model((*Finding)(nil)).
+		Where(kinds, kindArgs...).
 		Set(`"urgency" = (CASE WHEN "urgency_exploited_here" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_exploited" THEN ? ELSE 0 END)`+
 			` + (CASE WHEN "urgency_shipped" THEN ? ELSE 0 END) + `+rest,
@@ -583,6 +587,7 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		OnTheClock int `bun:"on_the_clock"`
 	}
 	clocked, clockedArgs := catalog.OnTheClock("st", "p", observedAt)
+	kinds, kindArgs := kind.Ranking.Where(`"f"."kind"`)
 	// Read before the flag is raised: afterwards there is nothing to tell the
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().
@@ -590,6 +595,7 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
+		Where(kinds, kindArgs...).
 		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(`"f"."kind" AS "kind"`).
 		ColumnExpr(`"f"."urgency_exploited" AS "urgency_exploited"`).
@@ -744,8 +750,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(clocked, clockedArgs...).
-		// A recorded flaw is clocked by recountOwn, below.
-		Where(`"f"."kind" <> ?`, Entered).
+		// What a scan opened. A recorded flaw is clocked by recountOwn, below.
+		Where(`"f"."kind" = ?`, Vulnerable).
 		GroupExpr(`"f"."urgency_exploited", "f"."urgency_exploited_here", "f"."opened_at", `+
 			`"f"."exploited_learned_at", "f"."fix_state", "f"."fixed_at", `+rating.EffectiveExpr).
 		Scan(ctx, &groups)
@@ -762,7 +768,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 			Where(`"urgency_exploited" = ?`, group.Exploited).
 			Where(`"urgency_exploited_here" = ?`, group.ExploitedHere).
 			Where(`"opened_at" = ?`, group.OpenedAt).
-			Where(`"kind" <> ?`, Entered).
+			Where(`"kind" = ?`, Vulnerable).
 			// A place a supplier answers on some routes carries no deadline.
 			Where(`"stated_by" IS NULL`).
 			Where(onClock, onClockArgs...)
@@ -794,9 +800,11 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		}
 	}
 	offClock, offClockArgs := clockedIn(productID, recountedAt, false)
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	if _, err := tx.NewUpdate().
 		Model((*Finding)(nil)).
 		Set(`"due_at" = NULL`).
+		Where(kinds, kindArgs...).
 		Where(`"vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"closed_at" IS NULL`).
 		Where(`"due_at" IS NOT NULL`).
@@ -859,11 +867,13 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			// The row-by-row form of mayBeToldOfHere: a claim is shown where
 			// its issue reaches something the reader may read in the claim's
 			// own product.
+			kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
 				TableExpr(IssueFindings("f")).
 				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+				Where(kinds, kindArgs...).
 				Where(`"si"."id" = "asm"."vulnerability_id"`).
 				Where(`"st"."product_id" = "asm"."product_id"`),
 				subject, products, all)
@@ -1030,6 +1040,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	}
 	type pair struct{ filed, product int64 }
 	rows := map[pair][]group{}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := database.IDsInBatches(ctx, distinct(filed), func(ctx context.Context, batch []int64) error {
 		var read []group
 		q := s.db.NewSelect().
@@ -1044,6 +1055,7 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 			ColumnExpr(`"f"."urgency_exploited_here" AS "exploited_here"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COUNT(*) AS "open"`).
+			Where(kinds, kindArgs...).
 			Where(`"si"."id" IN (?)`, bun.List(batch)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"st"."product_id" IN (?)`, bun.List(ratedIn)).

@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -453,9 +454,10 @@ func heldOpen(ctx context.Context, tx bun.IDB, targetID int64) (map[key]heldFind
 	map[at]heldFinding, error) {
 
 	var open []heldFinding
+	kinds, kindArgs := kind.Closure.Where(`"kind"`)
 	if err := tx.NewSelect().Model(&open).
 		Where(`"target_id" = ?`, targetID).
-		Where(`"kind" = ?`, Vulnerable).
+		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).Scan(ctx); err != nil {
 		return nil, nil, fmt.Errorf("read what is already open: %w", err)
 	}
@@ -983,16 +985,18 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 		// closed row ever recorded: a place whose version moves gathers a
 		// closed row at every move.
 		latest := func(grouping string) *bun.SelectQuery {
+			kinds, kindArgs := kind.Closure.Where(`"lf"."kind"`)
 			return db.NewSelect().
 				TableExpr(`"finding" AS "lf"`).
 				ColumnExpr(`MAX("lf"."id")`).
 				Where(`"lf"."target_id" = ?`, targetID).
-				Where(`"lf"."kind" = ?`, Vulnerable).
+				Where(kinds, kindArgs...).
 				Where(`"lf"."closed_at" IS NOT NULL`).
 				Where(`"lf"."vulnerability_id" IN (?)`, bun.List(batch)).
 				GroupExpr(grouping)
 		}
 		var rows []Finding
+		kinds, kindArgs := kind.Closure.Where(`"kind"`)
 		err := db.NewSelect().Model(&rows).
 			Column("id", "vulnerability_id", "component_id", "consumer_id",
 				"place_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
@@ -1000,7 +1004,7 @@ func latestClosed(ctx context.Context, db bun.IDB, targetID int64,
 			// is never a semi-join on PostgreSQL or MySQL, so without it the
 			// read walks every finding in the deployment.
 			Where(`"target_id" = ?`, targetID).
-			Where(`"kind" = ?`, Vulnerable).
+			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NOT NULL`).
 			Where(`"vulnerability_id" IN (?)`, bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {

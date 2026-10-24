@@ -22,6 +22,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -341,9 +342,10 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	evidence.Recorded = Kind(rows[0].Kind) == Entered
 	// Any place answers about the kind; disclosure is asked of all of them,
 	// because one undisclosed place among fifty makes the whole of it
-	// undisclosed for anybody deciding what may be said.
+	// undisclosed for anybody deciding what may be said. Anything not public
+	// is undisclosed for that purpose, internal material included.
 	for _, row := range rows {
-		if access.AsVisibility(row.Visibility) == access.Private {
+		if access.AsVisibility(row.Visibility) != access.Public {
 			evidence.Undisclosed = true
 		}
 		if row.DiscloseAt != nil &&
@@ -558,8 +560,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	var rows []evidenceRow
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		// The supplier's statement answering this place on some routes, and
@@ -843,8 +847,10 @@ func (s *Store) heldBy(ctx context.Context, targetID, vulnerabilityID, component
 	var holders []struct {
 		Identity *string `bun:"identity"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		// Joined on the party a person is assignable as, which is what
 		// the assignment column holds. A team's queue names no person
 		// and answers empty here, which is what a queue is.
@@ -882,8 +888,10 @@ func (s *Store) routedBy(ctx context.Context, targetID, vulnerabilityID,
 	var named []struct {
 		Name *string `bun:"name"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`LEFT JOIN "routing_rule" AS "rr" ON "rr"."id" = "f"."routed_by"`).
 		ColumnExpr(`"rr"."name" AS "name"`).
 		Where(`"f"."target_id" = ?`, targetID).

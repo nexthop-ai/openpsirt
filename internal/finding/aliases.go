@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/uptrace/bun"
 )
@@ -259,12 +260,14 @@ func triagesEverywhere(ctx context.Context, db bun.IDB, subject access.Subject,
 		ProductID  int64  `bun:"product_id"`
 		Visibility string `bun:"visibility"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		GroupExpr(`"st"."product_id", "f"."visibility"`).

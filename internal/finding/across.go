@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
@@ -603,6 +604,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		Where(`"de"."live_key" IS NOT NULL`).
 		GroupExpr(`"dv"."issue_id", "de"."place_identity"`)
 	folds, foldOf, foldArgs := held.folds(`"pf"."component_id"`)
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	perFix := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
@@ -615,6 +617,7 @@ func (s *Store) openAcross(ctx context.Context, productID int64, targets []int64
 		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX("pd"."promise") AS "promise"`).
 		Join(`LEFT JOIN (?) AS "pd" ON `+decidedPlaceIn(`"pd"."issue_id"`, `"pd"."place_identity"`, "f"), promises).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -801,10 +804,12 @@ func (s *Store) issuesOnEach(ctx context.Context, targets []int64, visible []acc
 
 	// Grouped to one row per issue before counting, which groups in memory
 	// where a distinct count over the places sorts them.
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	perIssue := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -896,12 +901,14 @@ func (s *Store) severalFixes(ctx context.Context, targets []int64, visible []acc
 		Issue       int64  `bun:"vulnerability_id"`
 		FixedIn     string `bun:"fixed_in"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).

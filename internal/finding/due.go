@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -359,11 +360,13 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	limit = database.AList.Of(limit)
 
 	standing, args := OffTheClock(`"st"."product_id"`, s.now())
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	// The narrowing, on its own, so the page and the count ask the same
 	// question of the same joins. Two spellings of one predicate is how a
 	// total stops describing the list it sits under.
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
@@ -627,6 +630,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// cleared afterwards, so a rewrite stopped part way leaves no
 		// deadline on what carries none.
 		onClock, onClockArgs := clockedIn(productID, now, true)
+		kinds, kindArgs := kind.Ranking.Where(`"f"."kind"`)
 
 		for _, start := range clockStarts(now) {
 			// The distinct moments the clock starts at in this product, off
@@ -638,6 +642,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 				Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 				ColumnExpr(string(database.Column(s.db, "f."+start.column))).
+				Where(kinds, kindArgs...).
 				Where(`"f"."closed_at" IS NULL`).
 				Where(`"st"."product_id" = ?`, productID).
 				Where(start.from(`"f".`), start.args...).
@@ -669,7 +674,9 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							Where(string(database.Column(s.db, start.column))+` IN (?)`, bun.List(chunk)).
 							Where(start.from(""), start.args...).
 							Where(`"closed_at" IS NULL`).
-							Where(`"kind" <> ?`, Entered).
+							// What a scan opened. A recorded flaw is
+							// recounted on its own windows, above.
+							Where(`"kind" = ?`, Vulnerable).
 							// A place a supplier answers on some routes
 							// carries no deadline.
 							Where(`"stated_by" IS NULL`).
@@ -779,9 +786,11 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 // not made meetable by the flaw being urgent. A refusal is the exception,
 // because on an exploited issue it leaves work only this deployment can do.
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	result, err := s.db.NewUpdate().
 		Model((*Finding)(nil)).
 		Set(`"due_at" = NULL`).
+		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).
 		Where(`"due_at" IS NOT NULL`).
 		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
@@ -852,10 +861,12 @@ func (s *Store) clearClockOn(ctx context.Context, streams []int64, why string) (
 		return 0, nil
 	}
 	cleared := 0
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	err := database.IDsInBatches(ctx, streams, func(ctx context.Context, batch []int64) error {
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
 			Set(`"due_at" = NULL`).
+			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
 			Where(`"target_id" IN (SELECT "tg"."id" FROM "target" AS "tg"
@@ -883,6 +894,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 	}
 
 	cleared := 0
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	for _, productID := range products {
 		floor, err := FloorFor(ctx, s.db, productID)
 		if err != nil {
@@ -899,6 +911,7 @@ func (s *Store) clearBelowFloor(ctx context.Context) (int, error) {
 		result, err := s.db.NewUpdate().
 			Model((*Finding)(nil)).
 			Set(`"due_at" = NULL`).
+			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
 			Where(`"urgency_exploited" = ?`, false).

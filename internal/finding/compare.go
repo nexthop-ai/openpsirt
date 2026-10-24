@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -124,9 +125,9 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	for _, v := range visible {
 		if slices.Contains(earlier, v) {
 			// Its destination is usually a public document, so including
-			// something undisclosed is a deliberate act rather than something
+			// anything not disclosed is a deliberate act rather than something
 			// somebody pastes in without noticing.
-			if v == access.Private && !includePrivate {
+			if v != access.Public && !includePrivate {
 				continue
 			}
 			both = append(both, v)
@@ -140,9 +141,11 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	}
 	visible = both
 
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	at := func(productID, targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			// The rating this product holds where it has stated one. Read
@@ -281,10 +284,12 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		}
 	}
 
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	at := func(targetID int64) ([]Changed, error) {
 		var rows []Changed
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
@@ -367,6 +372,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 		why[pairKey(c.Vulnerability, c.Component)] = Gone{Because: Unexplained}
 	}
 
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	for start := 0; start < len(fixed); start += database.BatchSize {
 		end := min(start+database.BatchSize, len(fixed))
 		batch := fixed[start:end]
@@ -407,6 +413,7 @@ func (s *Store) whyGone(ctx context.Context, targetID int64, fixed []Changed) (m
 			ColumnExpr(upstreamVersionOf("cp")+` AS "from_version"`).
 			ColumnExpr(`COALESCE("f"."moved_to", '') AS "moved_to"`).
 			ColumnExpr(`COALESCE("f"."closed_run_id", 0) AS "closed_run"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."closed_at" IS NOT NULL`).
 			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
@@ -502,7 +509,9 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	// Counted the way the findings list counts them, through the one spelling
 	// of each state, so a row here and the same row on the list cannot say
 	// different things about how far it has been decided.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	q = decisionCounts(q, "?", []any{productID}, claimWaiting, claimApproved, claimLapsed).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -563,6 +572,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		// One value per group, because the group is one claim: which bytes an
 		// engine compares to take the minimum cannot change the answer.
 		ColumnExpr(`COALESCE(MIN("cl"."justification"), '') AS "justification"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
