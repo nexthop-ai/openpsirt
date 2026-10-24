@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -841,11 +842,13 @@ func paged(db bun.IDB, grouped *bun.SelectQuery, columns ...string) *bun.SelectQ
 // openRows is open findings in these builds that the reader may see, read as
 // "f" and not yet grouped.
 func openRows(db bun.IDB, targets []int64, visible []access.Visibility) *bun.SelectQuery {
+	kinds, args := kind.Triage.Where(`"f"."kind"`)
 	return db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible))
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, args...)
 }
 
 // openGroups is open findings in these builds that the reader may see, grouped
@@ -889,6 +892,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 	// Four correlated counts over our decisions in this product at each
 	// place and at the versions the place holds, plus whether any live
 	// claim is with its author.
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []decorated
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -970,6 +974,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		// The page's issues and the page's folds, as two lists. That admits an
 		// issue from one row at the fold of another, and those groups are read
 		// and dropped; what it buys is the index. As fifty

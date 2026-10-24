@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -46,12 +47,14 @@ func inFoldOf(targetID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) func(*bun.SelectQuery) *bun.SelectQuery {
 
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		kinds, args := kind.Triage.Where(`"f"."kind"`)
 		return q.Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 			Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2" WHERE "c2"."id" = ?)`,
 				componentID).
 			Where(Decidable).
-			Where(`"f"."visibility" IN (?)`, bun.List(visible))
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(kinds, args...)
 	}
 }
 
@@ -139,6 +142,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		return nil, err
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []placeRow
 	err = placeColumns(s.db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		Where(`"f"."target_id" = ?`, targetID).
@@ -146,6 +150,7 @@ func (s *Store) PlaceFor(ctx context.Context, subject access.Subject, targetID i
 		Where(`"f"."place_identity" = ?`, placeIdentity).
 		Where(Decidable).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		OrderExpr("component_upstream, consumer_upstream").
 		Scan(ctx, &rows)
 	if err != nil {
@@ -244,6 +249,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		PlaceIdentity   string     `bun:"place_identity"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
@@ -255,6 +261,7 @@ func (s *Store) DeadlineAt(ctx context.Context, db bun.IDB, subject access.Subje
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."due_at" IS NOT NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."vulnerability_id", "f"."place_identity"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the deadline this covers: %w", err)
@@ -374,6 +381,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		Consumer        string `bun:"consumer"`
 		FixedIn         string `bun:"fixed_in"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	query := placeColumns(db.NewSelect().TableExpr(`"finding" AS "f"`), productID).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
@@ -384,6 +392,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		// Everything open against the package, whatever version each
 		// finding records as its fix. An upgrade is a claim that
 		// moving the package answers what is open on it, and the next

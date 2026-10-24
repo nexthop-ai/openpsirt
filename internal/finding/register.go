@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -151,9 +152,11 @@ func (s *Store) registerNarrowing(ctx context.Context, subject access.Subject,
 		return 0, nil, err
 	}
 	return productID, func(q *bun.SelectQuery) *bun.SelectQuery {
+		kinds, args := kind.Exports.Where(`"f"."kind"`)
 		return q.TableExpr(`"finding" AS "f"`).
 			Where(`"f"."target_id" = ?`, targetID).
-			Where(`"f"."visibility" IN (?)`, bun.List(visible))
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(kinds, args...)
 	}, nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -102,6 +103,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	// joining first reads the issue's row once per place only to fold the
 	// copies away. Inside one product an issue has one band, so the pair
 	// is already distinct once it carries one.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -110,6 +112,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"tg"."stream_id", "f"."vulnerability_id"`)
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
 

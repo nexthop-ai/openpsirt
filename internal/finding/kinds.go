@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -51,6 +52,7 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 	if len(targets) == 0 {
 		return []PackageKind{}, nil
 	}
+	kinds, args := kind.Triage.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
@@ -58,7 +60,8 @@ func (s *Store) PackageKinds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible))
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, args...)
 	return s.kindsOf(ctx, pairs, `"pairs"."vulnerability_id", `+FoldedOn)
 }
 
@@ -74,6 +77,7 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 	if !all && len(products) == 0 {
 		return []PackageKind{}, nil
 	}
+	kinds, args := kind.Triage.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
@@ -82,7 +86,8 @@ func (s *Store) PackageKindsAnywhere(ctx context.Context, subject access.Subject
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		Where(`"f"."closed_at" IS NULL`)
+		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, args...)
 	return s.kindsOf(ctx, onlyReadable(pairs, subject, products, all),
 		`"pairs"."product_id", "pairs"."vulnerability_id", `+FoldedOn)
 }

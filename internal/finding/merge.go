@@ -453,6 +453,8 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 			return fmt.Errorf("close a place held twice under %s: %w", gone.Identifier, err)
 		}
 	}
+	// Every finding under the absorbed issue moves, whatever its kind: one
+	// left under an issue that merged away is read under neither.
 	if _, err := v.db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"vulnerability_id" = ?`, kept).
 		Where(`"f"."vulnerability_id" = ?`, gone.ID).Exec(ctx); err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
@@ -129,11 +130,13 @@ func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
 		return nil, refused
 	}
 	var held []int64
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID)
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(kinds, kindArgs...)
 	if err := InTheFoldOf(q, componentID).
 		GroupExpr(`"f"."component_id"`).
 		Having(`SUM(CASE WHEN "f"."visibility" IN (?) THEN 1 ELSE 0 END) > 0`, bun.List(triaged)).
@@ -159,12 +162,14 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 		return []string{}, nil
 	}
 	var readable []int64
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."component_id"`).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible))
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...)
 	if err := InTheFoldOf(q, componentID).
 		GroupExpr(`"f"."component_id"`).
 		OrderExpr(`"f"."component_id"`).
@@ -218,18 +223,20 @@ func (s *Store) TagsInUse(ctx context.Context, subject access.Subject,
 	// A word survives where any finding it marks is readable, which is the
 	// same rule the list it filters answers by: offering a filter that
 	// matches nothing the caller may see would be its own small oracle.
-	const onSomethingReadable = `EXISTS (SELECT 1 FROM "finding" AS "f"
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	onSomethingReadable := `EXISTS (SELECT 1 FROM "finding" AS "f"
 		JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"
 		JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 		WHERE "st"."product_id" = "ft"."product_id"
 		  AND "f"."vulnerability_id" = "ft"."vulnerability_id"
 		  AND "f"."component_id" = "ft"."component_id"
-		  AND "f"."visibility" IN (?))`
+		  AND "f"."visibility" IN (?)
+		  AND ` + kinds + `)`
 	if err := s.db.NewSelect().Model((*Tag)(nil)).
 		ColumnExpr(`MIN("ft"."typed") AS "typed"`).
 		ColumnExpr(`COUNT(*) AS "used"`).
 		Where(`"ft"."product_id" = ?`, productID).
-		Where(onSomethingReadable, bun.List(visible)).
+		Where(onSomethingReadable, append([]any{bun.List(visible)}, kindArgs...)...).
 		GroupExpr(`"ft"."tag"`).
 		OrderExpr(`used DESC, "typed"`).
 		Limit(100).
@@ -289,11 +296,13 @@ type foldMark struct {
 func (s *Store) marksOnFolds(ctx context.Context, products, issues []int64, folds []string,
 	readable func(*bun.SelectQuery) *bun.SelectQuery) ([]foldMark, error) {
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	seen := readable(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr("1").
+		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ft"."product_id"`).
 		Where(`"f"."vulnerability_id" = "ft"."vulnerability_id"`).
 		Where(`"f"."component_id" = "ft"."component_id"`))

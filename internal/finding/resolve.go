@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -83,10 +84,12 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		// database that has moved: what is open there, and what visibility it
 		// carries, are both read here rather than handed in.
 		var rows []Finding
+		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		err := tx.NewSelect().Model(&rows).
 			Where(`"target_id" = ?`, targetID).
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"closed_at" IS NULL`).
+			Where(kinds, kindArgs...).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("read what is open there: %w", err)
@@ -116,7 +119,7 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 				!subject.OnCase(productID, row.VulnerabilityID) {
 				continue
 			}
-			if row.Kind != Entered {
+			if row.Kind == Vulnerable {
 				reported = true
 				continue
 			}
