@@ -164,9 +164,10 @@ auth:
   #   - through the trusted header, a name in trustedHeader.groupsHeader
   # One of those three has to be configured, or the install fails at render.
   #
-  # roles: approver, assigner, public-read, private-read, public-triage,
-  # private-triage, admin, audit. products names the products the roles are
-  # held on; leave it out for every product, including ones declared later.
+  # roles: approver, assigner, public-read, private-read, internal-read,
+  # public-triage, private-triage, internal-triage, admin, audit. products
+  # names the products the roles are held on; leave it out for every
+  # product, including ones declared later.
   # admin and audit are held over the deployment and take no products.
   #
   #   groupRoles:
