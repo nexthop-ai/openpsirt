@@ -4,6 +4,7 @@
 package analysis
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -22,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -159,7 +161,11 @@ func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc strin
 		if err != nil {
 			return err
 		}
-		return Place([]sarif.Log{log}, "").Hold(ctx, store, run.ID)
+		placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+		if err != nil {
+			return err
+		}
+		return placed.Hold(ctx, store, run.ID)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +407,7 @@ func TestARunWaitingADayForItsInventoryFails(t *testing.T) {
 	})
 }
 
-func TestARunHeldInAShapeThisReleaseDoesNotReadFails(t *testing.T) {
+func TestARunHeldInAShapeThisReleaseDoesNotReadFailsOnceItsBuildIsInventoried(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
 		store := series.NewStore(w.DB.DB)
@@ -411,6 +417,11 @@ func TestARunHeldInAShapeThisReleaseDoesNotReadFails(t *testing.T) {
 		if _, err := store.Write(t.Context(), run.ID, 1, strings.NewReader(`{"version":"2.1.0","runs":[]}`)); err != nil {
 			t.Fatal(err)
 		}
+		// A waiting run is not read, so nothing yet finds what it holds.
+		if status, err := w.applier.Apply(t.Context(), run.ID); err != nil || status != series.Waiting {
+			t.Fatalf("status %s, %v; want waiting, unread", status, err)
+		}
+		w.inventory(t, w.Target.ID)
 		status, err := w.applier.Apply(t.Context(), run.ID)
 		if err != nil || status != series.Failed {
 			t.Fatalf("status %s, %v; want failed", status, err)
@@ -420,6 +431,52 @@ func TestARunHeldInAShapeThisReleaseDoesNotReadFails(t *testing.T) {
 			t.Errorf("failure %q, %v; want the placed results could not be read", run.Failure, err)
 		}
 	})
+}
+
+func TestPlacedResultsPastTheByteBoundAreRefused(t *testing.T) {
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(document(spread(50), 10)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held bytes.Buffer
+	if err := placed.encode(&held); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Place([]sarif.Log{log}, "", int64(held.Len())); err != nil {
+		t.Errorf("refused at exactly its size: %v", err)
+	}
+	_, err = Place([]sarif.Log{log}, "", int64(held.Len())-1)
+	if !refusal.In(err) || !strings.Contains(err.Error(), "configured limit") {
+		t.Errorf("one byte short answered %v; want a refusal naming the limit", err)
+	}
+}
+
+func TestWhatARunSaysOnceIsHeldOnce(t *testing.T) {
+	tool := strings.Repeat("T", 4096)
+	doc := strings.Replace(document(spread(200), 10), `"name":"clang-tidy"`, `"name":"`+tool+`"`, 1)
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var held bytes.Buffer
+	if err := placed.encode(&held); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(held.String(), tool); n != 1 {
+		t.Errorf("the tool's name is held %d times; want once for its 200 results", n)
+	}
+	back, err := decode(&held)
+	if err != nil || len(back.Results) != 200 || back.tool(199) != tool || back.remote(0) == "" {
+		t.Errorf("read back %d results, %v; want 200 under the tool and its repository", len(back.Results), err)
+	}
 }
 
 func TestAFailureSignalOutsideTheCheckoutMakesTheRunNotComparable(t *testing.T) {
@@ -541,20 +598,6 @@ func TestAResultTheBaselineHoldsElsewhereIsInTheBaselineOnANewBuild(t *testing.T
 		}
 		if len(rows) != 2 || !in["src/sonic-frr/frr/bgpd/bgp_attr.c"] || in[inSWSS.uri] {
 			t.Errorf("baseline by path %v; want the result the baseline holds in it and the new one not", in)
-		}
-	})
-}
-
-func TestAnUploadOfAScannerAloneFails(t *testing.T) {
-	eachWorld(t, func(t *testing.T, w *world) {
-		w.inventory(t, w.Target.ID)
-		doc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Trivy"}},"results":[]}]}`
-		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), doc)
-		if status != series.Failed || run.Failure == "" {
-			t.Fatalf("status %s, failure %q; want failed, saying why", status, run.Failure)
-		}
-		if r := receiptOf(t, run); len(r.Scanners) != 1 {
-			t.Errorf("receipt %+v; want the scanner named", r)
 		}
 	})
 }

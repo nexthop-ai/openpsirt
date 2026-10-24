@@ -24607,7 +24607,7 @@ paths:
 
         Returns 202 once the documents are read and their results placed and stored, before any result is applied. The documents themselves are not stored. Poll `GET .../analyses` for what the run did. The same documents for the same series and build answer 200 with the run they match.
 
-        A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone.
+        A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else.
 
         Requires: internal-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
       operationId: upload-analysis

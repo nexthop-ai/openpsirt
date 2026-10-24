@@ -54,7 +54,7 @@ Answers:
 |---|---|
 | 202 `queued` | Stored and waiting to be applied |
 | 200 `already_held` | The same documents for the same series, build and build time, answered as the run they repeat |
-| 422 | A document or a field could not be read, or the series name is longer than a name may be; the detail names which |
+| 422 | A document or a field could not be read, the upload holds no analyzer run that ran, its placed results are past the byte bound, or the series name is longer than a name may be; the detail names which |
 | 409 | The product, release or variant is retired |
 | 503 | The queue is past its backlog |
 
@@ -64,13 +64,16 @@ A SARIF document is hostile input (REQ-69). Each bound is configuration,
 `docs/configuration.md` § Analyzer result limits lists them with their
 defaults, and an upload past one is refused with the bound named.
 
-An upload's documents are read whole before any of it is stored, so what they
-hold is in memory at once. The bytes and the entries held are bounded across
-the upload for that reason, and are memory figures.
+An upload's documents are read whole and their results placed before any of
+it is stored, so what they hold and the placed results are in memory at once.
+The bytes and the entries held are bounded across the upload for that reason,
+and are memory figures. Placed results take about 1.25 times their encoded
+size in memory: 150,000 results with 600,000 flow steps read as 145 MB, and
+placing them added 103 MB beside that, an encoding of 98 MB.
 
 | Bound | On |
 |---|---|
-| Bytes | The request, compressed; and the upload's documents together once decompressed, counting the text each result is worded with from its rule's message strings |
+| Bytes | The request, compressed; the upload's documents together once decompressed, counting the text each result is worded with from its rule's message strings; and the placed results once encoded, before any of them is stored |
 | Entries held | The upload's documents together: runs, results, rules, locations, kept flow steps, invocations, and the members of every list and map they carry. Each costs memory however few bytes of the document it took |
 | Documents | Per upload. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent |
 | Runs | Per document |
@@ -86,8 +89,8 @@ the upload for that reason, and are memory figures.
 | Rule | |
 |---|---|
 | A run from a dependency or secret scanner is left out whole and named on the receipt | This upload takes static analysis alone; an inventory goes to the scan upload |
-| An upload whose every run is a scanner's fails | Nothing in it is analysis |
-| A run whose `results` is absent or null fails | SARIF's own distinction: absent is a tool that did not start, `[]` is one that ran and found nothing |
+| An upload whose every run is a scanner's is refused, naming the scanners | Nothing in it is analysis |
+| An upload with a run whose `results` is absent or null is refused | SARIF's own distinction: absent is a tool that did not start, `[]` is one that ran and found nothing |
 | A result's rule is found by its identifier, whole and then by its leading `/`-separated components, within the tool component the result names where it names one; a position in a rule list is read only where the result states no identifier, and only within the component it names, the driver where it names none | Each extension numbers its own rules from zero, and a hierarchical identifier such as `CA5350/md5` is reported under the rule `CA5350` |
 | A result whose rule is an advisory's identifier is dropped and counted | A scanner's finding wearing an analyzer's clothes would be filed as a rule |
 | A result that is the tool's own failure is dropped, counted, and makes the run not comparable, wherever it is and whether or not it names a file | `clang-diagnostic-error`, `syntaxError`, `internalAstError`, `cppcheckError` and `preprocessorErrorDirective` say a unit was not analyzed; a generated header outside the checkout fails a unit as surely as a file in it |
@@ -137,10 +140,10 @@ placed results are read before it, since they do not change once stored.
 
 | State | When |
 |---|---|
-| `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival |
+| `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival. The placed results are not read while a run waits |
 | `superseded` | The series has applied a run to this build built at or after this one. Nothing changes |
 | `held` | A comparable run would mark more of the build's open leads not reproduced than the deployment allows at once. Nothing changes |
-| `failed` | Every run was a scanner's, a run stated no results, the placed results are held in a shape the release applying them does not read, or the build had no inventory read within a day of the run arriving |
+| `failed` | The placed results are held in a shape the release applying them does not read, or the build had no inventory read within a day of the run arriving |
 | `applied` | Results matched, opened and recorded |
 
 Two runs of one series are applied one after the other. Each reads what the
@@ -241,6 +244,7 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | Limit | Detail |
 |---|---|
 | Exact matching churns where an analyzer writes no fingerprint | clang-tidy, and clang before 22, give rule, path, line and message alone; every line moved above a result reopens it as a new lead |
+| A run that ends unread counts nothing on its receipt | A run is read only once its build has an inventory, so one superseded or failed while it waits, or held in a shape the release applying it does not read, ends with a receipt naming no drop and no discard |
 | Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
 | A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |

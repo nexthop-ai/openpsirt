@@ -156,6 +156,10 @@ func TestAnAnalyzerUploadIsRefusedInWordsTheSenderCanAct(t *testing.T) {
 			"too many at once": {[]string{clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun,
 				clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun},
 				map[string]string{"series": "s"}, "per-unit documents"},
+			"a scanner alone": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Trivy"}},"results":[]}]}`},
+				map[string]string{"series": "s"}, "scanner's (Trivy)"},
+			"a run that did not run": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang-tidy"}}}]}`},
+				map[string]string{"series": "s"}, "did not run"},
 			"a long series": {[]string{clangRun}, map[string]string{"series": strings.Repeat("s", database.NameWidth+1)},
 				"may be at most"},
 		} {

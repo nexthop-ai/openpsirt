@@ -299,9 +299,10 @@ ingress:
 #
 # Raise both together with the ingest bounds. `OPENPSIRT_INGEST_*` allows about
 # 250 MB for one document being read, and that is the server's half. An
-# analyzer upload is held whole while it is read: `OPENPSIRT_ANALYSIS_MAX_BYTES`
-# and `OPENPSIRT_ANALYSIS_MAX_HELD` are memory figures, about 450 MB together at
-# their defaults, and an upload can be read while a scan is.
+# analyzer upload is held whole while it is read and placed:
+# `OPENPSIRT_ANALYSIS_MAX_BYTES` and `OPENPSIRT_ANALYSIS_MAX_HELD` are memory
+# figures, about 800 MB together at their defaults counting the placed results,
+# and an upload can be read while a scan is.
 #
 # Patch branch lookups, where `patchBranches.enabled` turns them on, add git as a
 # third process in the same cgroup: 1.3 GB at the peak of a first fetch of the

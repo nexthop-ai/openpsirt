@@ -90,7 +90,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"Poll `GET .../analyses` for what the run did. The same documents for the same series " +
 			"and build answer 200 with the run they match.\n\n" +
 			"A dependency or secret scanner's run is left out and named on the receipt; this " +
-			"upload takes static analysis alone.",
+			"upload takes static analysis alone, and refuses one holding nothing else.",
 		Tags:         []string{"Ingest"},
 		MaxBodyBytes: analysisLimits(in).MaxBytes + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
@@ -178,7 +178,13 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	}
 	stated := analysis.Describe(logs, given)
 	hash := analysis.RunHash(digests, stated.BuiltAt)
-	placed := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot))
+	placed, err := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot), analysisLimits(in).MaxBytes)
+	switch {
+	case errors.As(err, &refused):
+		return nil, huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error())
+	case err != nil:
+		return nil, core.WentWrong(in.Logger, "the upload could not be placed", err)
+	}
 	dated := stated.BuiltAt.IsZero()
 	if dated {
 		stated.BuiltAt = time.Now().UTC()
