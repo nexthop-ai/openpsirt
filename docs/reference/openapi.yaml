@@ -1018,8 +1018,10 @@ components:
             - assigner
             - public-read
             - private-read
+            - internal-read
             - public-triage
             - private-triage
+            - internal-triage
             - admin
             - audit
           type: string
@@ -1351,6 +1353,9 @@ components:
     CanBody:
       additionalProperties: false
       properties:
+        agrees_internal:
+          description: "Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage"
+          type: boolean
         agrees_private:
           description: "Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"
           type: boolean
@@ -1358,7 +1363,7 @@ components:
           description: "Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"
           type: boolean
         may_agree:
-          description: Agree to somebody else's claim, or send it back, at either visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
+          description: Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
           type: boolean
         may_approve_rulings:
           description: "Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"
@@ -1370,21 +1375,27 @@ components:
           description: Argue about a finding nobody has disclosed
           type: boolean
         may_see:
-          description: Read findings here at either visibility
+          description: Read findings here at any visibility
           type: boolean
         may_triage:
-          description: Argue about a finding here at either visibility
+          description: Argue about a finding here at any visibility
           type: boolean
         name:
           description: The label shown for it
           type: string
         product:
           type: string
+        reads_internal:
+          description: Read internal findings, which are never disclosed
+          type: boolean
         reads_private:
           description: Read findings nobody has disclosed yet
           type: boolean
         reads_public:
           description: Read findings that have been disclosed
+          type: boolean
+        triages_internal:
+          description: Argue about an internal finding
           type: boolean
         triages_public:
           description: Argue about a finding that has been disclosed
@@ -1395,13 +1406,16 @@ components:
         - may_see
         - reads_public
         - reads_private
+        - reads_internal
         - may_triage
         - triages_public
+        - triages_internal
         - may_assign
         - may_hide
         - may_agree
         - agrees_public
         - agrees_private
+        - agrees_internal
         - may_approve_rulings
       type: object
     CarriedBody:
@@ -3385,6 +3399,7 @@ components:
           enum:
             - public
             - private
+            - internal
           type: string
       required:
         - identifier
@@ -4402,8 +4417,10 @@ components:
             - assigner
             - public-read
             - private-read
+            - internal-read
             - public-triage
             - private-triage
+            - internal-triage
           type: string
       required:
         - role
@@ -4497,8 +4514,10 @@ components:
             - assigner
             - public-read
             - private-read
+            - internal-read
             - public-triage
             - private-triage
+            - internal-triage
           type: string
         source:
           description: Whether an administrator assigned this or a group derived it
@@ -11256,8 +11275,10 @@ components:
               - assigner
               - public-read
               - private-read
+              - internal-read
               - public-triage
               - private-triage
+              - internal-triage
             type: string
           type:
             - array
@@ -13237,7 +13258,7 @@ paths:
 
         Only decisions you may reach are touched, and only agreements you gave: another reviewer's batch of the same name stands.
 
-        Requires: approver or public-triage or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
+        Requires: approver or public-triage or private-triage or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
       operationId: undo-batch
       parameters:
         - in: path
@@ -13267,6 +13288,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
         note: A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
         narrowed: true
   /v1/approvals/scrutiny:
@@ -13422,7 +13444,7 @@ paths:
 
         Asked of triage on the product the rating belongs to: taking a rating back is making one.
 
-        Requires: public-triage or private-triage on the product. The product is the rating's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. The product is the rating's own, not one in the path.
       operationId: withdraw-assessment
       parameters:
         - in: path
@@ -13448,6 +13470,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: The product is the rating's own, not one in the path.
   /v1/assessments/{id}/agreement:
     post:
@@ -13456,7 +13479,7 @@ paths:
 
         The second person holds their role on the product the rating belongs to. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its triage line; a rating in a product you hold nothing on answers as one that is not there.
 
-        Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
+        Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
       operationId: agree-assessment
       parameters:
         - in: path
@@ -13487,6 +13510,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
         note: The proposer may not approve their own. The product is the rating's own, not one in the path.
   /v1/assignments:
     get:
@@ -14101,7 +14125,7 @@ paths:
       description: |-
         Withdraws the claim so none of it applies to any finding. A claim is one argument however many places it covers, so this takes back all of it; holding part of one back is setting rows aside, at `POST /v1/claims/{id}/approval`. The record is kept — a withdrawn claim reads as proposed, approved, then withdrawn. Requires no approval.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: withdraw-claim
       parameters:
         - in: path
@@ -14127,6 +14151,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
     get:
       description: |-
         Returns one claim whole: what it says, where it lands, what it covers now, and what became of it.
@@ -14176,7 +14201,7 @@ paths:
 
         Returns 404 for a claim you may not act on every row of, and 409 if you proposed it.
 
-        Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own.
+        Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
       operationId: approve-claim
       parameters:
         - in: path
@@ -14213,6 +14238,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
         note: The proposer may not approve their own.
   /v1/claims/{id}/approvals:
     get:
@@ -14294,7 +14320,7 @@ paths:
 
         A comment may later be edited by its author only, and editing overwrites it rather than keeping revisions.
 
-        Requires: approver or public-triage or private-triage on the product
+        Requires: approver or public-triage or private-triage or internal-triage on the product
       operationId: comment-on-claim
       parameters:
         - in: path
@@ -14331,6 +14357,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
   /v1/claims/{id}/elsewhere:
     put:
       description: |-
@@ -14340,7 +14367,7 @@ paths:
 
         Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: point-claim-elsewhere
       parameters:
         - in: path
@@ -14372,6 +14399,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/claims/{id}/promise:
     put:
       description: |-
@@ -14381,7 +14409,7 @@ paths:
 
         `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: repromise-upgrade
       parameters:
         - in: path
@@ -14413,6 +14441,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/claims/{id}/reaffirmation:
     post:
       description: |-
@@ -14428,7 +14457,7 @@ paths:
 
         A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
 
-        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+        Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
       operationId: reaffirm-claim
       parameters:
         - in: path
@@ -14464,6 +14493,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/claims/{id}/reasoning:
     put:
       description: |-
@@ -14473,7 +14503,7 @@ paths:
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: revise-claim
       parameters:
         - in: path
@@ -14509,6 +14539,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/claims/{id}/revisions:
     get:
       description: |-
@@ -14551,7 +14582,7 @@ paths:
 
         `because` is required and is recorded as a comment on each decision. Needs no approval of its own. You cannot send back a claim whose words are your own.
 
-        Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own.
+        Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
       operationId: send-claim-back
       parameters:
         - in: path
@@ -14584,6 +14615,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
         note: The proposer may not approve their own.
   /v1/claims/{id}/split:
     post:
@@ -14594,7 +14626,7 @@ paths:
 
         `because` is required and is recorded as a comment on the new claim. Naming a row that is not part of the claim is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: split-claim
       parameters:
         - in: path
@@ -14630,6 +14662,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/comments/{id}:
     put:
       description: |-
@@ -14639,7 +14672,7 @@ paths:
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 
-        Requires: approver or public-triage or private-triage on the product. Only the author may edit a comment.
+        Requires: approver or public-triage or private-triage or internal-triage on the product. Only the author may edit a comment.
       operationId: edit-comment
       parameters:
         - in: path
@@ -14676,6 +14709,7 @@ paths:
           - approver
           - public-triage
           - private-triage
+          - internal-triage
         note: Only the author may edit a comment.
   /v1/comments/{id}/history:
     get:
@@ -15319,7 +15353,7 @@ paths:
 
         Asked of triage on the product the record belongs to: clearing one is recording one.
 
-        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
       operationId: clear-exploited-here
       parameters:
         - in: path
@@ -15351,6 +15385,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: The product is the record's own, not one in the path.
   /v1/exploited-here/{id}/fixes:
     post:
@@ -15361,7 +15396,7 @@ paths:
 
         A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
 
-        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
       operationId: name-fix-release
       parameters:
         - in: path
@@ -15397,6 +15432,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: The product is the record's own, not one in the path.
   /v1/exploited-here/{id}/fixes/{fix}:
     delete:
@@ -15405,7 +15441,7 @@ paths:
 
         A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
 
-        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
       operationId: withdraw-fix-release
       parameters:
         - in: path
@@ -15437,6 +15473,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: The product is the record's own, not one in the path.
   /v1/exploited-here/{id}/told:
     post:
@@ -15447,7 +15484,7 @@ paths:
 
         Allowed on a cleared record, because a notice given before the clearing still happened.
 
-        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
       operationId: record-told-outside
       parameters:
         - in: path
@@ -15483,6 +15520,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: The product is the record's own, not one in the path.
   /v1/findings:
     get:
@@ -16863,7 +16901,7 @@ paths:
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 
-        Requires: public-triage or private-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+        Requires: public-triage or private-triage or internal-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
       operationId: edit-issue-note
       parameters:
         - in: path
@@ -16899,6 +16937,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: Only the author may edit a note. The product is the note's own, not one in the path.
   /v1/notes/{id}/history:
     get:
@@ -17180,7 +17219,7 @@ paths:
 
         Unpaged. A record you may not be told of is left out and counted nowhere.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+        Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
       operationId: list-obligations
       responses:
         "200":
@@ -17205,6 +17244,8 @@ paths:
           - public-triage
           - private-read
           - private-triage
+          - internal-read
+          - internal-triage
         note: A product you may not read contributes nothing, not even a count.
         narrowed: true
   /v1/outbound:
@@ -17390,8 +17431,10 @@ paths:
               - assigner
               - public-read
               - private-read
+              - internal-read
               - public-triage
               - private-triage
+              - internal-triage
             type: string
       responses:
         "200":
@@ -18637,7 +18680,7 @@ paths:
 
         Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a judgment one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: plan-upgrade
       parameters:
         - in: path
@@ -18677,6 +18720,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/components/{component}/upstream-statements:
     get:
       description: |-
@@ -19958,7 +20002,7 @@ paths:
 
         Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
 
-        Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+        Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
       operationId: assign-matching-findings
       parameters:
         - in: path
@@ -20512,6 +20556,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
   /v1/products/{product}/findings/components:
     get:
@@ -21986,7 +22031,7 @@ paths:
 
         Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+        Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
       operationId: list-holders
       parameters:
         - in: path
@@ -22004,6 +22049,7 @@ paths:
             enum:
               - public
               - private
+              - internal
             type: string
         - description: Narrow to names containing this, ignoring capitals
           explode: false
@@ -22045,7 +22091,9 @@ paths:
           - public-triage
           - private-read
           - private-triage
-        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+          - internal-read
+          - internal-triage
+        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
     delete:
       description: |-
@@ -22162,7 +22210,7 @@ paths:
 
         The published rating is never overwritten. The product's is what ranks there; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: assess-issue
       parameters:
         - in: path
@@ -22204,6 +22252,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/issues/{vulnerability}/attachments:
     get:
       description: |-
@@ -22253,7 +22302,7 @@ paths:
 
         An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
 
-        Requires: public-triage or private-triage on the product. A collaborator brought onto this issue may attach to it too.
+        Requires: public-triage or private-triage or internal-triage on the product. A collaborator brought onto this issue may attach to it too.
       operationId: upload-attachment
       parameters:
         - in: path
@@ -22310,6 +22359,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: A collaborator brought onto this issue may attach to it too.
   /v1/products/{product}/issues/{vulnerability}/builds:
     put:
@@ -22808,7 +22858,7 @@ paths:
 
         One record stands per issue and product. Clear the one standing before recording another.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: record-exploited-here
       parameters:
         - in: path
@@ -22850,6 +22900,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/issues/{vulnerability}/notes:
     get:
       description: |-
@@ -22905,7 +22956,7 @@ paths:
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: note-on-issue
       parameters:
         - in: path
@@ -22947,6 +22998,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/issues/{vulnerability}/report:
     get:
       description: |-
@@ -23036,9 +23088,9 @@ paths:
 
         Only people who can already see the thing. An autocomplete listing everybody teaches somebody to name a colleague who then cannot open what they were called to — and on an undisclosed finding, the mention itself says a finding exists, which is the disclosure the visibility rule prevents.
 
-        `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
+        `visibility` says which kind of finding the text is about. Asking about undisclosed or internal findings requires being able to read them.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+        Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
       operationId: list-mentionable
       parameters:
         - in: path
@@ -23056,6 +23108,7 @@ paths:
             enum:
               - public
               - private
+              - internal
             type: string
         - description: Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name
           explode: false
@@ -23097,7 +23150,9 @@ paths:
           - public-triage
           - private-read
           - private-triage
-        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+          - internal-read
+          - internal-triage
+        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
   /v1/products/{product}/nameable-flaws:
     get:
       description: |-
@@ -23849,7 +23904,7 @@ paths:
 
         First match wins, and which rule placed a finding is recorded on the finding.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: list-routing-rules
       parameters:
         - in: path
@@ -23878,6 +23933,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
     post:
       description: |-
         Records a standing rule and queues it against what is already open.
@@ -23932,7 +23988,7 @@ paths:
 
         It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: preview-routing-rule
       parameters:
         - in: path
@@ -23977,6 +24033,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/routing-rules/{id}:
     delete:
       description: |-
@@ -24326,7 +24383,7 @@ paths:
 
         `absent` cover nothing here and are left behind.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: preview-carried-decisions
       parameters:
         - in: path
@@ -24381,6 +24438,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
     post:
       description: |-
         Takes the judgments named onto this build as claims waiting for agreement, each carrying the words from the line it came from.
@@ -24391,7 +24449,7 @@ paths:
 
         A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: carry-decisions
       parameters:
         - in: path
@@ -24452,6 +24510,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/carried-patches:
     get:
       description: |-
@@ -24737,7 +24796,7 @@ paths:
 
         Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: decide-together
       parameters:
         - in: path
@@ -24808,6 +24867,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues:
     get:
       description: |-
@@ -24996,7 +25056,7 @@ paths:
 
         Findings arriving later under the same component start unassigned.
 
-        Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+        Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
       operationId: assign-finding
       parameters:
         - in: path
@@ -25068,6 +25128,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
   /v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/decision:
     post:
@@ -25086,7 +25147,7 @@ paths:
 
         `patch-needed` is the backport case: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: decide-finding
       parameters:
         - in: path
@@ -25166,6 +25227,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/reach:
     get:
       description: |-
@@ -25248,7 +25310,7 @@ paths:
       description: |-
         Removes a tag. Taking off one that is not there succeeds and changes nothing.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: untag-finding
       parameters:
         - in: path
@@ -25322,6 +25384,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
     put:
       description: |-
         Puts a free-text tag on one issue in one component of this product.
@@ -25334,7 +25397,7 @@ paths:
 
         Tagging is triage, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: tag-finding
       parameters:
         - in: path
@@ -25408,6 +25471,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision:
     get:
       description: |-
@@ -25486,7 +25550,7 @@ paths:
 
         It also says how many findings this one judgment covers, and how many distinct versions of the component sit at this place — more than one means a single decision cannot honestly cover all of them.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: decide
       parameters:
         - in: path
@@ -25545,6 +25609,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision/reaffirmation:
     post:
       description: |-
@@ -25558,7 +25623,7 @@ paths:
 
         `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
 
-        Requires: public-triage or private-triage on the product
+        Requires: public-triage or private-triage or internal-triage on the product
       operationId: reaffirm-decision
       parameters:
         - in: path
@@ -25617,6 +25682,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/reach:
     get:
       description: |-
@@ -26432,7 +26498,7 @@ paths:
 
         Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
 
-        Requires: public-triage or private-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
+        Requires: public-triage or private-triage or internal-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
       operationId: upload-scan
       parameters:
         - description: The declared product this build is of
@@ -26502,6 +26568,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
         note: A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
   /v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes:
     get:
@@ -26967,7 +27034,7 @@ paths:
 
         Only the words on findings you may read. A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only the words on findings you may see.
+        Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
       operationId: list-tags
       parameters:
         - in: path
@@ -26998,6 +27065,8 @@ paths:
           - public-triage
           - private-read
           - private-triage
+          - internal-read
+          - internal-triage
         note: Answers only the words on findings you may see.
   /v1/products/{product}/triage-floor:
     put:
@@ -27410,7 +27479,7 @@ paths:
 
         Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
 
-        Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+        Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
       operationId: reaffirm-many
       requestBody:
         content:
@@ -27439,6 +27508,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
+          - internal-triage
   /v1/releases/out-of-support:
     get:
       description: |-

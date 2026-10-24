@@ -394,7 +394,7 @@ export interface paths {
          *
          *     Only decisions you may reach are touched, and only agreements you gave: another reviewer's batch of the same name stands.
          *
-         *     Requires: approver or public-triage or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A batch is one reviewer's afternoon and may span products, so it is undone as far as you reach and no further.
          */
         delete: operations["undo-batch"];
         options?: never;
@@ -474,7 +474,7 @@ export interface paths {
          *
          *     Asked of triage on the product the rating belongs to: taking a rating back is making one.
          *
-         *     Requires: public-triage or private-triage on the product. The product is the rating's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the rating's own, not one in the path.
          */
         delete: operations["withdraw-assessment"];
         options?: never;
@@ -497,7 +497,7 @@ export interface paths {
          *
          *     The second person holds their role on the product the rating belongs to. Agreeing is what puts a milder rating into force, so it moves that product's deadlines and its triage line; a rating in a product you hold nothing on answers as one that is not there.
          *
-         *     Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own. The product is the rating's own, not one in the path.
          */
         post: operations["agree-assessment"];
         delete?: never;
@@ -680,7 +680,7 @@ export interface paths {
          * Withdraw a triage claim
          * @description Withdraws the claim so none of it applies to any finding. A claim is one argument however many places it covers, so this takes back all of it; holding part of one back is setting rows aside, at `POST /v1/claims/{id}/approval`. The record is kept — a withdrawn claim reads as proposed, approved, then withdrawn. Requires no approval.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         delete: operations["withdraw-claim"];
         options?: never;
@@ -707,7 +707,7 @@ export interface paths {
          *
          *     Returns 404 for a claim you may not act on every row of, and 409 if you proposed it.
          *
-         *     Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
          */
         post: operations["approve-claim"];
         delete?: never;
@@ -767,7 +767,7 @@ export interface paths {
          *
          *     A comment may later be edited by its author only, and editing overwrites it rather than keeping revisions.
          *
-         *     Requires: approver or public-triage or private-triage on the product
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product
          */
         post: operations["comment-on-claim"];
         delete?: never;
@@ -792,7 +792,7 @@ export interface paths {
          *
          *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         put: operations["point-claim-elsewhere"];
         post?: never;
@@ -818,7 +818,7 @@ export interface paths {
          *
          *     `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         put: operations["repromise-upgrade"];
         post?: never;
@@ -851,7 +851,7 @@ export interface paths {
          *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-claim"];
         delete?: never;
@@ -876,7 +876,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         put: operations["revise-claim"];
         post?: never;
@@ -925,7 +925,7 @@ export interface paths {
          *
          *     `because` is required and is recorded as a comment on each decision. Needs no approval of its own. You cannot send back a claim whose words are your own.
          *
-         *     Requires: approver or public-triage or private-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
          */
         post: operations["send-claim-back"];
         delete?: never;
@@ -951,7 +951,7 @@ export interface paths {
          *
          *     `because` is required and is recorded as a comment on the new claim. Naming a row that is not part of the claim is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["split-claim"];
         delete?: never;
@@ -976,7 +976,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: approver or public-triage or private-triage on the product. Only the author may edit a comment.
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. Only the author may edit a comment.
          */
         put: operations["edit-comment"];
         post?: never;
@@ -1274,7 +1274,7 @@ export interface paths {
          *
          *     Asked of triage on the product the record belongs to: clearing one is recording one.
          *
-         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
          */
         delete: operations["clear-exploited-here"];
         options?: never;
@@ -1299,7 +1299,7 @@ export interface paths {
          *
          *     A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
          *
-         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
          */
         post: operations["name-fix-release"];
         delete?: never;
@@ -1324,7 +1324,7 @@ export interface paths {
          *
          *     A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
          *
-         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
          */
         delete: operations["withdraw-fix-release"];
         options?: never;
@@ -1349,7 +1349,7 @@ export interface paths {
          *
          *     Allowed on a cleared record, because a notice given before the clearing still happened.
          *
-         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
          */
         post: operations["record-told-outside"];
         delete?: never;
@@ -1652,7 +1652,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
+         *     Requires: public-triage or private-triage or internal-triage on the product. Only the author may edit a note. The product is the note's own, not one in the path.
          */
         put: operations["edit-issue-note"];
         post?: never;
@@ -1825,7 +1825,7 @@ export interface paths {
          *
          *     Unpaged. A record you may not be told of is left out and counted nowhere.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
          */
         get: operations["list-obligations"];
         put?: never;
@@ -2563,7 +2563,7 @@ export interface paths {
          *
          *     Saying who carries it is part of the act, not a second one: name a `person` or a `team`, and every finding the promise covers is handed to them in the same transaction, so a promise nobody is carrying and a holder with no promise are both impossible. A team is a perfectly good holder — moving a package is work a queue tracks rather than a judgment one person makes — and it stays unheld until somebody on it takes it. The handover is product-wide like every other, because the promise is per build and who is carrying the work is not.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["plan-upgrade"];
         delete?: never;
@@ -2719,7 +2719,7 @@ export interface paths {
          *
          *     Refused as a whole where any row has not been disclosed and the person or team may not read undisclosed work in the product.
          *
-         *     Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
          */
         post: operations["assign-matching-findings"];
         delete?: never;
@@ -2885,7 +2885,7 @@ export interface paths {
          *
          *     Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
          */
         get: operations["list-holders"];
         put?: never;
@@ -2957,7 +2957,7 @@ export interface paths {
          *
          *     The published rating is never overwritten. The product's is what ranks there; the world's stays beside it, because a rating of ours shown where the world's goes reads as the world's.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["assess-issue"];
         delete?: never;
@@ -2993,7 +2993,7 @@ export interface paths {
          *
          *     An upload nothing refers to is removed after a day, so a file attached and then abandoned does not accumulate. Send `evidence=true` where the file hangs off the issue itself — a test case that proves the flaw — rather than off text you are about to write: it is then listed at once and never swept, because the issue is what points at it.
          *
-         *     Requires: public-triage or private-triage on the product. A collaborator brought onto this issue may attach to it too.
+         *     Requires: public-triage or private-triage or internal-triage on the product. A collaborator brought onto this issue may attach to it too.
          */
         post: operations["upload-attachment"];
         delete?: never;
@@ -3259,7 +3259,7 @@ export interface paths {
          *
          *     One record stands per issue and product. Clear the one standing before recording another.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["record-exploited-here"];
         delete?: never;
@@ -3299,7 +3299,7 @@ export interface paths {
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["note-on-issue"];
         delete?: never;
@@ -3373,9 +3373,9 @@ export interface paths {
          *
          *     Only people who can already see the thing. An autocomplete listing everybody teaches somebody to name a colleague who then cannot open what they were called to — and on an undisclosed finding, the mention itself says a finding exists, which is the disclosure the visibility rule prevents.
          *
-         *     `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
+         *     `visibility` says which kind of finding the text is about. Asking about undisclosed or internal findings requires being able to read them.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
          */
         get: operations["list-mentionable"];
         put?: never;
@@ -3783,7 +3783,7 @@ export interface paths {
          *
          *     First match wins, and which rule placed a finding is recorded on the finding.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         get: operations["list-routing-rules"];
         put?: never;
@@ -3821,7 +3821,7 @@ export interface paths {
          *
          *     It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         get: operations["preview-routing-rule"];
         put?: never;
@@ -4025,7 +4025,7 @@ export interface paths {
          *
          *     `absent` cover nothing here and are left behind.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         get: operations["preview-carried-decisions"];
         put?: never;
@@ -4039,7 +4039,7 @@ export interface paths {
          *
          *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["carry-decisions"];
         delete?: never;
@@ -4187,7 +4187,7 @@ export interface paths {
          *
          *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["decide-together"];
         delete?: never;
@@ -4266,7 +4266,7 @@ export interface paths {
          *
          *     Findings arriving later under the same component start unassigned.
          *
-         *     Requires: public-triage or private-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
          */
         put: operations["assign-finding"];
         post?: never;
@@ -4301,7 +4301,7 @@ export interface paths {
          *
          *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["decide-finding"];
         delete?: never;
@@ -4356,7 +4356,7 @@ export interface paths {
          *
          *     Tagging is triage, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         put: operations["tag-finding"];
         post?: never;
@@ -4364,7 +4364,7 @@ export interface paths {
          * Take a tag off a finding
          * @description Removes a tag. Taking off one that is not there succeeds and changes nothing.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         delete: operations["untag-finding"];
         options?: never;
@@ -4409,7 +4409,7 @@ export interface paths {
          *
          *     It also says how many findings this one judgment covers, and how many distinct versions of the component sit at this place — more than one means a single decision cannot honestly cover all of them.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["decide"];
         delete?: never;
@@ -4439,7 +4439,7 @@ export interface paths {
          *
          *     `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
         post: operations["reaffirm-decision"];
         delete?: never;
@@ -4737,7 +4737,7 @@ export interface paths {
          *
          *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
          *
-         *     Requires: public-triage or private-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
+         *     Requires: public-triage or private-triage or internal-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
          */
         post: operations["upload-scan"];
         delete?: never;
@@ -4939,7 +4939,7 @@ export interface paths {
          *
          *     Only the words on findings you may read. A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only the words on findings you may see.
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
          */
         get: operations["list-tags"];
         put?: never;
@@ -5163,7 +5163,7 @@ export interface paths {
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
-         *     Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key
+         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
          */
         post: operations["reaffirm-many"];
         delete?: never;
@@ -6895,7 +6895,7 @@ export interface components {
              * @description The role membership of this group grants
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin" | "audit";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage" | "admin" | "audit";
         };
         BlockingBody: {
             component: string;
@@ -7085,11 +7085,13 @@ export interface components {
             version: string;
         };
         CanBody: {
+            /** @description Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage */
+            agrees_internal: boolean;
             /** @description Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage */
             agrees_private: boolean;
             /** @description Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage */
             agrees_public: boolean;
-            /** @description Agree to somebody else's claim, or send it back, at either visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
+            /** @description Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
             may_approve_rulings: boolean;
@@ -7097,17 +7099,21 @@ export interface components {
             may_assign: boolean;
             /** @description Argue about a finding nobody has disclosed */
             may_hide: boolean;
-            /** @description Read findings here at either visibility */
+            /** @description Read findings here at any visibility */
             may_see: boolean;
-            /** @description Argue about a finding here at either visibility */
+            /** @description Argue about a finding here at any visibility */
             may_triage: boolean;
             /** @description The label shown for it */
             name: string;
             product: string;
+            /** @description Read internal findings, which are never disclosed */
+            reads_internal: boolean;
             /** @description Read findings nobody has disclosed yet */
             reads_private: boolean;
             /** @description Read findings that have been disclosed */
             reads_public: boolean;
+            /** @description Argue about an internal finding */
+            triages_internal: boolean;
             /** @description Argue about a finding that has been disclosed */
             triages_public: boolean;
         };
@@ -8245,7 +8251,7 @@ export interface components {
              * @description Whether it has been disclosed
              * @enum {string}
              */
-            visibility: "public" | "private";
+            visibility: "public" | "private" | "internal";
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -8847,7 +8853,7 @@ export interface components {
              * @description The rights it carries
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
         };
         GrownBody: {
             approved_at: string;
@@ -8900,7 +8906,7 @@ export interface components {
              * @description The rights it carries
              * @enum {string}
              */
-            role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
+            role: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
             /**
              * @description Whether an administrator assigned this or a group derived it
              * @enum {string}
@@ -12677,7 +12683,7 @@ export interface components {
             /** @description The moment it stops working */
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
-            holds?: ("approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage")[] | null;
+            holds?: ("approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage")[] | null;
             /** @description When it was last used, to the hour */
             last_used_at?: string;
             /** @description The lifetime, such as "720h". There is a configured maximum */
@@ -16252,7 +16258,7 @@ export interface operations {
                 /** @description Keep only people holding something on this product, by the name that addresses it */
                 product?: string;
                 /** @description Keep only people holding this role */
-                role?: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
+                role?: "approver" | "assigner" | "public-read" | "private-read" | "internal-read" | "public-triage" | "private-triage" | "internal-triage";
             };
             header?: never;
             path?: never;
@@ -18076,7 +18082,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The visibility of the work being handed over */
-                visibility?: "public" | "private";
+                visibility?: "public" | "private" | "internal";
                 /** @description Narrow to names containing this, ignoring capitals */
                 q?: string;
                 limit?: number;
@@ -18796,7 +18802,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description The kind of finding the text is about */
-                visibility?: "public" | "private";
+                visibility?: "public" | "private" | "internal";
                 /** @description Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name */
                 q?: string;
                 limit?: number;
