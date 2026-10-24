@@ -29,6 +29,9 @@ func seriesV0110(t *columnTypes) []string {
 			"name"        ` + t.name + ` NOT NULL,
 			"name_folded" ` + t.name + ` NOT NULL,
 			"created_at"  ` + t.timestamp + ` NOT NULL,
+			-- Written with a fresh value by every run applied, which is what
+			-- makes two runs of the series wait for each other.
+			"taken_by"    ` + t.name + ` NULL,
 			CONSTRAINT "series_name_unique" UNIQUE ("product_id", "kind", "name_folded"),
 			CONSTRAINT "series_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,

@@ -11,6 +11,7 @@ package series
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -310,8 +311,13 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 // series are applied one after the other. Each reads what the series last
 // saw, and two at once would both read it before either wrote: one result
 // opened twice, or two baselines.
+//
+// The write puts a new value in the row every time. An update setting a
+// column to what it already holds is matched and not written on MySQL and
+// MariaDB, and a cluster certifies only rows that were written, so two runs
+// applied on two nodes would both pass.
 func (s *Store) Take(ctx context.Context, runID int64) error {
-	if _, err := s.db.NewUpdate().Table("series").Set(`"name" = "name"`).
+	if _, err := s.db.NewUpdate().Table("series").Set(`"taken_by" = ?`, rand.Text()).
 		Where(`"id" = (SELECT "sr"."series_id" FROM "series_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("take the series of run %d: %w", runID, err)

@@ -145,7 +145,9 @@ placed results are read before it, since they do not change once stored.
 
 Two runs of one series are applied one after the other. Each reads what the
 series last saw and writes what it sees, so two at once would open one result
-twice or record two baselines.
+twice or record two baselines. Each takes the series' row first, by writing a value to it that
+no run wrote before, because a cluster certifies only rows that were written
+(`DESIGN-database.md` § Retryable transactions).
 
 The hold is two settings, the analyzer drop share and floor, and both have to
 be passed. The share is of the leads the last comparable run saw; the floor

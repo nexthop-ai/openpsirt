@@ -436,6 +436,27 @@ func TestAFailureSignalOutsideTheCheckoutMakesTheRunNotComparable(t *testing.T) 
 	})
 }
 
+func TestTakingASeriesWritesItsRowEveryTime(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		taken := func() string {
+			t.Helper()
+			if err := series.NewStore(w.DB.DB).Take(t.Context(), run.ID); err != nil {
+				t.Fatal(err)
+			}
+			var by string
+			if err := w.DB.DB.NewSelect().Table("series").Column("taken_by").
+				Where(`"id" = ?`, run.SeriesID).Scan(t.Context(), &by); err != nil {
+				t.Fatal(err)
+			}
+			return by
+		}
+		if first, second := taken(), taken(); first == "" || first == second {
+			t.Errorf("taken by %q, then %q; want a new value each time", first, second)
+		}
+	})
+}
+
 func TestTwoRunsOfOneSeriesAreAppliedOneAfterTheOther(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
