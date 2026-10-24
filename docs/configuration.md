@@ -437,7 +437,7 @@ products = ["router-os", "switch-os"]
 
 | Part | Rule |
 |---|---|
-| Roles | `approver`, `assigner`, `public-read`, `private-read`, `public-triage`, `private-triage`, and `admin` and `audit`, which are held over the whole deployment |
+| Roles | `approver`, `assigner`, `public-read`, `private-read`, `internal-read`, `public-triage`, `private-triage`, `internal-triage`, and `admin` and `audit`, which are held over the whole deployment |
 | Products | By name, in any capitals. None means every product, including one declared later. A product nobody has declared yet is accepted, and grants from each member's next sign-in after a pipeline declares it. `admin` and `audit` take none |
 | A name holding `%`, `;`, `=`, `+`, `@` or `,` | Written percent-encoded in the variable, as `%25`, `%3B`, `%3D`, `%2B`, `%40` and `%2C`: `security%40example.com=audit`. A file writes the name as it is |
 | A source of groups | Required. Mappings with none of `OPENPSIRT_OIDC_GROUPS_CLAIM` beside an issuer, `OPENPSIRT_GITHUB_ORG` beside a GitHub client, or `OPENPSIRT_TRUSTED_GROUPS_HEADER` beside a trusted header stop the process |
