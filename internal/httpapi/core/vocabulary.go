@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -401,6 +402,18 @@ type Progress string
 
 // Schema offers every state an upload can reach.
 func (Progress) Schema(huma.Registry) *huma.Schema { return words(ingest.Progresses()) }
+
+// RunStatus is what became of an analyzer run.
+type RunStatus string
+
+// Schema offers every status a run can hold.
+func (RunStatus) Schema(huma.Registry) *huma.Schema { return words(series.Statuses()) }
+
+// RunReason is why an analyzer run's absences are not evidence.
+type RunReason string
+
+// Schema offers every reason a run is not comparable.
+func (RunReason) Schema(huma.Registry) *huma.Schema { return words(series.Reasons()) }
 
 // DocumentKind is what a document a build sent is.
 type DocumentKind string

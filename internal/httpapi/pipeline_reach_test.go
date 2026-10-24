@@ -32,6 +32,7 @@ func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	const build = "/v1/products/{product}/streams/{stream}/variants/{variant}"
 	sent := map[string]int{
 		build + "/scans":                             http.StatusOK,
+		build + "/analyses":                          http.StatusOK,
 		build + "/scans/{scan}/changes":              http.StatusOK,
 		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
 	}

@@ -4000,6 +4000,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/analyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List uploaded analyzer runs and their status
+         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see.
+         *
+         *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-analyses"];
+        put?: never;
+        /**
+         * Upload static analysis results
+         * @description Accepts one analyzer run as SARIF 2.1.0 documents in repeated multipart fields named `sarif`, each optionally compressed with gzip. The other fields fill what the documents leave unstated; where both state a value, the documents win.
+         *
+         *     The series names the analysis and is required, in the `series` field or as the part of each run's `automationDetails.id` before its last slash.
+         *
+         *     Returns 202 once the documents are read and stored, before any result is applied. Poll `GET .../analyses` for what the run did. The same documents for the same series and build answer 200 with the run they match.
+         *
+         *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone.
+         *
+         *     Requires: internal-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
+         */
+        post: operations["upload-analysis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/carried": {
         parameters: {
             query?: never;
@@ -6635,6 +6671,78 @@ export interface components {
             /** @description What to call it instead. Omitted leaves the name alone */
             name?: string;
         };
+        AnalysisReceiptBody: {
+            /** @description Whether this was the series' first comparable run */
+            baseline?: boolean;
+            /** @description The build time the run states, or the time it arrived where it states none */
+            built_at: string;
+            /** @description The commit analyzed */
+            commit?: string;
+            /** @description Whether the results this run did not report count as not reproduced. Absent until it is applied */
+            comparable?: boolean;
+            /** @description What the run did. Absent until it has been read */
+            counts?: components["schemas"]["Receipt"];
+            /** @description Why the run could not be applied, where it could not */
+            failure?: string;
+            /**
+             * @description Why they do not, where they do not
+             * @enum {string}
+             */
+            not_comparable?: "exit-status" | "incomplete" | "failure-signal" | "no-coverage" | "units-short" | "tool-changed" | "rules-changed";
+            /** @description The moment it arrived here */
+            received_at: string;
+            /**
+             * Format: int64
+             * @description The run this upload became
+             */
+            run_id: number;
+            /** @description The series the run belongs to */
+            series: string;
+            /**
+             * @description What became of it: waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed
+             * @enum {string}
+             */
+            status: "queued" | "waiting" | "applied" | "superseded" | "held" | "failed";
+            /** @description The analyzer that ran */
+            tool?: string;
+            /** @description Its version */
+            tool_version?: string;
+        };
+        AnalysisReceiptsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AnalysisReceiptsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AnalysisReceiptBody"][] | null;
+            /** Format: int64 */
+            total: number;
+        };
+        AnalysisResult: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AnalysisResult.json
+             */
+            readonly $schema?: string;
+            /** @description The build time the run states, or the time it arrived where it states none */
+            built_at: string;
+            /** @description Whether the run stated no build time, so the time it arrived orders it instead */
+            dated_on_arrival?: boolean;
+            /**
+             * @description Whether this upload was taken or matched one already held
+             * @enum {string}
+             */
+            outcome: "queued" | "already_held";
+            /**
+             * Format: int64
+             * @description The run this upload became, or the one it matched
+             */
+            run_id: number;
+            /** @description The series the run belongs to */
+            series: string;
+        };
         AnywhereOutputBody: {
             /**
              * Format: uri
@@ -7097,7 +7205,7 @@ export interface components {
             may_approve_rulings: boolean;
             /** @description Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage */
             may_assign: boolean;
-            /** @description Argue about a finding nobody has disclosed */
+            /** @description Triage a private finding, which nobody has disclosed */
             may_hide: boolean;
             /** @description Read findings here at any visibility */
             may_see: boolean;
@@ -11249,6 +11357,43 @@ export interface components {
              * @enum {string}
              */
             reason: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+        };
+        Receipt: {
+            /** @description What was left out of the results kept, by what it was: snippets, markdown, contents or fixes */
+            discarded?: {
+                [key: string]: number;
+            };
+            /** @description Results left out, by reason: advisory-identifier, outside-the-checkout, repeat or failure-signal */
+            dropped?: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Results the build held open that this comparable run did not report
+             */
+            not_reproduced: number;
+            /**
+             * Format: int64
+             * @description Results the run reported that the build did not hold open
+             */
+            opened: number;
+            /**
+             * Format: int64
+             * @description Of those seen again, the ones an earlier run had not reported
+             */
+            returned: number;
+            /** @description The dependency and secret scanners whose runs were left out whole */
+            scanners?: string[] | null;
+            /**
+             * Format: int64
+             * @description Results the build held open that the run reported again
+             */
+            seen: number;
+            /**
+             * Format: int64
+             * @description How many a held run would have marked not reproduced
+             */
+            would_mark?: number;
         };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */
@@ -19757,6 +19902,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyVariantBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-analyses": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisReceiptsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The declared product this build is of */
+                product: string;
+                /** @description The declared branch or tag */
+                stream: string;
+                /** @description The declared way that stream is built */
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** @description When the build was made, in RFC 3339. Runs are ordered by it */
+                    built?: string;
+                    /** @description The commit analyzed, at the top of the checkout */
+                    commit?: string;
+                    /** @description The analyzer's exit status, as a whole number */
+                    "exit-status"?: string;
+                    /** @description The rules enabled, one identifier per field */
+                    rules?: string[] | null;
+                    sarif: string[];
+                    /** @description Which analysis this is, the same for every build: the tool and its configuration */
+                    series?: string;
+                    /** @description The checkout's absolute path on the build host, which every path is placed against */
+                    "source-root"?: string;
+                    /** @description A path, relative to the checkout, holding code the product did not write */
+                    "third-party"?: string[] | null;
+                    /** @description The analyzer's version */
+                    "tool-version"?: string;
+                    /** @description How many it analyzed, as a whole number */
+                    "units-analyzed"?: string;
+                    /** @description How many translation units the run was meant to analyze, as a whole number */
+                    "units-expected"?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
                 };
             };
             /** @description Error */

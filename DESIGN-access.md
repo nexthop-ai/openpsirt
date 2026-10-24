@@ -118,7 +118,9 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 
 No consumer of vulnerability findings includes analysis results. The findings
 lists, reports, exports, published documents and the interface's screens read
-none, and the screens for working leads are not built. `DESIGN-kinds.md`
+none, and the screens for working leads are not built. A person sends an
+analyzer run where they hold `internal-triage` on the product, since every
+result opens internal. `DESIGN-kinds.md`
 § Consumers holds which kinds each consumer reads.
 
 ## Breadth of view
@@ -653,7 +655,7 @@ to ask.
 |---|---|---|
 | A person | A session cookie, or a username a trusted proxy asserts on every request | What their roles allow |
 | A person's own script | A token they minted | A narrowed view of what they may do |
-| A pipeline | An API key | Send scans, and read back what became of its own |
+| A pipeline | An API key | Send scans and analyzer runs, and read back what became of its own |
 | Anybody at all | None, and none is looked at | Read the security documents of the products that publish. § Anybody at all |
 
 A pipeline may send and nothing else — no reading findings, no triage, no
@@ -666,6 +668,7 @@ being applied correctly to it.
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
 | A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
+| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the leads a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
 | A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |
