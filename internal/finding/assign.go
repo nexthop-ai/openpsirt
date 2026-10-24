@@ -1125,8 +1125,8 @@ func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, a
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
 	return q.Where(where, args...)
 }
 
@@ -1144,8 +1144,8 @@ func orCarried(q *bun.SelectQuery, subject access.Subject, products []int64, all
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
 	if mine := subject.Mine(); len(mine) > 0 {
 		where = "(" + where + ` OR ("f"."assigned_to" IN (?) AND "f"."visibility" = ?))`
 		args = append(args, bun.List(mine), access.Public)

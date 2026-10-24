@@ -75,7 +75,8 @@ func (v *Vulnerabilities) recordOf(ctx context.Context, reports []Named) (*onRec
 	}
 	if err := v.db.NewSelect().Model(&held.filed).
 		Column("id", "identifier_folded", "issue_id").
-		Where(`"vu"."identifier_folded" IN (?)`, bun.List(folded)).Scan(ctx); err != nil {
+		Where(`"vu"."identifier_folded" IN (?)`, bun.List(folded)).
+		Where(`"vu"."kind" IN (?)`, bun.List(reportedIssues())).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("look up these vulnerabilities by the names they are filed under: %w", err)
 	}
 	reached := map[int64]bool{}

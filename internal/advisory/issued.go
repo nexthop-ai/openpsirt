@@ -186,8 +186,8 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
 	bound := append([]any{finding.Entered}, args...)
 	bound = append(bound, access.Private)
 	bound = append(bound, args...)

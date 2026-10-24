@@ -82,3 +82,11 @@ func StopV090AfterDropping(ctx context.Context, db *database.DB, tables ...strin
 	}
 	return nil
 }
+
+// StatementsV0110 is v0.11.0's declaration of each table it changes.
+func StatementsV0110(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{
+		"vulnerability": vulnerabilityV0110(t),
+	}
+}

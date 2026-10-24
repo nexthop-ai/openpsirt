@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
 	"time"
 
@@ -196,8 +195,10 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 		t.Error("private triage triages disclosed work too")
 	}
 
-	// The narrowing sorts each product by what it allows there.
-	both, public, private := access.Split([]int64{3, 4, 5, 6}, func(v access.Visibility, id int64) bool {
+	// The narrowing sorts each product by what it allows there: the product
+	// alone where everything is allowed, the product and one visibility, and
+	// the product and the visibilities it allows where those are several.
+	readings := access.Split([]int64{3, 4, 5, 6, 7, 8}, func(v access.Visibility, id int64) bool {
 		switch id {
 		case 3:
 			return true
@@ -205,14 +206,22 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 			return v == access.Public
 		case 5:
 			return v == access.Private
+		case 7:
+			return v != access.Internal
+		case 8:
+			return v == access.Internal
 		}
 		return false
 	})
-	if !slices.Equal(both, []int64{3}) || !slices.Equal(public, []int64{4}) ||
-		!slices.Equal(private, []int64{5}) {
-		t.Errorf("split into %v, %v, %v; want [3], [4], [5]", both, public, private)
+	where, args := access.VisibleWhere("p", "v", readings)
+	want := "(p IN (?) OR (p IN (?) AND v = ?) OR (p IN (?) AND v = ?) OR (p IN (?) AND v IN (?)) OR (p IN (?) AND v = ?))"
+	if where != want {
+		t.Errorf("split into %q; want %q", where, want)
 	}
-	if where, _ := access.VisibleWhere("p", "v", nil, nil, nil); where != "1 = 0" {
+	if len(args) != 9 || args[2] != access.Public || args[4] != access.Private || args[8] != access.Internal {
+		t.Errorf("split binds %v", args)
+	}
+	if where, _ := access.VisibleWhere("p", "v", access.Split(nil, nil)); where != "1 = 0" {
 		t.Errorf("nothing allowed narrows to %q, want a condition nothing meets", where)
 	}
 }

@@ -293,10 +293,10 @@ func visibleCondition(subject access.Subject, product, visibility, vulnerability
 		}
 		return "1 = 0", nil
 	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
+	readings := access.Split(products, func(v access.Visibility, id int64) bool {
 		return allowed(subject, id, v)
 	})
-	where, args := access.VisibleWhere(product, visibility, both, public, private)
+	where, args := access.VisibleWhere(product, visibility, readings)
 	if cases {
 		where, args = orBrought(subject, where, args, product, vulnerability)
 	}
