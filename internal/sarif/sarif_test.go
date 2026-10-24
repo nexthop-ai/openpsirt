@@ -218,6 +218,44 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 	}
 }
 
+func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
+	step := `{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}}`
+	notice := func(id string) string { return `{"level":"error","descriptor":{"id":"` + id + `"}}` }
+	rules := func(rules string) string {
+		return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[` + rules + `]}}}]}`
+	}
+	// held is everything the document holds: its run, and what each case
+	// names, two of the kind it is for.
+	for name, c := range map[string]struct {
+		doc  string
+		held int
+	}{
+		"invocations":     {run(`,"invocations":[{},{}]`), 3},
+		"repositories":    {run(`,"versionControlProvenance":[{},{}]`), 3},
+		"starting points": {run(`,"originalUriBaseIds":{"A":{},"B":{}}`), 3},
+		"rules":           {rules(`{},{}`), 3},
+		"message strings": {rules(`{"messageStrings":{"a":{"text":"x"},"b":{"text":"y"}}}`), 4},
+		"tags":            {rules(`{"properties":{"tags":["a","b"]}}`), 4},
+		"arguments":       {run(`,"results":[{"message":{"text":"x","arguments":["a","b"]}}]`), 4},
+		"fingerprints":    {run(`,"results":[{"partialFingerprints":{"a":"1","b":"2"}}]`), 4},
+		"kept steps": {run(`,"results":[{"codeFlows":[{"threadFlows":[{"locations":[` + step + `,` + step + `]}]}]}]`),
+			4},
+		"notified rules": {run(`,"invocations":[{"toolExecutionNotifications":[` + notice("a") + `,` + notice("b") + `]}]`),
+			4},
+		"changed repositories": {run(`,"properties":{"openpsirt/changed":["a","b"]}`), 3},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lim := limits()
+			lim.MaxHeld = c.held
+			if _, err := NewUpload(lim).Read(strings.NewReader(c.doc)); err != nil {
+				t.Fatalf("refused holding %d at a bound of %d: %v", c.held, c.held, err)
+			}
+			lim.MaxHeld = c.held - 1
+			refused(t, c.doc, lim, "other entries across the upload's documents")
+		})
+	}
+}
+
 func TestATextPastItsBoundIsCut(t *testing.T) {
 	long := strings.Repeat("é", 200)
 	r := read(t, run(`,"results":[{"message":{"text":"`+long+`"}}]`)).Runs[0]
