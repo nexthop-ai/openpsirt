@@ -99,7 +99,7 @@ func (p Placed) Hold(ctx context.Context, store *series.Store, runID int64) erro
 }
 
 // inventoryWait is how long a run waits for its build's inventory before it
-// fails. A waiting run's job and documents are held while it waits, so a
+// fails. A waiting run's job and placed results are held while it waits, so a
 // series analyzed on a build that is never inventoried would otherwise hold
 // one of each per upload for good.
 const inventoryWait = 24 * time.Hour

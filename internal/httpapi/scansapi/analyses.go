@@ -85,7 +85,8 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"documents leave unstated; where both state a value, the documents win.\n\n" +
 			"The series names the analysis and is required, in the `series` field or as the part " +
 			"of each run's `automationDetails.id` before its last slash.\n\n" +
-			"Returns 202 once the documents are read and stored, before any result is applied. " +
+			"Returns 202 once the documents are read and their results placed and stored, before any result " +
+			"is applied. The documents themselves are not stored. " +
 			"Poll `GET .../analyses` for what the run did. The same documents for the same series " +
 			"and build answer 200 with the run they match.\n\n" +
 			"A dependency or secret scanner's run is left out and named on the receipt; this " +

@@ -78,7 +78,7 @@ func (s *Store) Write(ctx context.Context, runID int64, ordinal int, r io.Reader
 }
 
 // Documents is a run's documents still held whole, in the order they were
-// sent.
+// written.
 func (s *Store) Documents(ctx context.Context, runID int64) ([]Document, error) {
 	var docs []Document
 	err := s.db.NewSelect().Model(&docs).
