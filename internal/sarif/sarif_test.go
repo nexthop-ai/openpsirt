@@ -547,7 +547,9 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 		{"ruleIndex":1},
 		{"ruleId":"e0","ruleIndex":0},
 		{"ruleId":"r0","rule":{"toolComponent":{"index":0}}},
-		{"ruleId":"zz","ruleIndex":0}],
+		{"ruleId":"zz","ruleIndex":0},
+		{"ruleId":"r0/md5","ruleIndex":0},
+		{"ruleId":"r0x/md5"}],
 	"tool":{"driver":{"name":"t","rules":[{"id":"r0","defaultConfiguration":{"level":"note"}}]},
 		"extensions":[{"name":"pack","rules":[
 			{"id":"e0","defaultConfiguration":{"level":"error"}},
@@ -559,6 +561,8 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 		{"e0", "error"},
 		{"r0", "warning"},
 		{"zz", "warning"},
+		{"r0/md5", "note"},
+		{"r0x/md5", "warning"},
 	} {
 		if got := r.Results[i]; got.RuleID != want.id || got.Level != want.level {
 			t.Errorf("result %d: rule %q at %q; want %q at %q", i, got.RuleID, got.Level, want.id, want.level)

@@ -385,7 +385,8 @@ func (rd *reader) settle(run *Run, waiting []pending) error {
 }
 
 // ruleOf is the rule a result cites. Its identifier is looked for first,
-// within the component the result names where it names one. A position is
+// whole and then by its leading components, within the component the result
+// names where it names one. A position is
 // read only where the result states no identifier, and only within the
 // component it names: the driver, where it names none.
 func ruleOf(rules []Rule, byID map[string][]int, byComponent map[int][]int, id string, p pending) *Rule {
@@ -393,13 +394,19 @@ func ruleOf(rules []Rule, byID map[string][]int, byComponent map[int][]int, id s
 	if p.ruleComponent != nil {
 		component = *p.ruleComponent + 1
 	}
-	if id != "" {
-		for _, j := range byID[id] {
+	// A hierarchical identifier names a rule by its leading components:
+	// "CA5350/md5" is reported under the rule "CA5350".
+	for cut := id; cut != ""; {
+		for _, j := range byID[cut] {
 			if p.ruleComponent == nil || rules[j].component == component {
 				return &rules[j]
 			}
 		}
-		return nil
+		i := strings.LastIndexByte(cut, '/')
+		if i <= 0 {
+			return nil
+		}
+		cut = cut[:i]
 	}
 	if p.ruleIndex == nil {
 		return nil
