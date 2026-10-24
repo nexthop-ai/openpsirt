@@ -182,7 +182,9 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 	s.unnarrowed = false
 	// And the case's write half goes unless a triage role was named, for the
 	// same reason: what a token carries is what it was asked to carry, and a
-	// case grant writes without any role at all.
+	// case grant writes without any role at all. Internal triage does not
+	// count: a case is about disclosed and undisclosed work, and internal
+	// material is no part of one.
 	s.casesReadOnly = !wanted[PublicTriage] && !wanted[PrivateTriage]
 	return s
 }

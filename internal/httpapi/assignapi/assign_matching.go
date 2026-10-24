@@ -50,17 +50,23 @@ func recipient(err error, otherwise func(error) error) error {
 	return otherwise(err)
 }
 
-// personAdmits refuses handing a person work some of which is undisclosed in a
-// product where they may not read undisclosed work: the hand-over would be the
-// disclosure. Asked through the transaction that hands the work over.
+// personAdmits refuses handing a person work some of which is undisclosed, or
+// internal, in a product where they may not read work of that visibility: the
+// hand-over would be the disclosure. Asked through the transaction that hands
+// the work over.
 func personAdmits(person *access.Account, productID int64) finding.Admits {
 	return func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
-		if strictest != access.Private {
+		if strictest == access.Public {
 			return nil
 		}
 		reads, err := access.NewStore(db).PersonReads(ctx, person.ID, productID, strictest)
 		if err != nil {
 			return err
+		}
+		if !reads && strictest == access.Internal {
+			return errRecipient{huma.Error422UnprocessableEntity(
+				"some of this is internal and they may not read internal work here, " +
+					"so handing it to them would show it to them")}
 		}
 		if !reads {
 			return errRecipient{huma.Error422UnprocessableEntity(

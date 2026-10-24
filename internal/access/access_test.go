@@ -226,6 +226,56 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 	}
 }
 
+// Internal material is read and triaged under roles of its own, and neither
+// of the other visibilities carries it. Anybody at all reading what is
+// published reads none of it.
+func TestReadingInternalIsNotReadingEitherOther(t *testing.T) {
+	analyst := access.NewPerson(8, "analyst", false, map[int64][]access.Role{
+		4: {access.InternalRead},
+		5: {access.InternalTriage},
+		6: {access.PublicTriage, access.PrivateTriage},
+	}, 80)
+
+	for _, product := range []int64{4, 5} {
+		if !analyst.Reads(access.Internal, product) {
+			t.Errorf("product %d: internal work is not read", product)
+		}
+		if analyst.Reads(access.Public, product) || analyst.Reads(access.Private, product) {
+			t.Errorf("product %d: an internal grant read disclosed or undisclosed work", product)
+		}
+		if !analyst.ReadsIn(product) || !analyst.Sees(product) {
+			t.Errorf("product %d: an internal grant does not make the product readable", product)
+		}
+		if got := access.Visible(analyst, product); len(got) != 1 || got[0] != access.Internal {
+			t.Errorf("product %d: visible is %v, want only internal work", product, got)
+		}
+	}
+	if analyst.Triages(access.Internal, 4) || analyst.TriagesIn(4) {
+		t.Error("reading internal work triages it")
+	}
+	if !analyst.Triages(access.Internal, 5) || !analyst.TriagesIn(5) {
+		t.Error("internal triage does not triage internal work")
+	}
+	if analyst.Triages(access.Private, 5) || analyst.Triages(access.Public, 5) {
+		t.Error("internal triage triages disclosed or undisclosed work too")
+	}
+	// Triage at both disclosed visibilities is not internal triage.
+	if analyst.Reads(access.Internal, 6) || analyst.Triages(access.Internal, 6) {
+		t.Error("public and private triage reached internal work")
+	}
+
+	published := access.Published([]int64{4, 5, 6})
+	for _, product := range []int64{4, 5, 6} {
+		if published.Reads(access.Internal, product) {
+			t.Errorf("product %d: anybody at all reads internal work", product)
+		}
+		if !published.Reads(access.Public, product) {
+			t.Errorf("product %d: anybody at all does not read disclosed work, so the "+
+				"refusal above is not the visibility", product)
+		}
+	}
+}
+
 func TestACapabilityHandsOverNoVisibility(t *testing.T) {
 	// Approving and assigning are things somebody may do, bounded by what they
 	// may read. Otherwise granting the ability to approve would quietly grant

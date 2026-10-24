@@ -494,10 +494,11 @@ type SettingSection string
 // Schema offers every section, in the order a screen shows them.
 func (SettingSection) Schema(huma.Registry) *huma.Schema { return words(setting.Sections()) }
 
-// Visibility is whether something has been disclosed.
+// Visibility is whether something has been disclosed, or is internal material
+// disclosure never applies to.
 type Visibility string
 
-// Schema offers both visibilities, disclosed first.
+// Schema offers every visibility, disclosed first.
 func (Visibility) Schema(huma.Registry) *huma.Schema { return words(access.Visibilities()) }
 
 // ChangeKind is what one scan did to one name.

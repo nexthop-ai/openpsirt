@@ -301,7 +301,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"of its issue on the component at its version at the next scan, unless it is " +
 			"declined. At most 200.",
 		Tags: []string{"Triage"},
-	}, core.PerProduct, "", core.ReadRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", core.DisclosureReadRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Component string `path:"component"`
 	}) (*core.ListOutput[UpstreamSaidBody], error) {
@@ -341,7 +341,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"422; answer a supplier's statement by proposing a claim about the place. A " +
 			"statement in a product the caller does not triage is answered 404.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
-	}, core.AnyPerson, "", core.TriageRights()...), declineHandler(in, true))
+	}, core.AnyPerson, "", core.DisclosureTriageRights()...), declineHandler(in, true))
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "restore-statement", Method: http.MethodDelete,
@@ -352,7 +352,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			"Recorded in the administrative trail.\n\n" +
 			"A statement in a product the caller does not triage is answered 404.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
-	}, core.AnyPerson, "", core.TriageRights()...), declineHandler(in, false))
+	}, core.AnyPerson, "", core.DisclosureTriageRights()...), declineHandler(in, false))
 }
 
 // declineHandler declines one statement an upstream published, or restores it.

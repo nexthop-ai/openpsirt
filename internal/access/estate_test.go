@@ -152,3 +152,30 @@ func TestAnEstateRoleIsSetAsideAndRestoredByAModeSwitch(t *testing.T) {
 		}
 	})
 }
+
+// An internal role held across every product reads internal work in each, and
+// nothing else in any of them.
+func TestAnInternalEstateRoleReadsInternalWorkAlone(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "the-analysts", "The Analysts", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantEstateRole(ctx, person.ID, access.InternalTriage); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := f.store.Resolve(ctx, "the-analysts")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, product := range []int64{f.products["sonic"], f.products["onie"]} {
+			if !subject.Triages(access.Internal, product) || !subject.Reads(access.Internal, product) {
+				t.Errorf("product %d: internal triage across the estate does not reach it", product)
+			}
+			if subject.Reads(access.Public, product) || subject.Reads(access.Private, product) {
+				t.Errorf("product %d: internal triage across the estate read other work", product)
+			}
+		}
+	})
+}

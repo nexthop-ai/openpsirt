@@ -148,9 +148,10 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 		hidden := r.Embargoed(t)
 
 		type can struct {
-			MayAgree      bool `json:"may_agree"`
-			AgreesPublic  bool `json:"agrees_public"`
-			AgreesPrivate bool `json:"agrees_private"`
+			MayAgree       bool `json:"may_agree"`
+			AgreesPublic   bool `json:"agrees_public"`
+			AgreesPrivate  bool `json:"agrees_private"`
+			AgreesInternal bool `json:"agrees_internal"`
 		}
 		session := func(who string) can {
 			t.Helper()
@@ -174,6 +175,9 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 			"reviewer":       {MayAgree: true, AgreesPublic: true, AgreesPrivate: false},
 			"embargo-reader": {MayAgree: false, AgreesPublic: false, AgreesPrivate: false},
 			"private-triage": {MayAgree: true, AgreesPublic: true, AgreesPrivate: true},
+			// Internal triage agrees about internal work and nothing else.
+			"internal-triager": {MayAgree: true, AgreesInternal: true},
+			"internal-reader":  {},
 		} {
 			if got := session(who); got != want {
 				t.Errorf("the session describes %s's agreeing as %+v, want %+v", who, got, want)

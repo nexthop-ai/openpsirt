@@ -158,8 +158,10 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 			PersonID: who, Kind: notify.Mentioned,
 			Body: fmt.Sprintf("%s named you in a note on %s.",
 				whoever(subject), about.About),
-			Link:     link,
-			Private:  about.Visibility == access.Private,
+			Link: link,
+			// Anything not disclosed carries no detail out of the
+			// deployment, internal material included.
+			Private:  about.Visibility != access.Public,
 			Concerns: notify.Concerning(about.ProductID, about.VulnerabilityID, 0),
 			// The same two as columns. Concerns is a string a digest
 			// matches on; these are what a read narrows by, and a
