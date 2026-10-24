@@ -89,21 +89,25 @@ func (p Placed) encode(w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	out.Write(head[:len(head)-1])
-	out.WriteString(`,"results":[`)
+	head = append(head[:len(head)-1], `,"results":[`...)
+	if _, err := out.Write(head); err != nil {
+		return err
+	}
 	for i := range results {
-		if i > 0 {
-			out.WriteByte(',')
-		}
 		one, err := json.Marshal(&results[i])
 		if err != nil {
 			return err
+		}
+		if i > 0 {
+			one = append([]byte{','}, one...)
 		}
 		if _, err := out.Write(one); err != nil {
 			return err
 		}
 	}
-	out.WriteString("]}")
+	if _, err := out.WriteString("]}"); err != nil {
+		return err
+	}
 	return out.Flush()
 }
 
