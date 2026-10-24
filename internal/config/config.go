@@ -170,6 +170,7 @@ type Config struct {
 	AnalysisMaxProperties int
 	AnalysisMaxText       int
 	AnalysisMaxDepth      int
+	AnalysisMaxHeld       int
 	// BootstrapAdmins are granted administrator at every startup, not only the
 	// first. Applying it every time makes it the way back in for an operator
 	// who has locked themselves out: add yourself, restart. For software
@@ -413,6 +414,7 @@ func load(given map[string]string) (Config, error) {
 		AnalysisMaxProperties: r.number("ANALYSIS_MAX_PROPERTIES", 0),
 		AnalysisMaxText:       r.number("ANALYSIS_MAX_TEXT", 0),
 		AnalysisMaxDepth:      r.number("ANALYSIS_MAX_DEPTH", 0),
+		AnalysisMaxHeld:       r.number("ANALYSIS_MAX_HELD", 0),
 
 		QueueMaxAttempts:  r.number("QUEUE_MAX_ATTEMPTS", queueing.MaxAttempts),
 		QueueClaimTimeout: r.duration("QUEUE_CLAIM_TIMEOUT", queueing.ClaimTimeout),

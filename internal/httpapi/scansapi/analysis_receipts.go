@@ -27,7 +27,7 @@ type AnalysisReceiptBody struct {
 	Commit     string         `json:"commit,omitempty" doc:"The commit analyzed"`
 	BuiltAt    string         `json:"built_at" doc:"The build time the run states, or the time it arrived where it states none"`
 	ReceivedAt string         `json:"received_at" doc:"The moment it arrived here"`
-	Status     core.RunStatus `json:"status" doc:"What became of it: waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed"`
+	Status     core.RunStatus `json:"status" doc:"What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed"`
 	Failure    string         `json:"failure,omitempty" doc:"Why the run could not be applied, where it could not"`
 	// Comparable is absent until the run is applied.
 	Comparable    *bool          `json:"comparable,omitempty" doc:"Whether the results this run did not report count as not reproduced. Absent until it is applied"`
@@ -78,7 +78,7 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that build could not be looked up", err)
 		}
 		sent, total, err := series.NewStore(in.DB.DB).Receipts(ctx, subject, named.ProductID, target.ID,
-			kind.Analysis, access.Internal, input.Limit, input.Offset)
+			kind.Analysis, analysis.OpensAt, input.Limit, input.Offset)
 		switch {
 		case errors.Is(err, access.ErrDenied):
 			return nil, core.NothingScannedThere()

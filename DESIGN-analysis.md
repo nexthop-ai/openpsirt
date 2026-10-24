@@ -40,7 +40,7 @@ POST /v1/products/{product}/streams/{stream}/variants/{variant}/analyses
 |---|---|
 | Its own operation beside the scan upload | Analysis runs on its own schedule, often in another job from the inventory |
 | A pipeline key covering the build sends it; a person sends where they hold `internal-triage` on the product | Every result opens internal |
-| The documents are read at the door and stored as they arrived, compressed or not; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, and applying waits for the build's inventory |
+| The documents are read at the door and stored as they arrived, compressed or not, until the run is applied or ends; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, and applying waits for the build's inventory |
 | A retired product, release or variant takes no run, and a queue past its backlog answers 503 | The scan upload's rules, for the same reasons |
 | The fields fill what the documents leave unstated, and the documents win where both state a value | The upload client writes them into the SARIF; a plain producer passes them beside it |
 | The series is required, from the field or from each run's `automationDetails.id`, written `<series>/<built>` | It is what the next run is compared against |
@@ -54,7 +54,7 @@ Answers:
 |---|---|
 | 202 `queued` | Stored and waiting to be applied |
 | 200 `already_held` | The same documents for the same series, build and build time, answered as the run they repeat |
-| 422 | A document or a field could not be read; the detail names which |
+| 422 | A document or a field could not be read, or the series name is longer than a name may be; the detail names which |
 | 409 | The product, release or variant is retired |
 | 503 | The queue is past its backlog |
 
@@ -62,18 +62,23 @@ Answers:
 
 A SARIF document is hostile input (REQ-69). Each bound is configuration,
 `docs/configuration.md` § Analyzer result limits lists them with their
-defaults, and a document past one is refused with the bound named.
+defaults, and an upload past one is refused with the bound named.
+
+An upload's documents are read whole before any of it is stored, so what they
+hold is in memory at once. The bytes and the entries held are bounded across
+the upload for that reason, and are memory figures.
 
 | Bound | On |
 |---|---|
-| Bytes | The request, compressed, and each document once decompressed |
-| Documents | Per upload. clang writes one per translation unit, and the upload client merges them into one |
+| Bytes | The request, compressed; and the upload's documents together once decompressed, counting the text each result is worded with from its rule's message strings |
+| Entries held | The upload's documents together: runs, results, rules, locations, kept flow steps, invocations, and the members of every list and map they carry. Each costs memory however few bytes of the document it took |
+| Documents | Per upload. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent |
 | Runs | Per document |
 | Results, rules, repositories, named starting points | Per run |
 | Locations and related locations, flow steps | Per result |
 | Starting-point chains | How many named starting points one path passes through. A chain that loops refuses the document |
 | Property members | Per property bag |
-| Text | Per message or description; a longer one is cut rather than refused |
+| Text | Per message or description; a longer one is cut. Filling a message string's placeholders stops at this length |
 | Depth | Nesting of the JSON |
 
 ## Run contents
@@ -83,12 +88,16 @@ defaults, and a document past one is refused with the bound named.
 | A run from a dependency or secret scanner is left out whole and named on the receipt | This upload takes static analysis alone; an inventory goes to the scan upload |
 | An upload whose every run is a scanner's fails | Nothing in it is analysis |
 | A run whose `results` is absent or null fails | SARIF's own distinction: absent is a tool that did not start, `[]` is one that ran and found nothing |
+| A result's rule is found by its identifier, within the tool component the result names where it names one; a position in a rule list is read only where the result states no identifier, and only within the component it names, the driver where it names none | Each extension numbers its own rules from zero |
 | A result whose rule is an advisory's identifier is dropped and counted | A scanner's finding wearing an analyzer's clothes would be filed as a rule |
+| A result that is the tool's own failure is dropped, counted, and makes the run not comparable, wherever it is and whether or not it names a file | `clang-diagnostic-error`, `syntaxError`, `internalAstError`, `cppcheckError` and `preprocessorErrorDirective` say a unit was not analyzed; a generated header outside the checkout fails a unit as surely as a file in it |
+| A result whose kind is `pass`, `notApplicable` or `informational` is dropped and counted as `not-a-problem` | It reports no problem. A result stating no kind is a `fail`, and `review` and `open` ask a person to settle it |
+| A result covered by a suppression in force is dropped and counted as `suppressed` | A suppression stating no status, or `accepted`, is the tool honoring a person's decision in the source; one `underReview` or `rejected` is not in force |
+| A result whose `baselineState` is `absent` is dropped and counted as `absent` | The tool says it is no longer found, and opening it would leave a lead no later run could find again |
 | A path is resolved through its named starting points and placed against the source root | Paths arrive absolute, as `file://` addresses, relative to the working directory, and under a starting point left undefined |
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
-| A result that is the tool's own failure is dropped, counted, and makes the run not comparable | `clang-diagnostic-error`, `syntaxError`, `internalAstError`, `cppcheckError` and `preprocessorErrorDirective` say a unit was not analyzed |
-| Snippets, whole-file contents, fixes and markdown messages are discarded on arrival, and counted on the receipt | Source does not enter the deployment |
+| Snippets, whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | Source enters no finding, no lead's description and no receipt. The stored documents hold them until the run ends (§ Limits) |
 | The source root is held on the run until the run is read, and cleared after | It is a path on somebody's build host |
 
 ## Run parameters
@@ -128,11 +137,15 @@ documents are read again before it, since they do not change once stored.
 
 | State | When |
 |---|---|
-| `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later |
+| `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival |
 | `superseded` | The series has applied a run to this build built at or after this one. Nothing changes |
 | `held` | A comparable run would mark more of the build's open leads not reproduced than the deployment allows at once. Nothing changes |
-| `failed` | The documents could not be read, every run was a scanner's, or a run stated no results |
+| `failed` | The documents could not be read, every run was a scanner's, a run stated no results, or the build had no inventory read within a day of the run arriving |
 | `applied` | Results matched, opened and recorded |
+
+Two runs of one series are applied one after the other. Each reads what the
+series last saw and writes what it sees, so two at once would open one result
+twice or record two baselines.
 
 The hold is two settings, the analyzer drop share and floor, and both have to
 be passed. The share is of the leads the last comparable run saw; the floor
@@ -228,6 +241,7 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | Exact matching churns where an analyzer writes no fingerprint | clang-tidy, and clang before 22, give rule, path, line and message alone; every line moved above a result reopens it as a new lead |
 | Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
-| A run waiting for an inventory waits for as long as none is read | It is handed back each minute, and its job is never set aside |
-| The bounds' defaults are a judgment, not a measurement of the largest real producer | They are several times the fixtures here. A deployment analyzing a large tree raises them |
+| A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its documents |
+| The documents are stored as they arrived until the run ends | A snippet, a file's contents, or a secret a scanner's run carries sits in the database and its backups until the run is applied, superseded, held or failed: at most a day and the time a job takes |
+| The bounds' defaults are a judgment | They are several times the fixtures here and are not measured against the largest real producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

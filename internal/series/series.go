@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -167,6 +168,9 @@ func (s *Store) Receive(ctx context.Context, a Arriving) (*Run, bool, error) {
 	if typed == "" {
 		return nil, false, ErrUnnamed
 	}
+	if n := utf8.RuneCountInString(typed); n > database.NameWidth {
+		return nil, false, refusal.Errorf("the series name is %d characters, and one may be at most %d", n, database.NameWidth)
+	}
 	if a.BuiltAt.After(s.now().Add(futureTolerance)) {
 		return nil, false, ErrBuiltInFuture
 	}
@@ -305,6 +309,19 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 	return nil
 }
 
+// Take holds a run's series until the transaction ends, so two runs of one
+// series are applied one after the other. Each reads what the series last
+// saw, and two at once would both read it before either wrote: one result
+// opened twice, or two baselines.
+func (s *Store) Take(ctx context.Context, runID int64) error {
+	if _, err := s.db.NewUpdate().Table("series").Set(`"name" = "name"`).
+		Where(`"id" = (SELECT "sr"."series_id" FROM "series_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("take the series of run %d: %w", runID, err)
+	}
+	return nil
+}
+
 // Modules records the repositories a run's checkout held.
 func (s *Store) Modules(ctx context.Context, runID int64, modules []Module) error {
 	if len(modules) == 0 {
@@ -313,7 +330,7 @@ func (s *Store) Modules(ctx context.Context, runID int64, modules []Module) erro
 	for i := range modules {
 		modules[i].RunID = runID
 	}
-	if _, err := s.db.NewInsert().Model(&modules).Exec(ctx); err != nil {
+	if err := database.InBatchesUnkeyed(ctx, s.db, modules); err != nil {
 		return fmt.Errorf("record the repositories run %d held: %w", runID, err)
 	}
 	return nil

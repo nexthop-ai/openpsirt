@@ -172,8 +172,8 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 			component = id
 		}
 		rows[i] = finding.Finding{
-			TargetID: run.TargetID, Kind: opensAs.kind, VulnerabilityID: rules[k.Rule],
-			Visibility: opensAs.visibility, ComponentID: component, PlaceIdentity: place,
+			TargetID: run.TargetID, Kind: kind.Analysis, VulnerabilityID: rules[k.Rule],
+			Visibility: OpensAt, ComponentID: component, PlaceIdentity: place,
 			OpenedAt: now,
 		}
 	}

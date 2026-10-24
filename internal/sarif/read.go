@@ -4,6 +4,7 @@
 package sarif
 
 import (
+	"errors"
 	"io"
 	"strings"
 
@@ -12,10 +13,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// Limits bounds one document. A count past its bound refuses the document;
-// a text past its bound is cut.
+// Limits bounds one upload's documents. A count past its bound refuses the
+// document; a text past its bound is cut.
 type Limits struct {
-	// MaxBytes is the document's size once decompressed.
+	// MaxBytes is the upload's documents' size once decompressed, together
+	// with the text their results are worded with from their rules' message
+	// strings.
 	MaxBytes int64
 	MaxDepth int
 	MaxRuns  int
@@ -36,13 +39,19 @@ type Limits struct {
 	MaxProperties int
 	// MaxText is the longest message or description kept, in bytes.
 	MaxText int
+	// MaxHeld is how many things the upload's documents hold together:
+	// results, rules, locations, steps, invocations and the members of
+	// every list and map they carry. Each costs memory however little of the
+	// document it took, so this is the bound on what reading holds beyond
+	// the text.
+	MaxHeld int
 }
 
 // DefaultLimits are the bounds a reader uses where it is given none.
 //
-// The heap a result costs is its locations and steps, so results and steps
-// are bounded together: a run at every ceiling at once is the largest thing
-// read, and none is close to it.
+// A thing held costs about 200 bytes of memory however few bytes of the
+// document it took, so MaxHeld at its default bounds that to about 200 MB on
+// top of MaxBytes.
 func DefaultLimits() Limits {
 	return Limits{
 		MaxBytes:      256 << 20,
@@ -57,12 +66,13 @@ func DefaultLimits() Limits {
 		MaxChain:      16,
 		MaxProperties: 256,
 		MaxText:       16 << 10,
+		MaxHeld:       1_000_000,
 	}
 }
 
 // DefaultDocuments is how many documents one upload may carry where nobody
-// has said. The upload client merges a tool's per-unit documents into one
-// run, so a plain upload of one document per unit meets this.
+// has said. A tool writing a document per unit has them merged into one
+// before they are sent.
 const DefaultDocuments = 16
 
 // OrDefault fills in anything left unset, so a caller that wants one bound
@@ -73,7 +83,7 @@ func (l Limits) OrDefault() Limits {
 		{&l.MaxDepth, &d.MaxDepth}, {&l.MaxRuns, &d.MaxRuns}, {&l.MaxResults, &d.MaxResults},
 		{&l.MaxRules, &d.MaxRules}, {&l.MaxLocations, &d.MaxLocations}, {&l.MaxSteps, &d.MaxSteps},
 		{&l.MaxModules, &d.MaxModules}, {&l.MaxBases, &d.MaxBases}, {&l.MaxChain, &d.MaxChain},
-		{&l.MaxProperties, &d.MaxProperties}, {&l.MaxText, &d.MaxText},
+		{&l.MaxProperties, &d.MaxProperties}, {&l.MaxText, &d.MaxText}, {&l.MaxHeld, &d.MaxHeld},
 	} {
 		if *f.v <= 0 {
 			*f.v = *f.d
@@ -85,23 +95,83 @@ func (l Limits) OrDefault() Limits {
 	return l
 }
 
-// Read reads one document.
-func Read(r io.Reader, lim Limits) (Log, error) {
-	b := docread.NewJSON(r, lim.MaxBytes, lim.MaxDepth)
-	rd := reader{b: b, lim: lim}
-	log, err := rd.log()
+// Upload reads the documents of one upload within one budget. What they
+// hold is in memory at once, so their size, the text worded for their
+// results and what they hold are bounded across the upload together.
+type Upload struct {
+	lim Limits
+	// bytes is what the documents read so far took once decompressed, and
+	// the text worded for their results.
+	bytes int64
+	held  int
+}
+
+// NewUpload is an upload that has read nothing.
+func NewUpload(lim Limits) *Upload { return &Upload{lim: lim} }
+
+// Read reads the upload's next document, compressed with gzip or not.
+func (u *Upload) Read(r io.Reader) (Log, error) {
+	left := u.lim.MaxBytes - u.bytes
+	plain, err := gunzipped(r, left)
 	if err != nil {
-		return Log{}, b.Refused("reading SARIF", err)
+		return Log{}, err
 	}
-	if err := b.End(); err != nil {
+	counted := &counting{r: plain}
+	b := docread.NewJSON(counted, left, u.lim.MaxDepth)
+	rd := reader{b: b, lim: u.lim, up: u, read: counted}
+	log, err := rd.log()
+	if err == nil {
+		err = b.End()
+	}
+	u.bytes += counted.n
+	switch {
+	case errors.Is(err, docread.ErrTooLarge) && left < u.lim.MaxBytes, err == nil && u.bytes > u.lim.MaxBytes:
+		return Log{}, over(uploadBytes, int(u.lim.MaxBytes))
+	case err != nil:
 		return Log{}, b.Refused("reading SARIF", err)
 	}
 	return log, nil
 }
 
+// uploadBytes is what the bound on an upload's size counts.
+const uploadBytes = "bytes across the upload's documents and the text worded for their results"
+
+// counting counts what passes through it.
+type counting struct {
+	r io.Reader
+	n int64
+}
+
+func (c *counting) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += int64(n)
+	return n, err
+}
+
 type reader struct {
-	b   *docread.JSON
-	lim Limits
+	b    *docread.JSON
+	lim  Limits
+	up   *Upload
+	read *counting
+}
+
+// hold counts one more thing held, refusing the upload past the bound.
+func (rd *reader) hold() error {
+	rd.up.held++
+	if rd.up.held > rd.lim.MaxHeld {
+		return over("results, locations and other entries across the upload's documents", rd.lim.MaxHeld)
+	}
+	return nil
+}
+
+// spend counts text worded for a result against the upload's size, which it
+// costs as much as text the document carried.
+func (rd *reader) spend(n int) error {
+	rd.up.bytes += int64(n)
+	if rd.up.bytes+rd.read.n > rd.lim.MaxBytes {
+		return over(uploadBytes, int(rd.lim.MaxBytes))
+	}
+	return nil
 }
 
 // over refuses a count past its bound, naming the bound.
@@ -124,6 +194,9 @@ func (rd *reader) log() (Log, error) {
 			return rd.b.Array(func() error {
 				if len(log.Runs) == rd.lim.MaxRuns {
 					return over("runs", rd.lim.MaxRuns)
+				}
+				if err := rd.hold(); err != nil {
+					return err
 				}
 				run, err := rd.run()
 				if err != nil {
@@ -149,10 +222,13 @@ func (rd *reader) log() (Log, error) {
 // read: a run's members may arrive in any order, and a result citing a rule by
 // position or a message by identifier may precede the rules it cites.
 type pending struct {
-	ruleIndex  *int
-	messageID  string
-	arguments  []string
-	hasOwnText bool
+	ruleIndex *int
+	// ruleComponent is the position among the tool's extensions of the one
+	// the result's rule belongs to, where the result names one.
+	ruleComponent *int
+	messageID     string
+	arguments     []string
+	hasOwnText    bool
 }
 
 func (rd *reader) run() (Run, error) {
@@ -168,6 +244,9 @@ func (rd *reader) run() (Run, error) {
 				if len(results) == rd.lim.MaxResults {
 					return over("results in a run", rd.lim.MaxResults)
 				}
+				if err := rd.hold(); err != nil {
+					return err
+				}
 				res, p, err := rd.result(&run.Discarded)
 				if err != nil {
 					return err
@@ -182,6 +261,9 @@ func (rd *reader) run() (Run, error) {
 			return err
 		case "invocations":
 			return rd.b.Array(func() error {
+				if err := rd.hold(); err != nil {
+					return err
+				}
 				inv, err := rd.invocation()
 				run.Invocations = append(run.Invocations, inv)
 				return err
@@ -200,6 +282,9 @@ func (rd *reader) run() (Run, error) {
 				if len(run.Modules) == rd.lim.MaxModules {
 					return over("repositories in a run", rd.lim.MaxModules)
 				}
+				if err := rd.hold(); err != nil {
+					return err
+				}
 				m, err := rd.module()
 				run.Modules = append(run.Modules, m)
 				return err
@@ -209,6 +294,9 @@ func (rd *reader) run() (Run, error) {
 			return rd.b.Object(func(name string) error {
 				if len(run.Bases) == rd.lim.MaxBases {
 					return over("named starting points in a run", rd.lim.MaxBases)
+				}
+				if err := rd.hold(); err != nil {
+					return err
 				}
 				loc, err := rd.artifactLocation()
 				run.Bases[name] = loc
@@ -235,7 +323,9 @@ func (rd *reader) run() (Run, error) {
 	if err := chained(run.Bases, rd.lim.MaxChain); err != nil {
 		return Run{}, err
 	}
-	rd.settle(&run, waiting)
+	if err := rd.settle(&run, waiting); err != nil {
+		return Run{}, err
+	}
 	return run, nil
 }
 
@@ -261,22 +351,18 @@ func chained(bases map[string]ArtifactLocation, most int) error {
 }
 
 // settle fills in what each result named by reference.
-func (rd *reader) settle(run *Run, waiting []pending) {
+func (rd *reader) settle(run *Run, waiting []pending) error {
+	byID := map[string][]int{}
+	byComponent := map[int][]int{}
+	for j, rule := range run.Tool.Rules {
+		byID[rule.ID] = append(byID[rule.ID], j)
+		byComponent[rule.component] = append(byComponent[rule.component], j)
+	}
 	for i := range run.Results {
 		res, p := &run.Results[i], waiting[i]
-		var rule *Rule
-		if p.ruleIndex != nil && *p.ruleIndex >= 0 && *p.ruleIndex < len(run.Tool.Rules) {
-			rule = &run.Tool.Rules[*p.ruleIndex]
-			if res.RuleID == "" {
-				res.RuleID = rule.ID
-			}
-		} else if res.RuleID != "" {
-			for j := range run.Tool.Rules {
-				if run.Tool.Rules[j].ID == res.RuleID {
-					rule = &run.Tool.Rules[j]
-					break
-				}
-			}
+		rule := ruleOf(run.Tool.Rules, byID, byComponent, res.RuleID, p)
+		if rule != nil && res.RuleID == "" {
+			res.RuleID = rule.ID
 		}
 		if res.Level == "" && rule != nil {
 			res.Level = rule.DefaultLevel
@@ -289,13 +375,47 @@ func (rd *reader) settle(run *Run, waiting []pending) {
 			stringsOf = rule.messages
 		}
 		if !p.hasOwnText || len(p.arguments) > 0 {
-			res.Message = rd.text(worded(res.Message, p.messageID, p.arguments, stringsOf))
+			res.Message = rd.text(worded(res.Message, p.messageID, p.arguments, stringsOf, rd.lim.MaxText))
+			if err := rd.spend(len(res.Message)); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
+}
+
+// ruleOf is the rule a result cites. Its identifier is looked for first,
+// within the component the result names where it names one. A position is
+// read only where the result states no identifier, and only within the
+// component it names: the driver, where it names none.
+func ruleOf(rules []Rule, byID map[string][]int, byComponent map[int][]int, id string, p pending) *Rule {
+	component := 0
+	if p.ruleComponent != nil {
+		component = *p.ruleComponent + 1
+	}
+	if id != "" {
+		for _, j := range byID[id] {
+			if p.ruleComponent == nil || rules[j].component == component {
+				return &rules[j]
+			}
+		}
+		return nil
+	}
+	if p.ruleIndex == nil {
+		return nil
+	}
+	at := byComponent[component]
+	if n := *p.ruleIndex; n >= 0 && n < len(at) {
+		return &rules[at[n]]
+	}
+	return nil
 }
 
 func (rd *reader) tool(run *Run) error {
-	component := func(driver bool) error {
+	extensions := 0
+	// component reads the driver, at 0, or an extension, from 1 on.
+	component := func(at int) error {
+		driver := at == 0
 		return rd.b.Object(func(key string) error {
 			switch key {
 			case "name":
@@ -319,7 +439,11 @@ func (rd *reader) tool(run *Run) error {
 					if len(run.Tool.Rules) == rd.lim.MaxRules {
 						return over("rules in a run", rd.lim.MaxRules)
 					}
+					if err := rd.hold(); err != nil {
+						return err
+					}
 					rule, err := rd.rule(&run.Discarded)
+					rule.component = at
 					run.Tool.Rules = append(run.Tool.Rules, rule)
 					return err
 				})
@@ -331,9 +455,12 @@ func (rd *reader) tool(run *Run) error {
 	return rd.b.Object(func(key string) error {
 		switch key {
 		case "driver":
-			return component(true)
+			return component(0)
 		case "extensions":
-			return rd.b.Array(func() error { return component(false) })
+			return rd.b.Array(func() error {
+				extensions++
+				return component(extensions)
+			})
 		default:
 			return rd.b.Skip()
 		}
@@ -372,10 +499,11 @@ func (rd *reader) rule(discarded *Discarded) (Rule, error) {
 			rule.messages = map[string]string{}
 			return rd.b.Object(func(id string) error {
 				s, err := rd.message(discarded, nil)
-				if len(rule.messages) < rd.lim.MaxRules {
-					rule.messages[id] = s
+				if err != nil || len(rule.messages) == rd.lim.MaxRules {
+					return err
 				}
-				return err
+				rule.messages[id] = s
+				return rd.hold()
 			})
 		case "defaultConfiguration":
 			return rd.b.Object(func(key string) error {
@@ -392,10 +520,11 @@ func (rd *reader) rule(discarded *Discarded) (Rule, error) {
 				case "tags":
 					return rd.b.Array(func() error {
 						s, err := rd.b.Str()
-						if len(rule.Tags) < rd.lim.MaxRules {
-							rule.Tags = append(rule.Tags, rd.text(s))
+						if err != nil || len(rule.Tags) == rd.lim.MaxRules {
+							return err
 						}
-						return err
+						rule.Tags = append(rule.Tags, rd.text(s))
+						return rd.hold()
 					})
 				case "security-severity":
 					s, err := rd.b.Str()
@@ -450,10 +579,11 @@ func (rd *reader) message(discarded *Discarded, p *pending) (string, error) {
 		case "arguments":
 			return rd.b.Array(func() error {
 				s, err := rd.b.Str()
-				if p != nil && len(p.arguments) < rd.lim.MaxLocations {
-					p.arguments = append(p.arguments, rd.text(s))
+				if err != nil || p == nil || len(p.arguments) == rd.lim.MaxLocations {
+					return err
 				}
-				return err
+				p.arguments = append(p.arguments, rd.text(s))
+				return rd.hold()
 			})
 		default:
 			return rd.b.Skip()
@@ -494,6 +624,15 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 					n, err := rd.b.Int()
 					p.ruleIndex = n
 					return err
+				case "toolComponent":
+					return rd.b.Object(func(key string) error {
+						if key != "index" {
+							return rd.b.Skip()
+						}
+						n, err := rd.b.Int()
+						p.ruleComponent = n
+						return err
+					})
 				default:
 					return rd.b.Skip()
 				}
@@ -508,6 +647,31 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 			s, err := rd.b.Str()
 			res.Level = level(s)
 			return err
+		case "kind":
+			s, err := rd.b.Str()
+			res.Kind = resultKind(s)
+			return err
+		case "suppressions":
+			return rd.b.Array(func() error {
+				status := ""
+				err := rd.b.Object(func(key string) error {
+					if key != "status" {
+						return rd.b.Skip()
+					}
+					s, err := rd.b.Str()
+					status = s
+					return err
+				})
+				// A suppression stating no status is in force.
+				if status == "" || status == "accepted" {
+					res.Suppressed = true
+				}
+				return err
+			})
+		case "baselineState":
+			s, err := rd.b.Str()
+			res.Absent = s == "absent"
+			return err
 		case "message":
 			s, err := rd.message(discarded, &p)
 			res.Message = s
@@ -516,6 +680,9 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 			return rd.b.Array(func() error {
 				if len(res.Locations)+len(res.Related) == rd.lim.MaxLocations {
 					return over("locations in a result", rd.lim.MaxLocations)
+				}
+				if err := rd.hold(); err != nil {
+					return err
 				}
 				loc, err := rd.location(discarded)
 				if key == "locations" {
@@ -538,10 +705,11 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 			}
 			return rd.b.Object(func(scheme string) error {
 				s, err := rd.b.Str()
-				if len(res.Fingerprints) < rd.lim.MaxLocations {
-					res.Fingerprints[bound.Head(scheme, docread.MostQuoted)] = rd.text(s)
+				if err != nil || len(res.Fingerprints) == rd.lim.MaxLocations {
+					return err
 				}
-				return err
+				res.Fingerprints[bound.Head(scheme, docread.MostQuoted)] = rd.text(s)
+				return rd.hold()
 			})
 		case "fixes":
 			return rd.b.Array(func() error {
@@ -554,7 +722,20 @@ func (rd *reader) result(discarded *Discarded) (Result, pending, error) {
 			return rd.b.Skip()
 		}
 	})
+	if res.Kind == "" {
+		res.Kind = "fail"
+	}
 	return res, p, err
+}
+
+// resultKind is a result kind the format defines, and empty for anything
+// else.
+func resultKind(s string) string {
+	switch s {
+	case "pass", "open", "informational", "notApplicable", "review", "fail":
+		return s
+	}
+	return ""
 }
 
 // codeFlow reads one flow. The steps of the first thread of the first flow
@@ -578,10 +759,11 @@ func (rd *reader) codeFlow(discarded *Discarded, res *Result, keep bool, steps *
 						return over("flow steps in a result", rd.lim.MaxSteps)
 					}
 					step, err := rd.step(discarded)
-					if keepThread {
-						res.Steps = append(res.Steps, step)
+					if err != nil || !keepThread {
+						return err
 					}
-					return err
+					res.Steps = append(res.Steps, step)
+					return rd.hold()
 				})
 			})
 		})
@@ -756,13 +938,15 @@ func (rd *reader) invocation() (Invocation, error) {
 						return rd.b.Skip()
 					}
 				})
-				if lvl == "error" {
-					inv.Errors++
-					if id != "" && len(inv.Notified) < rd.lim.MaxRules {
-						inv.Notified = append(inv.Notified, id)
-					}
+				if err != nil || lvl != "error" {
+					return err
 				}
-				return err
+				inv.Errors++
+				if id == "" || len(inv.Notified) == rd.lim.MaxRules {
+					return nil
+				}
+				inv.Notified = append(inv.Notified, id)
+				return rd.hold()
 			})
 		default:
 			return rd.b.Skip()
@@ -826,8 +1010,11 @@ func (rd *reader) runProperties(p *RunProperties) error {
 				if len(p.Changed) == rd.lim.MaxModules {
 					return over("changed repositories in a run", rd.lim.MaxModules)
 				}
+				if err != nil {
+					return err
+				}
 				p.Changed = append(p.Changed, rd.text(s))
-				return err
+				return rd.hold()
 			})
 		default:
 			if strings.HasPrefix(key, "openpsirt/") {

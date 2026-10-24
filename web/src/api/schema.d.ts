@@ -6699,7 +6699,7 @@ export interface components {
             /** @description The series the run belongs to */
             series: string;
             /**
-             * @description What became of it: waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed
+             * @description What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed
              * @enum {string}
              */
             status: "queued" | "waiting" | "applied" | "superseded" | "held" | "failed";
@@ -11363,7 +11363,7 @@ export interface components {
             discarded?: {
                 [key: string]: number;
             };
-            /** @description Results left out, by reason: advisory-identifier, outside-the-checkout, repeat or failure-signal */
+            /** @description Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent */
             dropped?: {
                 [key: string]: number;
             };

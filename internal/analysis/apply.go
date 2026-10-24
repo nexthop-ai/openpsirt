@@ -46,7 +46,7 @@ type Receipt struct {
 	Returned      int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
 	NotReproduced int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
 	WouldMark     int            `json:"would_mark,omitempty" doc:"How many a held run would have marked not reproduced"`
-	Dropped       map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat or failure-signal"`
+	Dropped       map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
 	Scanners      []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded     map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
 }
@@ -57,6 +57,12 @@ const (
 	DroppedOutside  = "outside-the-checkout"
 	DroppedRepeat   = "repeat"
 	DroppedFailure  = "failure-signal"
+	// DroppedNotAProblem is a result whose kind reports no problem: a check
+	// that passed, or one that did not apply.
+	DroppedNotAProblem = "not-a-problem"
+	DroppedSuppressed  = "suppressed"
+	// DroppedAbsent is a result the tool says is no longer found.
+	DroppedAbsent = "absent"
 )
 
 // prepared is a run's documents, read and placed.
@@ -70,6 +76,12 @@ type prepared struct {
 	receipt Receipt
 	failure string
 }
+
+// inventoryWait is how long a run waits for its build's inventory before it
+// fails. A waiting run's job and documents are held while it waits, so a
+// series analyzed on a build that is never inventoried would otherwise hold
+// one of each per upload for good.
+const inventoryWait = 24 * time.Hour
 
 // Apply reads one stored run and applies it, reporting what became of it.
 //
@@ -108,12 +120,9 @@ func (a *Applier) read(ctx context.Context, store *series.Store, run *series.Run
 		return prepared{}, err
 	}
 	var logs []sarif.Log
+	upload := sarif.NewUpload(a.limits)
 	for i := range docs {
-		r, err := sarif.Gunzipped(store.Open(ctx, &docs[i]), a.limits.MaxBytes)
-		if err != nil {
-			return prepared{failure: err.Error()}, nil
-		}
-		log, err := sarif.Read(r, a.limits)
+		log, err := upload.Read(store.Open(ctx, &docs[i]))
 		var refused refusal.Refusal
 		switch {
 		case errors.As(err, &refused):
@@ -152,11 +161,6 @@ func place(logs []sarif.Log, run *series.Run) prepared {
 				out.signals += inv.Errors
 			}
 			for _, res := range placer.Place(r, run.SourceRoot) {
-				if sarif.FailureSignal(res.RuleID) {
-					out.signals++
-					out.receipt.Dropped[DroppedFailure]++
-					continue
-				}
 				name := ruleName(r.Tool.Name, res.RuleID)
 				if _, ok := out.rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
@@ -178,8 +182,11 @@ func place(logs []sarif.Log, run *series.Run) prepared {
 		return out
 	}
 	d := placer.Dropped()
+	out.signals += d.Failure
 	for reason, n := range map[string]int{
 		DroppedAdvisory: d.Advisory, DroppedOutside: d.Outside, DroppedRepeat: d.Repeats,
+		DroppedFailure: d.Failure, DroppedNotAProblem: d.NotAProblem,
+		DroppedSuppressed: d.Suppressed, DroppedAbsent: d.Absent,
 	} {
 		if n > 0 {
 			out.receipt.Dropped[reason] += n
@@ -219,6 +226,9 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 // apply applies a prepared run inside one transaction.
 func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepared) (series.Status, error) {
 	store := series.NewStore(tx)
+	if err := store.Take(ctx, runID); err != nil {
+		return "", err
+	}
 	run, err := store.ByID(ctx, runID)
 	if err != nil {
 		return "", err
@@ -248,6 +258,10 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		return "", err
 	}
 	if inventory == nil {
+		if a.now().Sub(run.ReceivedAt) >= inventoryWait {
+			run.Status, run.Failure = series.Failed, "the build had no inventory read within a day of the run arriving"
+			return run.Status, a.end(ctx, store, run, read.receipt)
+		}
 		run.Status = series.Waiting
 		return run.Status, store.Mark(ctx, run)
 	}
@@ -404,9 +418,6 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 	return missed >= floor && missed*100 > share*live, nil
 }
 
-// Finding kind and visibility every result opens with: a result nobody has
-// judged is internal.
-var opensAs = struct {
-	kind       kind.Kind
-	visibility access.Visibility
-}{kind.Analysis, access.Internal}
+// OpensAt is the visibility every lead opens at, and the one a receipt
+// counting leads is read at: a result nobody has judged is internal.
+const OpensAt = access.Internal

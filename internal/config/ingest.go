@@ -43,6 +43,7 @@ func (c Config) AnalysisLimits() sarif.Limits {
 		MaxChain:      c.AnalysisMaxChain,
 		MaxProperties: c.AnalysisMaxProperties,
 		MaxText:       c.AnalysisMaxText,
+		MaxHeld:       c.AnalysisMaxHeld,
 	}.OrDefault()
 }
 

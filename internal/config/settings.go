@@ -166,4 +166,5 @@ var settings = []setting{
 	{"ANALYSIS_MAX_PROPERTIES", "analysis.max_properties", number},
 	{"ANALYSIS_MAX_TEXT", "analysis.max_text", number},
 	{"ANALYSIS_MAX_DEPTH", "analysis.max_depth", number},
+	{"ANALYSIS_MAX_HELD", "analysis.max_held", number},
 }

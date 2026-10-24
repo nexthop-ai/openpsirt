@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -123,7 +124,9 @@ func TestAnAnalyzerUploadIsRefusedInWordsTheSenderCanAct(t *testing.T) {
 			"in the future":  {[]string{clangRun}, map[string]string{"series": "s", "built": "2999-01-01T00:00:00Z"}, "future"},
 			"too many at once": {[]string{clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun,
 				clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun},
-				map[string]string{"series": "s"}, "merges"},
+				map[string]string{"series": "s"}, "per-unit documents"},
+			"a long series": {[]string{clangRun}, map[string]string{"series": strings.Repeat("s", database.NameWidth+1)},
+				"may be at most"},
 		} {
 			t.Run(name, func(t *testing.T) {
 				code, _, body := sendRun(t, f, c.docs, c.fields)
@@ -131,6 +134,21 @@ func TestAnAnalyzerUploadIsRefusedInWordsTheSenderCanAct(t *testing.T) {
 					t.Errorf("answered %d (%s); want 422 saying %q", code, body, c.says)
 				}
 			})
+		}
+	})
+}
+
+func TestTheTextAProducerStatesIsRecordedAtAnyLength(t *testing.T) {
+	httpapitest.IngestOn(t, dbtest.Two, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		long := strings.Repeat("a", 4*database.NameWidth)
+		doc := strings.Replace(clangRun, `"name":"clang-tidy","version":"18.1.3"`,
+			`"name":"clang-tidy-`+long+`","version":"`+long+`"`, 1)
+		doc = strings.Replace(doc, `"results"`, `"properties":{"openpsirt/client":"`+long[:200]+`"},"results"`, 1)
+		code, _, body := sendRun(t, f, []string{doc}, map[string]string{
+			"series": strings.Repeat("s", database.NameWidth), "commit": long,
+		})
+		if code != http.StatusAccepted {
+			t.Errorf("answered %d (%s); want 202", code, body)
 		}
 	})
 }

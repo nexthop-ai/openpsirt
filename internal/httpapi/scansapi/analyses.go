@@ -132,7 +132,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	}
 	if most := analysisDocuments(in); len(files) > most {
 		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
-			"that run carries %d documents, and this deployment reads %d; the upload client merges a tool's documents into one",
+			"that run carries %d documents, and this deployment reads %d; merge a tool's per-unit documents into one before sending",
 			len(files), most))
 	}
 
@@ -284,20 +284,18 @@ func statedBeside(parts *analysisParts) (analysis.Stated, error) {
 	return out, nil
 }
 
-// readAnalysis reads each document, and digests each as it arrived.
+// readAnalysis reads each document within one budget for the upload, and
+// digests each as it arrived.
 func readAnalysis(files []huma.FormFile, limits sarif.Limits) ([]sarif.Log, []string, error) {
 	logs := make([]sarif.Log, 0, len(files))
 	digests := make([]string, 0, len(files))
+	upload := sarif.NewUpload(limits)
 	for i, file := range files {
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			return nil, nil, err
 		}
 		digest := sha256.New()
-		r, err := sarif.Gunzipped(io.TeeReader(file, digest), limits.MaxBytes)
-		if err != nil {
-			return nil, nil, fmt.Errorf("document %d: %w", i+1, err)
-		}
-		log, err := sarif.Read(r, limits)
+		log, err := upload.Read(io.TeeReader(file, digest))
 		if err != nil {
 			return nil, nil, fmt.Errorf("document %d: %w", i+1, err)
 		}
@@ -320,7 +318,7 @@ func admittedAnalysis(ctx context.Context, in core.Deps, product, stream, varian
 	if err != nil {
 		return access.Subject{}, nil, err
 	}
-	if subject.Kind != access.Pipeline && !subject.Triages(access.Internal, named.ProductID) {
+	if subject.Kind != access.Pipeline && !subject.Triages(analysis.OpensAt, named.ProductID) {
 		return access.Subject{}, nil, huma.Error403Forbidden("not authorized")
 	}
 	return subject, named, nil

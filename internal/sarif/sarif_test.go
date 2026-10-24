@@ -16,7 +16,7 @@ func limits() Limits {
 	return Limits{
 		MaxBytes: 1 << 20, MaxDepth: 32, MaxRuns: 4, MaxResults: 100, MaxRules: 100,
 		MaxLocations: 10, MaxSteps: 20, MaxModules: 8, MaxBases: 8, MaxChain: 4,
-		MaxProperties: 16, MaxText: 200,
+		MaxProperties: 16, MaxText: 200, MaxHeld: 1000,
 	}
 }
 
@@ -27,7 +27,7 @@ func readFile(t *testing.T, name string) Log {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	log, err := Read(f, limits())
+	log, err := NewUpload(limits()).Read(f)
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -36,7 +36,7 @@ func readFile(t *testing.T, name string) Log {
 
 func read(t *testing.T, doc string) Log {
 	t.Helper()
-	log, err := Read(strings.NewReader(doc), limits())
+	log, err := NewUpload(limits()).Read(strings.NewReader(doc))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func read(t *testing.T, doc string) Log {
 // want.
 func refused(t *testing.T, doc string, lim Limits, want string) {
 	t.Helper()
-	_, err := Read(strings.NewReader(doc), lim)
+	_, err := NewUpload(lim).Read(strings.NewReader(doc))
 	if err == nil {
 		t.Fatalf("read; want a refusal holding %q", want)
 	}
@@ -207,6 +207,8 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 			func(*Limits) {}, "deeper than"},
 		"size": {run(`,"results":[` + many(`{"ruleId":"x"}`, 100) + `]`),
 			func(l *Limits) { l.MaxBytes = 200 }, "larger than the configured limit"},
+		"held": {run(`,"results":[{"locations":[` + location + `]},{}]`),
+			func(l *Limits) { l.MaxHeld = 3 }, "other entries across the upload's documents"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			lim := limits()
@@ -410,5 +412,156 @@ func TestTheFunctionAndCallDepthTheClientWritesAreKept(t *testing.T) {
 	}
 	if p.Steps[0].Path != "a.c" || p.Steps[1].Path != "" || p.Steps[1].StartLine != 9 {
 		t.Errorf("steps %+v; a step outside the checkout keeps its line and loses its path", p.Steps)
+	}
+}
+
+func TestAnUploadIsBoundedAcrossItsDocuments(t *testing.T) {
+	doc := run(`,"results":[{"ruleId":"x"},{"ruleId":"y"}]`)
+	for name, lim := range map[string]func(*Limits){
+		"size": func(l *Limits) { l.MaxBytes = int64(len(doc)*2 - 1) },
+		"held": func(l *Limits) { l.MaxHeld = 5 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			l := limits()
+			lim(&l)
+			upload := NewUpload(l)
+			if _, err := upload.Read(strings.NewReader(doc)); err != nil {
+				t.Fatalf("first document: %v", err)
+			}
+			_, err := upload.Read(strings.NewReader(doc))
+			if err == nil || !strings.Contains(err.Error(), "across the upload's documents") {
+				t.Fatalf("second document: %v; want the upload refused", err)
+			}
+			if _, err := NewUpload(l).Read(strings.NewReader(doc)); err != nil {
+				t.Errorf("the same document alone: %v", err)
+			}
+		})
+	}
+}
+
+func TestTextWordedForAResultCountsTowardTheUploadsSize(t *testing.T) {
+	doc := run(`,"results":[` + strings.Repeat(`{"ruleId":"r","message":{"id":"m","arguments":["a"]}},`, 3) +
+		`{"ruleId":"r","message":{"id":"m","arguments":["a"]}}]` +
+		`,"tool":{"driver":{"name":"t","rules":[{"id":"r","messageStrings":{"m":{"text":"` +
+		strings.Repeat("x", 150) + ` {0}"}}}]}}`)
+	lim := limits()
+	lim.MaxBytes = int64(len(doc) + 3*152)
+	_, err := NewUpload(lim).Read(strings.NewReader(doc))
+	if err == nil || !strings.Contains(err.Error(), "the text worded for their results") {
+		t.Fatalf("%v; want the worded text counted", err)
+	}
+	lim.MaxBytes = int64(len(doc) + 4*152)
+	if _, err := NewUpload(lim).Read(strings.NewReader(doc)); err != nil {
+		t.Errorf("with room for the worded text: %v", err)
+	}
+}
+
+func TestTextWordedEarlyInADocumentCountsOnceTheDocumentEnds(t *testing.T) {
+	worded := `{"tool":{"driver":{"name":"t","rules":[{"id":"r","messageStrings":{"m":{"text":"` +
+		strings.Repeat("x", 150) + ` {0}"}}}]}},"results":[{"ruleId":"r","message":{"id":"m","arguments":["a"]}}]}`
+	padded := `{"tool":{"driver":{"name":"` + strings.Repeat("p", 100) + `"}},"results":[]}`
+	doc := `{"version":"2.1.0","runs":[` + worded + `,` + padded + `]}`
+	lim := limits()
+	lim.MaxBytes = int64(len(doc) + 100)
+	_, err := NewUpload(lim).Read(strings.NewReader(doc))
+	if err == nil || !strings.Contains(err.Error(), "the text worded for their results") {
+		t.Fatalf("%v; want the worded text counted with the rest of the document", err)
+	}
+}
+
+func TestWordingPastTheBoundStopsTheDocumentThere(t *testing.T) {
+	doc := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[{"id":"r","messageStrings":{"m":{"text":"` +
+		strings.Repeat("x", 150) + ` {0}"}}}]}},"results":[` +
+		strings.Repeat(`{"ruleId":"r","message":{"id":"m","arguments":["a"]}},`, 3) +
+		`{"ruleId":"r","message":{"id":"m","arguments":["a"]}}]},`
+	lim := limits()
+	lim.MaxBytes = int64(len(doc) + 200)
+	_, err := NewUpload(lim).Read(strings.NewReader(doc + ` not JSON`))
+	if err == nil || !strings.Contains(err.Error(), "the text worded for their results") {
+		t.Fatalf("%v; want the run refused before the rest is read", err)
+	}
+}
+
+func TestALaterDocumentIsReadOnlyWithinWhatIsLeft(t *testing.T) {
+	first := run(`,"results":[]`)
+	lim := limits()
+	lim.MaxBytes = int64(len(first) + 40)
+	upload := NewUpload(lim)
+	if _, err := upload.Read(strings.NewReader(first)); err != nil {
+		t.Fatal(err)
+	}
+	_, err := upload.Read(strings.NewReader(run(`,"results":[`+strings.Repeat(`{},`, 30)) + ` not JSON`))
+	if err == nil || !strings.Contains(err.Error(), "across the upload's documents") {
+		t.Fatalf("%v; want the second document stopped where the budget ran out", err)
+	}
+}
+
+func TestFillingAMessageStopsAtItsBound(t *testing.T) {
+	argument := strings.Repeat("a", 100)
+	got := fill(strings.Repeat("{0}", 1000), []string{argument}, 250)
+	if len(got) > 250+len(argument) {
+		t.Errorf("filled %d bytes; want it to stop once past 250", len(got))
+	}
+}
+
+func TestAResultReportingNoProblemIsLeftOut(t *testing.T) {
+	at := `"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}]`
+	r := read(t, run(`,"results":[
+		{"ruleId":"a",`+at+`},
+		{"ruleId":"b","kind":"review",`+at+`},
+		{"ruleId":"c","kind":"open",`+at+`},
+		{"ruleId":"d","kind":"fail","suppressions":[{"kind":"inSource","status":"rejected"}],`+at+`},
+		{"ruleId":"e","kind":"pass",`+at+`},
+		{"ruleId":"f","kind":"notApplicable",`+at+`},
+		{"ruleId":"g","kind":"informational",`+at+`},
+		{"ruleId":"h","suppressions":[{"kind":"inSource"}],`+at+`},
+		{"ruleId":"i","suppressions":[{"status":"underReview"},{"status":"accepted"}],`+at+`},
+		{"ruleId":"j","baselineState":"absent",`+at+`},
+		{"ruleId":"k","baselineState":"unchanged",`+at+`}]`)).Runs[0]
+	placed, dropped := Prepare(&r, "")
+	var kept []string
+	for _, p := range placed {
+		kept = append(kept, p.RuleID)
+	}
+	if strings.Join(kept, "") != "abcdk" {
+		t.Errorf("kept %v", kept)
+	}
+	if dropped != (Dropped{NotAProblem: 3, Suppressed: 2, Absent: 1}) {
+		t.Errorf("dropped %+v", dropped)
+	}
+}
+
+func TestAFailureSignalOutsideTheCheckoutIsStillAFailure(t *testing.T) {
+	r := read(t, run(`,"results":[
+		{"ruleId":"clang-diagnostic-error","locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///tmp/build/gen.h"}}}]},
+		{"ruleId":"syntaxError"}]`)).Runs[0]
+	placed, dropped := Prepare(&r, "/src")
+	if len(placed) != 0 || dropped != (Dropped{Failure: 2}) {
+		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
+	}
+}
+
+func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
+	doc := `{"version":"2.1.0","runs":[{"results":[
+		{"rule":{"index":1,"toolComponent":{"index":0}}},
+		{"ruleIndex":1},
+		{"ruleId":"e0","ruleIndex":0},
+		{"ruleId":"r0","rule":{"toolComponent":{"index":0}}},
+		{"ruleId":"zz","ruleIndex":0}],
+	"tool":{"driver":{"name":"t","rules":[{"id":"r0","defaultConfiguration":{"level":"note"}}]},
+		"extensions":[{"name":"pack","rules":[
+			{"id":"e0","defaultConfiguration":{"level":"error"}},
+			{"id":"e1","defaultConfiguration":{"level":"none"}}]}]}}]}`
+	r := read(t, doc).Runs[0]
+	for i, want := range []struct{ id, level string }{
+		{"e1", "none"},
+		{"", "warning"},
+		{"e0", "error"},
+		{"r0", "warning"},
+		{"zz", "warning"},
+	} {
+		if got := r.Results[i]; got.RuleID != want.id || got.Level != want.level {
+			t.Errorf("result %d: rule %q at %q; want %q at %q", i, got.RuleID, got.Level, want.id, want.level)
+		}
 	}
 }

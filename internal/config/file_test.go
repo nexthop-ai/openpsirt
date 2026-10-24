@@ -171,6 +171,7 @@ var everySetting = map[string]string{
 	"ANALYSIS_MAX_PROPERTIES": "17",
 	"ANALYSIS_MAX_TEXT":       "18",
 	"ANALYSIS_MAX_DEPTH":      "19",
+	"ANALYSIS_MAX_HELD":       "20",
 }
 
 // A deployment configured by file and one configured by the environment, with

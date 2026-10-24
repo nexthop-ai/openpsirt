@@ -125,8 +125,23 @@ func (w *world) inventory(t *testing.T, targetID int64) {
 // send receives a run as the upload operation does and applies it.
 func (w *world) send(t *testing.T, targetID int64, built time.Time, doc string) (*series.Run, series.Status) {
 	t.Helper()
+	run := w.receive(t, targetID, built, doc)
+	status, err := w.applier.Apply(t.Context(), run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err = series.NewStore(w.DB.DB).ByID(t.Context(), run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return run, status
+}
+
+// receive receives a run as the upload operation does.
+func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc string) *series.Run {
+	t.Helper()
 	ctx := t.Context()
-	log, err := sarif.Read(strings.NewReader(doc), sarif.DefaultLimits())
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,15 +164,40 @@ func (w *world) send(t *testing.T, targetID int64, built time.Time, doc string) 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	status, err := w.applier.Apply(ctx, run.ID)
-	if err != nil {
+	return run
+}
+
+// spread is n results of one rule, each in a file of its own.
+func spread(n int) []sent {
+	out := make([]sent, n)
+	for i := range out {
+		out[i] = sent{"bugprone-use-after-move", "SRCROOT", fmt.Sprintf("src/f%d.c", i), "v used after it was moved", 1}
+	}
+	return out
+}
+
+// sightings is every sighting the build's leads have.
+func (w *world) sightings(t *testing.T, targetID int64) []series.Sighting {
+	t.Helper()
+	var rows []series.Sighting
+	if err := w.DB.DB.NewSelect().Model(&rows).
+		Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
+		Where(`"f"."target_id" = ?`, targetID).Scan(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	run, err = series.NewStore(w.DB.DB).ByID(ctx, run.ID)
-	if err != nil {
+	return rows
+}
+
+// drops sets the share and floor a run is held past.
+func (w *world) drops(t *testing.T, share, floor string) {
+	t.Helper()
+	settings := setting.NewStore(w.DB.DB)
+	if _, _, err := settings.Change(t.Context(), setting.AnalysisDropShare, share); err != nil {
 		t.Fatal(err)
 	}
-	return run, status
+	if _, _, err := settings.Change(t.Context(), setting.AnalysisDropFloor, floor); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func receiptOf(t *testing.T, run *series.Run) Receipt {
@@ -294,9 +334,7 @@ func TestARunBuiltBeforeTheLastAppliedIsSuperseded(t *testing.T) {
 func TestARunThatWouldMarkMostOfABuildIsHeld(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
-		if _, _, err := setting.NewStore(w.DB.DB).Change(t.Context(), setting.AnalysisDropFloor, "1"); err != nil {
-			t.Fatal(err)
-		}
+		w.drops(t, "50", "1")
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
 		run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(nil, 10))
@@ -305,6 +343,107 @@ func TestARunThatWouldMarkMostOfABuildIsHeld(t *testing.T) {
 		}
 		if r := receiptOf(t, run); r.WouldMark != 2 || r.NotReproduced != 0 {
 			t.Errorf("receipt %+v; want two it would mark and none marked", r)
+		}
+		for _, s := range w.sightings(t, w.Target.ID) {
+			if s.AbsentRunID != nil {
+				t.Errorf("finding %d marked not reproduced by a held run", s.FindingID)
+			}
+		}
+	})
+}
+
+func TestARunPastOnlyOneOfTheTwoDropBoundsIsApplied(t *testing.T) {
+	for name, c := range map[string]struct {
+		share, floor string
+		missed       int
+	}{
+		// Two of four is half, which the share of 50 does not pass.
+		"past the floor alone": {"50", "1", 2},
+		// Four of four is all of them, and four is short of the floor.
+		"past the share alone": {"50", "5", 4},
+	} {
+		t.Run(name, func(t *testing.T) {
+			eachWorld(t, func(t *testing.T, w *world) {
+				w.inventory(t, w.Target.ID)
+				w.drops(t, c.share, c.floor)
+				start := time.Now().UTC().Add(-3 * time.Hour)
+				all := spread(4)
+				w.send(t, w.Target.ID, start, document(all, 10))
+				run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(all[c.missed:], 10))
+				if status != series.Applied {
+					t.Fatalf("status %s; want applied", status)
+				}
+				if r := receiptOf(t, run); r.NotReproduced != c.missed {
+					t.Errorf("receipt %+v; want %d not reproduced", r, c.missed)
+				}
+			})
+		})
+	}
+}
+
+func TestARunWaitingADayForItsInventoryFails(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		if status != series.Waiting {
+			t.Fatalf("status %s; want waiting", status)
+		}
+		w.applier.now = func() time.Time { return run.ReceivedAt.Add(inventoryWait - time.Minute) }
+		if status, err := w.applier.Apply(t.Context(), run.ID); err != nil || status != series.Waiting {
+			t.Fatalf("status %s, %v; want still waiting short of a day", status, err)
+		}
+		w.applier.now = func() time.Time { return run.ReceivedAt.Add(inventoryWait) }
+		if status, err := w.applier.Apply(t.Context(), run.ID); err != nil || status != series.Failed {
+			t.Fatalf("status %s, %v; want failed after a day", status, err)
+		}
+		docs, err := series.NewStore(w.DB.DB).Documents(t.Context(), run.ID)
+		if err != nil || len(docs) != 0 {
+			t.Errorf("%d documents still held, %v", len(docs), err)
+		}
+	})
+}
+
+func TestAFailureSignalOutsideTheCheckoutMakesTheRunNotComparable(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		failed := sent{"clang-diagnostic-error", "", "file:///tmp/build/generated.h", "unknown type name", 3}
+		run, _ := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR, failed}, 10))
+		if run.Comparable == nil || *run.Comparable || run.Reason != series.FailureSignal {
+			t.Errorf("comparable %v for %q; want not comparable, a failure signal", run.Comparable, run.Reason)
+		}
+		if r := receiptOf(t, run); r.Dropped[DroppedFailure] != 1 || r.Dropped[DroppedOutside] != 0 {
+			t.Errorf("receipt %+v; want the failure counted as one", r)
+		}
+	})
+}
+
+func TestTwoRunsOfOneSeriesAreAppliedOneAfterTheOther(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		ctx := t.Context()
+		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		tx, err := w.DB.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := series.NewStore(tx).Take(ctx, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		done := make(chan error, 1)
+		go func() {
+			_, err := w.applier.Apply(ctx, run.ID)
+			done <- err
+		}()
+		select {
+		case err := <-done:
+			_ = tx.Rollback()
+			t.Fatalf("applied while another apply held the series: %v", err)
+		case <-time.After(300 * time.Millisecond):
+		}
+		if err := tx.Rollback(); err != nil {
+			t.Fatal(err)
+		}
+		if err := <-done; err != nil {
+			t.Fatal(err)
 		}
 	})
 }

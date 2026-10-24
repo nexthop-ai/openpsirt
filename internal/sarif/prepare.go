@@ -93,6 +93,15 @@ type PlacedStep struct {
 type Dropped struct {
 	// Advisory is the results whose rule is an advisory's identifier.
 	Advisory int
+	// Failure is the results that are the analyzer reporting a failure of
+	// its own run, wherever they are.
+	Failure int
+	// NotAProblem is the results whose kind reports no problem.
+	NotAProblem int
+	// Suppressed is the results a suppression in force covers.
+	Suppressed int
+	// Absent is the results the tool says are no longer found.
+	Absent int
 	// Outside is the results whose file is outside the checkout, or that
 	// name no file.
 	Outside int
@@ -123,8 +132,21 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 	paths := PathsOf(run, root)
 	var out []Placed
 	for _, res := range run.Results {
-		if advisory.MatchString(res.RuleID) {
+		switch {
+		case advisory.MatchString(res.RuleID):
 			pl.dropped.Advisory++
+			continue
+		case failureSignal(res.RuleID):
+			pl.dropped.Failure++
+			continue
+		case !problem(res.Kind):
+			pl.dropped.NotAProblem++
+			continue
+		case res.Suppressed:
+			pl.dropped.Suppressed++
+			continue
+		case res.Absent:
+			pl.dropped.Absent++
 			continue
 		}
 		if len(res.Locations) == 0 {
@@ -181,9 +203,13 @@ var failureSignals = map[string]bool{
 	"preprocessorErrorDirective": true,
 }
 
-// FailureSignal is whether a result is the analyzer reporting a failure of its
+// failureSignal is whether a result is the analyzer reporting a failure of its
 // own run.
-func FailureSignal(ruleID string) bool { return failureSignals[ruleID] }
+func failureSignal(ruleID string) bool { return failureSignals[ruleID] }
+
+// problem is whether a result's kind reports a problem: a failed check, or
+// one a person is asked to review or settle.
+func problem(kind string) bool { return kind == "fail" || kind == "review" || kind == "open" }
 
 func placedStep(paths Paths, loc Location, depth *int) PlacedStep {
 	rel, _ := paths.Relative(loc.URI, loc.Base)

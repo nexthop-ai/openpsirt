@@ -76,12 +76,24 @@ type Rule struct {
 	// messages is the rule's message strings, by identifier, which a result
 	// citing one by identifier is worded from.
 	messages map[string]string
+	// component is the tool component the rule belongs to: 0 for the
+	// driver, and an extension's position among the extensions from 1 on.
+	component int
 }
 
 // Result is one thing a tool reported.
 type Result struct {
 	RuleID string
 	Level  string
+	// Kind is what the result says of its rule: fail where it says nothing,
+	// and pass, notApplicable or informational where it reports no problem.
+	Kind string
+	// Suppressed is whether a suppression in force covers the result: one
+	// accepted, or one stating no status.
+	Suppressed bool
+	// Absent is whether the result says it was in the tool's own baseline
+	// and is no longer found.
+	Absent bool
 	// Message is the result's text, with any markdown left out and any
 	// message string it cites filled in.
 	Message string
@@ -193,24 +205,26 @@ func (r Run) RuleOf(id string) (Rule, bool) {
 }
 
 // worded is a message's text: its own, or the message string it cites with
-// its arguments filled in.
-func worded(text, id string, arguments []string, strings map[string]string) string {
+// its arguments filled in, up to most bytes.
+func worded(text, id string, arguments []string, strings map[string]string, most int) string {
 	if text == "" && id != "" {
 		text = strings[id]
 	}
 	if len(arguments) == 0 || !containsPlaceholder(text) {
 		return text
 	}
-	return fill(text, arguments)
+	return fill(text, arguments, most)
 }
 
 func containsPlaceholder(text string) bool { return strings.Contains(text, "{") }
 
 // fill replaces each {n} with the nth argument, leaving a placeholder with no
-// argument as written.
-func fill(text string, arguments []string) string {
+// argument as written. It stops once most bytes are written, since a message
+// cut to that length is all that is kept and filling past it costs memory
+// for nothing.
+func fill(text string, arguments []string, most int) string {
 	var b strings.Builder
-	for i := 0; i < len(text); i++ {
+	for i := 0; i < len(text) && b.Len() < most; i++ {
 		if text[i] == '{' {
 			end := strings.IndexByte(text[i:], '}')
 			if end > 1 {

@@ -14,10 +14,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// Gunzipped is a document as JSON: decompressed where it arrived compressed,
+// gunzipped is a document as JSON: decompressed where it arrived compressed,
 // and refused past most bytes once decompressed. A document is compressed
 // where it opens with gzip's magic bytes, whatever it was labeled.
-func Gunzipped(r io.Reader, most int64) (io.Reader, error) {
+func gunzipped(r io.Reader, most int64) (io.Reader, error) {
 	br := bufio.NewReader(r)
 	head, err := br.Peek(2)
 	if err != nil || head[0] != 0x1f || head[1] != 0x8b {

@@ -633,7 +633,7 @@ components:
           description: The series the run belongs to
           type: string
         status:
-          description: "What became of it: waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed"
+          description: "What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed"
           enum:
             - queued
             - waiting
@@ -8907,7 +8907,7 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat or failure-signal"
+          description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
         not_reproduced:
           description: Results the build held open that this comparable run did not report

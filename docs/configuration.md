@@ -1176,14 +1176,19 @@ process in the same container, so the memory limit covers both — see
 ## Analyzer result limits
 
 An analyzer's results arrive as SARIF from a build pipeline, and are read
-within bounds for the reason a scan file is. A document past one is refused
-with a sentence naming the bound, and the run is recorded as failed with that
-sentence on its receipt. Leave one unset and it keeps the built-in value.
+within bounds for the reason a scan file is. An upload past one is refused
+with a sentence naming the bound, and no run is recorded. Leave one unset and
+it keeps the built-in value.
+
+An upload's documents are held in memory together while they are read, so
+two of these bound memory rather than the document: the size, and the count of
+entries held. At the defaults they come to about 450 MB, which the server's
+memory limit has to leave room for beside a scan.
 
 | Variable | File key | What it does | Default |
 |---|---|---|---|
-| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large a single document may be, decompressed, and the whole upload compressed | 256 MB |
-| `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, and the upload client merges them into one | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large the whole upload may be compressed | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RUNS` | `analysis.max_runs` | How many runs one document may hold | 16 |
 | `OPENPSIRT_ANALYSIS_MAX_RESULTS` | `analysis.max_results` | How many results one run may hold | 100,000 |
 | `OPENPSIRT_ANALYSIS_MAX_RULES` | `analysis.max_rules` | How many rules one run may describe | 10,000 |
@@ -1195,6 +1200,7 @@ sentence on its receipt. Leave one unset and it keeps the built-in value.
 | `OPENPSIRT_ANALYSIS_MAX_PROPERTIES` | `analysis.max_properties` | How many members one property bag may hold | 256 |
 | `OPENPSIRT_ANALYSIS_MAX_TEXT` | `analysis.max_text` | The longest message or description kept. A longer one is cut rather than refused | 16 KB |
 | `OPENPSIRT_ANALYSIS_MAX_DEPTH` | `analysis.max_depth` | How deeply a document may nest | 64 |
+| `OPENPSIRT_ANALYSIS_MAX_HELD` | `analysis.max_held` | How many entries one upload's documents may hold together: results, rules, locations, path steps, invocations and the members of every list they carry. About 200 bytes of memory each, however little of the document each took | 1,000,000 |
 
 ## Scanner output limits
 

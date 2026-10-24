@@ -43,7 +43,7 @@ func seriesV0110(t *columnTypes) []string {
 			-- answered as the run it repeats.
 			"content_hash"   ` + t.hash + ` NOT NULL,
 			-- The commit at the top of the checkout that was analyzed.
-			"source_commit"  ` + t.name + ` NULL,
+			"source_commit"  ` + t.free + ` NULL,
 			-- When the pipeline says the build was made, which orders runs.
 			-- An analyzer writes no time of its own.
 			"built_at"       ` + t.timestamp + ` NOT NULL,
@@ -53,10 +53,10 @@ func seriesV0110(t *columnTypes) []string {
 			-- Why a run that was taken could not be read, in the words the
 			-- sender is shown.
 			"failure"        ` + t.text + ` NULL,
-			"tool_name"      ` + t.name + ` NULL,
-			"tool_version"   ` + t.name + ` NULL,
+			"tool_name"      ` + t.free + ` NULL,
+			"tool_version"   ` + t.free + ` NULL,
 			-- The upload client's version, where the client wrote the run.
-			"client_version" ` + t.name + ` NULL,
+			"client_version" ` + t.free + ` NULL,
 			-- The rules enabled: a digest of their identifiers, sorted, and
 			-- how many. Null where the run states none.
 			"rules_digest"   ` + t.hash + ` NULL,

@@ -88,7 +88,7 @@ func (s *Store) Saw(ctx context.Context, run *Run, findingIDs []int64, baseline 
 	if len(fresh) == 0 {
 		return nil
 	}
-	if _, err := s.db.NewInsert().Model(&fresh).Exec(ctx); err != nil {
+	if err := database.InBatchesUnkeyed(ctx, s.db, fresh); err != nil {
 		return fmt.Errorf("record what the run saw first: %w", err)
 	}
 	return nil
