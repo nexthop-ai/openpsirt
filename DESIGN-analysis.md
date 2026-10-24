@@ -16,9 +16,9 @@ shares is in `DESIGN-ingest.md`.
 
 - [The upload](#the-upload)
 - [Bounds](#bounds)
-- [Reading a run](#reading-a-run)
+- [Run contents](#run-contents)
 - [Run parameters](#run-parameters)
-- [Applying a run](#applying-a-run)
+- [Run application](#run-application)
 - [Matching](#matching)
 - [Placement](#placement)
 - [Receipts](#receipts)
@@ -76,7 +76,7 @@ defaults, and a document past one is refused with the bound named.
 | Text | Per message or description; a longer one is cut rather than refused |
 | Depth | Nesting of the JSON |
 
-## Reading a run
+## Run contents
 
 | Rule | |
 |---|---|
@@ -121,7 +121,7 @@ holds is recorded:
 | `tool-changed` | Ran another tool or version than the series' last applied run on the build |
 | `rules-changed` | Ran another rule set than that run |
 
-## Applying a run
+## Run application
 
 A worker claims the queued job and applies the run in one transaction. The
 documents are read again before it, since they do not change once stored.
@@ -194,7 +194,7 @@ A lead is one component at one place (REQ-17).
 
 | Field | |
 |---|---|
-| Status, failure | § Applying a run |
+| Status, failure | § Run application |
 | Comparable, and the reason where not | § Run parameters |
 | Baseline | The series' first comparable run |
 | Tool and version | As recorded |
