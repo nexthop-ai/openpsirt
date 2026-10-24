@@ -318,10 +318,3 @@ func (s *Store) Modules(ctx context.Context, runID int64, modules []Module) erro
 	}
 	return nil
 }
-
-// InTransaction runs fn against a store over one retryable transaction.
-func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, *Store) error) error {
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		return fn(ctx, NewStore(tx))
-	})
-}
