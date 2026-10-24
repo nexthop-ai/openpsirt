@@ -694,6 +694,9 @@ func (s *Store) editing(ctx context.Context, subject access.Subject,
 // the role somewhere, because an advisory names no product until an issue is
 // added to it; naming one is the act that picks the product, and from there
 // the ordinary per-product rule applies.
+//
+// Internal triage is not among the roles: an advisory discloses, and internal
+// material is never disclosed.
 func triages(subject access.Subject, productID int64) bool {
 	return subject.Holds(access.PublicTriage, productID) ||
 		subject.Holds(access.PrivateTriage, productID)

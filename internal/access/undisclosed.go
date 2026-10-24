@@ -35,6 +35,27 @@ func AnyPrivate(column string) (string, any) {
 	return "(" + count + " > 0)", arg
 }
 
+// WithheldCount is an aggregate counting the rows of a group whose detail
+// stays inside the deployment, with the argument it binds: every visibility
+// but public.
+//
+// Undisclosed and internal rows both. Disclosure applies to private work
+// alone, and PrivateCount is the question it asks; what a message leaving
+// the deployment may say about a row is asked of this one.
+func WithheldCount(column string) (string, any) {
+	if !visibilityColumns[column] {
+		panic("access.WithheldCount: " + column + " is not a visibility column")
+	}
+	return "COUNT(CASE WHEN " + column + " <> ? THEN 1 END)", string(Public)
+}
+
+// AnyWithheld is a condition over a group that holds where the detail of any
+// of its rows stays inside the deployment, with the argument it binds.
+func AnyWithheld(column string) (string, any) {
+	count, arg := WithheldCount(column)
+	return "(" + count + " > 0)", arg
+}
+
 // alias is the shape of a name a column list selects a count under. The name
 // is placed in the statement inside quotes, so a quote in it would close them.
 var alias = regexp.MustCompile(`^[a-z_]+$`)
@@ -51,6 +72,12 @@ func as(caller, name string) string {
 func PrivateCountAs(column, name string) (string, any) {
 	count, arg := PrivateCount(column)
 	return count + as("PrivateCountAs", name), arg
+}
+
+// WithheldCountAs is WithheldCount selected under a name, for a column list.
+func WithheldCountAs(column, name string) (string, any) {
+	count, arg := WithheldCount(column)
+	return count + as("WithheldCountAs", name), arg
 }
 
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.

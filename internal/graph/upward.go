@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // The tree, seen upward, for somebody narrowed to their own work.
@@ -66,9 +67,9 @@ const ours = 2000
 // of visibility of what was assigned, which is what gives a
 // capability held without a read role any content at all — so the population
 // here is what they hold, as an assignment carries it: a disclosed row
-// whatever they read, an undisclosed one only where they read undisclosed
-// work in the product. Somebody who holds nothing gets nothing, which is not a refusal:
-// there is no work of theirs here to hang a tree from.
+// whatever they read, and a row at any other visibility only where they read
+// that visibility in the product. Somebody who holds nothing gets nothing,
+// which is not a refusal: there is no work of theirs here to hang a tree from.
 //
 // Complete is false where they hold work on more components than this will
 // assemble. The tree is then a part of the answer and the counts under-report,
@@ -92,6 +93,7 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		Purl        string `bun:"purl"`
 		Issues      int    `bun:"issues"`
 	}
+	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
 	held := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -103,15 +105,20 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_to" IN (?)`, bun.List(mine)).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."component_id"`).
 		OrderExpr(`issues DESC, "name"`).
 		Limit(ours + 1)
-	// An assignment carries an undisclosed row only to somebody who reads
-	// undisclosed work here, so anybody else gets disclosed rows alone — the
-	// rule the work list applies, for the same reason.
-	if !subject.Reads(access.Private, productID) {
-		held = held.Where(`"f"."visibility" = ?`, access.Public)
+	// An assignment carries a row that is not disclosed only to somebody who
+	// reads its visibility here — the rule the work list applies, for the same
+	// reason.
+	carried := []access.Visibility{access.Public}
+	for _, v := range access.Visibilities() {
+		if v != access.Public && subject.Reads(v, productID) {
+			carried = append(carried, v)
+		}
 	}
+	held = held.Where(`"f"."visibility" IN (?)`, bun.List(carried))
 	if err := held.Scan(ctx, &rows); err != nil {
 		return nil, false, fmt.Errorf("read what you hold in this build: %w", err)
 	}

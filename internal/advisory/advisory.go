@@ -33,6 +33,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/version"
@@ -330,12 +331,14 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 func (s *Store) here(ctx context.Context, subject access.Subject,
 	productID, issueID int64) (bool, error) {
 
+	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	count, err := s.db.NewSelect().Model((*finding.Finding)(nil)).
 		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issueID).
 		Where(`"f"."visibility" IN (?)`, bun.List(access.Visible(subject, productID))).
+		Where(kinds, kindArgs...).
 		Count(ctx)
 	if err != nil {
 		return false, fmt.Errorf("count where issue %d sits here: %w", issueID, err)

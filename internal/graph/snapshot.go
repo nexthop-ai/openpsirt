@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -993,7 +994,8 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 	targetID int64, only []int64) *bun.SelectQuery {
 
-	within, args := "", []any{targetID, bun.List(readable)}
+	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
+	within, args := "", append([]any{targetID, bun.List(readable)}, kindArgs...)
 	if only != nil {
 		within, args = ` AND "f"."component_id" IN (?)`, append(args, bun.List(only))
 	}
@@ -1001,7 +1003,8 @@ func openIssuesJoin(query *bun.SelectQuery, readable []access.Visibility,
 		Join(`LEFT JOIN (SELECT "g"."cid" AS "cid", COUNT(*) AS "n"
 			FROM (SELECT "f"."component_id" AS "cid", "f"."vulnerability_id" AS "vid"
 			      FROM "finding" AS "f"
-			      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)`+within+`
+			      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
+			        AND `+kinds+within+`
 			      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
 			GROUP BY "g"."cid") AS "open" ON "open"."cid" = "c"."id"`, args...).
 		ColumnExpr(`COALESCE("open"."n", 0) AS "findings"`)

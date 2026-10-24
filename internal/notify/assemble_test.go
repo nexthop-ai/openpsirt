@@ -69,7 +69,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: "dependency",
+				TargetID: target.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[each.identifier],
 				Visibility:      each.visibility, ComponentID: component.ID,
 				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
@@ -170,7 +170,7 @@ func TestTheDailyDigestNamesOnlyWhatIsDisclosedAndMovesOnWhateverTheChannelSays(
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: "dependency", VulnerabilityID: named[each.identifier],
+				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: named[each.identifier],
 				Visibility: each.visibility, ComponentID: component.ID,
 				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
 				OpenedAt: time.Now().UTC(),
@@ -249,7 +249,7 @@ func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
 				t.Fatal(err)
 			}
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: "dependency",
+				TargetID: target.ID, Kind: finding.Vulnerable,
 				VulnerabilityID: named[identifier], Visibility: access.Public,
 				ComponentID: component.ID, PlaceIdentity: "place-" + identifier,
 				Urgency: int64(i + 1), OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,

@@ -554,7 +554,7 @@ func (r *run) heldWordsAndRatings(ctx context.Context) (Words, Ratings, error) {
 		WHERE "f"."kind" = 'entered' AND `
 	// A scanned issue kept in a merge, as the upgrade tells one apart.
 	const kept = `(EXISTS (SELECT 1 FROM "finding" AS "scanned"
-			WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" <> 'entered')
+			WHERE "scanned"."vulnerability_id" = "v"."id" AND "scanned"."kind" = 'vulnerability')
 		AND EXISTS (SELECT 1 FROM "vulnerability_merge" AS "vm" WHERE "vm"."kept_id" = "v"."id"))`
 	for _, each := range []struct {
 		query string

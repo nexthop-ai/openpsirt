@@ -361,7 +361,8 @@ func (w *sweep) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	for _, per := range reach {
 		for productID, at := range per {
 			if (at.reads(false) && (at.approves || at.triages(false))) ||
-				(at.reads(true) && (at.approves || at.triages(true))) {
+				(at.reads(true) && (at.approves || at.triages(true))) ||
+				(at.readsInternal && (at.approves || at.triagesInternal)) {
 				able[productID]++
 			}
 		}
