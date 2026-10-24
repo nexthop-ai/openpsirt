@@ -1173,6 +1173,29 @@ process in the same container, so the memory limit covers both — see
 | `OPENPSIRT_INGEST_MAX_DEPTH` | `ingest.max_depth` | How deeply it may nest | 64 |
 | `OPENPSIRT_INGEST_MAX_DOCUMENTS` | `ingest.max_documents` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
 
+## Analyzer result limits
+
+An analyzer's results arrive as SARIF from a build pipeline, and are read
+within bounds for the reason a scan file is. A document past one is refused
+with a sentence naming the bound, and the run is recorded as failed with that
+sentence on its receipt. Leave one unset and it keeps the built-in value.
+
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large a single document may be, decompressed, and the whole upload compressed | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, and the upload client merges them into one | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_RUNS` | `analysis.max_runs` | How many runs one document may hold | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_RESULTS` | `analysis.max_results` | How many results one run may hold | 100,000 |
+| `OPENPSIRT_ANALYSIS_MAX_RULES` | `analysis.max_rules` | How many rules one run may describe | 10,000 |
+| `OPENPSIRT_ANALYSIS_MAX_LOCATIONS` | `analysis.max_locations` | How many locations and related locations one result may name | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_STEPS` | `analysis.max_steps` | How many path steps one result may take, across every flow it states | 10,000 |
+| `OPENPSIRT_ANALYSIS_MAX_MODULES` | `analysis.max_modules` | How many repositories one run may say its checkout holds | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_BASES` | `analysis.max_bases` | How many named starting points for paths one run may declare | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_CHAIN` | `analysis.max_chain` | How many named starting points one path may pass through. A cycle is refused at any length | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_PROPERTIES` | `analysis.max_properties` | How many members one property bag may hold | 256 |
+| `OPENPSIRT_ANALYSIS_MAX_TEXT` | `analysis.max_text` | The longest message or description kept. A longer one is cut rather than refused | 16 KB |
+| `OPENPSIRT_ANALYSIS_MAX_DEPTH` | `analysis.max_depth` | How deeply a document may nest | 64 |
+
 ## Scanner output limits
 
 The scanner's report is read in the same process, and its size is components ×

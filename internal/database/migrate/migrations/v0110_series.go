@@ -74,6 +74,11 @@ func seriesV0110(t *columnTypes) []string {
 			-- The paths the pipeline names as code it did not write, as a
 			-- JSON list of prefixes.
 			"third_party"    ` + t.text + ` NULL,
+			-- The checkout's absolute path on the machine that analyzed it,
+			-- which absolute paths in the documents are placed against. Kept
+			-- until the run is read, and cleared then: it names the build
+			-- host's own layout.
+			"source_root"    ` + t.text + ` NULL,
 			-- The inventory the run was read against: the build's newest
 			-- read inventory when the run was applied.
 			"scan_id"        ` + t.refNull + ` NULL,

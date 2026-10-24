@@ -53,6 +53,8 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/sbom/`, `internal/scanner/` | Reading an inventory and scanning it. See `DESIGN-ingest.md` |
 | `internal/docread/` | Reading a document somebody else wrote as a bounded stream, for every reader of one. See `DESIGN-ingest.md` |
 | `internal/sarif/` | Reading an analyzer's SARIF and placing its results in the checkout. See `DESIGN-analysis.md` |
+| `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `DESIGN-kinds.md` |
+| `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `DESIGN-analysis.md` |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |

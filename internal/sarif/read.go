@@ -38,6 +38,53 @@ type Limits struct {
 	MaxText int
 }
 
+// DefaultLimits are the bounds a reader uses where it is given none.
+//
+// The heap a result costs is its locations and steps, so results and steps
+// are bounded together: a run at every ceiling at once is the largest thing
+// read, and none is close to it.
+func DefaultLimits() Limits {
+	return Limits{
+		MaxBytes:      256 << 20,
+		MaxDepth:      64,
+		MaxRuns:       16,
+		MaxResults:    100_000,
+		MaxRules:      10_000,
+		MaxLocations:  1_000,
+		MaxSteps:      10_000,
+		MaxModules:    1_000,
+		MaxBases:      1_000,
+		MaxChain:      16,
+		MaxProperties: 256,
+		MaxText:       16 << 10,
+	}
+}
+
+// DefaultDocuments is how many documents one upload may carry where nobody
+// has said. The upload client merges a tool's per-unit documents into one
+// run, so a plain upload of one document per unit meets this.
+const DefaultDocuments = 16
+
+// OrDefault fills in anything left unset, so a caller that wants one bound
+// changed does not have to restate the rest.
+func (l Limits) OrDefault() Limits {
+	d := DefaultLimits()
+	for _, f := range []struct{ v, d *int }{
+		{&l.MaxDepth, &d.MaxDepth}, {&l.MaxRuns, &d.MaxRuns}, {&l.MaxResults, &d.MaxResults},
+		{&l.MaxRules, &d.MaxRules}, {&l.MaxLocations, &d.MaxLocations}, {&l.MaxSteps, &d.MaxSteps},
+		{&l.MaxModules, &d.MaxModules}, {&l.MaxBases, &d.MaxBases}, {&l.MaxChain, &d.MaxChain},
+		{&l.MaxProperties, &d.MaxProperties}, {&l.MaxText, &d.MaxText},
+	} {
+		if *f.v <= 0 {
+			*f.v = *f.d
+		}
+	}
+	if l.MaxBytes <= 0 {
+		l.MaxBytes = d.MaxBytes
+	}
+	return l
+}
+
 // Read reads one document.
 func Read(r io.Reader, lim Limits) (Log, error) {
 	b := docread.NewJSON(r, lim.MaxBytes, lim.MaxDepth)

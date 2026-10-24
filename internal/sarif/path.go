@@ -108,6 +108,16 @@ func (p Paths) Module(rel string) (int, bool) {
 	return at, at >= 0
 }
 
+// ModulePath is where the repository at position i sits in the checkout,
+// with no trailing slash and empty for the checkout itself. It is false for
+// one the run places nowhere this can tell.
+func (p Paths) ModulePath(i int) (string, bool) {
+	if i < 0 || i >= len(p.modules) || p.modules[i] == "\x00" {
+		return "", false
+	}
+	return strings.TrimSuffix(p.modules[i], "/"), true
+}
+
 // Within is a path relative to the repository at position i.
 func (p Paths) Within(i int, rel string) string {
 	return strings.TrimPrefix(rel, p.modules[i])

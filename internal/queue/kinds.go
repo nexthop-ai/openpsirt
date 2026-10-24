@@ -21,6 +21,8 @@ const (
 	// Route names the work of applying the standing rules to what is already
 	// open.
 	Route = "routing.sweep"
+	// Analyze names the work of applying an analyzer's run to its build.
+	Analyze = "analysis.apply"
 )
 
 // Kinds is every kind of work this deployment queues.
@@ -29,4 +31,4 @@ const (
 // operator looking at what is waiting. The cap is per kind, so a single number
 // across the queue would hide the kind that is actually backed up behind the
 // two that are not.
-func Kinds() []string { return []string{Parse, Scan, Route} }
+func Kinds() []string { return []string{Parse, Scan, Route, Analyze} }

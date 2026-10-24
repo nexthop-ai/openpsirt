@@ -102,35 +102,47 @@ type Dropped struct {
 	Repeats int
 }
 
-// Prepare places a run's results in the checkout and leaves out what the
-// deployment does not keep. root is the checkout's absolute path where the
-// pipeline states one.
-func Prepare(run *Run, root string) ([]Placed, Dropped) {
+// Placer places the results of one upload's runs in the checkout, leaving
+// out what the deployment does not keep. A result repeated in another run of
+// the same upload is a repeat as much as one repeated within a run: clang
+// writes a document per unit, and a header's result is in each.
+type Placer struct {
+	seen    map[string]bool
+	dropped Dropped
+}
+
+// NewPlacer is a placer that has seen nothing.
+func NewPlacer() *Placer { return &Placer{seen: map[string]bool{}} }
+
+// Dropped is what the placer has left out so far.
+func (pl *Placer) Dropped() Dropped { return pl.dropped }
+
+// Place places one run's results. root is the checkout's absolute path where
+// the pipeline states one.
+func (pl *Placer) Place(run *Run, root string) []Placed {
 	paths := PathsOf(run, root)
 	var out []Placed
-	var dropped Dropped
-	seen := map[string]bool{}
 	for _, res := range run.Results {
 		if advisory.MatchString(res.RuleID) {
-			dropped.Advisory++
+			pl.dropped.Advisory++
 			continue
 		}
 		if len(res.Locations) == 0 {
-			dropped.Outside++
+			pl.dropped.Outside++
 			continue
 		}
 		first := res.Locations[0]
 		rel, ok := paths.Relative(first.URI, first.Base)
 		if !ok {
-			dropped.Outside++
+			pl.dropped.Outside++
 			continue
 		}
 		key := strings.Join([]string{res.RuleID, rel, itoa(first.StartLine), itoa(first.StartColumn), res.Message}, "\x00")
-		if seen[key] {
-			dropped.Repeats++
+		if pl.seen[key] {
+			pl.dropped.Repeats++
 			continue
 		}
-		seen[key] = true
+		pl.seen[key] = true
 		p := Placed{
 			RuleID: res.RuleID, Level: res.Level, Message: res.Message,
 			Path: rel, StartLine: first.StartLine, StartColumn: first.StartColumn,
@@ -148,8 +160,30 @@ func Prepare(run *Run, root string) ([]Placed, Dropped) {
 		}
 		out = append(out, p)
 	}
-	return out, dropped
+	return out
 }
+
+// Prepare places one run's results on their own, and says what it left out.
+func Prepare(run *Run, root string) ([]Placed, Dropped) {
+	pl := NewPlacer()
+	placed := pl.Place(run, root)
+	return placed, pl.Dropped()
+}
+
+// failureSignals is the rules whose results say the analyzer failed on part
+// of what it was given rather than found a flaw in it: a unit that would not
+// compile, a file that would not parse.
+var failureSignals = map[string]bool{
+	"clang-diagnostic-error":     true,
+	"syntaxError":                true,
+	"internalAstError":           true,
+	"cppcheckError":              true,
+	"preprocessorErrorDirective": true,
+}
+
+// FailureSignal is whether a result is the analyzer reporting a failure of its
+// own run.
+func FailureSignal(ruleID string) bool { return failureSignals[ruleID] }
 
 func placedStep(paths Paths, loc Location, depth *int) PlacedStep {
 	rel, _ := paths.Relative(loc.URI, loc.Base)

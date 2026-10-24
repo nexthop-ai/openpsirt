@@ -101,19 +101,32 @@ receipt and read nowhere else.
 
 ## Runs and series
 
-Runs and series are the arrival of results for a kind whose producer sends
-them per series, and are **not built**: the analysis upload is their first
-user (`DESIGN-analysis.md`).
+A series is one analysis a product runs the same way on every build, named by
+the producer: `clang-tidy/default`. A run is one arrival of a series' results
+against one build. The analysis kind is the one that arrives this way
+(`DESIGN-analysis.md`).
+
+| Rule | |
+|---|---|
+| A series is per product and per kind, and its name is matched without regard to capitals | A name people type |
+| A run is ordered by the build time it states, and only one built after the series' last applied run on the build is applied | A run arriving late would mark results absent and the next would reopen them |
+| A run repeating one already held, on its documents and stated build time, is answered as that one | A retry after a timeout that had succeeded (REQ-06) |
+| A run is comparable where its absences are evidence; one that is not adds and updates findings and marks none absent | `DESIGN-analysis.md` § Run parameters holds the reasons |
+| A sighting is what a series knows of one finding: the run that first saw it, the last that did, and the first comparable run that did not | Absence is an interval on the sighting rather than a closure |
+| A run's documents are stored until it is applied, then let go; its receipt stays | What a run said is recorded on the findings it saw |
 
 ## Component from a path
 
-A finding of a kind whose results carry paths is placed at a component derived
-from the path when results arrive. It is **not built**.
+A finding of a kind whose results carry paths is placed at the component the
+build's inventory says was built from the repository holding the path, and at
+the build itself where none was. `DESIGN-analysis.md` § Placement holds the
+rules.
 
 ## Source locations
 
-Locations, source links and snippets belong to any kind with source locations.
-They are **not built**.
+The path, lines, columns, enclosing function, flow steps and related places
+of a finding are stored as the newest run that saw it stated them. Source
+links and snippets are **not built**.
 
 ## Limits
 
