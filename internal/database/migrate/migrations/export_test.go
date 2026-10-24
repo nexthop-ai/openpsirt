@@ -88,5 +88,6 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
 		"vulnerability": vulnerabilityV0110(t),
+		"finding":       findingV0110(t),
 	}
 }

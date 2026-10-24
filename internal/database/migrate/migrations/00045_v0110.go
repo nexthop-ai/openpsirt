@@ -29,7 +29,17 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //
 //   - An issue records what sort of issue it is: a published vulnerability, a
 //     flaw minted here, or an analyzer's rule.
+//   - The finding indexes a read answers from without the table carry the
+//     finding's kind.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err := u.index(findingV0110(u.t), "finding",
+		"finding_group_idx", "finding_opened_run_idx", "finding_closed_run_idx"); err != nil {
+		return err
+	}
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110,
 	} {
