@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -54,26 +55,26 @@ type Advisory struct {
 // their own flaws as claims about what a build ships.
 func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 	lim = lim.OrDefault()
-	b := newBounded(r, lim.MaxBytes, lim.MaxDepth)
+	b := docread.NewJSON(r, lim.MaxBytes, lim.MaxDepth)
 	read := newCSAF(b, lim)
 	read.profile = advisoryProfile
-	err := b.object(func(key string) error {
+	err := b.Object(func(key string) error {
 		switch key {
 		case "document", "product_tree", "vulnerabilities":
 			return read.key(key)
 		default:
-			return b.skip()
+			return b.Skip()
 		}
 	})
 	if err == nil {
-		err = b.end()
+		err = b.End()
 	}
 	if err != nil {
-		return Advisory{}, b.refused("reading an advisory", err)
+		return Advisory{}, b.Refused("reading an advisory", err)
 	}
 	claims, err := read.finish()
 	if err != nil {
-		return Advisory{}, b.refused("reading an advisory", err)
+		return Advisory{}, b.Refused("reading an advisory", err)
 	}
 	if strings.TrimSpace(read.publisher) == "" {
 		return Advisory{}, refusal.Errorf("reading an advisory: it names no publisher, and " +

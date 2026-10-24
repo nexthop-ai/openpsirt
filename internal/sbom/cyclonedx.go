@@ -38,7 +38,7 @@ func (c *reader) cyclonedxSerial() error { return c.into(&c.doc.Serial) }
 // was asked for.
 func (c *reader) cyclonedxComponents() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
 	_, err := c.componentArray()
 	return err
@@ -48,7 +48,7 @@ func (c *reader) cyclonedxComponents() error {
 // asked for.
 func (c *reader) cyclonedxDependencies() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
 	return c.dependencies()
 }
@@ -95,14 +95,14 @@ func cyclonedxRevision(spec string) error {
 
 // metadata reads what the document says about itself.
 func (c *reader) metadata() error {
-	return c.b.object(func(key string) error {
+	return c.b.Object(func(key string) error {
 		switch key {
 		case "timestamp":
 			return c.builtAt()
 		case "component":
 			return c.rootComponent()
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 }
@@ -136,7 +136,7 @@ func (c *reader) holdRoot(described graph.Described, ref string, nested []graph.
 // the header read walks them, inside the upload request.
 func (c *reader) componentArray() ([]graph.Described, error) {
 	var members []graph.Described
-	err := c.b.array(func() error {
+	err := c.b.Array(func() error {
 		described, ref, nested, err := c.component()
 		if err != nil {
 			return err
@@ -188,7 +188,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	if err := c.count(); err != nil {
 		return graph.Described{}, "", nil, err
 	}
-	err := c.b.object(func(key string) error {
+	err := c.b.Object(func(key string) error {
 		switch key {
 		case "bom-ref":
 			return c.into(&s.ref)
@@ -211,11 +211,11 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			return nil
 		case "supplier":
 			// An object naming who supplied it.
-			return c.b.object(func(field string) error {
+			return c.b.Object(func(field string) error {
 				if field == "name" {
 					return c.into(&s.supplier)
 				}
-				return c.b.skip()
+				return c.b.Skip()
 			})
 		case "publisher":
 			return c.into(&s.publisher)
@@ -233,7 +233,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			s.nested = append(s.nested, members...)
 			return nil
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 	if err != nil {
@@ -329,16 +329,16 @@ func (c *reader) settle(s cdxComponent) (graph.Described, string, []graph.Descri
 // apart from one declared or unmarked, because the format's default is a
 // declaration.
 func (c *reader) cdxLicenses(declared, concluded *[]string) error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var said, acknowledged string
-		if err := c.b.object(func(key string) error {
+		if err := c.b.Object(func(key string) error {
 			switch key {
 			case "expression":
 				return c.into(&said)
 			case "acknowledgement":
 				return c.into(&acknowledged)
 			case "license":
-				return c.b.object(func(field string) error {
+				return c.b.Object(func(field string) error {
 					switch field {
 					case "id":
 						return c.into(&said)
@@ -346,17 +346,17 @@ func (c *reader) cdxLicenses(declared, concluded *[]string) error {
 						// An identifier stands where both are given: it is
 						// the one another tool can match.
 						if said != "" {
-							return c.b.skip()
+							return c.b.Skip()
 						}
 						return c.into(&said)
 					case "acknowledgement":
 						return c.into(&acknowledged)
 					default:
-						return c.b.skip()
+						return c.b.Skip()
 					}
 				})
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		}); err != nil {
 			return err
@@ -389,14 +389,14 @@ func (c *reader) cdxLicense(said, acknowledged string, declared, concluded *[]st
 // findings unexplainable. The first ancestor is the one the producer forked
 // from; anything further back is history rather than identity.
 func (c *reader) pedigree(described *graph.Described, carried *[]Suppression) error {
-	return c.b.object(func(key string) error {
+	return c.b.Object(func(key string) error {
 		switch key {
 		case "ancestors":
 			return c.ancestor(described)
 		case "patches":
 			return c.patches(carried)
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 }
@@ -404,19 +404,19 @@ func (c *reader) pedigree(described *graph.Described, carried *[]Suppression) er
 // ancestor reads what a component was forked from.
 func (c *reader) ancestor(described *graph.Described) error {
 	first := true
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		if !first {
-			return c.b.skip()
+			return c.b.Skip()
 		}
 		first = false
-		return c.b.object(func(field string) error {
+		return c.b.Object(func(field string) error {
 			switch field {
 			case "name":
 				return c.into(&described.UpstreamName)
 			case "version":
 				return c.into(&described.UpstreamVersion)
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		})
 	})
@@ -430,22 +430,22 @@ func (c *reader) ancestor(described *graph.Described) error {
 // in its own name, or in a header declaring what it fixes — so what is read
 // here is a claim rather than a mention.
 func (c *reader) patches(carried *[]Suppression) error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var (
 			diff    string
 			claimed []Suppression
 		)
-		err := c.b.object(func(key string) error {
+		err := c.b.Object(func(key string) error {
 			switch key {
 			case "diff":
-				return c.b.object(func(field string) error {
+				return c.b.Object(func(field string) error {
 					if field != "url" {
-						return c.b.skip()
+						return c.b.Skip()
 					}
 					return c.into(&diff)
 				})
 			case "resolves":
-				return c.b.array(func() error {
+				return c.b.Array(func() error {
 					if err := c.claim(); err != nil {
 						return err
 					}
@@ -459,7 +459,7 @@ func (c *reader) patches(carried *[]Suppression) error {
 					return nil
 				})
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		})
 		if err != nil {
@@ -485,14 +485,14 @@ func patched(diff string, claimed []Suppression, carried *[]Suppression) {
 // vulnerability, and only the last of those is a claim about security.
 func (c *reader) resolved() (Suppression, error) {
 	var kind, id string
-	err := c.b.object(func(key string) error {
+	err := c.b.Object(func(key string) error {
 		switch key {
 		case "type":
 			return c.into(&kind)
 		case "id":
 			return c.into(&id)
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 	if err != nil {
@@ -513,18 +513,18 @@ func resolvedClaim(kind, id string) Suppression {
 
 // dependencies reads the declared edges.
 func (c *reader) dependencies() error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var (
 			ref      string
 			children []string
 		)
-		err := c.b.object(func(key string) error {
+		err := c.b.Object(func(key string) error {
 			switch key {
 			case "ref":
 				return c.into(&ref)
 			case "dependsOn":
-				return c.b.array(func() error {
-					child, err := c.b.str()
+				return c.b.Array(func() error {
+					child, err := c.b.Str()
 					if err != nil {
 						return err
 					}
@@ -539,7 +539,7 @@ func (c *reader) dependencies() error {
 					return nil
 				})
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		})
 		if err != nil {

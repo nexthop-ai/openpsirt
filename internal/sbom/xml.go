@@ -10,10 +10,11 @@ import (
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// boundedXML reads XML as a stream, under the bounds bounded reads JSON
+// boundedXML reads XML as a stream, under the bounds docread.JSON reads JSON
 // under: at most so many bytes, nested at most so deep, and holding only the
 // element being read rather than the whole document.
 //
@@ -36,7 +37,7 @@ type boundedXML struct {
 	dec      *xml.Decoder
 	maxDepth int
 	depth    int
-	src      *source
+	src      *docread.Source
 	// space is the namespace the document's own elements are in, set once the
 	// top-level element has said what it is. An element in any other is an
 	// extension, and is walked past whatever it is called: a component a
@@ -48,16 +49,16 @@ type boundedXML struct {
 // newBoundedXML reads r as XML, at most maxBytes of it and nested at most
 // maxDepth deep.
 func newBoundedXML(r io.Reader, maxBytes int64, maxDepth int) *boundedXML {
-	src := &source{r: r}
+	src := docread.NewSource(r)
 	return &boundedXML{
-		dec:      xml.NewDecoder(&capped{r: src, left: maxBytes}),
+		dec:      xml.NewDecoder(docread.Cap(src, maxBytes)),
 		maxDepth: maxDepth,
 		src:      src,
 	}
 }
 
-// refused states what went wrong under what, as bounded does.
-func (x *boundedXML) refused(what string, err error) error { return x.src.refused(what, err) }
+// refused states what went wrong under what, as docread.JSON does.
+func (x *boundedXML) refused(what string, err error) error { return x.src.Refused(what, err) }
 
 // token reads the next token, refusing a document type declaration.
 func (x *boundedXML) token() (xml.Token, error) {
@@ -192,7 +193,7 @@ func (x *boundedXML) text() (string, error) {
 		case xml.StartElement:
 			// The element is the document's own, and its name is as long as
 			// the document lets it be.
-			return "", refusal.Errorf("want text, got the element %s", bound.Head(t.Name.Local, mostQuoted))
+			return "", refusal.Errorf("want text, got the element %s", bound.Head(t.Name.Local, docread.MostQuoted))
 		case xml.EndElement:
 			return strings.TrimSpace(text.String()), nil
 		}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -76,7 +77,7 @@ type reader struct {
 	// at before either encoding's stream is started on it. b reads it as JSON
 	// and x as XML, and only one of the two is ever set.
 	in         *bufio.Reader
-	b          *bounded
+	b          *docread.JSON
 	x          *boundedXML
 	lim        Limits
 	headerOnly bool
@@ -237,7 +238,7 @@ func (c *reader) bind(ref string, described graph.Described) error {
 // builtAt reads the header value saying when the build was made, at the
 // stream's current value. An empty value leaves the document undated.
 func (c *reader) builtAt() error {
-	raw, err := c.b.str()
+	raw, err := c.b.Str()
 	if err != nil {
 		return err
 	}
@@ -648,7 +649,7 @@ func printable(d *graph.Described) {
 
 // into reads one string into dst.
 func (c *reader) into(dst *string) error {
-	value, err := c.b.str()
+	value, err := c.b.Str()
 	if err != nil {
 		return err
 	}
