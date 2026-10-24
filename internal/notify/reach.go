@@ -37,7 +37,7 @@ import (
 type acts struct {
 	approves                                                 bool
 	readsPublic, readsPrivate, triagesPublic, triagesPrivate bool
-	readsInternal, triagesInternal                           bool
+	readsInternal                                            bool
 }
 
 // reads is what a condition sent to whoever may read it asks, of something
@@ -130,10 +130,8 @@ func actsOf(people []access.Account, held map[int64][]access.Grant) map[int64]ma
 				at.readsPublic, at.triagesPublic = true, true
 			case access.PrivateTriage:
 				at.readsPrivate, at.triagesPrivate = true, true
-			case access.InternalRead:
+			case access.InternalRead, access.InternalTriage:
 				at.readsInternal = true
-			case access.InternalTriage:
-				at.readsInternal, at.triagesInternal = true, true
 			}
 			per[grant.ProductID] = at
 		}
