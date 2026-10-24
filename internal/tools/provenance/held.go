@@ -107,6 +107,12 @@ var Held = []Entry{
 
 	// Written here, or produced here by running a tool over something this
 	// project builds or a public image. The fixture READMEs say which.
+	{"internal/sarif/testdata/clang18-a.sarif", Ours, ""},
+	{"internal/sarif/testdata/clang18-b.sarif", Ours, ""},
+	{"internal/sarif/testdata/cppcheck222.sarif", Ours, ""},
+	{"internal/sarif/testdata/src/a.c", Ours, ""},
+	{"internal/sarif/testdata/src/b.c", Ours, ""},
+	{"internal/sarif/testdata/src/include/shared.h", Ours, ""},
 	{"internal/sbom/testdata/advisory-named-products.csaf.json", Ours, ""},
 	{"internal/sbom/testdata/advisory-opaque-products.csaf.json", Ours, ""},
 	{"internal/sbom/testdata/advisory-platform-packages.csaf.json", Ours, ""},

@@ -1,0 +1,320 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+// Package series holds results a producer sends per series: one analysis
+// a product runs the same way on every build, each run of it against a
+// build, and what each run saw and did not see.
+//
+// Built for any kind whose producer sends results that way. Static analysis
+// is the first.
+package series
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/typedname"
+)
+
+// Status is what became of a run.
+type Status string
+
+const (
+	// Queued is a run stored and not yet read.
+	Queued Status = "queued"
+	// Waiting is a run whose build has no inventory read yet. It is read
+	// once one is.
+	Waiting Status = "waiting"
+	// Applied is a run read and applied.
+	Applied Status = "applied"
+	// Superseded is a run older than one already applied to its build. It is
+	// kept and changes nothing.
+	Superseded Status = "superseded"
+	// Held is a comparable run that would have marked more of its series'
+	// open results not reproduced than the deployment allows. It changes
+	// nothing.
+	Held Status = "held"
+	// Failed is a run that could not be read, or whose tool did not run.
+	Failed Status = "failed"
+)
+
+// Statuses is every status a run may hold.
+func Statuses() []Status { return []Status{Queued, Waiting, Applied, Superseded, Held, Failed} }
+
+// Series is one analysis a product runs the same way on every build.
+type Series struct {
+	bun.BaseModel `bun:"table:series,alias:se"`
+
+	ID         int64     `bun:"id,pk,autoincrement"`
+	ProductID  int64     `bun:"product_id,notnull"`
+	Kind       kind.Kind `bun:"kind,notnull"`
+	Name       string    `bun:"name,notnull"`
+	NameFolded string    `bun:"name_folded,notnull"`
+	CreatedAt  time.Time `bun:"created_at,notnull"`
+}
+
+// Run is one run of a series against one build.
+type Run struct {
+	bun.BaseModel `bun:"table:series_run,alias:sr"`
+
+	ID           int64      `bun:"id,pk,autoincrement"`
+	SeriesID     int64      `bun:"series_id,notnull"`
+	TargetID     int64      `bun:"target_id,notnull"`
+	ContentHash  string     `bun:"content_hash,notnull"`
+	SourceCommit string     `bun:"source_commit,nullzero"`
+	BuiltAt      time.Time  `bun:"built_at,notnull"`
+	ReceivedAt   time.Time  `bun:"received_at,notnull"`
+	Credential   string     `bun:"credential,nullzero"`
+	Status       Status     `bun:"status,notnull"`
+	Failure      string     `bun:"failure,nullzero"`
+	Params                  // what the run says about itself
+	Comparable   *bool      `bun:"comparable"`
+	Reason       Reason     `bun:"not_comparable,nullzero"`
+	ScanID       *int64     `bun:"scan_id"`
+	Baseline     bool       `bun:"baseline,notnull"`
+	Receipt      string     `bun:"receipt,nullzero"`
+	AppliedAt    *time.Time `bun:"applied_at"`
+}
+
+// Params is what a run says about itself: in its documents, or beside them in
+// the request where the documents say nothing.
+type Params struct {
+	ToolName      string `bun:"tool_name,nullzero"`
+	ToolVersion   string `bun:"tool_version,nullzero"`
+	ClientVersion string `bun:"client_version,nullzero"`
+	// RulesDigest and RulesCount are the rules enabled: a digest of their
+	// identifiers, sorted, and how many.
+	RulesDigest   string `bun:"rules_digest,nullzero"`
+	RulesCount    *int   `bun:"rules_count"`
+	UnitsExpected *int   `bun:"units_expected"`
+	UnitsAnalyzed *int   `bun:"units_analyzed"`
+	ExitStatus    *int   `bun:"exit_status"`
+	// Completed is what the tool said of its own run.
+	Completed *bool `bun:"completed"`
+	// ThirdParty is the paths the pipeline names as code it did not write,
+	// as a JSON list.
+	ThirdParty string `bun:"third_party,nullzero"`
+	// SourceRoot is the checkout's absolute path where the pipeline states
+	// one, held until the run is read.
+	SourceRoot string `bun:"source_root,nullzero"`
+}
+
+// Module is one repository a run's checkout held.
+type Module struct {
+	bun.BaseModel `bun:"table:series_module,alias:sm"`
+
+	ID       int64  `bun:"id,pk,autoincrement"`
+	RunID    int64  `bun:"run_id,notnull"`
+	Path     string `bun:"path,notnull"`
+	Remote   string `bun:"remote,nullzero"`
+	Revision string `bun:"revision,nullzero"`
+	Changed  bool   `bun:"changed,notnull"`
+}
+
+// Store reads and writes series and their runs.
+type Store struct {
+	db  bun.IDB
+	now func() time.Time
+}
+
+// NewStore returns a store over db, which may be a transaction.
+func NewStore(db bun.IDB) *Store {
+	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// Arriving is a run as it arrives.
+type Arriving struct {
+	ProductID   int64
+	TargetID    int64
+	Kind        kind.Kind
+	Series      string
+	ContentHash string
+	Commit      string
+	BuiltAt     time.Time
+	Credential  string
+	Params      Params
+}
+
+// ErrUnnamed refuses a run that names no series.
+var ErrUnnamed = refusal.New("the run names no series: send one, or write it into the run's automation identifier")
+
+// ErrBuiltInFuture refuses a run stating a build time ahead of this
+// deployment's clock. Runs are ordered by it, so one dated ahead would leave
+// every run after it superseded.
+var ErrBuiltInFuture = refusal.New("the run states a build time in the future; check the build host's clock")
+
+// futureTolerance is how far ahead of this deployment's clock a build time
+// may be, for clocks that disagree by a little.
+const futureTolerance = 5 * time.Minute
+
+// Receive records an arriving run, or answers the run it repeats. A repeat
+// is the same documents for the same series and build; it is reported, and
+// nothing is written.
+func (s *Store) Receive(ctx context.Context, a Arriving) (*Run, bool, error) {
+	if !kind.Known(a.Kind) {
+		return nil, false, fmt.Errorf("receive a run: %q is not a kind of finding", a.Kind)
+	}
+	typed := strings.TrimSpace(a.Series)
+	if typed == "" {
+		return nil, false, ErrUnnamed
+	}
+	if a.BuiltAt.After(s.now().Add(futureTolerance)) {
+		return nil, false, ErrBuiltInFuture
+	}
+	series, err := s.series(ctx, a.ProductID, a.Kind, typed)
+	if err != nil {
+		return nil, false, err
+	}
+	var held Run
+	err = s.db.NewSelect().Model(&held).
+		Where(`"sr"."series_id" = ?`, series.ID).
+		Where(`"sr"."target_id" = ?`, a.TargetID).
+		Where(`"sr"."content_hash" = ?`, a.ContentHash).
+		Scan(ctx)
+	switch {
+	case err == nil:
+		return &held, true, nil
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, false, fmt.Errorf("look for the run this repeats: %w", err)
+	}
+	now := s.now().Truncate(time.Microsecond)
+	run := &Run{
+		SeriesID: series.ID, TargetID: a.TargetID, ContentHash: a.ContentHash,
+		SourceCommit: a.Commit, BuiltAt: a.BuiltAt.UTC().Truncate(time.Microsecond),
+		ReceivedAt: now, Credential: a.Credential, Status: Queued, Params: a.Params,
+	}
+	if _, err := s.db.NewInsert().Model(run).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			// The same documents arriving twice at once. The retry finds the
+			// one that landed and answers it as a repeat.
+			return nil, false, fmt.Errorf("record the run: %w", database.ErrGoAgain)
+		}
+		return nil, false, fmt.Errorf("record the run: %w", err)
+	}
+	return run, false, nil
+}
+
+// series is the product's series of this kind under this name, made where
+// there is none.
+func (s *Store) series(ctx context.Context, productID int64, k kind.Kind, typed string) (*Series, error) {
+	var found Series
+	err := s.db.NewSelect().Model(&found).
+		Where(`"se"."product_id" = ?`, productID).
+		Where(`"se"."kind" = ?`, k).
+		Where(`"se"."name_folded" = ?`, typedname.Matching(typed)).
+		Scan(ctx)
+	if err == nil {
+		return &found, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("look up the series: %w", err)
+	}
+	made := &Series{
+		ProductID: productID, Kind: k, Name: typed, NameFolded: typedname.Matching(typed),
+		CreatedAt: s.now().Truncate(time.Microsecond),
+	}
+	if _, err := s.db.NewInsert().Model(made).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			return nil, fmt.Errorf("record the series: %w", database.ErrGoAgain)
+		}
+		return nil, fmt.Errorf("record the series: %w", err)
+	}
+	return made, nil
+}
+
+// ByID is one run.
+func (s *Store) ByID(ctx context.Context, id int64) (*Run, error) {
+	var run Run
+	if err := s.db.NewSelect().Model(&run).Where(`"sr"."id" = ?`, id).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read run %d: %w", id, err)
+	}
+	return &run, nil
+}
+
+// SeriesOf is the series a run belongs to.
+func (s *Store) SeriesOf(ctx context.Context, run *Run) (*Series, error) {
+	var found Series
+	if err := s.db.NewSelect().Model(&found).Where(`"se"."id" = ?`, run.SeriesID).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read series %d: %w", run.SeriesID, err)
+	}
+	return &found, nil
+}
+
+// Previous is the newest run of the same series applied to the same build,
+// and nil where there is none.
+func (s *Store) Previous(ctx context.Context, run *Run) (*Run, error) {
+	var prev Run
+	err := s.db.NewSelect().Model(&prev).
+		Where(`"sr"."series_id" = ?`, run.SeriesID).
+		Where(`"sr"."target_id" = ?`, run.TargetID).
+		Where(`"sr"."status" = ?`, Applied).
+		Where(`"sr"."id" <> ?`, run.ID).
+		OrderExpr(`"sr"."built_at" DESC, "sr"."id" DESC`).
+		Limit(1).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read the run before this one: %w", err)
+	}
+	return &prev, nil
+}
+
+// HasBaseline reports whether a series has a comparable run applied to any
+// build of its product, which is what makes a later run something other
+// than the baseline.
+func (s *Store) HasBaseline(ctx context.Context, seriesID int64) (bool, error) {
+	found, err := s.db.NewSelect().Model((*Run)(nil)).
+		Where(`"sr"."series_id" = ?`, seriesID).
+		Where(`"sr"."status" = ?`, Applied).
+		Where(`"sr"."comparable" = ?`, true).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether the series has a baseline: %w", err)
+	}
+	return found, nil
+}
+
+// Mark records what became of a run. The status, the failure, whether it is
+// comparable and why not, the inventory it was read against, whether it is
+// the baseline, the receipt and when it was applied are written; everything
+// else on the run is as it arrived.
+func (s *Store) Mark(ctx context.Context, run *Run) error {
+	if run.Status == Applied && run.AppliedAt == nil {
+		at := s.now().Truncate(time.Microsecond)
+		run.AppliedAt = &at
+	}
+	_, err := s.db.NewUpdate().Model(run).
+		Column("status", "failure", "comparable", "not_comparable", "scan_id", "baseline", "receipt",
+			"applied_at", "source_root", "tool_name", "tool_version", "client_version", "rules_digest", "rules_count",
+			"units_expected", "units_analyzed", "exit_status", "completed").
+		WherePK().Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record what became of run %d: %w", run.ID, err)
+	}
+	return nil
+}
+
+// Modules records the repositories a run's checkout held.
+func (s *Store) Modules(ctx context.Context, runID int64, modules []Module) error {
+	if len(modules) == 0 {
+		return nil
+	}
+	for i := range modules {
+		modules[i].RunID = runID
+	}
+	if _, err := s.db.NewInsert().Model(&modules).Exec(ctx); err != nil {
+		return fmt.Errorf("record the repositories run %d held: %w", runID, err)
+	}
+	return nil
+}

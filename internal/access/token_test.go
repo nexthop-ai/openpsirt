@@ -775,3 +775,58 @@ func TestAWithdrawnTokensNameMayBeGivenAgain(t *testing.T) {
 		}
 	})
 }
+
+// A token narrowed to an internal role carries that role and no other, and
+// internal triage on it is not the triage a case's write half asks for: a case
+// is about disclosed and undisclosed work.
+func TestATokenNarrowsToAnInternalRole(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		sonic := f.products["sonic"]
+		person := holding(t, f, "analyst", "Analyst", sonic,
+			access.PublicRead, access.InternalRead, access.InternalTriage)
+		issues, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "SONIC-2026-8200", Severity: "high"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := issues["SONIC-2026-8200"]
+		if _, err := f.store.AddToCase(ctx, sonic, issue, person.ID, person.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, c := range []struct {
+			what           string
+			holds          []access.Role
+			readsPublic    bool
+			readsInternal  bool
+			triageInternal bool
+		}{
+			{"narrowed to internal reading", []access.Role{access.InternalRead}, false, true, false},
+			{"narrowed to internal triage", []access.Role{access.InternalTriage}, false, true, true},
+			{"narrowed to public reading", []access.Role{access.PublicRead}, true, false, false},
+		} {
+			_, secret, err := f.store.NewToken(ctx, person.ID, c.what, nil, c.holds, time.Hour, 0)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			subject, err := f.store.ResolveToken(ctx, secret)
+			if err != nil {
+				t.Fatalf("%s: %v", c.what, err)
+			}
+			if got := subject.Reads(access.Public, sonic); got != c.readsPublic {
+				t.Errorf("a token %s reads disclosed work: %v, want %v", c.what, got, c.readsPublic)
+			}
+			if got := subject.Reads(access.Internal, sonic); got != c.readsInternal {
+				t.Errorf("a token %s reads internal work: %v, want %v", c.what, got, c.readsInternal)
+			}
+			if got := subject.Triages(access.Internal, sonic); got != c.triageInternal {
+				t.Errorf("a token %s triages internal work: %v, want %v", c.what, got, c.triageInternal)
+			}
+			if subject.OnCaseToAct(sonic, issue) {
+				t.Errorf("a token %s writes on a case", c.what)
+			}
+		}
+	})
+}

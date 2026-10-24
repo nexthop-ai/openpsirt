@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Everything open at one component.
@@ -59,8 +60,10 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		return nil, 0, 0, err
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
@@ -171,6 +174,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// shows rather than off the places: the places are read for what
 			// a decision is keyed on, and that read carries no clock.
 			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 			Where(`"f"."closed_at" IS NULL`).
@@ -237,6 +241,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		ComponentUpstream string `bun:"component_upstream"`
 		ConsumerUpstream  string `bun:"consumer_upstream"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
@@ -246,6 +251,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
@@ -391,9 +397,11 @@ func NarrowedWithin(ctx context.Context, tx bun.IDB, subject access.Subject, tar
 		return Narrowing{}, err
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).

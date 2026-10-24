@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -124,6 +125,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// along to be discarded after. A DISTINCT over the joined rows reaches
 	// the same answer and was measured slower on PostgreSQL, because the
 	// join runs before it.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	moments := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -143,6 +145,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// states is unaffected, were never present, so neither is in any
 		// step's open set.
 		Where(`COALESCE("f"."closed_because", '') NOT IN (?)`, bun.List(NeverPresent())).
+		Where(kinds, kindArgs...).
 		// Only what can fall in the range. A finding opened after the last
 		// point contributes to nothing, and one closed before the first
 		// contributes to nothing either — reading the whole table to discard

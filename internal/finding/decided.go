@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // The decision state of a group, counted per place.
@@ -156,8 +158,10 @@ func decisionsAtPlaces(q *bun.SelectQuery, productID int64, states ...decisionSt
 // SQLite starts from every open finding and reads every decision of its
 // product once per row.
 func decisionsOutward(q *bun.SelectQuery) *bun.SelectQuery {
+	kinds, kindArgs := kind.Triage.Where(`"f2"."kind"`)
 	return decisionsOver(q, `"finding" AS "f2"`).
 		ColumnExpr(`"f2"."id" AS "finding_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"f2"."closed_at" IS NULL`).
 		GroupExpr(`"f2"."id"`)
 }

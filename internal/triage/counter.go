@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // The case against agreeing.
@@ -126,6 +127,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"f"."place_identity" AS "place_identity"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"f"."place_identity" IN (?)`, bun.List(places)).
 		Where(`"st"."product_id" IN (?)`, bun.List(products)).
 		// The issue before the decision, and CROSS JOIN ... WHERE is what fixes

@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
@@ -77,6 +78,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	// an issue has one band, so the band does not need to be in the key, and
 	// joining first reads the issue's row once per place only to fold the
 	// copies away.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -85,6 +87,7 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`)
 	pairs = inOneProduct(pairs, subject, productID, all)
 	inner := s.db.NewSelect().
@@ -239,6 +242,7 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		Purl    string `bun:"purl"`
 		Name    string `bun:"name"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err = s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
@@ -253,6 +257,7 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		// fold, with the producer's own spelling naming the one spelled so.
 		Where(`"c"."name_folded" = ?`, graph.Folded(name)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		OrderExpr(`"c"."version", "c"."purl", "c"."name"`).
 		Scan(ctx, &rows)
 	if err != nil {

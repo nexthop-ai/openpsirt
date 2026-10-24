@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -191,9 +192,12 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	sameProduct := `AND EXISTS (SELECT 1 FROM "target" AS "tg"
 			JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"
 			WHERE "tg"."id" = "f"."target_id" AND "st"."product_id" = "de"."product_id")`
+	kinds, onArgs := kindsOf(kind.Statistics, "f")
+	sameProduct += " AND " + kinds
 	mayRead, readArgs := readableFindingsOn(subject, "f", `"de"."product_id"`)
 	if mayRead != "" {
 		sameProduct += " AND " + mayRead
+		onArgs = append(onArgs, readArgs...)
 	}
 	q := s.db.NewSelect().
 		TableExpr(finding.Decisions).
@@ -202,7 +206,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		// matched by, and left-joined: a claim about a place that has since
 		// closed still happened, and dropping it would make the figures
 		// flatter exactly where work was finished.
-		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")+` `+sameProduct, readArgs...).
+		Join(`LEFT JOIN "finding" AS "f" ON `+finding.DecisionAtPlace("f")+` `+sameProduct, onArgs...).
 		Join(`LEFT JOIN "vulnerability" AS "v" ON "v"."id" = "dv"."issue_id"`).
 		// Rated as the product that made the decision rates it, which is the
 		// band every other surface groups this issue under. Read from the

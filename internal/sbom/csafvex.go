@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -119,7 +120,7 @@ type scoped struct {
 func (s scoped) names() bool { return len(s.ids) > 0 || len(s.groups) > 0 }
 
 type csafReader struct {
-	b   *bounded
+	b   *docread.JSON
 	lim Limits
 	// profile is which kind of document this reader was opened for and
 	// category what the document states. A document of the other profile is
@@ -242,7 +243,7 @@ var csafStatuses = map[string]Status{
 	"under_investigation": UnderInvestigation,
 }
 
-func newCSAF(b *bounded, lim Limits) *csafReader {
+func newCSAF(b *docread.JSON, lim Limits) *csafReader {
 	return &csafReader{
 		b: b, lim: lim, profile: vexProfile,
 		tree: map[string]named{}, joined: map[string]joins{},
@@ -261,9 +262,9 @@ func (r *csafReader) key(key string) error {
 	case "product_tree":
 		return r.productTree()
 	case "vulnerabilities":
-		return r.b.array(func() error { return r.vulnerability() })
+		return r.b.Array(func() error { return r.vulnerability() })
 	}
-	return r.b.skip()
+	return r.b.Skip()
 }
 
 // finish is the claims once the whole document has been read and the tree is
@@ -314,36 +315,36 @@ func (r *csafReader) wrongProfile() error {
 // document is what the document says about itself: which profile it is, who
 // issued it, what they called it and the name a revision of it replaces.
 func (r *csafReader) document() error {
-	return r.b.object(func(key string) error {
+	return r.b.Object(func(key string) error {
 		switch key {
 		case "category":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			r.category = value
 			return err
 		case "title":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			r.title = value
 			return err
 		case "publisher":
-			return r.b.object(func(field string) error {
+			return r.b.Object(func(field string) error {
 				if field != "name" {
-					return r.b.skip()
+					return r.b.Skip()
 				}
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				r.publisher = value
 				return err
 			})
 		case "tracking":
-			return r.b.object(func(field string) error {
+			return r.b.Object(func(field string) error {
 				if field != "id" {
-					return r.b.skip()
+					return r.b.Skip()
 				}
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				r.identifier = value
 				return err
 			})
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 }
@@ -352,12 +353,12 @@ func (r *csafReader) document() error {
 // depth and a product may be defined at any level of them, so the walk is the
 // same at every level and only the `product` objects are read.
 func (r *csafReader) productTree() error {
-	return r.b.object(func(key string) error {
+	return r.b.Object(func(key string) error {
 		switch key {
 		case "branches":
 			return r.branches()
 		case "full_product_names":
-			return r.b.array(func() error {
+			return r.b.Array(func() error {
 				id, err := r.product()
 				if id != "" {
 					r.defined = append(r.defined, id)
@@ -365,11 +366,11 @@ func (r *csafReader) productTree() error {
 				return err
 			})
 		case "relationships":
-			return r.b.array(func() error { return r.relationship() })
+			return r.b.Array(func() error { return r.relationship() })
 		case "product_groups":
-			return r.b.array(func() error { return r.productGroup() })
+			return r.b.Array(func() error { return r.productGroup() })
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 }
@@ -386,15 +387,15 @@ func (r *csafReader) productGroup() error {
 		id  string
 		has []string
 	)
-	err := r.b.object(func(key string) error {
+	err := r.b.Object(func(key string) error {
 		switch key {
 		case "group_id":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			id = value
 			return err
 		case "product_ids":
-			return r.b.array(func() error {
-				product, err := r.b.str()
+			return r.b.Array(func() error {
+				product, err := r.b.Str()
 				if err != nil {
 					return err
 				}
@@ -410,7 +411,7 @@ func (r *csafReader) productGroup() error {
 				return nil
 			})
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 	if err != nil {
@@ -445,42 +446,42 @@ func (r *csafReader) relationship() error {
 		id   string
 		join joins
 	)
-	err := r.b.object(func(key string) error {
+	err := r.b.Object(func(key string) error {
 		switch key {
 		case "product_reference":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			join.reference = value
 			return err
 		case "relates_to_product_reference":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			join.context = value
 			return err
 		case "full_product_name":
-			return r.b.object(func(field string) error {
+			return r.b.Object(func(field string) error {
 				switch field {
 				case "product_id":
-					value, err := r.b.str()
+					value, err := r.b.Str()
 					id = value
 					return err
 				case "name":
-					value, err := r.b.str()
+					value, err := r.b.Str()
 					join.own.name = value
 					return err
 				case "product_identification_helper":
-					return r.b.object(func(helper string) error {
+					return r.b.Object(func(helper string) error {
 						if helper != "purl" {
-							return r.b.skip()
+							return r.b.Skip()
 						}
-						value, err := r.b.str()
+						value, err := r.b.Str()
 						join.own.purl = value
 						return err
 					})
 				default:
-					return r.b.skip()
+					return r.b.Skip()
 				}
 			})
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 	if err != nil {
@@ -512,20 +513,20 @@ func (r *csafReader) relationship() error {
 // inside it. The innermost version wins: an inner branch fills its products
 // first, and an outer one only fills what is still empty.
 func (r *csafReader) branches() error {
-	return r.b.array(func() error {
+	return r.b.Array(func() error {
 		var (
 			category string
 			name     string
 			within   []string
 		)
-		err := r.b.object(func(key string) error {
+		err := r.b.Object(func(key string) error {
 			switch key {
 			case "category":
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				category = value
 				return err
 			case "name":
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				name = value
 				return err
 			case "branches":
@@ -539,7 +540,7 @@ func (r *csafReader) branches() error {
 				}
 				return err
 			default:
-				return r.b.skip()
+				return r.b.Skip()
 			}
 		})
 		if err != nil {
@@ -575,27 +576,27 @@ func (r *csafReader) product() (string, error) {
 		id  string
 		one named
 	)
-	err := r.b.object(func(key string) error {
+	err := r.b.Object(func(key string) error {
 		switch key {
 		case "product_id":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			id = value
 			return err
 		case "name":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			one.name = value
 			return err
 		case "product_identification_helper":
-			return r.b.object(func(field string) error {
+			return r.b.Object(func(field string) error {
 				if field != "purl" {
-					return r.b.skip()
+					return r.b.Skip()
 				}
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				one.purl = value
 				return err
 			})
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 	if err != nil {
@@ -633,10 +634,10 @@ func (r *csafReader) vulnerability() error {
 		cve string
 		ids []string
 	)
-	err := r.b.object(func(key string) error {
+	err := r.b.Object(func(key string) error {
 		switch key {
 		case "cve":
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			if cve == "" {
 				cve = value
 			}
@@ -652,7 +653,7 @@ func (r *csafReader) vulnerability() error {
 		case "remediations":
 			return r.prose(one, Affected, "details")
 		default:
-			return r.b.skip()
+			return r.b.Skip()
 		}
 	})
 	if err != nil {
@@ -677,13 +678,13 @@ func (r *csafReader) vulnerability() error {
 // name where no CVE is given: a document about something with no CVE still
 // names it something, and refusing it would drop the claim.
 func (r *csafReader) ids(into *[]string) error {
-	return r.b.array(func() error {
+	return r.b.Array(func() error {
 		var text string
-		if err := r.b.object(func(key string) error {
+		if err := r.b.Object(func(key string) error {
 			if key != "text" {
-				return r.b.skip()
+				return r.b.Skip()
 			}
-			value, err := r.b.str()
+			value, err := r.b.Str()
 			text = value
 			return err
 		}); err != nil {
@@ -707,13 +708,13 @@ func (r *csafReader) ids(into *[]string) error {
 // identifier appears in is the status, which is the whole shape difference
 // from OpenVEX.
 func (r *csafReader) productStatus(one *claimed) error {
-	return r.b.object(func(list string) error {
+	return r.b.Object(func(list string) error {
 		status, known := r.statuses[list]
 		if !known {
-			return r.b.skip()
+			return r.b.Skip()
 		}
-		return r.b.array(func() error {
-			id, err := r.b.str()
+		return r.b.Array(func() error {
+			id, err := r.b.Str()
 			if err != nil {
 				return err
 			}
@@ -741,8 +742,8 @@ func (r *csafReader) productStatus(one *claimed) error {
 func (r *csafReader) scope(key string, into *scoped) (bool, error) {
 	switch key {
 	case "product_ids":
-		return true, r.b.array(func() error {
-			id, err := r.b.str()
+		return true, r.b.Array(func() error {
+			id, err := r.b.Str()
 			if err != nil || id == "" {
 				return err
 			}
@@ -756,8 +757,8 @@ func (r *csafReader) scope(key string, into *scoped) (bool, error) {
 			return nil
 		})
 	case "group_ids":
-		return true, r.b.array(func() error {
-			group, err := r.b.str()
+		return true, r.b.Array(func() error {
+			group, err := r.b.Str()
 			if err != nil || group == "" {
 				return err
 			}
@@ -775,18 +776,18 @@ func (r *csafReader) scope(key string, into *scoped) (bool, error) {
 // with no products applies to all of this vulnerability's, which is how the
 // format spells "the whole claim".
 func (r *csafReader) flags(one *claimed) error {
-	return r.b.array(func() error {
+	return r.b.Array(func() error {
 		var flag scoped
-		if err := r.b.object(func(key string) error {
+		if err := r.b.Object(func(key string) error {
 			if key == "label" {
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				flag.words = value
 				return err
 			}
 			if read, err := r.scope(key, &flag); read {
 				return err
 			}
-			return r.b.skip()
+			return r.b.Skip()
 		}); err != nil {
 			return err
 		}
@@ -816,18 +817,18 @@ func (r *csafReader) flags(one *claimed) error {
 // do about something that is, and reading either into both would attach an
 // argument to a claim it was not made about.
 func (r *csafReader) prose(one *claimed, to Status, field string) error {
-	return r.b.array(func() error {
+	return r.b.Array(func() error {
 		var words scoped
-		if err := r.b.object(func(key string) error {
+		if err := r.b.Object(func(key string) error {
 			if key == field {
-				value, err := r.b.str()
+				value, err := r.b.Str()
 				words.words = value
 				return err
 			}
 			if read, err := r.scope(key, &words); read {
 				return err
 			}
-			return r.b.skip()
+			return r.b.Skip()
 		}); err != nil {
 			return err
 		}

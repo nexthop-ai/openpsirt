@@ -289,8 +289,8 @@ func recordedOutOfReachOf(subject access.Subject, column string) (string, []any)
 	}
 	// Neither column is ever null, so negating the reader's narrowing is
 	// exact.
-	both, public, private := access.Split(products, subject.Reads)
-	visible, args := access.VisibleWhere(`"rs"."product_id"`, `"rf"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	visible, args := access.VisibleWhere(`"rs"."product_id"`, `"rf"."visibility"`, readings)
 	return `EXISTS (SELECT 1 FROM "finding" AS "rf"
 		JOIN "target" AS "rt" ON "rt"."id" = "rf"."target_id"
 		JOIN "stream" AS "rs" ON "rs"."id" = "rt"."stream_id"

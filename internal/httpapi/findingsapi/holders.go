@@ -67,7 +67,8 @@ func registerHolders(api huma.API, in core.Deps) {
 			"directory and needs administration.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "Asking about disclosed findings, the default, needs public-read or "+
-		"public-triage; about undisclosed findings, private-read or private-triage.",
+		"public-triage; about undisclosed findings, private-read or private-triage; about "+
+		"internal findings, internal-read or internal-triage.",
 		core.ReadRights()...), func(ctx context.Context, input *struct {
 		Product    string          `path:"product"`
 		Visibility core.Visibility `query:"visibility" default:"public" doc:"The visibility of the work being handed over"`

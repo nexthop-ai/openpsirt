@@ -238,9 +238,17 @@ func EnforceDeclarations(api huma.API) {
 	})
 }
 
-// TriageRights is the pair meaning "may argue about findings here". Either is
-// enough; which of the two decides what is visible rather than what is allowed.
+// TriageRights is the roles meaning "may argue about findings here", one per
+// visibility. Any is enough; which decides what is visible rather than what is
+// allowed.
 func TriageRights() []access.Role {
+	return []access.Role{access.PublicTriage, access.PrivateTriage, access.InternalTriage}
+}
+
+// DisclosureTriageRights is the triage roles at the visibilities disclosure
+// applies to, for the operations about disclosing, advisories, recorded flaws
+// and what an upstream says. Internal material is never disclosed.
+func DisclosureTriageRights() []access.Role {
 	return []access.Role{access.PublicTriage, access.PrivateTriage}
 }
 
@@ -248,16 +256,24 @@ func TriageRights() []access.Role {
 // triager on somebody else's work. That the two are different people is
 // checked separately and has no override.
 func ApproveRights() []access.Role {
-	return []access.Role{access.Approver, access.PublicTriage, access.PrivateTriage}
+	return []access.Role{access.Approver, access.PublicTriage, access.PrivateTriage,
+		access.InternalTriage}
 }
 
-// ReadRights is the roles that may read findings on a product: the pair that
-// reads, and the pair that triages, because triage implies reading at the same
-// visibility. The set Reads admits, stated as a list for the operations that
-// gate on it.
+// ReadRights is the roles that may read findings on a product: the role that
+// reads, and the role that triages, at each visibility, because triage implies
+// reading at the same visibility. The set Reads admits, stated as a list for
+// the operations that gate on it.
 func ReadRights() []access.Role {
 	return []access.Role{access.PublicRead, access.PublicTriage,
-		access.PrivateRead, access.PrivateTriage}
+		access.PrivateRead, access.PrivateTriage,
+		access.InternalRead, access.InternalTriage}
+}
+
+// DisclosureReadRights is ReadRights at the visibilities disclosure applies
+// to, for the reads about disclosing and about what an upstream says.
+func DisclosureReadRights() []access.Role {
+	return append(PublicRights(), PrivateRights()...)
 }
 
 // PublicRights is the roles that may read work that has been disclosed.

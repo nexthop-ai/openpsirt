@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -66,7 +67,9 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	selfward := to == nil || *to == subject.Party()
 
 	now := s.now().UTC().Truncate(time.Microsecond)
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	update := naming(db.NewUpdate().Model((*Finding)(nil)).
+		Where(kinds, kindArgs...).
 		// Across the product's builds, not one of them. The same code
 		// built as several variants is one piece of work — a judgment
 		// carries no variant, so somebody taking this on has taken on
@@ -153,7 +156,7 @@ func mayHandOver(subject access.Subject, productID int64) (dispatches bool, err 
 // triagedIn is the visibilities this subject triages in one product.
 func triagedIn(subject access.Subject, productID int64) []access.Visibility {
 	var triaged []access.Visibility
-	for _, v := range []access.Visibility{access.Public, access.Private} {
+	for _, v := range access.Visibilities() {
 		if subject.Triages(v, productID) {
 			triaged = append(triaged, v)
 		}
@@ -302,8 +305,10 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 		// the failing path only, and narrowed by what this person may see so
 		// that the answer cannot describe a row they may not read.
 		if !dispatches {
+			kinds, kindArgs := kind.Triage.Where(`"kind"`)
 			held, err := s.db.NewSelect().Model((*Finding)(nil)).
 				Column("id").
+				Where(kinds, kindArgs...).
 				Where(inThisProduct, productID).
 				Where(`"vulnerability_id" = ?`, vulnerabilityID).
 				Where(`"component_id" = ?`, componentID).
@@ -336,8 +341,8 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// Asked of every visibility rather than of what the caller may read: what
 	// moved carries its visibility to whoever now holds it, whether or not the
 	// caller can see every row of it.
-	every := []access.Visibility{access.Public, access.Private}
-	private, err := anyUndisclosed(ctx, s.db, every, oneFinding(productID, vulnerabilityID, componentID))
+	private, err := anyUndisclosed(ctx, s.db, access.Visibilities(),
+		oneFinding(productID, vulnerabilityID, componentID))
 	if err != nil {
 		return moved, false, fmt.Errorf("read whether that finding is disclosed: %w", err)
 	}
@@ -349,7 +354,9 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 func anyUndisclosed(ctx context.Context, db bun.IDB, visible []access.Visibility,
 	naming func(*bun.SelectQuery) *bun.SelectQuery) (bool, error) {
 
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	return naming(db.NewSelect().Model((*Finding)(nil)).Column("id")).
+		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).
 		Where(`"visibility" IN (?)`, bun.List(visible)).
 		Where(`"visibility" = ?`, access.Private).
@@ -471,8 +478,10 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 	}
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		kinds, kindArgs := kind.Triage.Where(`"kind"`)
 		result, err := tx.NewUpdate().Model((*Finding)(nil)).
 			Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil).
+			Where(kinds, kindArgs...).
 			Where(`"assigned_to" = ?`, party).
 			Where(`"closed_at" IS NULL`).
 			Where(inThisProduct, productID).
@@ -504,7 +513,9 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 				return err
 			}
 		}
+		kinds, kindArgs := kind.Triage.Where(`"kind"`)
 		update := tx.NewUpdate().Model((*Finding)(nil)).
+			Where(kinds, kindArgs...).
 			Where(`"assigned_to" = ?`, from).
 			Where(`"closed_at" IS NULL`)
 		if to == nil {
@@ -533,13 +544,15 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 // person holds reads nothing undisclosed.
 func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 	var products []int64
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := tx.NewSelect().
 		TableExpr(`"target" AS "tg"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`DISTINCT "st"."product_id"`).
 		Where(`"tg"."id" IN (SELECT "f"."target_id" FROM "finding" AS "f"
-			WHERE "f"."assigned_to" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" = ?)`,
-			from, access.Private).
+			WHERE "f"."assigned_to" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" = ?
+			AND `+kinds+`)`,
+			append([]any{from, access.Private}, kindArgs...)...).
 		Scan(ctx, &products); err != nil {
 		return fmt.Errorf("read where their undisclosed work is: %w", err)
 	}
@@ -615,11 +628,13 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		return nil, nil
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."assigned_to" IS NOT NULL`)
 		// One product where the caller named one, for a screen that is about
@@ -869,10 +884,12 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	}
 	limit = database.AList.Of(limit)
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`)
 		if since != nil {
 			q = q.Where(`"f"."opened_at" > ?`, *since)
@@ -1125,8 +1142,8 @@ func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, a
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
 	return q.Where(where, args...)
 }
 
@@ -1144,8 +1161,8 @@ func orCarried(q *bun.SelectQuery, subject access.Subject, products []int64, all
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
 	if mine := subject.Mine(); len(mine) > 0 {
 		where = "(" + where + ` OR ("f"."assigned_to" IN (?) AND "f"."visibility" = ?))`
 		args = append(args, bun.List(mine), access.Public)

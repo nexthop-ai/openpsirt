@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // SeveralStates is the word for a claim whose matching rows are not all in one
@@ -183,6 +184,7 @@ func (s *Store) AuditClaims(ctx context.Context, subject access.Subject, f Filte
 		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`COUNT(DISTINCT "c"."name_folded") AS "components"`).
 		Where(`"de"."claim_id" IN (?)`, bun.List(ids)).
+		Apply(ofKinds(kind.Triage, "f")).
 		GroupExpr(`"de"."claim_id"`)
 	components = readableFindings(components, subject, "f", `"st"."product_id"`)
 	var named []struct {

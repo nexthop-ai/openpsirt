@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -323,7 +324,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Undisclosed     bool  `bun:"undisclosed"`
 		Exploited       bool  `bun:"exploited"`
 	}
-	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
+	undisclosed, private := access.AnyWithheld(`"f"."visibility"`)
 	err := findingsWith(w.db.NewSelect(), true).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
 		ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END) = 1 AS "exploited"`).
@@ -545,12 +546,14 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	// than as rows: one issue in one component is one thing to deal with
 	// however many places it sits at, and "6 items" meaning 288 findings is a
 	// number that makes somebody's absence look like a catastrophe.
+	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	held := w.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."assigned_to" AS "person_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."assigned_to" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`)
 

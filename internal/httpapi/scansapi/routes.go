@@ -15,6 +15,8 @@ import (
 // documents and runs it can read back.
 func Register(api huma.API, in core.Deps) {
 	registerScans(api, in)
+	registerAnalyses(api, in)
+	registerAnalysisReceipts(api, in)
 	registerReceipts(api, in)
 	// Reading back a document a build sent.
 	registerRetained(api, in)

@@ -480,6 +480,20 @@ func (r *Reach) Undisclosed(t *testing.T) {
 	}
 }
 
+// Internal makes every finding of one issue internal.
+//
+// Written straight to the column: no producer here opens an internal finding,
+// and what is being tested is who reads one rather than how one arrives.
+func (r *Reach) Internal(t *testing.T, identifier string) {
+	t.Helper()
+	if _, err := r.DB.DB.NewUpdate().Table("finding").
+		Set(`"visibility" = ?`, access.Internal).
+		Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
+			identifier).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // DeclaredAs adds a window as the administrator from a body of its own, and
 // returns the answer.
 func (r *Reach) DeclaredAs(t *testing.T, body string) int {

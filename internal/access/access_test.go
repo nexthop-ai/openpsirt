@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"testing"
 	"time"
 
@@ -196,8 +195,10 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 		t.Error("private triage triages disclosed work too")
 	}
 
-	// The narrowing sorts each product by what it allows there.
-	both, public, private := access.Split([]int64{3, 4, 5, 6}, func(v access.Visibility, id int64) bool {
+	// The narrowing sorts each product by what it allows there: the product
+	// alone where everything is allowed, the product and one visibility, and
+	// the product and the visibilities it allows where those are several.
+	readings := access.Split([]int64{3, 4, 5, 6, 7, 8}, func(v access.Visibility, id int64) bool {
 		switch id {
 		case 3:
 			return true
@@ -205,15 +206,73 @@ func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
 			return v == access.Public
 		case 5:
 			return v == access.Private
+		case 7:
+			return v != access.Internal
+		case 8:
+			return v == access.Internal
 		}
 		return false
 	})
-	if !slices.Equal(both, []int64{3}) || !slices.Equal(public, []int64{4}) ||
-		!slices.Equal(private, []int64{5}) {
-		t.Errorf("split into %v, %v, %v; want [3], [4], [5]", both, public, private)
+	where, args := access.VisibleWhere("p", "v", readings)
+	want := "(p IN (?) OR (p IN (?) AND v = ?) OR (p IN (?) AND v = ?) OR (p IN (?) AND v IN (?)) OR (p IN (?) AND v = ?))"
+	if where != want {
+		t.Errorf("split into %q; want %q", where, want)
 	}
-	if where, _ := access.VisibleWhere("p", "v", nil, nil, nil); where != "1 = 0" {
+	if len(args) != 9 || args[2] != access.Public || args[4] != access.Private || args[8] != access.Internal {
+		t.Errorf("split binds %v", args)
+	}
+	if where, _ := access.VisibleWhere("p", "v", access.Split(nil, nil)); where != "1 = 0" {
 		t.Errorf("nothing allowed narrows to %q, want a condition nothing meets", where)
+	}
+}
+
+// Internal material is read and triaged under roles of its own, and neither
+// of the other visibilities carries it. Anybody at all reading what is
+// published reads none of it.
+func TestReadingInternalIsNotReadingEitherOther(t *testing.T) {
+	analyst := access.NewPerson(8, "analyst", false, map[int64][]access.Role{
+		4: {access.InternalRead},
+		5: {access.InternalTriage},
+		6: {access.PublicTriage, access.PrivateTriage},
+	}, 80)
+
+	for _, product := range []int64{4, 5} {
+		if !analyst.Reads(access.Internal, product) {
+			t.Errorf("product %d: internal work is not read", product)
+		}
+		if analyst.Reads(access.Public, product) || analyst.Reads(access.Private, product) {
+			t.Errorf("product %d: an internal grant read disclosed or undisclosed work", product)
+		}
+		if !analyst.ReadsIn(product) || !analyst.Sees(product) {
+			t.Errorf("product %d: an internal grant does not make the product readable", product)
+		}
+		if got := access.Visible(analyst, product); len(got) != 1 || got[0] != access.Internal {
+			t.Errorf("product %d: visible is %v, want only internal work", product, got)
+		}
+	}
+	if analyst.Triages(access.Internal, 4) || analyst.TriagesIn(4) {
+		t.Error("reading internal work triages it")
+	}
+	if !analyst.Triages(access.Internal, 5) || !analyst.TriagesIn(5) {
+		t.Error("internal triage does not triage internal work")
+	}
+	if analyst.Triages(access.Private, 5) || analyst.Triages(access.Public, 5) {
+		t.Error("internal triage triages disclosed or undisclosed work too")
+	}
+	// Triage at both disclosed visibilities is not internal triage.
+	if analyst.Reads(access.Internal, 6) || analyst.Triages(access.Internal, 6) {
+		t.Error("public and private triage reached internal work")
+	}
+
+	published := access.Published([]int64{4, 5, 6})
+	for _, product := range []int64{4, 5, 6} {
+		if published.Reads(access.Internal, product) {
+			t.Errorf("product %d: anybody at all reads internal work", product)
+		}
+		if !published.Reads(access.Public, product) {
+			t.Errorf("product %d: anybody at all does not read disclosed work, so the "+
+				"refusal above is not the visibility", product)
+		}
 	}
 }
 

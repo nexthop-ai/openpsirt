@@ -6,6 +6,7 @@ package notify
 import (
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -21,8 +22,12 @@ import (
 // place is keyed on both upstream versions and one of them is the consumer's —
 // so the condition that asks about decisions needs it and the one that does
 // not, does not.
+//
+// Kept to the kinds of finding a notification is about.
 func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
+	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	q = q.TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).

@@ -99,6 +99,9 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"triager", http.MethodGet, mine, http.StatusOK},
 			{"triager", http.MethodGet, mineBuilt, http.StatusOK},
 			{"private-triage", http.MethodGet, mine, http.StatusOK},
+			{"internal-reader", http.MethodGet, mine, http.StatusOK},
+			{"internal-reader", http.MethodGet, theirs, http.StatusNotFound},
+			{"internal-triager", http.MethodGet, mineBuilt, http.StatusOK},
 
 			// A capability is not a way in. Holding one and nothing else
 			// leaves the product invisible, exactly as if it had never been
@@ -115,6 +118,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"private", http.MethodPost, products, http.StatusForbidden},
 			{"triager", http.MethodPost, products, http.StatusForbidden},
 			{"private-triage", http.MethodPost, products, http.StatusForbidden},
+			{"internal-triager", http.MethodPost, products, http.StatusForbidden},
 			{"approver", http.MethodPost, products, http.StatusForbidden},
 			{"assigner-only", http.MethodPost, products, http.StatusForbidden},
 			{"reader", http.MethodPost, mine, http.StatusForbidden},
@@ -167,6 +171,8 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodGet, mineFound, http.StatusOK},
 			{"private", http.MethodGet, mineFound, http.StatusOK},
 			{"triager", http.MethodGet, mineFound, http.StatusOK},
+			{"internal-reader", http.MethodGet, mineFound, http.StatusOK},
+			{"internal-reader", http.MethodGet, theirFound, http.StatusNotFound},
 			// An administrator holds no role on this product, so
 			// they read nothing of it. Administering the catalog
 			// is knowing the build exists, which is why this is
@@ -220,6 +226,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"private", http.MethodGet, people, http.StatusForbidden},
 			{"triager", http.MethodGet, people, http.StatusForbidden},
 			{"private-triage", http.MethodGet, people, http.StatusForbidden},
+			{"internal-triager", http.MethodGet, people, http.StatusForbidden},
 			{"approver", http.MethodGet, people, http.StatusForbidden},
 			{"assigner-only", http.MethodGet, people, http.StatusForbidden},
 			{"reader", http.MethodGet, keys, http.StatusForbidden},

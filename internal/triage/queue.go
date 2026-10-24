@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
@@ -301,6 +302,7 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Where(finding.DecisionFiledAt("de", "f")).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 }
@@ -459,6 +461,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		// Live rows only, as a claim's reach is counted.
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 	err := readableFindings(query, subject, "f", `"st"."product_id"`).
@@ -608,6 +611,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
 		Where(`"de"."claim_id" IN (?)`, bun.List(claimIDs)).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
 		Where(`"f"."fixed_in" <> ''`)

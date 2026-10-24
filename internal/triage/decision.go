@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -923,12 +924,10 @@ func orEmpty(stored *string) string {
 //
 // Unset has to read as private, or a place assembled by something that forgot
 // to state it would make a private finding argueable by anybody who can triage
-// the public ones.
+// the public ones. Internal stays internal: read as private, it would be
+// argued by the private team and refused to the people who work it.
 func visibilityOf(at Place) access.Visibility {
-	if at.Visibility == access.Public {
-		return access.Public
-	}
-	return access.Private
+	return access.AsVisibility(string(at.Visibility))
 }
 
 // disclosedSince turns public every row whose issue was disclosed in its
@@ -966,6 +965,7 @@ func (s *Store) disclosedSince(ctx context.Context, rows []Decision) error {
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
 		Where(`"st"."product_id" IN (?)`, bun.List(keysOf(products))).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
+		Apply(ofKinds(kind.Triage, "f")).
 		GroupExpr(`"st"."product_id", "f"."vulnerability_id"`).
 		Scan(ctx, &held)
 	if err != nil {

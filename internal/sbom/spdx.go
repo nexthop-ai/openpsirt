@@ -144,9 +144,9 @@ func (c *reader) spdxNamespace() error { return c.into(&c.doc.Serial) }
 
 // spdxCreationInfo reads when the producer says the document was made.
 func (c *reader) spdxCreationInfo() error {
-	return c.b.object(func(key string) error {
+	return c.b.Object(func(key string) error {
 		if key != "created" {
-			return c.b.skip()
+			return c.b.Skip()
 		}
 		return c.builtAt()
 	})
@@ -161,9 +161,9 @@ func (c *reader) spdxCreationInfo() error {
 // things, which is settled once everything is in hand.
 func (c *reader) spdxDocumentDescribes() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		// Charged as each is read. This is a top-level array, so on the header
 		// pass — which runs inside the upload request — it was the one array
 		// with neither a skip above nor a bound here, which is exactly what
@@ -171,7 +171,7 @@ func (c *reader) spdxDocumentDescribes() error {
 		if err := c.count(); err != nil {
 			return err
 		}
-		ref, err := c.b.str()
+		ref, err := c.b.Str()
 		if err != nil {
 			return err
 		}
@@ -184,9 +184,9 @@ func (c *reader) spdxDocumentDescribes() error {
 // for.
 func (c *reader) spdxPackages() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		described, ref, err := c.spdxPackage()
 		if err != nil {
 			return err
@@ -215,7 +215,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	if err := c.count(); err != nil {
 		return graph.Described{}, "", err
 	}
-	err := c.b.object(func(key string) error {
+	err := c.b.Object(func(key string) error {
 		switch key {
 		case "SPDXID":
 			return c.into(&ref)
@@ -257,7 +257,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			described.Container = purpose == "CONTAINER"
 			return nil
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 	if err != nil {
@@ -306,16 +306,16 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 // same answer everything downstream has already been given rather than
 // inventing a preference.
 func (c *reader) spdxExternalRefs(described *graph.Described) error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var kind, locator string
-		if err := c.b.object(func(key string) error {
+		if err := c.b.Object(func(key string) error {
 			switch key {
 			case "referenceType":
 				return c.into(&kind)
 			case "referenceLocator":
 				return c.into(&locator)
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		}); err != nil {
 			return err
@@ -356,16 +356,16 @@ func (c *reader) spdxExternalRefs(described *graph.Described) error {
 // walk, and an unbounded array is an unbounded walk whatever it holds.
 func (c *reader) spdxFiles() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		if err := c.file(); err != nil {
 			return err
 		}
 		var ref string
-		if err := c.b.object(func(key string) error {
+		if err := c.b.Object(func(key string) error {
 			if key != "SPDXID" {
-				return c.b.skip()
+				return c.b.Skip()
 			}
 			return c.into(&ref)
 		}); err != nil {
@@ -379,11 +379,11 @@ func (c *reader) spdxFiles() error {
 // was derived from — all three of which this format states the same way.
 func (c *reader) spdxRelationships() error {
 	if c.headerOnly {
-		return c.b.skip()
+		return c.b.Skip()
 	}
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var from, kind, to string
-		if err := c.b.object(func(key string) error {
+		if err := c.b.Object(func(key string) error {
 			switch key {
 			case "spdxElementId":
 				return c.into(&from)
@@ -392,7 +392,7 @@ func (c *reader) spdxRelationships() error {
 			case "relatedSpdxElement":
 				return c.into(&to)
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		}); err != nil {
 			return err

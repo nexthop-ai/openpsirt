@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -264,10 +265,11 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 
 // claimRollup is every decision row read as one row per claim, product and
 // proposer: the product's name, how many rows the claim wrote there under the
-// alias given, and how many of them are undisclosed. Each sweep adds the
+// alias given, and how many of them are withheld: at any visibility but
+// public, so a message about them carries no detail. Each sweep adds the
 // conditions and the columns of its own.
 //
-// The undisclosed rows are counted rather than taken from an aggregate over
+// The withheld rows are counted rather than taken from an aggregate over
 // the word itself. A visibility is a name, and MIN over names would answer "is
 // any of this private" by alphabetical accident.
 func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
@@ -279,7 +281,7 @@ func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
-		ColumnExpr(access.PrivateCountAs(`"de"."visibility"`, "private_rows")).
+		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
 		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."proposed_by"`)
 }
 
@@ -395,8 +397,9 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	// of work counts in: one flaw in a kernel is one thing to deal with
 	// and dozens of finding rows. Grouped rather than distinct over the
 	// visibility, which would make one issue at an undisclosed place and a
-	// disclosed one two pieces of work; the group is undisclosed where any of
+	// disclosed one two pieces of work; the group is withheld where any of
 	// its rows is.
+	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -410,7 +413,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private_rows")).
+		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "private_rows")).
+		Where(kinds, kindArgs...).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_at" IS NOT NULL`).
 		Where(`"f"."assigned_at" <= ?`, since).
@@ -471,8 +475,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		for _, personID := range members {
 			at := reach[personID][row.ProductID]
 			// Disclosed work travels with the assignment to whoever holds
-			// it, so a member reading the product at either visibility may
-			// take it. Undisclosed work needs one who reads it.
+			// it, so a member reading the product at any visibility may
+			// take it. Withheld work needs one who reads it.
 			if (private && !at.reads(true)) || (!private && !at.readsIn()) {
 				continue
 			}

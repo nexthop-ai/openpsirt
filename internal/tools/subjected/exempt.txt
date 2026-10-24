@@ -16,6 +16,7 @@ finding.Store.Builds Not varying by reader: which builds a scope names. The scop
 finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Store.RetiredWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Vulnerabilities.Intern A background pass: it files the issues a scan or an authorized recording names.
+finding.Vulnerabilities.Rule A background pass: it files the rules an analyzer run names.
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
 finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
 finding.Vulnerabilities.Ratings Not varying by reader: the ratings held for an issue. Read beside a finding the caller was authorized for.

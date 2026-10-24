@@ -101,7 +101,7 @@ func (f *fixture) anIssue(t *testing.T, name string, visibility access.Visibilit
 		t.Fatalf("record a component: %v", err)
 	}
 	row := &finding.Finding{
-		TargetID: f.target, Kind: "dependency", VulnerabilityID: issue.ID,
+		TargetID: f.target, Kind: finding.Vulnerable, VulnerabilityID: issue.ID,
 		Visibility: visibility, ComponentID: component.ID,
 		PlaceIdentity: "place-" + name, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}

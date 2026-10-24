@@ -16,6 +16,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Reranked puts every open finding of these issues back where the signals now
@@ -126,6 +127,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 	// own value of the order by a CASE over the issue inside the statement.
 	// The likelihood is close to unique to an issue, so a statement per value
 	// of the order is a statement per issue.
+	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	byProduct := map[int64][]ordered{}
 	for _, id := range issues {
 		issue := signals[id]
@@ -150,7 +152,8 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 			}
 			q := reranking(tx, productID,
 				"CASE vulnerability_id"+strings.Repeat(" WHEN ? THEN ?", len(batch))+" END", rests...).
-				Where(`"vulnerability_id" IN (?)`, bun.List(ids))
+				Where(`"vulnerability_id" IN (?)`, bun.List(ids)).
+				Where(kinds, kindArgs...)
 			if scanned != 0 {
 				q = q.Where(`NOT ("target_id" = ? AND "kind" = ?)`, scanned, Vulnerable)
 			}
@@ -234,6 +237,7 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 			VulnerabilityID int64 `bun:"vulnerability_id"`
 			ProductID       int64 `bun:"product_id"`
 		}
+		kinds, kindArgs := kind.Ranking.Where(`"f"."kind"`)
 		q := tx.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -242,6 +246,7 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(batch)).
 			Where(`"f"."closed_at" IS NULL`).
+			Where(kinds, kindArgs...).
 			GroupExpr(`"f"."vulnerability_id", "st"."product_id"`).
 			OrderExpr(`"f"."vulnerability_id", "st"."product_id"`)
 		if scanned != 0 {

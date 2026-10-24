@@ -114,7 +114,7 @@ func registerReleases(api huma.API, in core.Deps) {
 			"retitling does. Asking for what already stands changes nothing.\n\n" +
 			"A release the issue is not in answers 404.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.AnyPerson, changesWhatItSays, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Product       string `json:"product" minLength:"1"`

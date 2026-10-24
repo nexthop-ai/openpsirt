@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -252,11 +253,13 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	// the write re-checks the holder so that an assignment landing between the
 	// read and the write is not overwritten.
 	var ids []int64
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	page := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
 		Where(inThisProduct, productID).
+		Where(kinds, kindArgs...).
 		Limit(int64(room))
 	if rule.Upstream != "" {
 		page = bySource(page, rule.Upstream)
@@ -419,10 +422,12 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	// The same narrowing the sweep does, minus the holder: what a rule matches
 	// and what it would place differ by who holds it, and both are worth
 	// seeing.
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) (*bun.SelectQuery, error) {
 		q = q.Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-			Where(inThisProductAs(`"f"."target_id"`), productID)
+			Where(inThisProductAs(`"f"."target_id"`), productID).
+			Where(kinds, kindArgs...)
 		if upstream != "" {
 			q = bySource(q, upstream)
 		}

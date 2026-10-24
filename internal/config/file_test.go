@@ -157,7 +157,20 @@ var everySetting = map[string]string{
 
 	"INGEST_MAX_BYTES": "1048576", "INGEST_MAX_COMPONENTS": "501", "INGEST_MAX_EDGES": "502",
 	"INGEST_MAX_FILES": "503", "INGEST_MAX_STATEMENTS": "504", "INGEST_MAX_DEPTH": "12",
-	"INGEST_MAX_DOCUMENTS": "5",
+	"INGEST_MAX_DOCUMENTS":    "5",
+	"ANALYSIS_MAX_BYTES":      "7",
+	"ANALYSIS_MAX_DOCUMENTS":  "8",
+	"ANALYSIS_MAX_RUNS":       "9",
+	"ANALYSIS_MAX_RESULTS":    "10",
+	"ANALYSIS_MAX_RULES":      "11",
+	"ANALYSIS_MAX_LOCATIONS":  "12",
+	"ANALYSIS_MAX_STEPS":      "13",
+	"ANALYSIS_MAX_MODULES":    "14",
+	"ANALYSIS_MAX_BASES":      "15",
+	"ANALYSIS_MAX_CHAIN":      "16",
+	"ANALYSIS_MAX_PROPERTIES": "17",
+	"ANALYSIS_MAX_TEXT":       "18",
+	"ANALYSIS_MAX_DEPTH":      "19",
 }
 
 // A deployment configured by file and one configured by the environment, with

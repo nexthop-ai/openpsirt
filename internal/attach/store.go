@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Store reads and writes attachments, and owns the bytes as well as the rows.
@@ -78,45 +79,48 @@ var (
 	ErrGone     = fmt.Errorf("that attachment was removed")
 )
 
-// visibilityOf is how disclosed an issue is in one product.
+// visibilitiesOf is how disclosed an issue is in one product: the
+// visibilities a reader has to hold to reach what hangs off it.
 //
-// The most careful row governs. An issue with one undisclosed finding
+// The most careful rows govern. An issue with one undisclosed finding
 // against it is undisclosed here, whatever else is open beside it — the same
-// rule that decides what may be said about a group outside the application
-// . Asked at the moment of the request rather than copied onto the
-// attachment, so an embargo ending carries the file with the words.
-func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (access.Visibility, bool, error) {
-	var counted struct {
-		Here    int `bun:"here"`
-		Private int `bun:"undisclosed"`
-	}
+// rule that decides what may be said about a group outside the application.
+// Each visibility other than public is its own grant and neither answers for
+// the other, so an issue holding private and internal rows asks for both.
+// Only an issue with nothing but disclosed rows asks for public. Asked at the
+// moment of the request rather than copied onto the attachment, so an embargo
+// ending carries the file with the words.
+//
+// The issue's presence here at all is the second answer. Without it, "no
+// undisclosed findings" and "no findings" are the same answer, and any reader
+// of any product could confirm a guessed identifier one request at a time.
+func visibilitiesOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
+	[]access.Visibility, bool, error) {
+
+	var held []string
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`COUNT(*) AS "here"`).
-		// Counted rather than summed over a CASE. That shape comes back as a
-		// decimal on two of the four engines and the cast that fixes it is
-		// spelled per engine, which is why the rule says to write two counts
-		// — and this was the second copy of a shape recorded as removed.
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "undisclosed")).
+		ColumnExpr(`DISTINCT "f"."visibility"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(finding.HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
-		Scan(ctx, &counted)
+		Where(kinds, kindArgs...).
+		Scan(ctx, &held)
 	if err != nil {
-		return access.Private, false, fmt.Errorf("read how disclosed an issue is: %w", err)
+		return nil, false, fmt.Errorf("read how disclosed an issue is: %w", err)
 	}
-	// The issue's presence here at all, answered separately from how disclosed
-	// it is. Without it, "no undisclosed findings" and "no findings" were the
-	// same answer — so an issue that is not in this product read as public
-	// here and any reader of any product could confirm, one request at a time,
-	// that a name exists somewhere in the deployment. That turns the random
-	// draw an entered identifier is minted from into a space somebody can
-	// check a guess against.
-	if counted.Private > 0 {
-		return access.Private, true, nil
+	var withheld []access.Visibility
+	for _, each := range held {
+		if v := access.AsVisibility(each); v != access.Public {
+			withheld = append(withheld, v)
+		}
 	}
-	return access.Public, counted.Here > 0, nil
+	if len(withheld) > 0 {
+		return withheld, true, nil
+	}
+	return []access.Visibility{access.Public}, len(held) > 0, nil
 }
 
 // mayReach reports whether a subject may read this issue's text, which is
@@ -127,7 +131,7 @@ func mayReach(ctx context.Context, db bun.IDB, subject access.Subject,
 	if subject.Kind != access.Person {
 		return access.Denied("reach an attachment without being a person")
 	}
-	visibility, here, err := visibilityOf(ctx, db, productID, vulnerabilityID)
+	required, here, err := visibilitiesOf(ctx, db, productID, vulnerabilityID)
 	if err != nil {
 		return err
 	}
@@ -142,7 +146,7 @@ func mayReach(ctx context.Context, db bun.IDB, subject access.Subject,
 	// may read what hangs off it, and asking only the product-wide
 	// question made the grant one that granted nothing on the files that
 	// are usually the evidence.
-	if !holds(access.VisibleOn(subject, productID, vulnerabilityID), visibility) {
+	if !holdsAll(access.VisibleOn(subject, productID, vulnerabilityID), required) {
 		// The same answer as an issue that is not there. Telling
 		// somebody that a file exists but is not theirs is telling
 		// them the issue exists .
@@ -171,13 +175,15 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 	if subject.OnCaseToAct(productID, vulnerabilityID) {
 		return nil
 	}
-	visibility, _, err := visibilityOf(ctx, db, productID, vulnerabilityID)
+	required, _, err := visibilitiesOf(ctx, db, productID, vulnerabilityID)
 	if err != nil {
 		return err
 	}
-	if !subject.Triages(visibility, productID) {
-		// The same words reaching it refuses with, for the same reason.
-		return access.Denied(fmt.Sprintf("attach a file in product %d", productID))
+	for _, visibility := range required {
+		if !subject.Triages(visibility, productID) {
+			// The same words reaching it refuses with, for the same reason.
+			return access.Denied(fmt.Sprintf("attach a file in product %d", productID))
+		}
 	}
 	return nil
 }
@@ -485,12 +491,19 @@ func heldBytes(ctx context.Context, db bun.IDB, personID int64) (int64, error) {
 	return held, err
 }
 
-// holds reports whether one of these visibilities is the one wanted.
-func holds(visible []access.Visibility, want access.Visibility) bool {
-	for _, each := range visible {
-		if each == want {
-			return true
+// holdsAll reports whether every visibility wanted is among these.
+func holdsAll(visible []access.Visibility, wanted []access.Visibility) bool {
+	for _, want := range wanted {
+		found := false
+		for _, each := range visible {
+			if each == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
 		}
 	}
-	return false
+	return true
 }

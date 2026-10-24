@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -181,6 +182,7 @@ const (
 func runChanged(db bun.IDB, targetID int64, column runColumn,
 	visible []access.Visibility) (*bun.SelectQuery, string) {
 
+	kinds, args := kind.Statistics.Where(`"f"."kind"`)
 	return db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
@@ -188,5 +190,6 @@ func runChanged(db bun.IDB, targetID int64, column runColumn,
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, args...).
 		Where(wasOpen), string(database.Column(db, "f."+string(column)))
 }

@@ -26,17 +26,19 @@ import (
 // the notifications.
 const NotArguedAway = `("f"."suppressed_by" IS NULL AND "f"."stated_by" IS NULL)`
 
-// LatestAtItsPlace says no row of the same issue has been recorded at the same
-// place in the same build after the finding `f`.
+// LatestAtItsPlace says no row of the same kind and issue has been recorded at
+// the same place in the same build after the finding `f`.
 //
 // A run records a new row rather than reopening a closed one, so a place
 // closed by a supplier's statement and recorded again later, at another
 // version or closed another way, holds rows the later one stands for. Ordered
 // by identifier rather than by moment: a version moving closes the row before
-// and records the row after at one moment.
+// and records the row after at one moment. Held to the kind of `f`, so the
+// later rows are of a kind the outer query already reads.
 const LatestAtItsPlace = `NOT EXISTS (SELECT 1 FROM "finding" AS "lt"
 	WHERE "lt"."target_id" = "f"."target_id" AND "lt"."vulnerability_id" = "f"."vulnerability_id"
-	  AND "lt"."place_identity" = "f"."place_identity" AND "lt"."id" > "f"."id")`
+	  AND "lt"."place_identity" = "f"."place_identity" AND "lt"."kind" = "f"."kind"
+	  AND "lt"."id" > "f"."id")`
 
 // Decidable says a finding `f` is one somebody may decide about: open, or
 // closed by a supplier's statement and the latest row at its place. A person

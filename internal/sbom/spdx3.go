@@ -140,7 +140,7 @@ type spdx3Element struct {
 // spdx3Context refuses a version this reader was not written against, from the
 // only place the third version states one outside its own graph.
 func (c *reader) spdx3Context() error {
-	return c.b.each(func(context string) error {
+	return c.b.Each(func(context string) error {
 		rest, ours := strings.CutPrefix(strings.TrimSpace(context), spdx3ContextPrefix)
 		if !ours {
 			return nil
@@ -161,7 +161,7 @@ func (c *reader) spdx3Context() error {
 // walk, and which entries turn out to be components is not known until each one
 // has been read.
 func (c *reader) spdx3Graph() error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		if err := c.count(); err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ func (c *reader) spdx3Graph() error {
 // spdx3Element reads one entry of the graph into a neutral shape.
 func (c *reader) spdx3Element() (spdx3Element, error) {
 	var e spdx3Element
-	err := c.b.object(func(key string) error {
+	err := c.b.Object(func(key string) error {
 		switch key {
 		case "spdxId", "@id":
 			return c.into(&e.id)
@@ -205,7 +205,7 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			// its own, it is the record every other reference to that
 			// identifier means, wherever it was written.
 			var inline spdx3Element
-			ref, err := c.b.stringOrObject(func(key string) error {
+			ref, err := c.b.StringOrObject(func(key string) error {
 				switch key {
 				case "@id", "spdxId":
 					return c.into(&inline.id)
@@ -214,7 +214,7 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 				case "specVersion":
 					return c.into(&inline.specVersion)
 				default:
-					return c.b.skip()
+					return c.b.Skip()
 				}
 			})
 			if err != nil {
@@ -228,7 +228,7 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			// that single entry carries an array as long as the byte bound
 			// allows — in the synchronous upload request, on the header pass
 			// too.
-			return c.b.each(func(ref string) error {
+			return c.b.Each(func(ref string) error {
 				if err := c.count(); err != nil {
 					return err
 				}
@@ -248,7 +248,7 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			// charged here rather than per relationship. Charged as each is
 			// read: a count taken after the array has already done the work
 			// the bound exists to stop.
-			return c.b.each(func(ref string) error {
+			return c.b.Each(func(ref string) error {
 				if err := c.charge(); err != nil {
 					return err
 				}
@@ -256,7 +256,7 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 				return nil
 			})
 		default:
-			return c.b.skip()
+			return c.b.Skip()
 		}
 	})
 	return e, err
@@ -265,13 +265,13 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 // spdx3Imports reads the identifiers a document states it brought in from
 // another, each charged against the component bound as a root element is.
 func (c *reader) spdx3Imports(e *spdx3Element) error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		if err := c.count(); err != nil {
 			return err
 		}
-		return c.b.object(func(key string) error {
+		return c.b.Object(func(key string) error {
 			if key != "externalSpdxId" {
-				return c.b.skip()
+				return c.b.Skip()
 			}
 			var ref string
 			if err := c.into(&ref); err != nil {
@@ -369,16 +369,16 @@ func (c *reader) spdx3Inventory(e spdx3Element) {
 // own, which is the other place a package identifier and the national database
 // key are stated.
 func (c *reader) spdx3ExternalIdentifiers(e *spdx3Element) error {
-	return c.b.array(func() error {
+	return c.b.Array(func() error {
 		var kind, value string
-		if err := c.b.object(func(key string) error {
+		if err := c.b.Object(func(key string) error {
 			switch key {
 			case "externalIdentifierType":
 				return c.into(&kind)
 			case "identifier":
 				return c.into(&value)
 			default:
-				return c.b.skip()
+				return c.b.Skip()
 			}
 		}); err != nil {
 			return err

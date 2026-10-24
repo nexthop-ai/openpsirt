@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // FlawReport is what somebody told us, and what became of it.
@@ -290,8 +291,9 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		Identifier      string     `bun:"identifier"`
 		ReportedBy      string     `bun:"reported_by"`
 		ReceivedOn      *time.Time `bun:"received_on"`
-		Private         int        `bun:"private"`
+		Undisclosed     int        `bun:"undisclosed"`
 	}
+	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	err := s.db.NewSelect().
 		TableExpr(`"flaw_report" AS "fr"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "fr"."vulnerability_id"`).
@@ -308,11 +310,12 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN("v"."identifier") AS "identifier"`).
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
+		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "undisclosed")).
 		Where(`"fr"."acknowledged_at" IS NULL`).
 		// A flaw found here has nobody outside to answer.
 		Where(`"fr"."found_here" = ?`, false).
 		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, kindArgs...).
 		// The product it was reported against, not every product the issue
 		// turns up in. One report is one letter to answer, and fanning it out
 		// across the products a shared name reaches told each of them about a
@@ -330,7 +333,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 			VulnerabilityID: row.VulnerabilityID, ProductID: row.ProductID,
 			Product: row.Product, Identifier: row.Identifier,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
-			Undisclosed: row.Private > 0,
+			Undisclosed: row.Undisclosed > 0,
 		})
 	}
 	return out, nil

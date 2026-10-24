@@ -1,0 +1,63 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package kind
+
+import "testing"
+
+func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
+	consumers := Consumers()
+	if len(consumers) == 0 {
+		t.Fatal("no consumers were found, so this checked nothing")
+	}
+	for _, c := range consumers {
+		kinds := c.Kinds()
+		if len(kinds) == 0 {
+			t.Errorf("%s includes no kind", c)
+		}
+		for _, k := range kinds {
+			if !Known(k) {
+				t.Errorf("%s includes %q, which nothing declares", c, k)
+			}
+			if !c.Includes(k) {
+				t.Errorf("%s lists %q and does not include it", c, k)
+			}
+		}
+	}
+	if Known("dependency") {
+		t.Error("a kind nothing declares is known")
+	}
+}
+
+func TestAnalysisReachesNoConsumerOfVulnerabilityFindings(t *testing.T) {
+	for _, c := range Consumers() {
+		if c.Includes(Analysis) {
+			t.Errorf("%s includes analysis results", c)
+		}
+	}
+}
+
+func TestOnlyTheSweepLeavesRecordedFlawsOut(t *testing.T) {
+	for _, c := range Consumers() {
+		if got, want := c.Includes(Entered), c != Closure; got != want {
+			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)
+		}
+	}
+}
+
+func TestAConditionNamesTheKindsItIncludes(t *testing.T) {
+	for _, c := range []struct {
+		kinds []Kind
+		where string
+		args  int
+	}{
+		{nil, "1 = 0", 0},
+		{[]Kind{Vulnerability}, `"f"."kind" = ?`, 1},
+		{[]Kind{Vulnerability, Entered}, `"f"."kind" IN (?)`, 1},
+	} {
+		where, args := In(`"f"."kind"`, c.kinds)
+		if where != c.where || len(args) != c.args {
+			t.Errorf("%v: %q with %d arguments; want %q with %d", c.kinds, where, len(args), c.where, c.args)
+		}
+	}
+}

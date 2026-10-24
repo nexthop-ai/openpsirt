@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Piece is one piece of work as the findings list shows it: an issue at a
@@ -195,8 +196,10 @@ func (s *Store) leftBehind(ctx context.Context, productID int64, visible []acces
 		args = append(args, *to)
 	}
 	var ids []int64
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	if err := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("vulnerability_id").
+		Where(kinds, kindArgs...).
 		Where(inThisProduct, productID).
 		Where(`"vulnerability_id" IN (?)`, bun.List(issues)).
 		Where(inFold, fold).

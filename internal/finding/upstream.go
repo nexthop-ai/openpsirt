@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -158,6 +159,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	issued := `SELECT "vv"."id" FROM "vulnerability" AS "vv" WHERE "vv"."identifier_folded" = "ss"."vulnerability"
 		UNION SELECT "vl"."vulnerability_id" FROM "vulnerability_alias" AS "vl"
 		WHERE "vl"."identifier_folded" = "ss"."vulnerability"`
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var out []Offer
 	q := s.db.NewSelect().
 		TableExpr(`"vex_statement" AS "ss"`).
@@ -191,6 +193,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		Where(`"ss"."declined_at" IS NULL`).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" = ?`, access.Public).
+		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" IN (`+issued+`)`).
 		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+` WHERE `+DecisionAt(`"st"."product_id"`)+`
 			AND "de"."live_key" IS NOT NULL AND "de"."state" IN (?))`,

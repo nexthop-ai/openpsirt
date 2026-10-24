@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -141,11 +142,13 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// it. Every issue counted is among these, so the places of the rest are
 	// never read. A place out of the reader's reach can put an issue here, so
 	// the window's two ends are checked again on what the reader reads.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	closing := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(`"f"."closed_at" IS NOT NULL`).
 		Where(wasOpen).
+		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
 				q = q.Where(`"f"."closed_at" >= ?`, since)
@@ -170,6 +173,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
 		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL THEN 1 ELSE 0 END) AS "open_places"`).
 		Where(wasOpen).
+		Where(kinds, kindArgs...).
 		Where(`"f"."vulnerability_id" IN (?)`, closing).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where(`"f"."closed_at" IS NULL`).
@@ -222,6 +226,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(wasOpen).
+		Where(kinds, kindArgs...).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			if !since.IsZero() {
 				q = q.Where(`"f"."opened_at" >= ?`, since)
@@ -272,6 +277,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	// for the reason the state filter gives: SQLite left to choose starts
 	// from every open finding.
 	standing, held := InForce()
+	answeredKinds, answeredArgs := kind.Statistics.Where(`"f2"."kind"`)
 	answered := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(DecisionIssue).
@@ -284,11 +290,13 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(standing, held...).
 		Where(`"f2"."closed_at" IS NULL`).
+		Where(answeredKinds, answeredArgs...).
 		GroupExpr(`"f2"."id"`)
 
 	// One row per issue and product, with the flags. Every narrowing is a
 	// condition on a place, so each applies here, before the places are
 	// reduced.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	places := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -298,6 +306,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."opened_at" <= ?`, now).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."vulnerability_id", "st"."product_id"`)
 	for i, bucket := range agingBuckets {
 		in, args := bucket.holds(now)

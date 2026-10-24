@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // ToReaffirm is one claim of somebody's that lapsed and that nothing has
@@ -215,6 +216,7 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 	for _, row := range rows {
 		ids = append(ids, row.ID)
 	}
+	kinds, args := kindsOf(kind.VersionCarry, "f")
 	var still []int64
 	if err := s.db.NewSelect().Model((*Decision)(nil)).
 		ColumnExpr(`"de"."id"`).
@@ -225,7 +227,8 @@ func (s *Store) movedUnder(ctx context.Context, rows []Decision) (map[int64]bool
 			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
 			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
 			` WHERE "st"."product_id" = "de"."product_id" AND "f"."closed_at" IS NULL`+
-			` AND `+finding.DecisionFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`).
+			` AND `+kinds+
+			` AND `+finding.DecisionFiledAt("de", "f")+` AND `+finding.VersionsMatch+`)`, args...).
 		Scan(ctx, &still); err != nil {
 		return nil, fmt.Errorf("read which of these the code moved under: %w", err)
 	}

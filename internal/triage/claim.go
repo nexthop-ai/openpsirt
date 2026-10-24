@@ -868,7 +868,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			// action over many places and its rows need not agree,
 			// so the representative row above answers for the
 			// claim's identity and not for this.
-			if row.Visibility == access.Private {
+			if row.Visibility != access.Public {
 				result.Undisclosed = true
 			}
 			ids = append(ids, row.ID)
