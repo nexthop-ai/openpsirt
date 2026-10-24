@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Spent is what the work went into, for one component in one product.
@@ -84,6 +85,8 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 	if readableHere == "" {
 		readableHere = "1 = 1"
 	}
+	kinds, onArgs := kindsOf(kind.Statistics, "pf")
+	onArgs = append(onArgs, readableArgs...)
 	grouped := func() *bun.SelectQuery {
 		q := s.db.NewSelect().
 			TableExpr(finding.Decisions).
@@ -110,7 +113,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			AND "pf"."target_id" IN (SELECT "et"."id" FROM "target" AS "et"
 				JOIN "stream" AS "es" ON "es"."id" = "et"."stream_id"
 				WHERE "es"."product_id" = "de"."product_id")
-			AND `+readableHere, readableArgs...).
+			AND `+kinds+` AND `+readableHere, onArgs...).
 			Join(`LEFT JOIN "component" AS "pc" ON "pc"."id" = "pf"."component_id"`).
 			Where(`"de"."proposed_at" < ?`, until).
 			GroupExpr(`"de"."product_id", COALESCE("pc"."name", '')`)

@@ -399,7 +399,7 @@ func (f *fixture) placeAt(t *testing.T, stream string, target int64, component, 
 		}
 	}
 	row := &finding.Finding{
-		TargetID: target, Kind: "dependency", VulnerabilityID: f.issue,
+		TargetID: target, Kind: finding.Vulnerable, VulnerabilityID: f.issue,
 		Visibility: access.Public, ComponentID: carrier.ID, ConsumerID: &holder.ID,
 		PlaceIdentity: f.at().PlaceIdentity, Urgency: 1, OpenedAt: time.Now().UTC(),
 	}

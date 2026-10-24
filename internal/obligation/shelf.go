@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -79,6 +80,7 @@ type Entry struct {
 // The sweep asks as the deployment and narrows again per recipient, because
 // who may act on a product is a different question from who may read it.
 func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standing, error) {
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	var rows []struct {
 		triage.ExploitedHere `bun:"extend"`
 
@@ -100,8 +102,9 @@ func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standi
 			` JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`+
 			` JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`+
 			` WHERE "si"."id" = "eh"."vulnerability_id"`+
-			` AND "st"."product_id" = "eh"."product_id" AND "f"."visibility" = ?)`+
-			` THEN 1 ELSE 0 END AS "private"`, access.Private).
+			` AND "st"."product_id" = "eh"."product_id" AND "f"."visibility" = ?`+
+			` AND `+kinds+`)`+
+			` THEN 1 ELSE 0 END AS "private"`, append([]any{access.Private}, kindArgs...)...).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "eh"."vulnerability_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "eh"."product_id"`).
 		Where(`"eh"."cleared_at" IS NULL`).

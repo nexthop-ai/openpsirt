@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -502,6 +503,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Where(`"f"."target_id" = ?`, at.TargetID).
 		Where(`"f"."component_id" IN (?)`, bun.List(fold)).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(at.VulnerabilityIDs)).
 		GroupExpr(`"st"."product_id", "f"."vulnerability_id", "f"."place_identity", "f"."visibility", ` +
 			`"c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version", ` +

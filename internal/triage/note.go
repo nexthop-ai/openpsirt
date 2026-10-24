@@ -9,6 +9,7 @@ package triage
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -104,7 +106,7 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 		if !told {
 			return ErrNoSuchNote
 		}
-		if !subject.Triages(at, productID) && !subject.OnCaseToAct(productID, vulnerabilityID) {
+		if !mayDecideOn(subject, productID, vulnerabilityID, at) {
 			return access.Denied("write a note about an issue here")
 		}
 		if _, err := tx.NewInsert().Model(note).Exec(ctx); err != nil {
@@ -165,8 +167,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 		if !told {
 			return ErrNoSuchNote
 		}
-		if !subject.Triages(at, note.ProductID) &&
-			!subject.OnCaseToAct(note.ProductID, note.VulnerabilityID) {
+		if !mayDecideOn(subject, note.ProductID, note.VulnerabilityID, at) {
 			return access.Denied("change a note about an issue here")
 		}
 		if note.WrittenBy != subject.ID {
@@ -230,7 +231,7 @@ func (s *Store) Notes(ctx context.Context, subject access.Subject,
 	if !told {
 		return nil, ErrNoSuchNote
 	}
-	if !subject.Reads(at, productID) && !subject.OnCase(productID, vulnerabilityID) {
+	if !slices.Contains(access.VisibleOn(subject, productID, vulnerabilityID), at) {
 		return nil, ErrNoSuchNote
 	}
 	var notes []IssueNote
@@ -279,23 +280,29 @@ func (s *Store) NoteVisibility(ctx context.Context, productID,
 	return noteVisibility(ctx, s.db, productID, vulnerabilityID)
 }
 
+// noteVisibility is private where any of the issue's findings in the product
+// is, internal where none is and any is internal, and public otherwise.
+// Internal is never read as public: it is material never disclosed at all.
 func noteVisibility(ctx context.Context, db bun.IDB, productID,
 	vulnerabilityID int64) (access.Visibility, error) {
 
-	hidden, err := db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`"f"."id"`).
-		Where(finding.HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
-		Where(`"st"."product_id" = ?`, productID).
-		Where(`"f"."visibility" = ?`, access.Private).
-		Exists(ctx)
-	if err != nil {
-		return access.Public, fmt.Errorf("read whether this issue is announced here: %w", err)
-	}
-	if hidden {
-		return access.Private, nil
+	for _, v := range []access.Visibility{access.Private, access.Internal} {
+		held, err := db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+			ColumnExpr(`"f"."id"`).
+			Where(finding.HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
+			Where(`"st"."product_id" = ?`, productID).
+			Apply(ofKinds(kind.Triage, "f")).
+			Where(`"f"."visibility" = ?`, v).
+			Exists(ctx)
+		if err != nil {
+			return access.Public, fmt.Errorf("read whether this issue is announced here: %w", err)
+		}
+		if held {
+			return v, nil
+		}
 	}
 	return access.Public, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Whole is one claim and everything about it: what it says, what it covers
@@ -132,7 +133,7 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 	for _, row := range rows {
 		issues[row.VulnerabilityID] = true
 		places[row.PlaceIdentity] = true
-		if row.Visibility == access.Private {
+		if row.Visibility != access.Public {
 			whole.Undisclosed = true
 		}
 	}
@@ -230,6 +231,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		// well its versions still match.
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
@@ -298,7 +300,8 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		Where(`"de"."ended_at" IS NOT NULL`).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(`"f"."opened_at" <= "de"."ended_at"`).
-		Where(`("f"."closed_at" IS NULL OR "f"."closed_at" > "de"."ended_at")`)
+		Where(`("f"."closed_at" IS NULL OR "f"."closed_at" > "de"."ended_at")`).
+		Apply(ofKinds(kind.Triage, "f"))
 	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
 		GroupExpr(`"de"."state", "st"."name", "va"."name"`).
 		OrderExpr(`"de"."state", "st"."name", "va"."name"`).

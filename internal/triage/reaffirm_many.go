@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -549,6 +550,7 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			ColumnExpr(`MAX(CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
 			Where(`"st"."product_id" = ?`, productID).
 			Where(`"f"."closed_at" IS NULL`).
+			Apply(ofKinds(kind.Triage, "f")).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
 			Where(`"f"."place_identity" IN (?)`, bun.List(wordsOf(identities))).

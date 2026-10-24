@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -105,7 +106,7 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 			} else {
 				q = q.Where(`"de"."severity_centi" = ?`, *group.Baseline)
 			}
-			if err := q.Where(coversSomething).Scan(ctx, &rows); err != nil {
+			if err := q.Apply(coversSomething).Scan(ctx, &rows); err != nil {
 				return fmt.Errorf("read what a severity rise outgrew: %w", err)
 			}
 			ids = append(ids, rows...)
@@ -159,14 +160,18 @@ func (s *Store) LapseRatedWorse(ctx context.Context, where RatedWorseWhere) (Lap
 // decision against the product's open findings: 64.3 s for the sweep after a
 // rescan of a build of 324,508 open findings with 133,549 decisions, against
 // 1.37 s for the same 2,858 groups compared directly.
-var coversSomething = `EXISTS (SELECT 1 FROM "finding" AS "fc"` +
-	` JOIN "component" AS "c" ON "c"."id" = "fc"."component_id"` +
-	` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"` +
-	` JOIN "target" AS "tgc" ON "tgc"."id" = "fc"."target_id"` +
-	` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"` +
-	` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL` +
-	` AND ` + finding.DecisionAtPlace("fc") +
-	` AND ` + finding.VersionsMatch + `)`
+func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
+	kinds, args := kindsOf(kind.VersionCarry, "fc")
+	return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fc"`+
+		` JOIN "component" AS "c" ON "c"."id" = "fc"."component_id"`+
+		` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"`+
+		` JOIN "target" AS "tgc" ON "tgc"."id" = "fc"."target_id"`+
+		` JOIN "stream" AS "stc" ON "stc"."id" = "tgc"."stream_id"`+
+		` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL`+
+		` AND `+kinds+
+		` AND `+finding.DecisionAtPlace("fc")+
+		` AND `+finding.VersionsMatch+`)`, args...)
+}
 
 // ratedWorseGroup is the standing rows of one claim about one issue in one
 // product that share a baseline, with the rating in force there now.
@@ -203,7 +208,7 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
 		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 		Where(`"de"."live_key" IS NOT NULL`).
-		Where(coversSomething).
+		Apply(coversSomething).
 		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."vulnerability_id", "cl"."outcome", ` +
 			`"cl"."justification", "de"."severity_centi", "v"."severity", "ir"."severity", "v"."score_centi"`)
 	if where.ProductID > 0 {
@@ -213,8 +218,10 @@ func ratedWorseGroups(ctx context.Context, tx bun.IDB, where RatedWorseWhere) ([
 		q = q.Where(finding.FiledUnderAny(filed.DecisionIssue), bun.List(where.Vulnerabilities))
 	}
 	if where.OpenIn > 0 {
+		kinds, args := kindsOf(kind.VersionCarry, "fo")
 		q = q.Where(`"dv"."issue_id" IN (SELECT "fo"."vulnerability_id" FROM "finding" AS "fo"`+
-			` WHERE "fo"."target_id" = ? AND "fo"."closed_at" IS NULL)`, where.OpenIn)
+			` WHERE "fo"."target_id" = ? AND "fo"."closed_at" IS NULL AND `+kinds+`)`,
+			append([]any{where.OpenIn}, args...)...)
 	}
 	var groups []ratedWorseGroup
 	if err := q.Scan(ctx, &groups); err != nil {

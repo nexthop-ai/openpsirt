@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -200,8 +201,10 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		OnTag int `bun:"on_tag"`
 	}
 	// Undisclosed where any open finding there is, disclosed where there are
-	// findings and none is, and nothing where there are none.
+	// findings and none is, and nothing where there are none. The kinds a
+	// version carries hold no other visibility.
 	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
+	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The issue the decision is read as, which is the one the new line holds.
@@ -212,8 +215,10 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
-			AS "visibility"`, private, string(access.Private), string(access.Public), toTarget).
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+				AND `+kinds+`), '')
+			AS "visibility"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
+			kindArgs...)...).
 		Apply(versionsOnLine(toTarget, "component_now", "consumer_now")).
 		// A line carried onto that was built once. It is a fact about the
 		// target rather than about the decision, and the rule that refuses a
@@ -245,18 +250,24 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 // version alone can pair versions no finding holds together. Ordered on both
 // and taken once, both columns read the same row.
 func versionsOnLine(toTarget int64, componentAs, consumerAs string) func(*bun.SelectQuery) *bun.SelectQuery {
+	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	first := func(expr string) string {
 		return `COALESCE((SELECT ` + expr + ` FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
 			LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"
 			WHERE "f"."target_id" = ? AND ` + finding.DecisionAtPlace("f") + ` AND "f"."closed_at" IS NULL
+				AND ` + kinds + `
 			ORDER BY ` + finding.ComponentUpstreamExpr + `, ` + finding.ConsumerUpstreamExpr + `
 			LIMIT 1), '')`
 	}
+	as := func(name string) []any {
+		args := append([]any{toTarget}, kindArgs...)
+		return append(args, bun.Ident(name))
+	}
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.
-			ColumnExpr(first(finding.ComponentUpstreamExpr)+` AS ?`, toTarget, bun.Ident(componentAs)).
-			ColumnExpr(first(finding.ConsumerUpstreamExpr)+` AS ?`, toTarget, bun.Ident(consumerAs))
+			ColumnExpr(first(finding.ComponentUpstreamExpr)+` AS ?`, as(componentAs)...).
+			ColumnExpr(first(finding.ConsumerUpstreamExpr)+` AS ?`, as(consumerAs)...)
 	}
 }
 
@@ -347,6 +358,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}
+	// Public and private only: a version carries decisions about the kinds
+	// VersionCarry reads, and those hold no internal finding.
 	var readable []access.Visibility
 	for _, v := range []access.Visibility{access.Public, access.Private} {
 		if mayDecide(subject, productID, v) {
@@ -377,6 +390,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Landing string `bun:"landing"`
 	}
 	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
+	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
+	gKinds, gKindArgs := kindsOf(kind.VersionCarry, "g")
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		// The issue each decision is read as, which is the one the new line holds.
@@ -395,22 +410,26 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		// The new line's contents at that place, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN("c"."name") FROM "finding" AS "f"
 			JOIN "component" AS "c" ON "c"."id" = "f"."component_id"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
-			AS "component"`, toTarget).
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+				AND `+kinds+`), '')
+			AS "component"`, append([]any{toTarget}, kindArgs...)...).
 		// Both versions, because a decision is keyed on both: a build whose
 		// consumer alone has moved is one the claim does not reach, and the
 		// finding surfaces unanswered.
 		Apply(versionsOnLine(toTarget, "now_at", "consumer_now")).
 		ColumnExpr(`COALESCE("de"."consumer_upstream_version", '') AS "consumer_was"`).
 		ColumnExpr(`EXISTS (SELECT 1 FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL)
-			AS "still_there"`, toTarget).
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+				AND `+kinds+`)
+			AS "still_there"`, append([]any{toTarget}, kindArgs...)...).
 		// The visibility the place lands at, read as placeOnLine reads it.
 		ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL
 				WHEN `+undisclosed+` THEN ? ELSE ? END
 			FROM "finding" AS "f"
-			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL), '')
-			AS "landing"`, private, string(access.Private), string(access.Public), toTarget).
+			WHERE "f"."target_id" = ? AND `+finding.DecisionAtPlace("f")+` AND "f"."closed_at" IS NULL
+				AND `+kinds+`), '')
+			AS "landing"`, append([]any{private, string(access.Private), string(access.Public), toTarget},
+			kindArgs...)...).
 		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE("cl"."deferred_until", "cl"."committed_to") IS NOT NULL
 			AND COALESCE("cl"."deferred_until", "cl"."committed_to") <= ?) AS "ran_out"`, s.now()).
@@ -418,7 +437,8 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Where(`"de"."product_id" = ?`, productID).
 		Where(`"de"."visibility" IN (?)`, bun.List(readable)).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "g"
-			WHERE "g"."target_id" = ? AND `+finding.DecisionAtPlace("g")+`)`, fromTarget).
+			WHERE "g"."target_id" = ? AND `+finding.DecisionAtPlace("g")+` AND `+gKinds+`)`,
+			append([]any{fromTarget}, gKindArgs...)...).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what a new line would inherit: %w", err)

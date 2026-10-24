@@ -120,8 +120,8 @@ func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *
 }
 
 // readableFindings narrows a query that joins findings to the ones a subject
-// may read, per product: disclosed findings where they read disclosed ones on
-// that product, undisclosed where they read undisclosed ones.
+// may read, per product and per visibility: a finding of each visibility where
+// they read that visibility on that product.
 //
 // The same rule as narrowedBy, asked of the finding's visibility and the
 // product it sits in rather than the decision's. A decision somebody may read
@@ -154,22 +154,29 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 }
 
 // orBrought widens a narrowing by the cases this subject was brought into: one
-// issue in one product, at either visibility.
+// issue in one product, at the visibilities caseReaches allows.
 //
 // Only where the product's own grant is not already wider. A case adds nothing
-// where somebody reads the product at both visibilities, and the narrower
-// clause would be dead weight on every read. Read from the subject rather than
-// from anything typed, so the pairs are the ones resolved at sign-in.
+// where somebody reads the product at every visibility a case reaches, and the
+// narrower clause would be dead weight on every read. Read from the subject
+// rather than from anything typed, so the pairs are the ones resolved at
+// sign-in.
 func orBrought(subject access.Subject, where string, args []any,
-	product, vulnerability string) (string, []any) {
+	product, visibility, vulnerability string) (string, []any) {
 
+	var reached []access.Visibility
+	for _, v := range access.Visibilities() {
+		if caseReaches(v) {
+			reached = append(reached, v)
+		}
+	}
 	var brought []string
 	for _, id := range subject.CaseProducts() {
-		if subject.Reads(access.Public, id) && subject.Reads(access.Private, id) {
+		if readsAll(subject, id, reached) {
 			continue
 		}
-		brought = append(brought, "("+product+" = ? AND "+vulnerability+" IN (?))")
-		args = append(args, id, bun.List(subject.Cases(id)))
+		brought = append(brought, "("+product+" = ? AND "+vulnerability+" IN (?) AND "+visibility+" IN (?))")
+		args = append(args, id, bun.List(subject.Cases(id)), bun.List(reached))
 	}
 	if len(brought) == 0 {
 		return where, args
@@ -204,7 +211,26 @@ func mayDecideOn(subject access.Subject, productID, vulnerabilityID int64,
 	visibility access.Visibility) bool {
 
 	return mayDecide(subject, productID, visibility) ||
-		subject.OnCaseToAct(productID, vulnerabilityID)
+		(caseReaches(visibility) && subject.OnCaseToAct(productID, vulnerabilityID))
+}
+
+// readsAll reports whether this subject reads every one of these visibilities
+// in a product.
+func readsAll(subject access.Subject, productID int64, visibilities []access.Visibility) bool {
+	for _, v := range visibilities {
+		if !subject.Reads(v, productID) {
+			return false
+		}
+	}
+	return true
+}
+
+// caseReaches reports whether a case grant reaches findings of this
+// visibility. A case is about undisclosed work and the record it becomes once
+// disclosed, so it reaches public and private findings and never an internal
+// one; access.VisibleOn holds the same rule for reading.
+func caseReaches(visibility access.Visibility) bool {
+	return visibility == access.Public || visibility == access.Private
 }
 
 // readableOn is readable with the case grant asked beside the product-wide
@@ -244,9 +270,9 @@ const (
 // an export or a report is exactly where filtering afterwards gets forgotten —
 // and where the number is the leak even when no row is shown.
 //
-// Public and private are asked separately, per product, because each is its
-// own grant: reaching one implies nothing about the other, so a new right
-// cannot widen one by being written into the other.
+// Each visibility is asked separately, per product, because each is its own
+// grant: reaching one implies nothing about another, so a new right cannot
+// widen one by being written into another.
 //
 // The products are bound as values. They come from the subject's own grants
 // rather than from anything typed, so writing them into the statement would be
@@ -298,7 +324,7 @@ func visibleCondition(subject access.Subject, product, visibility, vulnerability
 	})
 	where, args := access.VisibleWhere(product, visibility, readings)
 	if cases {
-		where, args = orBrought(subject, where, args, product, vulnerability)
+		where, args = orBrought(subject, where, args, product, visibility, vulnerability)
 	}
 	return where, args
 }
@@ -321,7 +347,12 @@ func negated(where string, args []any) (string, []any) {
 func unnarrowedMay(subject access.Subject,
 	allowed func(access.Subject, int64, access.Visibility) bool) bool {
 
-	return allowed(subject, 0, access.Public) && allowed(subject, 0, access.Private)
+	for _, v := range access.Visibilities() {
+		if !allowed(subject, 0, v) {
+			return false
+		}
+	}
+	return true
 }
 
 // partlyHidden is which of these claims hold a row this subject may not read.
