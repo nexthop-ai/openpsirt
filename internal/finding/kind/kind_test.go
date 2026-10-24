@@ -6,11 +6,11 @@ package kind
 import "testing"
 
 func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
-	consumers := Consumers()
-	if len(consumers) == 0 {
+	all := consumers()
+	if len(all) == 0 {
 		t.Fatal("no consumers were found, so this checked nothing")
 	}
-	for _, c := range consumers {
+	for _, c := range all {
 		kinds := c.Kinds()
 		if len(kinds) == 0 {
 			t.Errorf("%s includes no kind", c)
@@ -19,7 +19,7 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 			if !Known(k) {
 				t.Errorf("%s includes %q, which nothing declares", c, k)
 			}
-			if !c.Includes(k) {
+			if !c.includes(k) {
 				t.Errorf("%s lists %q and does not include it", c, k)
 			}
 		}
@@ -30,16 +30,16 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 }
 
 func TestAnalysisReachesNoConsumerOfVulnerabilityFindings(t *testing.T) {
-	for _, c := range Consumers() {
-		if c.Includes(Analysis) {
+	for _, c := range consumers() {
+		if c.includes(Analysis) {
 			t.Errorf("%s includes analysis results", c)
 		}
 	}
 }
 
 func TestOnlyTheSweepLeavesRecordedFlawsOut(t *testing.T) {
-	for _, c := range Consumers() {
-		if got, want := c.Includes(Entered), c != Closure; got != want {
+	for _, c := range consumers() {
+		if got, want := c.includes(Entered), c != Closure; got != want {
 			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)
 		}
 	}

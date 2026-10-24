@@ -16,8 +16,6 @@ package kind
 
 import (
 	"github.com/uptrace/bun"
-
-	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // Kind says what sort of finding this is, meaning what produced it.
@@ -52,25 +50,6 @@ const (
 	Rule Issue = "rule"
 )
 
-// Issues is every sort of issue, in the order a list of them reads.
-func Issues() []Issue { return []Issue{Advisory, Flaw, Rule} }
-
-// Absence says what it means that a finding's producer stopped reporting it.
-type Absence string
-
-const (
-	// Closes is a finding the run that no longer reports it closes, with a
-	// reason worked out from what the build now holds.
-	Closes Absence = "closes"
-	// Stated is a finding no run has an opinion about. A person opened it
-	// and a person closes it.
-	Stated Absence = "stated"
-	// NotReproduced is a finding a comparable run no longer reports. It stays
-	// open and is marked, because the analyzer reacting to a change nearby
-	// looks the same as a fix.
-	NotReproduced Absence = "not-reproduced"
-)
-
 // Declaration is what one kind of finding is.
 type Declaration struct {
 	Kind Kind
@@ -79,28 +58,14 @@ type Declaration struct {
 	// and no other, so an analyzer's rule never merges with a CVE. The first
 	// is the sort an issue it introduces is filed as.
 	Issues []Issue
-	// Absence is what a producer no longer reporting one means.
-	Absence Absence
-	// Visibilities is every visibility a finding of this kind may hold, the
-	// one it arrives at first.
-	Visibilities []access.Visibility
 }
 
 // Declarations is every kind of finding there is.
 func Declarations() []Declaration {
 	return []Declaration{
-		{
-			Kind: Vulnerability, Issues: []Issue{Advisory, Flaw}, Absence: Closes,
-			Visibilities: []access.Visibility{access.Public, access.Private},
-		},
-		{
-			Kind: Entered, Issues: []Issue{Flaw}, Absence: Stated,
-			Visibilities: []access.Visibility{access.Private, access.Public},
-		},
-		{
-			Kind: Analysis, Issues: []Issue{Rule}, Absence: NotReproduced,
-			Visibilities: []access.Visibility{access.Internal, access.Private},
-		},
+		{Kind: Vulnerability, Issues: []Issue{Advisory, Flaw}},
+		{Kind: Entered, Issues: []Issue{Flaw}},
+		{Kind: Analysis, Issues: []Issue{Rule}},
 	}
 }
 
@@ -151,8 +116,8 @@ const (
 	Notifications Consumer = "notifications"
 )
 
-// Consumers is every consumer of findings.
-func Consumers() []Consumer {
+// consumers is every consumer of findings.
+func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Inventory, Statistics, Exports,
 		VEX, Advisories, Notifications,
@@ -178,8 +143,8 @@ func (c Consumer) Kinds() []Kind {
 	return nil
 }
 
-// Includes reports whether this consumer reads findings of kind k.
-func (c Consumer) Includes(k Kind) bool {
+// includes reports whether this consumer reads findings of kind k.
+func (c Consumer) includes(k Kind) bool {
 	for _, have := range c.Kinds() {
 		if have == k {
 			return true

@@ -56,8 +56,8 @@ internal ones. Somebody who works more than one holds each. A triage role
 carries reading at its own visibility. Somebody holding `internal-read` alone
 sees the product listed with nothing open against it but internal findings.
 
-The findings lists, screens and reports show no internal finding. Analysis
-results reach none of them.
+The findings lists, screens and reports show no analysis result, and analysis
+results are the only internal findings. Analysis results reach none of them.
 
 A disclosed finding assigned to somebody is listed among their work whatever
 they read, drawn in the tree of what they hold, and theirs to hand back, because
