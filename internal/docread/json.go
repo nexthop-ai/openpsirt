@@ -418,3 +418,29 @@ func (b *JSON) Bool() (*bool, error) {
 		return nil, refusal.Errorf("want a boolean, got %s", bound.Head(fmt.Sprint(v), MostQuoted))
 	}
 }
+
+// ArrayOrNull reads one array as Array does, or a null, and reports which: a
+// format that tells an absent list from an empty one states the absence as
+// null.
+func (b *JSON) ArrayOrNull(fn func() error) (bool, error) {
+	tok, err := b.Token()
+	if err != nil {
+		return false, err
+	}
+	if tok == nil {
+		return false, nil
+	}
+	if tok != json.Delim('[') {
+		return false, refusal.Errorf("want an array, got %s", bound.Head(fmt.Sprint(tok), MostQuoted))
+	}
+	if err := b.enter(); err != nil {
+		return false, err
+	}
+	defer b.leave()
+	for b.dec.More() {
+		if err := fn(); err != nil {
+			return true, err
+		}
+	}
+	return true, b.close()
+}
