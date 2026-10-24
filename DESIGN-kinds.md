@@ -113,7 +113,7 @@ against one build. The analysis kind is the one that arrives this way
 | A run repeating one already held, on its documents and stated build time, is answered as that one | A retry after a timeout that had succeeded (REQ-06) |
 | A run is comparable where its absences are evidence; one that is not adds and updates findings and marks none absent | `DESIGN-analysis.md` § Run parameters holds the reasons |
 | A sighting is what a series knows of one finding: the run that first saw it, the last that did, and the first comparable run that did not | Absence is an interval on the sighting rather than a closure |
-| A run's documents are stored until it is applied, then let go; its receipt stays | What a run said is recorded on the findings it saw |
+| A run's documents are placed at the door and not stored; its placed results are held until it is applied, then let go, and its receipt stays | What a run said is recorded on the findings it saw |
 
 ## Component from a path
 

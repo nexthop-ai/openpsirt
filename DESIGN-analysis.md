@@ -40,7 +40,7 @@ POST /v1/products/{product}/streams/{stream}/variants/{variant}/analyses
 |---|---|
 | Its own operation beside the scan upload | Analysis runs on its own schedule, often in another job from the inventory |
 | A pipeline key covering the build sends it; a person sends where they hold `internal-triage` on the product | Every result opens internal |
-| The documents are read at the door and stored as they arrived, compressed or not, until the run is applied or ends; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, and applying waits for the build's inventory |
+| The documents are read and their results placed at the door; the placed results are stored until the run ends, and the documents are not stored; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, no snippet, file contents, fix or scanner run is ever written, and applying waits for the build's inventory |
 | A retired product, release or variant takes no run, and a queue past its backlog answers 503 | The scan upload's rules, for the same reasons |
 | The fields fill what the documents leave unstated, and the documents win where both state a value | The upload client writes them into the SARIF; a plain producer passes them beside it |
 | The series is required, from the field or from each run's `automationDetails.id`, written `<series>/<built>` | It is what the next run is compared against |
@@ -97,8 +97,8 @@ the upload for that reason, and are memory figures.
 | A path is resolved through its named starting points and placed against the source root | Paths arrive absolute, as `file://` addresses, relative to the working directory, and under a starting point left undefined |
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
-| Snippets, whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | Source enters no finding, no lead's description and no receipt. The stored documents hold them until the run ends (§ Limits) |
-| The source root is held on the run until the run is read, and cleared after | It is a path on somebody's build host |
+| Snippets, whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | Source enters no finding, no lead's description, no receipt and nothing stored |
+| The source root is used at the door and not stored | It is a path on somebody's build host |
 
 ## Run parameters
 
@@ -133,14 +133,14 @@ holds is recorded:
 ## Run application
 
 A worker claims the queued job and applies the run in one transaction. The
-documents are read again before it, since they do not change once stored.
+placed results are read before it, since they do not change once stored.
 
 | State | When |
 |---|---|
 | `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival |
 | `superseded` | The series has applied a run to this build built at or after this one. Nothing changes |
 | `held` | A comparable run would mark more of the build's open leads not reproduced than the deployment allows at once. Nothing changes |
-| `failed` | The documents could not be read, every run was a scanner's, a run stated no results, or the build had no inventory read within a day of the run arriving |
+| `failed` | Every run was a scanner's, a run stated no results, the placed results are held in a shape the release applying them does not read, or the build had no inventory read within a day of the run arriving |
 | `applied` | Results matched, opened and recorded |
 
 Two runs of one series are applied one after the other. Each reads what the
@@ -159,7 +159,7 @@ An applied run, in order:
 4. Replaces what the last run said about each lead it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
 5. Records each lead as seen by this run. A comparable run records each open lead it did not see as not reproduced by it, and a lead not reproduced that is seen again is counted as returned.
 6. Records the repositories the run says its checkout held.
-7. Lets the stored documents go, and writes the receipt.
+7. Lets the placed results go, and writes the receipt.
 
 Not reproduced is absence, and a lead stays open (`DESIGN-kinds.md` § Kinds).
 A not-comparable run opens and updates leads and marks none.
@@ -241,7 +241,6 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | Exact matching churns where an analyzer writes no fingerprint | clang-tidy, and clang before 22, give rule, path, line and message alone; every line moved above a result reopens it as a new lead |
 | Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
-| A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its documents |
-| The documents are stored as they arrived until the run ends | A snippet, a file's contents, or a secret a scanner's run carries sits in the database and its backups until the run is applied, superseded, held or failed: at most a day and the time a job takes |
+| A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |
 | The bounds' defaults are a judgment | They are several times the fixtures here and are not measured against the largest real producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

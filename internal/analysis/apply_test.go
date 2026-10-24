@@ -76,7 +76,7 @@ type world struct {
 func eachWorld(t *testing.T, fn func(t *testing.T, w *world)) {
 	t.Helper()
 	fixture.Each(t, func(t *testing.T, fw *fixture.World) {
-		fn(t, &world{World: fw, applier: NewApplier(fw.DB, sarif.DefaultLimits())})
+		fn(t, &world{World: fw, applier: NewApplier(fw.DB)})
 	})
 }
 
@@ -159,8 +159,7 @@ func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc strin
 		if err != nil {
 			return err
 		}
-		_, err = store.Write(ctx, run.ID, 0, strings.NewReader(doc))
-		return err
+		return Place([]sarif.Log{log}, "").Hold(ctx, store, run.ID)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -398,6 +397,27 @@ func TestARunWaitingADayForItsInventoryFails(t *testing.T) {
 		docs, err := series.NewStore(w.DB.DB).Documents(t.Context(), run.ID)
 		if err != nil || len(docs) != 0 {
 			t.Errorf("%d documents still held, %v", len(docs), err)
+		}
+	})
+}
+
+func TestARunHeldInAShapeThisReleaseDoesNotReadFails(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		run := w.receive(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		store := series.NewStore(w.DB.DB)
+		if err := store.Discard(t.Context(), run.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Write(t.Context(), run.ID, 1, strings.NewReader(`{"version":"2.1.0","runs":[]}`)); err != nil {
+			t.Fatal(err)
+		}
+		status, err := w.applier.Apply(t.Context(), run.ID)
+		if err != nil || status != series.Failed {
+			t.Fatalf("status %s, %v; want failed", status, err)
+		}
+		run, err = store.ByID(t.Context(), run.ID)
+		if err != nil || !strings.Contains(run.Failure, "could not be read") {
+			t.Errorf("failure %q, %v; want the placed results could not be read", run.Failure, err)
 		}
 	})
 }

@@ -104,9 +104,6 @@ type Params struct {
 	// ThirdParty is the paths the pipeline names as code it did not write,
 	// as a JSON list.
 	ThirdParty string `bun:"third_party,nullzero"`
-	// SourceRoot is the checkout's absolute path where the pipeline states
-	// one, held until the run is read.
-	SourceRoot string `bun:"source_root,nullzero"`
 }
 
 // Module is one repository a run's checkout held.
@@ -300,7 +297,7 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 	}
 	_, err := s.db.NewUpdate().Model(run).
 		Column("status", "failure", "comparable", "not_comparable", "scan_id", "baseline", "receipt",
-			"applied_at", "source_root", "tool_name", "tool_version", "client_version", "rules_digest", "rules_count",
+			"applied_at", "tool_name", "tool_version", "client_version", "rules_digest", "rules_count",
 			"units_expected", "units_analyzed", "exit_status", "completed").
 		WherePK().Exec(ctx)
 	if err != nil {

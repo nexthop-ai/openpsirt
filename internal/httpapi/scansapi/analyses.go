@@ -177,6 +177,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	}
 	stated := analysis.Describe(logs, given)
 	hash := analysis.RunHash(digests, stated.BuiltAt)
+	placed := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot))
 	dated := stated.BuiltAt.IsZero()
 	if dated {
 		stated.BuiltAt = time.Now().UTC()
@@ -202,13 +203,8 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		if err != nil || repeat {
 			return err
 		}
-		for i, file := range files {
-			if _, err := file.Seek(0, io.SeekStart); err != nil {
-				return err
-			}
-			if _, err := store.Write(ctx, run.ID, i, file); err != nil {
-				return err
-			}
+		if err := placed.Hold(ctx, store, run.ID); err != nil {
+			return err
 		}
 		_, err = in.Queue.AddTx(ctx, tx, queue.Analyze, strconv.FormatInt(run.ID, 10))
 		return err
@@ -243,7 +239,6 @@ func statedBeside(parts *analysisParts) (analysis.Stated, error) {
 		out.BuiltAt = t
 	}
 	out.Params.ToolVersion = strings.TrimSpace(parts.ToolVersion)
-	out.Params.SourceRoot = strings.TrimSpace(parts.SourceRoot)
 	out.Params.RulesDigest, out.Params.RulesCount = analysis.RuleSet(parts.Rules)
 	for _, n := range []struct {
 		name  string

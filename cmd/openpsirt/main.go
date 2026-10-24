@@ -603,7 +603,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	routing := finding.NewSweeper(db, work, logger, name)
 	// Applies what an analyzer reported against a build, once the build has
 	// an inventory to place the results on.
-	analyze := analysis.NewWorker(analysis.NewApplier(db, cfg.AnalysisLimits()), work, logger, name)
+	analyze := analysis.NewWorker(analysis.NewApplier(db), work, logger, name)
 	// The tool's own health. It needs nothing configured, which is the point:
 	// an operator who never set up mail is exactly the one who would otherwise
 	// never hear that a build stopped being scanned.

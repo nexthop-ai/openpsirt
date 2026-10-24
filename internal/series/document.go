@@ -22,7 +22,7 @@ import (
 // documents are stored under.
 const chunkSize = 512 << 10
 
-// Document is one of the files a run arrived as, as it is held.
+// Document is what a run is held as until it is applied, stored in parts.
 type Document struct {
 	bun.BaseModel `bun:"table:series_document,alias:sd"`
 
@@ -45,7 +45,7 @@ type chunk struct {
 }
 
 // Write stores one document of a run, reading it as a stream. The hash is
-// over the bytes as they arrived.
+// over the bytes stored.
 func (s *Store) Write(ctx context.Context, runID int64, ordinal int, r io.Reader) (*Document, error) {
 	doc := &Document{RunID: runID, Ordinal: ordinal, CreatedAt: s.now().Truncate(time.Microsecond)}
 	if _, err := s.db.NewInsert().Model(doc).Exec(ctx); err != nil {
@@ -131,7 +131,7 @@ func (c *chunks) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// Discard lets a run's documents go once they have been read. The rows
+// Discard lets a run's documents go once the run ends. The rows
 // recording what arrived stay; the bytes do not. It joins the caller's
 // transaction, so the run's ending and the bytes going are one act.
 func (s *Store) Discard(ctx context.Context, runID int64) error {

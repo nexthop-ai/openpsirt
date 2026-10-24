@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -104,6 +105,36 @@ func TestAnAnalyzerRunIsQueuedAndASecondSendingIsTheSameRun(t *testing.T) {
 		}
 		if listed.Body.Total != 2 || listed.Body.Items[0].Status != core.RunStatus(series.Queued) {
 			t.Errorf("receipts %+v; want two queued runs", listed.Body)
+		}
+	})
+}
+
+func TestAnAnalyzerRunIsHeldAsItsPlacedResultsAndNeverAsSent(t *testing.T) {
+	httpapitest.IngestOn(t, dbtest.Two, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		sent := strings.Replace(clangRun, `"region":{"startLine":4}`,
+			`"region":{"startLine":4,"snippet":{"text":"token = \"hunter2\""}}`, 1)
+		code, run, body := sendRun(t, f, []string{sent}, map[string]string{
+			"series": "clang-tidy/default", "source-root": "/home/builder/sonic",
+		})
+		if code != http.StatusAccepted {
+			t.Fatalf("answered %d (%s); want 202", code, body)
+		}
+		store := series.NewStore(f.DB.DB)
+		docs, err := store.Documents(t.Context(), run.RunID)
+		if err != nil || len(docs) != 1 {
+			t.Fatalf("%d documents held, %v; want the placed results alone", len(docs), err)
+		}
+		held, err := io.ReadAll(store.Open(t.Context(), &docs[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(held), `"src/a.c"`) {
+			t.Errorf("held %s; want the result placed at src/a.c", held)
+		}
+		for _, sentOnly := range []string{"hunter2", "/home/builder", "2.1.0"} {
+			if strings.Contains(string(held), sentOnly) {
+				t.Errorf("held %s; want nothing of %q, which only the document carried", held, sentOnly)
+			}
 		}
 	})
 }

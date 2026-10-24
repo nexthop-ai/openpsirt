@@ -7,10 +7,11 @@
 package analysis
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -28,14 +28,13 @@ import (
 
 // Applier applies stored runs.
 type Applier struct {
-	db     *database.DB
-	limits sarif.Limits
-	now    func() time.Time
+	db  *database.DB
+	now func() time.Time
 }
 
-// NewApplier returns an applier reading documents within limits.
-func NewApplier(db *database.DB, limits sarif.Limits) *Applier {
-	return &Applier{db: db, limits: limits, now: func() time.Time { return time.Now().UTC() }}
+// NewApplier returns an applier.
+func NewApplier(db *database.DB) *Applier {
+	return &Applier{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
 // Receipt is what a pipeline is told about a run it sent. It counts and
@@ -65,16 +64,38 @@ const (
 	DroppedAbsent = "absent"
 )
 
-// prepared is a run's documents, read and placed.
-type prepared struct {
-	results []sarif.Placed
-	tools   []string // per result, the tool that reported it
-	remotes []string // per result, the repository its file is in
-	rules   map[string]finding.Rule
-	modules []series.Module
-	signals int
-	receipt Receipt
-	failure string
+// Placed is a run's documents read and placed in the checkout: what a run is
+// held as until it is applied. The documents themselves are not kept.
+type Placed struct {
+	// Shape is the form the results are held in, which the release applying
+	// them has to read. Any other JSON decodes as a run with no results, and
+	// a comparable run with no results marks the whole build not reproduced.
+	Shape   int            `json:"shape"`
+	Results []sarif.Placed `json:"results,omitempty"`
+	// Tools is, per result, the tool that reported it, and Remotes the
+	// repository its file is in.
+	Tools   []string                `json:"tools,omitempty"`
+	Remotes []string                `json:"remotes,omitempty"`
+	Rules   map[string]finding.Rule `json:"rules,omitempty"`
+	Modules []series.Module         `json:"modules,omitempty"`
+	Signals int                     `json:"signals,omitempty"`
+	Receipt Receipt                 `json:"receipt"`
+	Failure string                  `json:"failure,omitempty"`
+}
+
+// heldShape is the form this release holds placed results in.
+const heldShape = 1
+
+// Hold stores what a run is held as until it is applied, joining the
+// caller's transaction.
+func (p Placed) Hold(ctx context.Context, store *series.Store, runID int64) error {
+	p.Shape = heldShape
+	said, err := json.Marshal(p)
+	if err != nil {
+		return fmt.Errorf("write the placed results: %w", err)
+	}
+	_, err = store.Write(ctx, runID, 0, bytes.NewReader(said))
+	return err
 }
 
 // inventoryWait is how long a run waits for its build's inventory before it
@@ -85,8 +106,8 @@ const inventoryWait = 24 * time.Hour
 
 // Apply reads one stored run and applies it, reporting what became of it.
 //
-// The documents are read before the transaction that applies them. They do
-// not change once stored, and the run's own state is read again inside.
+// The placed results are read before the transaction that applies them. They
+// do not change once stored, and the run's own state is read again inside.
 func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error) {
 	store := series.NewStore(a.db.DB)
 	run, err := store.ByID(ctx, runID)
@@ -111,35 +132,35 @@ func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error)
 // pending is whether a run is still to be applied.
 func pending(s series.Status) bool { return s == series.Queued || s == series.Waiting }
 
-// read reads a run's documents and places their results. A document that
-// cannot be read is the run's failure, stated in words the sender is shown;
-// a fault reading the stored bytes is returned.
-func (a *Applier) read(ctx context.Context, store *series.Store, run *series.Run) (prepared, error) {
+// read reads what a run is held as. Results held in a shape this release
+// does not read are the run's failure; a fault reading the stored bytes is
+// returned.
+func (a *Applier) read(ctx context.Context, store *series.Store, run *series.Run) (Placed, error) {
 	docs, err := store.Documents(ctx, run.ID)
 	if err != nil {
-		return prepared{}, err
+		return Placed{}, err
 	}
-	var logs []sarif.Log
-	upload := sarif.NewUpload(a.limits)
-	for i := range docs {
-		log, err := upload.Read(store.Open(ctx, &docs[i]))
-		var refused refusal.Refusal
-		switch {
-		case errors.As(err, &refused):
-			return prepared{failure: fmt.Sprintf("document %d: %s", i+1, err)}, nil
-		case err != nil:
-			return prepared{}, err
-		}
-		logs = append(logs, log)
+	if len(docs) != 1 {
+		return Placed{Failure: "the run's placed results are not held"}, nil
 	}
-	return place(logs, run), nil
+	said, err := io.ReadAll(store.Open(ctx, &docs[0]))
+	if err != nil {
+		return Placed{}, err
+	}
+	var out Placed
+	if err := json.Unmarshal(said, &out); err != nil || out.Shape != heldShape {
+		return Placed{Failure: "the run's placed results could not be read"}, nil
+	}
+	return out, nil
 }
 
-// place puts every result of a run's documents in the checkout.
-func place(logs []sarif.Log, run *series.Run) prepared {
-	out := prepared{
-		rules:   map[string]finding.Rule{},
-		receipt: Receipt{Dropped: map[string]int{}, Discarded: map[string]int{}},
+// Place puts every result of a run's documents in the checkout, leaving out
+// what a run does not keep. root is the checkout's absolute path where the
+// pipeline states one.
+func Place(logs []sarif.Log, root string) Placed {
+	out := Placed{
+		Rules:   map[string]finding.Rule{},
+		Receipt: Receipt{Dropped: map[string]int{}, Discarded: map[string]int{}},
 	}
 	placer := sarif.NewPlacer()
 	var discarded sarif.Discarded
@@ -148,48 +169,48 @@ func place(logs []sarif.Log, run *series.Run) prepared {
 		for i := range log.Runs {
 			r := &log.Runs[i]
 			if sarif.Scanner(r.Tool.Name) {
-				out.receipt.Scanners = append(out.receipt.Scanners, r.Tool.Name)
+				out.Receipt.Scanners = append(out.Receipt.Scanners, r.Tool.Name)
 				continue
 			}
 			kept++
 			if !r.Ran {
-				out.failure = "a run states no results, which is an analyzer that did not run"
+				out.Failure = "a run states no results, which is an analyzer that did not run"
 				return out
 			}
 			discarded.Add(r.Discarded)
 			for _, inv := range r.Invocations {
-				out.signals += inv.Errors
+				out.Signals += inv.Errors
 			}
-			for _, res := range placer.Place(r, run.SourceRoot) {
+			for _, res := range placer.Place(r, root) {
 				name := ruleName(r.Tool.Name, res.RuleID)
-				if _, ok := out.rules[name]; !ok {
+				if _, ok := out.Rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
-					out.rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags}
+					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags}
 				}
 				remote := ""
 				if res.Module >= 0 && res.Module < len(r.Modules) {
 					remote = normalizedRemote(r.Modules[res.Module].Repository)
 				}
-				out.results = append(out.results, res)
-				out.tools = append(out.tools, r.Tool.Name)
-				out.remotes = append(out.remotes, remote)
+				out.Results = append(out.Results, res)
+				out.Tools = append(out.Tools, r.Tool.Name)
+				out.Remotes = append(out.Remotes, remote)
 			}
-			out.modules = append(out.modules, modulesOf(r, run.SourceRoot)...)
+			out.Modules = append(out.Modules, modulesOf(r, root)...)
 		}
 	}
 	if kept == 0 {
-		out.failure = "every run is a dependency or secret scanner's, and this upload takes neither"
+		out.Failure = "every run is a dependency or secret scanner's, and this upload takes neither"
 		return out
 	}
 	d := placer.Dropped()
-	out.signals += d.Failure
+	out.Signals += d.Failure
 	for reason, n := range map[string]int{
 		DroppedAdvisory: d.Advisory, DroppedOutside: d.Outside, DroppedRepeat: d.Repeats,
 		DroppedFailure: d.Failure, DroppedNotAProblem: d.NotAProblem,
 		DroppedSuppressed: d.Suppressed, DroppedAbsent: d.Absent,
 	} {
 		if n > 0 {
-			out.receipt.Dropped[reason] += n
+			out.Receipt.Dropped[reason] += n
 		}
 	}
 	for what, n := range map[string]int{
@@ -197,7 +218,7 @@ func place(logs []sarif.Log, run *series.Run) prepared {
 		"contents": discarded.Contents, "fixes": discarded.Fixes,
 	} {
 		if n > 0 {
-			out.receipt.Discarded[what] = n
+			out.Receipt.Discarded[what] = n
 		}
 	}
 	return out
@@ -223,8 +244,8 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 	return out
 }
 
-// apply applies a prepared run inside one transaction.
-func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepared) (series.Status, error) {
+// apply applies a placed run inside one transaction.
+func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read Placed) (series.Status, error) {
 	store := series.NewStore(tx)
 	if err := store.Take(ctx, runID); err != nil {
 		return "", err
@@ -236,9 +257,9 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	if !pending(run.Status) {
 		return run.Status, nil
 	}
-	if read.failure != "" {
-		run.Status, run.Failure = series.Failed, read.failure
-		return run.Status, a.end(ctx, store, run, read.receipt)
+	if read.Failure != "" {
+		run.Status, run.Failure = series.Failed, read.Failure
+		return run.Status, a.end(ctx, store, run, read.Receipt)
 	}
 
 	previous, err := store.Previous(ctx, run)
@@ -250,7 +271,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	// run would reopen them.
 	if previous != nil && !run.BuiltAt.After(previous.BuiltAt) {
 		run.Status = series.Superseded
-		return run.Status, a.end(ctx, store, run, read.receipt)
+		return run.Status, a.end(ctx, store, run, read.Receipt)
 	}
 
 	inventory, err := inventoryOf(ctx, tx, run.TargetID)
@@ -260,7 +281,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	if inventory == nil {
 		if a.now().Sub(run.ReceivedAt) >= inventoryWait {
 			run.Status, run.Failure = series.Failed, "the build had no inventory read within a day of the run arriving"
-			return run.Status, a.end(ctx, store, run, read.receipt)
+			return run.Status, a.end(ctx, store, run, read.Receipt)
 		}
 		run.Status = series.Waiting
 		return run.Status, store.Mark(ctx, run)
@@ -271,7 +292,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	if err != nil {
 		return "", err
 	}
-	comparable, reason := series.Comparability(run.Params, previous, read.signals)
+	comparable, reason := series.Comparability(run.Params, previous, read.Signals)
 	run.Comparable, run.Reason = &comparable, reason
 	if comparable {
 		had, err := store.HasBaseline(ctx, set.ID)
@@ -281,10 +302,10 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		run.Baseline = !had
 	}
 
-	keyed := make([]Keyed, len(read.results))
-	for i, res := range read.results {
-		keyed[i] = key(ruleName(read.tools[i], res.RuleID), res)
-		keyed[i].Remote = read.remotes[i]
+	keyed := make([]Keyed, len(read.Results))
+	for i, res := range read.Results {
+		keyed[i] = key(ruleName(read.Tools[i], res.RuleID), res)
+		keyed[i].Remote = read.Remotes[i]
 	}
 	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
 	if err != nil {
@@ -295,7 +316,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		return "", err
 	}
 
-	receipt := read.receipt
+	receipt := read.Receipt
 	if comparable && previous != nil {
 		drop, err := sharpDrop(ctx, tx, len(missed), live(open))
 		if err != nil {
@@ -310,7 +331,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 
 	issues := finding.NewVulnerabilities(tx)
 	ruleIDs := map[string]int64{}
-	for name, rule := range read.rules {
+	for name, rule := range read.Rules {
 		id, err := issues.Rule(ctx, rule)
 		if err != nil {
 			return "", err
@@ -362,7 +383,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 		}
 		receipt.NotReproduced = len(missed)
 	}
-	if err := store.Modules(ctx, run.ID, read.modules); err != nil {
+	if err := store.Modules(ctx, run.ID, read.Modules); err != nil {
 		return "", err
 	}
 
@@ -371,8 +392,8 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read prepar
 	return run.Status, a.end(ctx, store, run, receipt)
 }
 
-// end records what became of a run and lets its documents go. Nothing reads
-// them again: a run is applied once, and a held run changes nothing.
+// end records what became of a run and lets its placed results go. Nothing
+// reads them again: a run is applied once, and a held run changes nothing.
 func (a *Applier) end(ctx context.Context, store *series.Store, run *series.Run, receipt Receipt) error {
 	said, err := json.Marshal(receipt)
 	if err != nil {
@@ -382,7 +403,6 @@ func (a *Applier) end(ctx context.Context, store *series.Store, run *series.Run,
 	if err := store.Discard(ctx, run.ID); err != nil {
 		return err
 	}
-	run.SourceRoot = ""
 	return store.Mark(ctx, run)
 }
 
