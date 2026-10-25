@@ -34,8 +34,9 @@ const (
 	// RuleInForce is an approved rule covering no more than its approver
 	// was shown, by the factor the deployment allows.
 	RuleInForce RuleState = "in-force"
-	// RuleOutgrown is an approved rule covering more than that. It still
-	// covers what it names, and asks to be approved again.
+	// RuleOutgrown is an approved rule naming an analyzer rule and covering
+	// more than that. It still covers what it names, and asks to be
+	// approved again.
 	RuleOutgrown RuleState = "outgrown"
 	// RuleRetired is a rule taken out of use. It covers nothing.
 	RuleRetired RuleState = "retired"
@@ -360,16 +361,18 @@ func growth(ctx context.Context, db bun.IDB) (int, error) {
 	return n, nil
 }
 
-// ruleState is where a rule stands covering this many leads. An approval
-// shown none is measured as though shown one, so that a rule approved over
-// an empty path is not outgrown by its first lead.
+// ruleState is where a rule stands covering this many leads. A rule naming a
+// path alone is never outgrown: code under a dismissed path grows as a
+// matter of course, and what the approver agreed to is the path. An approval
+// shown none is measured as though shown one, so that a rule approved over a
+// rule with no leads yet is not outgrown by its first.
 func ruleState(r leadRule, covering, factor int) RuleState {
 	switch {
 	case r.RetiredAt != nil:
 		return RuleRetired
 	case r.ApprovedAt == nil:
 		return RuleProposed
-	case covering > max(*r.ApprovedCovering, 1)*factor:
+	case r.Rule != nil && covering > max(*r.ApprovedCovering, 1)*factor:
 		return RuleOutgrown
 	}
 	return RuleInForce

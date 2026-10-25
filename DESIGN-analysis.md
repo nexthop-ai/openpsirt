@@ -404,7 +404,7 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 |---|---|---|
 | `proposed` | Nobody has approved it | Nothing |
 | `in-force` | Approved, and covering no more than the leads its approver was shown times the growth factor | What it names |
-| `outgrown` | Approved, and covering more than that | What it names, and asks to be approved again |
+| `outgrown` | Approved, naming an analyzer rule, and covering more than that | What it names, and asks to be approved again |
 | `retired` | Taken out of use | Nothing |
 
 | Rule | |
@@ -414,7 +414,8 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | Its words never change | An approval is of what was read (REQ-28). A rule worded differently is retired and proposed again |
 | Approval records the open leads the rule covers as its approved size | What the approver was shown |
 | The growth factor is `triage.lead-rule-growth`, two where nobody has said | A rule covering ten leads when approved and a thousand later is not what the approver read (REQ-27) |
-| An approval shown no lead is measured as though shown one | A rule approved over an empty path is not outgrown by its first lead |
+| A rule naming a path alone is never outgrown | Code under a dismissed path grows as a matter of course, and what the approver agreed to is the path |
+| An approval shown no lead is measured as though shown one | A rule approved before its analyzer rule reports anything is not outgrown by its first lead |
 | An outgrown rule is approved again at its new size, and a rule in force is refused | Approving again is how the approver reads what it now covers |
 | An outgrown rule keeps dismissing what it names | Withdrawn, every lead it covers would reach the queue at once, which is the noise the rule exists to hold |
 | A rule's coverage counts open leads by place, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |

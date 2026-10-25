@@ -182,7 +182,7 @@ var settable = []struct {
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultReviewIssues) }, false},
 	{setting.LeadRuleGrowth, "Standing rule growth", setting.Triage,
 		"How many times its approved size a standing rule may grow before it is approved again",
-		"Measured in open leads. An outgrown rule still dismisses what it names.",
+		"Measured in open leads, for rules naming an analyzer rule. An outgrown rule still dismisses what it names.",
 		setting.Count, nil, func(core.Deps) string { return strconv.Itoa(setting.DefaultLeadRuleGrowth) }, false},
 	{setting.AgreedIssues, "Issues per re-confirmation", setting.Triage,
 		"Issues one re-confirmation may cover where nobody must agree again",

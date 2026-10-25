@@ -167,11 +167,11 @@ func TestAStandingRuleThatNamesNothingIsRefused(t *testing.T) {
 	})
 }
 
-// leadRunWithOverflow is the seeded run reporting a second lead, of the
-// other rule in another file.
-func leadRunWithOverflow() string {
+// leadRunWithSecondLeak is the seeded run reporting a second leak, in
+// another file.
+func leadRunWithSecondLeak() string {
 	return strings.Replace(httpapitest.LeadRunAt(12), `"results":[`,
-		`"results":[{"ruleId":"overflow","message":{"text":"n overflows"},`+
+		`"results":[{"ruleId":"leak","message":{"text":"q is leaked"},`+
 			`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/c.c","uriBaseId":"SRCROOT"},`+
 			`"region":{"startLine":4}}}]},`, 1)
 }
@@ -181,17 +181,27 @@ func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.LeadRuleGrowth, "1"); err != nil {
 			t.Fatal(err)
 		}
-		rule := proposeLeadRule(t, r, `{"prefix":"src","reason":"mitigated","reasoning":"sandboxed"}`)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"mitigated","reasoning":"sandboxed"}`)
+		path := proposeLeadRule(t, r, `{"prefix":"src","reason":"mitigated","reasoning":"sandboxed"}`)
 		approveLeadRule(t, r, rule.ID)
+		approveLeadRule(t, r, path.ID)
 		// Approved over nothing, the rule is measured as though it was shown
 		// one lead.
 		httpapitest.SeededLead(t, r)
 		if got := leadRulesOf(t, r)[rule.ID]; got.State != "in-force" || got.Covering != 1 {
 			t.Fatalf("the rule is %+v; want in force over its first lead", got)
 		}
-		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), leadRunWithOverflow())
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), leadRunWithSecondLeak())
 		if got := leadRulesOf(t, r)[rule.ID]; got.State != "outgrown" || got.Covering != 2 {
 			t.Fatalf("the rule is %+v; want outgrown over two leads", got)
+		}
+		// Code under a dismissed path grows, and its rule asks nothing.
+		if got := leadRulesOf(t, r)[path.ID]; got.State != "in-force" || got.Covering != 2 {
+			t.Errorf("the path's rule is %+v; want in force over both leads", got)
+		}
+		retirePath := fmt.Sprintf("%s/%d", leadRulesAt, path.ID)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, retirePath, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("retiring the path's rule answered %d: %s", got.Code, got.Body)
 		}
 		if got := leadsOf(t, r, "internal-reader", "?state=dismissed"); got.Ruled != 2 || len(got.Items) != 2 {
 			t.Errorf("an outgrown rule dismisses %+v; want both leads still", got)

@@ -128,7 +128,8 @@ const (
 	// issues rather than places, because issues are what a reviewer reads.
 	ReviewIssues = "triage.review-issues"
 	// LeadRuleGrowth is how many times the leads its approver was shown a
-	// standing rule may cover before it asks to be approved again. A rule
+	// standing rule naming an analyzer rule may cover before it asks to be
+	// approved again. A rule
 	// covering far more than it did is no longer what somebody agreed to.
 	LeadRuleGrowth = "triage.lead-rule-growth"
 	// AgreedIssues is how many issues one re-confirmation may answer where
