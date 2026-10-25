@@ -13,20 +13,25 @@ const mostDepth = 16
 // was CWE-788, 119 and 121 from three tools — and agree about its family. A
 // pillar ends the walk only where it is the weakness itself: a pillar holds
 // flaws as unlike as a null dereference and a condition always true, which
-// share CWE-710. A weakness the catalog does not place, and one whose walk
-// reaches a pillar with no class between, is its own family.
+// share CWE-710. A walk reaching a pillar with no class between takes the
+// weakness just under the pillar, so CWE-467 and the CWE-131 above it are one
+// family and CWE-476 and CWE-570 are two. A weakness the catalog does not
+// place is its own family.
 func Family(id string) string {
 	id = Canonical(id)
-	at := id
+	at, below := id, id
 	for range mostDepth {
 		if classes[at] && (at == id || !pillars[at]) {
 			return at
+		}
+		if pillars[at] {
+			return below
 		}
 		parent, ok := parents[at]
 		if !ok {
 			return id
 		}
-		at = parent
+		below, at = at, parent
 	}
 	return id
 }

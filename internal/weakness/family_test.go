@@ -38,6 +38,21 @@ func TestAPillarIsNoWeaknessFamily(t *testing.T) {
 	}
 }
 
+func TestAWeaknessUnderAPillarIsInTheFamilyJustBelowIt(t *testing.T) {
+	// cppcheck names sizeof on a pointer CWE-467 and clang names the same
+	// malloc CWE-131, the base above it, which sits directly under the
+	// CWE-682 pillar. A wrapped integer that overruns, CWE-680, sits under
+	// CWE-190 the same way.
+	for id, want := range map[string]string{
+		"CWE-467": "CWE-131", "CWE-131": "CWE-131",
+		"CWE-680": "CWE-190", "CWE-190": "CWE-190",
+	} {
+		if got := Family(id); got != want {
+			t.Errorf("%s is in family %s; want %s", id, got, want)
+		}
+	}
+}
+
 func TestMemorySafetyOutranksStyle(t *testing.T) {
 	for id, want := range map[string]Tier{
 		"CWE-787":  TierMemory,
