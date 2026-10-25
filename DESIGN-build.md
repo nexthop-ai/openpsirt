@@ -36,6 +36,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | Path | Holds |
 |---|---|
 | `cmd/openpsirt/` | The binary. Flag parsing, configuration, server lifecycle |
+| `cmd/openpsirt-analysis/` | The upload client a pipeline runs. See `DESIGN-analysis.md` § Upload client |
 | `internal/version/` | What this build is. Values injected at link time |
 | `internal/config/` | Settings, read from the environment with working defaults |
 | `internal/httpapi/` | The HTTP surface: the router, the middleware in front of every route, sign-in, the served interface, and registering every area's operations into the one description the API document is generated from. See `DESIGN-api.md` § File organization |
@@ -56,6 +57,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/series/` | Runs of one analysis across builds: their order, whether each is comparable, and what each saw. See `DESIGN-kinds.md` |
 | `internal/analysis/` | Applying an analyzer's run to its build as findings of the analysis kind. See `DESIGN-analysis.md` |
 | `internal/sourcelink/` | What a product says about its repositories, and the source addresses built from it. See `DESIGN-analysis.md` |
+| `internal/analysisclient/` | Building the SARIF the upload client sends, from an analyzer's output and the checkout. See `DESIGN-analysis.md` § Upload client |
 | `internal/graph/`, `internal/finding/` | The dependency graph and what a scan found. See `DESIGN-data-model.md`, `DESIGN-findings.md` |
 | `internal/filed/` | The one spelling of a record filed under an issue read as another, for the packages that relate a record to an issue. See `DESIGN-findings.md` § Merged issues |
 | `internal/rating/` | How a product's own rating of an issue is spelled in a query, where both sides of the graph may say it. See `DESIGN-findings.md` |
@@ -134,7 +136,8 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
-| `make vet-other-os` | Type-checks the build for macOS, which compiles the files a build constraint keeps off Linux |
+| `make vet-other-os` | Type-checks the build for macOS, which compiles the files a build constraint keeps off Linux, and the upload client for Windows |
+| `make client-test` | The upload client's tests, uncached. What the macOS and Windows jobs run. `make client-packages` and `make client-sources` print the lists those jobs read |
 | `make govulncheck` | Known vulnerabilities in Go modules and the toolchain, failing only what the change introduced |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs, failing only what the change introduced |
@@ -224,14 +227,22 @@ the same: a target that sets it, inside `check`.
 
 ## CI jobs
 
-Three, and each of the two beside the first is separate for a reason of its own
-rather than for tidiness.
+Four, and each beside the first is separate for a reason of its own rather
+than for tidiness.
 
 | Job | Holds | Why it is not a step of the first |
 |---|---|---|
 | Build, test and check | `engines-check`, `make check`, `check-engines`, and the bill of materials as an artifact | — |
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
+| Upload client on macOS and Windows | `client-test` on each system, after a step on Linux compares the change against `client-sources` | The upload client is the one program here that runs on a build host, and the other two systems are the only place its paths and line endings are seen as a pipeline there sees them |
+
+| Rule | |
+|---|---|
+| **The two systems run only when a client source moved** | A macOS or Windows runner costs several Linux ones, and a change elsewhere cannot reach the client |
+| **The source list is the imports** | A test in `internal/build` fails on a package the client imports that `client-sources` does not hold |
+| **A skipped job satisfies the merge check** | The aggregator waits for checks to pass or be skipped. A queue entry and a pull request compare against their own base |
+| **No make on Windows** | The Linux step prints the package list and the Go release, and the two jobs run `go test` on them directly |
 
 ### CI caches
 

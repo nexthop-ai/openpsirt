@@ -330,3 +330,62 @@ jobs:
       # lockfile already give the other two ecosystems here.
       - run: pip install --require-hashes -r docs/requirements.txt
       - run: make docs-site
+
+  # The upload client on the two other systems a pipeline runs it on. Paths,
+  # drive letters and line endings are seen there as a build host sees them,
+  # and nowhere else here.
+  #
+  # Both runners cost several Linux ones, so they start only when one of the
+  # client's sources moved. The list is the makefile's, which a test holds to
+  # the client's imports; the step here only compares the change against it.
+  client-changes:
+    name: Upload client sources
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      packages: ${{ steps.compare.outputs.packages }}
+      go: ${{ steps.compare.outputs.go }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Compare the change against the client's sources
+        id: compare
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          echo "go=$(make -s --no-print-directory go-version)" >> "$GITHUB_OUTPUT"
+          echo "packages=$(make -s --no-print-directory client-packages)" >> "$GITHUB_OUTPUT"
+          # A base that cannot be fetched, such as the first push of a
+          # branch, runs the jobs rather than skipping them.
+          changed=true
+          if [ -n "$BASE" ] && git fetch -q --depth=1 origin "$BASE" 2>/dev/null; then
+            # The list is split into words on purpose: it is paths.
+            # shellcheck disable=SC2046
+            if git diff --quiet "$BASE" HEAD -- $(make -s --no-print-directory client-sources); then
+              changed=false
+            fi
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "the upload client's sources changed: $changed"
+
+  client:
+    name: Upload client on ${{ matrix.os }}
+    needs: client-changes
+    if: needs.client-changes.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # The client imports nothing outside the standard library, so there is
+      # no module to cache, and its tests compile in seconds.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version: ${{ needs.client-changes.outputs.go }}
+          cache: false
+      - name: The upload client's tests
+        env:
+          PACKAGES: ${{ needs.client-changes.outputs.packages }}
+        # The list is split into words on purpose: it is package paths.
+        run: go test -count=1 $PACKAGES

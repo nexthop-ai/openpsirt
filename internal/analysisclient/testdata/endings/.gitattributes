@@ -1,0 +1,6 @@
+# Each file holds one function, with different line endings and indentation,
+# and all three give one content fingerprint on every operating system.
+# lf.c and crlf.c are kept as written; auto.c takes the line endings a
+# checkout on each system gives it.
+lf.c -text
+crlf.c -text

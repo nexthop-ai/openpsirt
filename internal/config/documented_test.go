@@ -162,9 +162,10 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	// Where one is named in a message, an API description or a field telling
 	// an operator to set it: every file of the program. The harness and the
 	// gates are left out, because the names they carry configure a test run
-	// rather than a deployment.
+	// rather than a deployment. The upload client is left out too: its names
+	// configure a pipeline, and docs/analysis.md holds them.
 	refusals := goSources(t, "../..", "../../internal/tools", "../../internal/dbtest",
-		"../../web", "../../node_modules")
+		"../../web", "../../node_modules", "../../cmd/openpsirt-analysis", "../../internal/analysisclient")
 	requireAmong(t, refusals, "../../internal/config/config.go", "../../cmd/openpsirt/main.go")
 
 	// A variable named anywhere in the program is one an operator is being

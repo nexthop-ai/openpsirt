@@ -24,6 +24,7 @@ shares is in `DESIGN-ingest.md`.
 - [Placement](#placement)
 - [Source](#source)
 - [Receipts](#receipts)
+- [Upload client](#upload-client)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -351,6 +352,109 @@ of a build it may send to; a person reads them where they read internal
 findings in the product, since the counts are of internal findings. A
 pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 
+## Upload client
+
+`openpsirt-analysis` runs in a pipeline beside the analyzer. It reads the
+analyzer's output and the checkout, writes one SARIF run holding what the
+deployment cannot learn from the output alone, and sends it as § The upload
+describes.
+
+```
+openpsirt-analysis upload --product P --stream S --variant V --series NAME \
+  [--commit SHA] [--built TIME] [--snippets] [--salt-file FILE] \
+  [--third-party PATH]... OUTPUT...
+openpsirt-analysis write --series NAME --output FILE OUTPUT...
+```
+
+`write` builds the same document and stores it rather than sending it, so a
+pipeline can see exactly what would leave.
+
+### Formats read
+
+| Format | Read as |
+|---|---|
+| clang `plist-multi-file` | One result per diagnostic. Its issue hash as `clang/issueHash/v1`, its enclosing function as a logical location, its path as a code flow with each step's function, and each checker's documentation address. One document is one translation unit analyzed |
+| cppcheck XML version 2 | One result per error. `error` and `warning` keep their level, `style`, `performance` and `portability` are notes, and `information` and `debug` are left out: they describe cppcheck's own run. Its CWE as the tag `external/cwe/cwe-<n>`, its hash as `hash/v1`, the first location as the result's and the others as related locations with their text |
+| SARIF 2.1.0, from any tool | Forwarded. Artifact and rule references resolved to paths and identifiers, so nothing points into a list the client removes |
+| Any of the three, gzipped | Decompressed first |
+
+| Rule | |
+|---|---|
+| A native format is read where the tool has one | clang's plist carries the issue hash, the call path and the enclosing function; clang's SARIF carries none of them |
+| clang's plain `plist` is not what to send | It drops a diagnostic whose path crosses files. `plist-multi-file` keeps it |
+| An HTML report and a directory of output are refused | Both carry source |
+| Every output of one upload is of one tool, and they merge into one run | A series is one tool. Rules merge by identifier, results and invocations are concatenated, and per-unit counts add |
+| An output that is none of the formats is refused | It is named, with the formats read |
+
+### Paths
+
+Every path is written relative to the checkout, with `/`, under the starting
+point `SRCROOT`, which the document leaves undefined, so the deployment places
+it against the source root it is given (§ Placement).
+
+| Rule | |
+|---|---|
+| A path arrives absolute, as a `file://` address, relative to the working directory, or under a starting point the output defines | Each is resolved before it is placed. A chain of starting points is followed to sixteen steps |
+| A drive letter and a path on a drive compare without regard to case | Windows compares them that way |
+| A path's case is taken from the checkout's index | A tool on a case-insensitive system writes the case it was asked for. Where two indexed paths differ only by case, the path is left as the tool wrote it |
+| A path outside the checkout is written as the `file://` address it is | The deployment drops it with its result and counts it; nothing about it is placed |
+| A path under a starting point the output never defines is left as written | Guessing its root would place it somewhere it is not |
+| A region whose end is before its start loses its end | It states a line and no span |
+
+### Repositories
+
+| Rule | |
+|---|---|
+| Every repository the checkout holds is listed, submodules at every depth | A result is placed on the component built from the innermost repository holding it (§ Placement) |
+| Each is written as a `versionControlProvenance` entry with its commit and the directory it is checked out at, as a `mappedTo` under `SRCROOT` | A directory written under another starting point chained to `SRCROOT` is not placed by the deployment |
+| The top repository's commit is `--commit`, or the commit checked out | The submodules' are the commits checked out |
+| A remote is written as a web address: `https`, no credentials, port or `.git`, an SSH or scp-style address turned into the host and path it names | A remote written for SSH and an identifier written for HTTPS name one repository. A submodule's relative address is resolved against its parent's remote |
+| A repository whose remote is a local path is left out of the list | It names no repository anybody else can reach |
+| A repository with tracked changes is named in `openpsirt/changed` | Its results describe code no commit holds |
+
+### Fingerprints
+
+Each result carries `openpsirt/context/v1`, a content fingerprint of the line
+it is about.
+
+| Rule | |
+|---|---|
+| It is a SHA-256 of the line and one line either side, each with its surrounding white space removed and every run of white space inside it written as one space, joined by line feeds | A reindented or moved block keeps it, and the same text gives the same fingerprint whatever line endings a checkout on any system gives it. A line before the first or after the last is empty |
+| A carriage return ending a line is removed before anything else | A Windows checkout's line endings are the checkout's, not the code's |
+| With `--salt-file`, it is an HMAC-SHA256 keyed on the file's contents, its surrounding white space trimmed | A short line cannot be recovered by hashing guesses |
+| A salted run names its salt as `openpsirt/salt`: the first eight bytes of the salt's SHA-256, in lower-case hexadecimal | A changed salt changes every fingerprint, and the name is what says so |
+| A salted run carries no fingerprint the tool wrote | A tool's own fingerprint cannot be salted, and a short line is recovered from it by guessing |
+| A file is read only inside the checkout, every link along its path followed, and only up to 16 MiB | A fingerprint or a snippet reads nothing off the build host beside the code |
+
+### Contents sent
+
+| Rule | |
+|---|---|
+| No source text leaves unless `--snippets` is given | A run carries paths, lines and fingerprints |
+| With `--snippets`, each location carries its lines, and a context region two lines either side, each bounded at 4,096 bytes | A carriage return is removed from each line |
+| Whole-file contents, fixes, snippets and markdown messages in forwarded SARIF are removed, and counted in what the client prints | A markdown message with no text keeps its markdown as its text |
+| A forwarded run's artifact list and starting points are removed | Every path is resolved before it is written, so nothing reads them |
+| The run parameters are written as § Run parameters reads them: `openpsirt/client`, `openpsirt/commit`, `openpsirt/series` or `automationDetails.id` where `--built` is given, the unit counts together or not at all, and an invocation from `--exit-status` | `--compile-commands` gives the units expected as its entry count; for clang, the units analyzed are the documents read |
+| The rule set and the third-party paths are sent as the upload's fields | The deployment reads them from the fields alone |
+
+### Sending
+
+| Rule | |
+|---|---|
+| The document is gzipped and sent as the one `sarif` part of the upload, with the key as a bearer token | An analyzer's output compresses several times over, and the request's bound is on its compressed size |
+| The address is `--url` or `OPENPSIRT_URL`; the key is `OPENPSIRT_KEY` and nothing else | A key on a command line is in every process listing on the build host |
+| A 503 is sent again after its `Retry-After`, and a request that reached nothing after a pause doubling each time, five attempts in all, no pause over two minutes | A matrix of builds finishing together each gets its turn |
+| The receipt is printed as the deployment returned it; a refusal fails the step with its words | A 202 says the run is queued, and the counts are read from the run's receipt afterwards |
+
+### Distribution
+
+| Rule | |
+|---|---|
+| One binary, pure Go with cgo off, for Linux, macOS and Windows on amd64 and arm64 | It runs where the analyzer runs. `DESIGN-packaging.md` § Release assets names the archives |
+| The archives are covered by the release's checksum file and its signature | The same verification as every other asset |
+| No Authenticode signature and no notarization | A pipeline fetches the binary by a command, which neither check stops. One downloaded through a browser on macOS or Windows is held by the system until a person allows it |
+| CI runs the client's tests on macOS and Windows when one of its sources moved | `DESIGN-build.md` § CI jobs. The fingerprints of one function written with each line ending are pinned to hashes worked out by hand, so a system computing them differently fails there |
+
 ## Not built
 
 | Part | State |
@@ -364,7 +468,6 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | Third-party paths | Recorded on the run and read by nothing |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
 | Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
-| The upload client, `openpsirt-analysis` | Not built. Each pipeline writes the run parameters itself |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
 ## Limits
@@ -383,4 +486,6 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | A snippet records what the upload sent | Nothing compares it with the repository, so a patched repository's snippet is the patched source and its link is the source before the patch |
 | A link in a lead with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
+| One upload is one tool | A pipeline running clang and cppcheck makes two uploads, one per series |
+| The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

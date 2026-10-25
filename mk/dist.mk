@@ -4,7 +4,7 @@
 # The release: every asset it carries, built into one directory and checked
 # there, and the record of a release's migrations that a tag is checked against.
 
-.PHONY: dist dist-version dist-clean dist-binaries dist-chart dist-inventories dist-sums dist-verify dist-serves release-freeze release-check
+.PHONY: dist dist-version dist-clean dist-binaries dist-client dist-chart dist-inventories dist-sums dist-verify dist-serves release-freeze release-check
 
 # What a release is made of, and where it is built.
 #
@@ -54,6 +54,7 @@ dist:
 	@$(MAKE) --no-print-directory dist-clean
 	@$(MAKE) --no-print-directory web
 	@$(MAKE) --no-print-directory dist-binaries
+	@$(MAKE) --no-print-directory dist-client
 	@$(MAKE) --no-print-directory dist-chart
 	@$(MAKE) --no-print-directory dist-inventories
 	@$(MAKE) --no-print-directory check-packaging CHECK_IMAGE=$(DIST_IMAGE):$(DIST_VERSION)
@@ -107,6 +108,26 @@ dist-binaries: dist-version
 	  rm -rf $(DIST_DIR)/$$name; \
 	  echo "  $$name.tar.gz"; \
 	done
+
+# The upload client, one archive per system and architecture a pipeline runs
+# on. Pure Go and cgo off, so every one cross-compiles here. A Windows archive
+# is a tar.gz as well: tar ships with Windows, and one shape keeps the checksum
+# file and the name check uniform.
+DIST_CLIENT_SYSTEMS ?= linux darwin windows
+dist-client: STAMP_VERSION := $(DIST_VERSION)
+dist-client: dist-version
+	@mkdir -p $(DIST_DIR)
+	@set -e; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	  name=openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch; \
+	  exe=openpsirt-analysis; [ "$$os" != windows ] || exe=openpsirt-analysis.exe; \
+	  rm -rf $(DIST_DIR)/$$name; mkdir -p $(DIST_DIR)/$$name; \
+	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
+	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
+	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
+	  tar -C $(DIST_DIR) -czf $(DIST_DIR)/$$name.tar.gz $$name; \
+	  rm -rf $(DIST_DIR)/$$name; \
+	  echo "  $$name.tar.gz"; \
+	done; done
 
 # The chart, with its version and the version of the application it installs
 # both stamped from the tag.
@@ -173,6 +194,9 @@ dist-sums: dist-version
 # checked where none is: a stripped binary built with -trimpath records no
 # linker flags to read the stamp from without running it.
 #
+# The upload client built for this machine is asked its version as well. The
+# others are named by the same check every asset's name takes.
+#
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
 # named for what it signs, not for the release.
@@ -207,6 +231,14 @@ dist-verify: dist-version
 	      || $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
 	      || fail=1; \
 	  done; \
+	  client=openpsirt-analysis_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH); \
+	  if [ ! -f $(DIST_DIR)/$$client.tar.gz ]; then skipped="$$skipped the upload client (no archive)"; \
+	  else \
+	    tar -C "$$work" -xzf $(DIST_DIR)/$$client.tar.gz; \
+	    said=$$("$$work"/$$client/openpsirt-analysis version | awk '{print $$2}'); \
+	    [ "$$said" = "$(DIST_VERSION)" ] \
+	      || { echo "the upload client reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
+	  fi; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
 	  elif ! command -v helm >/dev/null 2>&1; then skipped="$$skipped the chart (no helm)"; \
