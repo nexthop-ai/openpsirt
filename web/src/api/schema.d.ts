@@ -7457,7 +7457,7 @@ export interface components {
             agrees_private: boolean;
             /** @description Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage */
             agrees_public: boolean;
-            /** @description Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
+            /** @description Agree to somebody else's claim, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's claim there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
             may_approve_rulings: boolean;
@@ -7762,6 +7762,8 @@ export interface components {
              * @enum {string}
              */
             happened: "waiting" | "sent-back" | "approved" | "withdrawn" | "lapsed" | "undone" | "mixed";
+            /** @description At least one row is about internal material, a static analysis lead. Agreeing to it takes the approver capability */
+            internal?: boolean;
             /**
              * Format: int64
              * @description The number of distinct issues it covers

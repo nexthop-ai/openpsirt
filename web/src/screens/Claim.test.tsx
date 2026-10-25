@@ -96,13 +96,14 @@ describe("the stripe on a claim's page", () => {
 
 describe("the answer a second person gives", () => {
   // The claim waits on somebody who agrees to public findings in sonic.
-  function waiting(proposedBy: string, undisclosed = false) {
+  function waiting(proposedBy: string, undisclosed = false, internal = false) {
     return {
       claim: { id: 4, proposed_by: proposedBy },
       place: { product: "sonic", vulnerability: "CVE-2026-1" },
       argument: { outcome: "not-applicable" },
       happened: "waiting",
       undisclosed,
+      internal,
       issues: 1,
       places: 1,
       age_days: 1,
@@ -149,5 +150,26 @@ describe("the answer a second person gives", () => {
   it("offers no Agree on an undisclosed claim to somebody who agrees only to public ones", async () => {
     await drawn(waiting("ana", true), BO);
     expect(agree()).toBeUndefined();
+  });
+
+  // A lead claim is internal, and its second person holds the approver
+  // capability: a private triager is refused it, and an internal approver
+  // who triages nothing undisclosed is not.
+  it("offers no Agree on a lead claim to a triager of undisclosed work", async () => {
+    const privateTriager: Who = {
+      ...BO,
+      reach: [{ product: "sonic", agrees_private: true }] as unknown as Who["reach"],
+    };
+    await drawn(waiting("ana", true, true), privateTriager);
+    expect(agree()).toBeUndefined();
+  });
+
+  it("offers Agree on a lead claim to an approver of internal work", async () => {
+    const reviewer: Who = {
+      ...BO,
+      reach: [{ product: "sonic", agrees_internal: true }] as unknown as Who["reach"],
+    };
+    await drawn(waiting("ana", true, true), reviewer);
+    expect(agree()).toBeDefined();
   });
 });

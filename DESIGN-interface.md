@@ -1428,6 +1428,7 @@ the screens draw them.
 | A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
 | The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |
 | The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
+| The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |

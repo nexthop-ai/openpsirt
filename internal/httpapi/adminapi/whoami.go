@@ -42,7 +42,7 @@ type CanBody struct {
 	TriagesInternal   bool   `json:"triages_internal" doc:"Argue about an internal finding"`
 	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
 	MayHide           bool   `json:"may_hide" doc:"Triage a private finding, which nobody has disclosed"`
-	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
+	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's claim there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override"`
 	AgreesPublic      bool   `json:"agrees_public" doc:"Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
 	AgreesPrivate     bool   `json:"agrees_private" doc:"Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
 	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability"`

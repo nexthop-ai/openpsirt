@@ -59,6 +59,15 @@ func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
 			t.Fatal(err)
 		}
+		// The claim says it is internal, which is what a screen offering
+		// Agree asks the reader's reach at.
+		var claim struct {
+			Internal bool `json:"internal"`
+		}
+		httpapitest.Read(t, r, "internal-reviewer", fmt.Sprintf("/v1/claims/%d", decided.ClaimID), &claim)
+		if !claim.Internal {
+			t.Error("a claim about a lead does not say it is internal")
+		}
 		approval := fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID)
 		// Triaging internal material is not the right to agree to it.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, approval, `{}`),

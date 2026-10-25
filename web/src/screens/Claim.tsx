@@ -437,7 +437,13 @@ function Answer({
   // The claim names its product by the name that addresses it, which is what
   // somebody's reach is keyed on.
   const here = mayOf(who.data, claim.place.product ?? "");
-  const mayAgree = !!(claim.undisclosed ? here?.agrees_private : here?.agrees_public);
+  // Asked at the claim's most careful row: a lead claim is internal, and
+  // agreeing there takes the approver capability.
+  const mayAgree = !!(claim.internal
+    ? here?.agrees_internal
+    : claim.undisclosed
+      ? here?.agrees_private
+      : here?.agrees_public);
   if (mine || !mayAgree || !live(claim.happened)) return null;
   const busy = approve.isPending || reject.isPending;
   const failed = approve.error ?? reject.error;

@@ -1486,7 +1486,7 @@ components:
           description: "Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"
           type: boolean
         may_agree:
-          description: Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
+          description: Agree to somebody else's claim, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's claim there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override
           type: boolean
         may_approve_rulings:
           description: "Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"
@@ -2014,6 +2014,9 @@ components:
             - undone
             - mixed
           type: string
+        internal:
+          description: At least one row is about internal material, a static analysis lead. Agreeing to it takes the approver capability
+          type: boolean
         issues:
           description: The number of distinct issues it covers
           format: int64
