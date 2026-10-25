@@ -102,7 +102,7 @@ const (
 	Triage Consumer = "triage"
 	// Decisions is the claims people make about findings: their rows, the
 	// reasoning and its revisions, approvals, comments on a claim, the review
-	// queue and every read of one claim.
+	// queue, every read of one claim, and the record of judgments and its file.
 	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a
 	// component and the places it sits at.
@@ -110,7 +110,7 @@ const (
 	// Statistics is every figure about findings: trends, comparisons of two
 	// builds, coverage, the reports and the home page's numbers.
 	Statistics Consumer = "statistics"
-	// Exports is every list written out as a file.
+	// Exports is the findings lists written out as files.
 	Exports Consumer = "exports"
 	// VEX is the documents stating what affects a build.
 	VEX Consumer = "vex"
