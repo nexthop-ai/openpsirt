@@ -52,6 +52,15 @@ type Outcome string
 // Schema answers with every outcome the domain recognizes, in its order.
 func (Outcome) Schema(huma.Registry) *huma.Schema { return words(triage.Outcomes()) }
 
+// VulnerabilityOutcome is an outcome about a finding of the vulnerability and
+// entered kinds, for the lists and reports that read those kinds alone.
+type VulnerabilityOutcome string
+
+// Schema answers with the outcomes about a vulnerability.
+func (VulnerabilityOutcome) Schema(huma.Registry) *huma.Schema {
+	return words(triage.VulnerabilityOutcomes())
+}
+
 // OutcomeOneAtATime is the outcomes one act may record against one finding.
 type OutcomeOneAtATime string
 
@@ -71,6 +80,18 @@ type Justification string
 
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
+
+// LeadOutcome is what a claim about a lead says it is.
+type LeadOutcome string
+
+// Schema answers with the outcomes a claim about a lead records.
+func (LeadOutcome) Schema(huma.Registry) *huma.Schema { return words(triage.LeadOutcomes()) }
+
+// LeadReason is the reason a lead was dismissed.
+type LeadReason string
+
+// Schema answers with the reasons a lead is dismissed for.
+func (LeadReason) Schema(huma.Registry) *huma.Schema { return words(triage.LeadReasons()) }
 
 // StatementScope is whom a statement published from a claim holds for.
 type StatementScope string

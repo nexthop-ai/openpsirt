@@ -131,7 +131,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(`"f"."closed_at" IS NULL`).
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", "c"."name"`).
 		Scan(ctx, &rows)
@@ -214,7 +214,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(wanted)).
 		Where(`"f"."component_id" IN (?)`, bun.List(components)).
 		Where(`"f"."closed_at" IS NULL`).
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &counts); err != nil {
@@ -264,7 +264,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."component_id" IN (?)`, bun.List(components)).
 		Where(`"f"."closed_at" IS NULL`).
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"de"."claim_id", "f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &covered); err != nil {

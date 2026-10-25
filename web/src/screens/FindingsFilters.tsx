@@ -3,7 +3,7 @@
 
 import { FLOORS } from "../ui/severities";
 import { labeled } from "../ui/Outcome";
-import type { Outcome } from "../ui/outcomes";
+import type { VulnerabilityOutcome } from "../ui/outcomes";
 import { notACredential } from "../ui/noautofill";
 import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
@@ -80,7 +80,7 @@ export const STATES = [
 // beside the tokens here: a second spelling of a word somebody picks and then
 // reads back is how the two stop agreeing. Keyed by every outcome the server
 // records, so one it adds or drops is a compile error here.
-const OFFERED: Record<Outcome, true> = {
+const OFFERED: Record<VulnerabilityOutcome, true> = {
   affected: true,
   "not-applicable": true,
   mismatched: true,
@@ -92,7 +92,7 @@ const OFFERED: Record<Outcome, true> = {
 };
 const OUTCOMES: readonly (readonly [string, string])[] = [
   ["", "Any"],
-  ...(Object.keys(OFFERED) as Outcome[]).map((each) => [each, labeled(each)] as const),
+  ...(Object.keys(OFFERED) as VulnerabilityOutcome[]).map((each) => [each, labeled(each)] as const),
 ];
 
 export const ASSIGNED = [

@@ -8,11 +8,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // LeadAt is the finding a lead is on one build, where the subject may read
@@ -43,4 +48,84 @@ func (s *Store) LeadAt(ctx context.Context, subject access.Subject, targetID int
 		return nil, fmt.Errorf("read the lead at that place: %w", err)
 	}
 	return &lead, nil
+}
+
+// ErrStillSeen says a lead a run still sees is not stated fixed.
+var ErrStillSeen = refusal.New("the newest comparable run still sees this lead, so it is not fixed here")
+
+// FixLead closes a lead on one build because somebody states it is fixed
+// there. The lead has to be one a comparable run no longer sees: that absence
+// is the evidence the statement is made with, and a run still reporting the
+// result is the authority on what it found. A lead seen again opens anew at
+// the same place.
+func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID int64,
+	placeIdentity, because string) (*Resolved, error) {
+
+	because = strings.TrimSpace(because)
+	if because == "" {
+		return nil, ErrNoReason
+	}
+	if err := markdown.Check(because); err != nil {
+		return nil, err
+	}
+	productID, err := productOf(ctx, s.db, targetID)
+	if err != nil {
+		return nil, err
+	}
+	out := &Resolved{}
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		now := s.now().UTC().Truncate(time.Microsecond)
+		out.At, out.Closed = now, 0
+		kinds, kindArgs := kind.Evidence.Where(`"f"."kind"`)
+		var lead struct {
+			ID         int64             `bun:"id"`
+			Visibility access.Visibility `bun:"visibility"`
+			Absent     *int64            `bun:"absent_run_id"`
+		}
+		err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
+			ColumnExpr(`"f"."id", "f"."visibility", "si"."absent_run_id"`).
+			Where(`"f"."target_id" = ?`, targetID).
+			Where(`"f"."place_identity" = ?`, placeIdentity).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(kinds, kindArgs...).
+			Limit(1).Scan(ctx, &lead)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrNothingOpenThere
+		case err != nil:
+			return fmt.Errorf("read the lead at that place: %w", err)
+		}
+		// A lead somebody may not read is one they are not told of.
+		if !subject.Reads(lead.Visibility, productID) {
+			return ErrNothingOpenThere
+		}
+		if !subject.Triages(lead.Visibility, productID) {
+			return access.Denied(fmt.Sprintf("close a lead in product %d", productID))
+		}
+		if lead.Absent == nil {
+			return ErrStillSeen
+		}
+		result, err := tx.NewUpdate().Model((*Finding)(nil)).
+			Set(`"closed_at" = ?`, now).
+			Set(`"closed_by" = ?`, subject.ID).
+			Set(`"closed_note" = ?`, because).
+			Set(`"closed_because" = ?`, Fixed).
+			Where(`"id" = ?`, lead.ID).
+			Where(`"closed_at" IS NULL`).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("close lead %d: %w", lead.ID, err)
+		}
+		affected, err := database.Affected(result)
+		if err != nil {
+			return fmt.Errorf("close lead %d: %w", lead.ID, err)
+		}
+		out.Closed = int(affected)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }

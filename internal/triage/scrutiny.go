@@ -452,7 +452,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Where(`"f"."closed_at" IS NULL`).
 		// The kinds the count recorded at approval reads, so growth compares
 		// one population with itself.
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"de"."claim_id"`).

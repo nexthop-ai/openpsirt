@@ -101,6 +101,9 @@ judgment made about a leaf.
 
 ## Outcomes
 
+These are the outcomes about a vulnerability. A lead takes its own, which
+`DESIGN-analysis.md` § Lead triage holds.
+
 | Outcome | Means |
 |---|---|
 | **Affected** | It applies, and goes to remediation |

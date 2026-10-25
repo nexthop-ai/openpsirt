@@ -50,6 +50,21 @@ const said: Record<Word, { label: string; color: string; means: string }> = {
     color: "var(--ok)",
     means: "the fix is already in the version shipping here",
   },
+  dismissed: {
+    label: "Dismissed",
+    color: "var(--ok)",
+    means: "the analyzer's result is not a flaw to act on",
+  },
+  "not-security": {
+    label: "Not a security issue",
+    color: "var(--ok)",
+    means: "a real flaw that does no harm",
+  },
+  confirmed: {
+    label: "Confirmed",
+    color: "var(--sev-high)",
+    means: "the analyzer found a real flaw",
+  },
 };
 
 // Every outcome the interface knows, in the order above, for a control that

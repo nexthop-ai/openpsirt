@@ -536,6 +536,7 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			ComponentUpstream string `bun:"component_upstream"`
 			ConsumerUpstream  string `bun:"consumer_upstream"`
 			OnTag             int    `bun:"on_tag"`
+			Kind              string `bun:"kind"`
 		}
 		err := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -548,9 +549,10 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 			ColumnExpr(finding.ComponentUpstreamExpr+` AS "component_upstream"`).
 			ColumnExpr(finding.ConsumerUpstreamExpr+` AS "consumer_upstream"`).
 			ColumnExpr(`MAX(CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).
+			ColumnExpr(`MAX("f"."kind") AS "kind"`).
 			Where(`"st"."product_id" = ?`, productID).
 			Where(`"f"."closed_at" IS NULL`).
-			Apply(ofKinds(kind.Triage, "f")).
+			Apply(ofKinds(kind.Decisions, "f")).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
 			Where(`"f"."place_identity" IN (?)`, bun.List(wordsOf(identities))).
@@ -568,6 +570,7 @@ func (s *Store) whereTheyAreNow(ctx context.Context, subject access.Subject,
 				ComponentUpstream: row.ComponentUpstream,
 				ConsumerUpstream:  row.ConsumerUpstream,
 				OnTag:             row.OnTag == 1,
+				Kind:              kind.Kind(row.Kind),
 			})
 		}
 	}

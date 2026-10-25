@@ -30,7 +30,7 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 }
 
 // builtForAnalysis is the consumers that read analysis results.
-var builtForAnalysis = map[Consumer]bool{Evidence: true}
+var builtForAnalysis = map[Consumer]bool{Decisions: true, Evidence: true}
 
 func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 	for _, c := range consumers() {
@@ -40,9 +40,9 @@ func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 	}
 }
 
-func TestOnlyTheSweepAndTheAnalysisConsumersLeaveRecordedFlawsOut(t *testing.T) {
+func TestOnlyTheSweepAndTheEvidenceLeaveRecordedFlawsOut(t *testing.T) {
 	for _, c := range consumers() {
-		if got, want := c.includes(Entered), c != Closure && !builtForAnalysis[c]; got != want {
+		if got, want := c.includes(Entered), c != Closure && c != Evidence; got != want {
 			t.Errorf("%s includes recorded flaws: %v; want %v", c, got, want)
 		}
 	}

@@ -45,6 +45,19 @@ type LeadEvidenceBody struct {
 	NotSeen   string      `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
 	Compare   string      `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
 	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
+	State     LeadState   `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
+}
+
+// LeadState is where a lead stands.
+type LeadState string
+
+// Schema answers with the states a lead is in.
+func (LeadState) Schema(huma.Registry) *huma.Schema {
+	offered := make([]any, 0, len(analysis.States()))
+	for _, each := range analysis.States() {
+		offered = append(offered, string(each))
+	}
+	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
 func registerLeads(api huma.API, in core.Deps) {
@@ -90,7 +103,7 @@ func registerLeads(api huma.API, in core.Deps) {
 		body := LeadEvidenceBody{
 			At: leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
-			Compare: evidence.Compare, Unchanged: evidence.Unchanged,
+			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
 		}
 		for _, p := range evidence.Steps {
 			body.Steps = append(body.Steps, leadPlace(p))

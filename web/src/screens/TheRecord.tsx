@@ -48,6 +48,9 @@ const OUTCOME_SAID: Record<Outcome, string> = {
   "upgrade-needed": "upgrade planned",
   "patch-needed": "backport planned",
   affected: "affected",
+  dismissed: "lead",
+  "not-security": "lead, not a security issue",
+  confirmed: "lead confirmed",
 };
 
 // The outcomes as the filter offers them, a dismissal named as one.

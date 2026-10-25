@@ -119,7 +119,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 			finding.FoldIdentifier(f.Issue))
 	}
 	if f.Component != "" {
-		kinds, args := kindsOf(kind.Triage, "cf")
+		kinds, args := kindsOf(kind.Decisions, "cf")
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
 			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
@@ -141,7 +141,7 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
 			  AND "bf"."target_id" = ? AND "bs"."product_id" = "de"."product_id"`
 		args := []any{f.TargetID}
-		kinds, kindArgs := kindsOf(kind.Triage, "bf")
+		kinds, kindArgs := kindsOf(kind.Decisions, "bf")
 		clause += " AND " + kinds
 		args = append(args, kindArgs...)
 		if mayRead != "" {
@@ -441,7 +441,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ColumnExpr(`"de"."id" AS "decision_id"`).
 		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
 		Where(`"st2"."product_id" = "de"."product_id"`).
-		Apply(ofKinds(kind.Triage, "f2")).
+		Apply(ofKinds(kind.Decisions, "f2")).
 		Where(`"de"."id" IN (?)`, bun.List(keys)).
 		GroupExpr(`"de"."id"`)
 	err := s.db.NewSelect().

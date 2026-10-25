@@ -35,6 +35,8 @@ type Evidence struct {
 	// neither patched it.
 	Compare   string
 	Unchanged bool
+	// State is where the lead stands.
+	State State
 }
 
 // Located is one place a run named for a lead.
@@ -113,6 +115,13 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		} else {
 			out.Related = append(out.Related, one)
 		}
+	}
+	state, stateArgs := stateOf(productID)
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
+		ColumnExpr(state, stateArgs...).
+		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State); err != nil {
+		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)
 	}
 	if seen.AbsentRunID != nil {
 		absent, after, err := runAndModules(ctx, store, *seen.AbsentRunID)

@@ -98,8 +98,12 @@ const (
 	Ranking Consumer = "ranking"
 	// Triage is the shared finding model as people work it: the findings
 	// lists and their counts, one finding's page, assignment and routing,
-	// decisions and their approvals, notes, queues and disclosure.
+	// notes on an issue, and disclosure.
 	Triage Consumer = "triage"
+	// Decisions is the claims people make about findings: their rows, the
+	// reasoning and its revisions, approvals, comments on a claim, the review
+	// queue and every read of one claim.
+	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a
 	// component and the places it sits at.
 	Inventory Consumer = "inventory"
@@ -122,8 +126,8 @@ const (
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
-		Closure, VersionCarry, Ranking, Triage, Inventory, Statistics, Exports,
-		VEX, Advisories, Notifications, Evidence,
+		Closure, VersionCarry, Ranking, Triage, Decisions, Inventory, Statistics,
+		Exports, VEX, Advisories, Notifications, Evidence,
 	}
 }
 
@@ -142,6 +146,8 @@ func (c Consumer) Kinds() []Kind {
 	case VersionCarry, Ranking, Triage, Inventory, Statistics, Exports, VEX,
 		Advisories, Notifications:
 		return []Kind{Vulnerability, Entered}
+	case Decisions:
+		return []Kind{Vulnerability, Entered, Analysis}
 	case Evidence:
 		return []Kind{Analysis}
 	}

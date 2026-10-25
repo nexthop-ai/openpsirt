@@ -7,7 +7,11 @@ import { useWho } from "../app/session";
 
 // Every outcome the server records, read from the published API document so a
 // word the server adds is a compile error wherever a screen names it.
-export type Outcome = NonNullable<Body<"DisposedBody">["outcome"]>;
+export type Outcome = NonNullable<Body<"DecisionBody">["outcome"]>;
+
+// The outcomes about a vulnerability, which the findings lists and the reports
+// filter by. A lead's outcomes are recorded on a lead and nowhere else.
+export type VulnerabilityOutcome = NonNullable<Body<"DisposedBody">["outcome"]>;
 
 // What one outcome claims, as the server publishes it beside the caller.
 export type Claims = Body<"OutcomeBody">;

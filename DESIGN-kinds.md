@@ -76,7 +76,8 @@ and a kind it does not name never reaches it.
 | Closure | A run's sweep: what it opens, updates and closes | Vulnerability |
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
-| Triage | The findings lists and their counts, one finding's page, assignment and routing, decisions and approvals, notes, queues and disclosure | Vulnerability, entered |
+| Triage | The findings lists and their counts, one finding's page, assignment and routing, notes on an issue, and disclosure | Vulnerability, entered |
+| Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue and every read of one claim | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the places it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
 | Exports | Every list written out as a file (REQ-50) | Vulnerability, entered |
@@ -85,10 +86,10 @@ and a kind it does not name never reaches it.
 | Notifications | What is said to people about findings | Vulnerability, entered |
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
 
-Analysis findings are included by Evidence alone. The screens, queues, counts
-and exports that read them are built for them (`DESIGN-analysis.md`) and are
-**not built**; a lead is counted on its run's receipt and read through its
-evidence and nowhere else.
+Analysis findings are included by Evidence and Decisions alone: a lead is
+read through its evidence and the claims about it (`DESIGN-analysis.md`
+§ Lead triage). The screens, queues, counts and exports that list leads are
+**not built**.
 
 ## Inclusion
 

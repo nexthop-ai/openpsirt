@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"sort"
 	"strings"
 
@@ -260,7 +259,7 @@ func outcomeBodies() []OutcomeBody {
 		out = append(out, OutcomeBody{
 			Outcome: core.Outcome(each), HidesRisk: each.HidesRisk(), Dated: each.Dated(),
 			NeedsJustification: each.NeedsJustification(),
-			Dismisses:          slices.Contains(triage.OutcomesDismissing(), each),
+			Dismisses:          each.Dismisses(),
 		})
 	}
 	return out

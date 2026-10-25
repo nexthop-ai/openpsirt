@@ -4592,6 +4592,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a triage decision for a lead
+         * @description Records what a lead is: `dismissed`, `not-security` or `confirmed`.
+         *
+         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
+         *
+         *     The decision covers the lead on every stream and variant it is seen on. A lead that is fixed is refused: it opens again where it is seen again.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["decide-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a lead as fixed
+         * @description Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
+         *
+         *     A lead seen again opens anew at the same place.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["fix-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage": {
         parameters: {
             query?: never;
@@ -8020,12 +8070,17 @@ export interface components {
              * @description The outcome
              * @enum {string}
              */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description The number of findings this decision covers
              */
             places?: number;
+            /**
+             * @description Why a lead was dismissed. Ignored in a request
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The reasoning, in markdown. Somebody else has to agree with this */
             reasoning: string;
             /**
@@ -8274,7 +8329,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             proposed_at: string;
             /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
@@ -8315,7 +8370,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The product it was decided in */
             product: string;
             /** @description The reasoning, in markdown. Empty where you may read only some of the places the claim covers */
@@ -8894,6 +8949,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        "Fix-leadRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Fix-leadRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What fixed it, in markdown */
+            because: string;
+        };
         FixBody: {
             /**
              * Format: uri
@@ -9033,7 +9098,7 @@ export interface components {
              */
             covers_now: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
         };
         "Hand-back-assignmentsRequest": {
             /**
@@ -9323,7 +9388,7 @@ export interface components {
             /** @description The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
@@ -9384,7 +9449,7 @@ export interface components {
             /** @description The mitigation a holder can apply */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description How many places the matching decisions are at
@@ -9456,7 +9521,7 @@ export interface components {
             /** Format: int64 */
             claim_id: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             product: string;
             /** Format: int64 */
             rows: number;
@@ -9499,6 +9564,26 @@ export interface components {
             version?: string;
             vulnerability: string;
         };
+        LeadDecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadDecisionBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description What the lead is: dismissed, not a security issue, or confirmed as a real flaw
+             * @enum {string}
+             */
+            outcome: "dismissed" | "not-security" | "confirmed";
+            /**
+             * @description Why it is dismissed. Required when it is, and refused otherwise
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown. Somebody else has to agree with a dismissal */
+            reasoning: string;
+        };
         LeadEvidenceBody: {
             /**
              * Format: uri
@@ -9524,10 +9609,28 @@ export interface components {
             open: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
+            /**
+             * @description Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to
+             * @enum {string}
+             */
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
+        };
+        LeadFixedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadFixedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When it was closed
+             */
+            at: string;
         };
         LeadPlace: {
             /** @description Whether the link opens on a branch the product names rather than on the analyzed commit */
@@ -10646,7 +10749,7 @@ export interface components {
             /** @description Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one */
             needs_justification: boolean;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
         };
         OutlierBody: {
             /**
@@ -11770,7 +11873,7 @@ export interface components {
             /** @description What stops the flaw, where the decision named it. The document states it as the impact */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The decision's justification, which the document states as the reason the release is not affected */
             reason?: string;
         };
@@ -12759,7 +12862,7 @@ export interface components {
             kind: "finding" | "together" | "extension" | "returned";
             needs_approval?: boolean;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description The number of this finding's places the claim covers
@@ -14500,7 +14603,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -14558,7 +14661,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -14614,7 +14717,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -15207,7 +15310,7 @@ export interface operations {
                 /** @description Limit to one product, by name */
                 product?: string;
                 /** @description Limit to one outcome */
-                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
                 /** @description Limit to one state */
                 state?: "proposed" | "approved" | "withdrawn" | "lapsed";
                 /** @description Only deferrals whose date has passed */
@@ -21073,6 +21176,84 @@ export interface operations {
             };
         };
     };
+    "decide-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "fix-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Fix-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadFixedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-match-coverage": {
         parameters: {
             query?: {
@@ -22296,7 +22477,7 @@ export interface operations {
                 /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only claims of these outcomes. Any of them, not all */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
                 release?: string;
                 /** @description The number returned. Zero returns the total alone */
@@ -22346,7 +22527,7 @@ export interface operations {
                 /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only claims of these outcomes. Any of them, not all */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
                 release?: string;
             };

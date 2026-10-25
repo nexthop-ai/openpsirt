@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -161,6 +162,9 @@ type Place struct {
 	// Read from the finding rather than supplied, for the same reason the
 	// visibility is: what may be said about a place is a fact about the place.
 	OnTag bool
+	// Kind is the finding's kind, which decides the outcomes a claim about it
+	// may record. Unset is the vulnerability kind.
+	Kind kind.Kind
 	// ComponentUpstream and ConsumerUpstream are the versions expiry compares.
 	// They are the *upstream* versions: a shipped package carries a version of
 	// its own that moves whenever it is rebuilt, and rebuilding is not a
@@ -608,6 +612,16 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 	// meaningless on the others, which are claims about priority rather than
 	// about applicability.
 	switch {
+	case outcome == Dismissed:
+		// A lead's reasons are their own: the vulnerability ones describe
+		// how a known issue applies, and a lead is a guess somebody judged.
+		if !slices.Contains(LeadReasons(), LeadReason(justification)) {
+			return refusal.Errorf("%q is not a reason a lead is dismissed for: %v", justification, LeadReasons())
+		}
+		if strings.TrimSpace(mitigation) != "" {
+			return refusal.New("a dismissed lead says what stops it in its reasoning")
+		}
+		return nil
 	case outcome.NeedsJustification():
 		if !justification.Valid() {
 			return refusal.Errorf("%q is not a recognized reason for something not applying", justification)
@@ -656,6 +670,14 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return refusal.Errorf("%q is not an outcome", p.Outcome)
+	}
+	// A lead is asked whether it is real, and a vulnerability how it
+	// applies. Each kind's outcomes answer its own question and no other.
+	if !slices.Contains(OutcomesFor(p.Place.Kind), p.Outcome) {
+		if p.Place.Kind == kind.Analysis {
+			return refusal.Errorf("%q is not something a lead is judged to be: %v", p.Outcome, LeadOutcomes())
+		}
+		return refusal.Errorf("%q is a judgment about a lead", p.Outcome)
 	}
 	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing

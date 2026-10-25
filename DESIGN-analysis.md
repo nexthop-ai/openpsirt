@@ -5,8 +5,8 @@ is placed in the checkout, matched to what the same analysis reported on that
 build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
-Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-25, REQ-42,
-REQ-43, REQ-66, REQ-69.
+Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
+REQ-28, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -23,6 +23,7 @@ shares is in `DESIGN-ingest.md`.
 - [Matching](#matching)
 - [Placement](#placement)
 - [Source](#source)
+- [Lead triage](#lead-triage)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -208,7 +209,7 @@ whole key, then the function, then the nearest line.
 |---|---|
 | A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
 | The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
-| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and is asked to be reaffirmed on a probable one (§ Not built) |
+| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
 
 ### Carrying
 
@@ -336,6 +337,73 @@ slash.
 | It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as a place holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
 | The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same place |
 | Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
+
+## Lead triage
+
+A claim about a lead is a claim as `DESIGN-triage.md` describes one: one
+argument, its rows, its reasoning and every revision of it, and a second
+person's approval of one revision (REQ-24, REQ-28). It is keyed on the
+product, the rule the lead is filed under, and the lead's place, with no
+versions, so one judgment covers the lead on every stream and variant it is
+seen on (REQ-25).
+
+`POST …/streams/{stream}/variants/{variant}/leads/{place}/decision` records one.
+
+| Outcome | Means | Second person |
+|---|---|---|
+| `dismissed` | Not a flaw to act on, for the reason stated | Yes |
+| `not-security` | Real and harmless: a crash on a path no input reaches, a leak in a tool that exits | Yes |
+| `confirmed` | A real flaw | No |
+
+| Reason a lead is dismissed | Means |
+|---|---|
+| `false_positive` | The analyzer is wrong: the flaw is not there |
+| `wont_fix` | The flaw is there and will not be fixed |
+| `used_in_tests` | The code is only used in tests and does not ship |
+| `mitigated` | Something already in place stops it, which the reasoning names |
+
+| Rule | |
+|---|---|
+| A lead takes the lead outcomes alone, and a vulnerability takes none of them | A lead is asked whether it is real; a vulnerability, how a known issue applies |
+| A dismissal states one of the four reasons | A dismissal nobody can review is one a second person cannot agree to |
+| A claim about a lead covers its place at any version | The place is the lead, carried by matching rather than by versions |
+| A claim about a lead is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every claim has, at the visibility a lead has |
+| A fixed lead takes no claim | It opens again where it is seen again |
+| A lead paired only probably, on its function or its nearest line, lapses the claim dismissing it or calling it no security issue | The judgment was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one claim or many, as a lapsed claim is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
+| A claim confirming a lead stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
+| The lapse is written in the transaction that records the pairing | A pairing is never recorded with the claim on it left standing |
+
+### Fixed leads
+
+`POST …/streams/{stream}/variants/{variant}/leads/{place}/fixed` closes a lead
+on one build, with what fixed it.
+
+| Rule | |
+|---|---|
+| Only a lead the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
+| It closes the lead on the build named and nowhere else | Each build holding it is a statement of its own |
+| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
+| A lead seen again opens anew at the same place | The matching that finds a closed lead carries the result to its place (§ Carrying) |
+| A claim about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one claim's reads include it; the findings lists do not |
+
+### Lead states
+
+A lead's state is worked out when it is read, from its finding, its sighting
+and the claim standing at its place. The evidence of a lead carries it.
+
+| State | When |
+|---|---|
+| Fixed | The finding is closed |
+| Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
+| Not reproduced | A comparable run did not see it |
+| Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did |
+| Open | None of the above |
+
+| Rule | |
+|---|---|
+| A standing claim comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
+| Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
+| A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
 
 ## Receipts
 
@@ -470,12 +538,13 @@ it is about.
 
 | Part | State |
 |---|---|
-| The screens, queues, counts and exports that read leads | The Evidence consumer alone includes the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is counted on its run's receipt and read through its evidence and nowhere else |
-| A screen for a product's repository settings and a lead's evidence | Not built. Both are read and written through the API |
-| Triage of a lead: dismissal with a second person's approval, standing rules, escalation from the baseline | Not built |
+| The screens, queues, counts and exports that read leads | The Evidence and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is counted on its run's receipt and read through its evidence and the claims about it, and nowhere else |
+| A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
+| Standing rules and escalation from the baseline | Not built |
+| Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
 | Moving a lead into a private case | Not built |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
-| A dismissal asked to be reaffirmed after a probable pairing, and a re-baseline's probable pairings listed together | Not built. How each lead was paired and whether a run was a re-baseline are recorded; triage of a lead is not built |
+| A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |

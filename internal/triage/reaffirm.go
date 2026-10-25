@@ -297,6 +297,10 @@ func turnsOnSeverity(claim Claim) bool {
 	if !claim.Outcome.HidesRisk() || claim.Outcome == Mismatched {
 		return false
 	}
+	// A rule is rated by nobody, so nothing about a lead rises.
+	if claim.Outcome.AboutALead() {
+		return false
+	}
 	switch claim.Outcome {
 	case AlreadyFixed:
 		return false

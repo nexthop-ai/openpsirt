@@ -10,7 +10,14 @@ describe("the outcomes that close a question", () => {
   // date. A screen asking for a hand-written list leaves out whatever it grows.
   it("are the ones published as hiding risk and carrying no date", () => {
     expect([...classesOf(PUBLISHED).dismissing].sort()).toEqual(
-      ["already-fixed", "mismatched", "not-applicable", "wont-fix"].sort(),
+      [
+        "already-fixed",
+        "dismissed",
+        "mismatched",
+        "not-applicable",
+        "not-security",
+        "wont-fix",
+      ].sort(),
     );
   });
 

@@ -209,3 +209,44 @@ func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) 
 	}
 	return database.Affected(result)
 }
+
+// LapseLeads marks lapsed the claims dismissing a lead at these places of a
+// product, because a run paired each lead only probably: on its function or
+// its nearest line, rather than on its whole key. The judgment was about the
+// result as it was keyed, and a weaker pairing is a guess that the result is
+// the same one, so somebody re-affirms it.
+//
+// A claim confirming a lead stands: it says the flaw is real, and a weaker
+// pairing does not make it less so.
+//
+// Written inside the transaction that records the pairing, so a pairing is
+// never recorded with the claim on it left standing.
+func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []string, moment time.Time) (int64, error) {
+	if len(places) == 0 {
+		return 0, nil
+	}
+	var total int64
+	for start := 0; start < len(places); start += database.BatchSize {
+		batch := places[start:min(start+database.BatchSize, len(places))]
+		var ids []int64
+		if err := tx.NewSelect().Model((*Decision)(nil)).
+			Join(`JOIN "claim" AS "lc" ON "lc"."id" = "de"."claim_id"`).
+			ColumnExpr(`"de"."id"`).
+			Where(`"de"."product_id" = ?`, productID).
+			Where(`"de"."place_identity" IN (?)`, bun.List(batch)).
+			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
+			Scan(ctx, &ids); err != nil {
+			return total, fmt.Errorf("read the claims on leads paired probably: %w", err)
+		}
+		if len(ids) == 0 {
+			continue
+		}
+		n, err := markLapsed(ctx, tx, ids, moment.Truncate(time.Microsecond))
+		if err != nil {
+			return total, fmt.Errorf("lapse the claims on leads paired probably: %w", err)
+		}
+		total += n
+	}
+	return total, nil
+}

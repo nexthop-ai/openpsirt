@@ -62,10 +62,10 @@ type ChangedBody struct {
 	// somebody can sign a release off against: an approved
 	// not-applicable and a row nobody has looked at are opposite answers
 	// and read alike without it.
-	State         core.Standing      `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
-	Outcome       core.Outcome       `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
-	Justification core.Justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
-	Due           string             `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
+	State         core.Standing             `json:"state,omitempty" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
+	Outcome       core.VulnerabilityOutcome `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
+	Justification core.Justification        `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
+	Due           string                    `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
 }
 
 func registerReports(api huma.API, in core.Deps) {
@@ -428,7 +428,7 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 		if bumped {
 			body.ArrivedFrom = row.ArrivedFrom
 			body.State = core.Standing(row.State)
-			body.Outcome, body.Justification = core.Outcome(row.Outcome), core.Justification(row.Justification)
+			body.Outcome, body.Justification = core.VulnerabilityOutcome(row.Outcome), core.Justification(row.Justification)
 			if row.Due != nil {
 				body.Due = row.Due.UTC().Format(time.DateOnly)
 			}
@@ -440,14 +440,14 @@ func changed(rows []finding.Changed, why, bumped bool) []ChangedBody {
 
 // InheritedBody is one claim a new line could take on.
 type InheritedBody struct {
-	Decision      int64        `json:"decision"`
-	Vulnerability string       `json:"vulnerability"`
-	Component     string       `json:"component"`
-	Outcome       core.Outcome `json:"outcome"`
-	Was           string       `json:"was" doc:"The version the claim was made against"`
-	Now           string       `json:"now" doc:"The new line's contents"`
-	Reasoning     string       `json:"reasoning" doc:"The old words, to start from rather than start without"`
-	DeferredDays  int          `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
+	Decision      int64                     `json:"decision"`
+	Vulnerability string                    `json:"vulnerability"`
+	Component     string                    `json:"component"`
+	Outcome       core.VulnerabilityOutcome `json:"outcome"`
+	Was           string                    `json:"was" doc:"The version the claim was made against"`
+	Now           string                    `json:"now" doc:"The new line's contents"`
+	Reasoning     string                    `json:"reasoning" doc:"The old words, to start from rather than start without"`
+	DeferredDays  int                       `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
 }
 
 // CarriedBody is the set a new line inherits.
@@ -585,7 +585,7 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 	for _, row := range rows {
 		out = append(out, InheritedBody{
 			Decision: row.DecisionID, Vulnerability: row.Vulnerability,
-			Component: row.Component, Outcome: core.Outcome(row.Outcome),
+			Component: row.Component, Outcome: core.VulnerabilityOutcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 			DeferredDays: row.DeferredDays,
 		})

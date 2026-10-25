@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"flag"
 	"os"
-	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -49,7 +48,7 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 			}
 			if got.HidesRisk != want.HidesRisk() || got.Dated != want.Dated() ||
 				got.NeedsJustification != want.NeedsJustification() ||
-				got.Dismisses != slices.Contains(triage.OutcomesDismissing(), want) {
+				got.Dismisses != want.Dismisses() {
 				t.Errorf("%s is published as %+v, which is not the rule the server applies", want, got)
 			}
 		}

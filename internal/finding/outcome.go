@@ -27,4 +27,24 @@ const (
 	OutcomeUpgradeNeeded = "upgrade-needed"
 	// OutcomePatchNeeded promises a backported patch by a date.
 	OutcomePatchNeeded = "patch-needed"
+	// OutcomeDismissed says a lead is not a real flaw, or not one to act on,
+	// for the reason it states.
+	OutcomeDismissed = "dismissed"
+	// OutcomeNotSecurity says a lead is a real flaw that does no harm: a
+	// crash on a path no input reaches, a leak in a tool that exits.
+	OutcomeNotSecurity = "not-security"
+	// OutcomeConfirmed says a lead is a real flaw.
+	OutcomeConfirmed = "confirmed"
 )
+
+// AnyVersionOutcomes are the outcomes a claim covers its place with whatever
+// versions the place holds: a wrong match, which is about identity, and every
+// outcome about a lead, whose place is the lead itself.
+func AnyVersionOutcomes() []string {
+	return []string{OutcomeMismatched, OutcomeDismissed, OutcomeNotSecurity, OutcomeConfirmed}
+}
+
+// anyVersionList is AnyVersionOutcomes as the list a statement compares an
+// outcome against.
+const anyVersionList = `'` + OutcomeMismatched + `', '` + OutcomeDismissed + `', '` +
+	OutcomeNotSecurity + `', '` + OutcomeConfirmed + `'`

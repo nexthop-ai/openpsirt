@@ -2795,11 +2795,22 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         places:
           description: The number of findings this decision covers
           format: int64
           type: integer
+        reason:
+          description: Why a lead was dismissed. Ignored in a request
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
         reasoning:
           description: The reasoning, in markdown. Somebody else has to agree with this
           minLength: 1
@@ -3262,6 +3273,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         proposed_at:
           type: string
@@ -3351,6 +3365,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         product:
           description: The product it was decided in
@@ -4321,6 +4338,23 @@ components:
         - items
         - total
       type: object
+    Fix-leadRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Fix-leadRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: What fixed it, in markdown
+          minLength: 1
+          type: string
+      required:
+        - because
+      type: object
     FixBody:
       additionalProperties: false
       properties:
@@ -4576,6 +4610,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
       required:
         - claim_id
@@ -5139,6 +5176,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         product:
           description: The product, by the name that addresses it
@@ -5250,6 +5290,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         places:
           description: How many places the matching decisions are at
@@ -5383,6 +5426,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         product:
           type: string
@@ -5460,6 +5506,39 @@ components:
         - due
         - days_left
       type: object
+    LeadDecisionBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadDecisionBody.json
+          format: uri
+          readOnly: true
+          type: string
+        outcome:
+          description: "What the lead is: dismissed, not a security issue, or confirmed as a real flaw"
+          enum:
+            - dismissed
+            - not-security
+            - confirmed
+          type: string
+        reason:
+          description: Why it is dismissed. Required when it is, and refused otherwise
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
+        reasoning:
+          description: The reasoning, in markdown. Somebody else has to agree with a dismissal
+          minLength: 1
+          type: string
+      required:
+        - outcome
+        - reasoning
+      type: object
     LeadEvidenceBody:
       additionalProperties: false
       properties:
@@ -5494,6 +5573,17 @@ components:
           type:
             - array
             - "null"
+        state:
+          description: "Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"
+          enum:
+            - baseline
+            - open
+            - not-reproduced
+            - fixed
+            - dismissed
+            - not-security
+            - confirmed
+          type: string
         steps:
           description: The path the analyzer took to it, in order
           items:
@@ -5510,6 +5600,24 @@ components:
         - related
         - open
         - last_seen
+        - state
+      type: object
+    LeadFixedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadFixedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        at:
+          description: When it was closed
+          format: date-time
+          type: string
+      required:
+        - at
       type: object
     LeadPlace:
       additionalProperties: false
@@ -7634,6 +7742,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
       required:
         - outcome
@@ -9474,6 +9585,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         reason:
           description: The decision's justification, which the document states as the reason the release is not affected
@@ -11162,6 +11276,9 @@ components:
             - already-fixed
             - upgrade-needed
             - patch-needed
+            - dismissed
+            - not-security
+            - confirmed
           type: string
         places:
           description: The number of this finding's places the claim covers
@@ -14032,6 +14149,9 @@ paths:
                 - already-fixed
                 - upgrade-needed
                 - patch-needed
+                - dismissed
+                - not-security
+                - confirmed
               type: string
             type:
               - array
@@ -14204,6 +14324,9 @@ paths:
                 - already-fixed
                 - upgrade-needed
                 - patch-needed
+                - dismissed
+                - not-security
+                - confirmed
               type: string
             type:
               - array
@@ -14362,6 +14485,9 @@ paths:
                 - already-fixed
                 - upgrade-needed
                 - patch-needed
+                - dismissed
+                - not-security
+                - confirmed
               type: string
             type:
               - array
@@ -15235,6 +15361,9 @@ paths:
               - already-fixed
               - upgrade-needed
               - patch-needed
+              - dismissed
+              - not-security
+              - confirmed
             type: string
         - description: Limit to one state
           explode: false
@@ -26484,6 +26613,128 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision:
+    post:
+      description: |-
+        Records what a lead is: `dismissed`, `not-security` or `confirmed`.
+
+        `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
+
+        The decision covers the lead on every stream and variant it is seen on. A lead that is fixed is refused: it opens again where it is seen again.
+
+        Requires: public-triage or private-triage or internal-triage on the product
+      operationId: decide-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadDecisionBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DecisionBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record a triage decision for a lead
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+          - internal-triage
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed:
+    post:
+      description: |-
+        Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
+
+        A lead seen again opens anew at the same place.
+
+        Requires: public-triage or private-triage or internal-triage on the product
+      operationId: fix-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Fix-leadRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadFixedBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Close a lead as fixed
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+          - internal-triage
   /v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage:
     get:
       description: |-
@@ -28585,6 +28836,9 @@ paths:
                 - already-fixed
                 - upgrade-needed
                 - patch-needed
+                - dismissed
+                - not-security
+                - confirmed
               type: string
             type:
               - array
@@ -28728,6 +28982,9 @@ paths:
                 - already-fixed
                 - upgrade-needed
                 - patch-needed
+                - dismissed
+                - not-security
+                - confirmed
               type: string
             type:
               - array

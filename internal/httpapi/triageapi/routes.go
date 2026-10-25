@@ -29,6 +29,8 @@ func Register(api huma.API, in core.Deps) {
 	registerReaffirmClaim(api, in)
 	registerReaffirmMany(api, in)
 	registerProposing(api, in)
+	registerLeadDecisions(api, in)
+	registerLeadFixed(api, in)
 	registerPlaceDecisions(api, in)
 	registerElsewhere(api, in)
 	registerReachAcross(api, in)

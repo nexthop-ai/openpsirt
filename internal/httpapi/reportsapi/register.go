@@ -25,21 +25,21 @@ import (
 // DisposedBody is one known vulnerability in a build and what was decided
 // about it, including nothing.
 type DisposedBody struct {
-	Vulnerability string             `json:"vulnerability"`
-	Severity      string             `json:"severity,omitempty"`
-	Component     string             `json:"component"`
-	Version       string             `json:"version,omitempty"`
-	Ecosystem     string             `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace     string             `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Place         string             `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
-	Consumer      string             `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
-	State         core.Standing      `json:"state" doc:"The decision state. undecided is a row nobody has decided anything about"`
-	Outcome       core.Outcome       `json:"outcome,omitempty"`
-	Justification core.Justification `json:"justification,omitempty"`
-	ProposedBy    string             `json:"proposed_by,omitempty"`
-	ProposedAt    string             `json:"proposed_at,omitempty"`
-	ApprovedBy    string             `json:"approved_by,omitempty" doc:"The people who agreed, by name"`
-	ApprovedAt    string             `json:"approved_at,omitempty"`
+	Vulnerability string                    `json:"vulnerability"`
+	Severity      string                    `json:"severity,omitempty"`
+	Component     string                    `json:"component"`
+	Version       string                    `json:"version,omitempty"`
+	Ecosystem     string                    `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
+	Namespace     string                    `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
+	Place         string                    `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
+	Consumer      string                    `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
+	State         core.Standing             `json:"state" doc:"The decision state. undecided is a row nobody has decided anything about"`
+	Outcome       core.VulnerabilityOutcome `json:"outcome,omitempty"`
+	Justification core.Justification        `json:"justification,omitempty"`
+	ProposedBy    string                    `json:"proposed_by,omitempty"`
+	ProposedAt    string                    `json:"proposed_at,omitempty"`
+	ApprovedBy    string                    `json:"approved_by,omitempty" doc:"The people who agreed, by name"`
+	ApprovedAt    string                    `json:"approved_at,omitempty"`
 	// AgreementCarried says the agreement was given for an earlier claim and
 	// carried onto this one, which is what a re-affirmation stands on. The
 	// person named read those words rather than these.
@@ -149,12 +149,12 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 // component — each a way of reading the same complete answer rather than a
 // different question.
 type Registering struct {
-	State     []core.Standing `query:"state,explode" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
-	Outcome   []core.Outcome  `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
-	Component string          `query:"component" doc:"Keep one component, by name"`
-	Issue     string          `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
-	Standing  string          `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
-	Because   []closure       `query:"closed_because,explode" uniqueItems:"true" doc:"Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows"`
+	State     []core.Standing             `query:"state,explode" uniqueItems:"true" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
+	Outcome   []core.VulnerabilityOutcome `query:"outcome,explode" uniqueItems:"true" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
+	Component string                      `query:"component" doc:"Keep one component, by name"`
+	Issue     string                      `query:"issue" doc:"Keep one vulnerability, under the name it is filed here"`
+	Standing  string                      `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
+	Because   []closure                   `query:"closed_because,explode" uniqueItems:"true" doc:"Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows"`
 }
 
 // narrow is the store's own filter, built from the request.
@@ -369,7 +369,7 @@ func disposedBody(ctx context.Context, in core.Deps, row finding.Disposed) Dispo
 		Component: row.Component, Version: row.Version, Place: row.Place,
 		Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
 		Consumer: row.Consumer,
-		State:    core.Standing(row.State), Outcome: core.Outcome(row.Outcome),
+		State:    core.Standing(row.State), Outcome: core.VulnerabilityOutcome(row.Outcome),
 		Justification: core.Justification(row.Justification),
 		ProposedBy:    row.ProposedBy, ApprovedBy: row.ApprovedBy,
 		AgreementCarried: row.AgreementCarried,

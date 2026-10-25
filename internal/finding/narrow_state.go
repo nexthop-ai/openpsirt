@@ -18,8 +18,9 @@ import (
 // empty, so the two absences are compared as the same absence.
 //
 // A claim that the scanner matched something that is not here covers the place
-// whatever it now holds, because the versions are not what it is about. Its
-// own version columns record what it was made against and are not compared.
+// whatever it now holds, because the versions are not what it is about. A claim
+// about a lead does too, because a lead's place is the lead. Their own version
+// columns record what each was made against and are not compared.
 //
 // The four aliases are the caller's to join: a finding's own row carries only
 // the identifiers, the versions are on the components, and the outcome is on
@@ -30,7 +31,7 @@ import (
 // Exported because the same question is asked outside this package: what is
 // undecided is what the notification sweep means by work sitting still, and a
 // second spelling of it would be a second definition of "decided".
-const KeyMatches = `("cl"."outcome" = '` + OutcomeMismatched + "' OR (" + VersionsMatch + "))"
+const KeyMatches = `("cl"."outcome" IN (` + anyVersionList + ") OR (" + VersionsMatch + "))"
 
 // VersionsMatch says a decision row `de` was written against the versions a
 // finding's component `c` and consumer `uc` hold now, which is the half of

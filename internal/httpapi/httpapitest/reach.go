@@ -365,7 +365,10 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// nobody has judged, and handed neither of the other halves.
 		"internal-reader":  {access.InternalRead},
 		"internal-triager": {access.InternalTriage},
-		"approver":         {access.Approver},
+		// The right to agree with the internal material it reads, which is
+		// what a second person on a lead holds.
+		"internal-reviewer": {access.InternalRead, access.Approver},
+		"approver":          {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity

@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
@@ -140,6 +141,10 @@ func statedVocabularies() map[string][]string {
 		"outcomes that hide risk":        words(triage.OutcomesThatHideRisk()),
 		"outcomes a statement offers":    finding.OutcomesOffered(),
 		"justifications":                 words(triage.Justifications()),
+		"outcomes about a lead":          words(triage.LeadOutcomes()),
+		"outcomes about a vulnerability": words(triage.VulnerabilityOutcomes()),
+		"reasons a lead is dismissed":    words(triage.LeadReasons()),
+		"lead states":                    words(analysis.States()),
 		"statement scopes":               words(triage.Scopes()),
 		"roles":                          words(access.Roles()),
 		"roles and rights":               append(words(access.Roles()), words(access.OverTheDeployment())...),
