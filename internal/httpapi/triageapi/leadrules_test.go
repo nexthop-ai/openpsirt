@@ -68,7 +68,7 @@ func leadRulesOf(t *testing.T, r *httpapitest.Reach) map[int64]leadRuleRead {
 }
 
 func TestAStandingRuleDismissesNothingUntilSomebodyElseApprovesIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, "/v1/products/mine/leads/"+place+"/escalation", `{}`)
 		rule := proposeLeadRule(t, r,
@@ -120,7 +120,7 @@ func TestTheAuthorOfAStandingRuleCannotApproveIt(t *testing.T) {
 }
 
 func TestAStandingRuleCoversTheLeadsOfItsRuleUnderItsPath(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		const why = `"reason":"wont_fix","reasoning":"vendored"`
 		want := map[int64]int{}
@@ -177,7 +177,7 @@ func leadRunWithSecondLeak() string {
 }
 
 func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.LeadRuleGrowth, "1"); err != nil {
 			t.Fatal(err)
 		}
@@ -228,7 +228,7 @@ func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 }
 
 func TestAMemorySafetyRuleIsDismissedOnlyUnderAPath(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour),
 			ratedRun(`"tags":["external/cwe/cwe-563"]`, `"tags":["external/cwe/cwe-787"]`))
@@ -260,7 +260,7 @@ func TestARuleTaggedWithAWeaknessByNameIsClassifiedByIt(t *testing.T) {
 }
 
 func TestARuleFoundToFindMemoryFlawsAfterItWasProposedIsNotApproved(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"wont_fix","reasoning":"short-lived tool"}`)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour),
@@ -274,7 +274,7 @@ func TestARuleFoundToFindMemoryFlawsAfterItWasProposedIsNotApproved(t *testing.T
 }
 
 func TestAnInjectionRuleIsDismissedOnlyUnderAPath(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(`"tags":["external/cwe/cwe-89"]`, ``))
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
@@ -283,7 +283,7 @@ func TestAnInjectionRuleIsDismissedOnlyUnderAPath(t *testing.T) {
 }
 
 func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindMemoryFlaws(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"wont_fix","reasoning":"short-lived tool"}`)
 		approveLeadRule(t, r, rule.ID)
@@ -322,7 +322,7 @@ func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindInjection(t *testing.T
 }
 
 func TestARuleItsToolTagsWithNoWeaknessIsRatedByTheTableHeldForIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		// clang names no weakness for unix.Malloc; the table holds that it
 		// reports uses after free.
 		httpapitest.SeededLead(t, r)

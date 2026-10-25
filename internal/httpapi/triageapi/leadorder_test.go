@@ -42,7 +42,7 @@ func TestTheQueueIsOrderedByTheToolsOwnRating(t *testing.T) {
 		{"a precise leak", `"precision":"high"`, `"precision":"medium"`, "src/d.c"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+			httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 				httpapitest.SeededLead(t, r)
 				httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(c.leak, c.overflow))
 				got := leadsOf(t, r, "internal-reader", "")

@@ -17,7 +17,7 @@ import (
 const leadDecisionAt = "/v1/products/mine/streams/master/variants/broadcom/leads/%s/decision"
 
 func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		at := fmt.Sprintf(leadDecisionAt, httpapitest.SeededLead(t, r))
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at,
 			`{"outcome":"dismissed","reasoning":"never reached"}`); got.Code != http.StatusUnprocessableEntity {
@@ -70,7 +70,7 @@ func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
 }
 
 func TestAConfirmedLeadWaitsForNobody(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		at := fmt.Sprintf(leadDecisionAt, httpapitest.SeededLead(t, r))
 		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at,
 			`{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
@@ -130,7 +130,7 @@ func leadState(t *testing.T, r *httpapitest.Reach, place string) string {
 }
 
 func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		if got := leadState(t, r, place); got != "baseline" {
 			t.Fatalf("a lead in the series' first run is %q; want baseline", got)
@@ -153,7 +153,7 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 }
 
 func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place + "/fixed"
 		body := `{"because":"the bounds check landed"}`
@@ -188,7 +188,7 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 }
 
 func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`)
@@ -257,7 +257,7 @@ func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed 
 }
 
 func TestTheQueueLeavesTheBaselineOutAndCountsIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		got := leadsOf(t, r, "internal-reader", "")
 		if len(got.Items) != 0 || got.Total != 0 || got.States["baseline"] != 1 {
@@ -276,7 +276,7 @@ func TestTheQueueLeavesTheBaselineOutAndCountsIt(t *testing.T) {
 }
 
 func TestALeadPulledInIsInTheQueue(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := "/v1/products/mine/leads/" + place + "/escalation"
 		// Somebody who reads the lead and does not triage it is answered as
@@ -302,7 +302,7 @@ func TestALeadPulledInIsInTheQueue(t *testing.T) {
 }
 
 func TestALeadUnderAnImportantPathIsInTheQueue(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		const at = "/v1/products/mine/important-paths"
 		set := func(body string) {
@@ -352,7 +352,7 @@ func TestAnImportantPathThatSaysNothingIsRefused(t *testing.T) {
 }
 
 func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, "/v1/products/mine/leads/"+place+"/escalation", `{}`)
 		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
@@ -371,7 +371,7 @@ func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
 }
 
 func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		type evidence struct {
 			Rule     string             `json:"rule"`
