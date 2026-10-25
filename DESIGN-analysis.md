@@ -707,6 +707,7 @@ it is about.
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
+| Telling anybody a claim on a lead waits for a second person or was sent back | Not built. Notifications include no lead (`DESIGN-kinds.md` § Consumers), so the claim notices count the claims about vulnerabilities and flaws alone; the review queue lists a claim on a lead |
 | Moving a lead into a private case | Not built |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
