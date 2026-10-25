@@ -48,7 +48,7 @@ type LeadRuleBody struct {
 	Approved   *int            `json:"approved_covering,omitempty" doc:"The open leads it covered when last approved"`
 	RetiredAt  string          `json:"retired_at,omitempty" format:"date-time"`
 	Covering   int             `json:"covering" doc:"The open leads it names now that you may read, approved or not"`
-	State      LeadRuleState   `json:"state" doc:"proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. retired covers nothing"`
+	State      LeadRuleState   `json:"state" doc:"proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. needs-path names an analyzer rule and no path, and covers nothing since the rule was found to find memory safety or injection flaws: retire it and propose it again with a path. retired covers nothing"`
 }
 
 func leadRuleBody(r analysis.StandingRule) LeadRuleBody {

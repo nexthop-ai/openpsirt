@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -42,12 +43,16 @@ const (
 	RuleOutgrown RuleState = "outgrown"
 	// RuleRetired is a rule taken out of use. It covers nothing.
 	RuleRetired RuleState = "retired"
+	// RuleNeedsPath is a rule naming an analyzer rule and no path whose
+	// rule has since been found to find memory safety or injection flaws.
+	// It covers nothing until it is retired and proposed again with a path.
+	RuleNeedsPath RuleState = "needs-path"
 )
 
 // RuleStates are every state a standing rule is in, in the order a rule
 // meets them.
 func RuleStates() []RuleState {
-	return []RuleState{RuleProposed, RuleInForce, RuleOutgrown, RuleRetired}
+	return []RuleState{RuleProposed, RuleInForce, RuleOutgrown, RuleNeedsPath, RuleRetired}
 }
 
 // ErrNoSuchRule is a standing rule this product does not hold, or one
@@ -84,6 +89,8 @@ type leadRule struct {
 	ApprovedCovering *int       `bun:"approved_covering"`
 	RetiredBy        *int64     `bun:"retired_by"`
 	RetiredAt        *time.Time `bun:"retired_at"`
+	// Barred is a rule the guard on whole-rule dismissals refuses now.
+	Barred bool `bun:"-"`
 }
 
 // covers is whether the standing rule under "lr" names the finding under "f",
@@ -96,9 +103,16 @@ const covers = `("lr"."rule_folded" IS NULL OR EXISTS (SELECT 1 FROM "vulnerabil
 
 // ruled is whether an approved standing rule in use in the product bound
 // covers the finding under "f", whose result is under "ar".
+//
+// A rule naming an analyzer rule and no path covers nothing once the rule is
+// found to find memory safety or injection flaws, which are judged one lead
+// at a time.
 var ruled = `EXISTS (SELECT 1 FROM "lead_rule" AS "lr"
 	WHERE "lr"."product_id" = ? AND "lr"."approved_at" IS NOT NULL AND "lr"."retired_at" IS NULL
-	  AND ` + covers + `)`
+	  AND ` + covers + `
+	  AND ("lr"."prefix" IS NOT NULL OR "lr"."rule_folded" IS NULL OR NOT EXISTS (
+		SELECT 1 FROM "rule_rating" AS "rb" WHERE "rb"."vulnerability_id" = "f"."vulnerability_id"
+		  AND "rb"."weakness_tier" >= ` + strconv.Itoa(int(weakness.TierInjection)) + `)))`
 
 // StandingRule is a standing rule as it is read: what it names, who proposed
 // and approved it, and how many leads it covers now.
@@ -298,6 +312,15 @@ func StandingRules(ctx context.Context, db bun.IDB, subject access.Subject, prod
 	if err != nil {
 		return nil, err
 	}
+	for i := range rows {
+		err := wholeRuleDismissable(ctx, db, rows[i])
+		switch {
+		case refusal.In(err):
+			rows[i].Barred = true
+		case err != nil:
+			return nil, err
+		}
+	}
 	out := make([]StandingRule, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, *ruleOf(r, counted[r.ID], factor))
@@ -405,6 +428,8 @@ func ruleState(r leadRule, covering, factor int) RuleState {
 	switch {
 	case r.RetiredAt != nil:
 		return RuleRetired
+	case r.Barred:
+		return RuleNeedsPath
 	case r.ApprovedAt == nil:
 		return RuleProposed
 	case r.Rule != nil && covering > max(*r.ApprovedCovering, 1)*factor:

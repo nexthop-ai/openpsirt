@@ -255,8 +255,8 @@ func TestARuleFoundToFindMemoryFlawsAfterItWasProposedIsNotApproved(t *testing.T
 			ratedRun(`"tags":["external/cwe/cwe-416"]`, ``))
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
 			fmt.Sprintf("%s/%d/approval", leadRulesAt, rule.ID), `{}`), http.StatusUnprocessableEntity)
-		if got := leadRulesOf(t, r)[rule.ID]; got.State != "proposed" {
-			t.Errorf("the rule is %+v; want it proposed still", got)
+		if got := leadRulesOf(t, r)[rule.ID]; got.State != "needs-path" || got.Approved != nil {
+			t.Errorf("the rule is %+v; want it unapproved, needing a path", got)
 		}
 	})
 }
@@ -267,5 +267,29 @@ func TestAnInjectionRuleIsDismissedOnlyUnderAPath(t *testing.T) {
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(`"tags":["external/cwe/cwe-89"]`, ``))
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
 			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"parameterized"}`), http.StatusUnprocessableEntity)
+	})
+}
+
+func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindMemoryFlaws(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"wont_fix","reasoning":"short-lived tool"}`)
+		approveLeadRule(t, r, rule.ID)
+		path := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","prefix":"src/d.c","reason":"wont_fix","reasoning":"pooled"}`)
+		approveLeadRule(t, r, path.ID)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(`"tags":["external/cwe/cwe-416"]`, ``))
+		listed := leadRulesOf(t, r)
+		if got := listed[rule.ID]; got.State != "needs-path" {
+			t.Fatalf("the rule is %+v; want it to need a path", got)
+		}
+		if got := listed[path.ID]; got.State != "in-force" {
+			t.Errorf("the rule naming a path is %+v; want it in force", got)
+		}
+		// The leak the path names stays dismissed, and the one it does not
+		// comes back.
+		got := leadsOf(t, r, "internal-reader", "?state=dismissed")
+		if len(got.Items) != 1 || got.Items[0].Path != "src/d.c" || got.Ruled != 1 {
+			t.Errorf("the dismissed leads are %+v; want the one under the path alone", got)
+		}
 	})
 }

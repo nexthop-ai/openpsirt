@@ -9934,10 +9934,10 @@ export interface components {
             /** @description The analyzer rule it names, as <tool>/<rule>. Left out, every rule */
             rule?: string;
             /**
-             * @description proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. retired covers nothing
+             * @description proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. needs-path names an analyzer rule and no path, and covers nothing since the rule was found to find memory safety or injection flaws: retire it and propose it again with a path. retired covers nothing
              * @enum {string}
              */
-            state: "proposed" | "in-force" | "outgrown" | "retired";
+            state: "proposed" | "in-force" | "outgrown" | "needs-path" | "retired";
         };
         LeadsOutputBody: {
             /**
