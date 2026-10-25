@@ -120,7 +120,7 @@ func registerLeadRules(api huma.API, in core.Deps) {
 		Description: "Records a rule dismissing every open lead of an analyzer rule, every one at or " +
 			"under a path, or every one of a rule under a path. At least one of `rule` and `prefix` " +
 			"is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule " +
-			"finds memory safety or injection flaws, or where no analyzer has reported it here.\n\n" +
+			"finds memory safety or injection flaws, or where no analyzer has reported it.\n\n" +
 			"It dismisses nothing until somebody other than its author holding `approver` and " +
 			"`internal-read` on the product approves it. Its words do not change: retire it and " +
 			"propose another. Recorded in the administrative trail.",

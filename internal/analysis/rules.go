@@ -348,7 +348,7 @@ func wholeRuleDismissable(ctx context.Context, tx bun.IDB, row leadRule) error {
 	}
 	switch {
 	case len(held) == 0:
-		return refusal.Errorf("no analyzer has reported %q here, so what it finds is not known: name a path with it", *row.Rule)
+		return refusal.Errorf("no analyzer has reported %q, so what it finds is not known: name a path with it", *row.Rule)
 	case weakness.Tier(slices.Max(held)) >= weakness.TierInjection:
 		return refusal.Errorf("%q finds memory safety or injection flaws, which are judged one lead at a time: name a path with it", *row.Rule)
 	}
