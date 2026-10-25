@@ -501,15 +501,26 @@ A baseline lead enters the queue when it is escalated.
 
 ## Weakness families
 
-A rule names the weaknesses its tags name, as `external/cwe/cwe-N`. Tools
-disagree about the number for one flaw: one overflow was CWE-788, 119 and
-121 from three tools. They agree about its family.
+A rule names the weaknesses its tags name, as `external/cwe/cwe-N`. A rule
+whose tags name none takes the weaknesses a table held here names for it.
+Tools disagree about the number for one flaw: one overflow was CWE-788, 119
+and 121 from three tools. They agree about its family.
+
+| Tool | Source of its weaknesses |
+|---|---|
+| CodeQL | Its rule tags |
+| semgrep | Its rule tags |
+| cppcheck XML | The tags the upload client writes from each error's weakness |
+| cppcheck SARIF | Its rule tags from the release that writes them. Releases 2.16 to 2.18 tag a rule `security` and name no weakness, so a table generated from `cppcheck --errorlist` by `make cppcheck-weaknesses` names one, for 302 checks of cppcheck 2.22.0 |
+| clang, and the clang checkers clang-tidy runs | A table held here, by checker, over the 47 checkers clang 18 runs on C. clang tags nothing and publishes no table. A checker no weakness fits with confidence is held as naming none, and `make clang-checkers` names a checker a new release adds |
 
 | Rule | |
 |---|---|
 | A weakness's family is the nearest class or pillar up its primary parents in the catalog's research view, or itself where it is one | CWE-121, 122, 126, 787 and 788 are all CWE-119, and so are use after free and double free |
 | A weakness the catalog does not place is its own family | A newer catalog than the one committed assigns numbers this one does not know |
 | The hierarchy is read from the published catalog by `make weakness-names` and committed with the names | `DESIGN-build.md` § Make targets. Nobody types a thousand parents |
+| A clang checker reporting several kinds of flaw names each | unix.Malloc reports leaks, double frees and uses after free under one name, so it is a memory-safety rule and groups in the resource family and the bounds family both |
+| A rule whose tags name a weakness is classified by its tags alone | The tool's own word about its rule outranks a table about it |
 
 A weakness's tier says how likely it is to be a flaw worth fixing first. It is
 the tier of the nearest of itself and its ancestors the table names, so naming
@@ -692,7 +703,6 @@ it is about.
 | The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
-| Weaknesses for plain cppcheck and for clang | Not built. A rule names the weaknesses its tags name, which CodeQL and semgrep write and these two do not |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
 | Moving a lead into a private case | Not built |

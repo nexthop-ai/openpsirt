@@ -135,7 +135,13 @@ func (v *Vulnerabilities) Rule(ctx context.Context, rule Rule) (int64, error) {
 			return 0, fmt.Errorf("describe the rule %q: %w", rule.Name, err)
 		}
 	}
-	if err := v.classify(ctx, id, weaknessesOf(rule.Tags), ""); err != nil {
+	// A rule whose tags name no weakness is classified by what the tables
+	// held for tools that tag none say of it.
+	weaknesses := weaknessesOf(rule.Tags)
+	if len(weaknesses) == 0 {
+		weaknesses = weakness.OfRule(strings.TrimSpace(rule.Name))
+	}
+	if err := v.classify(ctx, id, weaknesses, ""); err != nil {
 		return 0, fmt.Errorf("record what kind of flaw the rule %q finds: %w", rule.Name, err)
 	}
 	if err := v.reference(ctx, id, []Reference{{URL: rule.Documentation, Kind: Documentation}}); err != nil {

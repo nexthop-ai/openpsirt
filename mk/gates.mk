@@ -6,7 +6,7 @@
 # internal/tools, the generated files that must match what generates them, and
 # the pinned versions that must agree with each other.
 
-.PHONY: govulncheck licenses sbom secrets web-audit unreachable readable negatives reserved confined granted narrowed subjected attached reserved-words weakness-names reserved-current unclaimed vendored spdx spdx-fix openapi-current
+.PHONY: govulncheck licenses sbom secrets web-audit unreachable readable negatives reserved confined granted narrowed subjected attached reserved-words weakness-names cppcheck-weaknesses clang-checkers reserved-current unclaimed vendored spdx spdx-fix openapi-current
 
 # Permissive only, for anything that ships. Build tooling is unrestricted.
 ALLOWED_LICENSES := Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MIT,MPL-2.0
@@ -228,6 +228,17 @@ reserved-words:
 # version it read is in the generated file.
 weakness-names:
 	$(GO) run ./internal/tools/weakness
+
+# The weakness each cppcheck check finds, asked of cppcheck itself, for the
+# cppcheck releases whose SARIF tags no rule with one. Not in any gate: CI
+# installs no cppcheck. CPPCHECK names the binary where it is not on the path.
+cppcheck-weaknesses:
+	$(GO) run ./internal/tools/cppcheckweakness
+
+# The clang checkers for C the weakness table has not looked at. Run against
+# each new clang release; it fails naming them. CLANG names the binary.
+clang-checkers:
+	$(GO) run ./internal/tools/clangcheckers
 
 # That the generated half of the word list is what the engines say today.
 #

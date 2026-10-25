@@ -293,3 +293,17 @@ func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindMemoryFlaws(t *testing
 		}
 	})
 }
+
+func TestARuleItsToolTagsWithNoWeaknessIsRatedByTheTableHeldForIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// clang names no weakness for unix.Malloc; the table holds that it
+		// reports uses after free.
+		httpapitest.SeededLead(t, r)
+		doc := strings.ReplaceAll(httpapitest.LeadRunAt(12), `"leak"`, `"unix.Malloc"`)
+		doc = strings.Replace(doc, `"name":"clang-tidy"`, `"name":"clang"`, 1)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), doc)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
+			`{"rule":"clang/unix.Malloc","reason":"false_positive","reasoning":"every allocation is pooled"}`),
+			http.StatusUnprocessableEntity)
+	})
+}
