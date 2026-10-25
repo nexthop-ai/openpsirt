@@ -112,13 +112,15 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 | Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
-| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage` |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage`. A lead moved into a flaw's case is private, so the case reaches it |
+| A lead moved into a private case is a stub to a reader of internal work alone: its state, rule, location and when it was seen | The lead was internal work before it was a case, and the case is what is withheld (`DESIGN-analysis.md` § Keep or move) |
+| A lead collaborator is granted one handed-off lead at the internal and private visibilities, and reads its evidence alone | A grant of one lead is no grant of a list, a build's tree or its inventory, and it ends at disclosure because a disclosed lead is public (`DESIGN-analysis.md` § Lead collaborators) |
 | Approving at internal visibility needs its holder to read internal work and hold the approver capability | A claim there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
 No consumer of vulnerability findings includes analysis results. The findings
 lists, reports, exports, published documents and the interface's screens read
-none, and the screens for working leads are not built. A person sends an
+none; the lead screens read leads. A person sends an
 analyzer run where they hold `internal-triage` on the product, since every
 result opens internal. `DESIGN-kinds.md`
 § Consumers holds which kinds each consumer reads.

@@ -170,44 +170,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			FromReport: input.Body.FromReport,
 		})
 		if err != nil {
-			// Each of these is the caller's to fix, and says which. Falling
-			// through to the generic refusal would answer a name the build
-			// holds twice, and a summary of nothing but spaces, with a 500
-			// that says the request went wrong at our end.
-			var several *graph.Ambiguous
-			switch {
-			case errors.As(err, &several):
-				return nil, core.SeveralComponents(several,
-					"version, and ecosystem and namespace where two share one")
-			case errors.Is(err, finding.ErrNoSuchComponent):
-				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
-			case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, cvss.ErrNotAVector):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNothingScanned):
-				return nil, huma.Error404NotFound(finding.ErrNothingScanned.Error())
-			case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrTooManyPlaces):
-				// The caller's to narrow, and the sentence says by how much.
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrToldTwice):
-				return nil, core.Asked(in.Logger, err)
-			case errors.Is(err, finding.ErrNoSuchReport):
-				return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
-			case errors.Is(err, finding.ErrAlreadyJudged):
-				return nil, huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
-			case errors.Is(err, finding.ErrIssueReported):
-				return nil, huma.Error409Conflict(finding.ErrIssueReported.Error())
-			}
-			// A summary the writing policy refuses, answered with where to
-			// look, as every other piece of writing is.
-			var faults markdown.Faults
-			if errors.As(err, &faults) {
-				return nil, core.RefusedText(faults)
-			}
-			return nil, core.RefusedFinding(in, err)
+			return nil, refusedFlaw(in, err)
 		}
 
 		component, err := finding.NewStore(in.DB.DB).ComponentName(ctx, rows[0].ComponentID)
@@ -235,6 +198,48 @@ func registerEntry(api huma.API, in core.Deps) {
 		}
 		return out, nil
 	})
+}
+
+// refusedFlaw is the answer to a recorded flaw the store turned away.
+func refusedFlaw(in core.Deps, err error) error {
+	// Each of these is the caller's to fix, and says which. Falling
+	// through to the generic refusal would answer a name the build
+	// holds twice, and a summary of nothing but spaces, with a 500
+	// that says the request went wrong at our end.
+	var several *graph.Ambiguous
+	switch {
+	case errors.As(err, &several):
+		return core.SeveralComponents(several,
+			"version, and ecosystem and namespace where two share one")
+	case errors.Is(err, finding.ErrNoSuchComponent):
+		return huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
+	case errors.Is(err, finding.ErrNothingSaid), errors.Is(err, finding.ErrNotAWeakness):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, cvss.ErrNotAVector):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrNothingScanned):
+		return huma.Error404NotFound(finding.ErrNothingScanned.Error())
+	case errors.Is(err, finding.ErrNoBuild), errors.Is(err, finding.ErrSeveralProducts):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrTooManyPlaces):
+		// The caller's to narrow, and the sentence says by how much.
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrToldTwice):
+		return core.Asked(in.Logger, err)
+	case errors.Is(err, finding.ErrNoSuchReport):
+		return huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+	case errors.Is(err, finding.ErrAlreadyJudged):
+		return huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
+	case errors.Is(err, finding.ErrIssueReported):
+		return huma.Error409Conflict(finding.ErrIssueReported.Error())
+	}
+	// A summary the writing policy refuses, answered with where to
+	// look, as every other piece of writing is.
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return core.RefusedText(faults)
+	}
+	return core.RefusedFinding(in, err)
 }
 
 // ResolvedBody is the record of a flaw marked fixed.

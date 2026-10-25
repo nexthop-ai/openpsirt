@@ -28,16 +28,39 @@ func (s *Store) LeadAt(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return nil, err
 	}
-	visible, err := access.Readable(subject, productID)
+	reach := LeadReach(subject, productID)
+	return s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
+}
+
+// LeadOrStubAt is LeadAt for a read of the lead's evidence, and reports
+// whether the subject reads it only as a stub: the lead without the case
+// (LeadReading).
+func (s *Store) LeadOrStubAt(ctx context.Context, subject access.Subject, targetID int64,
+	placeIdentity string) (*Finding, bool, error) {
+
+	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
-		return nil, ErrNoOpenFinding
+		return nil, false, err
 	}
+	reach := LeadReach(subject, productID)
+	lead, err := s.leadWhere(ctx, targetID, placeIdentity, reach.Full, reach.FullArgs)
+	if !errors.Is(err, ErrNoOpenFinding) {
+		return lead, false, err
+	}
+	lead, err = s.leadWhere(ctx, targetID, placeIdentity, reach.Stub, reach.StubArgs)
+	return lead, err == nil, err
+}
+
+// leadWhere is the lead at a place on one build that a condition admits.
+func (s *Store) leadWhere(ctx context.Context, targetID int64, placeIdentity string,
+	reads string, readArgs []any) (*Finding, error) {
+
 	kinds, kindArgs := kind.Evidence.Where(`"f"."kind"`)
 	var lead Finding
-	err = s.db.NewSelect().Model(&lead).
+	err := s.db.NewSelect().Model(&lead).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."place_identity" = ?`, placeIdentity).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(reads, readArgs...).
 		Where(kinds, kindArgs...).
 		OrderExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END ASC, "f"."id" DESC`).
 		Limit(1).Scan(ctx)

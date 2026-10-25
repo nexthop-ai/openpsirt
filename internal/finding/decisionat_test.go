@@ -32,6 +32,10 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 	},
 	"analysis/state.go": {
 		{"f", "le"}: "a lead pulled into the queue, at its place in the product bound",
+		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
+	},
+	"finding/handoff.go": {
+		{"f", "lh"}: "a lead handed off as a flaw, at its place in the product bound",
 	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one place",

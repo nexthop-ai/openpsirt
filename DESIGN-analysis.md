@@ -6,7 +6,7 @@ build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
 Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
-REQ-27, REQ-28, REQ-30, REQ-42, REQ-43, REQ-66, REQ-69.
+REQ-19, REQ-27, REQ-28, REQ-30, REQ-40, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -27,6 +27,7 @@ shares is in `DESIGN-ingest.md`.
 - [Lead queue](#lead-queue)
 - [Weakness families](#weakness-families)
 - [Grouped leads](#grouped-leads)
+- [Hand-off](#hand-off)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -272,7 +273,7 @@ administrative trail.
 | Setting | |
 |---|---|
 | Hosts | Each a remote prefix, a web address, and a style: `github`, `gitlab`, `gitea` (Forgejo writes Gitea's), or `custom` with a file template and an optional comparison template |
-| Paths | Each a prefix of the checkout, with a repository and branch for links where an upload names none, whether source under it is kept, or both |
+| Paths | Each a prefix of the checkout, with a repository and branch for links where an upload names none, whether source under it is kept, whether kept source is disclosed with a flaw, or any of them |
 
 | Rule | |
 |---|---|
@@ -280,7 +281,7 @@ administrative trail.
 | A custom template begins with `{repo}/` and names only `{commit}`, `{path}`, `{start}` and `{end}`, or `{from}` and `{to}` for a comparison | A template beginning anywhere else could open on another host |
 | A remote prefix may hold a path, which is how a mirror is named: the host covering a remote is the one with the longest prefix, and the rest of the remote is the repository under its web address | `git.example.com/mirror/github/FRRouting/frr` opens at `https://github.com/FRRouting/frr` |
 | A path's repository and branch are named together or not at all | One is no link |
-| A path that names neither a repository nor whether source is kept is refused | It says nothing |
+| A path that names no repository and says nothing of source is refused | It says nothing |
 | A product states at most 100 hosts and 2,000 paths | sonic-buildimage pins dozens of submodules |
 | Remotes and prefixes are compared normalized: a host in lower case, a path with no leading or trailing slash | One repository written two ways is one entry |
 
@@ -313,6 +314,7 @@ named host, the revision is not a commit, or the path leaves the repository.
 | A context region's source is preferred to its region's, with the line it starts at | It is the wider of the two |
 | At most 4 KiB of source is kept per place | A client sends a few lines either side |
 | A snippet is answered as text, and shown as text | It is uploaded data (REQ-66) |
+| Source is disclosed with a flaw under a path where the longest prefix stating it says so, and stripped everywhere else | Off by default: a private product's source is not published because one flaw in it was (§ Hand-off) |
 
 ### Rule documentation
 
@@ -434,6 +436,7 @@ and the claim standing at its place. The evidence of a lead carries it.
 | State | When |
 |---|---|
 | Fixed | The finding is closed |
+| Handed off | It was recorded as a flaw (§ Hand-off) |
 | Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
 | Dismissed | No claim stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
 | Not reproduced | A comparable run did not see it |
@@ -446,6 +449,7 @@ and the claim standing at its place. The evidence of a lead carries it.
 | A standing claim or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
 | Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
 | A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
+| A handed-off lead leaves the queue and takes no claim | Its flaw is what is judged |
 
 ## Lead queue
 
@@ -571,6 +575,78 @@ at least one.
 | A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
 | A lead of the group already answered, waiting on a claim, under a standing rule, fixed, or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
 | A lead possibly the same flaw is left out | It is judged on its own |
+
+## Hand-off
+
+A confirmed lead is recorded as a flaw found here (REQ-19), through the path
+every recorded flaw takes (`DESIGN-findings.md` § Recorded flaws), and linked
+to it. The lead is then handed off: its flaw is what is judged, fixed and
+disclosed.
+
+`GET …/streams/{stream}/variants/{variant}/leads/{place}/hand-off` is what a
+hand-off is offered, and `POST` on the same address records it.
+
+| Rule | |
+|---|---|
+| Only a confirmed lead is handed off, and only once | Confirmation is the judgment that it is a flaw; a second flaw for one lead is one flaw recorded twice |
+| A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
+| The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its place rather than by versions |
+| The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
+| A handed-off lead takes no claim; one is refused with 409 | The flaw's decisions replace the lead's |
+
+### Hand-off offer
+
+| Part | |
+|---|---|
+| Builds | Every build holding the lead, open or closed, which the flaw is proposed against. The person chooses which it is recorded against |
+| Components | Ranked: the one the lead's prefix was confirmed as before, the one the lead was placed on as it arrived, up to five whose names resemble the prefix's last segment, then the build itself |
+| Lacking | For each component, the builds the lead was seen in that hold no such component. Recording the flaw against them is refused |
+| Unanalyzed | For each component, the builds in use that hold it and that the lead's series never analyzed. A variant nobody analyzes ships the same code |
+| Prefix | The innermost repository the run names holding the file, or else the file's directory |
+| Disclosure | What moving the lead into the case discloses with the flaw (§ Keep or move) |
+
+| Rule | |
+|---|---|
+| The component chosen is recorded for the prefix, replacing what it was confirmed as before | The next lead under the prefix is offered it first |
+| The longest recorded prefix holding a lead's path is the one offered | A repository nested in another names its own component |
+| A resembling component is offered and never chosen for the person | A name contained in a directory's name is a guess |
+
+### Keep or move
+
+A hand-off keeps the lead internal or moves it into its flaw's case.
+`PUT …/leads/{place}/move` moves a kept lead, and `DELETE` on the same address
+takes a moved one back out.
+
+| | Kept | Moved |
+|---|---|---|
+| Visibility of the lead and the claims at its place | Internal | Private |
+| An internal reader reads | The whole lead, and nothing of the case | A stub: the state, the rule, the location and when it was seen |
+| A reader of undisclosed work reads | Nothing | The whole lead, and its flaw |
+| A reader on the flaw's case reads | The whole lead, and its flaw | The whole lead, and its flaw |
+| When the flaw is disclosed | The lead stays internal | The lead and its claims go public with the flaw (REQ-40) |
+| A later sighting opens | Internal | Private, in the case |
+
+| Rule | |
+|---|---|
+| A move discloses, with the flaw, everybody who wrote reasoning or a comment on a claim about the lead, every path it names and every message the analyzer wrote there, and the offer says so before the move | People writing in the record have to know that from the first word (REQ-40) |
+| At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets) | A product's source is not published because one flaw in it was |
+| A move or its undo is refused with 409 once the flaw is disclosed | Disclosure is one way |
+| A move and its undo are recorded in the administrative trail, as the change of access they are | A move changes who reads the lead |
+| A move and its undo are made by somebody holding `internal-triage` and `private-triage` | The hand-off's own rule |
+
+### Lead collaborators
+
+`…/leads/{place}/collaborators` lists, adds and removes people brought into
+one handed-off lead, as case collaborators are brought into one flaw
+(REQ-43, `DESIGN-access.md` § Case collaborators).
+
+| Rule | |
+|---|---|
+| A grant reaches the lead's evidence at the internal and private visibilities, and nothing else | It is one lead, never a list, and ends at disclosure by itself |
+| A grant does not reach the build's inventory or tree | It is a grant of one lead, not of the build it is on |
+| Collaborators are managed by somebody who reads the lead at the visibility the hand-off holds | Whoever reads the lead decides who else does |
+| A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in | As a case collaborator is |
+| A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
 
 ## Receipts
 
@@ -711,8 +787,7 @@ it is about.
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
 | Telling anybody a claim on a lead waits for a second person or was sent back | Not built. Notifications include no lead (`DESIGN-kinds.md` § Consumers), so the claim notices count the claims about vulnerabilities and flaws alone; the review queue lists a claim on a lead |
-| Moving a lead into a private case | Not built |
-| Recording a flaw from a confirmed lead | Not built. A confirmed lead stays confirmed; nothing is handed off |
+| Telling anybody a lead was handed off or moved | Not built. Recording the flaw tells what recording any flaw tells; a lead collaborator is told they were brought in |
 | Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
@@ -740,4 +815,5 @@ it is about.
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
+| An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

@@ -134,7 +134,15 @@ export function Leads() {
                       <td className="mono" title={row.function}>
                         {located(row.path, row.line)}
                       </td>
-                      <td>{row.message}</td>
+                      <td>
+                        {row.withheld ? (
+                          <span className="hint" title="Part of a case you are not on.">
+                            Withheld
+                          </span>
+                        ) : (
+                          row.message
+                        )}
+                      </td>
                       <td className="hint" style={{ whiteSpace: "nowrap" }}>
                         {row.stream} · {row.variant}
                         {row.builds > 1 && ` +${row.builds - 1}`}

@@ -1038,6 +1038,22 @@ components:
       required:
         - items
       type: object
+    AuthorBody:
+      additionalProperties: false
+      properties:
+        identity:
+          type: string
+        name:
+          description: Their display name, where it differs from their identity
+          type: string
+        writings:
+          description: The number of revisions of reasoning and comments they wrote on claims about the lead
+          format: int64
+          type: integer
+      required:
+        - identity
+        - writings
+      type: object
     BecameBody:
       additionalProperties: false
       properties:
@@ -3040,6 +3056,42 @@ components:
       required:
         - reason
       type: object
+    DisclosesBody:
+      additionalProperties: false
+      properties:
+        authors:
+          description: Everybody who wrote reasoning or a comment on a claim about the lead
+          items:
+            $ref: "#/components/schemas/AuthorBody"
+          type:
+            - array
+            - "null"
+        messages:
+          description: The number of messages the analyzer wrote at those paths
+          format: int64
+          type: integer
+        paths:
+          description: Every path the lead names
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        snippets:
+          description: The number of source snippets disclosed with the flaw
+          format: int64
+          type: integer
+        stripped:
+          description: The number of source snippets removed at disclosure, under paths the product does not disclose snippets for
+          format: int64
+          type: integer
+      required:
+        - authors
+        - paths
+        - messages
+        - snippets
+        - stripped
+      type: object
     DisposedBody:
       additionalProperties: false
       properties:
@@ -4656,6 +4708,140 @@ components:
       required:
         - moved
       type: object
+    Hand-off-leadRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Hand-off-leadRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        builds:
+          description: Every build the flaw is recorded against
+          items:
+            $ref: "#/components/schemas/LeadBuild"
+          maxItems: 200
+          minItems: 1
+          type:
+            - array
+            - "null"
+        component:
+          description: The component that carries it. Omit for the build itself
+          type: string
+        ecosystem:
+          description: The ecosystem, where two components share the name
+          type: string
+        move:
+          description: Whether the lead moves into the flaw's case. Kept internal by default
+          type: boolean
+        namespace:
+          description: The namespace, where two share a name and an ecosystem
+          type: string
+        severity:
+          description: The severity. Worked out from the vector where one is given
+          enum:
+            - critical
+            - high
+            - medium
+            - low
+            - negligible
+            - none
+          type: string
+        summary:
+          description: The flaw, in your own words
+          minLength: 1
+          type: string
+        vector:
+          description: A CVSS 3.0 or 3.1 base vector
+          type: string
+        weaknesses:
+          description: The kind of flaw, as CWE- and a number, the root cause first
+          items:
+            pattern: ^(\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\s*$
+            type: string
+          maxItems: 16
+          type:
+            - array
+            - "null"
+      required:
+        - builds
+        - summary
+      type: object
+    HandedOffBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/HandedOffBody.json
+          format: uri
+          readOnly: true
+          type: string
+        builds:
+          description: The number of builds it was recorded against
+          format: int64
+          type: integer
+        component:
+          description: The component in the build that carries it
+          type: string
+        identifier:
+          description: The identifier the flaw was filed under
+          type: string
+        moved:
+          description: Whether the lead moved into the flaw's case
+          type: boolean
+        places:
+          description: The number of findings of the flaw that opened
+          format: int64
+          type: integer
+      required:
+        - identifier
+        - component
+        - builds
+        - places
+        - moved
+      type: object
+    HandoffOfferBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/HandoffOfferBody.json
+          format: uri
+          readOnly: true
+          type: string
+        discloses:
+          $ref: "#/components/schemas/DisclosesBody"
+          description: What moving the lead into the flaw's case discloses when the flaw is disclosed
+        prefix:
+          description: "The path a confirmed component is remembered for: the repository the lead is in, or its directory"
+          type: string
+        rule:
+          description: The analyzer's rule, as <tool>/<rule>
+          type: string
+        seen:
+          description: Every build the lead was seen in, which the flaw is proposed against
+          items:
+            $ref: "#/components/schemas/LeadBuild"
+          type:
+            - array
+            - "null"
+        suggestions:
+          description: The components offered, most likely first. The build itself is always last
+          items:
+            $ref: "#/components/schemas/SuggestionBody"
+          type:
+            - array
+            - "null"
+      required:
+        - rule
+        - seen
+        - suggestions
+        - discloses
+      type: object
     HeldBody:
       additionalProperties: false
       properties:
@@ -5547,6 +5733,21 @@ components:
         - due
         - days_left
       type: object
+    LeadBuild:
+      additionalProperties: false
+      properties:
+        stream:
+          description: A branch or a tag
+          minLength: 1
+          type: string
+        variant:
+          description: The way that line is built
+          minLength: 1
+          type: string
+      required:
+        - stream
+        - variant
+      type: object
     LeadDecisionBody:
       additionalProperties: false
       properties:
@@ -5616,6 +5817,9 @@ components:
         decision:
           $ref: "#/components/schemas/DecisionBody"
           description: The live claim at the lead, agreed to or waiting for a second person. Absent where there is none
+        handoff:
+          $ref: "#/components/schemas/LeadHandoffBody"
+          description: The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead
         kin:
           description: Other analyzers' leads on the build that are the same flaw, and those that possibly are
           items:
@@ -5654,6 +5858,7 @@ components:
             - dismissed
             - not-security
             - confirmed
+            - handed-off
           type: string
         steps:
           description: The path the analyzer took to it, in order
@@ -5664,6 +5869,9 @@ components:
             - "null"
         unchanged:
           description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
+          type: boolean
+        withheld:
+          description: Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered
           type: boolean
       required:
         - rule
@@ -5691,6 +5899,34 @@ components:
           type: string
       required:
         - at
+      type: object
+    LeadHandoffBody:
+      additionalProperties: false
+      properties:
+        disclosed:
+          description: Whether the flaw is disclosed, which ends moving the lead in or out
+          type: boolean
+        flaw:
+          description: The identifier the flaw was filed under
+          type: string
+        handed_at:
+          format: date-time
+          type: string
+        handed_by:
+          description: The person who handed it off, by sign-in identity
+          type: string
+        handed_by_name:
+          description: Their display name, where it differs from their identity
+          type: string
+        moved:
+          description: Whether the lead is part of the flaw's case. Otherwise it is kept internal and linked
+          type: boolean
+      required:
+        - flaw
+        - moved
+        - disclosed
+        - handed_by
+        - handed_at
       type: object
     LeadKin:
       additionalProperties: false
@@ -5789,7 +6025,7 @@ components:
           format: int64
           type: integer
         message:
-          description: What the analyzer says
+          description: What the analyzer says. Empty where the lead is withheld
           type: string
         opened:
           description: When the lead was first opened on any of them
@@ -5814,6 +6050,7 @@ components:
             - dismissed
             - not-security
             - confirmed
+            - handed-off
           type: string
         stream:
           description: The branch or tag of the newest build the lead is listed on, to link to
@@ -5821,6 +6058,9 @@ components:
         variant:
           description: The variant of that build
           type: string
+        withheld:
+          description: Whether the lead is part of a case you are not on, so what the analyzer said is not answered
+          type: boolean
       required:
         - place
         - rule
@@ -10209,6 +10449,9 @@ components:
         branch:
           description: The branch links into that repository open on. Such links are approximate
           type: string
+        disclosed_snippets:
+          description: Whether the snippets of a lead moved into a case are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure
+          type: boolean
         prefix:
           description: A path from the top of the checkout. Empty is the whole product
           type: string
@@ -11909,6 +12152,45 @@ components:
       required:
         - name
         - kind
+      type: object
+    SuggestionBody:
+      additionalProperties: false
+      properties:
+        component:
+          description: The component, as the builds name it. Absent for the build itself
+          type: string
+        ecosystem:
+          description: Its ecosystem, where its package identifier states one
+          type: string
+        from:
+          description: "Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself"
+          enum:
+            - confirmed
+            - placed
+            - resembles
+            - build
+          type: string
+        lacking:
+          description: The builds the lead was seen in that hold no such component. Recording the flaw against them is refused
+          items:
+            $ref: "#/components/schemas/LeadBuild"
+          type:
+            - array
+            - "null"
+        namespace:
+          description: Its namespace, where its package identifier states one
+          type: string
+        unanalyzed:
+          description: The builds holding the component that the lead's series never analyzed
+          items:
+            $ref: "#/components/schemas/LeadBuild"
+          type:
+            - array
+            - "null"
+      required:
+        - from
+        - lacking
+        - unanalyzed
       type: object
     TLP:
       additionalProperties: false
@@ -24171,6 +24453,7 @@ paths:
               - dismissed
               - not-security
               - confirmed
+              - handed-off
             type: string
         - description: The number returned
           explode: false
@@ -27285,6 +27568,177 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators:
+    get:
+      description: |-
+        Everybody granted this one handed-off lead in this product, oldest first.
+
+        A grant reads the lead's evidence and nothing else of the product, while the lead is internal or private.
+
+        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+      operationId: list-lead-collaborators
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyCollaboratorBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List who has been granted a handed-off lead
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-read
+          - internal-triage
+          - private-read
+          - private-triage
+        note: Where you read the lead at the visibility it holds.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}:
+    delete:
+      description: |-
+        Withdraws the grant. The record of it is kept.
+
+        Withdrawing a grant somebody does not hold answers 404 and records nothing.
+
+        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+      operationId: remove-lead-collaborator
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+        - in: path
+          name: identity
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Withdraw somebody's grant of a handed-off lead
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-read
+          - internal-triage
+          - private-read
+          - private-triage
+        note: Where you read the lead at the visibility it holds.
+    put:
+      description: |-
+        Grants one person this one handed-off lead in this product, to read its evidence, without granting them anything else of the product.
+
+        It is an access change: it lands in the administration trail, and they are told in the notification area inside the application.
+
+        Adding somebody who already holds it succeeds and changes nothing.
+
+        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+      operationId: add-lead-collaborator
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+        - in: path
+          name: identity
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Grant somebody a handed-off lead
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-read
+          - internal-triage
+          - private-read
+          - private-triage
+        note: Where you read the lead at the visibility it holds.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision:
     post:
       description: |-
@@ -27292,7 +27746,7 @@ paths:
 
         `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
 
-        The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again.
+        The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again. A lead handed off as a flaw is refused with 409, because its flaw is judged instead.
 
         Requires: internal-triage on the product
       operationId: decide-lead
@@ -27403,6 +27857,222 @@ paths:
         scope: product
         any_of:
           - internal-triage
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off:
+    get:
+      description: |-
+        Returns what recording a confirmed lead as a flaw here is offered: the components it may be recorded against, most likely first, the builds it was seen in, and what moving it into the flaw's case would disclose with the flaw.
+
+        A suggestion lists the builds the lead was seen in that lack it, since recording the flaw against those is refused, and the builds holding it that the lead's series never analyzed.
+
+        Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+      operationId: get-lead-handoff
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandoffOfferBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get what a lead's hand-off is offered
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+          - private-triage
+        note: Both internal-triage and private-triage on the product.
+    post:
+      description: |-
+        Records a confirmed lead as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the lead to it.
+
+        `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
+
+        `move` makes the lead part of the flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. Left out, the lead is kept internal and linked.
+
+        A lead nobody confirmed, or one already handed off, is refused with 409.
+
+        Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+      operationId: hand-off-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Hand-off-leadRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HandedOffBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Hand off a confirmed lead as a flaw
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+          - private-triage
+        note: Both internal-triage and private-triage on the product.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move:
+    delete:
+      description: |-
+        Makes a moved lead internal again while its flaw is undisclosed, with the claims about it. It stays linked to the flaw.
+
+        Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
+
+        Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+      operationId: unmove-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Take a lead back out of its flaw's case
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+          - private-triage
+        note: Both internal-triage and private-triage on the product.
+    put:
+      description: |-
+        Makes a kept lead part of its flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+
+        Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
+
+        Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+      operationId: move-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Move a handed-off lead into its flaw's case
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+          - private-triage
+        note: Both internal-triage and private-triage on the product.
   /v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage:
     get:
       description: |-

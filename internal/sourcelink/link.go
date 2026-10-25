@@ -147,6 +147,19 @@ func (c Config) Snippets(path string) bool {
 	return keep
 }
 
+// DisclosesSnippets is whether the snippets under a path of a lead moved into
+// a case are disclosed with its flaw: the setting of the longest prefix that
+// states one, and off where none does.
+func (c Config) DisclosesSnippets(path string) bool {
+	best, disclose := -1, false
+	for _, p := range c.Paths {
+		if p.DisclosedSnippets != nil && under(path, p.Prefix) && len(p.Prefix) > best {
+			best, disclose = len(p.Prefix), *p.DisclosedSnippets
+		}
+	}
+	return disclose
+}
+
 // located is the repository a path is in, and where in it.
 type located struct {
 	module      string

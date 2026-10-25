@@ -21,6 +21,8 @@ const (
 	NotReproduced State = "not-reproduced"
 	// Fixed is a lead somebody stated was fixed.
 	Fixed State = "fixed"
+	// HandedOff is a confirmed lead recorded as a flaw here.
+	HandedOff State = "handed-off"
 	// Dismissed, NotSecurity and Confirmed are a lead a standing claim
 	// answers.
 	Dismissed   State = finding.OutcomeDismissed
@@ -30,7 +32,7 @@ const (
 
 // States are every state a lead is in, in the order a lead meets them.
 func States() []State {
-	return []State{Baseline, Open, NotReproduced, Fixed, Dismissed, NotSecurity, Confirmed}
+	return []State{Baseline, Open, NotReproduced, Fixed, Dismissed, NotSecurity, Confirmed, HandedOff}
 }
 
 // standingOutcome is the outcome of the claim standing at the place of the
@@ -54,9 +56,16 @@ var escalated = `(` + corroborated + `
 		WHERE "ip"."product_id" = ? AND ("ip"."prefix" = "ar"."path"
 		  OR SUBSTR("ar"."path", 1, "ip"."under_length") = "ip"."under")))`
 
+// handedOff is whether the lead under "f" in the product bound was handed off.
+var handedOff = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity")`
+
 // stateOf is the state of the finding under "f", whose sighting is under
 // "si" and result under "ar", in the product bound, as an expression, with
 // what it binds.
+//
+// A hand-off comes after a closure and before everything else: the lead is
+// its flaw's now, and whatever is said of the flaw is said there.
 //
 // A standing claim comes before a standing rule, which comes before absence:
 // a dismissed lead a run does not see stays dismissed and records the
@@ -65,9 +74,10 @@ var escalated = `(` + corroborated + `
 func stateOf(productID int64) (string, []any) {
 	return `CASE
 		WHEN "f"."closed_at" IS NOT NULL THEN '` + string(Fixed) + `'
+		WHEN ` + handedOff + ` THEN '` + string(HandedOff) + `'
 		WHEN ` + standingOutcome + ` IS NOT NULL THEN ` + standingOutcome + `
 		WHEN ` + ruled + ` THEN '` + string(Dismissed) + `'
 		WHEN "si"."absent_run_id" IS NOT NULL THEN '` + string(NotReproduced) + `'
 		WHEN "si"."baseline" = TRUE AND NOT ` + escalated + ` THEN '` + string(Baseline) + `'
-		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID, productID}
+		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID, productID, productID}
 }

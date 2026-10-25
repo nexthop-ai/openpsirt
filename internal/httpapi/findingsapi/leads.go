@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -50,6 +51,18 @@ type LeadEvidenceBody struct {
 	State     LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
 	Kin       []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
 	Decision  *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
+	Withheld  bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
+	Handoff   *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
+}
+
+// LeadHandoffBody is the flaw a lead was handed off as.
+type LeadHandoffBody struct {
+	Flaw         string `json:"flaw" doc:"The identifier the flaw was filed under"`
+	Moved        bool   `json:"moved" doc:"Whether the lead is part of the flaw's case. Otherwise it is kept internal and linked"`
+	Disclosed    bool   `json:"disclosed" doc:"Whether the flaw is disclosed, which ends moving the lead in or out"`
+	HandedBy     string `json:"handed_by" doc:"The person who handed it off, by sign-in identity"`
+	HandedByName string `json:"handed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	HandedAt     string `json:"handed_at" format:"date-time"`
 }
 
 // LeadKin is another lead on a build that is the same flaw as a lead, or
@@ -98,7 +111,9 @@ func registerLeads(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		// Resolved for somebody granted the lead alone as well: the names
+		// it sits at, and nothing past them.
+		named, err := core.LocatedForLead(ctx, in, subject, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +121,7 @@ func registerLeads(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		lead, err := finding.NewStore(in.DB.DB).LeadAt(ctx, subject, target.ID, input.Place)
+		lead, _, err := finding.NewStore(in.DB.DB).LeadOrStubAt(ctx, subject, target.ID, input.Place)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
@@ -119,7 +134,12 @@ func registerLeads(api huma.API, in core.Deps) {
 			At:   leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
-			Kin: make([]LeadKin, 0, len(evidence.Kin)),
+			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub,
+		}
+		if !evidence.Stub {
+			if body.Handoff, err = leadHandoff(ctx, in, subject, named.ProductID, lead.PlaceIdentity); err != nil {
+				return nil, core.WentWrong(in.Logger, "the flaw that lead was handed off as could not be read", err)
+			}
 		}
 		for _, k := range evidence.Kin {
 			one := LeadKin{Place: k.Place, Rule: k.Rule, Path: k.Path, Same: k.Same}
@@ -127,6 +147,10 @@ func registerLeads(api huma.API, in core.Deps) {
 				one.Line = *k.Line
 			}
 			body.Kin = append(body.Kin, one)
+		}
+		if evidence.Stub {
+			// The claims about a moved lead are part of the case.
+			return &struct{ Body LeadEvidenceBody }{Body: body}, nil
 		}
 		held, err := triage.NewStore(in.DB.DB).PreviouslyAt(ctx, subject, triage.Place{
 			ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID, PlaceIdentity: lead.PlaceIdentity,
@@ -160,4 +184,37 @@ func leadPlace(p analysis.Located) LeadPlace {
 		Link: p.Link.URL, Repository: p.Link.Repository, Within: p.Link.Within, Revision: p.Link.Revision,
 		Approximate: p.Link.Approximate, Patched: p.Link.Patched, Unlinked: p.Link.Unlinked,
 	}
+}
+
+// leadHandoff is the flaw a lead was handed off as, where the reader is on the
+// case: they read the product's undisclosed work, are on the flaw's case, or
+// were granted the lead. Nil for anybody else, and for a lead not handed off.
+func leadHandoff(ctx context.Context, in core.Deps, subject access.Subject, productID int64,
+	place string) (*LeadHandoffBody, error) {
+
+	h, err := finding.HandoffAt(ctx, in.DB.DB, productID, place)
+	if err != nil || h == nil {
+		return nil, err
+	}
+	if !subject.Reads(access.Private, productID) && !subject.OnCase(productID, h.VulnerabilityID) &&
+		!subject.OnLead(productID, place) {
+		return nil, nil
+	}
+	names, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, []int64{h.VulnerabilityID})
+	if err != nil {
+		return nil, err
+	}
+	disclosed, err := finding.AnyUndisclosed(ctx, in.DB.DB, productID, h.VulnerabilityID)
+	if err != nil {
+		return nil, err
+	}
+	who, err := core.WhoSigned(ctx, in.DB.DB, []int64{h.HandedBy})
+	if err != nil {
+		return nil, err
+	}
+	return &LeadHandoffBody{
+		Flaw: names[h.VulnerabilityID], Moved: h.Moved(), Disclosed: !disclosed,
+		HandedBy: who.Identity(h.HandedBy), HandedByName: who.Label(h.HandedBy),
+		HandedAt: core.Stamp(h.HandedAt),
+	}, nil
 }

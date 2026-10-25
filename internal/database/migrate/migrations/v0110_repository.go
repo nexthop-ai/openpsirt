@@ -54,6 +54,10 @@ func repositoryV0110(t *columnTypes) []string {
 			-- Whether source snippets under the prefix are kept. Null takes
 			-- the setting of the nearest prefix that states one.
 			"snippets"         ` + t.boolean + ` NULL,
+			-- Whether the snippets of a lead moved into a case are disclosed
+			-- with its flaw. Null takes the nearest prefix that states one,
+			-- and none stating one strips them.
+			"disclosed_snippets" ` + t.boolean + ` NULL,
 			CONSTRAINT "repository_path_prefix_unique" UNIQUE ("product_id", "prefix_identity"),
 			CONSTRAINT "repository_path_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,

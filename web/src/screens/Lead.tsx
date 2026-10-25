@@ -23,17 +23,20 @@ import { labeled } from "../ui/Outcome";
 import { linkable } from "../ui/addressable";
 import { on } from "../ui/when";
 import { LEAD_OUTCOMES, LEAD_REASONS, LEAD_TONES, located, reasonSaid, stateSaid } from "./leads";
+import { Handoff } from "./LeadHandoff";
 
 // One lead on one build: what the analyzer said, the path it took, the leads
 // that are the same flaw, and where the lead stands. Somebody who triages
 // internal material judges it here, pulls it out of the baseline, or closes it
-// as fixed once a run no longer sees it.
+// as fixed once a run no longer sees it, and hands a confirmed one off as a
+// flaw.
 export function Lead() {
   const { product = "", stream = "", variant = "", place = "" } = useParams();
   const build: Build = { product, stream, variant };
   const lead = useLead(build, place);
   const may = mayOf(useWho().data, product);
   const triages = !!may?.triages_internal;
+  const handsOff = triages && !!may?.may_hide;
 
   if (lead.isPending) return <Loading />;
   if (lead.isError) return <Failed error={lead.error} what="The lead could not be read." />;
@@ -56,6 +59,9 @@ export function Lead() {
       <div className="card">
         <h3>Result</h3>
         <Place place={at} />
+        {evidence.withheld && (
+          <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
+        )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
           {evidence.not_seen && ` · not seen ${on(evidence.not_seen)}`}
@@ -99,31 +105,35 @@ export function Lead() {
 
       <Kin build={build} evidence={evidence} />
 
-      <div className="card">
-        <h3>Decision</h3>
-        {evidence.decision ? (
-          <p>
-            {labeled(evidence.decision.outcome)}
-            {evidence.decision.reason && ` · ${reasonSaid(evidence.decision.reason)}`}
-            {evidence.decision.needs_approval && evidence.decision.state === "proposed" && (
-              <span className="state waiting"> Waiting for approval</span>
-            )}{" "}
-            {evidence.decision.claim_id !== undefined && (
-              <Link to={claimAt(evidence.decision.claim_id)}>
-                Claim {evidence.decision.claim_id}
-              </Link>
-            )}
-          </p>
-        ) : triages && evidence.open ? (
-          <DecideForm build={build} place={place} />
-        ) : (
-          <p className="hint">None.</p>
-        )}
-        {triages && evidence.state === "baseline" && <Escalate product={product} place={place} />}
-        {triages && evidence.state === "not-reproduced" && evidence.open && (
-          <FixForm build={build} place={place} />
-        )}
-      </div>
+      <Handoff build={build} place={place} evidence={evidence} handsOff={handsOff} />
+
+      {!evidence.withheld && evidence.state !== "handed-off" && (
+        <div className="card">
+          <h3>Decision</h3>
+          {evidence.decision ? (
+            <p>
+              {labeled(evidence.decision.outcome)}
+              {evidence.decision.reason && ` · ${reasonSaid(evidence.decision.reason)}`}
+              {evidence.decision.needs_approval && evidence.decision.state === "proposed" && (
+                <span className="state waiting"> Waiting for approval</span>
+              )}{" "}
+              {evidence.decision.claim_id !== undefined && (
+                <Link to={claimAt(evidence.decision.claim_id)}>
+                  Claim {evidence.decision.claim_id}
+                </Link>
+              )}
+            </p>
+          ) : triages && evidence.open ? (
+            <DecideForm build={build} place={place} />
+          ) : (
+            <p className="hint">None.</p>
+          )}
+          {triages && evidence.state === "baseline" && <Escalate product={product} place={place} />}
+          {triages && evidence.state === "not-reproduced" && evidence.open && (
+            <FixForm build={build} place={place} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

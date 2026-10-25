@@ -336,7 +336,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	if err != nil {
 		return "", err
 	}
-	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, from, components, inventory.root)
+	opened, inBaseline, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
 	}

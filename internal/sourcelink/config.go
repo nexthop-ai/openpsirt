@@ -82,6 +82,10 @@ type Path struct {
 	// Snippets is whether source under the prefix is kept, or nil where the
 	// nearest prefix stating it decides.
 	Snippets *bool `bun:"snippets"`
+	// DisclosedSnippets is whether the snippets of a lead moved into a case
+	// are disclosed with its flaw, or nil where the nearest prefix stating it
+	// decides.
+	DisclosedSnippets *bool `bun:"disclosed_snippets"`
 }
 
 // Config is what a product says about its repositories.
@@ -165,8 +169,9 @@ func (c *Config) Valid() error {
 			return refusal.Errorf("path %q: a repository and its branch are named together or not at all", prefix)
 		case p.Remote != "" && Normalize(p.Remote) == "":
 			return refusal.Errorf("path %q: %q names no repository", prefix, p.Remote)
-		case p.Remote == "" && p.Snippets == nil:
-			return refusal.Errorf("path %q says nothing: name a repository, or whether snippets are kept", prefix)
+		case p.Remote == "" && p.Snippets == nil && p.DisclosedSnippets == nil:
+			return refusal.Errorf("path %q says nothing: name a repository, whether snippets are kept, "+
+				"or whether they are disclosed", prefix)
 		case strings.ContainsAny(p.Branch, " \t\n?#\\"):
 			return refusal.Errorf("path %q: %q is not a branch name", prefix, p.Branch)
 		}

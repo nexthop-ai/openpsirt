@@ -33,6 +33,9 @@ type RepositoryPath struct {
 	Remote   string `json:"remote,omitempty" doc:"The repository the code under the prefix is, where an upload names none. Sent with branch"`
 	Branch   string `json:"branch,omitempty" doc:"The branch links into that repository open on. Such links are approximate"`
 	Snippets *bool  `json:"snippets,omitempty" doc:"Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it is off"`
+	// DisclosedSnippets is apart from Snippets: keeping source to read here
+	// and publishing it beside an advisory are two decisions.
+	DisclosedSnippets *bool `json:"disclosed_snippets,omitempty" doc:"Whether the snippets of a lead moved into a case are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure"`
 }
 
 // RepositoriesBody is what a product says about its repositories.
@@ -129,7 +132,8 @@ func repositoriesStated(b RepositoriesBody) sourcelink.Config {
 		})
 	}
 	for _, p := range b.Paths {
-		c.Paths = append(c.Paths, sourcelink.Path{Prefix: p.Prefix, Remote: p.Remote, Branch: p.Branch, Snippets: p.Snippets})
+		c.Paths = append(c.Paths, sourcelink.Path{Prefix: p.Prefix, Remote: p.Remote, Branch: p.Branch,
+			Snippets: p.Snippets, DisclosedSnippets: p.DisclosedSnippets})
 	}
 	return c
 }
@@ -144,7 +148,8 @@ func repositoriesSaid(c sourcelink.Config) RepositoriesBody {
 		})
 	}
 	for _, p := range c.Paths {
-		out.Paths = append(out.Paths, RepositoryPath{Prefix: p.Prefix, Remote: p.Remote, Branch: p.Branch, Snippets: p.Snippets})
+		out.Paths = append(out.Paths, RepositoryPath{Prefix: p.Prefix, Remote: p.Remote, Branch: p.Branch,
+			Snippets: p.Snippets, DisclosedSnippets: p.DisclosedSnippets})
 	}
 	return out
 }

@@ -4746,6 +4746,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List who has been granted a handed-off lead
+         * @description Everybody granted this one handed-off lead in this product, oldest first.
+         *
+         *     A grant reads the lead's evidence and nothing else of the product, while the lead is internal or private.
+         *
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         */
+        get: operations["list-lead-collaborators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant somebody a handed-off lead
+         * @description Grants one person this one handed-off lead in this product, to read its evidence, without granting them anything else of the product.
+         *
+         *     It is an access change: it lands in the administration trail, and they are told in the notification area inside the application.
+         *
+         *     Adding somebody who already holds it succeeds and changes nothing.
+         *
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         */
+        put: operations["add-lead-collaborator"];
+        post?: never;
+        /**
+         * Withdraw somebody's grant of a handed-off lead
+         * @description Withdraws the grant. The record of it is kept.
+         *
+         *     Withdrawing a grant somebody does not hold answers 404 and records nothing.
+         *
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         */
+        delete: operations["remove-lead-collaborator"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision": {
         parameters: {
             query?: never;
@@ -4761,7 +4819,7 @@ export interface paths {
          *
          *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
          *
-         *     The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again.
+         *     The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again. A lead handed off as a flaw is refused with 409, because its flaw is judged instead.
          *
          *     Requires: internal-triage on the product
          */
@@ -4791,6 +4849,74 @@ export interface paths {
          */
         post: operations["fix-lead"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get what a lead's hand-off is offered
+         * @description Returns what recording a confirmed lead as a flaw here is offered: the components it may be recorded against, most likely first, the builds it was seen in, and what moving it into the flaw's case would disclose with the flaw.
+         *
+         *     A suggestion lists the builds the lead was seen in that lack it, since recording the flaw against those is refused, and the builds holding it that the lead's series never analyzed.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        get: operations["get-lead-handoff"];
+        put?: never;
+        /**
+         * Hand off a confirmed lead as a flaw
+         * @description Records a confirmed lead as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the lead to it.
+         *
+         *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
+         *
+         *     `move` makes the lead part of the flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. Left out, the lead is kept internal and linked.
+         *
+         *     A lead nobody confirmed, or one already handed off, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        post: operations["hand-off-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a handed-off lead into its flaw's case
+         * @description Makes a kept lead part of its flaw's case: it becomes private, internal readers keep only its state, rule, location and sightings, and it is disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+         *
+         *     Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        put: operations["move-lead"];
+        post?: never;
+        /**
+         * Take a lead back out of its flaw's case
+         * @description Makes a moved lead internal again while its flaw is undisclosed, with the claims about it. It stays linked to the flaw.
+         *
+         *     Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        delete: operations["unmove-lead"];
         options?: never;
         head?: never;
         patch?: never;
@@ -7203,6 +7329,16 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["AttachmentBody"][] | null;
         };
+        AuthorBody: {
+            identity: string;
+            /** @description Their display name, where it differs from their identity */
+            name?: string;
+            /**
+             * Format: int64
+             * @description The number of revisions of reasoning and comments they wrote on claims about the lead
+             */
+            writings: number;
+        };
         BecameBody: {
             /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
@@ -8367,6 +8503,27 @@ export interface components {
             /** @description The reason the issue is being disclosed */
             reason: string;
         };
+        DisclosesBody: {
+            /** @description Everybody who wrote reasoning or a comment on a claim about the lead */
+            authors: components["schemas"]["AuthorBody"][] | null;
+            /**
+             * Format: int64
+             * @description The number of messages the analyzer wrote at those paths
+             */
+            messages: number;
+            /** @description Every path the lead names */
+            paths: string[] | null;
+            /**
+             * Format: int64
+             * @description The number of source snippets disclosed with the flaw
+             */
+            snippets: number;
+            /**
+             * Format: int64
+             * @description The number of source snippets removed at disclosure, under paths the product does not disclose snippets for
+             */
+            stripped: number;
+        };
         DisposedBody: {
             /** @description Whether the agreement was carried forward from an earlier claim rather than given for this one */
             agreement_carried?: boolean;
@@ -9276,6 +9433,77 @@ export interface components {
             /** Format: int64 */
             moved: number;
         };
+        "Hand-off-leadRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Hand-off-leadRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Every build the flaw is recorded against */
+            builds: components["schemas"]["LeadBuild"][] | null;
+            /** @description The component that carries it. Omit for the build itself */
+            component?: string;
+            /** @description The ecosystem, where two components share the name */
+            ecosystem?: string;
+            /** @description Whether the lead moves into the flaw's case. Kept internal by default */
+            move?: boolean;
+            /** @description The namespace, where two share a name and an ecosystem */
+            namespace?: string;
+            /**
+             * @description The severity. Worked out from the vector where one is given
+             * @enum {string}
+             */
+            severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
+            /** @description The flaw, in your own words */
+            summary: string;
+            /** @description A CVSS 3.0 or 3.1 base vector */
+            vector?: string;
+            /** @description The kind of flaw, as CWE- and a number, the root cause first */
+            weaknesses?: string[] | null;
+        };
+        HandedOffBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandedOffBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The number of builds it was recorded against
+             */
+            builds: number;
+            /** @description The component in the build that carries it */
+            component: string;
+            /** @description The identifier the flaw was filed under */
+            identifier: string;
+            /** @description Whether the lead moved into the flaw's case */
+            moved: boolean;
+            /**
+             * Format: int64
+             * @description The number of findings of the flaw that opened
+             */
+            places: number;
+        };
+        HandoffOfferBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/HandoffOfferBody.json
+             */
+            readonly $schema?: string;
+            /** @description What moving the lead into the flaw's case discloses when the flaw is disclosed */
+            discloses: components["schemas"]["DisclosesBody"];
+            /** @description The path a confirmed component is remembered for: the repository the lead is in, or its directory */
+            prefix?: string;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /** @description Every build the lead was seen in, which the flaw is proposed against */
+            seen: components["schemas"]["LeadBuild"][] | null;
+            /** @description The components offered, most likely first. The build itself is always last */
+            suggestions: components["schemas"]["SuggestionBody"][] | null;
+        };
         HeldBody: {
             /** @description Whether this grants anything right now */
             effective: boolean;
@@ -9740,6 +9968,12 @@ export interface components {
             version?: string;
             vulnerability: string;
         };
+        LeadBuild: {
+            /** @description A branch or a tag */
+            stream: string;
+            /** @description The way that line is built */
+            variant: string;
+        };
         LeadDecisionBody: {
             /**
              * Format: uri
@@ -9786,6 +10020,8 @@ export interface components {
             compare?: string;
             /** @description The live claim at the lead, agreed to or waiting for a second person. Absent where there is none */
             decision?: components["schemas"]["DecisionBody"];
+            /** @description The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead */
+            handoff?: components["schemas"]["LeadHandoffBody"];
             /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
             kin: components["schemas"]["LeadKin"][] | null;
             /**
@@ -9808,11 +10044,13 @@ export interface components {
              * @description Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to
              * @enum {string}
              */
-            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
+            /** @description Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered */
+            withheld?: boolean;
         };
         LeadFixedBody: {
             /**
@@ -9826,6 +10064,20 @@ export interface components {
              * @description When it was closed
              */
             at: string;
+        };
+        LeadHandoffBody: {
+            /** @description Whether the flaw is disclosed, which ends moving the lead in or out */
+            disclosed: boolean;
+            /** @description The identifier the flaw was filed under */
+            flaw: string;
+            /** Format: date-time */
+            handed_at: string;
+            /** @description The person who handed it off, by sign-in identity */
+            handed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            handed_by_name?: string;
+            /** @description Whether the lead is part of the flaw's case. Otherwise it is kept internal and linked */
+            moved: boolean;
         };
         LeadKin: {
             /**
@@ -9897,7 +10149,7 @@ export interface components {
              * @description The line the result starts at
              */
             line?: number;
-            /** @description What the analyzer says */
+            /** @description What the analyzer says. Empty where the lead is withheld */
             message: string;
             /**
              * Format: date
@@ -9914,11 +10166,13 @@ export interface components {
              * @description Where the lead stands on that build
              * @enum {string}
              */
-            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The branch or tag of the newest build the lead is listed on, to link to */
             stream: string;
             /** @description The variant of that build */
             variant: string;
+            /** @description Whether the lead is part of a case you are not on, so what the analyzer said is not answered */
+            withheld?: boolean;
         };
         LeadRuleBody: {
             /**
@@ -12401,6 +12655,8 @@ export interface components {
         RepositoryPath: {
             /** @description The branch links into that repository open on. Such links are approximate */
             branch?: string;
+            /** @description Whether the snippets of a lead moved into a case are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure */
+            disclosed_snippets?: boolean;
             /** @description A path from the top of the checkout. Empty is the whole product */
             prefix: string;
             /** @description The repository the code under the prefix is, where an upload names none. Sent with branch */
@@ -13380,6 +13636,23 @@ export interface components {
             released_on?: string;
             /** @description Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
             retired?: boolean;
+        };
+        SuggestionBody: {
+            /** @description The component, as the builds name it. Absent for the build itself */
+            component?: string;
+            /** @description Its ecosystem, where its package identifier states one */
+            ecosystem?: string;
+            /**
+             * @description Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself
+             * @enum {string}
+             */
+            from: "confirmed" | "placed" | "resembles" | "build";
+            /** @description The builds the lead was seen in that hold no such component. Recording the flaw against them is refused */
+            lacking: components["schemas"]["LeadBuild"][] | null;
+            /** @description Its namespace, where its package identifier states one */
+            namespace?: string;
+            /** @description The builds holding the component that the lead's series never analyzed */
+            unanalyzed: components["schemas"]["LeadBuild"][] | null;
         };
         TLP: {
             label: string;
@@ -19782,7 +20055,7 @@ export interface operations {
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
                 /** @description List the leads in one state. Left out, the queue */
-                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
                 /** @description The number returned */
                 limit?: number;
                 /** @description The number skipped */
@@ -21799,6 +22072,109 @@ export interface operations {
             };
         };
     };
+    "list-lead-collaborators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyCollaboratorBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-lead-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-lead-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "decide-lead": {
         parameters: {
             query?: never;
@@ -21865,6 +22241,146 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LeadFixedBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-lead-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOfferBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "hand-off-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Hand-off-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandedOffBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "move-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "unmove-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

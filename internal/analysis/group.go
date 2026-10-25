@@ -134,6 +134,7 @@ func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, product
 			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionFiledAt("dc", "f")+`)`,
 			productID).
 		Where(`NOT `+ruled, productID).
+		Where(`NOT `+handedOff, productID).
 		OrderExpr(`"f"."place_identity" ASC`).
 		Scan(ctx, &out); err != nil {
 		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)
