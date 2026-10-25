@@ -228,14 +228,11 @@ func registerImportantPaths(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if !subject.Reads(access.Internal, product.ID) {
-			// The product resolved, so the caller can see it: refused for
-			// the role.
-			return nil, huma.Error403Forbidden("not authorized")
-		}
-		held, err := analysis.ImportantPaths(ctx, in.DB.DB, product.ID)
+		// The product resolved, so the caller can see it: a refusal is for
+		// the role.
+		held, err := analysis.ImportantPaths(ctx, in.DB.DB, subject, product.ID)
 		if err != nil {
-			return nil, core.WentWrong(in.Logger, "the important paths could not be read", err)
+			return nil, core.Asked(in.Logger, err)
 		}
 		return &struct{ Body ImportantPathsBody }{Body: ImportantPathsBody{Paths: held}}, nil
 	})
@@ -257,28 +254,21 @@ func registerImportantPaths(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		named, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
-		if err != nil {
+		if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Product); err != nil {
 			return nil, err
-		}
-		if !subject.Holds(access.InternalTriage, named.ID) {
-			return nil, huma.Error403Forbidden("not authorized")
-		}
-		paths, err := analysis.CleanImportantPaths(input.Body.Paths)
-		if err != nil {
-			return nil, huma.Error422UnprocessableEntity(err.Error())
 		}
 		return &struct{}{}, core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
 			product, err := catalog.NewStore(tx).ProductByName(ctx, input.Product)
 			if err != nil {
 				return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)
 			}
-			was, err := analysis.ImportantPaths(ctx, tx, product.ID)
+			was, err := analysis.ImportantPaths(ctx, tx, subject, product.ID)
 			if err != nil {
-				return core.WentWrong(in.Logger, "the important paths could not be read", err)
+				return core.Asked(in.Logger, err)
 			}
-			if err := analysis.ReplaceImportantPaths(ctx, tx, product.ID, paths); err != nil {
-				return core.WentWrong(in.Logger, "the important paths could not be recorded", err)
+			paths, err := analysis.ReplaceImportantPaths(ctx, tx, subject, product.ID, input.Body.Paths)
+			if err != nil {
+				return core.Asked(in.Logger, err)
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, "important paths of "+product.Name,
 				trail.Said(strings.Join(was, ", "), true), trail.Said(strings.Join(paths, ", "), true)); err != nil {

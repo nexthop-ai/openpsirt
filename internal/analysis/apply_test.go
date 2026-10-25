@@ -1072,3 +1072,24 @@ func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
 		}
 	})
 }
+
+func TestAProductsImportantPathsAreReadAndSetOnlyWhereTheSubjectMay(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		public := w.holding(t, "public", access.PrivateTriage)
+		reader := w.holding(t, "analyst", access.InternalRead)
+		triager := w.holding(t, "lead", access.InternalTriage)
+		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, reader, w.Product.ID, []string{"src"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody reading internal findings set the important paths: %v", err)
+		}
+		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, triager, w.Product.ID, []string{"src"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ImportantPaths(ctx, w.DB.DB, public, w.Product.ID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody reading no internal findings read the important paths: %v", err)
+		}
+		if got, err := ImportantPaths(ctx, w.DB.DB, reader, w.Product.ID); err != nil || len(got) != 1 || got[0] != "src" {
+			t.Errorf("an internal reader read %v, %v; want the path set", got, err)
+		}
+	})
+}

@@ -108,7 +108,12 @@ func Escalate(ctx context.Context, db bun.IDB, subject access.Subject, productID
 }
 
 // ImportantPaths is the path prefixes a product marks important, in order.
-func ImportantPaths(ctx context.Context, db bun.IDB, productID int64) ([]string, error) {
+// The subject has to read internal findings in the product: the paths say
+// which leads are in its queue.
+func ImportantPaths(ctx context.Context, db bun.IDB, subject access.Subject, productID int64) ([]string, error) {
+	if !subject.Reads(access.Internal, productID) {
+		return nil, access.Denied(fmt.Sprintf("read the important paths of product %d", productID))
+	}
 	var rows []importantPath
 	if err := db.NewSelect().Model(&rows).
 		Where(`"ip"."product_id" = ?`, productID).
@@ -123,11 +128,11 @@ func ImportantPaths(ctx context.Context, db bun.IDB, productID int64) ([]string,
 	return out, nil
 }
 
-// CleanImportantPaths is a product's important paths as they are stored:
+// cleanImportantPaths is a product's important paths as they are stored:
 // each from the top of the checkout with no leading or trailing slash. A
 // path that is empty, climbs out of the checkout, or is named twice is
 // refused, naming it.
-func CleanImportantPaths(paths []string) ([]string, error) {
+func cleanImportantPaths(paths []string) ([]string, error) {
 	if len(paths) > MaxImportantPaths {
 		return nil, refusal.Errorf("%d important paths; a product marks at most %d", len(paths), MaxImportantPaths)
 	}
@@ -151,14 +156,25 @@ func CleanImportantPaths(paths []string) ([]string, error) {
 }
 
 // ReplaceImportantPaths replaces the path prefixes a product marks
-// important with paths, as CleanImportantPaths returns them.
-func ReplaceImportantPaths(ctx context.Context, tx bun.IDB, productID int64, paths []string) error {
+// important with those asked, and returns them as they are stored. The
+// subject has to triage internal findings in the product, and is authorized
+// before a path is read.
+func ReplaceImportantPaths(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64,
+	asked []string) ([]string, error) {
+
+	if !subject.Triages(access.Internal, productID) {
+		return nil, access.Denied(fmt.Sprintf("set the important paths of product %d", productID))
+	}
+	paths, err := cleanImportantPaths(asked)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.NewDelete().Model((*importantPath)(nil)).
 		Where(`"product_id" = ?`, productID).Exec(ctx); err != nil {
-		return fmt.Errorf("clear the important paths of product %d: %w", productID, err)
+		return nil, fmt.Errorf("clear the important paths of product %d: %w", productID, err)
 	}
 	if len(paths) == 0 {
-		return nil
+		return paths, nil
 	}
 	rows := make([]importantPath, 0, len(paths))
 	for _, p := range paths {
@@ -169,7 +185,7 @@ func ReplaceImportantPaths(ctx context.Context, tx bun.IDB, productID int64, pat
 		})
 	}
 	if err := database.InBatches(ctx, tx, rows); err != nil {
-		return fmt.Errorf("record the important paths of product %d: %w", productID, err)
+		return nil, fmt.Errorf("record the important paths of product %d: %w", productID, err)
 	}
-	return nil
+	return paths, nil
 }
