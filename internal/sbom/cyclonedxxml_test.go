@@ -95,6 +95,27 @@ func TestEachEncodingOfOneProducersInventoryReadsTheSame(t *testing.T) {
 				if !found {
 					t.Errorf("no %s was read from the XML", name)
 				}
+				// And its XML leaves out the two repository references whose
+				// address holds a Maven property nothing expanded.
+				for name, repository := range map[string]string{
+					"httpclient": "https://github.com/apache/httpcomponents-client/tree/${project.scm.tag}",
+					"httpcore":   "https://github.com/apache/httpcomponents-core/tree/${project.scm.tag}",
+				} {
+					found := false
+					eachDescribed(xml, func(d *graph.Described) {
+						if d.Name != name {
+							return
+						}
+						found = true
+						if d.Repository != "" {
+							t.Errorf("%s states the repository %q in XML, which the published file does not", name, d.Repository)
+						}
+						d.Repository = repository
+					})
+					if !found {
+						t.Errorf("no %s was read from the XML", name)
+					}
+				}
 			}},
 		{json: "image.cdx.json", xml: "image.cdx.xml"},
 	} {
@@ -134,8 +155,8 @@ func TestEachEncodingOfOneProducersInventoryReadsTheSame(t *testing.T) {
 func TestWhatNoFixtureCarriesReadsTheSameInEitherEncoding(t *testing.T) {
 	// The spellings neither fixture pair has: a license expression, a license
 	// marked as concluded either way the format allows, components nested in
-	// a component and in the root, both ways of naming a supplier, and a
-	// scope.
+	// a component and in the root, both ways of naming a supplier, a scope,
+	// and a repository named among other references.
 	const json = `{"bomFormat": "CycloneDX", "specVersion": "1.6",
   "metadata": {"component": {"bom-ref": "root", "name": "product", "version": "1.0",
     "components": [{"bom-ref": "agent", "name": "agent", "version": "2.0", "purl": "pkg:generic/agent@2.0"}]}},
@@ -147,6 +168,8 @@ func TestWhatNoFixtureCarriesReadsTheSameInEitherEncoding(t *testing.T) {
        "licenses": [{"license": {"name": "OpenSSL License", "acknowledgement": "concluded"}}, {"license": {"id": "Apache-2.0"}}]}]},
     {"bom-ref": "b", "name": "zlib", "version": "1.3", "purl": "pkg:deb/debian/zlib1g@1.3",
      "supplier": {"name": "zlib project"}, "publisher": "someone else", "scope": "excluded",
+     "externalReferences": [{"type": "website", "url": "https://zlib.net"},
+       {"url": "https://github.com/madler/zlib", "type": "vcs"}, {"type": "vcs", "url": "https://example.com/mirror"}],
      "licenses": [{"expression": "Zlib", "acknowledgement": "concluded"}]}
   ],
   "dependencies": [{"ref": "root", "dependsOn": ["a", "b"]}]
@@ -175,6 +198,11 @@ func TestWhatNoFixtureCarriesReadsTheSameInEitherEncoding(t *testing.T) {
       <name>zlib</name><version>1.3</version><scope>excluded</scope>
       <licenses><expression acknowledgement="concluded">Zlib</expression></licenses>
       <purl>pkg:deb/debian/zlib1g@1.3</purl>
+      <externalReferences>
+        <reference type="website"><url>https://zlib.net</url></reference>
+        <reference type="vcs"><url>https://github.com/madler/zlib</url></reference>
+        <reference type="vcs"><url>https://example.com/mirror</url></reference>
+      </externalReferences>
     </component>
   </components>
   <dependencies><dependency ref="root"><dependency ref="a"/><dependency ref="b"/></dependency></dependencies>
@@ -187,13 +215,13 @@ func TestWhatNoFixtureCarriesReadsTheSameInEitherEncoding(t *testing.T) {
 	// nothing does not pass.
 	byName := map[string]string{}
 	for _, c := range second.Components {
-		byName[c.Name] = c.License + " / " + c.Supplier
+		byName[c.Name] = c.License + " / " + c.Supplier + " / " + c.Repository
 	}
 	for name, want := range map[string]string{
-		"openssl":   "Apache-2.0 OR MIT / Debian",
-		"libcrypto": "Apache-2.0 / ",
-		"zlib":      "Zlib / zlib project",
-		"agent":     " / ",
+		"openssl":   "Apache-2.0 OR MIT / Debian / ",
+		"libcrypto": "Apache-2.0 /  / ",
+		"zlib":      "Zlib / zlib project / https://github.com/madler/zlib",
+		"agent":     " /  / ",
 	} {
 		if byName[name] != want {
 			t.Errorf("%s reads as %q, want %q", name, byName[name], want)

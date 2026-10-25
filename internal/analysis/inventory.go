@@ -82,19 +82,20 @@ func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed
 	var nodes []struct {
 		ComponentID int64  `bun:"component_id"`
 		Purl        string `bun:"purl"`
+		Repository  string `bun:"repository"`
 	}
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`"n"."component_id", "n"."purl"`).
+		ColumnExpr(`"n"."component_id", "n"."purl", "n"."repository"`).
 		Where(`"n"."target_id" = ?`, targetID).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`"n"."purl" IS NOT NULL`).
+		Where(`("n"."purl" IS NOT NULL OR "n"."repository" IS NOT NULL)`).
 		OrderExpr(`"n"."id" ASC`).
 		Scan(ctx, &nodes); err != nil {
 		return nil, fmt.Errorf("read the build's components: %w", err)
 	}
 	for _, n := range nodes {
-		remote := remoteOfPurl(n.Purl)
+		remote := remoteOf(n.Purl, n.Repository)
 		if !wanted[remote] {
 			continue
 		}
@@ -111,6 +112,16 @@ var hosts = map[string]string{
 	"github":    "github.com",
 	"gitlab":    "gitlab.com",
 	"bitbucket": "bitbucket.org",
+}
+
+// remoteOf is the repository a component is built from, normalized: the one
+// its package identifier names, and otherwise the version-control reference
+// the inventory states beside it.
+func remoteOf(purl, repository string) string {
+	if remote := remoteOfPurl(purl); remote != "" {
+		return remote
+	}
+	return sourcelink.Normalize(repository)
 }
 
 // remoteOfPurl is the repository a package identifier says the package is

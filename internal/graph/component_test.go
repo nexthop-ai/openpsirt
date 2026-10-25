@@ -505,3 +505,40 @@ func TestOneProductsScanLeavesAnotherProductsScannerInputAlone(t *testing.T) {
 		}
 	})
 }
+
+func TestABuildHoldsTheRepositoryItsNewestInventoryStates(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		holding := func(d graph.Described) graph.Snapshot {
+			return graph.Snapshot{
+				Root:         root,
+				Components:   []graph.Described{d},
+				Dependencies: []graph.Dependency{{Parent: root, Child: d}},
+			}
+		}
+		held := func() []string {
+			t.Helper()
+			var got []string
+			if err := f.db.NewSelect().TableExpr(`"graph_node" AS "n"`).ColumnExpr(`"n"."repository"`).
+				Where(`"n"."target_id" = ?`, f.targetID).Where(`"n"."closed_scan_id" IS NULL`).
+				Where(`"n"."repository" IS NOT NULL`).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		bare := graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr", Version: "10.2"}
+		stating := bare
+		stating.Repository = "https://github.com/FRRouting/frr"
+		for _, step := range []struct {
+			described graph.Described
+			want      int
+		}{{bare, 0}, {stating, 1}, {bare, 0}} {
+			if _, err := fixtures.ApplyGraph(ctx, f.db, f.targetID, f.scan(t), holding(step.described)); err != nil {
+				t.Fatal(err)
+			}
+			if got := held(); len(got) != step.want {
+				t.Errorf("after an inventory stating %q the build holds %q", step.described.Repository, got)
+			}
+		}
+	})
+}

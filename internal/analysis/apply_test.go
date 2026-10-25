@@ -135,6 +135,13 @@ func eachWorld(t *testing.T, fn func(t *testing.T, w *world)) {
 // built from its repository.
 func (w *world) inventory(t *testing.T, targetID int64) {
 	t.Helper()
+	w.inventoryWith(t, targetID, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr", Version: "10.2"})
+}
+
+// inventoryWith records a read inventory for a build: the product, and FRR
+// as the inventory describes it.
+func (w *world) inventoryWith(t *testing.T, targetID int64, frr graph.Described) {
+	t.Helper()
 	ctx := t.Context()
 	scans := ingest.NewStore(w.DB.DB)
 	scan, outcome, err := scans.Record(ctx, ingest.Arriving{
@@ -145,7 +152,6 @@ func (w *world) inventory(t *testing.T, targetID int64) {
 		t.Fatalf("record the inventory: %v %v", outcome, err)
 	}
 	root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
-	frr := graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr", Version: "10.2"}
 	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, targetID, scan.ID, graph.Snapshot{
 		Root: root, Components: []graph.Described{frr},
 		Dependencies: []graph.Dependency{{Parent: root, Child: frr}},
@@ -482,6 +488,30 @@ func TestARunHeldInAShapeThisReleaseDoesNotReadFailsOnceItsBuildIsInventoried(t 
 		run, err = store.ByID(t.Context(), run.ID)
 		if err != nil || !strings.Contains(run.Failure, "could not be read") {
 			t.Errorf("failure %q, %v; want the placed results could not be read", run.Failure, err)
+		}
+	})
+}
+
+func TestAResultIsPlacedOnTheComponentWhoseReferenceNamesItsRepository(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		withCredential := graph.Described{Purl: "pkg:deb/debian/frr@10.2", Name: "frr", Version: "10.2", //nolint:gosec // G101: a placeholder credential to be removed
+			Repository: "https://ci:SECRET@github.com/FRRouting/frr.git?ref=main"}
+		w.inventoryWith(t, w.Target.ID, withCredential)
+		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		leads := w.leads(t, w.Target.ID)
+		if len(leads) != 1 || leads[0].ComponentID != w.frr {
+			t.Fatalf("findings %+v; want one on FRR (%d)", leads, w.frr)
+		}
+		var held []string
+		if err := w.DB.DB.NewSelect().TableExpr(`"graph_node" AS "n"`).ColumnExpr(`"n"."repository"`).
+			Where(`"n"."repository" IS NOT NULL`).Scan(t.Context(), &held); err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 || held[0] != "https://github.com/FRRouting/frr.git" {
+			t.Errorf("the build holds %q; want the repository without its credential or query", held)
 		}
 	})
 }

@@ -248,6 +248,7 @@ A lead is one component at one place (REQ-17).
 |---|---|
 | A result in a repository the run names is placed on the build's component built from that repository | The innermost repository holding its path |
 | A component is built from a repository where its package identifier names it: the `github`, `gitlab` and `bitbucket` types by namespace and name, and any type by a `vcs_url` qualifier | The inventory is the only statement of which component a directory became |
+| A component whose identifier names no repository is built from the one its inventory states in a CycloneDX external reference of type `vcs`, the first where it states several | A distribution package's identifier names no repository. sonic-buildimage states one this way on packages whose identifier is `pkg:deb` |
 | Repository addresses compare as host, owner and name, in lower case, without scheme, credentials, port, revision or `.git` | A remote written for SSH and an identifier written for HTTPS name one repository |
 | A result in no repository the inventory names is placed on the build itself | Every build has a root |
 | The inventory placed against is the build's newest that has been read | A run arriving before its inventory waits for it |
@@ -476,6 +477,7 @@ it is about.
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A dismissal asked to be reaffirmed after a probable pairing, and a re-baseline's probable pairings listed together | Not built. How each lead was paired and whether a run was a re-baseline are recorded; triage of a lead is not built |
 | Third-party paths | Recorded on the run and read by nothing |
+| A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
 | Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |

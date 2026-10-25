@@ -36,6 +36,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - An analyzer's result records where it is and what it said.
 //   - A product records the repository hosts its links may point at, and
 //     what it says about the code under a path prefix.
+//   - A build's node records the repository the build stated a component is
+//     built from.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
@@ -46,7 +48,7 @@ func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 		return err
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
-		issueKindV0110, createSeriesV0110, createRepositoryV0110,
+		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

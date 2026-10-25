@@ -163,6 +163,8 @@ func (c *reader) xmlComponent(el xml.StartElement) (graph.Described, string, []g
 			return c.x.into(&s.scope)
 		case "pedigree":
 			return c.xmlPedigree(&s.described, &s.carried)
+		case "externalReferences":
+			return c.xmlRepository(&s.described.Repository)
 		case "components":
 			members, err := c.xmlComponents()
 			if err != nil {
@@ -178,6 +180,29 @@ func (c *reader) xmlComponent(el xml.StartElement) (graph.Described, string, []g
 		return graph.Described{}, "", nil, err
 	}
 	return c.settle(s)
+}
+
+// xmlRepository reads the first reference of type vcs, as cdxRepository
+// does. The type is an attribute and the address an element.
+func (c *reader) xmlRepository(dst *string) error {
+	return c.x.children(func(el xml.StartElement) error {
+		if el.Name.Local != "reference" {
+			return c.x.skip()
+		}
+		var address string
+		if err := c.x.children(func(field xml.StartElement) error {
+			if field.Name.Local == "url" {
+				return c.x.into(&address)
+			}
+			return c.x.skip()
+		}); err != nil {
+			return err
+		}
+		if *dst == "" && attr(el, "type") == "vcs" {
+			*dst = strings.TrimSpace(address)
+		}
+		return nil
+	})
 }
 
 // xmlLicenses reads the licenses a component states: a license element naming

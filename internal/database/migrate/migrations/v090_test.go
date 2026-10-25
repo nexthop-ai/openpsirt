@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // v090 is the migration v0.9.0 carries v0.8.0's schema across with.
@@ -262,7 +263,16 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 			}
 		})
 
+		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
+			declarationsAreBuilt(t, ctx, db, migrations.StatementsV090(db.Server.Engine))
+		})
+
 		t.Run("TheNextRebuildMovesOnlyTheVersion", func(t *testing.T) {
+			// The rebuild is the running release's, which writes its own
+			// declaration of the graph.
+			if err := schema.Up(ctx, db, quiet()); err != nil {
+				t.Fatalf("migrate to the latest: %v", err)
+			}
 			rec, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
 				TargetID: w.target, ContentHash: "night-d",
 				BuiltAt: time.Date(2026, 10, 4, 2, 0, 0, 0, time.UTC), ParserVersion: "test",
@@ -293,9 +303,6 @@ func TestAV080DatabaseUpgradesItsImagesToTheirNames(t *testing.T) {
 			}
 		})
 
-		t.Run("TheDeclarationsAreTheTablesTheMigrationsBuild", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV090(db.Server.Engine))
-		})
 		leaveAtLatest(t, ctx, db)
 	})
 }
@@ -417,7 +424,9 @@ func imagesAreMergedV090(t *testing.T, ctx context.Context, db *database.DB, w v
 	nodesOf := func(componentID int64) []graph.Node {
 		t.Helper()
 		var nodes []graph.Node
-		if err := db.DB.NewSelect().Model(&nodes).Where(`"component_id" = ?`, componentID).
+		// The repository column is v0.11.0's, and this is v0.9.0's table.
+		if err := db.DB.NewSelect().Model(&nodes).ExcludeColumn("repository").
+			Where(`"component_id" = ?`, componentID).
 			Order("opened_scan_id").Scan(ctx); err != nil {
 			t.Fatal(err)
 		}

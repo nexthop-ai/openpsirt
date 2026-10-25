@@ -645,6 +645,7 @@ func printable(d *graph.Described) {
 	d.CPE = graph.Printable(d.CPE)
 	d.UpstreamName = graph.Printable(d.UpstreamName)
 	d.UpstreamVersion = graph.Printable(d.UpstreamVersion)
+	d.Repository = graph.Printable(d.Repository)
 }
 
 // into reads one string into dst.

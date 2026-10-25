@@ -489,6 +489,7 @@ scoped to one product. So across reports the rule is scoped to one product.
 | What a build did not state is taken from what other builds of the same product stated, earliest first | One product's builds describe one package one way, and a qualifier a later build states for it is what the product means by it |
 | Nothing stated is overwritten | A qualifier is compared key by key without regard to capitals. Two builds disagreeing is not something a reader can settle, so the build's own statement stands |
 | The supplier and the license are filled in on the row where it has none | `DESIGN-findings.md` § Component suppliers. Neither reaches a scanner |
+| The repository a build states a component is built from is held on its node, without a credential or query, and never filled in from another build | It places an analyzer's result on the build that stated it (`DESIGN-analysis.md` § Placement), and a repository another build named is a guess about this one |
 
 The fold key is worked out once, when the component is first stored, and does
 not move. A later report stating a distribution or a source package is held on
