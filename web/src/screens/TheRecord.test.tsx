@@ -183,3 +183,28 @@ describe("the record's list", () => {
     expect(asked.getAll("claim_state")).toEqual(["approved", "lapsed"]);
   });
 });
+
+describe("the exception report", () => {
+  it("reads as one that should be empty when asked for a lead's dismissals", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") {
+        return {
+          data: {
+            identity: "ana",
+            name: "Ana",
+            admin: true,
+            kind: "person",
+            reach: [],
+            outcomes: PUBLISHED,
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(
+      screen(<TheRecord />, "/record?outcome=dismissed&outcome=not-security&alone=true"),
+    );
+    await settle();
+    expect(mount.host().textContent).toContain("No dismissal stands on one person's say-so.");
+  });
+});

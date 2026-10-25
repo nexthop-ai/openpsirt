@@ -175,7 +175,8 @@ func OutcomesThatHideRisk() []Outcome {
 // control held.
 //
 // The vulnerability outcomes alone: the reports counting dismissals read the
-// vulnerability kinds, and a lead is counted nowhere a vulnerability is.
+// vulnerability kinds. Approval quality reads lead claims too, and asks what
+// always needs a second person rather than this.
 func OutcomesDismissing() []Outcome {
 	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
 	for _, each := range VulnerabilityOutcomes() {
@@ -188,8 +189,9 @@ func OutcomesDismissing() []Outcome {
 
 // Dismisses reports whether this outcome claims no further work is needed
 // about a vulnerability: it hides risk and carries no date that something
-// later checks. A lead's outcomes dismiss nothing the reports count, because
-// a lead is counted nowhere a vulnerability is.
+// later checks. A lead's outcomes dismiss nothing the dismissal counts read,
+// because those read the vulnerability kinds alone. Approval quality reads
+// lead claims and files a lead's dismissal standing alone with these.
 func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.

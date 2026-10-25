@@ -181,7 +181,8 @@ export function TheRecord() {
   // would be telling an auditor a control had failed when it had not.
   // The exception report is asked of dismissals alone: asked of everything it
   // returns a large and entirely legitimate population.
-  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.dismisses(each));
+  // A lead's dismissal counts here: it always needs a second person too.
+  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.alwaysGated(each));
   const asked = [
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),

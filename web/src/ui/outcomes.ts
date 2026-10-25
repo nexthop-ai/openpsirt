@@ -23,7 +23,8 @@ export type Claims = Body<"OutcomeBody">;
 // | Field | Means |
 // |---|---|
 // | known | the server's answer has arrived; until it has, nothing is in any class |
-// | dismissing | the server calls it a dismissal: it hides risk and stores no date |
+// | dismissing | the server calls it a dismissal: it hides risk and stores no date, about a vulnerability |
+// | alwaysGated | it hides risk and stores no date, about a vulnerability or a lead, so a second person always agrees |
 // | hidesRisk | recording it takes the issue out of the working queue |
 // | dated | it stores a date: a review date, or when promised work lands |
 // | needsJustification | it states which recognized reason applies |
@@ -31,6 +32,7 @@ export type Classes = {
   known: boolean;
   dismissing: Outcome[];
   dismisses: (outcome?: string) => boolean;
+  alwaysGated: (outcome?: string) => boolean;
   hidesRisk: (outcome?: string) => boolean;
   dated: (outcome?: string) => boolean;
   needsJustification: (outcome?: string) => boolean;
@@ -43,12 +45,15 @@ export function classesOf(published: readonly Claims[] | null | undefined): Clas
   const has = (field: "hides_risk" | "dated" | "needs_justification") => (outcome?: string) =>
     by.get(outcome ?? "")?.[field] ?? false;
   const dismissing = (published ?? []).filter((each) => each.dismisses).map((each) => each.outcome);
+  const hidesRisk = has("hides_risk");
+  const dated = has("dated");
   return {
     known: by.size > 0,
     dismissing,
     dismisses: (outcome) => (dismissing as string[]).includes(outcome ?? ""),
-    hidesRisk: has("hides_risk"),
-    dated: has("dated"),
+    alwaysGated: (outcome) => hidesRisk(outcome) && !dated(outcome),
+    hidesRisk,
+    dated,
     needsJustification: has("needs_justification"),
   };
 }

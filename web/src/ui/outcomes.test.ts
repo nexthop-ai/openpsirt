@@ -38,6 +38,25 @@ describe("the outcomes that close a question", () => {
   });
 });
 
+describe("the outcomes that always need a second person", () => {
+  it("are the dismissals of a vulnerability and of a lead", () => {
+    const { alwaysGated } = classesOf(PUBLISHED);
+    for (const each of [
+      "already-fixed",
+      "mismatched",
+      "not-applicable",
+      "wont-fix",
+      "dismissed",
+      "not-security",
+    ]) {
+      expect(alwaysGated(each)).toBe(true);
+    }
+    for (const each of ["confirmed", "affected", "deferred", "upgrade-needed", "patch-needed"]) {
+      expect(alwaysGated(each)).toBe(false);
+    }
+  });
+});
+
 describe("the outcomes that state a reason", () => {
   it("are the ones the server says state one", () => {
     const { needsJustification } = classesOf(PUBLISHED);

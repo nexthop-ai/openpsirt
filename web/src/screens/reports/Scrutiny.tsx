@@ -89,10 +89,11 @@ export function Scrutiny() {
 
   const alone = got.data?.alone ?? [];
   // A deferral standing alone reads very differently from a dismissal standing
-  // alone, and the table says which it is looking at.
-  const { dismisses } = useOutcomes();
-  const dismissed = alone.filter((row) => dismisses(row.outcome));
-  const exempt = alone.filter((row) => !dismisses(row.outcome));
+  // alone, and the table says which it is looking at. A lead's dismissal is
+  // one of the dismissals: it always needs a second person too.
+  const { alwaysGated } = useOutcomes();
+  const dismissed = alone.filter((row) => alwaysGated(row.outcome));
+  const exempt = alone.filter((row) => !alwaysGated(row.outcome));
 
   return (
     <Sheet
