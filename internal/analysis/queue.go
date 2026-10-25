@@ -100,7 +100,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 			Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
-			ColumnExpr(`"f"."id", "f"."place_identity", "f"."opened_at"`).
+			ColumnExpr(`"f"."id", "f"."place_identity", "f"."target_id", "f"."opened_at"`).
 			ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 			ColumnExpr(`CASE WHEN `+corroborated+` THEN 1 ELSE 0 END AS "corroborated"`).
 			ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
@@ -164,7 +164,9 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).
 		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
-		ColumnExpr(`COUNT(*) AS "builds", MIN("l"."opened_at") AS "opened"`).
+		// Builds rather than rows: a lead fixed, seen again and fixed again
+		// on one build is two closed rows there.
+		ColumnExpr(`COUNT(DISTINCT "l"."target_id") AS "builds", MIN("l"."opened_at") AS "opened"`).
 		GroupExpr(`"l"."place_identity"`).
 		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."corroborated") DESC`).
 		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
