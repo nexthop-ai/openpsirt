@@ -7,18 +7,19 @@ import { PUBLISHED } from "../test/outcomes";
 
 describe("the outcomes that close a question", () => {
   // The server counts and filters by the outcomes that hide risk and carry no
-  // date. A screen asking for a hand-written list leaves out whatever it grows.
+  // date, about a vulnerability. A screen asking for a hand-written list leaves
+  // out whatever it grows.
   it("are the ones published as hiding risk and carrying no date", () => {
     expect([...classesOf(PUBLISHED).dismissing].sort()).toEqual(
-      [
-        "already-fixed",
-        "dismissed",
-        "mismatched",
-        "not-applicable",
-        "not-security",
-        "wont-fix",
-      ].sort(),
+      ["already-fixed", "mismatched", "not-applicable", "wont-fix"].sort(),
     );
+  });
+
+  it("leave out what is said about a lead", () => {
+    const { dismisses } = classesOf(PUBLISHED);
+    for (const each of ["dismissed", "not-security", "confirmed"]) {
+      expect(dismisses(each)).toBe(false);
+    }
   });
 
   it("leave out a promise, a deferral and an affected finding", () => {

@@ -66,7 +66,7 @@ type OutcomeBody struct {
 	HidesRisk          bool         `json:"hides_risk" doc:"Whether recording it takes the issue out of the working queue"`
 	Dated              bool         `json:"dated" doc:"Whether it stores a date: when somebody looks again, or when promised work lands"`
 	NeedsJustification bool         `json:"needs_justification" doc:"Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one"`
-	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count"`
+	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a lead"`
 }
 
 // WhoBody is the caller, as the caller.

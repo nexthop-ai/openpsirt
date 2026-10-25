@@ -53,6 +53,14 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 			}
 		}
 
+		// The reports read dismissals from the record, which holds claims
+		// about leads, and count vulnerabilities alone.
+		for _, got := range who.Outcomes {
+			if got.Dismisses && triage.Outcome(got.Outcome).AboutALead() {
+				t.Errorf("%s, an outcome about a lead, is published as a dismissal the reports count", got.Outcome)
+			}
+		}
+
 		// The web tests serve their copy in place of this answer, so it is
 		// held to the answer rather than to somebody's reading of the rules.
 		answer, err := json.MarshalIndent(who.Outcomes, "", "  ")

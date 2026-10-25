@@ -11065,7 +11065,7 @@ export interface components {
         OutcomeBody: {
             /** @description Whether it stores a date: when somebody looks again, or when promised work lands */
             dated: boolean;
-            /** @description Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count */
+            /** @description Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a lead */
             dismisses: boolean;
             /** @description Whether recording it takes the issue out of the working queue */
             hides_risk: boolean;

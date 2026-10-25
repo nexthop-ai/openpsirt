@@ -186,9 +186,11 @@ func OutcomesDismissing() []Outcome {
 	return kept
 }
 
-// Dismisses reports whether this outcome claims no further work is needed:
-// it hides risk and carries no date that something later checks.
-func (o Outcome) Dismisses() bool { return o.HidesRisk() && !o.Dated() }
+// Dismisses reports whether this outcome claims no further work is needed
+// about a vulnerability: it hides risk and carries no date that something
+// later checks. A lead's outcomes dismiss nothing the reports count, because
+// a lead is counted nowhere a vulnerability is.
+func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.
 func (o Outcome) Valid() bool {

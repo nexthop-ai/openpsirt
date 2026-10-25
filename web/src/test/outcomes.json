@@ -60,14 +60,14 @@
     "hides_risk": true,
     "dated": false,
     "needs_justification": true,
-    "dismisses": true
+    "dismisses": false
   },
   {
     "outcome": "not-security",
     "hides_risk": true,
     "dated": false,
     "needs_justification": false,
-    "dismisses": true
+    "dismisses": false
   },
   {
     "outcome": "confirmed",
