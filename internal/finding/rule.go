@@ -71,9 +71,10 @@ type ruleRating struct {
 	WeaknessTier    int     `bun:"weakness_tier,notnull"`
 }
 
-// cweTag is a rule tag naming a weakness, in the convention CodeQL writes and
-// the upload client writes for cppcheck.
-var cweTag = regexp.MustCompile(`(?i)^external/cwe/cwe-(\d+)$`)
+// cweTag is a rule tag naming a weakness: `external/cwe/cwe-N`, the
+// convention CodeQL writes and the upload client writes for cppcheck, and
+// `CWE-N: name`, which semgrep writes.
+var cweTag = regexp.MustCompile(`(?i)^(?:external/cwe/)?cwe-(\d+)(?::.*)?$`)
 
 // weaknessesOf is the weaknesses a rule's tags name.
 func weaknessesOf(tags []string) []string {

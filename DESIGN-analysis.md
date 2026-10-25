@@ -502,7 +502,8 @@ A baseline lead enters the queue when it is escalated.
 
 ## Weakness families
 
-A rule names the weaknesses its tags name, as `external/cwe/cwe-N`. A rule
+A rule names the weaknesses its tags name, as `external/cwe/cwe-N`, or as
+`CWE-N: name`, which semgrep writes. A rule
 whose tags name none takes the weaknesses a table held here names for it.
 Tools disagree about the number for one flaw: one overflow was CWE-788, 119
 and 121 from three tools. They agree about its family.

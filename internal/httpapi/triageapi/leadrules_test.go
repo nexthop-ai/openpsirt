@@ -247,6 +247,18 @@ func TestAMemorySafetyRuleIsDismissedOnlyUnderAPath(t *testing.T) {
 	})
 }
 
+func TestARuleTaggedWithAWeaknessByNameIsClassifiedByIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		// semgrep tags a rule with the weakness's number and its name.
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(
+			`"tags":["CWE-120: Buffer Copy without Checking Size of Input ('Classic Buffer Overflow')"]`, ``))
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
+			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"sized by the caller"}`),
+			http.StatusUnprocessableEntity)
+	})
+}
+
 func TestARuleFoundToFindMemoryFlawsAfterItWasProposedIsNotApproved(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
