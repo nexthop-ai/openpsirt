@@ -116,20 +116,26 @@ dist-binaries: dist-version
 #
 # The inventory is read off the built binary, as the server's is in the image,
 # and names the system and architecture it was built for, so there is one for
-# each archive.
+# each archive. The generator takes that system and architecture from its own
+# environment rather than from the binary, so it is built once for this
+# machine and run with each target's. The standard library is listed, because
+# it is the only module the client links besides its own.
+CLIENT_INVENTORY_TOOL := bin/cyclonedx-gomod
 DIST_CLIENT_SYSTEMS ?= linux darwin windows
 dist-client: STAMP_VERSION := $(DIST_VERSION)
 dist-client: dist-version
 	@command -v zip >/dev/null 2>&1 \
 	  || { echo "zip is needed to archive the Windows upload client"; exit 1; }
 	@mkdir -p $(DIST_DIR)
+	@$(GO) build -modfile=tools/cyclonedx-gomod/go.mod -o $(CLIENT_INVENTORY_TOOL) \
+	  github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod
 	@set -e; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
 	  name=openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch; \
 	  exe=openpsirt-analysis; [ "$$os" != windows ] || exe=openpsirt-analysis.exe; \
 	  rm -rf $(DIST_DIR)/$$name; mkdir -p $(DIST_DIR)/$$name; \
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
 	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
-	  $(GO) tool -modfile=tools/cyclonedx-gomod/go.mod cyclonedx-gomod bin -json \
+	  GOOS=$$os GOARCH=$$arch $(CLIENT_INVENTORY_TOOL) bin -json -std \
 	    -version $(DIST_VERSION) -output $(DIST_DIR)/$$name.cdx.json $(DIST_DIR)/$$name/$$exe; \
 	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
 	  if [ "$$os" = windows ]; then \
@@ -210,7 +216,9 @@ dist-sums: dist-version
 # The upload client built for this machine is asked its version as well, and
 # each Windows archive is opened to see that it holds the program. The others
 # are named by the same check every asset's name takes. Every inventory, each
-# client binary's among them, is read for the version it describes.
+# client binary's among them, is read for the version it describes, and each
+# client binary's for the system and architecture its package identifier
+# names and for the standard library it lists.
 #
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
@@ -285,6 +293,15 @@ dist-verify: dist-version
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "$$(basename $$inventory) describes $$said and the release is $(DIST_VERSION)"; fail=1; }; \
 	  done; \
+	  for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	    inventory=$(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json; \
+	    [ -f "$$inventory" ] || continue; \
+	    purl=$$(jq -r '.metadata.component.purl' "$$inventory"); \
+	    case "$$purl" in *goarch=$$arch\&goos=$$os\&*) ;; \
+	      *) echo "$$(basename $$inventory) names $$purl, not $$os on $$arch"; fail=1 ;; esac; \
+	    jq -e '[.components[]?.purl | select(startswith("pkg:golang/std@"))] | length > 0' "$$inventory" >/dev/null \
+	      || { echo "$$(basename $$inventory) does not list the standard library"; fail=1; }; \
+	  done; done; \
 	  [ "$$fail" = 0 ] || exit 1; \
 	  echo "  every asset names $(DIST_VERSION), and every one that carries it inside agrees"; \
 	  [ -z "$$skipped" ] || echo "  not checked:$$skipped"
