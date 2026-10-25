@@ -66,14 +66,17 @@ func TestWhatTheClientWritesIsWhatTheDeploymentReads(t *testing.T) {
 	}
 	two, exit := 2, 0
 	built := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
-	doc, _, err := analysisclient.Build(t.Context(), analysisclient.Options{
+	runs, _, err := analysisclient.Build(t.Context(), analysisclient.Options{
 		Root: root, Work: root, Series: "clang-sa/default", Built: built,
 		UnitsExpected: &two, ExitStatus: &exit, Client: "openpsirt-analysis test",
 	}, inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want clang's alone", len(runs))
+	}
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(runs[0].Doc))
 	if err != nil {
 		t.Fatalf("the deployment refuses what the client wrote: %v", err)
 	}

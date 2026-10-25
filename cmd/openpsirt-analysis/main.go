@@ -38,6 +38,10 @@ Each OUTPUT is clang plist-multi-file, cppcheck XML version 2, or any tool's
 SARIF 2.1.0, compressed with gzip or not. The address is --url, or
 OPENPSIRT_URL where the flag is not given. The key is read from OPENPSIRT_KEY
 alone, so it is never on a command line a process listing shows.
+
+Output of several analyzers is sent as one upload per analyzer, each with its
+own series, named --series TOOL=NAME once per analyzer. write puts each in a
+file of its own, the analyzer's name before the extension.
 `
 
 func main() {
@@ -96,18 +100,19 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	var (
 		to                               analysisclient.Target
-		series, commit, built, root, out string
+		commit, built, root, out         string
 		toolVersion, saltFile, rulesFile string
 		compileCommands                  string
 		snippets                         bool
-		rules, thirdParty                many
+		rules, thirdParty, series        many
 		expected, analyzed, exitStatus   count
 	)
 	fs.StringVar(&to.URL, "url", os.Getenv("OPENPSIRT_URL"), "the deployment's address")
 	fs.StringVar(&to.Product, "product", "", "the declared product the build is of")
 	fs.StringVar(&to.Stream, "stream", "", "the declared branch or tag")
 	fs.StringVar(&to.Variant, "variant", "", "the declared way the stream is built")
-	fs.StringVar(&series, "series", "", "which analysis this is, the same for every build: the tool and its configuration")
+	fs.Var(&series, "series", "which analysis this is, the same for every build: the tool and its configuration; "+
+		"TOOL=NAME names one analyzer's where the output is of several")
 	fs.StringVar(&commit, "commit", "", "the commit analyzed; the checked-out commit where unset")
 	fs.StringVar(&built, "built", "", "when the build was made, in RFC 3339; the deployment dates the run on arrival where unset")
 	fs.StringVar(&root, "source-root", "", "the top of the checkout; the git working tree holding the current directory where unset")
@@ -131,9 +136,23 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 
 	opts := analysisclient.Options{
-		Series: series, Commit: commit, ToolVersion: toolVersion, Snippets: snippets,
+		Commit: commit, ToolVersion: toolVersion, Snippets: snippets,
 		UnitsExpected: expected.n, UnitsAnalyzed: analyzed.n, ExitStatus: exitStatus.n,
 		Client: "openpsirt-analysis " + version.Get().Version,
+	}
+	for _, named := range series {
+		tool, name, each := strings.Cut(named, "=")
+		switch {
+		case !each && opts.Series != "":
+			return errors.New("--series is named twice; name each analyzer's as --series TOOL=NAME")
+		case !each:
+			opts.Series = named
+		default:
+			if opts.SeriesOf == nil {
+				opts.SeriesOf = map[string]string{}
+			}
+			opts.SeriesOf[strings.ToLower(strings.TrimSpace(tool))] = name
+		}
 	}
 	if built != "" {
 		t, err := time.Parse(time.RFC3339, built)
@@ -197,9 +216,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		}
 		inputs = append(inputs, analysisclient.Input{Name: f, Data: data})
 	}
-	doc, report, err := analysisclient.Build(ctx, opts, inputs)
+	runs, report, err := analysisclient.Build(ctx, opts, inputs)
 	if err != nil {
 		return err
+	}
+	if len(runs) > 1 && len(rules) > 0 {
+		return errors.New("the output is of several analyzers, and --rule and --rules-file name one analyzer's rules")
 	}
 	summary := fmt.Sprintf("%s: %d results, %d fingerprinted, %d snippets", strings.Join(report.Tools, ", "),
 		report.Results, report.Fingerprints, report.Snippets)
@@ -214,22 +236,50 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		if out == "" {
 			return errors.New("write needs --output")
 		}
-		return os.WriteFile(out, doc, 0o644) //nolint:gosec // G306,G703: the document is for the pipeline to read, at the path it named
+		for _, r := range runs {
+			if err := os.WriteFile(written(out, r.Tool, len(runs)), r.Doc, 0o644); err != nil { //nolint:gosec // G306,G703: the document is for the pipeline to read, at the path it named
+				return err
+			}
+		}
+		return nil
 	}
 	to.Key = os.Getenv("OPENPSIRT_KEY")
 	if to.Key == "" {
 		return errors.New("OPENPSIRT_KEY holds no key")
 	}
-	answer, err := analysisclient.Send(ctx, &http.Client{Timeout: 10 * time.Minute}, to, doc,
-		analysisclient.Fields{Rules: rules, ThirdParty: thirdParty})
-	if err != nil {
-		return err
+	// Each analyzer's run is its own upload, and one refused does not keep
+	// the others from being sent.
+	var failed []string
+	for _, r := range runs {
+		answer, err := analysisclient.Send(ctx, &http.Client{Timeout: 10 * time.Minute}, to, r.Doc,
+			analysisclient.Fields{Rules: rules, ThirdParty: thirdParty})
+		switch {
+		case err != nil:
+			failed = append(failed, fmt.Sprintf("%s: %v", r.Series, err))
+		case answer.Status >= 300:
+			failed = append(failed, fmt.Sprintf("%s: the deployment answered %d: %s", r.Series, answer.Status,
+				strings.TrimSpace(string(answer.Body))))
+		default:
+			if _, err := stdout.Write(answer.Body); err != nil {
+				return err
+			}
+		}
 	}
-	if answer.Status >= 300 {
-		return fmt.Errorf("the deployment answered %d: %s", answer.Status, strings.TrimSpace(string(answer.Body)))
+	if len(failed) > 0 {
+		return errors.New(strings.Join(failed, "; "))
 	}
-	_, err = stdout.Write(answer.Body)
-	return err
+	return nil
+}
+
+// written is where write puts one analyzer's document: the path named, or,
+// where the output is of several, that path with the analyzer's name before
+// its extension.
+func written(out, tool string, runs int) string {
+	if runs == 1 {
+		return out
+	}
+	ext := filepath.Ext(out)
+	return strings.TrimSuffix(out, ext) + "." + tool + ext
 }
 
 // units is how many entries a compilation database holds: each is a unit

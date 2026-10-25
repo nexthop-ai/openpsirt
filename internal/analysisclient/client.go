@@ -49,7 +49,12 @@ type Options struct {
 	// Root is the top of the checkout analyzed, and Work the directory the
 	// tool's relative paths are relative to: absolute paths on this host.
 	Root, Work string
-	Series     string
+	// Series is the analysis an output of one tool is. SeriesOf is each
+	// tool's, by the name its output gives it in lower case, and is what an
+	// output of several tools needs: a series named once for all of them
+	// would change name whenever a tool was added or dropped.
+	Series   string
+	SeriesOf map[string]string
 	// Commit is the checkout's commit; empty is the commit checked out.
 	Commit string
 	// Built is when the build was made; zero leaves the deployment to date
@@ -82,15 +87,23 @@ type Report struct {
 	Removed map[string]int
 }
 
-// Build writes one SARIF document holding a run per tool from the
-// analyzer's outputs.
-func Build(ctx context.Context, opts Options, inputs []Input) ([]byte, Report, error) {
+// Run is one tool's run, as a SARIF document of its own and the series it
+// is sent as.
+type Run struct {
+	Tool   string
+	Series string
+	Doc    []byte
+}
+
+// Build writes a SARIF document per tool from the analyzer's outputs. Each is
+// one upload: a series is one tool.
+func Build(ctx context.Context, opts Options, inputs []Input) ([]Run, Report, error) {
 	return build(ctx, runGit, opts, inputs)
 }
 
-func build(ctx context.Context, run git, opts Options, inputs []Input) ([]byte, Report, error) {
+func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, Report, error) {
 	report := Report{Removed: map[string]int{}}
-	if opts.Series == "" {
+	if opts.Series == "" && len(opts.SeriesOf) == 0 {
 		return nil, report, errors.New("a run needs a series: the analysis it is, the same for every build")
 	}
 	root, work := filepath.ToSlash(opts.Root), filepath.ToSlash(opts.Work)
@@ -127,9 +140,20 @@ func build(ctx context.Context, run git, opts Options, inputs []Input) ([]byte, 
 	if len(order) == 0 {
 		return nil, report, errors.New("no analyzer output was given")
 	}
-	if len(order) > 1 {
-		return nil, report, fmt.Errorf("the output is of %s; a series is one tool, so send each tool's output in an upload of its own",
-			strings.Join(order, " and "))
+	series := map[string]string{}
+	for _, tool := range order {
+		named := opts.SeriesOf[tool]
+		if named == "" && len(order) == 1 {
+			named = opts.Series
+		}
+		if named == "" {
+			return nil, report, fmt.Errorf("the output is of %s; name each one's series, as %s",
+				strings.Join(order, " and "), seriesFlags(order))
+		}
+		series[tool] = named
+	}
+	if len(order) > 1 && opts.ToolVersion != "" {
+		return nil, report, fmt.Errorf("the output is of %s, and a tool version is one analyzer's", strings.Join(order, " and "))
 	}
 	for k, n := range report.Removed {
 		if n == 0 {
@@ -137,25 +161,34 @@ func build(ctx context.Context, run git, opts Options, inputs []Input) ([]byte, 
 		}
 	}
 	src := &source{root: opts.Root, files: map[string][]string{}, salt: opts.Salt}
-	var runs list
+	var out []Run
 	for _, tool := range order {
 		merged := merge(byTool[tool])
-		describe(merged, opts, repos, src, &report)
+		describe(merged, opts, series[tool], repos, src, &report)
 		report.Tools = append(report.Tools, str(child(child(merged, "tool"), "driver"), "name"))
-		runs = append(runs, merged)
+		doc := obj{
+			"version": sarifVersion,
+			"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+			"runs":    list{merged},
+		}
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(doc); err != nil {
+			return nil, report, err
+		}
+		out = append(out, Run{Tool: tool, Series: series[tool], Doc: buf.Bytes()})
 	}
-	doc := obj{
-		"version": sarifVersion,
-		"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
-		"runs":    runs,
+	return out, report, nil
+}
+
+// seriesFlags is the flags naming a series for each of these tools.
+func seriesFlags(tools []string) string {
+	flags := make([]string, len(tools))
+	for i, tool := range tools {
+		flags[i] = "--series " + tool + "=NAME"
 	}
-	var out bytes.Buffer
-	enc := json.NewEncoder(&out)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(doc); err != nil {
-		return nil, report, err
-	}
-	return out.Bytes(), report, nil
+	return strings.Join(flags, " ")
 }
 
 // readInput reads one output, decompressed where it arrived compressed.
@@ -199,7 +232,7 @@ const (
 
 // describe writes what the run says about itself, the repositories its
 // checkout holds, and each result's fingerprint and snippets.
-func describe(run obj, opts Options, repos []repository, src *source, report *Report) {
+func describe(run obj, opts Options, series string, repos []repository, src *source, report *Report) {
 	driver := ensure(ensure(run, "tool"), "driver")
 	if str(driver, "version") == "" && opts.ToolVersion != "" {
 		driver["version"] = opts.ToolVersion
@@ -223,9 +256,9 @@ func describe(run obj, opts Options, repos []repository, src *source, report *Re
 	top := repos[0]
 	props[propCommit] = top.Commit
 	if opts.Built.IsZero() {
-		props[propSeries] = opts.Series
+		props[propSeries] = series
 	} else {
-		run["automationDetails"] = obj{"id": opts.Series + "/" + opts.Built.UTC().Format(time.RFC3339)}
+		run["automationDetails"] = obj{"id": series + "/" + opts.Built.UTC().Format(time.RFC3339)}
 	}
 	if opts.ExitStatus != nil {
 		inv := obj{"exitCode": *opts.ExitStatus, "executionSuccessful": *opts.ExitStatus == 0}

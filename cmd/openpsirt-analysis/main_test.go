@@ -126,3 +126,53 @@ func TestTheSaltIsNamedByItsTrimmedBytes(t *testing.T) {
 		t.Error("the document carries the salt itself")
 	}
 }
+
+// second is a second analyzer's output about the checkout's file.
+func second(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "check.sarif")
+	if err := os.WriteFile(path, []byte(strings.Replace(output, `"name":"lint"`, `"name":"check"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestTheOutputOfTwoAnalyzersIsAnUploadOfEach(t *testing.T) {
+	_, sarif := checkout(t)
+	srv, got := deployment(t)
+	t.Setenv("OPENPSIRT_KEY", "secret")
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+		"--series", "lint=lint/all", "--series", "check=check/all", sarif, second(t)}
+	if err := run(context.Background(), args, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(*got) != 2 {
+		t.Fatalf("sent %d uploads; want one per analyzer", len(*got))
+	}
+}
+
+func TestTheOutputOfTwoAnalyzersIsWrittenToAFileOfEach(t *testing.T) {
+	_, sarif := checkout(t)
+	out := filepath.Join(t.TempDir(), "run.sarif")
+	if err := run(context.Background(), []string{"write", "--series", "lint=lint/all", "--series", "check=check/all",
+		"--output", out, sarif, second(t)}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range []string{"lint", "check"} {
+		data, err := os.ReadFile(filepath.Join(filepath.Dir(out), "run."+tool+".sarif")) //nolint:gosec // G304: a path under the test's own directory
+		if err != nil || !strings.Contains(string(data), tool+"/all") {
+			t.Errorf("%s's document: %v; want its own file naming its series", tool, err)
+		}
+	}
+}
+
+func TestOneAnalyzersRulesAreRefusedForTheOutputOfTwo(t *testing.T) {
+	_, sarif := checkout(t)
+	srv, got := deployment(t)
+	t.Setenv("OPENPSIRT_KEY", "secret")
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+		"--series", "lint=lint/all", "--series", "check=check/all", "--rule", "r1", sarif, second(t)}
+	if err := run(context.Background(), args, &bytes.Buffer{}, &bytes.Buffer{}); err == nil || len(*got) != 0 {
+		t.Errorf("err %v, %d sent; want the rules refused before anything is sent", err, len(*got))
+	}
+}

@@ -360,10 +360,10 @@ deployment cannot learn from the output alone, and sends it as § The upload
 describes.
 
 ```
-openpsirt-analysis upload --product P --stream S --variant V --series NAME \
+openpsirt-analysis upload --product P --stream S --variant V --series [TOOL=]NAME... \
   [--commit SHA] [--built TIME] [--snippets] [--salt-file FILE] \
   [--third-party PATH]... OUTPUT...
-openpsirt-analysis write --series NAME --output FILE OUTPUT...
+openpsirt-analysis write --series [TOOL=]NAME... --output FILE OUTPUT...
 ```
 
 `write` builds the same document and stores it rather than sending it, so a
@@ -383,7 +383,10 @@ pipeline can see exactly what would leave.
 | A native format is read where the tool has one | clang's plist carries the issue hash, the call path and the enclosing function; clang's SARIF carries none of them |
 | clang's plain `plist` is not what to send | It drops a diagnostic whose path crosses files. `plist-multi-file` keeps it |
 | An HTML report and a directory of output are refused | Both carry source |
-| Every output of one upload is of one tool, and they merge into one run | A series is one tool. Rules merge by identifier, results and invocations are concatenated, and per-unit counts add |
+| The outputs of one tool merge into one run | Rules merge by identifier, results and invocations are concatenated, and per-unit counts add |
+| The outputs of several tools are one upload per tool | A series is one tool. `write` stores each in a file of its own, the tool's name before the extension. One refused does not keep the others from being sent |
+| Output of several tools names each one's series, as `--series TOOL=NAME` | A series named once for all of them changes name whenever a tool is added or dropped. A bare `--series NAME` serves output of one tool |
+| `--rule`, `--rules-file` and `--tool-version` are refused for output of several tools | Each describes one tool |
 | An output that is none of the formats is refused | It is named, with the formats read |
 
 ### Paths
@@ -486,6 +489,6 @@ it is about.
 | A snippet records what the upload sent | Nothing compares it with the repository, so a patched repository's snippet is the patched source and its link is the source before the patch |
 | A link in a lead with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |
 | The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
-| One upload is one tool | A pipeline running clang and cppcheck makes two uploads, one per series |
+| A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

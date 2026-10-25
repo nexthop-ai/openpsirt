@@ -64,11 +64,14 @@ func built(t *testing.T, opts Options, inputs ...Input) (obj, Report) {
 	if opts.Series == "" {
 		opts.Series = "clang-sa/default"
 	}
-	doc, report, err := build(t.Context(), fakeGit(sourceFiles, "0123abcd"), opts, inputs)
+	written, report, err := build(t.Context(), fakeGit(sourceFiles, "0123abcd"), opts, inputs)
 	if err != nil {
 		t.Fatal(err)
 	}
-	dec := json.NewDecoder(bytes.NewReader(doc))
+	if len(written) != 1 {
+		t.Fatalf("%d documents; want one", len(written))
+	}
+	dec := json.NewDecoder(bytes.NewReader(written[0].Doc))
 	dec.UseNumber()
 	var out obj
 	if err := dec.Decode(&out); err != nil {
@@ -227,12 +230,55 @@ func TestUnitsThatFoundNothingAreARunThatRan(t *testing.T) {
 	}
 }
 
-func TestToolsOfTwoKindsAreRefused(t *testing.T) {
+func TestTheOutputOfTwoToolsIsARunOfEachUnderItsOwnSeries(t *testing.T) {
 	root := sources(t)
-	_, _, err := build(t.Context(), fakeGit(sourceFiles, "c"), Options{Root: root, Work: root, Series: "s"},
+	runs, _, err := build(t.Context(), fakeGit(sourceFiles, "c"),
+		Options{Root: root, Work: root, SeriesOf: map[string]string{"clang": "clang-sa/default", "cppcheck": "cppcheck/all"}},
 		[]Input{fixture(t, "clang18-a.plist"), fixture(t, "cppcheck222.xml")})
-	if err == nil || !strings.Contains(err.Error(), "upload of its own") {
-		t.Errorf("err %v; want two tools refused", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range runs {
+		var doc struct {
+			Runs []struct {
+				Tool struct {
+					Driver struct{ Name string } `json:"driver"`
+				} `json:"tool"`
+				Properties map[string]any `json:"properties"`
+			} `json:"runs"`
+		}
+		if err := json.Unmarshal(r.Doc, &doc); err != nil {
+			t.Fatal(err)
+		}
+		if len(doc.Runs) != 1 || !strings.EqualFold(doc.Runs[0].Tool.Driver.Name, r.Tool) {
+			t.Errorf("%s's document holds %+v; want its one run", r.Tool, doc.Runs)
+			continue
+		}
+		got[r.Tool], _ = doc.Runs[0].Properties["openpsirt/series"].(string)
+	}
+	if got["clang"] != "clang-sa/default" || got["cppcheck"] != "cppcheck/all" || len(got) != 2 {
+		t.Errorf("series %v; want each tool's own", got)
+	}
+}
+
+func TestTheOutputOfTwoToolsNeedsASeriesForEach(t *testing.T) {
+	root := sources(t)
+	for name, opts := range map[string]Options{
+		"one for both":   {Root: root, Work: root, Series: "s"},
+		"one named":      {Root: root, Work: root, SeriesOf: map[string]string{"clang": "s"}},
+		"a tool version": {Root: root, Work: root, ToolVersion: "18", SeriesOf: map[string]string{"clang": "a", "cppcheck": "b"}},
+	} {
+		_, _, err := build(t.Context(), fakeGit(sourceFiles, "c"), opts,
+			[]Input{fixture(t, "clang18-a.plist"), fixture(t, "cppcheck222.xml")})
+		if err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if _, _, err := build(t.Context(), fakeGit(sourceFiles, "c"), Options{Root: root, Work: root, Series: "s"},
+		[]Input{fixture(t, "clang18-a.plist"), fixture(t, "cppcheck222.xml")}); err == nil ||
+		!strings.Contains(err.Error(), "--series clang=NAME --series cppcheck=NAME") {
+		t.Errorf("err %v; want the flags to use named", err)
 	}
 }
 

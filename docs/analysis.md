@@ -32,8 +32,13 @@ onto the path.
 | cppcheck | `--xml --xml-version=2` |
 | Anything else | SARIF |
 
-Every output given to one upload is of one tool. Running two analyzers is two
-uploads, each with a series of its own.
+Output of several analyzers is sent as one upload per analyzer, each under a
+series of its own, named once per analyzer as `--series TOOL=NAME`: for
+example `--series clang=clang-sa --series cppcheck=cppcheck-all`. The tool is
+the name its output gives it, in any case. `write` stores each analyzer's run
+in a file of its own, the analyzer's name before the extension. `--rule`,
+`--rules-file` and `--tool-version` each describe one analyzer, and are refused
+for output of several.
 
 ## The upload
 
@@ -55,7 +60,7 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | Flag | |
 |---|---|
 | `--product`, `--stream`, `--variant` | The build the run is of |
-| `--series` | Which analysis this is: the tool and its configuration, the same on every build. Each run is compared with the series' last |
+| `--series` | Which analysis this is: the tool and its configuration, the same on every build. Each run is compared with the series' last. `TOOL=NAME` names one analyzer's, where the output is of several |
 | `--built` | When the build was made, in RFC 3339. Without it, the run is dated when it arrives |
 | `--commit` | The commit analyzed. The commit checked out where unset |
 | `--units-expected`, `--units-analyzed` | How many translation units the run was meant to analyze, and did. Both or neither |
