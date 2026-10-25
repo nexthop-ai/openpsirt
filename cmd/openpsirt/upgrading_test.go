@@ -186,13 +186,23 @@ func TestAStartAnswersItsHealthCheckWhileItMigrates(t *testing.T) {
 // which rolls its transaction back, closes the port, and exits cleanly.
 func TestAStopDuringTheMigrationExitsCleanly(t *testing.T) {
 	var interrupted atomic.Bool
+	// Stopped before the held start has taken the release, the start sees
+	// both its release and its stop, and may take the stop without
+	// migrating at all.
+	migrating := make(chan struct{})
 	s := startHeld(t, freeAddress(t), func(ctx context.Context, _ *database.DB, _ *slog.Logger) error {
+		close(migrating)
 		<-ctx.Done()
 		interrupted.Store(true)
 		return ctx.Err()
 	})
 	s.entering(t)
 	close(s.release)
+	select {
+	case <-migrating:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the migration had not begun 30s after it was let go")
+	}
 	if resp := s.get(t, "/healthz", ""); resp.StatusCode != http.StatusOK {
 		t.Fatalf("/healthz answered %s while migrating", resp.Status)
 	}
