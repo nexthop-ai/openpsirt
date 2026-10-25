@@ -457,10 +457,11 @@ with its leading `v` removed (REQ-01 and REQ-02).
 | Upload client archive | `openpsirt-analysis_<version>_<system>_<arch>.tar.gz`, and `.zip` for Windows | The upload client with `LICENSE` and `NOTICE`, for Linux, macOS and Windows on amd64 and arm64. Cross-compiled with cgo off. A Windows archive is a zip, the archive Windows opens without a tool of its own, and the release check opens each one to find the program. Covered by the checksum file and its signature like every other asset. See `DESIGN-analysis.md` § Upload client |
 | Binary inventory | `openpsirt_<version>.cdx.json` | What the binary ships: the modules it was linked from and the interface it embeds |
 | Image inventory | `openpsirt-image_<version>_linux_<arch>.cdx.json` | What the image ships. One per architecture, because it is read off an assembled filesystem |
+| Upload client inventory | `openpsirt-analysis_<version>_<system>_<arch>.cdx.json` | What one upload client binary ships: the modules it was linked from, read off the binary. One per archive, because a binary's inventory names the system and architecture it was built for |
 | Checksums | `SHA256SUMS` | Every file above, so a download is checkable without holding a signature |
 | Signature | `SHA256SUMS.cosign.bundle` | One signature over the checksum file rather than one per asset: the file already covers every asset, so a verifier checks one signature and then the hashes |
 
-Both inventories are published rather than left as a workflow artifact that
+Every inventory is published rather than left as a workflow artifact that
 expires. We ingest these for other people's software; REQ-04 is the same
 promise kept about our own, and a promise kept where somebody can see it.
 

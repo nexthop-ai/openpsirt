@@ -110,9 +110,13 @@ dist-binaries: dist-version
 	done
 
 # The upload client, one archive per system and architecture a pipeline runs
-# on. Pure Go and cgo off, so every one cross-compiles here. A Windows archive
-# is a zip, the archive Windows opens without a tool of its own; every other
-# is a tar.gz.
+# on, and an inventory of each binary beside it (REQ-04). Pure Go and cgo off,
+# so every one cross-compiles here. A Windows archive is a zip, the archive
+# Windows opens without a tool of its own; every other is a tar.gz.
+#
+# The inventory is read off the built binary, as the server's is in the image,
+# and names the system and architecture it was built for, so there is one for
+# each archive.
 DIST_CLIENT_SYSTEMS ?= linux darwin windows
 dist-client: STAMP_VERSION := $(DIST_VERSION)
 dist-client: dist-version
@@ -125,6 +129,8 @@ dist-client: dist-version
 	  rm -rf $(DIST_DIR)/$$name; mkdir -p $(DIST_DIR)/$$name; \
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
 	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
+	  $(GO) tool -modfile=tools/cyclonedx-gomod/go.mod cyclonedx-gomod bin -json \
+	    -version $(DIST_VERSION) -output $(DIST_DIR)/$$name.cdx.json $(DIST_DIR)/$$name/$$exe; \
 	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
 	  if [ "$$os" = windows ]; then \
 	    archive=$$name.zip; (cd $(DIST_DIR) && zip -qrX $$archive $$name); \
@@ -133,6 +139,7 @@ dist-client: dist-version
 	  fi; \
 	  rm -rf $(DIST_DIR)/$$name; \
 	  echo "  $$archive"; \
+	  echo "  $$name.cdx.json"; \
 	done; done
 
 # The chart, with its version and the version of the application it installs
@@ -202,7 +209,8 @@ dist-sums: dist-version
 #
 # The upload client built for this machine is asked its version as well, and
 # each Windows archive is opened to see that it holds the program. The others
-# are named by the same check every asset's name takes.
+# are named by the same check every asset's name takes. Every inventory, each
+# client binary's among them, is read for the version it describes.
 #
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
@@ -210,6 +218,8 @@ dist-sums: dist-version
 dist-verify: dist-version
 	@command -v jq >/dev/null 2>&1 \
 	  || { echo "jq is needed to read the version out of an inventory"; exit 1; }
+	@command -v unzip >/dev/null 2>&1 \
+	  || { echo "unzip is needed to open the Windows upload client archives"; exit 1; }
 	@set -e; fail=0; skipped=; \
 	  for path in $(DIST_DIR)/*; do \
 	    file=$$(basename "$$path"); \
@@ -263,9 +273,13 @@ dist-verify: dist-version
 	        || { echo "the chart's $$field is $$said and the release is $(DIST_VERSION)"; fail=1; }; \
 	    done; \
 	  fi; \
+	  clients=; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	    clients="$$clients $(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json"; \
+	  done; done; \
 	  for inventory in \
 	    $(DIST_DIR)/openpsirt_$(DIST_VERSION).cdx.json \
-	    $(DIST_DIR)/openpsirt-image_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH).cdx.json; do \
+	    $(DIST_DIR)/openpsirt-image_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH).cdx.json \
+	    $$clients; do \
 	    [ -f "$$inventory" ] || { skipped="$$skipped $$(basename $$inventory) (not built)"; continue; }; \
 	    said=$$(jq -r '.metadata.component.version' "$$inventory"); \
 	    [ "$$said" = "$(DIST_VERSION)" ] \

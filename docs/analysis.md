@@ -15,8 +15,10 @@ either order.
 
 Each release attaches `openpsirt-analysis_<version>_<system>_<arch>.tar.gz`
 for Linux and macOS and `openpsirt-analysis_<version>_windows_<arch>.zip` for
-Windows, on amd64 and arm64, covered by `SHA256SUMS` and its signature. Check
-them as the release notes show, then unpack the binary onto the path.
+Windows, on amd64 and arm64, each beside a CycloneDX inventory of its binary,
+`openpsirt-analysis_<version>_<system>_<arch>.cdx.json`, and all covered by
+`SHA256SUMS` and its signature. Check them as the release notes show, then
+unpack the binary onto the path.
 
 | Command | Does |
 |---|---|
