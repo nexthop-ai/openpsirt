@@ -74,6 +74,10 @@ type Placed struct {
 	Steps                  []PlacedStep
 	Related                []PlacedStep
 	Fingerprints           map[string]string
+	// Snippet is the source at the result, where the product keeps source
+	// under its path, and SnippetLine the line it starts at.
+	Snippet     string `json:",omitempty"`
+	SnippetLine int    `json:",omitempty"`
 	// Module is the position in the run's repository list of the one Path
 	// falls in, and -1 where it falls in none.
 	Module int
@@ -87,6 +91,8 @@ type PlacedStep struct {
 	Function          string
 	Message           string
 	Depth             *int
+	Snippet           string `json:",omitempty"`
+	SnippetLine       int    `json:",omitempty"`
 }
 
 // Dropped counts the results that preparing a run left out, by reason.
@@ -116,15 +122,37 @@ type Dropped struct {
 // the same upload is a repeat as much as one repeated within a run: clang
 // writes a document per unit, and a header's result is in each.
 type Placer struct {
-	seen    map[string]bool
-	dropped Dropped
+	seen     map[string]bool
+	dropped  Dropped
+	keep     func(path string) bool
+	snippets int
 }
 
-// NewPlacer is a placer that has seen nothing.
-func NewPlacer() *Placer { return &Placer{seen: map[string]bool{}} }
+// NewPlacer is a placer that has seen nothing. keep is whether source under
+// a path is kept, and a nil keep keeps none.
+func NewPlacer(keep func(path string) bool) *Placer {
+	return &Placer{seen: map[string]bool{}, keep: keep}
+}
 
 // Dropped is what the placer has left out so far.
 func (pl *Placer) Dropped() Dropped { return pl.dropped }
+
+// Snippets is how many locations' source the placer has discarded so far,
+// because the product keeps no source under their paths.
+func (pl *Placer) Snippets() int { return pl.snippets }
+
+// snippet is a location's source where it is kept, and nothing otherwise. A
+// location outside the checkout keeps none.
+func (pl *Placer) snippet(path string, loc Location) (string, int) {
+	if loc.Snippet == "" {
+		return "", 0
+	}
+	if path == "" || pl.keep == nil || !pl.keep(path) {
+		pl.snippets++
+		return "", 0
+	}
+	return loc.Snippet, loc.SnippetLine
+}
 
 // Place places one run's results. root is the checkout's absolute path where
 // the pipeline states one.
@@ -171,14 +199,15 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 			EndLine: first.EndLine, EndColumn: first.EndColumn,
 			Function: first.Function, Fingerprints: res.Fingerprints, Module: -1,
 		}
+		p.Snippet, p.SnippetLine = pl.snippet(rel, first)
 		if m, ok := paths.Module(rel); ok {
 			p.Module = m
 		}
 		for _, s := range res.Steps {
-			p.Steps = append(p.Steps, placedStep(paths, s.Location, s.Depth))
+			p.Steps = append(p.Steps, pl.placedStep(paths, s.Location, s.Depth))
 		}
 		for _, loc := range res.Related {
-			p.Related = append(p.Related, placedStep(paths, loc, nil))
+			p.Related = append(p.Related, pl.placedStep(paths, loc, nil))
 		}
 		out = append(out, p)
 	}
@@ -187,7 +216,7 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 
 // Prepare places one run's results on their own, and says what it left out.
 func Prepare(run *Run, root string) ([]Placed, Dropped) {
-	pl := NewPlacer()
+	pl := NewPlacer(nil)
 	placed := pl.Place(run, root)
 	return placed, pl.Dropped()
 }
@@ -211,12 +240,14 @@ func failureSignal(ruleID string) bool { return failureSignals[ruleID] }
 // one a person is asked to review or settle.
 func problem(kind string) bool { return kind == "fail" || kind == "review" || kind == "open" }
 
-func placedStep(paths Paths, loc Location, depth *int) PlacedStep {
+func (pl *Placer) placedStep(paths Paths, loc Location, depth *int) PlacedStep {
 	rel, _ := paths.Relative(loc.URI, loc.Base)
-	return PlacedStep{
+	step := PlacedStep{
 		Path: rel, StartLine: loc.StartLine, Column: loc.StartColumn,
 		Function: loc.Function, Message: loc.Message, Depth: depth,
 	}
+	step.Snippet, step.SnippetLine = pl.snippet(rel, loc)
+	return step
 }
 
 func itoa(n int) string {

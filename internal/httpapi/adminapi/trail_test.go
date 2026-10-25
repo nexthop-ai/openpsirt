@@ -172,6 +172,12 @@ var administrativeActs = []trailedAct{
 		body: `{"share":90,"approvers":4}`, kind: "setting", about: "pair thresholds of mine",
 	},
 	{
+		id: "set-product-repositories", what: "where a product's source links open",
+		method: http.MethodPut, path: "/v1/products/mine/repositories",
+		body: `{"hosts":[{"remote":"github.com","web":"https://github.com","style":"github"}],"paths":[]}`,
+		kind: "setting", about: "repositories of mine",
+	},
+	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
 		path: "/v1/products/mine/end-of-life", body: `{"on":"2027-01-01"}`,
 		kind: "support", about: "mine",

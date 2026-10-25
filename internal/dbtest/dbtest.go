@@ -994,6 +994,9 @@ var tables = []string{
 	"person",
 	// After person and team, which point at it.
 	"party",
+	// Before product, which they point at.
+	"repository_host",
+	"repository_path",
 	// Before finding and series_run, both of which they point at.
 	"analysis_location",
 	"analysis_result",

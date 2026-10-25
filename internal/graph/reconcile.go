@@ -48,7 +48,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			}
 			if node.Purl != says.purl || node.CPE != says.cpe ||
 				node.UpstreamName != says.upstreamName ||
-				node.UpstreamVersion != says.upstreamVersion {
+				node.UpstreamVersion != says.upstreamVersion ||
+				node.Repository != says.repository {
 				restated[node.ID] = says
 			}
 			continue
@@ -66,6 +67,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			IsRoot: says.isRoot, OpenedScanID: scanID,
 			Purl: says.purl, CPE: says.cpe,
 			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
+			Repository: says.repository,
 		})
 	}
 	// One statement per node. A build restates an identifier rarely, and
@@ -77,6 +79,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 			Set(`"cpe" = ?`, nullable(says.cpe)).
 			Set(`"upstream_name" = ?`, nullable(says.upstreamName)).
 			Set(`"upstream_version" = ?`, nullable(says.upstreamVersion)).
+			Set(`"repository" = ?`, nullable(says.repository)).
 			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
@@ -136,6 +139,7 @@ type stated struct {
 	isRoot                        bool
 	purl, cpe                     string
 	upstreamName, upstreamVersion string
+	repository                    string
 }
 
 // nullable is a stated identifier as the column holds it: absent where the

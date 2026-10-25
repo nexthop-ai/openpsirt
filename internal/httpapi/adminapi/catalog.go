@@ -22,5 +22,6 @@ func registerCatalog(api huma.API, d core.Declaring) {
 	registerVariantEdits(api, d)
 	registerCatalogAmends(api, d)
 	registerCatalogPolicy(api, d)
+	registerCatalogRepositories(api, d)
 	registerCatalogReading(api, d)
 }

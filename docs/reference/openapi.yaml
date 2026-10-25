@@ -5460,6 +5460,114 @@ components:
         - due
         - days_left
       type: object
+    LeadEvidenceBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadEvidenceBody.json
+          format: uri
+          readOnly: true
+          type: string
+        at:
+          $ref: "#/components/schemas/LeadPlace"
+          description: Where the lead is
+        compare:
+          description: The address comparing the lead's repository between those two builds
+          type: string
+        last_seen:
+          description: When the build of the newest run that saw the lead was made
+          format: date-time
+          type: string
+        not_seen:
+          description: When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
+          format: date-time
+          type: string
+        open:
+          description: Whether the lead is open on the build
+          type: boolean
+        related:
+          description: The other places the analyzer names
+          items:
+            $ref: "#/components/schemas/LeadPlace"
+          type:
+            - array
+            - "null"
+        steps:
+          description: The path the analyzer took to it, in order
+          items:
+            $ref: "#/components/schemas/LeadPlace"
+          type:
+            - array
+            - "null"
+        unchanged:
+          description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
+          type: boolean
+      required:
+        - at
+        - steps
+        - related
+        - open
+        - last_seen
+      type: object
+    LeadPlace:
+      additionalProperties: false
+      properties:
+        approximate:
+          description: Whether the link opens on a branch the product names rather than on the analyzed commit
+          type: boolean
+        depth:
+          description: How deep in calls a step is, where the analyzer says
+          format: int64
+          type: integer
+        end_column:
+          format: int64
+          type: integer
+        end_line:
+          format: int64
+          type: integer
+        function:
+          description: The function the place is in, where the analyzer names one
+          type: string
+        link:
+          description: The address of the place in the repository's web view. Absent where unlinked says why
+          type: string
+        message:
+          description: What the analyzer says at the place
+          type: string
+        patched:
+          description: Whether the repository differed from its commit when it was analyzed, so the link shows the source before the patch
+          type: boolean
+        path:
+          description: The file, from the top of the checkout. Absent for a step outside it
+          type: string
+        repository:
+          description: "The repository the place is in: its web address on a host the product names, or the remote as the upload stated it"
+          type: string
+        revision:
+          description: The commit the link opens at, or the branch of an approximate link
+          type: string
+        snippet:
+          description: The source at the place, where the product keeps source under its path. Uploaded text, to be shown as text
+          type: string
+        snippet_line:
+          description: The line the snippet starts at
+          format: int64
+          type: integer
+        start_column:
+          format: int64
+          type: integer
+        start_line:
+          format: int64
+          type: integer
+        unlinked:
+          description: Why the place has no link
+          type: string
+        within:
+          description: The place's path inside that repository
+          type: string
+      type: object
     LinkBody:
       additionalProperties: false
       properties:
@@ -8909,12 +9017,27 @@ components:
             type: integer
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
+        inherited:
+          description: Results new to the build carried from a lead of the branch it was cut from
+          format: int64
+          type: integer
         not_reproduced:
           description: Results the build held open that this comparable run did not report
           format: int64
           type: integer
         opened:
           description: Results the run reported that the build did not hold open
+          format: int64
+          type: integer
+        probable:
+          description: Results paired with a lead on its function or its nearest line rather than its whole key
+          format: int64
+          type: integer
+        rebaseline:
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
+          type: boolean
+        reopened:
+          description: Results found again at the place of a lead on the build that was closed
           format: int64
           type: integer
         returned:
@@ -9266,6 +9389,7 @@ components:
             - patch
             - advisory
             - report
+            - documentation
           type: string
         lookup:
           description: "'found' is a commit the copy of its repository holds. 'absent' is a hash the copy does not resolve to one commit: no commit has it, or it is an abbreviation more than one object shares. Omitted where no copy has been asked, or where the link names no commit"
@@ -9583,6 +9707,80 @@ components:
           type: string
       required:
         - vulnerability
+      type: object
+    RepositoriesBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RepositoriesBody.json
+          format: uri
+          readOnly: true
+          type: string
+        hosts:
+          description: The repository hosts locations may link to. A repository on no host here is shown unlinked
+          items:
+            $ref: "#/components/schemas/RepositoryHost"
+          type:
+            - array
+            - "null"
+        paths:
+          description: What the product says about the code under each path prefix
+          items:
+            $ref: "#/components/schemas/RepositoryPath"
+          type:
+            - array
+            - "null"
+      required:
+        - hosts
+        - paths
+      type: object
+    RepositoryHost:
+      additionalProperties: false
+      properties:
+        compare_template:
+          description: "For a custom host, two commits compared: begins with {repo}/ and may name {from} and {to}"
+          type: string
+        file_template:
+          description: "For a custom host, a file's lines: begins with {repo}/ and may name {commit}, {path}, {start} and {end}"
+          type: string
+        remote:
+          description: "The remotes the host covers: a host such as github.com, or a host and the path a mirror keeps its copies under"
+          type: string
+        style:
+          description: The kind of server, which names the addresses it writes; custom takes the two templates
+          enum:
+            - github
+            - gitlab
+            - gitea
+            - custom
+          type: string
+        web:
+          description: The https address the covered repositories are under, which links open on
+          type: string
+      required:
+        - remote
+        - web
+        - style
+      type: object
+    RepositoryPath:
+      additionalProperties: false
+      properties:
+        branch:
+          description: The branch links into that repository open on. Such links are approximate
+          type: string
+        prefix:
+          description: A path from the top of the checkout. Empty is the whole product
+          type: string
+        remote:
+          description: The repository the code under the prefix is, where an upload names none. Sent with branch
+          type: string
+        snippets:
+          description: Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it is off
+          type: boolean
+      required:
+        - prefix
       type: object
     Repromise-upgradeRequest:
       additionalProperties: false
@@ -24068,6 +24266,71 @@ paths:
         scope: product
         any_of:
           - private-triage
+  /v1/products/{product}/repositories:
+    get:
+      description: |-
+        Returns the repository hosts a product's source links may point at, and what it says about the code under each path prefix: the repository and branch for paths an upload names no repository for, and whether source snippets are kept.
+
+        Requires: administrator
+      operationId: get-product-repositories
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepositoriesBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get a product's repository settings
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
+    put:
+      description: |-
+        Replaces the repository hosts a product's source links may point at, and what it says about the code under each path prefix. Links are built when a location is read, so a change reaches every location at once. Snippets are kept or discarded as an upload arrives, so a change reaches the uploads after it.
+
+        Refused, naming the entry, where a host is not https, a template does not begin at the repository or names a placeholder it may not, an entry is named twice, a repository is sent without its branch, or a path climbs out of the checkout. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: set-product-repositories
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepositoriesBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Set a product's repository settings
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/routing-rules:
     get:
       description: |-
@@ -26170,6 +26433,57 @@ paths:
         any_of:
           - public-triage
           - private-triage
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}:
+    get:
+      description: |-
+        Returns what the newest run that saw a lead on a build said about it: where it is, the path the analyzer took to it, and the other places it names. Each place links into the repository's web view at the analyzed commit, where the product names the repository's host, and carries the source kept beside it, where the product keeps source under its path.
+
+        A lead the build no longer holds open answers the newest it held, with when it was last seen, when it was first not seen, and whether its repository changed between the two.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-lead-evidence
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadEvidenceBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get a lead's evidence
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
   /v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage:
     get:
       description: |-

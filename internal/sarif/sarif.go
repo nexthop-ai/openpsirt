@@ -120,7 +120,17 @@ type Location struct {
 	// Function is the enclosing function, where the document names one.
 	Function string
 	Message  string
+	// Snippet is the source the document carries for the location, and
+	// SnippetLine the line it starts at, zero where unstated.
+	Snippet     string
+	SnippetLine int
+	// widest is whether the snippet is the context region's.
+	widest bool
 }
+
+// MostSnippet is the longest source text kept for one location, in bytes. A
+// client sends a few lines either side of each location.
+const MostSnippet = 4 << 10
 
 // Step is one step of the path a tool took to a result.
 type Step struct {
@@ -171,13 +181,14 @@ type RunProperties struct {
 	Series string
 	Built  string
 	Commit string
+	// Salt marks the secret the client's fingerprint is salted with: a short
+	// digest of it, so a rotation is told apart without the secret.
+	Salt string
 }
 
-// Discarded counts what reading left out: source text and proposed changes,
-// none of which this deployment stores.
+// Discarded counts what reading left out: whole files and proposed changes,
+// none of which this deployment stores, and markdown reduced to its text.
 type Discarded struct {
-	// Snippets is the regions whose source text was dropped.
-	Snippets int
 	// Markdown is the messages reduced to their text.
 	Markdown int
 	// Contents is the files whose whole contents the document carried.
@@ -188,7 +199,6 @@ type Discarded struct {
 
 // Add totals another count into this one.
 func (d *Discarded) Add(other Discarded) {
-	d.Snippets += other.Snippets
 	d.Markdown += other.Markdown
 	d.Contents += other.Contents
 	d.Fixes += other.Fixes

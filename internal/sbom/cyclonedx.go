@@ -225,6 +225,8 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			return c.into(&s.scope)
 		case "pedigree":
 			return c.pedigree(&s.described, &s.carried)
+		case "externalReferences":
+			return c.cdxRepository(&s.described.Repository)
 		case "components":
 			members, err := c.componentArray()
 			if err != nil {
@@ -319,6 +321,32 @@ func (c *reader) settle(s cdxComponent) (graph.Described, string, []graph.Descri
 	// until the fields it is derived from have all arrived.
 	c.scoped(described, s.scope)
 	return described, s.ref, s.nested, nil
+}
+
+// cdxRepository reads the first external reference of type vcs, which is
+// the format's statement of the repository a component is built from. Each
+// reference's type and address are read before either is acted on, because a
+// producer chooses the order of its own keys.
+func (c *reader) cdxRepository(dst *string) error {
+	return c.b.Array(func() error {
+		var kind, address string
+		if err := c.b.Object(func(key string) error {
+			switch key {
+			case "type":
+				return c.into(&kind)
+			case "url":
+				return c.into(&address)
+			default:
+				return c.b.Skip()
+			}
+		}); err != nil {
+			return err
+		}
+		if *dst == "" && kind == "vcs" {
+			*dst = strings.TrimSpace(address)
+		}
+		return nil
+	})
 }
 
 // cdxLicenses reads the licenses a component states.

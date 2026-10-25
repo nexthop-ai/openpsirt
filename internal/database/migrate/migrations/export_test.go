@@ -89,6 +89,7 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 	out := map[string][]string{
 		"vulnerability": vulnerabilityV0110(t),
 		"finding":       findingV0110(t),
+		"graph_node":    graphNodeV0110(t),
 	}
 	for table, declared := range map[string][]string{
 		"series": seriesV0110(t), "series_run": seriesV0110(t), "series_document": seriesV0110(t),

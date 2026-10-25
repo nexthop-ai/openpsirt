@@ -132,6 +132,11 @@ type Described struct {
 	// carries no package identifier, because an identifier says what a
 	// package is (IsImage).
 	Container bool
+	// Repository is the version-control address the producer states the
+	// component is built from. Not part of identity, and held on the build's
+	// node rather than the shared row: one build's statement of where its
+	// copy came from is not another's.
+	Repository string
 }
 
 // Identity returns the content-derived key for a described component.
@@ -502,6 +507,9 @@ func (d *Described) FillFrom(other Described) {
 	}
 	if d.License == "" {
 		d.License = other.License
+	}
+	if d.Repository == "" {
+		d.Repository = other.Repository
 	}
 	d.Container = d.Container || other.Container
 	if d.UpstreamName == "" {

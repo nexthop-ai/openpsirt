@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -36,7 +35,12 @@ type result struct {
 	Fingerprint       string `bun:"fingerprint,nullzero"`
 	FingerprintScheme string `bun:"fingerprint_scheme,nullzero"`
 	MatchKey          string `bun:"match_key,notnull"`
+	FunctionKey       string `bun:"function_key,nullzero"`
+	LineKey           string `bun:"line_key,notnull"`
+	MatchedOn         string `bun:"matched_on,nullzero"`
 	Level             string `bun:"level,nullzero"`
+	Snippet           string `bun:"snippet,nullzero"`
+	SnippetLine       *int   `bun:"snippet_line"`
 }
 
 // location is another place a result names: a step on the analyzer's path,
@@ -55,6 +59,8 @@ type location struct {
 	EndColumn   *int   `bun:"end_column"`
 	MessageText string `bun:"message_text,nullzero"`
 	Depth       *int   `bun:"depth"`
+	Snippet     string `bun:"snippet,nullzero"`
+	SnippetLine *int   `bun:"snippet_line"`
 }
 
 // The parts a location plays.
@@ -64,43 +70,35 @@ const (
 )
 
 // match pairs a run's results with the findings its series holds open on
-// the build, one to one, on the exact key. It reports the pairs, the results
-// nothing matched, the open findings the run did not see, and how many of the
-// pairs had been missed by an earlier run.
+// the build, one to one, layer by layer (pair). It reports the pairs, the
+// results nothing matched, the open findings the run did not see, and how
+// many of the pairs had been missed by an earlier run.
 func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keyed) (
 	map[int64]Keyed, []Keyed, []int64, int, error) {
 
+	absent := make(map[int64]bool, len(open))
 	ids := make([]int64, 0, len(open))
 	for _, s := range open {
 		ids = append(ids, s.FindingID)
+		absent[s.FindingID] = s.AbsentRunID != nil
 	}
-	byKey := map[string][]int64{}
-	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var rows []result
-		if err := db.NewSelect().Model(&rows).Column("finding_id", "match_key").
-			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
-			return err
-		}
-		for _, r := range rows {
-			byKey[r.MatchKey] = append(byKey[r.MatchKey], r.FindingID)
-		}
-		return nil
-	}); err != nil {
+	candidates, err := candidatesOf(ctx, db, ids, absent)
+	if err != nil {
 		return nil, nil, nil, 0, fmt.Errorf("read what the series holds open: %w", err)
 	}
-	for k := range byKey {
-		sort.Slice(byKey[k], func(i, j int) bool { return byKey[k][i] < byKey[k][j] })
-	}
-
 	matched := map[int64]Keyed{}
+	paired := make([]bool, len(keyed))
+	for _, p := range pair(candidates, keyed) {
+		k := keyed[p.result]
+		k.On = p.on
+		matched[candidates[p.candidate].findingID] = k
+		paired[p.result] = true
+	}
 	var fresh []Keyed
-	for _, k := range keyed {
-		if held := byKey[k.Key]; len(held) > 0 {
-			matched[held[0]] = k
-			byKey[k.Key] = held[1:]
-			continue
+	for i, k := range keyed {
+		if !paired[i] {
+			fresh = append(fresh, k)
 		}
-		fresh = append(fresh, k)
 	}
 	var missed []int64
 	returned := 0
@@ -116,48 +114,40 @@ func match(ctx context.Context, db bun.IDB, open []series.Sighting, keyed []Keye
 	return matched, fresh, missed, returned, nil
 }
 
-// baselined is the results new to this build that a lead in the series'
-// baseline already reports on another build. Such a lead is the same result,
-// and is in the baseline too.
-func baselined(ctx context.Context, db bun.IDB, seriesID int64, fresh []Keyed) (map[string]bool, error) {
-	keys := make([]string, 0, len(fresh))
-	seen := map[string]bool{}
-	for _, k := range fresh {
-		if !seen[k.Key] {
-			seen[k.Key] = true
-			keys = append(keys, k.Key)
+// candidatesOf is these findings as their newest sightings described them,
+// in the order of their identifiers.
+func candidatesOf(ctx context.Context, db bun.IDB, ids []int64, absent map[int64]bool) ([]candidate, error) {
+	var out []candidate
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var rows []result
+		if err := db.NewSelect().Model(&rows).
+			Column("finding_id", "match_key", "function_key", "line_key", "start_line").
+			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx); err != nil {
+			return err
 		}
-	}
-	out := map[string]bool{}
-	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
-	for start := 0; start < len(keys); start += database.BatchSize {
-		end := min(start+database.BatchSize, len(keys))
-		var found []string
-		if err := db.NewSelect().
-			TableExpr(`"analysis_result" AS "ar"`).
-			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
-			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
-			ColumnExpr(`"ar"."match_key"`).
-			Where(`"si"."series_id" = ?`, seriesID).
-			Where(`"si"."baseline" = ?`, true).
-			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
-			Where(where, args...).
-			Scan(ctx, &found); err != nil {
-			return nil, fmt.Errorf("read which of these results the baseline holds: %w", err)
+		for _, r := range rows {
+			c := candidate{
+				findingID: r.FindingID, key: r.MatchKey, functionKey: r.FunctionKey,
+				lineKey: r.LineKey, absent: absent[r.FindingID],
+			}
+			if r.StartLine != nil {
+				c.line = *r.StartLine
+			}
+			out = append(out, c)
 		}
-		for _, k := range found {
-			out[k] = true
-		}
-	}
-	return out, nil
+		return nil
+	})
+	sort.Slice(out, func(i, j int) bool { return out[i].findingID < out[j].findingID })
+	return out, err
 }
 
 // open records each result new to this build as a finding, with what the run
-// said about it, at the place its series and key name: one result is one
-// place on every build of the series, so a decision on it reaches each. It
-// returns the findings, and those the baseline already holds elsewhere.
+// said about it. A result the series holds elsewhere takes that lead's place,
+// so a decision on it reaches this build too; any other opens at a place its
+// series and key name. It returns the findings, and those in the baseline
+// because a lead they were carried from is.
 func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fresh []Keyed,
-	rules map[string]int64, inBaseline map[string]bool, components map[string]int64, root int64) (
+	rules map[string]int64, from map[int]carried, components map[string]int64, root int64) (
 	[]int64, []int64, error) {
 
 	if len(fresh) == 0 {
@@ -167,6 +157,10 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 	rows := make([]finding.Finding, len(fresh))
 	for i, k := range fresh {
 		place := identity(seriesID, k.Key)
+		if c, ok := from[i]; ok {
+			place = c.place
+			fresh[i].On = c.on
+		}
 		component := root
 		if id, ok := components[k.Remote]; ok {
 			component = id
@@ -186,7 +180,7 @@ func (a *Applier) open(ctx context.Context, db bun.IDB, run *series.Run, seriesI
 	for i := range rows {
 		ids[i] = rows[i].ID
 		said[rows[i].ID] = fresh[i]
-		if inBaseline[fresh[i].Key] {
+		if from[i].baseline {
 			baseline = append(baseline, rows[i].ID)
 		}
 	}
@@ -235,7 +229,9 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 			StartLine: stated(k.StartLine), StartColumn: stated(k.StartColumn),
 			EndLine: stated(k.EndLine), EndColumn: stated(k.EndColumn),
 			Enclosing: k.Function, CallChain: k.Chain, MessageText: k.Message,
-			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key, Level: k.Level,
+			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key,
+			FunctionKey: k.FunctionKey, LineKey: k.LineKey, MatchedOn: k.On, Level: k.Level,
+			Snippet: k.Snippet, SnippetLine: stated(k.SnippetLine),
 		})
 		ordinal := 0
 		for _, steps := range []struct {
@@ -247,6 +243,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 					FindingID: id, Ordinal: ordinal, Part: steps.part, Path: s.Path,
 					StartLine: stated(s.StartLine), StartColumn: stated(s.Column),
 					MessageText: s.Message, Depth: s.Depth,
+					Snippet: s.Snippet, SnippetLine: stated(s.SnippetLine),
 				})
 				ordinal++
 			}
@@ -268,33 +265,4 @@ func stated(n int) *int {
 		return nil
 	}
 	return &n
-}
-
-// normalizedRemote is a repository's address as host, owner and name, in
-// lower case, with no scheme, credential, revision or suffix: the form a
-// remote and a package identifier are compared in.
-func normalizedRemote(remote string) string {
-	s := strings.ToLower(strings.TrimSpace(remote))
-	s, _, _ = strings.Cut(s, "#")
-	s, _, _ = strings.Cut(s, "?")
-	s = strings.TrimPrefix(s, "git+")
-	if _, rest, found := strings.Cut(s, "://"); found {
-		s = rest
-	} else if at := strings.Index(s, "@"); at >= 0 && strings.Contains(s[at:], ":") {
-		// The form an SSH remote is written in: user@host:owner/name.
-		s = strings.Replace(s[at+1:], ":", "/", 1)
-	}
-	host, path, _ := strings.Cut(s, "/")
-	if at := strings.LastIndex(host, "@"); at >= 0 {
-		host = host[at+1:]
-	}
-	host, _, _ = strings.Cut(host, ":")
-	// A revision follows the path, as a version-control address in a package
-	// identifier writes it.
-	path, _, _ = strings.Cut(path, "@")
-	path = strings.TrimSuffix(strings.TrimSuffix(path, "/"), ".git")
-	if host == "" || path == "" {
-		return ""
-	}
-	return host + "/" + path
 }

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.22.0"/>
+    <errors>
+        <error id="missingIncludeSystem" severity="information" msg="Include file: &lt;stdlib.h&gt; not found. Please note: Cppcheck does not need standard library headers to get proper results."/>
+        <error id="memleak" severity="error" msg="Memory leak: buf" verbose="Memory leak: buf" cwe="401" hash="6980177729852485756" file0="a.c">
+            <location file="a.c" line="7" column="9"/>
+            <symbol>buf</symbol>
+        </error>
+        <error id="zerodiv" severity="error" msg="Division by zero." verbose="Division by zero." cwe="369" hash="7334605733346961071" file0="a.c">
+            <location file="include/shared.h" line="4" column="14" info="Division by zero"/>
+            <location file="include/shared.h" line="3" column="13" info="Assignment &apos;z=0&apos;, assigned value is 0"/>
+        </error>
+        <error id="zerodiv" severity="error" msg="Division by zero." verbose="Division by zero." cwe="369" hash="11853660473422907863" file0="a.c">
+            <location file="a.c" line="15" column="14" info="Division by zero"/>
+            <location file="a.c" line="14" column="13" info="Assignment &apos;d=0&apos;, assigned value is 0"/>
+        </error>
+        <error id="deallocret" severity="error" msg="Returning/dereferencing &apos;p&apos; after it is deallocated / released" verbose="Returning/dereferencing &apos;p&apos; after it is deallocated / released" cwe="672" hash="12900043322122708522" file0="b.c">
+            <location file="b.c" line="6" column="5"/>
+            <location file="b.c" line="5" column="5" info="Memory is released"/>
+        </error>
+        <error id="checkersReport" severity="information" msg="Active checkers: 107/966 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 107/966 (use --checkers-report=&lt;filename&gt; to see details)"/>
+    </errors>
+</results>

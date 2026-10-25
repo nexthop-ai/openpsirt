@@ -808,9 +808,9 @@ func (rd *reader) location(discarded *Discarded) (Location, error) {
 					loc.URI, loc.Base = a.URI, a.Base
 					return err
 				case "region":
-					return rd.region(discarded, &loc, true)
+					return rd.region(&loc, false)
 				case "contextRegion":
-					return rd.region(discarded, &loc, false)
+					return rd.region(&loc, true)
 				default:
 					return rd.b.Skip()
 				}
@@ -841,32 +841,54 @@ func (rd *reader) location(discarded *Discarded) (Location, error) {
 	return loc, err
 }
 
-// region reads a region's lines and columns into loc where keep is set, and
-// counts the source text it carries either way.
-func (rd *reader) region(discarded *Discarded, loc *Location, keep bool) error {
-	return rd.b.Object(func(key string) error {
+// region reads a region's lines and columns into loc, and its source text
+// with the line it starts at. A context region's lines are not the
+// location's, so only its text is taken, and it is preferred to the region's
+// own, which is the narrower of the two.
+func (rd *reader) region(loc *Location, context bool) error {
+	var r Location
+	var snippet string
+	err := rd.b.Object(func(key string) error {
 		var into *int
 		switch key {
 		case "startLine":
-			into = &loc.StartLine
+			into = &r.StartLine
 		case "startColumn":
-			into = &loc.StartColumn
+			into = &r.StartColumn
 		case "endLine":
-			into = &loc.EndLine
+			into = &r.EndLine
 		case "endColumn":
-			into = &loc.EndColumn
+			into = &r.EndColumn
 		case "snippet":
-			discarded.Snippets++
-			return rd.b.Skip()
+			return rd.b.Object(func(key string) error {
+				if key != "text" {
+					return rd.b.Skip()
+				}
+				s, err := rd.b.Str()
+				snippet = bound.Head(s, MostSnippet)
+				return err
+			})
 		default:
 			return rd.b.Skip()
 		}
 		n, err := rd.b.Int()
-		if keep && n != nil && *n > 0 {
+		if n != nil && *n > 0 {
 			*into = *n
 		}
 		return err
 	})
+	switch {
+	case context:
+		if snippet != "" {
+			loc.Snippet, loc.SnippetLine, loc.widest = snippet, r.StartLine, true
+		}
+	default:
+		loc.StartLine, loc.StartColumn, loc.EndLine, loc.EndColumn = r.StartLine, r.StartColumn, r.EndLine, r.EndColumn
+		if snippet != "" && !loc.widest {
+			loc.Snippet, loc.SnippetLine = snippet, r.StartLine
+		}
+	}
+	return err
 }
 
 func (rd *reader) artifactLocation() (ArtifactLocation, error) {
@@ -972,6 +994,7 @@ const (
 	propSeries        = "openpsirt/series"
 	propBuilt         = "openpsirt/built"
 	propCommit        = "openpsirt/commit"
+	propSalt          = "openpsirt/salt"
 )
 
 // properties reads one property bag, refusing one with more members than the
@@ -1011,6 +1034,8 @@ func (rd *reader) runProperties(p *RunProperties) error {
 			return str(&p.Built)
 		case propCommit:
 			return str(&p.Commit)
+		case propSalt:
+			return str(&p.Salt)
 		case propChanged:
 			return rd.b.Array(func() error {
 				s, err := rd.b.Str()

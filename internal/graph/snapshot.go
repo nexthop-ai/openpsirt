@@ -12,10 +12,12 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Node is a component's presence in a variant.
@@ -47,6 +49,10 @@ type Node struct {
 	// be another product's.
 	UpstreamName    string `bun:"upstream_name,nullzero"`
 	UpstreamVersion string `bun:"upstream_version,nullzero"`
+	// Repository is the version-control address this build stated the
+	// component is built from, without credentials. An analyzer's result in
+	// that repository is placed on the component.
+	Repository string `bun:"repository,nullzero"`
 }
 
 // Edge is one component depending on another.
@@ -185,6 +191,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, targetID, scanID int64,
 					purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
 					upstreamName:    strings.TrimSpace(stored.UpstreamName),
 					upstreamVersion: strings.TrimSpace(stored.UpstreamVersion),
+					repository:      statedRepository(stored.Repository),
 				}
 			}
 		}
@@ -1343,4 +1350,12 @@ func (s *Store) DeclaredScopes(ctx context.Context, targetID int64,
 		}
 	}
 	return scopes, nil
+}
+
+// statedRepository is a repository address as a node holds it: trimmed,
+// without a credential or query, and bounded the way what a producer states
+// about a component is. A credential in an inventory would otherwise reach
+// every reader of the build.
+func statedRepository(remote string) string {
+	return bound.HeadRunes(sourcelink.WithoutCredential(remote), statedWidth)
 }

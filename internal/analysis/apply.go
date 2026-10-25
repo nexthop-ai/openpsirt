@@ -24,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Applier applies stored runs.
@@ -45,6 +46,10 @@ type Receipt struct {
 	Returned      int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
 	NotReproduced int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
 	WouldMark     int            `json:"would_mark,omitempty" doc:"How many a held run would have marked not reproduced"`
+	Probable      int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
+	Inherited     int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
+	Reopened      int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
+	Rebaseline    bool           `json:"rebaseline,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any"`
 	Dropped       map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
 	Scanners      []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded     map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
@@ -112,14 +117,15 @@ func pending(s series.Status) bool { return s == series.Queued || s == series.Wa
 // Place puts every result of a run's documents in the checkout, leaving out
 // what a run does not keep. root is the checkout's absolute path where the
 // pipeline states one, and most is how large the placed results may be
-// once encoded. An upload that holds nothing to apply, or more than most,
-// is refused in words the sender reads.
-func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
+// once encoded, and keep is whether source under a path is kept. An upload
+// that holds nothing to apply, or more than most, is refused in words the
+// sender reads.
+func Place(logs []sarif.Log, root string, most int64, keep func(path string) bool) (Placed, error) {
 	out := Placed{
 		Rules:   map[string]finding.Rule{},
 		Receipt: Receipt{Dropped: map[string]int{}, Discarded: map[string]int{}},
 	}
-	placer := sarif.NewPlacer()
+	placer := sarif.NewPlacer(keep)
 	var discarded sarif.Discarded
 	kept := 0
 	for _, log := range logs {
@@ -137,9 +143,9 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 			for _, inv := range r.Invocations {
 				out.Signals += inv.Errors
 			}
-			run := HeldRun{Tool: r.Tool.Name, Remotes: make([]string, len(r.Modules))}
+			run := HeldRun{Tool: r.Tool.Name, Salt: r.Properties.Salt, Remotes: make([]string, len(r.Modules))}
 			for j, m := range r.Modules {
-				run.Remotes[j] = normalizedRemote(m.Repository)
+				run.Remotes[j] = sourcelink.Normalize(m.Repository)
 			}
 			at := len(out.Runs)
 			out.Runs = append(out.Runs, run)
@@ -147,7 +153,8 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 				name := ruleName(r.Tool.Name, res.RuleID)
 				if _, ok := out.Rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
-					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags}
+					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags,
+						Documentation: sourcelink.Documentation(rule.HelpURI)}
 				}
 				out.Results = append(out.Results, res)
 				out.RunOf = append(out.RunOf, at)
@@ -171,7 +178,7 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 		}
 	}
 	for what, n := range map[string]int{
-		"snippets": discarded.Snippets, "markdown": discarded.Markdown,
+		"snippets": placer.Snippets(), "markdown": discarded.Markdown,
 		"contents": discarded.Contents, "fixes": discarded.Fixes,
 	} {
 		if n > 0 {
@@ -198,7 +205,7 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 			continue
 		}
 		out = append(out, series.Module{
-			Path: at, Remote: m.Repository, Revision: m.Revision, Changed: changed[at],
+			Path: at, Remote: sourcelink.WithoutCredential(m.Repository), Revision: m.Revision, Changed: changed[at],
 		})
 	}
 	return out
@@ -278,6 +285,14 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 		keyed[i] = key(ruleName(placed.tool(i), res.RuleID), res)
 		keyed[i].Remote = placed.remote(i)
 	}
+	run.Fingerprints = printsOf(placed, keyed)
+	if run.Fingerprints != "" {
+		last, err := store.LastPrinted(ctx, run)
+		if err != nil {
+			return "", err
+		}
+		run.Rebaseline = last != "" && last != run.Fingerprints
+	}
 	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
 	if err != nil {
 		return "", err
@@ -310,7 +325,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 		ruleIDs[name] = id
 	}
 
-	held, err := baselined(ctx, tx, set.ID, fresh)
+	from, err := carry(ctx, tx, run, set.ID, previous == nil, fresh)
 	if err != nil {
 		return "", err
 	}
@@ -318,7 +333,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	if err != nil {
 		return "", err
 	}
-	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, held, components, inventory.root)
+	opened, inBaseline, err := a.open(ctx, tx, run, set.ID, fresh, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
 	}
@@ -359,8 +374,56 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	}
 
 	receipt.Opened, receipt.Seen, receipt.Returned = len(opened), len(matched), returned
+	receipt.Rebaseline = run.Rebaseline
+	for _, k := range matched {
+		if !strong(k.On) {
+			receipt.Probable++
+		}
+	}
+	for _, c := range from {
+		if !strong(c.on) {
+			receipt.Probable++
+		}
+		switch c.from {
+		case fromParent:
+			receipt.Inherited++
+		case fromReopened:
+			receipt.Reopened++
+		}
+	}
 	run.Status = series.Applied
 	return run.Status, a.end(ctx, store, run, receipt)
+}
+
+// printsOf is what a run's results are fingerprinted with: the scheme each
+// key was built from, sorted and named once, "none" where no result carried
+// one, and the mark of each salt. Empty where the run reported nothing, so a
+// run with no results never reads as a change.
+func printsOf(placed Placed, keyed []Keyed) string {
+	if len(keyed) == 0 {
+		return ""
+	}
+	seen := map[string]bool{}
+	var parts []string
+	for _, k := range keyed {
+		if k.Scheme != "" && !seen[k.Scheme] {
+			seen[k.Scheme] = true
+			parts = append(parts, k.Scheme)
+		}
+	}
+	// A result carrying no fingerprint beside others that do says nothing
+	// of how the run fingerprints, so it alone never makes a re-baseline.
+	if len(parts) == 0 {
+		parts = append(parts, "none")
+	}
+	for _, r := range placed.Runs {
+		if mark := "salt " + r.Salt; r.Salt != "" && !seen[mark] {
+			seen[mark] = true
+			parts = append(parts, mark)
+		}
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, ",")
 }
 
 // end records what became of a run and lets its placed results go. Nothing

@@ -83,11 +83,12 @@ and a kind it does not name never reaches it.
 | VEX | The documents stating what affects a build | Vulnerability, entered |
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
+| Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
 
-Analysis findings are included by no consumer above. The screens, queues,
-counts and exports that read them are built for them (`DESIGN-analysis.md`) and
-are **not built**; a lead is recorded and counted on its run's receipt and read
-nowhere else.
+Analysis findings are included by Evidence alone. The screens, queues, counts
+and exports that read them are built for them (`DESIGN-analysis.md`) and are
+**not built**; a lead is counted on its run's receipt and read through its
+evidence and nowhere else.
 
 ## Inclusion
 
@@ -125,8 +126,9 @@ rules.
 ## Source locations
 
 The path, lines, columns, enclosing function, flow steps and related places
-of a finding are stored as the newest run that saw it stated them. Source
-links and snippets are **not built**.
+of a finding are stored as the newest run that saw it stated them. Links into
+the source are built when the evidence is read, and source text is kept only
+under a path the product allows it for (`DESIGN-analysis.md` § Source).
 
 ## Limits
 

@@ -4,7 +4,7 @@
 # The release: every asset it carries, built into one directory and checked
 # there, and the record of a release's migrations that a tag is checked against.
 
-.PHONY: dist dist-version dist-clean dist-binaries dist-chart dist-inventories dist-sums dist-verify dist-serves release-freeze release-check
+.PHONY: dist dist-version dist-clean dist-binaries dist-client dist-chart dist-inventories dist-sums dist-verify dist-serves release-freeze release-check
 
 # What a release is made of, and where it is built.
 #
@@ -54,6 +54,7 @@ dist:
 	@$(MAKE) --no-print-directory dist-clean
 	@$(MAKE) --no-print-directory web
 	@$(MAKE) --no-print-directory dist-binaries
+	@$(MAKE) --no-print-directory dist-client
 	@$(MAKE) --no-print-directory dist-chart
 	@$(MAKE) --no-print-directory dist-inventories
 	@$(MAKE) --no-print-directory check-packaging CHECK_IMAGE=$(DIST_IMAGE):$(DIST_VERSION)
@@ -107,6 +108,45 @@ dist-binaries: dist-version
 	  rm -rf $(DIST_DIR)/$$name; \
 	  echo "  $$name.tar.gz"; \
 	done
+
+# The upload client, one archive per system and architecture a pipeline runs
+# on, and an inventory of each binary beside it (REQ-04). Pure Go and cgo off,
+# so every one cross-compiles here. A Windows archive is a zip, the archive
+# Windows opens without a tool of its own; every other is a tar.gz.
+#
+# The inventory is read off the built binary, as the server's is in the image,
+# and names the system and architecture it was built for, so there is one for
+# each archive. The generator takes that system and architecture from its own
+# environment rather than from the binary, so it is built once for this
+# machine and run with each target's. The standard library is listed, because
+# it is the only module the client links besides its own.
+CLIENT_INVENTORY_TOOL := bin/cyclonedx-gomod
+DIST_CLIENT_SYSTEMS ?= linux darwin windows
+dist-client: STAMP_VERSION := $(DIST_VERSION)
+dist-client: dist-version
+	@command -v zip >/dev/null 2>&1 \
+	  || { echo "zip is needed to archive the Windows upload client"; exit 1; }
+	@mkdir -p $(DIST_DIR)
+	@$(GO) build -modfile=tools/cyclonedx-gomod/go.mod -o $(CLIENT_INVENTORY_TOOL) \
+	  github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod
+	@set -e; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	  name=openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch; \
+	  exe=openpsirt-analysis; [ "$$os" != windows ] || exe=openpsirt-analysis.exe; \
+	  rm -rf $(DIST_DIR)/$$name; mkdir -p $(DIST_DIR)/$$name; \
+	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
+	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
+	  GOOS=$$os GOARCH=$$arch $(CLIENT_INVENTORY_TOOL) bin -json -std \
+	    -version $(DIST_VERSION) -output $(DIST_DIR)/$$name.cdx.json $(DIST_DIR)/$$name/$$exe; \
+	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
+	  if [ "$$os" = windows ]; then \
+	    archive=$$name.zip; (cd $(DIST_DIR) && zip -qrX $$archive $$name); \
+	  else \
+	    archive=$$name.tar.gz; tar -C $(DIST_DIR) -czf $(DIST_DIR)/$$archive $$name; \
+	  fi; \
+	  rm -rf $(DIST_DIR)/$$name; \
+	  echo "  $$archive"; \
+	  echo "  $$name.cdx.json"; \
+	done; done
 
 # The chart, with its version and the version of the application it installs
 # both stamped from the tag.
@@ -173,12 +213,21 @@ dist-sums: dist-version
 # checked where none is: a stripped binary built with -trimpath records no
 # linker flags to read the stamp from without running it.
 #
+# The upload client built for this machine is asked its version as well, and
+# each Windows archive is opened to see that it holds the program. The others
+# are named by the same check every asset's name takes. Every inventory, each
+# client binary's among them, is read for the version it describes, and each
+# client binary's for the system and architecture its package identifier
+# names and for the standard library it lists.
+#
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
 # named for what it signs, not for the release.
 dist-verify: dist-version
 	@command -v jq >/dev/null 2>&1 \
 	  || { echo "jq is needed to read the version out of an inventory"; exit 1; }
+	@command -v unzip >/dev/null 2>&1 \
+	  || { echo "unzip is needed to open the Windows upload client archives"; exit 1; }
 	@set -e; fail=0; skipped=; \
 	  for path in $(DIST_DIR)/*; do \
 	    file=$$(basename "$$path"); \
@@ -207,6 +256,21 @@ dist-verify: dist-version
 	      || $(MAKE) --no-print-directory dist-serves BINARY="$$binary" \
 	      || fail=1; \
 	  done; \
+	  client=openpsirt-analysis_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH); \
+	  if [ ! -f $(DIST_DIR)/$$client.tar.gz ]; then skipped="$$skipped the upload client (no archive)"; \
+	  else \
+	    tar -C "$$work" -xzf $(DIST_DIR)/$$client.tar.gz; \
+	    said=$$("$$work"/$$client/openpsirt-analysis version | awk '{print $$2}'); \
+	    [ "$$said" = "$(DIST_VERSION)" ] \
+	      || { echo "the upload client reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
+	  fi; \
+	  for arch in $(DIST_ARCHES); do \
+	    client=openpsirt-analysis_$(DIST_VERSION)_windows_$$arch; \
+	    if [ ! -f $(DIST_DIR)/$$client.zip ]; then skipped="$$skipped the $$arch Windows upload client (no archive)"; \
+	    elif ! unzip -l $(DIST_DIR)/$$client.zip | grep -q " $$client/openpsirt-analysis.exe$$"; then \
+	      echo "$$client.zip does not hold $$client/openpsirt-analysis.exe"; fail=1; \
+	    fi; \
+	  done; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
 	  elif ! command -v helm >/dev/null 2>&1; then skipped="$$skipped the chart (no helm)"; \
@@ -217,14 +281,27 @@ dist-verify: dist-version
 	        || { echo "the chart's $$field is $$said and the release is $(DIST_VERSION)"; fail=1; }; \
 	    done; \
 	  fi; \
+	  clients=; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	    clients="$$clients $(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json"; \
+	  done; done; \
 	  for inventory in \
 	    $(DIST_DIR)/openpsirt_$(DIST_VERSION).cdx.json \
-	    $(DIST_DIR)/openpsirt-image_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH).cdx.json; do \
+	    $(DIST_DIR)/openpsirt-image_$(DIST_VERSION)_linux_$(DIST_IMAGE_ARCH).cdx.json \
+	    $$clients; do \
 	    [ -f "$$inventory" ] || { skipped="$$skipped $$(basename $$inventory) (not built)"; continue; }; \
 	    said=$$(jq -r '.metadata.component.version' "$$inventory"); \
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "$$(basename $$inventory) describes $$said and the release is $(DIST_VERSION)"; fail=1; }; \
 	  done; \
+	  for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
+	    inventory=$(DIST_DIR)/openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch.cdx.json; \
+	    [ -f "$$inventory" ] || continue; \
+	    purl=$$(jq -r '.metadata.component.purl' "$$inventory"); \
+	    case "$$purl" in *goarch=$$arch\&goos=$$os\&*) ;; \
+	      *) echo "$$(basename $$inventory) names $$purl, not $$os on $$arch"; fail=1 ;; esac; \
+	    jq -e '[.components[]?.purl | select(startswith("pkg:golang/std@"))] | length > 0' "$$inventory" >/dev/null \
+	      || { echo "$$(basename $$inventory) does not list the standard library"; fail=1; }; \
+	  done; done; \
 	  [ "$$fail" = 0 ] || exit 1; \
 	  echo "  every asset names $(DIST_VERSION), and every one that carries it inside agrees"; \
 	  [ -z "$$skipped" ] || echo "  not checked:$$skipped"

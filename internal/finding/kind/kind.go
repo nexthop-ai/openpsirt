@@ -114,13 +114,16 @@ const (
 	Advisories Consumer = "advisories"
 	// Notifications is what is said to people about findings.
 	Notifications Consumer = "notifications"
+	// Evidence is one lead's evidence: where it is, the path the analyzer
+	// took to it, links into the source and the source kept beside it.
+	Evidence Consumer = "evidence"
 )
 
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Inventory, Statistics, Exports,
-		VEX, Advisories, Notifications,
+		VEX, Advisories, Notifications, Evidence,
 	}
 }
 
@@ -139,6 +142,8 @@ func (c Consumer) Kinds() []Kind {
 	case VersionCarry, Ranking, Triage, Inventory, Statistics, Exports, VEX,
 		Advisories, Notifications:
 		return []Kind{Vulnerability, Entered}
+	case Evidence:
+		return []Kind{Analysis}
 	}
 	return nil
 }

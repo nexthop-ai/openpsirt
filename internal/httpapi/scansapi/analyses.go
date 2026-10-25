@@ -31,6 +31,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // analysisParts is what an analyzer's run arrives as: its documents, and what
@@ -178,7 +179,12 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	}
 	stated := analysis.Describe(logs, given)
 	hash := analysis.RunHash(digests, stated.BuiltAt)
-	placed, err := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot), analysisLimits(in).MaxBytes)
+	repositories, err := sourcelink.NewStore(in.DB.DB).Config(ctx, named.ProductID)
+	if err != nil {
+		return nil, core.WentWrong(in.Logger, "the product's repository settings could not be read", err)
+	}
+	placed, err := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot), analysisLimits(in).MaxBytes,
+		repositories.Snippets)
 	switch {
 	case errors.As(err, &refused):
 		return nil, huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error())

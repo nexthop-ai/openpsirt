@@ -1,0 +1,114 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi
+
+import (
+	"context"
+	"net/http"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+)
+
+// LeadPlace is one place an analyzer named for a lead.
+type LeadPlace struct {
+	Path        string `json:"path,omitempty" doc:"The file, from the top of the checkout. Absent for a step outside it"`
+	StartLine   int    `json:"start_line,omitempty"`
+	StartColumn int    `json:"start_column,omitempty"`
+	EndLine     int    `json:"end_line,omitempty"`
+	EndColumn   int    `json:"end_column,omitempty"`
+	Function    string `json:"function,omitempty" doc:"The function the place is in, where the analyzer names one"`
+	Message     string `json:"message,omitempty" doc:"What the analyzer says at the place"`
+	Depth       *int   `json:"depth,omitempty" doc:"How deep in calls a step is, where the analyzer says"`
+	Snippet     string `json:"snippet,omitempty" doc:"The source at the place, where the product keeps source under its path. Uploaded text, to be shown as text"`
+	SnippetLine int    `json:"snippet_line,omitempty" doc:"The line the snippet starts at"`
+	Link        string `json:"link,omitempty" doc:"The address of the place in the repository's web view. Absent where unlinked says why"`
+	Repository  string `json:"repository,omitempty" doc:"The repository the place is in: its web address on a host the product names, or the remote as the upload stated it"`
+	Within      string `json:"within,omitempty" doc:"The place's path inside that repository"`
+	Revision    string `json:"revision,omitempty" doc:"The commit the link opens at, or the branch of an approximate link"`
+	Approximate bool   `json:"approximate,omitempty" doc:"Whether the link opens on a branch the product names rather than on the analyzed commit"`
+	Patched     bool   `json:"patched,omitempty" doc:"Whether the repository differed from its commit when it was analyzed, so the link shows the source before the patch"`
+	Unlinked    string `json:"unlinked,omitempty" doc:"Why the place has no link"`
+}
+
+// LeadEvidenceBody is what the newest run that saw a lead said about it.
+type LeadEvidenceBody struct {
+	At        LeadPlace   `json:"at" doc:"Where the lead is"`
+	Steps     []LeadPlace `json:"steps" doc:"The path the analyzer took to it, in order"`
+	Related   []LeadPlace `json:"related" doc:"The other places the analyzer names"`
+	Open      bool        `json:"open" doc:"Whether the lead is open on the build"`
+	LastSeen  string      `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
+	NotSeen   string      `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
+	Compare   string      `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
+	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
+}
+
+func registerLeads(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "get-lead-evidence", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}",
+		Summary: "Get a lead's evidence",
+		Description: "Returns what the newest run that saw a lead on a build said about it: where it " +
+			"is, the path the analyzer took to it, and the other places it names. Each place links " +
+			"into the repository's web view at the analyzed commit, where the product names the " +
+			"repository's host, and carries the source kept beside it, where the product keeps " +
+			"source under its path.\n\n" +
+			"A lead the build no longer holds open answers the newest it held, with when it was " +
+			"last seen, when it was first not seen, and whether its repository changed between " +
+			"the two.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string `path:"product"`
+		Stream  string `path:"stream"`
+		Variant string `path:"variant"`
+		Place   string `path:"place" doc:"The lead's place identity"`
+	}) (*struct{ Body LeadEvidenceBody }, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		named, err := core.LocatedVisibly(ctx, in, subject, input.Product, input.Stream, input.Variant)
+		if err != nil {
+			return nil, err
+		}
+		target, err := core.TargetRow(ctx, in, named.StreamID, named.VariantID)
+		if err != nil {
+			return nil, err
+		}
+		lead, err := finding.NewStore(in.DB.DB).LeadAt(ctx, subject, target.ID, input.Place)
+		if err != nil {
+			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
+		}
+		evidence, err := analysis.EvidenceOf(ctx, in.DB.DB, subject, lead, named.ProductID)
+		if err != nil {
+			return nil, core.Absent(in.Logger, err, "that lead's evidence could not be read", core.NoSuchFinding)
+		}
+		body := LeadEvidenceBody{
+			At: leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
+			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
+			Compare: evidence.Compare, Unchanged: evidence.Unchanged,
+		}
+		for _, p := range evidence.Steps {
+			body.Steps = append(body.Steps, leadPlace(p))
+		}
+		for _, p := range evidence.Related {
+			body.Related = append(body.Related, leadPlace(p))
+		}
+		return &struct{ Body LeadEvidenceBody }{Body: body}, nil
+	})
+}
+
+// leadPlace is one place as an answer states it.
+func leadPlace(p analysis.Located) LeadPlace {
+	return LeadPlace{
+		Path: p.Path, StartLine: p.StartLine, StartColumn: p.StartColumn,
+		EndLine: p.EndLine, EndColumn: p.EndColumn, Function: p.Function, Message: p.Message,
+		Depth: p.Depth, Snippet: p.Snippet, SnippetLine: p.SnippetLine,
+		Link: p.Link.URL, Repository: p.Link.Repository, Within: p.Link.Within, Revision: p.Link.Revision,
+		Approximate: p.Link.Approximate, Patched: p.Link.Patched, Unlinked: p.Link.Unlinked,
+	}
+}
