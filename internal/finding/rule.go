@@ -5,6 +5,8 @@ package finding
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -18,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // Rule is an analyzer's rule as an issue: the name it is filed under, what
@@ -57,7 +60,7 @@ func RuleRating(severity, precision string) (*int, string) {
 	return tenths, precision
 }
 
-// ruleRating is a tool's rating of a rule's results.
+// ruleRating is how likely a rule's results are to be real.
 type ruleRating struct {
 	bun.BaseModel `bun:"table:rule_rating,alias:rr"`
 
@@ -65,6 +68,7 @@ type ruleRating struct {
 	VulnerabilityID int64   `bun:"vulnerability_id,notnull"`
 	SeverityTenths  *int    `bun:"severity_tenths"`
 	Precision       *string `bun:"precision"`
+	WeaknessTier    int     `bun:"weakness_tier,notnull"`
 }
 
 // cweTag is a rule tag naming a weakness, in the convention CodeQL writes and
@@ -143,19 +147,35 @@ func (v *Vulnerabilities) Rule(ctx context.Context, rule Rule) (int64, error) {
 	return id, nil
 }
 
-// rateRule records the rating a rule arrived with in place of the one held. A
-// rule arriving unrated leaves the one held: a run of the tool that omits it
-// says nothing about the rule.
+// rateRule records the rating a rule arrived with in place of the one held,
+// and ranks every weakness recorded for it. A rule arriving unrated keeps the
+// rating held: a run of the tool that omits it says nothing about the rule.
 func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) error {
-	if rule.SeverityTenths == nil && rule.Precision == "" {
-		return nil
+	var named []string
+	if err := v.db.NewSelect().Model((*Weakness)(nil)).Column("cwe").
+		Where(`"vulnerability_id" = ?`, id).Scan(ctx, &named); err != nil {
+		return err
 	}
-	row := ruleRating{VulnerabilityID: id, SeverityTenths: rule.SeverityTenths}
+	tier := weakness.TierOther
+	for _, w := range named {
+		tier = max(tier, weakness.TierOf(w))
+	}
+	var row ruleRating
+	err := v.db.NewSelect().Model(&row).Where(`"rr"."vulnerability_id" = ?`, id).Scan(ctx)
+	held := err == nil
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	row.VulnerabilityID, row.WeaknessTier = id, int(tier)
+	if rule.SeverityTenths != nil {
+		row.SeverityTenths = rule.SeverityTenths
+	}
 	if rule.Precision != "" {
 		row.Precision = &rule.Precision
 	}
-	if _, err := v.db.NewDelete().Model((*ruleRating)(nil)).
-		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {
+	if held {
+		_, err := v.db.NewUpdate().Model(&row).
+			Column("severity_tenths", "precision", "weakness_tier").WherePK().Exec(ctx)
 		return err
 	}
 	if _, err := v.db.NewInsert().Model(&row).Exec(ctx); err != nil {

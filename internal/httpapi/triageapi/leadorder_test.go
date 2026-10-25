@@ -30,6 +30,10 @@ func TestTheQueueIsOrderedByTheToolsOwnRating(t *testing.T) {
 	for _, c := range []struct {
 		name, leak, overflow, first string
 	}{
+		{"memory safety over a severe leak", `"tags":["external/cwe/cwe-401"],"security-severity":"9.8"`,
+			`"tags":["external/cwe/cwe-787"]`, "src/c.c"},
+		{"a use after free over severe dead code", `"tags":["external/cwe/cwe-416"]`,
+			`"tags":["external/cwe/cwe-563"],"security-severity":"9.8"`, "src/d.c"},
 		{"a severe overflow", ``, `"security-severity":"9.8"`, "src/c.c"},
 		{"a severe leak", `"security-severity":"9.8"`, `"security-severity":"2.0"`, "src/d.c"},
 		{"a severer overflow", `"security-severity":"2.0"`, `"security-severity":"9.8"`, "src/c.c"},
@@ -45,8 +49,8 @@ func TestTheQueueIsOrderedByTheToolsOwnRating(t *testing.T) {
 				if len(got.Items) != 2 || got.Items[0].Path != c.first {
 					t.Fatalf("the queue is %+v; want %s first", got.Items, c.first)
 				}
-				// A run of the tool that rates nothing leaves the rating
-				// recorded.
+				// A run of the tool that rates nothing and tags nothing
+				// leaves the rating and the weaknesses recorded.
 				httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Minute), ratedRun(``, ``))
 				if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 2 || got.Items[0].Path != c.first {
 					t.Errorf("after an unrated run the queue is %+v; want %s first still", got.Items, c.first)

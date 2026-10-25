@@ -77,8 +77,9 @@ func leadV0110(t *columnTypes) []string {
 		)` + t.suffix,
 		`CREATE INDEX "lead_rule_product_idx" ON "lead_rule" ("product_id")`,
 
-		// An analyzer's own rating of a rule's results, as the newest run
-		// naming the rule gave it. A rule rated by nothing has no row.
+		// How likely a rule's results are to be real: the analyzer's own
+		// rating, as the newest run rating the rule gave it, and the rank of
+		// the weaknesses it names.
 		`CREATE TABLE "rule_rating" (
 			"id"                ` + t.id + `,
 			"vulnerability_id"  ` + t.ref + ` NOT NULL,
@@ -88,6 +89,10 @@ func leadV0110(t *columnTypes) []string {
 			-- very-high, high, medium or low. Null where the tool gives
 			-- none.
 			"precision"         ` + t.kind + `,
+			-- How likely the weaknesses the rule names are to be a flaw
+			-- worth fixing first, from 0 up, as the server's table ranks
+			-- them when the rule was last recorded.
+			"weakness_tier"     INTEGER NOT NULL,
 			CONSTRAINT "rule_rating_rule_unique" UNIQUE ("vulnerability_id"),
 			CONSTRAINT "rule_rating_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,

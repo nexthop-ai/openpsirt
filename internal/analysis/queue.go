@@ -80,8 +80,9 @@ type Queue struct {
 //
 // With no state named it is the queue: open leads nobody's claim waits on.
 // Naming a state lists the leads in it, which is how the baseline is
-// searched. Ordered by what is likely real: the tool's own security severity
-// for the rule, then its precision, then newest first.
+// searched. Ordered by what is likely real: the rank of the weaknesses the
+// rule names, the tool's own security severity for the rule, its precision,
+// then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
 
@@ -99,6 +100,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
 			Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 			ColumnExpr(`"f"."id", "f"."place_identity", "f"."opened_at"`).
+			ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
 			ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
 			ColumnExpr(precisionRank+` AS "precise"`).
 			ColumnExpr(state+` AS "stands"`, stateArgs...).
@@ -160,7 +162,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
 		ColumnExpr(`COUNT(*) AS "builds", MIN("l"."opened_at") AS "opened"`).
 		GroupExpr(`"l"."place_identity"`).
-		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
+		OrderExpr(`MAX("l"."tier") DESC, MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
 		OrderExpr(`MIN("l"."opened_at") DESC, "l"."place_identity" ASC`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &page); err != nil {

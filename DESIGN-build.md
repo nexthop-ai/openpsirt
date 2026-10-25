@@ -162,7 +162,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
-| `make weakness-names` | Rewrites the weakness names from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
+| `make weakness-names` | Rewrites the weakness names, and each weakness's primary parent in the catalog's research view, from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs `$(DOCKER)` — docker unless set — and helm, and says so where it has neither. `make dist` refuses to run without them, because it gates the image it builds |
 | `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
