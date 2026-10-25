@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
@@ -93,6 +94,45 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	out := make([]Kin, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Kin{Place: r.Place, Rule: r.Rule, Path: r.Path, Line: r.Line, Same: r.Same == 1})
+	}
+	return out, nil
+}
+
+// Member is a lead one judgment about another lead also answers.
+type Member struct {
+	VulnerabilityID int64             `bun:"vulnerability_id"`
+	Place           string            `bun:"place_identity"`
+	Visibility      access.Visibility `bun:"visibility"`
+}
+
+// Unanswered is the leads on a lead's build that are the same flaw as it and
+// that nothing answers yet, where the subject may read them: open, under no
+// live claim, waiting or not, and covered by no standing rule. A lead already
+// answered keeps its own answer.
+func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
+	visible, err := access.Readable(subject, productID)
+	if err != nil {
+		return nil, err
+	}
+	// The lead asked about is under "g" and each of its kin under "f", so
+	// that the claim and the rule are asked of the kin. Which leads are one
+	// flaw does not depend on which of the two is asked about.
+	var out []Member
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
+		Join(`JOIN "finding" AS "g" ON "g"."id" = ?`, leadID).
+		Join(`JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"`).
+		ColumnExpr(`"f"."vulnerability_id", "f"."place_identity", "f"."visibility"`).
+		Where(nearby(groupLines)).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "dc"
+			WHERE "dc"."product_id" = ? AND "dc"."live_key" IS NOT NULL AND `+finding.DecisionFiledAt("dc", "f")+`)`,
+			productID).
+		Where(`NOT `+ruled, productID).
+		OrderExpr(`"f"."place_identity" ASC`).
+		Scan(ctx, &out); err != nil {
+		return nil, fmt.Errorf("read the leads one judgment about lead %d answers: %w", leadID, err)
 	}
 	return out, nil
 }

@@ -47,7 +47,9 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			"`dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or " +
 			"`mitigated`. A dismissal and `not-security` take effect once somebody else holding " +
 			"`approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.\n\n" +
-			"The decision covers the lead on every stream and variant it is seen on. A lead that " +
+			"The decision covers the lead on every stream and variant it is seen on, and every lead " +
+			"another analyzer reports as the same flaw on the build that nothing answers yet, as one " +
+			"claim agreed to once. A lead that " +
 			"is fixed is refused: it opens again where it is seen again.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
@@ -79,7 +81,11 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 		case err != nil:
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
-		decision, err := store.Propose(ctx, subject, triage.Proposal{
+		kin, err := analysis.Unanswered(ctx, in.DB.DB, subject, named.ProductID, lead.ID)
+		if err != nil {
+			return nil, core.RefusedDecision(in.Logger, err)
+		}
+		first := triage.Proposal{
 			Place: triage.Place{
 				ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID,
 				PlaceIdentity: lead.PlaceIdentity, Visibility: lead.Visibility, Kind: kind.Analysis,
@@ -89,7 +95,25 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			Reasoning:     input.Body.Reasoning,
 			By:            subject.ID,
 			MadeOn:        []int64{target.ID},
-		})
+		}
+		var decision *triage.Decision
+		if len(kin) == 0 {
+			decision, err = store.Propose(ctx, subject, first)
+		} else {
+			// One claim over the lead and every lead that is the same flaw,
+			// agreed to once.
+			proposals := []triage.Proposal{first}
+			for _, k := range kin {
+				also := first
+				also.Place.VulnerabilityID, also.Place.PlaceIdentity, also.Place.Visibility =
+					k.VulnerabilityID, k.Place, k.Visibility
+				proposals = append(proposals, also)
+			}
+			var recorded []*triage.Decision
+			if recorded, err = store.ProposeMany(ctx, subject, proposals); err == nil {
+				decision = recorded[0]
+			}
+		}
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}

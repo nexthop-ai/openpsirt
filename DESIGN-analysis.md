@@ -552,6 +552,9 @@ at least one.
 | A group is a lead and the leads within two lines of it, worked out for each lead | Two leads each the same flaw as a third and four lines apart are two groups |
 | Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead stands does not depend on who is looking |
 | A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
+| A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
+| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
+| A lead possibly the same flaw is left out | It is judged on its own |
 
 ## Receipts
 
@@ -689,7 +692,6 @@ it is about.
 | The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
-| One decision about every lead of a group | Not built. Each lead takes its own claim, and its evidence lists the leads it is one flaw with |
 | Weaknesses for plain cppcheck and for clang | Not built. A rule names the weaknesses its tags name, which CodeQL and semgrep write and these two do not |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |

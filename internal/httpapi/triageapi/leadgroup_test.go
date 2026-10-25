@@ -4,11 +4,15 @@
 package triageapi_test
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -107,6 +111,153 @@ func TestLeadsInTwoFilesAreNotOneFlaw(t *testing.T) {
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), overflowsIn("src/c.c", "416", "787", 3))
 		if kin := kinOf(t, r, place); len(kin) != 0 {
 			t.Errorf("the leak's kin are %+v; want none in another file", kin)
+		}
+	})
+}
+
+// decideLead records a judgment about a lead as the internal triager, and the
+// claim it made.
+func decideLead(t *testing.T, r *httpapitest.Reach, place, body string) core.DecisionBody {
+	t.Helper()
+	got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place), body)
+	if got.Code != http.StatusCreated {
+		t.Fatalf("deciding %s answered %d: %s", place, got.Code, got.Body)
+	}
+	var decided core.DecisionBody
+	if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
+		t.Fatal(err)
+	}
+	return decided
+}
+
+// besideTheLeak is the seeded lead and its kin once overflows are reported
+// at the lines of src/b.c given, in the bounds family.
+func besideTheLeak(t *testing.T, r *httpapitest.Reach, lines ...int) (string, []string) {
+	t.Helper()
+	place := httpapitest.SeededLead(t, r)
+	httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), overflowsBesideTheLeak("416", "787", lines...))
+	var kin []string
+	for _, k := range kinOf(t, r, place) {
+		kin = append(kin, k.Place)
+	}
+	return place, kin
+}
+
+func TestOneDecisionAnswersEveryLeadThatIsTheSameFlaw(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4, 12)
+		if len(kin) != 2 {
+			t.Fatalf("the leak's kin are %v; want the overflow on line 4 and possibly line 12", kin)
+		}
+		decided := decideLead(t, r, place,
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
+		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+		if got := leadState(t, r, place); got != "dismissed" {
+			t.Errorf("the lead decided is %q; want dismissed", got)
+		}
+		if got := leadState(t, r, kin[0]); got != "dismissed" {
+			t.Errorf("the overflow that is the same flaw is %q; want it answered by the one approval", got)
+		}
+		// A lead that is possibly the same flaw is left to be judged.
+		if got := leadState(t, r, kin[1]); got != "open" {
+			t.Errorf("the overflow that is possibly the same flaw is %q; want it open", got)
+		}
+	})
+}
+
+func TestALeadOfAGroupAlreadyAnsweredKeepsItsAnswer(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// The leak is answered before the overflow is reported beside it.
+		place := httpapitest.SeededLead(t, r)
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), overflowsBesideTheLeak("416", "787", 4))
+		kin := kinOf(t, r, place)
+		if len(kin) != 1 {
+			t.Fatalf("the leak's kin are %+v; want the overflow on line 4", kin)
+		}
+		decided := decideLead(t, r, kin[0].Place,
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"never reached"}`)
+		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+		if got := leadState(t, r, place); got != "confirmed" {
+			t.Errorf("the leak confirmed first is %q; want it confirmed still", got)
+		}
+		if got := leadState(t, r, kin[0].Place); got != "dismissed" {
+			t.Errorf("the overflow decided is %q; want dismissed", got)
+		}
+	})
+}
+
+func TestALeadOfAGroupWaitingOnAClaimKeepsIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decideLead(t, r, place, `{"outcome":"not-security","reasoning":"a style finding"}`)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), overflowsBesideTheLeak("416", "787", 4))
+		kin := kinOf(t, r, place)
+		if len(kin) != 1 {
+			t.Fatalf("the leak's kin are %+v; want the overflow on line 4", kin)
+		}
+		decideLead(t, r, kin[0].Place, `{"outcome":"confirmed","reasoning":"the length is attacker controlled"}`)
+		if got := leadState(t, r, place); got != "open" {
+			t.Errorf("the leak whose claim waits is %q; want it waiting still", got)
+		}
+	})
+}
+
+func TestALeadOfAGroupUnderAStandingRuleKeepsIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/overflow","prefix":"src/b.c",`+
+			`"reason":"false_positive","reasoning":"the buffer is sized by the generator"}`)
+		approveLeadRule(t, r, rule.ID)
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		if got := leadState(t, r, kin[0]); got != "dismissed" {
+			t.Errorf("the overflow a standing rule dismisses is %q; want it dismissed still", got)
+		}
+		if got := leadState(t, r, place); got != "confirmed" {
+			t.Errorf("the lead decided is %q; want confirmed", got)
+		}
+	})
+}
+
+func TestALeadOfAGroupNobodyMayReadIsNotDecided(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4)
+		if _, err := r.DB.DB.NewUpdate().Table("finding").Set(`"visibility" = 'private'`).
+			Where(`"place_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		var decided int
+		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("COUNT(*)").
+			Where(`"place_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		if decided != 0 {
+			t.Errorf("a judgment by somebody who cannot read the overflow was recorded at it %d times", decided)
+		}
+	})
+}
+
+func TestALeadOfAGroupThatIsFixedIsNotDecided(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, kin := besideTheLeak(t, r, 4)
+		if _, err := r.DB.DB.NewUpdate().Table("finding").Set(`"closed_at" = ?`, time.Now().UTC()).
+			Where(`"place_identity" = ?`, kin[0]).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		if got := leadState(t, r, kin[0]); got != "fixed" {
+			t.Errorf("the overflow fixed is %q; want it fixed still", got)
+		}
+		var decided int
+		if err := r.DB.DB.NewSelect().Table("decision").ColumnExpr("COUNT(*)").
+			Where(`"place_identity" = ?`, kin[0]).Scan(t.Context(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		if decided != 0 {
+			t.Errorf("a judgment was recorded at the fixed overflow %d times", decided)
 		}
 	})
 }
