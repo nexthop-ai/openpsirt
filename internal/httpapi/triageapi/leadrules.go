@@ -42,6 +42,7 @@ type LeadRuleBody struct {
 	Reason     core.LeadReason `json:"reason" doc:"Why the leads it covers are dismissed"`
 	Reasoning  string          `json:"reasoning" doc:"The reasoning, in markdown"`
 	ProposedBy int64           `json:"proposed_by" doc:"The person who proposed it"`
+	Yours      bool            `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
 	ProposedAt string          `json:"proposed_at" format:"date-time"`
 	ApprovedBy *int64          `json:"approved_by,omitempty" doc:"The person who last approved it"`
 	ApprovedAt string          `json:"approved_at,omitempty" format:"date-time"`
@@ -51,10 +52,11 @@ type LeadRuleBody struct {
 	State      LeadRuleState   `json:"state" doc:"proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. needs-path names an analyzer rule and no path, and covers nothing since the rule was found to find memory safety or injection flaws: retire it and propose it again with a path. retired covers nothing"`
 }
 
-func leadRuleBody(r analysis.StandingRule) LeadRuleBody {
+// leadRuleBody is a standing rule as the subject reads it.
+func leadRuleBody(subject access.Subject, r analysis.StandingRule) LeadRuleBody {
 	return LeadRuleBody{
 		ID: r.ID, Rule: r.Rule, Prefix: r.Prefix, Reason: core.LeadReason(r.Reason), Reasoning: r.Reasoning,
-		ProposedBy: r.ProposedBy, ProposedAt: core.Stamp(r.ProposedAt),
+		ProposedBy: r.ProposedBy, Yours: r.ProposedBy == subject.ID, ProposedAt: core.Stamp(r.ProposedAt),
 		ApprovedBy: r.ApprovedBy, ApprovedAt: core.StampAt(r.ApprovedAt), Approved: r.ApprovedCovering,
 		RetiredAt: core.StampAt(r.RetiredAt), Covering: r.Covering, State: LeadRuleState(r.State),
 	}
@@ -107,7 +109,7 @@ func registerLeadRules(api huma.API, in core.Deps) {
 		}{}
 		out.Body.Items = make([]LeadRuleBody, 0, len(rules))
 		for _, r := range rules {
-			out.Body.Items = append(out.Body.Items, leadRuleBody(r))
+			out.Body.Items = append(out.Body.Items, leadRuleBody(subject, r))
 		}
 		return out, nil
 	})
@@ -152,7 +154,7 @@ func registerLeadRules(api huma.API, in core.Deps) {
 		}); err != nil {
 			return nil, err
 		}
-		return &struct{ Body LeadRuleBody }{Body: leadRuleBody(*rule)}, nil
+		return &struct{ Body LeadRuleBody }{Body: leadRuleBody(subject, *rule)}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -194,7 +196,7 @@ func registerLeadRules(api huma.API, in core.Deps) {
 		}); err != nil {
 			return nil, err
 		}
-		return &struct{ Body LeadRuleBody }{Body: leadRuleBody(*rule)}, nil
+		return &struct{ Body LeadRuleBody }{Body: leadRuleBody(subject, *rule)}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{

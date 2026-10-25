@@ -58,7 +58,7 @@ func mayApprove(subject access.Subject, productID int64, visibility access.Visib
 	if subject.Kind != access.Person {
 		return false
 	}
-	return access.MayApprove(subject.Holds(access.Approver, productID),
+	return access.MayApprove(visibility, subject.Holds(access.Approver, productID),
 		subject.Reads(visibility, productID), mayDecide(subject, productID, visibility))
 }
 

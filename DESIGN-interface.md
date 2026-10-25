@@ -1431,7 +1431,7 @@ the screens draw them.
 | A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
 | The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
-| Approve is offered for a rule waiting or outgrown, to somebody who may agree to internal claims | The server refuses the rule's own proposer, and says so |
+| Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
 | The important paths are edited as one list, one path to a line | The server stores the list whole, so a blank line and surrounding space are dropped before it is sent |
 

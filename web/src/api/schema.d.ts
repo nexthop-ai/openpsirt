@@ -7451,7 +7451,7 @@ export interface components {
             version: string;
         };
         CanBody: {
-            /** @description Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage */
+            /** @description Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability */
             agrees_internal: boolean;
             /** @description Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage */
             agrees_private: boolean;
@@ -9969,6 +9969,8 @@ export interface components {
              * @enum {string}
              */
             state: "proposed" | "in-force" | "outgrown" | "needs-path" | "retired";
+            /** @description Whether you proposed it. The proposer may not approve it */
+            yours?: boolean;
         };
         LeadsOutputBody: {
             /**

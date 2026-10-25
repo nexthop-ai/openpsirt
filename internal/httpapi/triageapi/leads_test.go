@@ -47,6 +47,28 @@ func TestADismissedLeadStatesAReasonAndWaitsForASecondPerson(t *testing.T) {
 	})
 }
 
+func TestAClaimAboutALeadIsAgreedToOnlyByAnApprover(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		at := fmt.Sprintf(leadDecisionAt, httpapitest.SeededLead(t, r))
+		got := httpapitest.AsPerson(t, r, "internal-lead", http.MethodPost, at,
+			`{"outcome":"dismissed","reason":"wont_fix","reasoning":"a tool that exits"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
+		}
+		var decided core.DecisionBody
+		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		approval := fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID)
+		// Triaging internal material is not the right to agree to it.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, approval, `{}`),
+			http.StatusNotFound)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, approval, `{}`); got.Code != http.StatusOK {
+			t.Errorf("the internal reviewer's approval answered %d: %s", got.Code, got.Body)
+		}
+	})
+}
+
 func TestAConfirmedLeadWaitsForNobody(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		at := fmt.Sprintf(leadDecisionAt, httpapitest.SeededLead(t, r))

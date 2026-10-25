@@ -175,9 +175,11 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 			"reviewer":       {MayAgree: true, AgreesPublic: true, AgreesPrivate: false},
 			"embargo-reader": {MayAgree: false, AgreesPublic: false, AgreesPrivate: false},
 			"private-triage": {MayAgree: true, AgreesPublic: true, AgreesPrivate: true},
-			// Internal triage agrees about internal work and nothing else.
-			"internal-triager": {MayAgree: true, AgreesInternal: true},
-			"internal-reader":  {},
+			// Agreeing about internal work takes the capability: internal
+			// triage alone agrees to nothing.
+			"internal-triager":  {},
+			"internal-reviewer": {MayAgree: true, AgreesInternal: true},
+			"internal-reader":   {},
 		} {
 			if got := session(who); got != want {
 				t.Errorf("the session describes %s's agreeing as %+v, want %+v", who, got, want)

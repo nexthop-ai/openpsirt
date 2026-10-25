@@ -101,16 +101,18 @@ function Rules({
                   </span>
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
-                  {agrees && (rule.state === "proposed" || rule.state === "outgrown") && (
-                    <button
-                      type="button"
-                      className="btn quiet"
-                      disabled={approve.isPending}
-                      onClick={() => approve.mutate(rule.id)}
-                    >
-                      Approve
-                    </button>
-                  )}
+                  {agrees &&
+                    !rule.yours &&
+                    (rule.state === "proposed" || rule.state === "outgrown") && (
+                      <button
+                        type="button"
+                        className="btn quiet"
+                        disabled={approve.isPending}
+                        onClick={() => approve.mutate(rule.id)}
+                      >
+                        Approve
+                      </button>
+                    )}
                   {triages && rule.state !== "retired" && (
                     <button
                       type="button"

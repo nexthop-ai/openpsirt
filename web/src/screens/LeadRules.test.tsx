@@ -23,6 +23,7 @@ const RULES = [
   },
   {
     id: 2,
+    rule: "cppcheck/uninitvar",
     prefix: "third_party",
     reason: "wont_fix",
     reasoning: "y",
@@ -31,6 +32,17 @@ const RULES = [
     proposed_at: "2026-09-01T00:00:00Z",
     proposed_by: 2,
     state: "outgrown",
+  },
+  {
+    id: 3,
+    rule: "clang/deadcode.DeadStores",
+    reason: "wont_fix",
+    reasoning: "z",
+    covering: 3,
+    proposed_at: "2026-10-02T00:00:00Z",
+    proposed_by: 1,
+    yours: true,
+    state: "proposed",
   },
 ];
 
@@ -69,7 +81,7 @@ describe("the dismissal rules", () => {
     expect(text()).toContain("src/net");
   });
 
-  it("offers approval to an approver, for a rule waiting or outgrown", async () => {
+  it("offers approval to an approver, for a rule waiting or outgrown that is not theirs", async () => {
     await drawn({ agrees_internal: true });
     expect(buttons("Approve")).toHaveLength(2);
     expect(buttons("Retire")).toHaveLength(0);

@@ -45,7 +45,7 @@ type CanBody struct {
 	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
 	AgreesPublic      bool   `json:"agrees_public" doc:"Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
 	AgreesPrivate     bool   `json:"agrees_private" doc:"Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
-	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage"`
+	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability"`
 	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
@@ -206,11 +206,10 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			// first, so an interface drawing the control from this would
 			// offer an action that always fails.
 			triages := subject.TriagesIn(product.ID)
-			// Asked at one visibility, as approving a claim is: reading it,
-			// and the capability or triage there.
+			// Asked at one visibility, as approving a claim is.
 			agrees := func(v access.Visibility) bool {
-				return subject.Reads(v, product.ID) &&
-					(subject.Holds(access.Approver, product.ID) || subject.Triages(v, product.ID))
+				return access.MayApprove(v, subject.Holds(access.Approver, product.ID),
+					subject.Reads(v, product.ID), subject.Triages(v, product.ID))
 			}
 			mayAgree := false
 			for _, v := range access.Visibilities() {

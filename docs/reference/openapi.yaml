@@ -1477,7 +1477,7 @@ components:
       additionalProperties: false
       properties:
         agrees_internal:
-          description: "Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage"
+          description: "Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability"
           type: boolean
         agrees_private:
           description: "Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"
@@ -5893,6 +5893,9 @@ components:
             - needs-path
             - retired
           type: string
+        yours:
+          description: Whether you proposed it. The proposer may not approve it
+          type: boolean
       required:
         - id
         - reason

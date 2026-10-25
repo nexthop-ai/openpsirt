@@ -61,8 +61,8 @@ func (a acts) readsAll(public, private int) bool {
 // both visibilities: the rule a signed-in approver is held to, at each
 // visibility the rows are at.
 func (a acts) approvesAll(public, private int) bool {
-	return (public == 0 || access.MayApprove(a.approves, a.readsPublic, a.triagesPublic)) &&
-		(private == 0 || access.MayApprove(a.approves, a.readsPrivate, a.triagesPrivate))
+	return (public == 0 || access.MayApprove(access.Public, a.approves, a.readsPublic, a.triagesPublic)) &&
+		(private == 0 || access.MayApprove(access.Private, a.approves, a.readsPrivate, a.triagesPrivate))
 }
 
 // readsIn is whether they read the product at any visibility: the question
