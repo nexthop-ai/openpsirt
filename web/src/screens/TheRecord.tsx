@@ -24,6 +24,7 @@ import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
 import { allFindingsAt, claimAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
+import { reasonSaid } from "./leads";
 
 // The share of the record one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -713,6 +714,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
               <Because code={row.justification} />
             </span>
           )}
+          {row.reason && <span className="why">{reasonSaid(row.reason)}</span>}
         </span>
         <span className={`state ${stands ? "agreed" : "open"}`}>
           {stands ? "stands" : row.state}

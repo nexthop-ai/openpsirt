@@ -5212,6 +5212,14 @@ components:
           type: string
         proposed_by:
           type: string
+        reason:
+          description: Why a lead was dismissed, on a judgment about a lead, which states no justification
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
         reasoning:
           description: The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers
           type: string
@@ -5333,6 +5341,14 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          type: string
+        reason:
+          description: Why a lead was dismissed, on a claim about a lead, which states no justification
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
           type: string
         reasoning:
           description: The words the claim currently rests on. Editing them withdraws every agreement

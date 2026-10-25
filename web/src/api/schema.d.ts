@@ -9559,6 +9559,11 @@ export interface components {
             product_name?: string;
             proposed_at: string;
             proposed_by: string;
+            /**
+             * @description Why a lead was dismissed, on a judgment about a lead, which states no justification
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers */
             reasoning: string;
             /**
@@ -9630,6 +9635,11 @@ export interface components {
             products: number;
             proposed_at: string;
             proposed_by: string;
+            /**
+             * @description Why a lead was dismissed, on a claim about a lead, which states no justification
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The words the claim currently rests on. Editing them withdraws every agreement */
             reasoning: string;
             /**

@@ -360,3 +360,27 @@ func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordStatesALeadsReasonAsAReason(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decided := decideLead(t, r, place,
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
+		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+		var record struct {
+			Items []struct {
+				Outcome       string `json:"outcome"`
+				Justification string `json:"justification"`
+				Reason        string `json:"reason"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "internal-reviewer", "/v1/audit?outcome=dismissed", &record)
+		if len(record.Items) != 1 {
+			t.Fatalf("the record holds %+v; want the one dismissal", record.Items)
+		}
+		if got := record.Items[0]; got.Reason != "false_positive" || got.Justification != "" {
+			t.Errorf("the record states %+v; want the lead's reason as its reason and no justification", got)
+		}
+	})
+}
