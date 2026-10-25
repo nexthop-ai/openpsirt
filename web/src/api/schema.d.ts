@@ -3475,7 +3475,7 @@ export interface paths {
         };
         /**
          * List static analysis leads
-         * @description Returns one row per lead the product holds open, however many builds it is on, newest first.
+         * @description Returns one row per lead the product holds open, however many builds it is on. Ordered by the analyzer's own security severity for the rule, then its precision, then newest first.
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
          *

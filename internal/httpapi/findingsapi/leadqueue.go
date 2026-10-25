@@ -48,7 +48,8 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		Path:    "/v1/products/{product}/leads",
 		Summary: "List static analysis leads",
 		Description: "Returns one row per lead the product holds open, however many builds it is " +
-			"on, newest first.\n\n" +
+			"on. Ordered by the analyzer's own security severity for the rule, then its precision, " +
+			"then newest first.\n\n" +
 			"With no `state` it is the queue: open leads with no claim waiting for a second " +
 			"person. A lead in the baseline is left out until it is pulled in or its path is " +
 			"marked important. `state` lists the leads in one state instead, which is how the " +

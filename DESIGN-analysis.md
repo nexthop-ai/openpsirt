@@ -446,7 +446,12 @@ and the claim standing at its place. The evidence of a lead carries it.
 A product's leads are listed one row per lead, however many of the product's
 builds it is open on. A row shows the newest of those findings: its rule, its
 path, line, function and message, the build it is on, and its state there.
-Newest first.
+
+| Order | |
+|---|---|
+| The tool's own security severity for the rule, highest first, and a rule with none after every rule with one | CodeQL and semgrep rate a rule's results from 0 to 10 |
+| The tool's own precision for the rule: `very-high`, `high`, `medium`, `low`, then none | How often the rule is right, as its tool measures it |
+| Newest first | The work that arrived last is the work nobody has looked at |
 
 | List | Holds |
 |---|---|
@@ -459,6 +464,8 @@ Newest first.
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
+| A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
+| A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
 
 ### Escalation
 
@@ -615,7 +622,7 @@ it is about.
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
 | Escalation by a second tool reporting the same flaw | Not built. A lead leaves the baseline when somebody pulls it in or its path is important |
-| The queue ordered by what is likely real | Not built. The queue is newest first |
+| The queue ordered by weakness class, by a second tool reporting the same flaw, and by whether the path ships | Not built. The queue is ordered by the tool's own rating, then newest first |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
 | Moving a lead into a private case | Not built |

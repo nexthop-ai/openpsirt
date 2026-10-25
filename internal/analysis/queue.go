@@ -6,6 +6,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -24,6 +25,17 @@ var waitingClaim = `EXISTS (SELECT 1 FROM "decision" AS "dc"
 	  AND ` + finding.DecisionFiledAt("dc", "f") + `
 	  AND "dc"."state" = '` + string(triage.Proposed) + `'
 	  AND "dc"."needs_approval" = TRUE AND "dc"."sent_back_at" IS NULL)`
+
+// precisionRank is the tool's precision of the rule of the finding under "f",
+// whose rating is under "rr", as a number that sorts the most precise first,
+// and nought where the tool gives none.
+var precisionRank = func() string {
+	out := `CASE "rr"."precision"`
+	for i, p := range finding.Precisions() {
+		out += ` WHEN '` + p + `' THEN ` + strconv.Itoa(len(finding.Precisions())-i)
+	}
+	return out + ` ELSE 0 END`
+}()
 
 // Scope narrows a product's leads to one stream, one variant or one build.
 // Unset is every one under the product.
@@ -68,7 +80,8 @@ type Queue struct {
 //
 // With no state named it is the queue: open leads nobody's claim waits on.
 // Naming a state lists the leads in it, which is how the baseline is
-// searched. Newest first.
+// searched. Ordered by what is likely real: the tool's own security severity
+// for the rule, then its precision, then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
 
@@ -84,7 +97,10 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 			Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+			Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 			ColumnExpr(`"f"."id", "f"."place_identity", "f"."opened_at"`).
+			ColumnExpr(`COALESCE("rr"."severity_tenths", -1) AS "severity"`).
+			ColumnExpr(precisionRank+` AS "precise"`).
 			ColumnExpr(state+` AS "stands"`, stateArgs...).
 			ColumnExpr(`CASE WHEN `+waitingClaim+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
 			ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
@@ -144,6 +160,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		ColumnExpr(`"l"."place_identity", MAX("l"."id") AS "newest"`).
 		ColumnExpr(`COUNT(*) AS "builds", MIN("l"."opened_at") AS "opened"`).
 		GroupExpr(`"l"."place_identity"`).
+		OrderExpr(`MAX("l"."severity") DESC, MAX("l"."precise") DESC`).
 		OrderExpr(`MIN("l"."opened_at") DESC, "l"."place_identity" ASC`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &page); err != nil {

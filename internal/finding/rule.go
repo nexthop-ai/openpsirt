@@ -6,9 +6,14 @@ package finding
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
@@ -25,6 +30,41 @@ type Rule struct {
 	// Documentation is the address of the analyzer's page for the rule,
 	// already checked against the hosts analyzers document rules on.
 	Documentation string `json:",omitempty"`
+	// SeverityTenths and Precision are the tool's own rating of the rule's
+	// results, as RuleRating reads them. Unrated, the rating already recorded
+	// stands.
+	SeverityTenths *int   `json:",omitempty"`
+	Precision      string `json:",omitempty"`
+}
+
+// Precisions are the words an analyzer rates a rule's precision in, most
+// precise first.
+func Precisions() []string { return []string{"very-high", "high", "medium", "low"} }
+
+// RuleRating is a tool's security severity, a number from 0 to 10, in tenths,
+// and its precision as one of Precisions. Either is nil or empty where the
+// tool gave nothing this reads.
+func RuleRating(severity, precision string) (*int, string) {
+	var tenths *int
+	if f, err := strconv.ParseFloat(strings.TrimSpace(severity), 64); err == nil && f >= 0 && f <= 10 {
+		n := int(math.Round(f * 10))
+		tenths = &n
+	}
+	precision = strings.ToLower(strings.TrimSpace(precision))
+	if !slices.Contains(Precisions(), precision) {
+		precision = ""
+	}
+	return tenths, precision
+}
+
+// ruleRating is a tool's rating of a rule's results.
+type ruleRating struct {
+	bun.BaseModel `bun:"table:rule_rating,alias:rr"`
+
+	ID              int64   `bun:"id,pk,autoincrement"`
+	VulnerabilityID int64   `bun:"vulnerability_id,notnull"`
+	SeverityTenths  *int    `bun:"severity_tenths"`
+	Precision       *string `bun:"precision"`
 }
 
 // cweTag is a rule tag naming a weakness, in the convention CodeQL writes and
@@ -97,5 +137,32 @@ func (v *Vulnerabilities) Rule(ctx context.Context, rule Rule) (int64, error) {
 	if err := v.reference(ctx, id, []Reference{{URL: rule.Documentation, Kind: Documentation}}); err != nil {
 		return 0, fmt.Errorf("record where the rule %q is documented: %w", rule.Name, err)
 	}
+	if err := v.rateRule(ctx, id, rule); err != nil {
+		return 0, fmt.Errorf("record how the tool rates the rule %q: %w", rule.Name, err)
+	}
 	return id, nil
+}
+
+// rateRule records the rating a rule arrived with in place of the one held. A
+// rule arriving unrated leaves the one held: a run of the tool that omits it
+// says nothing about the rule.
+func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) error {
+	if rule.SeverityTenths == nil && rule.Precision == "" {
+		return nil
+	}
+	row := ruleRating{VulnerabilityID: id, SeverityTenths: rule.SeverityTenths}
+	if rule.Precision != "" {
+		row.Precision = &rule.Precision
+	}
+	if _, err := v.db.NewDelete().Model((*ruleRating)(nil)).
+		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {
+		return err
+	}
+	if _, err := v.db.NewInsert().Model(&row).Exec(ctx); err != nil {
+		if database.IsDuplicate(err) {
+			return database.ErrGoAgain
+		}
+		return err
+	}
+	return nil
 }

@@ -154,8 +154,10 @@ func Place(logs []sarif.Log, root string, most int64, keep func(path string) boo
 				name := ruleName(r.Tool.Name, res.RuleID)
 				if _, ok := out.Rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
+					tenths, precision := finding.RuleRating(rule.SecuritySeverity, rule.Precision)
 					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags,
-						Documentation: sourcelink.Documentation(rule.HelpURI)}
+						Documentation:  sourcelink.Documentation(rule.HelpURI),
+						SeverityTenths: tenths, Precision: precision}
 				}
 				out.Results = append(out.Results, res)
 				out.RunOf = append(out.RunOf, at)

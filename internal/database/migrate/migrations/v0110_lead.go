@@ -76,17 +76,32 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "lead_rule_retired_by_fk" FOREIGN KEY ("retired_by") REFERENCES "person"("id")
 		)` + t.suffix,
 		`CREATE INDEX "lead_rule_product_idx" ON "lead_rule" ("product_id")`,
+
+		// An analyzer's own rating of a rule's results, as the newest run
+		// naming the rule gave it. A rule rated by nothing has no row.
+		`CREATE TABLE "rule_rating" (
+			"id"                ` + t.id + `,
+			"vulnerability_id"  ` + t.ref + ` NOT NULL,
+			-- The security severity, from 0 to 10, in tenths. Null where
+			-- the tool gives none.
+			"severity_tenths"   INTEGER,
+			-- very-high, high, medium or low. Null where the tool gives
+			-- none.
+			"precision"         ` + t.kind + `,
+			CONSTRAINT "rule_rating_rule_unique" UNIQUE ("vulnerability_id"),
+			CONSTRAINT "rule_rating_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
+		)` + t.suffix,
 	}
 }
 
-// createLeadV0110 makes the escalation and standing rule tables, stepped over where they are
+// createLeadV0110 makes the escalation, standing rule and rule rating tables, stepped over where they are
 // already there.
 func createLeadV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule"} {
+	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule", "rule_rating"} {
 		present, err := u.hasColumn(table, "id")
 		if err != nil {
 			return err
