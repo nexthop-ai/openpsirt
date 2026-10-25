@@ -191,3 +191,138 @@ func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 		}
 	})
 }
+
+// leadsListed is a product's list of leads as somebody reads it.
+type leadsListed struct {
+	Items []struct {
+		Place  string `json:"place"`
+		Rule   string `json:"rule"`
+		Path   string `json:"path"`
+		State  string `json:"state"`
+		Builds int    `json:"builds"`
+	} `json:"items"`
+	Total   int            `json:"total"`
+	States  map[string]int `json:"states"`
+	Waiting int            `json:"waiting"`
+}
+
+func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed {
+	t.Helper()
+	var got leadsListed
+	httpapitest.Read(t, r, who, "/v1/products/mine/leads"+query, &got)
+	return got
+}
+
+func TestTheQueueLeavesTheBaselineOutAndCountsIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		got := leadsOf(t, r, "internal-reader", "")
+		if len(got.Items) != 0 || got.Total != 0 || got.States["baseline"] != 1 {
+			t.Fatalf("the queue is %+v; want nothing listed and one baseline lead counted", got)
+		}
+		searched := leadsOf(t, r, "internal-reader", "?state=baseline")
+		if len(searched.Items) != 1 || searched.Items[0].Place != place || searched.Items[0].State != "baseline" ||
+			searched.Items[0].Path != "src/a.c" || searched.Items[0].Builds != 1 {
+			t.Errorf("the baseline lists %+v; want the seeded lead", searched.Items)
+		}
+		// Somebody who reads no internal material is told of no lead.
+		if got := leadsOf(t, r, "reader", "?state=baseline"); len(got.Items) != 0 || len(got.States) != 0 {
+			t.Errorf("a reader of public material is shown %+v", got)
+		}
+	})
+}
+
+func TestALeadPulledInIsInTheQueue(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := "/v1/products/mine/leads/" + place + "/escalation"
+		// Somebody who reads the lead and does not triage it is answered as
+		// closing it as fixed answers them.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodPost, at, `{}`),
+			http.StatusNotFound)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
+			"/v1/products/mine/leads/nothing-here/escalation", `{}`), http.StatusNotFound)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, `{}`); got.Code != http.StatusOK {
+			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
+		}
+		got := leadsOf(t, r, "internal-reader", "")
+		if len(got.Items) != 1 || got.Items[0].Place != place || got.Items[0].State != "open" {
+			t.Fatalf("the queue is %+v; want the lead pulled in", got)
+		}
+		if got.States["baseline"] != 0 || got.States["open"] != 1 {
+			t.Errorf("the lead pulled in is counted %v; want it open", got.States)
+		}
+		if got := leadState(t, r, place); got != "open" {
+			t.Errorf("the lead's evidence says %q; want open", got)
+		}
+	})
+}
+
+func TestALeadUnderAnImportantPathIsInTheQueue(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		const at = "/v1/products/mine/important-paths"
+		set := func(body string) {
+			t.Helper()
+			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, body); got.Code != http.StatusNoContent {
+				t.Fatalf("marking %s answered %d: %s", body, got.Code, got.Body)
+			}
+		}
+		// A sibling whose name begins the same is not under it.
+		set(`{"paths":["sr","src/a"]}`)
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 0 {
+			t.Fatalf("a lead under no important path is in the queue: %+v", got.Items)
+		}
+		set(`{"paths":["/src/"]}`)
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 1 || got.Items[0].State != "open" {
+			t.Fatalf("a lead under an important path is not in the queue: %+v", got)
+		}
+		var held struct {
+			Paths []string `json:"paths"`
+		}
+		httpapitest.Read(t, r, "internal-reader", at, &held)
+		if len(held.Paths) != 1 || held.Paths[0] != "src" {
+			t.Errorf("the product holds %q; want src", held.Paths)
+		}
+		set(`{"paths":["src/a.c"]}`)
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 1 {
+			t.Errorf("a lead whose own path is important is not in the queue: %+v", got)
+		}
+		set(`{"paths":[]}`)
+		if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 0 || got.States["baseline"] != 1 {
+			t.Errorf("taking the path off leaves %+v; want the lead back in the baseline", got)
+		}
+	})
+}
+
+func TestAnImportantPathThatSaysNothingIsRefused(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		const at = "/v1/products/mine/important-paths"
+		for _, body := range []string{`{"paths":["../etc"]}`, `{"paths":["/"]}`, `{"paths":["src","src/"]}`, `{"paths":["a//b"]}`} {
+			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, body),
+				http.StatusUnprocessableEntity)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reader", http.MethodPut, at, `{"paths":["src"]}`),
+			http.StatusForbidden)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, ""), http.StatusForbidden)
+	})
+}
+
+func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, "/v1/products/mine/leads/"+place+"/escalation", `{}`)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
+		}
+		queue := leadsOf(t, r, "internal-reader", "")
+		if len(queue.Items) != 0 || queue.Waiting != 1 || queue.States["open"] != 1 {
+			t.Fatalf("the queue is %+v; want the lead left out and counted as waiting", queue)
+		}
+		if listed := leadsOf(t, r, "internal-reader", "?state=open"); len(listed.Items) != 1 {
+			t.Errorf("the open leads are %+v; want the one waiting", listed.Items)
+		}
+	})
+}

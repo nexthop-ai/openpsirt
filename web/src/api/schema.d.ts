@@ -2896,6 +2896,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a product's important paths
+         * @description Returns the path prefixes whose leads are in the queue from their first run, in order.
+         *
+         *     Requires: internal-read or internal-triage on the product
+         */
+        get: operations["get-important-paths"];
+        /**
+         * Set a product's important paths
+         * @description Replaces the path prefixes whose leads are in the queue from their first run. A lead in the baseline at or under one enters the queue at once, and leaves it again where its path is taken off.
+         *
+         *     Refused, naming the path, where one is empty, climbs out of the checkout or is named twice. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        put: operations["set-important-paths"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}": {
         parameters: {
             query?: never;
@@ -3354,6 +3384,54 @@ export interface paths {
          *     Requires: public-triage or private-triage on the product
          */
         post: operations["acknowledge-report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List static analysis leads
+         * @description Returns one row per lead the product holds open, however many builds it is on, newest first.
+         *
+         *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
+         *
+         *     `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads/{place}/escalation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull a lead into the queue
+         * @description Takes a lead out of the baseline and into the queue on every build of the product it is on. A lead already pulled in keeps when it first was, and a lead not in the baseline is unchanged.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["escalate-lead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9188,6 +9266,16 @@ export interface components {
         IdentificationHelper: {
             purl?: string;
         };
+        ImportantPathsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ImportantPathsBody.json
+             */
+            readonly $schema?: string;
+            /** @description Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run */
+            paths: string[] | null;
+        };
         Info: {
             /**
              * Format: uri
@@ -9584,6 +9672,19 @@ export interface components {
             /** @description The reasoning, in markdown. Somebody else has to agree with a dismissal */
             reasoning: string;
         };
+        LeadEscalatedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadEscalatedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When it was pulled in. Pulled in again, the first time stands
+             */
+            at: string;
+        };
         LeadEvidenceBody: {
             /**
              * Format: uri
@@ -9673,6 +9774,65 @@ export interface components {
             unlinked?: string;
             /** @description The place's path inside that repository */
             within?: string;
+        };
+        LeadRowBody: {
+            /**
+             * Format: int64
+             * @description The number of builds in the list's scope the lead is open on
+             */
+            builds: number;
+            /** @description The function the result is in, where the analyzer names one */
+            function?: string;
+            /**
+             * Format: int64
+             * @description The line the result starts at
+             */
+            line?: number;
+            /** @description What the analyzer says */
+            message: string;
+            /**
+             * Format: date
+             * @description When the lead was first opened on any of them
+             */
+            opened: string;
+            /** @description The file, from the top of the checkout */
+            path: string;
+            /** @description The lead's place identity, which addresses it on every build it is on */
+            place: string;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /**
+             * @description Where the lead stands on that build
+             * @enum {string}
+             */
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+            /** @description The branch or tag of the newest build the lead is listed on, to link to */
+            stream: string;
+            /** @description The variant of that build */
+            variant: string;
+        };
+        LeadsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadRowBody"][] | null;
+            /** @description The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description The leads the list holds
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description Open leads left out of the queue because a claim about them waits for a second person
+             */
+            waiting: number;
         };
         LinkBody: {
             /** @description The destination — the issue's record, a distribution's answer about it, or the package's own page */
@@ -18543,6 +18703,70 @@ export interface operations {
             };
         };
     };
+    "get-important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportantPathsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportantPathsBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "add-alias": {
         parameters: {
             query?: never;
@@ -19214,6 +19438,81 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "escalate-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadEscalatedBody"];
+                };
             };
             /** @description Error */
             default: {

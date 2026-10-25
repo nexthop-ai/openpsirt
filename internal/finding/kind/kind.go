@@ -121,13 +121,17 @@ const (
 	// Evidence is one lead's evidence: where it is, the path the analyzer
 	// took to it, links into the source and the source kept beside it.
 	Evidence Consumer = "evidence"
+	// Leads is the lead queue: the leads a product holds, by where they
+	// stand, with how many each list leaves out, and what pulls one out of
+	// the baseline.
+	Leads Consumer = "leads"
 )
 
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Decisions, Inventory, Statistics,
-		Exports, VEX, Advisories, Notifications, Evidence,
+		Exports, VEX, Advisories, Notifications, Evidence, Leads,
 	}
 }
 
@@ -148,7 +152,7 @@ func (c Consumer) Kinds() []Kind {
 		return []Kind{Vulnerability, Entered}
 	case Decisions:
 		return []Kind{Vulnerability, Entered, Analysis}
-	case Evidence:
+	case Evidence, Leads:
 		return []Kind{Analysis}
 	}
 	return nil

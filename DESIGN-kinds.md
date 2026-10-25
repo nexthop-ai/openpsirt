@@ -85,11 +85,12 @@ and a kind it does not name never reaches it.
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
+| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, and what pulls one out of the baseline (`DESIGN-analysis.md` § Lead queue) | Analysis |
 
-Analysis findings are included by Evidence and Decisions alone: a lead is
-read through its evidence and the claims about it (`DESIGN-analysis.md`
-§ Lead triage). The screens, queues, counts and exports that list leads are
-**not built**.
+Analysis findings are included by Evidence, Leads and Decisions alone: a
+lead is read through the lead queue, its evidence and the claims about it
+(`DESIGN-analysis.md` § Lead triage). The screens and exports that list
+leads are **not built**.
 
 ## Inclusion
 

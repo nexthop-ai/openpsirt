@@ -1,0 +1,102 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package findingsapi
+
+import (
+	"context"
+	"net/http"
+	"time"
+
+	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+)
+
+// LeadRowBody is one lead in a product's list of them.
+type LeadRowBody struct {
+	Place    string    `json:"place" doc:"The lead's place identity, which addresses it on every build it is on"`
+	Rule     string    `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Path     string    `json:"path" doc:"The file, from the top of the checkout"`
+	Line     int       `json:"line,omitempty" doc:"The line the result starts at"`
+	Function string    `json:"function,omitempty" doc:"The function the result is in, where the analyzer names one"`
+	Message  string    `json:"message" doc:"What the analyzer says"`
+	Stream   string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
+	Variant  string    `json:"variant" doc:"The variant of that build"`
+	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
+	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is open on"`
+	Opened   string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
+}
+
+// LeadsOutput is a page of a product's leads.
+type LeadsOutput struct {
+	Body struct {
+		Items []LeadRowBody `json:"items"`
+		Total int           `json:"total" doc:"The leads the list holds"`
+		// Counted rather than only listed, so that a list leaving the
+		// baseline out says how much it left (REQ-30).
+		States  map[string]int `json:"states" doc:"The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both"`
+		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
+	}
+}
+
+func registerLeadQueue(api huma.API, in core.Deps) {
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-leads", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/leads",
+		Summary: "List static analysis leads",
+		Description: "Returns one row per lead the product holds open, however many builds it is " +
+			"on, newest first.\n\n" +
+			"With no `state` it is the queue: open leads with no claim waiting for a second " +
+			"person. A lead in the baseline is left out until it is pulled in or its path is " +
+			"marked important. `state` lists the leads in one state instead, which is how the " +
+			"baseline is searched.\n\n" +
+			"`states` counts every open lead in the scope by state and `waiting` the open ones " +
+			"left out for a waiting claim, so what the list leaves out is counted. " +
+			"`stream` and `variant` are optional and independent. Supports limit and offset.",
+		Tags: []string{"Findings"},
+	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product string    `path:"product"`
+		Stream  string    `query:"stream" doc:"Limit to one branch or tag. Left out, every one under the product"`
+		Variant string    `query:"variant" doc:"Limit to one variant. Left out, every one under the product, and independent of the branch"`
+		State   LeadState `query:"state" doc:"List the leads in one state. Left out, the queue"`
+		core.Paging
+	}) (*LeadsOutput, error) {
+		subject, err := core.Reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
+			Product: input.Product, Stream: input.Stream, Variant: input.Variant,
+		})
+		if err != nil {
+			return nil, err
+		}
+		queue, err := analysis.LeadsOf(ctx, in.DB.DB, subject, analysis.Scope{
+			ProductID: *scope.ProductID, StreamID: scope.StreamID, VariantID: scope.VariantID,
+		}, analysis.State(input.State), input.Limit, input.Offset)
+		if err != nil {
+			return nil, core.Refused(in.Logger, err, "cannot read the leads")
+		}
+		out := &LeadsOutput{}
+		out.Body.Total, out.Body.Waiting = queue.Total, queue.Waiting
+		out.Body.States = map[string]int{}
+		for state, n := range queue.ByState {
+			out.Body.States[string(state)] = n
+		}
+		out.Body.Items = make([]LeadRowBody, 0, len(queue.Rows))
+		for _, r := range queue.Rows {
+			row := LeadRowBody{
+				Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message,
+				Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
+				Opened: r.Opened.UTC().Format(time.DateOnly),
+			}
+			if r.Line != nil {
+				row.Line = *r.Line
+			}
+			out.Body.Items = append(out.Body.Items, row)
+		}
+		return out, nil
+	})
+}

@@ -119,6 +119,7 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 	state, stateArgs := stateOf(productID)
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
+		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		ColumnExpr(state, stateArgs...).
 		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State); err != nil {
 		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)

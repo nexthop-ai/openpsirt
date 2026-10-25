@@ -988,6 +988,10 @@ var tables = []string{
 	"advisory",
 	// Before person, which it points at.
 	"outbound",
+	// Before person and product, which it points at.
+	"lead_escalation",
+	// Before product, which it points at.
+	"lead_important_path",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",

@@ -178,6 +178,11 @@ var administrativeActs = []trailedAct{
 		kind: "setting", about: "repositories of mine",
 	},
 	{
+		id: "set-important-paths", what: "the paths whose leads are worked from their first run",
+		who: "internal-triager", method: http.MethodPut, path: "/v1/products/mine/important-paths",
+		body: `{"paths":["src"]}`, kind: "setting", about: "important paths of mine",
+	},
+	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
 		path: "/v1/products/mine/end-of-life", body: `{"on":"2027-01-01"}`,
 		kind: "support", about: "mine",
@@ -629,6 +634,7 @@ var outsideTheTrail = map[string]string{
 	"upload-report-attachment":    "recorded on the attachment, which names who uploaded it",
 	"withdraw-advisory-approval":  "recorded on the agreement, which names who took it back and when",
 	"redact-attachment":           "recorded on the attachment",
+	"escalate-lead":               "recorded on the escalation, which names who pulled it in and when",
 	"upload-attachment":           "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                 "recorded as the scan's provenance",
 	"upload-analysis":             "recorded as the run's provenance",

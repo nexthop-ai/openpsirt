@@ -6,7 +6,7 @@ build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
 Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
-REQ-28, REQ-42, REQ-43, REQ-66, REQ-69.
+REQ-28, REQ-30, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -24,6 +24,7 @@ shares is in `DESIGN-ingest.md`.
 - [Placement](#placement)
 - [Source](#source)
 - [Lead triage](#lead-triage)
+- [Lead queue](#lead-queue)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -396,7 +397,7 @@ and the claim standing at its place. The evidence of a lead carries it.
 | Fixed | The finding is closed |
 | Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
 | Not reproduced | A comparable run did not see it |
-| Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did |
+| Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did, and nothing has escalated it (§ Escalation) |
 | Open | None of the above |
 
 | Rule | |
@@ -404,6 +405,43 @@ and the claim standing at its place. The evidence of a lead carries it.
 | A standing claim comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
 | Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
 | A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
+
+## Lead queue
+
+A product's leads are listed one row per lead, however many of the product's
+builds it is open on. A row shows the newest of those findings: its rule, its
+path, line, function and message, the build it is on, and its state there.
+Newest first.
+
+| List | Holds |
+|---|---|
+| The queue, with no state named | Open leads with no claim waiting for a second person |
+| A state named | The open leads in that state. Naming the baseline is how it is searched |
+
+| Rule | |
+|---|---|
+| Every list counts the leads in the scope by state, and the open leads a waiting claim leaves out of the queue | A list that leaves the baseline out says how many it left (REQ-30) |
+| A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
+| Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
+| A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
+
+### Escalation
+
+A baseline lead enters the queue when it is escalated.
+
+| Escalated by | |
+|---|---|
+| Somebody holding `internal-triage` pulling it in | On every build of the product the lead is on. Recorded with who pulled it in and when, and pulled in again it keeps the first |
+| Its path being at or under an important path | A product setting under `internal-triage`, recorded in the administrative trail. Taking a path off returns its leads to the baseline |
+
+| Rule | |
+|---|---|
+| An important path is a prefix from the top of the checkout, with no leading or trailing slash | `src` holds `src/a.c` and `src`, and not `src2/a.c` |
+| A path is compared exactly, character by character | Paths are case-sensitive, and SQLite's LIKE ignores the case of ASCII letters |
+| An empty path, a path climbing out of the checkout, and a path named twice are refused | The empty path would put the whole baseline in the queue |
+| A product marks at most 500 important paths | Each is asked of every baseline lead a list reads |
+| Somebody who reads a lead and does not triage it is answered as though it were not there | As closing a lead as fixed answers them |
+| Escalation is worked out when a lead is read | Marking or unmarking a path moves every lead under it at once |
 
 ## Receipts
 
@@ -538,9 +576,12 @@ it is about.
 
 | Part | State |
 |---|---|
-| The screens, queues, counts and exports that read leads | The Evidence and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is counted on its run's receipt and read through its evidence and the claims about it, and nowhere else |
+| The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
-| Standing rules and escalation from the baseline | Not built |
+| Standing rules | Not built |
+| Escalation by a second tool reporting the same flaw | Not built. A lead leaves the baseline when somebody pulls it in or its path is important |
+| The queue ordered by what is likely real | Not built. The queue is newest first |
+| Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
 | Moving a lead into a private case | Not built |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |

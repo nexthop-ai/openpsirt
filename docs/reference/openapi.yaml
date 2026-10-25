@@ -4767,6 +4767,27 @@ components:
         purl:
           type: string
       type: object
+    ImportantPathsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ImportantPathsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        paths:
+          description: Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run
+          items:
+            type: string
+          maxItems: 500
+          type:
+            - array
+            - "null"
+      required:
+        - paths
+      type: object
     Info:
       additionalProperties: false
       properties:
@@ -5539,6 +5560,23 @@ components:
         - outcome
         - reasoning
       type: object
+    LeadEscalatedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadEscalatedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        at:
+          description: When it was pulled in. Pulled in again, the first time stands
+          format: date-time
+          type: string
+      required:
+        - at
+      type: object
     LeadEvidenceBody:
       additionalProperties: false
       properties:
@@ -5675,6 +5713,100 @@ components:
         within:
           description: The place's path inside that repository
           type: string
+      type: object
+    LeadRowBody:
+      additionalProperties: false
+      properties:
+        builds:
+          description: The number of builds in the list's scope the lead is open on
+          format: int64
+          type: integer
+        function:
+          description: The function the result is in, where the analyzer names one
+          type: string
+        line:
+          description: The line the result starts at
+          format: int64
+          type: integer
+        message:
+          description: What the analyzer says
+          type: string
+        opened:
+          description: When the lead was first opened on any of them
+          format: date
+          type: string
+        path:
+          description: The file, from the top of the checkout
+          type: string
+        place:
+          description: The lead's place identity, which addresses it on every build it is on
+          type: string
+        rule:
+          description: The analyzer's rule, as <tool>/<rule>
+          type: string
+        state:
+          description: Where the lead stands on that build
+          enum:
+            - baseline
+            - open
+            - not-reproduced
+            - fixed
+            - dismissed
+            - not-security
+            - confirmed
+          type: string
+        stream:
+          description: The branch or tag of the newest build the lead is listed on, to link to
+          type: string
+        variant:
+          description: The variant of that build
+          type: string
+      required:
+        - place
+        - rule
+        - path
+        - message
+        - stream
+        - variant
+        - state
+        - builds
+        - opened
+      type: object
+    LeadsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/LeadRowBody"
+          type:
+            - array
+            - "null"
+        states:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both
+          type: object
+        total:
+          description: The leads the list holds
+          format: int64
+          type: integer
+        waiting:
+          description: Open leads left out of the queue because a claim about them waits for a second person
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
+        - states
+        - waiting
       type: object
     LinkBody:
       additionalProperties: false
@@ -22592,6 +22724,76 @@ paths:
           - internal-read
           - internal-triage
         note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage; about internal findings, internal-read or internal-triage.
+  /v1/products/{product}/important-paths:
+    get:
+      description: |-
+        Returns the path prefixes whose leads are in the queue from their first run, in order.
+
+        Requires: internal-read or internal-triage on the product
+      operationId: get-important-paths
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportantPathsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get a product's important paths
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-read
+          - internal-triage
+    put:
+      description: |-
+        Replaces the path prefixes whose leads are in the queue from their first run. A lead in the baseline at or under one enters the queue at once, and leaves it again where its path is taken off.
+
+        Refused, naming the path, where one is empty, climbs out of the checkout or is named twice. Recorded in the administrative trail.
+
+        Requires: internal-triage on the product
+      operationId: set-important-paths
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportantPathsBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Set a product's important paths
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
     delete:
       description: |-
@@ -23579,6 +23781,131 @@ paths:
         any_of:
           - public-triage
           - private-triage
+  /v1/products/{product}/leads:
+    get:
+      description: |-
+        Returns one row per lead the product holds open, however many builds it is on, newest first.
+
+        With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
+
+        `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-leads
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Limit to one branch or tag. Left out, every one under the product
+          explode: false
+          in: query
+          name: stream
+          schema:
+            description: Limit to one branch or tag. Left out, every one under the product
+            type: string
+        - description: Limit to one variant. Left out, every one under the product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Left out, every one under the product, and independent of the branch
+            type: string
+        - description: List the leads in one state. Left out, the queue
+          explode: false
+          in: query
+          name: state
+          schema:
+            description: List the leads in one state. Left out, the queue
+            enum:
+              - baseline
+              - open
+              - not-reproduced
+              - fixed
+              - dismissed
+              - not-security
+              - confirmed
+            type: string
+        - description: The number returned
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            description: The number returned
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - description: The number skipped
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: The number skipped
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List static analysis leads
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/products/{product}/leads/{place}/escalation:
+    post:
+      description: |-
+        Takes a lead out of the baseline and into the queue on every build of the product it is on. A lead already pulled in keeps when it first was, and a lead not in the baseline is unchanged.
+
+        Requires: internal-triage on the product
+      operationId: escalate-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadEscalatedBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Pull a lead into the queue
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
   /v1/products/{product}/mentionable:
     get:
       description: |-
