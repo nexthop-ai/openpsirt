@@ -315,6 +315,7 @@ jobs:
             echo "## Everything else"
             echo
             echo "The binaries, both CycloneDX inventories, \`SHA256SUMS\` and its cosign bundle are attached."
+            echo "\`openpsirt-analysis\` is the upload client a pipeline runs to send an analyzer's results, built for Linux, macOS and Windows."
             echo "Inventories are published because this tool ingests them for other people's software."
             echo
             echo "### Checking what you downloaded"

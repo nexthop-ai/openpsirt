@@ -80,7 +80,7 @@ STAMP_VERSION ?= $(VERSION)
 # The shell expands $STAMPED inside the double quotes the recipes put around
 # LDFLAGS, and treats what it expands to as data. Exported by the two targets
 # that link, so nothing else pays for asking git.
-build dist-binaries: export STAMPED = $(STAMP_VERSION)
+build dist-binaries dist-client: export STAMPED = $(STAMP_VERSION)
 LDFLAGS       = -s -w \
 	-X '$(PKG).version=$$STAMPED' \
 	-X '$(PKG).commit=$(COMMIT)' \
@@ -103,7 +103,7 @@ tool = $(GO) tool -modfile=$(CURDIR)/tools/$(1)/go.mod $(1)
 
 NPM ?= npm
 
-.PHONY: gate full docs-check all build test test-all test-race test-engines lint fmt openapi run clean check measure web web-deps web-api web-check clean-web
+.PHONY: gate full docs-check client-test client-packages client-sources all build test test-all test-race test-engines lint fmt openapi run clean check measure web web-deps web-api web-check clean-web
 
 all: check build
 
@@ -247,6 +247,26 @@ DOCS_PACKAGES := ./internal/docs/ ./internal/build/ ./internal/config/
 docs-check:
 	$(GO) test $(DOCS_PACKAGES)
 
+# The upload client's own tests, which are what the macOS and Windows runners
+# take: it is the one program here that runs on a build host rather than in a
+# deployment, and nothing else is shipped for either system.
+#
+# Those runners start only when one of the client's sources moved, and
+# CLIENT_SOURCES is that list: its packages, every package of ours they
+# import, the module's requirements and the workflow running them. A test in
+# internal/build holds it to the imports.
+CLIENT_PACKAGES := ./cmd/openpsirt-analysis/ ./internal/analysisclient/
+CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ go.mod go.sum .github/workflows/ci.yml
+client-test:
+	$(GO) test -count=1 $(CLIENT_PACKAGES)
+
+# The two lists, printed for the workflow, which reads them rather than
+# keeping copies.
+client-packages:
+	@echo $(CLIENT_PACKAGES)
+client-sources:
+	@echo $(CLIENT_SOURCES)
+
 # The linter is also the vet. Its govet runs every analyzer go vet does, over
 # test files and over the file behind the "measure" tag, so a separate go vet
 # ran the same analysis twice: 50 s of a two-core runner. A test in
@@ -270,6 +290,7 @@ lint:
 .PHONY: vet-other-os
 vet-other-os:
 	GOOS=darwin $(GO) vet $(PACKAGES)
+	GOOS=windows $(GO) vet $(CLIENT_PACKAGES)
 
 fmt:
 	$(call tool,golangci-lint) fmt
