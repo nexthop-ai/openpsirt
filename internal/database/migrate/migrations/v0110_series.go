@@ -212,6 +212,10 @@ func analysisV0110(t *columnTypes) []string {
 			-- The analyzer's own rating and how sure it is, where it gives
 			-- them.
 			"level"         ` + t.kind + ` NULL,
+			-- The source at the result and the line it starts at, where the
+			-- product keeps source under its path.
+			"snippet"       ` + t.text + ` NULL,
+			"snippet_line"  INTEGER NULL,
 			CONSTRAINT "analysis_result_finding_unique" UNIQUE ("finding_id"),
 			CONSTRAINT "analysis_result_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,
@@ -233,6 +237,8 @@ func analysisV0110(t *columnTypes) []string {
 			"message_text" ` + t.text + ` NULL,
 			-- How deep in calls a step is, where the output says.
 			"depth"        INTEGER NULL,
+			"snippet"      ` + t.text + ` NULL,
+			"snippet_line" INTEGER NULL,
 			CONSTRAINT "analysis_location_place_unique" UNIQUE ("finding_id", "ordinal"),
 			CONSTRAINT "analysis_location_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,

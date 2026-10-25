@@ -29,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
@@ -207,6 +208,7 @@ func statedVocabularies() map[string][]string {
 		"visibilities":                   words(access.Visibilities()),
 		"inventory changes":              words(graph.ChangeKinds()),
 		"spread over variants":           words(finding.VariantSpreads()),
+		"repository styles":              words(sourcelink.Styles()),
 	}
 }
 

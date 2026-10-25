@@ -353,6 +353,18 @@ func (s *Store) Take(ctx context.Context, runID int64) error {
 	return nil
 }
 
+// ModulesOf is the repositories a run's checkout held, in the order the run
+// named them.
+func (s *Store) ModulesOf(ctx context.Context, runID int64) ([]Module, error) {
+	var out []Module
+	if err := s.db.NewSelect().Model(&out).
+		Where(`"sm"."run_id" = ?`, runID).
+		OrderExpr(`"sm"."id" ASC`).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the repositories run %d held: %w", runID, err)
+	}
+	return out, nil
+}
+
 // Modules records the repositories a run's checkout held.
 func (s *Store) Modules(ctx context.Context, runID int64, modules []Module) error {
 	if len(modules) == 0 {

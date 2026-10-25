@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // sent is one result as a document states it: a rule, a file under a
@@ -60,6 +62,18 @@ func (s inside) json() string {
 		out += fmt.Sprintf(`,"partialFingerprints":{"hash/v1":%q}`, s.print)
 	}
 	return out + "}"
+}
+
+// quoted is a result stated with the source at it.
+type quoted struct {
+	sent
+	snippet string
+}
+
+func (s quoted) json() string {
+	return fmt.Sprintf(`{"ruleId":%q,"message":{"text":%q},"locations":[{"physicalLocation":`+
+		`{"artifactLocation":{"uri":%q,"uriBaseId":%q},"region":{"startLine":%d,"snippet":{"text":%q}}}}]}`,
+		s.rule, s.message, s.uri, s.base, s.line, s.snippet)
 }
 
 // document is one run of clang-tidy over a checkout holding FRR as a
@@ -195,7 +209,11 @@ func (w *world) receive(t *testing.T, targetID int64, built time.Time, doc strin
 		if err != nil {
 			return err
 		}
-		placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+		repositories, err := sourcelink.NewStore(tx).Config(ctx, w.Product.ID)
+		if err != nil {
+			return err
+		}
+		placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes, repositories.Snippets)
 		if err != nil {
 			return err
 		}
@@ -472,7 +490,7 @@ func TestPlacedResultsPastTheByteBoundAreRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,10 +498,10 @@ func TestPlacedResultsPastTheByteBoundAreRefused(t *testing.T) {
 	if err := placed.encode(&held); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Place([]sarif.Log{log}, "", int64(held.Len())); err != nil {
+	if _, err := Place([]sarif.Log{log}, "", int64(held.Len()), nil); err != nil {
 		t.Errorf("refused at exactly its size: %v", err)
 	}
-	_, err = Place([]sarif.Log{log}, "", int64(held.Len())-1)
+	_, err = Place([]sarif.Log{log}, "", int64(held.Len())-1, nil)
 	if !refusal.In(err) || !strings.Contains(err.Error(), "configured limit") {
 		t.Errorf("one byte short answered %v; want a refusal naming the limit", err)
 	}
@@ -496,7 +514,7 @@ func TestWhatARunSaysOnceIsHeldOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes)
+	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -845,6 +863,93 @@ func TestAClosedLeadFoundAgainIsReopenedWhereAnOlderBuildHoldsItToo(t *testing.T
 		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
 		if r := receiptOf(t, run); r.Reopened != 1 {
 			t.Errorf("receipt %+v; want the build's own closed lead reopened", r)
+		}
+	})
+}
+
+func TestSourceIsStoredOnlyUnderAPathTheProductKeepsItFor(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		yes := true
+		if err := sourcelink.NewStore(w.DB.DB).Replace(t.Context(), w.Product.ID,
+			sourcelink.Config{Paths: []sourcelink.Path{{Prefix: "src/sonic-frr", Snippets: &yes}}}); err != nil {
+			t.Fatal(err)
+		}
+		run, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), documentOf(
+			[]interface{ json() string }{quoted{inFRR, "free(x); use(x);"}, quoted{inSWSS, "private();"}}, 10, ""))
+		if status != series.Applied {
+			t.Fatalf("status %s (%s); want applied", status, run.Failure)
+		}
+		var rows []result
+		if err := w.DB.DB.NewSelect().Model(&rows).OrderExpr(`"ar"."path" ASC`).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{}
+		for _, r := range rows {
+			got[r.Path] = r.Snippet
+			if r.Snippet != "" && (r.SnippetLine == nil || *r.SnippetLine != inFRR.line) {
+				t.Errorf("%s keeps its source from another line; want %d", r.Path, inFRR.line)
+			}
+		}
+		if got["src/sonic-frr/frr/bgpd/bgp_attr.c"] != "free(x); use(x);" || got["src/sonic-swss/orchagent/orch.cpp"] != "" {
+			t.Errorf("stored %v; want FRR's source alone", got)
+		}
+		if r := receiptOf(t, run); r.Discarded["snippets"] != 1 {
+			t.Errorf("receipt discards %v; want the one snippet outside FRR", r.Discarded)
+		}
+	})
+}
+
+func TestARulesDocumentationOnAnAnalyzersHostIsRecordedWithItsIssue(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		const help = "https://clang.llvm.org/extra/clang-tidy/checks/bugprone/use-after-move.html"
+		doc := strings.Replace(document([]sent{inFRR}, 10),
+			`{"id":"bugprone-use-after-move",`, `{"id":"bugprone-use-after-move","helpUri":"`+help+`",`, 1)
+		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), doc); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		var refs []finding.Reference
+		if err := w.DB.DB.NewSelect().Model(&refs).
+			Where(`"vr"."vulnerability_id" = ?`, w.leads(t, w.Target.ID)[0].VulnerabilityID).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if len(refs) != 1 || refs[0].URL != help || refs[0].Kind != finding.Documentation {
+			t.Errorf("references %+v; want the rule's documentation", refs)
+		}
+	})
+}
+
+// holding is somebody holding one role on the world's product.
+func (w *world) holding(t *testing.T, who string, role access.Role) access.Subject {
+	t.Helper()
+	ctx := t.Context()
+	rights := access.NewStore(w.DB.DB)
+	person, err := rights.Ensure(ctx, who, "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.GrantRole(ctx, person.ID, w.Product.ID, role); err != nil {
+		t.Fatal(err)
+	}
+	subject, err := rights.Resolve(ctx, who)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return subject
+}
+
+func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		lead := w.leads(t, w.Target.ID)[0]
+		if _, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "public", access.PublicRead), &lead, w.Product.ID); !errors.Is(err, finding.ErrNoOpenFinding) {
+			t.Errorf("a public reader was answered %v; want no lead", err)
+		}
+		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &lead, w.Product.ID)
+		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
+			t.Errorf("an internal reader was answered %+v, %v; want the lead's place", got.At, err)
 		}
 	})
 }

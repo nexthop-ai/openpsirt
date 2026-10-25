@@ -3770,6 +3770,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a product's repository settings
+         * @description Returns the repository hosts a product's source links may point at, and what it says about the code under each path prefix: the repository and branch for paths an upload names no repository for, and whether source snippets are kept.
+         *
+         *     Requires: administrator
+         */
+        get: operations["get-product-repositories"];
+        /**
+         * Set a product's repository settings
+         * @description Replaces the repository hosts a product's source links may point at, and what it says about the code under each path prefix. Links are built when a location is read, so a change reaches every location at once. Snippets are kept or discarded as an upload arrives, so a change reaches the uploads after it.
+         *
+         *     Refused, naming the entry, where a host is not https, a template does not begin at the repository or names a placeholder it may not, an entry is named twice, a repository is sent without its branch, or a path climbs out of the checkout. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-product-repositories"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/routing-rules": {
         parameters: {
             query?: never;
@@ -4532,6 +4562,30 @@ export interface paths {
          *     Requires: public-triage or private-triage on the product
          */
         post: operations["resolve-finding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a lead's evidence
+         * @description Returns what the newest run that saw a lead on a build said about it: where it is, the path the analyzer took to it, and the other places it names. Each place links into the repository's web view at the analyzed commit, where the product names the repository's host, and carries the source kept beside it, where the product keeps source under its path.
+         *
+         *     A lead the build no longer holds open answers the newest it held, with when it was last seen, when it was first not seen, and whether its repository changed between the two.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-lead-evidence"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -9445,6 +9499,78 @@ export interface components {
             version?: string;
             vulnerability: string;
         };
+        LeadEvidenceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadEvidenceBody.json
+             */
+            readonly $schema?: string;
+            /** @description Where the lead is */
+            at: components["schemas"]["LeadPlace"];
+            /** @description The address comparing the lead's repository between those two builds */
+            compare?: string;
+            /**
+             * Format: date-time
+             * @description When the build of the newest run that saw the lead was made
+             */
+            last_seen: string;
+            /**
+             * Format: date-time
+             * @description When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
+             */
+            not_seen?: string;
+            /** @description Whether the lead is open on the build */
+            open: boolean;
+            /** @description The other places the analyzer names */
+            related: components["schemas"]["LeadPlace"][] | null;
+            /** @description The path the analyzer took to it, in order */
+            steps: components["schemas"]["LeadPlace"][] | null;
+            /** @description Whether those two builds name the same commit for the lead's repository, so its disappearance is not a change to that code */
+            unchanged?: boolean;
+        };
+        LeadPlace: {
+            /** @description Whether the link opens on a branch the product names rather than on the analyzed commit */
+            approximate?: boolean;
+            /**
+             * Format: int64
+             * @description How deep in calls a step is, where the analyzer says
+             */
+            depth?: number;
+            /** Format: int64 */
+            end_column?: number;
+            /** Format: int64 */
+            end_line?: number;
+            /** @description The function the place is in, where the analyzer names one */
+            function?: string;
+            /** @description The address of the place in the repository's web view. Absent where unlinked says why */
+            link?: string;
+            /** @description What the analyzer says at the place */
+            message?: string;
+            /** @description Whether the repository differed from its commit when it was analyzed, so the link shows the source before the patch */
+            patched?: boolean;
+            /** @description The file, from the top of the checkout. Absent for a step outside it */
+            path?: string;
+            /** @description The repository the place is in: its web address on a host the product names, or the remote as the upload stated it */
+            repository?: string;
+            /** @description The commit the link opens at, or the branch of an approximate link */
+            revision?: string;
+            /** @description The source at the place, where the product keeps source under its path. Uploaded text, to be shown as text */
+            snippet?: string;
+            /**
+             * Format: int64
+             * @description The line the snippet starts at
+             */
+            snippet_line?: number;
+            /** Format: int64 */
+            start_column?: number;
+            /** Format: int64 */
+            start_line?: number;
+            /** @description Why the place has no link */
+            unlinked?: string;
+            /** @description The place's path inside that repository */
+            within?: string;
+        };
         LinkBody: {
             /** @description The destination — the issue's record, a distribution's answer about it, or the package's own page */
             name: string;
@@ -11603,7 +11729,7 @@ export interface components {
              * @description The kind of reference. A patch is the change itself
              * @enum {string}
              */
-            kind: "patch" | "advisory" | "report";
+            kind: "patch" | "advisory" | "report" | "documentation";
             /**
              * @description 'found' is a commit the copy of its repository holds. 'absent' is a hash the copy does not resolve to one commit: no commit has it, or it is an abbreviation more than one object shares. Omitted where no copy has been asked, or where the link names no commit
              * @enum {string}
@@ -11785,6 +11911,43 @@ export interface components {
             readonly $schema?: string;
             /** @description The issue it turned out to be, under any identifier it goes by */
             vulnerability: string;
+        };
+        RepositoriesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RepositoriesBody.json
+             */
+            readonly $schema?: string;
+            /** @description The repository hosts locations may link to. A repository on no host here is shown unlinked */
+            hosts: components["schemas"]["RepositoryHost"][] | null;
+            /** @description What the product says about the code under each path prefix */
+            paths: components["schemas"]["RepositoryPath"][] | null;
+        };
+        RepositoryHost: {
+            /** @description For a custom host, two commits compared: begins with {repo}/ and may name {from} and {to} */
+            compare_template?: string;
+            /** @description For a custom host, a file's lines: begins with {repo}/ and may name {commit}, {path}, {start} and {end} */
+            file_template?: string;
+            /** @description The remotes the host covers: a host such as github.com, or a host and the path a mirror keeps its copies under */
+            remote: string;
+            /**
+             * @description The kind of server, which names the addresses it writes; custom takes the two templates
+             * @enum {string}
+             */
+            style: "github" | "gitlab" | "gitea" | "custom";
+            /** @description The https address the covered repositories are under, which links open on */
+            web: string;
+        };
+        RepositoryPath: {
+            /** @description The branch links into that repository open on. Such links are approximate */
+            branch?: string;
+            /** @description A path from the top of the checkout. Empty is the whole product */
+            prefix: string;
+            /** @description The repository the code under the prefix is, where an upload names none. Sent with branch */
+            remote?: string;
+            /** @description Whether source snippets under the prefix are kept. Absent takes the nearest prefix that states it, and no prefix stating it is off */
+            snippets?: boolean;
         };
         "Repromise-upgradeRequest": {
             /**
@@ -19562,6 +19725,70 @@ export interface operations {
             };
         };
     };
+    "get-product-repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoriesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-product-repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepositoriesBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-routing-rules": {
         parameters: {
             query?: never;
@@ -20798,6 +21025,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResolvedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-lead-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadEvidenceBody"];
                 };
             };
             /** @description Error */

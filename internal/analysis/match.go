@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -40,6 +39,8 @@ type result struct {
 	LineKey           string `bun:"line_key,notnull"`
 	MatchedOn         string `bun:"matched_on,nullzero"`
 	Level             string `bun:"level,nullzero"`
+	Snippet           string `bun:"snippet,nullzero"`
+	SnippetLine       *int   `bun:"snippet_line"`
 }
 
 // location is another place a result names: a step on the analyzer's path,
@@ -58,6 +59,8 @@ type location struct {
 	EndColumn   *int   `bun:"end_column"`
 	MessageText string `bun:"message_text,nullzero"`
 	Depth       *int   `bun:"depth"`
+	Snippet     string `bun:"snippet,nullzero"`
+	SnippetLine *int   `bun:"snippet_line"`
 }
 
 // The parts a location plays.
@@ -228,6 +231,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 			Enclosing: k.Function, CallChain: k.Chain, MessageText: k.Message,
 			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key,
 			FunctionKey: k.FunctionKey, LineKey: k.LineKey, MatchedOn: k.On, Level: k.Level,
+			Snippet: k.Snippet, SnippetLine: stated(k.SnippetLine),
 		})
 		ordinal := 0
 		for _, steps := range []struct {
@@ -239,6 +243,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 					FindingID: id, Ordinal: ordinal, Part: steps.part, Path: s.Path,
 					StartLine: stated(s.StartLine), StartColumn: stated(s.Column),
 					MessageText: s.Message, Depth: s.Depth,
+					Snippet: s.Snippet, SnippetLine: stated(s.SnippetLine),
 				})
 				ordinal++
 			}
@@ -260,33 +265,4 @@ func stated(n int) *int {
 		return nil
 	}
 	return &n
-}
-
-// normalizedRemote is a repository's address as host, owner and name, in
-// lower case, with no scheme, credential, revision or suffix: the form a
-// remote and a package identifier are compared in.
-func normalizedRemote(remote string) string {
-	s := strings.ToLower(strings.TrimSpace(remote))
-	s, _, _ = strings.Cut(s, "#")
-	s, _, _ = strings.Cut(s, "?")
-	s = strings.TrimPrefix(s, "git+")
-	if _, rest, found := strings.Cut(s, "://"); found {
-		s = rest
-	} else if at := strings.Index(s, "@"); at >= 0 && strings.Contains(s[at:], ":") {
-		// The form an SSH remote is written in: user@host:owner/name.
-		s = strings.Replace(s[at+1:], ":", "/", 1)
-	}
-	host, path, _ := strings.Cut(s, "/")
-	if at := strings.LastIndex(host, "@"); at >= 0 {
-		host = host[at+1:]
-	}
-	host, _, _ = strings.Cut(host, ":")
-	// A revision follows the path, as a version-control address in a package
-	// identifier writes it.
-	path, _, _ = strings.Cut(path, "@")
-	path = strings.TrimSuffix(strings.TrimSuffix(path, "/"), ".git")
-	if host == "" || path == "" {
-		return ""
-	}
-	return host + "/" + path
 }

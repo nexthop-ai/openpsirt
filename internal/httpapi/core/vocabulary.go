@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -414,6 +415,12 @@ type RunReason string
 
 // Schema offers every reason a run is not comparable.
 func (RunReason) Schema(huma.Registry) *huma.Schema { return words(series.Reasons()) }
+
+// RepositoryStyle is the kind of server a repository host is.
+type RepositoryStyle string
+
+// Schema offers every kind of server a host may be.
+func (RepositoryStyle) Schema(huma.Registry) *huma.Schema { return words(sourcelink.Styles()) }
 
 // DocumentKind is what a document a build sent is.
 type DocumentKind string

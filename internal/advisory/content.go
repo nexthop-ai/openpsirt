@@ -204,6 +204,8 @@ func summaryOfKind(kind finding.ReferenceKind) string {
 		return "Patch"
 	case finding.AdvisoryRef:
 		return "Advisory"
+	case finding.Documentation:
+		return "Documentation"
 	default:
 		return "Report"
 	}

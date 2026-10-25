@@ -24,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Applier applies stored runs.
@@ -116,14 +117,15 @@ func pending(s series.Status) bool { return s == series.Queued || s == series.Wa
 // Place puts every result of a run's documents in the checkout, leaving out
 // what a run does not keep. root is the checkout's absolute path where the
 // pipeline states one, and most is how large the placed results may be
-// once encoded. An upload that holds nothing to apply, or more than most,
-// is refused in words the sender reads.
-func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
+// once encoded, and keep is whether source under a path is kept. An upload
+// that holds nothing to apply, or more than most, is refused in words the
+// sender reads.
+func Place(logs []sarif.Log, root string, most int64, keep func(path string) bool) (Placed, error) {
 	out := Placed{
 		Rules:   map[string]finding.Rule{},
 		Receipt: Receipt{Dropped: map[string]int{}, Discarded: map[string]int{}},
 	}
-	placer := sarif.NewPlacer()
+	placer := sarif.NewPlacer(keep)
 	var discarded sarif.Discarded
 	kept := 0
 	for _, log := range logs {
@@ -143,7 +145,7 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 			}
 			run := HeldRun{Tool: r.Tool.Name, Salt: r.Properties.Salt, Remotes: make([]string, len(r.Modules))}
 			for j, m := range r.Modules {
-				run.Remotes[j] = normalizedRemote(m.Repository)
+				run.Remotes[j] = sourcelink.Normalize(m.Repository)
 			}
 			at := len(out.Runs)
 			out.Runs = append(out.Runs, run)
@@ -151,7 +153,8 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 				name := ruleName(r.Tool.Name, res.RuleID)
 				if _, ok := out.Rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
-					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags}
+					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags,
+						Documentation: sourcelink.Documentation(rule.HelpURI)}
 				}
 				out.Results = append(out.Results, res)
 				out.RunOf = append(out.RunOf, at)
@@ -175,7 +178,7 @@ func Place(logs []sarif.Log, root string, most int64) (Placed, error) {
 		}
 	}
 	for what, n := range map[string]int{
-		"snippets": discarded.Snippets, "markdown": discarded.Markdown,
+		"snippets": placer.Snippets(), "markdown": discarded.Markdown,
 		"contents": discarded.Contents, "fixes": discarded.Fixes,
 	} {
 		if n > 0 {

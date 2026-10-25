@@ -159,10 +159,10 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, targetID, seriesID int64, fr
 		}
 	}
 	type held struct {
-		ID       int64  `bun:"id"`
-		Key      string `bun:"match_key"`
-		Place    string `bun:"place_identity"`
-		TargetID int64  `bun:"target_id"`
+		ID       int64      `bun:"id"`
+		Key      string     `bun:"match_key"`
+		Place    string     `bun:"place_identity"`
+		TargetID int64      `bun:"target_id"`
 		ClosedAt *time.Time `bun:"closed_at"`
 		Baseline bool       `bun:"baseline"`
 	}

@@ -23,6 +23,7 @@ func Register(api huma.API, in core.Deps) {
 	registerKinds(api, in)
 	registerHolders(api, in)
 	registerFindingDetail(api, in)
+	registerLeads(api, in)
 	registerEntry(api, in)
 	registerDisclosure(api, in)
 	registerResolution(api, in)

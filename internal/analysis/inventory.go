@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // inventory is the read inventory a run is applied against: the scan, and
@@ -118,14 +119,14 @@ var hosts = map[string]string{
 func remoteOfPurl(purl string) string {
 	parts := graph.PartsOfPurl(purl)
 	if host, ok := hosts[parts.Type]; ok && parts.Namespace != "" {
-		return normalizedRemote(host + "/" + parts.Namespace + "/" + parts.Name)
+		return sourcelink.Normalize(host + "/" + parts.Namespace + "/" + parts.Name)
 	}
 	_, qualifiers, _ := strings.Cut(strings.SplitN(purl, "#", 2)[0], "?")
 	for _, pair := range strings.Split(qualifiers, "&") {
 		key, value, found := strings.Cut(pair, "=")
 		if found && strings.EqualFold(key, "vcs_url") {
 			if decoded, err := url.QueryUnescape(value); err == nil {
-				return normalizedRemote(decoded)
+				return sourcelink.Normalize(decoded)
 			}
 		}
 	}

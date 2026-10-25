@@ -16,11 +16,15 @@ import (
 )
 
 // Rule is an analyzer's rule as an issue: the name it is filed under, what
-// the analyzer says it checks, and the weaknesses its tags name.
+// the analyzer says it checks, the weaknesses its tags name, and where the
+// analyzer documents it.
 type Rule struct {
 	Name        string
 	Description string
 	Tags        []string
+	// Documentation is the address of the analyzer's page for the rule,
+	// already checked against the hosts analyzers document rules on.
+	Documentation string `json:",omitempty"`
 }
 
 // cweTag is a rule tag naming a weakness, in the convention CodeQL writes and
@@ -89,6 +93,9 @@ func (v *Vulnerabilities) Rule(ctx context.Context, rule Rule) (int64, error) {
 	}
 	if err := v.classify(ctx, id, weaknessesOf(rule.Tags), ""); err != nil {
 		return 0, fmt.Errorf("record what kind of flaw the rule %q finds: %w", rule.Name, err)
+	}
+	if err := v.reference(ctx, id, []Reference{{URL: rule.Documentation, Kind: Documentation}}); err != nil {
+		return 0, fmt.Errorf("record where the rule %q is documented: %w", rule.Name, err)
 	}
 	return id, nil
 }

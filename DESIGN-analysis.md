@@ -5,7 +5,8 @@ is placed in the checkout, matched to what the same analysis reported on that
 build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
-Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-25, REQ-69.
+Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-25, REQ-42,
+REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -21,6 +22,7 @@ shares is in `DESIGN-ingest.md`.
 - [Run application](#run-application)
 - [Matching](#matching)
 - [Placement](#placement)
+- [Source](#source)
 - [Receipts](#receipts)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -40,7 +42,7 @@ POST /v1/products/{product}/streams/{stream}/variants/{variant}/analyses
 |---|---|
 | Its own operation beside the scan upload | Analysis runs on its own schedule, often in another job from the inventory |
 | A pipeline key covering the build sends it; a person sends where they hold `internal-triage` on the product | Every result opens internal |
-| The documents are read and their results placed at the door; the placed results are stored until the run ends, and the documents are not stored; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, no snippet, file contents, fix or scanner run is ever written, and applying waits for the build's inventory |
+| The documents are read and their results placed at the door; the placed results are stored until the run ends, and the documents are not stored; the run is applied by a queued job | A document that cannot be read is refused in words the sender reads, no file contents, fix or scanner run is ever written, a snippet is written only where the product keeps source under its path (§ Source), and applying waits for the build's inventory |
 | A retired product, release or variant takes no run, and a queue past its backlog answers 503 | The scan upload's rules, for the same reasons |
 | The fields fill what the documents leave unstated, and the documents win where both state a value | The upload client writes them into the SARIF; a plain producer passes them beside it |
 | The series is required, from the field or from each run's `automationDetails.id`, written `<series>/<built>` | It is what the next run is compared against |
@@ -100,7 +102,8 @@ placing them added 103 MB beside that, an encoding of 98 MB.
 | A path is resolved through its named starting points and placed against the source root | Paths arrive absolute, as `file://` addresses, relative to the working directory, and under a starting point left undefined |
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
-| Snippets, whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | Source enters no finding, no lead's description, no receipt and nothing stored |
+| Whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | No whole file or replacement text is stored, and a message is its text |
+| A snippet is kept only where the product keeps source under its path, and counted on the receipt as discarded otherwise (§ Source) | A misconfigured pipeline does not put source into the deployment, and the upload is still accepted |
 | The source root is used at the door and not stored | It is a path on somebody's build host |
 
 ## Run parameters
@@ -247,6 +250,89 @@ A lead is one component at one place (REQ-17).
 | A result in no repository the inventory names is placed on the build itself | Every build has a root |
 | The inventory placed against is the build's newest that has been read | A run arriving before its inventory waits for it |
 
+## Source
+
+Every place a lead names links into the repository's web view at the analyzed
+commit, and carries the source kept beside it where the product keeps source
+under its path. The deployment builds an address and never requests it; the
+reader's browser does, and signs in where the repository is private.
+
+### Repository settings
+
+An administrator states them per product, and the change is in the
+administrative trail.
+
+| Setting | |
+|---|---|
+| Hosts | Each a remote prefix, a web address, and a style: `github`, `gitlab`, `gitea` (Forgejo writes Gitea's), or `custom` with a file template and an optional comparison template |
+| Paths | Each a prefix of the checkout, with a repository and branch for links where an upload names none, whether source under it is kept, or both |
+
+| Rule | |
+|---|---|
+| A web address is `https`, with no credential, query or fragment | A scheme is something a browser acts on |
+| A custom template begins with `{repo}/` and names only `{commit}`, `{path}`, `{start}` and `{end}`, or `{from}` and `{to}` for a comparison | A template beginning anywhere else could open on another host |
+| A remote prefix may hold a path, which is how a mirror is named: the host covering a remote is the one with the longest prefix, and the rest of the remote is the repository under its web address | `git.example.com/mirror/github/FRRouting/frr` opens at `https://github.com/FRRouting/frr` |
+| A path's repository and branch are named together or not at all | One is no link |
+| A path that names neither a repository nor whether source is kept is refused | It says nothing |
+| A product states at most 100 hosts and 2,000 paths | sonic-buildimage pins dozens of submodules |
+| Remotes and prefixes are compared normalized: a host in lower case, a path with no leading or trailing slash | One repository written two ways is one entry |
+
+### Source links
+
+| Rule | |
+|---|---|
+| A path is in the run's repository with the longest prefix holding it, and the rest of the path is within that repository | `src/sonic-sairedis/SAI/inc/saiport.h` is `inc/saiport.h` in SAI, at SAI's commit |
+| A relative remote resolves against the remote of the repository holding it, itself resolved the same way; an SSH remote is read as the host and path it names | `.gitmodules` uses both |
+| A remote on no host the product names is shown as text, unlinked | The remote comes from the upload, so without the list its host is the uploader's choice |
+| A link opens at a commit: 7 to 64 hexadecimal digits. A revision that is anything else is shown unlinked | A branch an upload names moves, and `?` or `#` in it would steer the link |
+| Each path segment is percent-encoded, and a segment that is empty, `.` or `..` leaves the place unlinked | `?`, `#` and traversal in a path would otherwise steer the link |
+| A finished address must open over `https` on the host the web address names, or the place is unlinked | The last check, after every template and substitution |
+| A repository whose working tree differed from its commit when it was analyzed is marked patched | The link shows the source before the patch |
+| A path no run repository holds links to the branch a product names for its longest prefix, marked approximate | The commit is unknown |
+| A place with no line opens the file; an end before the start is the start | |
+| A lead the build no longer holds open carries a comparison of its repository between the build of the newest run that saw it and the build of the first that did not, or says the two name the same commit | A disappearance where the code did not change is not a fix in that code |
+
+Each unlinked place says why: no repository is known, the repository is on no
+named host, the revision is not a commit, or the path leaves the repository.
+
+### Snippets
+
+| Rule | |
+|---|---|
+| Source is kept under a path where the longest prefix stating it says so, and nowhere where no prefix states it | Off by default: a private product may not allow its source in another system, and may carry public upstreams it does |
+| The upload's own statement of which paths are public decides nothing | A misconfigured pipeline could label a private path public |
+| Source is decided as an upload arrives, for the result and for every step and related place, and a place outside the checkout keeps none | A change to the setting reaches the uploads after it |
+| A context region's source is preferred to its region's, with the line it starts at | It is the wider of the two |
+| At most 4 KiB of source is kept per place | A client sends a few lines either side |
+| A snippet is answered as text, and shown as text | It is uploaded data (REQ-66) |
+
+### Rule documentation
+
+A rule's documentation address is recorded as a `documentation` reference on
+its issue where it is `https`, on the default port, with no credential, on a
+host analyzers document rules on: the LLVM, Cppcheck, CodeQL, GitHub
+documentation, SonarSource, Semgrep, PMD, SpotBugs, Find Security Bugs,
+Bandit, Pylint, Ruff, ESLint, Staticcheck, golangci-lint, Clippy, Microsoft
+Learn and PVS-Studio hosts. Any other address is dropped. It comes from the
+upload, so a host outside the list is the uploader's choice of where a reader
+is sent.
+
+### Evidence
+
+`GET …/streams/{stream}/variants/{variant}/leads/{place}` answers one lead's
+evidence on one build: where it is, the path the analyzer took to it, the
+related places, each with its link and source, when it was last seen, and,
+for a lead no longer open, when it was first not seen with the comparison
+above. The place identity addresses a lead because a rule's name holds a
+slash.
+
+| Rule | |
+|---|---|
+| The lead is read through the Evidence consumer, which includes the analysis kind alone (`DESIGN-kinds.md` § Consumers) | Nothing of a lead reaches a vulnerability consumer |
+| It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as a place holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
+| The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same place |
+| Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
+
 ## Receipts
 
 `GET …/analyses` lists a build's runs newest first.
@@ -269,12 +355,12 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 
 | Part | State |
 |---|---|
-| The screens, queues, counts and exports that read leads | No consumer includes the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is recorded and counted on its run's receipt and read nowhere else |
+| The screens, queues, counts and exports that read leads | The Evidence consumer alone includes the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is counted on its run's receipt and read through its evidence and nowhere else |
+| A screen for a product's repository settings and a lead's evidence | Not built. Both are read and written through the API |
 | Triage of a lead: dismissal with a second person's approval, standing rules, escalation from the baseline | Not built |
 | Moving a lead into a private case | Not built |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
 | A dismissal asked to be reaffirmed after a probable pairing, and a re-baseline's probable pairings listed together | Not built. How each lead was paired and whether a run was a re-baseline are recorded; triage of a lead is not built |
-| Source links into the repositories a run names, and stored snippets | Not built. The repositories are recorded; snippets are discarded |
 | Third-party paths | Recorded on the run and read by nothing |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
 | Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
@@ -293,4 +379,8 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |
 | A run waits a day for its build's inventory, and then fails | A pipeline that sends analysis for a build it never inventories has each run fail after a day. Until then each run holds a job counted against the backlog, and its placed results |
 | The bounds' defaults are a judgment | They are several times the fixtures here and are not measured against the largest real producer. A deployment analyzing a large tree raises them, and the memory limit with the two that are memory figures |
+| A link reaches only the repositories a product names a host for | A product of many hosts names each. A repository on none is shown as its remote, which is text |
+| A snippet records what the upload sent | Nothing compares it with the repository, so a patched repository's snippet is the patched source and its link is the source before the patch |
+| A link in a lead with no repository a run names is to a branch | It is marked approximate, and the branch has moved since the build whenever anybody pushed to it |
+| The documentation hosts are a list in the code | An analyzer documenting rules elsewhere has its documentation dropped until the list names it |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

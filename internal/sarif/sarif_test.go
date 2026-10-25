@@ -364,21 +364,66 @@ func TestADependencyOrSecretScannerIsKnownByItsDriver(t *testing.T) {
 	}
 }
 
-func TestSourceTextIsCountedAndNeverKept(t *testing.T) {
+func TestWholeFilesAndFixesAreCountedAndNeverKept(t *testing.T) {
 	doc := run(`,"artifacts":[{"contents":{"text":"int main(){}"}},{"location":{"uri":"a.c"}}],
 	"results":[{"message":{"text":"plain","markdown":"**bold**"},
 		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
-			"region":{"startLine":3,"snippet":{"text":"secret();"}},
-			"contextRegion":{"startLine":1,"endLine":5,"snippet":{"text":"..."}}}}],
+			"region":{"startLine":3}}}],
 		"fixes":[{"artifactChanges":[]}]}]`)
 	r := read(t, doc).Runs[0]
-	want := Discarded{Snippets: 2, Markdown: 1, Contents: 1, Fixes: 1}
+	want := Discarded{Markdown: 1, Contents: 1, Fixes: 1}
 	if r.Discarded != want {
 		t.Errorf("discarded %+v; want %+v", r.Discarded, want)
 	}
-	res := r.Results[0]
-	if res.Message != "plain" || res.Locations[0].StartLine != 3 || res.Locations[0].EndLine != 0 {
+	if res := r.Results[0]; res.Message != "plain" || res.Locations[0].StartLine != 3 {
 		t.Errorf("result %+v", res)
+	}
+}
+
+func TestALocationsSourceIsReadFromItsWidestRegion(t *testing.T) {
+	for name, regions := range map[string]string{
+		"context last":  `"region":{"startLine":3,"snippet":{"text":"secret();"}},"contextRegion":{"startLine":1,"endLine":5,"snippet":{"text":"a\nsecret();"}}`,
+		"context first": `"contextRegion":{"startLine":1,"endLine":5,"snippet":{"text":"a\nsecret();"}},"region":{"startLine":3,"snippet":{"text":"secret();"}}`,
+	} {
+		doc := run(`,"results":[{"message":{"text":"m"},
+			"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},` + regions + `}}]}]`)
+		loc := read(t, doc).Runs[0].Results[0].Locations[0]
+		if loc.Snippet != "a\nsecret();" || loc.SnippetLine != 1 {
+			t.Errorf("%s: snippet %q at %d; want the context region's, at line 1", name, loc.Snippet, loc.SnippetLine)
+		}
+		if loc.StartLine != 3 || loc.EndLine != 0 {
+			t.Errorf("%s: placed at %d-%d; want the region's own lines", name, loc.StartLine, loc.EndLine)
+		}
+	}
+	long := strings.Repeat("x", MostSnippet+10)
+	doc := run(`,"results":[{"message":{"text":"m"},
+		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":3,"snippet":{"text":"` + long + `"}}}}]}]`)
+	if got := read(t, doc).Runs[0].Results[0].Locations[0].Snippet; len(got) > MostSnippet {
+		t.Errorf("kept %d bytes of source; want at most %d", len(got), MostSnippet)
+	}
+}
+
+func TestSourceIsKeptOnlyUnderAPathItIsKeptFor(t *testing.T) {
+	doc := run(`,"results":[{"message":{"text":"m"},
+		"locations":[{"physicalLocation":{"artifactLocation":{"uri":"public/a.c"},"region":{"startLine":3,"snippet":{"text":"open();"}}}}],
+		"relatedLocations":[{"physicalLocation":{"artifactLocation":{"uri":"private/b.c"},"region":{"startLine":9,"snippet":{"text":"hidden();"}}}}],
+		"codeFlows":[{"threadFlows":[{"locations":[
+			{"location":{"physicalLocation":{"artifactLocation":{"uri":"public/c.c"},"region":{"startLine":1,"snippet":{"text":"step();"}}}}},
+			{"location":{"physicalLocation":{"artifactLocation":{"uri":"/elsewhere/d.c"},"region":{"startLine":1,"snippet":{"text":"outside();"}}}}}]}]}]}]`)
+	r := read(t, doc).Runs[0]
+	pl := NewPlacer(func(path string) bool { return strings.HasPrefix(path, "public/") })
+	got := pl.Place(&r, "")[0]
+	if got.Snippet != "open();" || got.SnippetLine != 3 {
+		t.Errorf("the result kept %q at %d; want its source", got.Snippet, got.SnippetLine)
+	}
+	if got.Steps[0].Snippet != "step();" || got.Steps[1].Snippet != "" || got.Related[0].Snippet != "" {
+		t.Errorf("steps kept %q and %q, related %q; want the public step's alone", got.Steps[0].Snippet, got.Steps[1].Snippet, got.Related[0].Snippet)
+	}
+	if pl.Snippets() != 2 {
+		t.Errorf("%d discarded; want the private and the outside location's", pl.Snippets())
+	}
+	if placed, _ := Prepare(&r, ""); placed[0].Snippet != "" {
+		t.Errorf("a placer keeping nothing kept %q", placed[0].Snippet)
 	}
 }
 

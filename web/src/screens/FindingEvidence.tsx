@@ -157,7 +157,12 @@ export function References({
   const [whole, setWhole] = useState(false);
   const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
   if (all.length === 0) return null;
-  const order: Record<Body<"ReferenceBody">["kind"], number> = { patch: 0, advisory: 1, report: 2 };
+  const order: Record<Body<"ReferenceBody">["kind"], number> = {
+    patch: 0,
+    advisory: 1,
+    report: 2,
+    documentation: 3,
+  };
   const sorted = [...all].sort((a, b) => (own(order, a.kind) ?? 9) - (own(order, b.kind) ?? 9));
   return (
     <div className="evblock">
