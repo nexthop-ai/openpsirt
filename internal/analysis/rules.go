@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -23,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // RuleState is where a standing rule stands, worked out when it is read.
@@ -167,6 +169,9 @@ func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	}
 	var out *StandingRule
 	err := database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
+		if err := wholeRuleDismissable(ctx, tx, row); err != nil {
+			return err
+		}
 		if _, err := tx.NewInsert().Model(&row).Exec(ctx); err != nil {
 			return fmt.Errorf("record the standing rule: %w", err)
 		}
@@ -201,6 +206,9 @@ func ApproveRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 		}
 		if row.ProposedBy == subject.ID {
 			return ErrOwnRule
+		}
+		if err := wholeRuleDismissable(ctx, tx, *row); err != nil {
+			return err
 		}
 		factor, err := growth(ctx, tx)
 		if err != nil {
@@ -295,6 +303,33 @@ func StandingRules(ctx context.Context, db bun.IDB, subject access.Subject, prod
 		out = append(out, *ruleOf(r, counted[r.ID], factor))
 	}
 	return out, nil
+}
+
+// wholeRuleDismissable refuses a standing rule naming an analyzer rule and no
+// path where the rule finds memory safety or injection, or where nothing has
+// recorded the rule, so its weaknesses are not known. A flaw of those kinds
+// is judged one lead at a time; a path narrows the rule to code somebody can
+// vouch for.
+func wholeRuleDismissable(ctx context.Context, tx bun.IDB, row leadRule) error {
+	if row.RuleFolded == nil || row.Prefix != nil {
+		return nil
+	}
+	var held []int
+	if err := tx.NewSelect().TableExpr(`"vulnerability" AS "vu"`).
+		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "vu"."id"`).
+		ColumnExpr(`COALESCE("rr"."weakness_tier", 0)`).
+		Where(`"vu"."identifier_folded" = ?`, *row.RuleFolded).
+		Where(`"vu"."kind" = ?`, kind.Rule).
+		Scan(ctx, &held); err != nil {
+		return fmt.Errorf("read what the rule %q finds: %w", *row.Rule, err)
+	}
+	switch {
+	case len(held) == 0:
+		return refusal.Errorf("no analyzer has reported %q here, so what it finds is not known: name a path with it", *row.Rule)
+	case weakness.Tier(slices.Max(held)) >= weakness.TierInjection:
+		return refusal.Errorf("%q finds memory safety or injection flaws, which are judged one lead at a time: name a path with it", *row.Rule)
+	}
+	return nil
 }
 
 // ruleIn is a standing rule of the product in use, for an update.

@@ -125,14 +125,14 @@ func TestAStandingRuleCoversTheLeadsOfItsRuleUnderItsPath(t *testing.T) {
 		const why = `"reason":"wont_fix","reasoning":"vendored"`
 		want := map[int64]int{}
 		for body, covering := range map[string]int{
-			`{"rule":"clang-tidy/leak",` + why + `}`:                  1,
-			`{"rule":"Clang-Tidy/leak",` + why + `}`:                  1,
-			`{"rule":"clang-tidy/overflow",` + why + `}`:              0,
-			`{"prefix":"src",` + why + `}`:                            1,
-			`{"prefix":"/src/a.c",` + why + `}`:                       1,
-			`{"prefix":"sr",` + why + `}`:                             0,
-			`{"rule":"clang-tidy/leak","prefix":"src",` + why + `}`:   1,
-			`{"rule":"clang-tidy/leak","prefix":"src/b",` + why + `}`: 0,
+			`{"rule":"clang-tidy/leak",` + why + `}`:                    1,
+			`{"rule":"Clang-Tidy/leak",` + why + `}`:                    1,
+			`{"rule":"clang-tidy/overflow","prefix":"src",` + why + `}`: 0,
+			`{"prefix":"src",` + why + `}`:                              1,
+			`{"prefix":"/src/a.c",` + why + `}`:                         1,
+			`{"prefix":"sr",` + why + `}`:                               0,
+			`{"rule":"clang-tidy/leak","prefix":"src",` + why + `}`:     1,
+			`{"rule":"clang-tidy/leak","prefix":"src/b",` + why + `}`:   0,
 		} {
 			want[proposeLeadRule(t, r, body).ID] = covering
 		}
@@ -181,7 +181,7 @@ func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.LeadRuleGrowth, "1"); err != nil {
 			t.Fatal(err)
 		}
-		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"mitigated","reasoning":"sandboxed"}`)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","prefix":"src","reason":"mitigated","reasoning":"sandboxed"}`)
 		path := proposeLeadRule(t, r, `{"prefix":"src","reason":"mitigated","reasoning":"sandboxed"}`)
 		approveLeadRule(t, r, rule.ID)
 		approveLeadRule(t, r, path.ID)
@@ -224,5 +224,48 @@ func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 		if got := leadsOf(t, r, "internal-reader", ""); got.Ruled != 0 || got.States["dismissed"] != 0 {
 			t.Errorf("a retired rule still dismisses: %+v", got)
 		}
+	})
+}
+
+func TestAMemorySafetyRuleIsDismissedOnlyUnderAPath(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour),
+			ratedRun(`"tags":["external/cwe/cwe-563"]`, `"tags":["external/cwe/cwe-787"]`))
+		const why = `"reason":"mitigated","reasoning":"bounds checked by the caller"`
+		for _, body := range []string{
+			`{"rule":"clang-tidy/overflow",` + why + `}`,
+			`{"rule":"clang-tidy/never-reported",` + why + `}`,
+		} {
+			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt, body),
+				http.StatusUnprocessableEntity)
+		}
+		proposeLeadRule(t, r, `{"rule":"clang-tidy/overflow","prefix":"src/c.c",`+why+`}`)
+		proposeLeadRule(t, r, `{"rule":"clang-tidy/never-reported","prefix":"src",`+why+`}`)
+		// Dead code is a class a rule may dismiss across the product.
+		proposeLeadRule(t, r, `{"rule":"clang-tidy/leak",`+why+`}`)
+	})
+}
+
+func TestARuleFoundToFindMemoryFlawsAfterItWasProposedIsNotApproved(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"wont_fix","reasoning":"short-lived tool"}`)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour),
+			ratedRun(`"tags":["external/cwe/cwe-416"]`, ``))
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
+			fmt.Sprintf("%s/%d/approval", leadRulesAt, rule.ID), `{}`), http.StatusUnprocessableEntity)
+		if got := leadRulesOf(t, r)[rule.ID]; got.State != "proposed" {
+			t.Errorf("the rule is %+v; want it proposed still", got)
+		}
+	})
+}
+
+func TestAnInjectionRuleIsDismissedOnlyUnderAPath(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(`"tags":["external/cwe/cwe-89"]`, ``))
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadRulesAt,
+			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"parameterized"}`), http.StatusUnprocessableEntity)
 	})
 }

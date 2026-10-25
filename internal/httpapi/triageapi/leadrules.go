@@ -117,7 +117,8 @@ func registerLeadRules(api huma.API, in core.Deps) {
 		Summary: "Propose a standing rule for leads",
 		Description: "Records a rule dismissing every open lead of an analyzer rule, every one at or " +
 			"under a path, or every one of a rule under a path. At least one of `rule` and `prefix` " +
-			"is required, and so are `reason` and `reasoning`.\n\n" +
+			"is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule " +
+			"finds memory safety or injection flaws, or where no analyzer has reported it here.\n\n" +
 			"It dismisses nothing until somebody other than its author holding `approver` and " +
 			"`internal-read` on the product approves it. Its words do not change: retire it and " +
 			"propose another. Recorded in the administrative trail.",
@@ -161,7 +162,9 @@ func registerLeadRules(api huma.API, in core.Deps) {
 			"was approved. An outgrown rule is approved again at its new size; a rule in force is " +
 			"refused with 409.\n\n" +
 			"Requires `approver` and `internal-read` on the product, and somebody other than the " +
-			"rule's author, which is refused with 409. Recorded in the administrative trail.",
+			"rule's author, which is refused with 409. A rule with no path is refused with 422 where its " +
+			"analyzer rule has since been found to find memory safety or injection flaws. " +
+			"Recorded in the administrative trail.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.Approver), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
