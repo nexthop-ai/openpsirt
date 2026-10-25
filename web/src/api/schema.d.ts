@@ -4763,7 +4763,7 @@ export interface paths {
          *
          *     The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: internal-triage on the product
          */
         post: operations["decide-lead"];
         delete?: never;
@@ -4787,7 +4787,7 @@ export interface paths {
          *
          *     A lead seen again opens anew at the same place.
          *
-         *     Requires: public-triage or private-triage or internal-triage on the product
+         *     Requires: internal-triage on the product
          */
         post: operations["fix-lead"];
         delete?: never;

@@ -52,7 +52,7 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			"claim agreed to once. A lead that " +
 			"is fixed is refused: it opens again where it is seen again.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
@@ -131,7 +131,7 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 			"`because` says what fixed it, and is required.\n\n" +
 			"A lead seen again opens anew at the same place.",
 		Tags: []string{"Triage"},
-	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
