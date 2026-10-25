@@ -105,7 +105,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			"Acknowledging twice keeps the first date: when somebody was answered is a fact " +
 			"about the past, and the second person to press it did not change it.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*struct{}, error) {
@@ -150,7 +150,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			"Recording a name it already goes by succeeds and changes nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Also asks for triage in every other product the issue is open in.",
-		core.TriageRights()...), func(ctx context.Context, input *struct {
+		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The other identifier, as it is written"`
@@ -215,7 +215,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			"answer to answers 404.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusOK,
 	}, core.PerProduct, "Also asks for triage in every other product the issue is open in.",
-		core.TriageRights()...), func(ctx context.Context, input *struct {
+		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The name to remove, as it is written"`

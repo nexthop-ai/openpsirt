@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Reach is how far a judgment travels, in the three parts somebody deciding
@@ -174,8 +175,10 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		ConsumerUpstream  string `bun:"consumer_upstream"`
 		Places            int    `bun:"places"`
 	}
+	kinds, kindArgs := kind.VersionCarry.Where(`"f"."kind"`)
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "t"."stream_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).

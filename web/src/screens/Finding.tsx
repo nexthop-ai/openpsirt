@@ -169,7 +169,7 @@ export function Finding() {
   // Whether this reader may argue about this finding, which is what the
   // controls about the finding turn on: triage at the finding's own
   // visibility, since each is its own role. A record of being exploited here
-  // is about the product and takes triage at either visibility. Read once:
+  // is about the product and takes triage at any visibility. Read once:
   // asked at each control, the copies drift and one of them ends up offering a
   // button that answers 403.
   const here = mayOf(who.data, product);

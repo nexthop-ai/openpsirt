@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // A product's standing, per build.
@@ -94,6 +95,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// second statement builds it a second time. Every column folds exactly — the
 	// places and the decided places are sums, the deadline a minimum and the
 	// exploitation flag a maximum.
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."target_id" AS "target_id"`).
@@ -123,6 +125,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."target_id", "f"."vulnerability_id", "f"."component_id"`).
 		Scan(ctx, &groups)
 	if err != nil {

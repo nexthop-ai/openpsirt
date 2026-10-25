@@ -39,6 +39,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	findingkind "github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -260,6 +261,8 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	if err != nil {
 		return nil, err
 	}
+	// Disclosed work, and undisclosed work for a preview. Internal material
+	// is never disclosed, so no document carries it.
 	visible := []access.Visibility{access.Public}
 	if undisclosed {
 		if !subject.Reads(access.Private, named.ProductID) {
@@ -360,6 +363,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
 		Where(`"f"."target_id" = ?`, target.ID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Apply(vexKinds("f")).
 		// The issue's key is grouped alongside its name so the aliases can be
 		// looked up per issue. Selecting it without grouping it is accepted by
 		// SQLite and refused by PostgreSQL, which is the whole reason a query
@@ -574,8 +578,9 @@ func (s *Store) closedInBuild(targetID int64, visible []access.Visibility,
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_because" = ?`, because).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Apply(vexKinds("f")).
 		Where(stillShips).
-		Where(noneOpenByNameAndPurl).
+		Apply(noneOpenByNameAndPurl).
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		Limit(int64(s.carrying() + 1))
 }
@@ -585,17 +590,29 @@ const stillShips = `EXISTS (SELECT 1 FROM "graph_node" AS "n"
 	WHERE "n"."target_id" = "f"."target_id" AND "n"."component_id" = "f"."component_id"
 		AND "n"."closed_scan_id" IS NULL)`
 
-// noneOpenByNameAndPurl says no place of the issue in a finding `f`'s build is
-// open at a component `c` of the same name and package identifier.
+// noneOpenByNameAndPurl keeps a query to findings `f` with no place of the
+// issue in their build open at a component `c` of the same name and package
+// identifier.
 //
 // Asked of the name and package identifier the statement is made about, which
 // may be several components: one at a version a patch does not reach is
 // affected, and a statement naming both would say otherwise.
-const noneOpenByNameAndPurl = `NOT EXISTS (SELECT 1 FROM "finding" AS "o"
+func noneOpenByNameAndPurl(q *bun.SelectQuery) *bun.SelectQuery {
+	kinds, args := findingkind.VEX.Where(`"o"."kind"`)
+	return q.Where(`NOT EXISTS (SELECT 1 FROM "finding" AS "o"
 	JOIN "component" AS "oc" ON "oc"."id" = "o"."component_id"
 	WHERE "o"."target_id" = "f"."target_id" AND "o"."vulnerability_id" = "f"."vulnerability_id"
 		AND "o"."closed_at" IS NULL AND "oc"."name" = "c"."name"
-		AND COALESCE("oc"."purl", '') = COALESCE("c"."purl", ''))`
+		AND COALESCE("oc"."purl", '') = COALESCE("c"."purl", '')
+		AND `+kinds+`)`, args...)
+}
+
+// vexKinds keeps a query to the kinds of finding a VEX document states, over
+// the finding table under the alias given.
+func vexKinds(alias string) func(*bun.SelectQuery) *bun.SelectQuery {
+	where, args := findingkind.VEX.Where(`"` + alias + `"."kind"`)
+	return func(q *bun.SelectQuery) *bun.SelectQuery { return q.Where(where, args...) }
+}
 
 // fixedByPatch is an issue a patch the build declares has fixed in one
 // component.

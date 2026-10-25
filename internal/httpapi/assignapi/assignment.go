@@ -643,23 +643,33 @@ func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
 		return them.Reads(access.Private, productID)
 	}
 	// A disclosed finding travels with the assignment to whoever holds it,
-	// so reading the product at either visibility is enough to be told.
+	// so reading the product at any visibility is enough to be told.
 	return them.ReadsIn(productID)
 }
 
 // teamMayHold reports whether a team may be handed work whose strictest
 // visibility is this: at least one member reads it.
 //
-// Undisclosed work needs a member who reads undisclosed work. Disclosed work
-// travels with the assignment to whoever holds it, so a member who reads the
-// product at either visibility is enough — a team of people working private
-// reports may be handed a disclosed finding and see it.
+// Undisclosed work needs a member who reads undisclosed work, and internal work
+// a member who reads internal work. Disclosed work travels with the assignment
+// to whoever holds it, so a member who reads the product at any visibility is
+// enough — a team of people working private reports may be handed a disclosed
+// finding and see it.
 func teamMayHold(ctx context.Context, rights *access.Store, teamID, productID int64,
 	strictest access.Visibility) (bool, error) {
 
 	reads, err := rights.AnyMemberReads(ctx, teamID, productID, strictest)
-	if err != nil || reads || strictest == access.Private {
+	if err != nil || reads || strictest != access.Public {
 		return reads, err
 	}
-	return rights.AnyMemberReads(ctx, teamID, productID, access.Private)
+	for _, v := range access.Visibilities() {
+		if v == access.Public {
+			continue
+		}
+		reads, err = rights.AnyMemberReads(ctx, teamID, productID, v)
+		if err != nil || reads {
+			return reads, err
+		}
+	}
+	return false, nil
 }

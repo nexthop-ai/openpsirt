@@ -33,10 +33,11 @@ func registerMentions(api huma.API, in core.Deps) {
 			"to — and on an undisclosed finding, the mention itself says a finding exists, " +
 			"which is the disclosure the visibility rule prevents.\n\n" +
 			"`visibility` says which kind of finding the text is about. Asking about " +
-			"undisclosed findings requires being able to read them.",
+			"undisclosed or internal findings requires being able to read them.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "Asking about disclosed findings, the default, needs public-read or "+
-		"public-triage; about undisclosed findings, private-read or private-triage.",
+		"public-triage; about undisclosed findings, private-read or private-triage; about "+
+		"internal findings, internal-read or internal-triage.",
 		core.ReadRights()...), func(ctx context.Context, input *struct {
 		Product    string          `path:"product"`
 		Visibility core.Visibility `query:"visibility" default:"public" doc:"The kind of finding the text is about"`
@@ -68,8 +69,8 @@ func registerMentions(api huma.API, in core.Deps) {
 // product, and the visibility asked about, for the pickers that offer people
 // who can already read what they would be named on or handed.
 //
-// A request about who may read undisclosed work is itself about undisclosed
-// work. Somebody who cannot read it is answered as though the product were not
+// A request about who may read undisclosed or internal work is itself about
+// that work. Somebody who cannot read it is answered as though the product were not
 // there, which is the answer every other path gives.
 func readersHere(ctx context.Context, in core.Deps, product, visibility string) (
 	access.Subject, *catalog.Product, access.Visibility, error) {

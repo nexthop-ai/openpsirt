@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 type Lapsed struct {
@@ -69,6 +70,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			Where(`"f"."target_id" = ?`, targetID).
 			Where(`"f"."closed_at" IS NULL`).
+			Apply(ofKinds(kind.VersionCarry, "f")).
 			Where(finding.DecisionAtPlace("f"))
 	}
 
@@ -84,6 +86,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Where(`"st"."product_id" = "de"."product_id"`).
 			Where(`"f"."closed_at" IS NULL`).
+			Apply(ofKinds(kind.VersionCarry, "f")).
 			Where(finding.DecisionAtPlace("f")).
 			Where(finding.VersionsMatch)
 	}

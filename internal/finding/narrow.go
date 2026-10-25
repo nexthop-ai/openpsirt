@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -712,6 +713,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		// on a package whose findings sit at another visibility says what that
 		// finding is about.
 		where, args := f.product()
+		kinds, kindArgs := kind.Triage.Where(`"fv"."kind"`)
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding_tag" AS "ft"
 			JOIN "component" AS "ct" ON "ct"."id" = "ft"."component_id"
 			WHERE "ft"."product_id" = `+where+`
@@ -725,7 +727,8 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 				WHERE "sv"."product_id" = "ft"."product_id"
 				  AND "fv"."vulnerability_id" = "ft"."vulnerability_id"
 				  AND "fv"."component_id" = "ft"."component_id"
-				  AND "fv"."visibility" = "f"."visibility"))`, append(args, bun.List(words))...)
+				  AND "fv"."visibility" = "f"."visibility"
+				  AND `+kinds+`))`, append(append(args, bun.List(words)), kindArgs...)...)
 	}
 	// Something a person recorded here rather than a scanner reporting it. Its
 	// own question rather than a shade of another: a recorded flaw is the only
@@ -735,7 +738,7 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	case RecordedByHand:
 		q = q.Where(`"f"."kind" = ?`, Entered)
 	case ReportedByAScanner:
-		q = q.Where(`"f"."kind" <> ?`, Entered)
+		q = q.Where(`"f"."kind" = ?`, Vulnerable)
 	}
 	if f.SentBack {
 		// The same condition the row's own count is computed from, so the
@@ -903,6 +906,7 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 	// The same issue at the same fold, open and seen by this reader; which
 	// build is added by the caller.
 	heldElsewhere := func() *bun.SelectQuery {
+		kinds, args := kind.Triage.Where(`"f2"."kind"`)
 		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
 			Join(`JOIN "component" AS "c2" ON "c2"."id" = "f2"."component_id"`).
 			ColumnExpr("1").
@@ -910,7 +914,8 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 			Where(`"c2"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"`+
 				` WHERE "c1"."id" = "f"."component_id")`).
 			Where(`"f2"."closed_at" IS NULL`).
-			Where(`"f2"."visibility" IN (?)`, bun.List(f.Visible))
+			Where(`"f2"."visibility" IN (?)`, bun.List(f.Visible)).
+			Where(kinds, args...)
 	}
 	switch f.AcrossVariants {
 	case OnlyThisVariant:

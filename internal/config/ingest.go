@@ -3,7 +3,10 @@
 
 package config
 
-import "github.com/nexthop-ai/openpsirt/internal/sbom"
+import (
+	"github.com/nexthop-ai/openpsirt/internal/sarif"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
+)
 
 // Limits is what a scan file is read within.
 //
@@ -22,4 +25,32 @@ func (c Config) Limits() sbom.Limits {
 		MaxDepth:      c.IngestMaxDepth,
 		MaxDocuments:  c.IngestMaxDocuments,
 	}
+}
+
+// AnalysisLimits is what an analyzer's results are read within, with each
+// bound left unset at the reader's own default.
+func (c Config) AnalysisLimits() sarif.Limits {
+	return sarif.Limits{
+		MaxBytes:      int64(c.AnalysisMaxBytes),
+		MaxDepth:      c.AnalysisMaxDepth,
+		MaxRuns:       c.AnalysisMaxRuns,
+		MaxResults:    c.AnalysisMaxResults,
+		MaxRules:      c.AnalysisMaxRules,
+		MaxLocations:  c.AnalysisMaxLocations,
+		MaxSteps:      c.AnalysisMaxSteps,
+		MaxModules:    c.AnalysisMaxModules,
+		MaxBases:      c.AnalysisMaxBases,
+		MaxChain:      c.AnalysisMaxChain,
+		MaxProperties: c.AnalysisMaxProperties,
+		MaxText:       c.AnalysisMaxText,
+		MaxHeld:       c.AnalysisMaxHeld,
+	}.OrDefault()
+}
+
+// AnalysisDocuments is how many documents one analyzer upload may carry.
+func (c Config) AnalysisDocuments() int {
+	if c.AnalysisMaxDocuments > 0 {
+		return c.AnalysisMaxDocuments
+	}
+	return sarif.DefaultDocuments
 }

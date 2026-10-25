@@ -17,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -123,12 +124,14 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 	// The findings the list is drawn from, narrowed the same way for the
 	// grouped page and for the builds and components named on it.
 	until := s.now().UTC().Add(within)
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	approaching := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			Where(kinds, kindArgs...).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."disclose_at" IS NOT NULL`).
@@ -569,11 +572,13 @@ func needsSecondPerson(ctx context.Context, db bun.IDB, productID, vulnerability
 // move.
 func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (time.Time, error) {
 	var was time.Time
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`MAX("f"."disclose_at")`).
+		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(`"f"."visibility" = ?`, access.Private).
@@ -819,8 +824,10 @@ func movedBy(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) 
 func moveTo(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	until time.Time) error {
 
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	_, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"disclose_at" = ?`, until).
+		Where(kinds, kindArgs...).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where(`"visibility" = ?`, access.Private).
 		Where(`"closed_at" IS NULL`).
@@ -890,6 +897,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		Product       string `bun:"product"`
 		Vulnerability string `bun:"vulnerability"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"fu"."kind"`)
 	query := s.db.NewSelect().
 		Model((*Movement)(nil)).
 		ColumnExpr("dx.*").
@@ -908,7 +916,8 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 			JOIN "stream" AS "su" ON "su"."id" = "tu"."stream_id"
 			WHERE "si"."id" = "dx"."vulnerability_id"
 			AND "su"."product_id" = "dx"."product_id"
-			AND "fu"."visibility" = ?)`, access.Private).
+			AND "fu"."visibility" = ?
+			AND `+kinds+`)`, append([]any{access.Private}, kindArgs...)...).
 		// Nor one a withdrawn ruling asked for, which can no longer be agreed
 		// to.
 		Where(`NOT EXISTS (SELECT 1 FROM "report_ruling" AS "rw"

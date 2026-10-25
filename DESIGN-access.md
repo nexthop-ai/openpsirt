@@ -9,6 +9,7 @@ REQ-44, REQ-45, REQ-56, REQ-63, REQ-68, REQ-69's server half.
 
 - [Authentication and authorization](#authentication-and-authorization)
 - [Roles](#roles)
+- [Internal visibility](#internal-visibility)
 - [Breadth of view](#breadth-of-view)
 - [The upward tree](#the-upward-tree)
 - [Refusals disclose nothing](#refusals-disclose-nothing)
@@ -67,13 +68,13 @@ should be here.
 
 | Kind | Roles |
 |---|---|
-| Read and triage, per visibility | `public-read`, `private-read`, `public-triage`, `private-triage` |
+| Read and triage, per visibility | `public-read`, `private-read`, `internal-read`, `public-triage`, `private-triage`, `internal-triage` |
 | Capabilities | `assigner`, `approver` |
 | Global | `admin` |
 
 | Rule | Reason |
 |---|---|
-| Each visibility is its own grant | Somebody working private reports is not handed every public finding with them. Somebody who works both holds both, and no role reaches a visibility it does not name |
+| Each visibility is its own grant | Somebody working private reports is not handed every public finding with them, and reading private work does not read internal work or the reverse. Somebody who works more than one holds each, and no role reaches a visibility it does not name |
 | Triage implies reading at the same visibility | Nobody decides about what they cannot see, and a deployment forced to grant both would eventually grant one and wonder why nothing worked |
 | A capability grants no visibility, and a capability has to grant something | What an approver reaches is bounded by what they may read. The converse held the other way too: approving asked for the triage role, which made the approver capability do nothing at all — somebody granted exactly the right to approve could approve nothing |
 | An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. Read the other way, it costs separation of duties: one account proposes a decision and approves it, re-rates severities and reads every embargo, so the second person a dismissal asks for is optional for whoever holds admin. It also makes a read-only auditor impossible to express |
@@ -92,6 +93,35 @@ by a rule about acting lets none.
 | Creating a credential asks for a session (REQ-44) | A credential may not mint another. That held for a personal token issuing a token, and was got around by what an administrator's token could make instead: a person, an administrator even, and a pipeline key, both outliving the token and neither bounded by it. Recording a person, creating a key and unbinding a provider identifier are the acts refused to a delegated subject. Unbinding is among them because whoever next arrives under the username is taken to be its holder |
 | Admin is a property of the person rather than a grant against a product | Modeling it as a grant means a row whose product is absent, and a uniqueness rule over a nullable column behaves differently on each of the four engines |
 | The `reporting` role is retired rather than defined | What such a role would gate is breadth of view, and statistics are what breadth looks like once aggregated. It gated nothing: one use outside tests, and a field in the session answer no screen read. A test asserts the refusal rather than its absence from a list |
+
+## Internal visibility
+
+Internal is the third visibility, beside public and private. It holds material
+never disclosed in its own right: unconfirmed results nobody has judged, such
+as an analyzer's leads (REQ-14). Analysis results are its first users.
+
+| Visibility | Holds | Read under | Triaged under |
+|---|---|---|---|
+| Public | Disclosed work | `public-read` | `public-triage` |
+| Private | Work not yet disclosed, which a disclosure opens | `private-read` | `private-triage` |
+| Internal | Unconfirmed results, never disclosed | `internal-read` | `internal-triage` |
+
+| Rule | Reason |
+|---|---|
+| Disclosure never applies to it | It carries no disclosure date, and nothing about it is published |
+| Its roles are granted like every other read and triage role | Per product, across every product, or from a group mapping. The people working analyzer output work a high volume of noise and the private team works few embargoed cases, and neither is handed the other's material |
+| `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
+| The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
+| A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage` |
+| Approving at internal visibility needs its holder to read internal work | The rule every visibility follows: reading there, with the approver capability or triage there. The session answer states it for each visibility |
+| A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
+
+No consumer of vulnerability findings includes analysis results. The findings
+lists, reports, exports, published documents and the interface's screens read
+none, and the screens for working leads are not built. A person sends an
+analyzer run where they hold `internal-triage` on the product, since every
+result opens internal. `DESIGN-kinds.md`
+§ Consumers holds which kinds each consumer reads.
 
 ## Breadth of view
 
@@ -528,22 +558,24 @@ because triage implies reading and reading does not imply triage, so a single
 answer would have to be qualified at every call site.
 
 Whether any row of a group is undisclosed is one aggregate too: a count of the
-undisclosed rows, compared with zero. The visibility words are compared for
-equality and never ordered, because the smallest word of a group answers the
-question only while "private" sorts before "public", and it is asked where an
-outbound message decides whether it may name the issue. A test fails on an
+private rows, compared with zero. Whether any row's detail stays inside the
+deployment is another: a count of the rows that are not public. An outbound
+message asks the second before it names an issue, so an internal row withholds
+detail as an undisclosed one does. The visibility words are compared for
+equality and never ordered, because the smallest word of a group answers either
+question only while the words happen to sort that way. A test fails on an
 ordering taken over a visibility column anywhere in the source.
 
 | Question | Asked at |
 |---|---|
 | An act on one finding — a claim, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
 | Approving somebody else's claim | Reading at the claim's visibility, with the approver capability or triage there. The session answer says which visibilities, so a screen offers it only where it succeeds |
-| An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, a record of being exploited, taking unowned work | Triage at either visibility. The finding-level question narrows further wherever there is a finding to ask it of |
+| An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, a record of being exploited, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
 | Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish. A document is disclosed work alone, and a row saying one went out is as much a disclosure as the document |
 | A release note between two builds | Public reading at both. Undisclosed work is added only where asked for and read |
 | An advisory, draft or issued | Every issue it covers at a visibility read in that issue's product |
-| A list, count or export spanning products | Per product and per visibility: both, disclosed only, or undisclosed only, as the grants on each product say. The assignment carry reaches the work list alone |
+| A list, count or export spanning products | Per product and per visibility: whichever of the three the grants on each product say. The assignment carry reaches the work list alone |
 
 ## Judgments about an issue
 
@@ -623,7 +655,7 @@ to ask.
 |---|---|---|
 | A person | A session cookie, or a username a trusted proxy asserts on every request | What their roles allow |
 | A person's own script | A token they minted | A narrowed view of what they may do |
-| A pipeline | An API key | Send scans, and read back what became of its own |
+| A pipeline | An API key | Send scans and analyzer runs, and read back what became of its own |
 | Anybody at all | None, and none is looked at | Read the security documents of the products that publish. § Anybody at all |
 
 A pipeline may send and nothing else — no reading findings, no triage, no
@@ -636,6 +668,7 @@ being applied correctly to it.
 | A key's scope is constraints, not a path | The product is always required; release and variant are independent, and either, both or neither may be pinned. Every constraint present must match |
 | A mismatch is refused rather than redirected | A product-wide key cannot imply which release an upload is for, so the upload always states its full target |
 | A key reads back the receipts of the builds it may upload to and nothing else | The same holds for the documents sent there and what each upload changed in the inventory. An upload is answered before its documents are read, and the party who can fix a producer emitting unreadable files is the pipeline that ran it. Every receipt of the build, whichever key sent it: a rotated key, or a second key on the build, is answered with another sender's scan when it re-sends the same bytes. Narrowed in the query rather than on the page after it is read: a count taken before filtering says how many other builds there are |
+| A key reads back the receipts of the analyzer runs sent to the builds it may upload to | A receipt counts the leads a run opened and saw and names none. A person reads the same receipts where they read internal findings in the product, since the counts are of internal findings (`DESIGN-analysis.md` § Receipts) |
 | The secret is generated here, never chosen, stored hashed, shown once | A credential store that can hand back what it holds gives up every pipeline's key along with a copy of the database. It is not a password: there is nothing to slow a guesser down |
 | A key's name is stored folded and matched exactly, the way a username is | An administrator types it to make the key and again to withdraw it. A name taken in other capitals is refused as taken, and one that is only spaces is refused as naming nothing |
 | A key's name is unique among the keys in force | A withdrawn key's name may be given to a new key. What a key sent is recorded against the key's row rather than its name, so a receipt credits the key that sent it. Withdrawing by name reaches the key in force |

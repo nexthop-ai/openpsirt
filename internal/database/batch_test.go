@@ -69,6 +69,7 @@ type issueRow struct {
 	ID          int64     `bun:"id,pk,autoincrement"`
 	Identifier  string    `bun:"identifier,notnull"`
 	Folded      string    `bun:"identifier_folded,notnull"`
+	Kind        string    `bun:"kind,notnull"`
 	Severity    *string   `bun:"severity"`
 	Description *string   `bun:"description"`
 	Exploited   bool      `bun:"exploited,notnull"`
@@ -101,6 +102,7 @@ func TestAnInsertReadingNothingBackStoresWhatItIsGiven(t *testing.T) {
 				}
 				made[i] = issueRow{
 					Identifier: fmt.Sprintf("%s-%04d", prefix, i), Folded: fmt.Sprintf("%s-%04d", prefix, i),
+					Kind:     "vulnerability",
 					Severity: short[i%len(short)], Description: texts[(i+3)%len(texts)],
 					Exploited: i%2 == 0, Likelihood: likelihood, Score: score,
 					FirstSeenAt: time.Date(2026, 10, 11, 12, 34, 56, 123456000+i*1000, east),
@@ -207,7 +209,7 @@ func TestAKeyedInsertCarriesTheIdentifiersTheDatabaseStored(t *testing.T) {
 			rows := make([]issueRow, 2*database.BatchSize+1)
 			for i := range rows {
 				id := fmt.Sprintf("%s-%04d", prefix, i)
-				rows[i] = issueRow{Identifier: id, Folded: id, FirstSeenAt: time.Now().UTC(), IssueID: int64(i)}
+				rows[i] = issueRow{Identifier: id, Folded: id, Kind: "vulnerability", FirstSeenAt: time.Now().UTC(), IssueID: int64(i)}
 			}
 			if err := database.InBatches(ctx, conn, rows); err != nil {
 				t.Fatal(err)

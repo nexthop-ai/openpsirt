@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // What a document states about one release, in the standard's words.
@@ -155,6 +156,7 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 	advisoryID, productID, issueID int64) ([]Release, error) {
 
 	visible := access.Visible(subject, productID)
+	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	var rows []struct {
 		StreamID  int64  `bun:"stream_id"`
 		VariantID int64  `bun:"variant_id"`
@@ -196,6 +198,7 @@ func releases(ctx context.Context, db bun.IDB, subject access.Subject,
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issueID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		Where(`COALESCE("f"."closed_because", '') NOT IN (?)`, bun.List(finding.NeverPresent())).
 		GroupExpr(`"st"."id", "va"."id", "st"."name", "va"."name"`).
 		Scan(ctx, &rows)
@@ -250,6 +253,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		VariantID int64 `bun:"variant_id"`
 		finding.Covering
 	}
+	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
@@ -261,6 +265,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, issueID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"t"."stream_id", "t"."variant_id"`)
 	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)

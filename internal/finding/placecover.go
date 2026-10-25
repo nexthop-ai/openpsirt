@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -246,12 +247,14 @@ func decidedPlaces(ctx context.Context, db bun.IDB, productID, targetID int64,
 		Outcomes int `bun:"outcomes"`
 		Covering
 	}
+	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
 	q := covered(statedPlaceColumns(db.NewSelect()), productID, visible, ForStatements).
 		ColumnExpr(`COUNT(*) AS "joined"`).
 		ColumnExpr(`COUNT("cl"."id") AS "decided"`).
 		ColumnExpr(`COUNT(DISTINCT "cl"."outcome") AS "outcomes"`).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."id", "v"."id", "v"."identifier", "c"."id", "c"."name", "giv"."purl", "gn"."purl", "c"."purl", "f"."consumer_id",
 			"uc"."name", "civ"."purl", "cn"."purl", "uc"."purl"`).
 		Having(`COUNT("cl"."id") > 0`)
@@ -283,12 +286,14 @@ func everyPlaceOf(ctx context.Context, db bun.IDB, targetID int64,
 	var rows []statedPlace
 	byIssue, issueArgs := database.InAnyOf(`"f"."vulnerability_id"`, keysOf(issues))
 	byComponent, componentArgs := database.InAnyOf(`"f"."component_id"`, keysOf(components))
+	kinds, kindArgs := kind.VEX.Where(`"f"."kind"`)
 	if err := statedPlaceColumns(db.NewSelect()).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(byIssue, issueArgs...).
 		Where(byComponent, componentArgs...).
+		Where(kinds, kindArgs...).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read every place of the components decided: %w", err)
 	}

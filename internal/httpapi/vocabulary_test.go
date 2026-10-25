@@ -27,6 +27,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -182,6 +183,8 @@ func statedVocabularies() map[string][]string {
 		"destination kinds":              append(words(notify.Kinds()), notify.Everything),
 		"notification lifetimes":         words(notify.Lifetimes()),
 		"upload progress":                words(ingest.Progresses()),
+		"run statuses":                   words(series.Statuses()),
+		"reasons a run is not compared":  words(series.Reasons()),
 		"document kinds":                 words(ingest.Kinds()),
 		"access modes":                   words(access.Modes()),
 		"grant sources":                  words(access.Sources()),

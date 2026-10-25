@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -62,14 +63,16 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 		return map[int64]int{}, nil
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	inner := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(column + ` AS "grouped_by"`).
+		ColumnExpr(column+` AS "grouped_by"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"f"."closed_at" IS NULL`)
 	if !all {
 		inner = inner.Where(`"st"."product_id" IN (?)`, bun.List(products))

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Went is one advisory that went out, as a report about a period reads it.
@@ -186,10 +187,12 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 	if all {
 		return q
 	}
-	both, public, private := access.Split(products, subject.Reads)
-	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, both, public, private)
+	readings := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(`"st"."product_id"`, `"f"."visibility"`, readings)
+	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	bound := append([]any{finding.Entered}, args...)
 	bound = append(bound, access.Private)
+	bound = append(bound, kindArgs...)
 	bound = append(bound, args...)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 		WHERE "ac"."advisory_id" = "ad"."id" AND (`+covered+`) AND (NOT EXISTS (
@@ -206,6 +209,7 @@ func everyIssue(q *bun.SelectQuery, subject access.Subject, covered string) *bun
 			WHERE "st"."product_id" = "ac"."product_id"
 			  AND "si"."id" = "ac"."vulnerability_id"
 			  AND "f"."visibility" = ?
+			  AND `+kinds+`
 			  AND NOT (`+where+`))))`,
 		bound...)
 }
@@ -319,6 +323,7 @@ func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool
 // the other, which is the over-refusal asking about the release rather than
 // about the product exists to avoid.
 func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+	kinds, kindArgs := kind.Advisories.Where(`"f"."kind"`)
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
 		Join(`JOIN "advisory_issue" AS "ac" ON "ac"."advisory_id" = "ai"."advisory_id"`).
 		Join(`JOIN "vulnerability" AS "acv" ON "acv"."id" = "ac"."vulnerability_id"`).
@@ -326,6 +331,7 @@ func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, 
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		Where(`"tg"."stream_id" = ?`, streamID).
+		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ac"."product_id"`).
 		Where(`"ac"."added_at" <= "ai"."issued_at"`).
 		Where(`("ac"."removed_at" IS NULL OR "ac"."removed_at" > "ai"."issued_at")`).

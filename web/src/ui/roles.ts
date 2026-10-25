@@ -24,7 +24,13 @@ const WORDS: Record<Role, { label: string; means: string; grants: boolean }> = {
   },
   "private-read": {
     label: "Read, private",
-    means: "Read findings nobody has announced. Public ones need their own role",
+    means: "Read findings not yet announced. Public and internal ones need their own role",
+    grants: true,
+  },
+  "internal-read": {
+    label: "Read, internal",
+    means:
+      "Read unconfirmed analysis results, never announced. Public and private ones need their own role",
     grants: true,
   },
   "public-triage": {
@@ -35,7 +41,12 @@ const WORDS: Record<Role, { label: string; means: string; grants: boolean }> = {
   "private-triage": {
     label: "Triage, private",
     means:
-      "The same for findings nobody has announced, including recording one. Public ones need their own role",
+      "The same for findings not yet announced, including recording one. Public and internal ones need their own role",
+    grants: true,
+  },
+  "internal-triage": {
+    label: "Triage, internal",
+    means: "The same for unconfirmed analysis results. Public and private ones need their own role",
     grants: true,
   },
   approver: {

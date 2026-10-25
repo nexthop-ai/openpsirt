@@ -80,7 +80,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Undisclosed     bool   `bun:"undisclosed"`
 		Untrusted       bool   `bun:"untrusted"`
 	}
-	undisclosed, private := access.AnyPrivate(`"de"."visibility"`)
+	undisclosed, private := access.AnyWithheld(`"de"."visibility"`)
 	err := w.db.NewSelect().
 		TableExpr(finding.Decisions).
 		Join(`JOIN "vex_statement" AS "ss" ON "ss"."id" = "de"."from_statement_id"`).

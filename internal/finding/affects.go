@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -272,9 +273,11 @@ func openIn(targetID, vulnerabilityID, componentID int64, name string,
 // opened first.
 func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) ([]Finding, error) {
 	var rows []Finding
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().Model(&rows).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).

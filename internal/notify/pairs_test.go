@@ -194,6 +194,24 @@ func TestAPairIsNotRaisedInATeamTooSmallForItToBeAChoice(t *testing.T) {
 	})
 }
 
+func TestSomebodyTriagingOnlyInternalFindingsIsNotCountedAsAnApprover(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		tm := aTeam(t, w, "ana", "ben")
+		rights := access.NewStore(w.DB.DB)
+		dee, err := rights.Ensure(t.Context(), "dee@example.com", "dee", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(t.Context(), dee.ID, tm.product, access.InternalTriage); err != nil {
+			t.Fatal(err)
+		}
+		tm.agreed(t, "ana", "ben", 10, 3)
+		if body := tm.heard(t, tm.admin); body != "" {
+			t.Errorf("a pair who are the whole team able to approve raised %q", body)
+		}
+	})
+}
+
 func TestAProductsOwnShareIsTheOneAsked(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		tm := aTeam(t, w, "ana", "ben", "cat")

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
@@ -38,9 +39,10 @@ type supersededAbout struct {
 	IssueID  int64  `bun:"issue_id"`
 	Absorbed string `bun:"absorbed"`
 	Kept     string `bun:"kept"`
-	// Private is whether the telling is held to private triage: a decision's
-	// own visibility, or for a judgment about the whole issue in a product,
-	// whether no finding of it there is disclosed.
+	// Private is whether the telling is withheld and held to private triage:
+	// whether a decision is at any visibility but public, or for a judgment
+	// about the whole issue in a product, whether no finding of it there is
+	// disclosed.
 	Private bool `bun:"private"`
 }
 
@@ -74,19 +76,20 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			ColumnExpr(`"vk"."identifier" AS "kept"`).
 			Where(`"p"."id" = ?`, one.ProductID)
 		if one.Kind == finding.DisplacedDecision {
-			// Private where either decision is: the one that stands is what
+			// Withheld where either decision is: the one that stands is what
 			// the link opens, and the one that lapsed is what the message
 			// is about.
 			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de" `+
-				`WHERE "de"."id" IN (?, ?) AND "de"."visibility" = ?) THEN 1 ELSE 0 END AS "private"`,
-				one.RecordID, one.StandingID, string(access.Private))
+				`WHERE "de"."id" IN (?, ?) AND "de"."visibility" <> ?) THEN 1 ELSE 0 END AS "private"`,
+				one.RecordID, one.StandingID, string(access.Public))
 		} else {
+			kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 			q = q.ColumnExpr(`CASE WHEN EXISTS (SELECT 1 FROM "finding" AS "f" `+
 				`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id" `+
 				`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id" `+
 				`WHERE "f"."vulnerability_id" = "vk"."issue_id" AND "st"."product_id" = "p"."id" `+
-				`AND "f"."visibility" = ?) THEN 0 ELSE 1 END AS "private"`,
-				string(access.Public))
+				`AND `+kinds+` AND "f"."visibility" = ?) THEN 0 ELSE 1 END AS "private"`,
+				append(kindArgs, string(access.Public))...)
 		}
 		var about supersededAbout
 		if err := q.Scan(ctx, &about); err != nil {

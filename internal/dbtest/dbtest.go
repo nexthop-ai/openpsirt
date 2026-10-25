@@ -994,6 +994,18 @@ var tables = []string{
 	"person",
 	// After person and team, which point at it.
 	"party",
+	// Before finding and series_run, both of which they point at.
+	"analysis_location",
+	"analysis_result",
+	"sighting",
+	// Before series_run, which they point at.
+	"series_module",
+	"series_document_chunk",
+	"series_document",
+	// Before series, scan and target, all of which it points at.
+	"series_run",
+	// Before product, which it points at.
+	"series",
 	"finding",
 	"suppression",
 	// After suppression and vex_statement, whose rows point at it with no

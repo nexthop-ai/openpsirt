@@ -34,6 +34,7 @@ var alwaysRuns = []string{
 	"watch for quiet builds",
 	"send what is owed outward",
 	"route unheld work to teams",
+	"apply analyzer runs",
 	"set aside work whose worker died",
 }
 

@@ -492,3 +492,51 @@ func TestARoutingRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
 		}
 	})
 }
+
+func TestARoutingRulePlacesNoAnalysisResult(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		// Two issues' rows as leads, one at each visibility a lead holds, and
+		// the third left as the vulnerability the rule does place.
+		for visibility, identifier := range map[access.Visibility]string{
+			access.Internal: "CVE-2026-2", access.Private: "CVE-2026-1",
+		} {
+			if _, err := f.db.DB.NewUpdate().Table("finding").
+				Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
+				Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`, identifier).
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "platform"), "the library",
+			"", "libnl-3-*"); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+			t.Fatal(err)
+		}
+		var rows []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&rows).Where(`"f"."target_id" = ?`, f.target).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		placed := 0
+		for _, row := range rows {
+			switch {
+			case row.Kind == "analysis" && row.AssignedTo != nil:
+				t.Errorf("the rule placed an analysis result at %s", row.Visibility)
+			case row.AssignedTo != nil:
+				placed++
+			}
+		}
+		if placed == 0 {
+			t.Error("the rule placed nothing, so it checked nothing")
+		}
+	})
+}

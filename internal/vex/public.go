@@ -264,6 +264,7 @@ func (s *Store) grouped(targetID int64, visible []access.Visibility) *bun.Select
 		ColumnExpr(`COALESCE("giv"."purl", "gn"."purl", "c"."purl", '') AS "purl"`).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+		Apply(vexKinds("f")).
 		GroupExpr(`"v"."id", "v"."identifier", "c"."name", "giv"."purl", "gn"."purl", "c"."purl"`).
 		Limit(int64(s.carrying() + 1))
 }

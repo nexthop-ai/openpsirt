@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // ReleaseState is what the latest scans of one release say about one issue.
@@ -60,11 +61,13 @@ func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, product
 	if subject.Kind != access.Person || (!onCase && !subject.Sees(productID)) {
 		return out, nil
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 		ColumnExpr(`DISTINCT "tg"."stream_id"`).
+		Where(kinds, kindArgs...).
 		Where(`"tg"."stream_id" IN (?)`, bun.List(streams)).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).

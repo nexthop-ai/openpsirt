@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -362,6 +363,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	// nobody is looking. A deferral or a promised upgrade leaves work that
 	// comes back, so those count as open.
 	standing, held := InForce()
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	open, err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -372,6 +374,7 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, kindArgs...).
 		Where(NotArguedAway).
 		Where(`NOT EXISTS (SELECT 1 FROM `+Decisions+`
 			JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"

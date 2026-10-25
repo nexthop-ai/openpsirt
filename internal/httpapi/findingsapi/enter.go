@@ -98,7 +98,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			"same clock and in the same reports. No scan will close it, so it is closed " +
 			"by a person through the resolve endpoint or it stays open.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.PerProduct, "public-triage where the finding is disclosed, private-triage where it is not.", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "public-triage where the finding is disclosed, private-triage where it is not.", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
 			// Builds is which builds ship it, rather than one in
@@ -261,7 +261,7 @@ func registerResolution(api huma.API, in core.Deps) {
 			"Nothing reopens one. Closing is a considered act, and this is the way it is " +
 			"undone: it is not.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.PerProduct, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
@@ -579,7 +579,7 @@ func registerMovements(api huma.API, in core.Deps) {
 			"Readable to anybody who may read the issue once it is disclosed in the product.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Where you may read undisclosed work, or once the issue is disclosed in the product.",
-		core.ReadRights()...), func(ctx context.Context, input *struct {
+		core.DisclosureReadRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*core.ListOutput[MovementBody], error) {
@@ -858,7 +858,7 @@ func registerAffects(api huma.API, in core.Deps) {
 			"decision of `not-applicable` with the justification that fits.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "public-triage where the finding is disclosed, private-triage where it is not.",
-		core.TriageRights()...), func(ctx context.Context, input *struct {
+		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The identifier it was filed under"`
 		Body          struct {

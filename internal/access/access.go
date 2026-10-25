@@ -66,17 +66,19 @@ const (
 	Assigner Role = "assigner"
 
 	// The reading and triage roles, per visibility.
-	PublicRead    Role = "public-read"
-	PrivateRead   Role = "private-read"
-	PublicTriage  Role = "public-triage"
-	PrivateTriage Role = "private-triage"
+	PublicRead     Role = "public-read"
+	PrivateRead    Role = "private-read"
+	InternalRead   Role = "internal-read"
+	PublicTriage   Role = "public-triage"
+	PrivateTriage  Role = "private-triage"
+	InternalTriage Role = "internal-triage"
 )
 
 // Roles are the baseline set. It is a floor, not a ceiling.
 func Roles() []Role {
 	return []Role{
 		Approver, Assigner,
-		PublicRead, PrivateRead, PublicTriage, PrivateTriage,
+		PublicRead, PrivateRead, InternalRead, PublicTriage, PrivateTriage, InternalTriage,
 	}
 }
 
@@ -139,19 +141,38 @@ const (
 	Public Visibility = "public"
 	// Private means not yet disclosed.
 	Private Visibility = "private"
+	// Internal is material never disclosed in its own right: results nobody
+	// has judged yet, such as an analyzer's leads. Disclosure never applies
+	// to it, and it is read and triaged under roles of its own.
+	Internal Visibility = "internal"
 )
 
-// Visibilities is both visibilities, disclosed first.
-func Visibilities() []Visibility { return []Visibility{Public, Private} }
+// Visibilities is every visibility, disclosed first.
+func Visibilities() []Visibility { return []Visibility{Public, Private, Internal} }
 
 // AsVisibility reads a stored value, treating anything unrecognized as not
 // disclosed. Unset has to read as private, or a column added later defaults
 // every existing row to visible.
 func AsVisibility(s string) Visibility {
-	if Visibility(s) == Public {
+	switch Visibility(s) {
+	case Public:
 		return Public
+	case Internal:
+		return Internal
 	}
 	return Private
+}
+
+// reading and triaging are the roles that read, and that triage, at one
+// visibility. Each visibility is its own pair.
+func reading(v Visibility) (read, triage Role) {
+	switch v {
+	case Public:
+		return PublicRead, PublicTriage
+	case Internal:
+		return InternalRead, InternalTriage
+	}
+	return PrivateRead, PrivateTriage
 }
 
 // Kind distinguishes the sorts of thing that can be asking.
@@ -506,16 +527,19 @@ func (s Subject) Reads(visibility Visibility, productID int64) bool {
 	if s.Kind == Anonymous {
 		return visibility == Public && s.published[productID]
 	}
-	if visibility == Public {
-		return s.Holds(PublicRead, productID) || s.Holds(PublicTriage, productID)
-	}
-	return s.Holds(PrivateRead, productID) || s.Holds(PrivateTriage, productID)
+	read, triage := reading(visibility)
+	return s.Holds(read, productID) || s.Holds(triage, productID)
 }
 
-// ReadsIn reports whether this subject reads findings of either visibility in
+// ReadsIn reports whether this subject reads findings of any visibility in
 // this product.
 func (s Subject) ReadsIn(productID int64) bool {
-	return s.Reads(Public, productID) || s.Reads(Private, productID)
+	for _, v := range Visibilities() {
+		if s.Reads(v, productID) {
+			return true
+		}
+	}
+	return false
 }
 
 // Triages reports whether a subject may argue about findings of this
@@ -532,10 +556,8 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 	if s.Kind != Person {
 		return false
 	}
-	if visibility == Public {
-		return s.Holds(PublicTriage, productID)
-	}
-	return s.Holds(PrivateTriage, productID)
+	_, triage := reading(visibility)
+	return s.Holds(triage, productID)
 }
 
 // MayApprove is who may agree to somebody else's claim at one visibility: the
@@ -551,56 +573,84 @@ func MayApprove(approver, reads, triages bool) bool {
 	return reads && (approver || triages)
 }
 
-// TriagesIn reports whether this subject triages findings of either visibility
+// TriagesIn reports whether this subject triages findings of any visibility
 // in this product.
 //
 // The question an act about the product rather than about one finding asks:
 // routing, a rating, an obligation, taking unowned work. The finding-level
 // question narrows further where there is a finding to ask it of.
 func (s Subject) TriagesIn(productID int64) bool {
-	return s.Triages(Public, productID) || s.Triages(Private, productID)
-}
-
-// Split sorts products by which visibilities a rule allows in each: both, only
-// disclosed, or only undisclosed. A product the rule allows neither in is in
-// none of the three.
-//
-// A query narrowing to what a subject may reach writes one clause per group —
-// the product alone for the first, the product and a visibility for the other
-// two — so every narrowing spells the rule the same way.
-func Split(products []int64, allowed func(Visibility, int64) bool) (both, public, private []int64) {
-	for _, id := range products {
-		pub, priv := allowed(Public, id), allowed(Private, id)
-		switch {
-		case pub && priv:
-			both = append(both, id)
-		case pub:
-			public = append(public, id)
-		case priv:
-			private = append(private, id)
+	for _, v := range Visibilities() {
+		if s.Triages(v, productID) {
+			return true
 		}
 	}
-	return both, public, private
+	return false
 }
 
-// VisibleWhere is one condition over the three groups Split sorts
-// products into: the product alone where both visibilities are allowed, the
-// product and its visibility where one is. Nothing allowed anywhere is a
-// condition nothing satisfies.
-func VisibleWhere(product, visibility string, both, public, private []int64) (string, []any) {
+// Readings is a set of products sorted by exactly which visibilities a rule
+// allows in each. A product the rule allows none in is in no group.
+type Readings struct {
+	groups []readingGroup
+}
+
+// readingGroup is the products a rule allows the same visibilities in.
+type readingGroup struct {
+	visibilities []Visibility
+	products     []int64
+}
+
+// Split sorts products by which visibilities a rule allows in each.
+//
+// A query narrowing to what a subject may reach writes one clause per group —
+// the product alone where every visibility is allowed, the product and the
+// visibilities otherwise — so every narrowing spells the rule the same way.
+func Split(products []int64, allowed func(Visibility, int64) bool) Readings {
+	var r Readings
+	index := map[string]int{}
+	for _, id := range products {
+		var held []Visibility
+		key := ""
+		for _, v := range Visibilities() {
+			if allowed(v, id) {
+				held = append(held, v)
+				key += string(v) + ","
+			}
+		}
+		if len(held) == 0 {
+			continue
+		}
+		at, seen := index[key]
+		if !seen {
+			at = len(r.groups)
+			index[key] = at
+			r.groups = append(r.groups, readingGroup{visibilities: held})
+		}
+		r.groups[at].products = append(r.groups[at].products, id)
+	}
+	return r
+}
+
+// VisibleWhere is one condition over the groups Split sorted products into:
+// the product alone where every visibility is allowed, the product and its
+// visibility where some are. Nothing allowed anywhere is a condition nothing
+// satisfies.
+func VisibleWhere(product, visibility string, r Readings) (string, []any) {
 	var clauses []string
 	var args []any
-	if len(both) > 0 {
-		clauses = append(clauses, product+" IN (?)")
-		args = append(args, bun.List(both))
-	}
-	if len(public) > 0 {
-		clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" = ?)")
-		args = append(args, bun.List(public), Public)
-	}
-	if len(private) > 0 {
-		clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" = ?)")
-		args = append(args, bun.List(private), Private)
+	every := len(Visibilities())
+	for _, g := range r.groups {
+		switch len(g.visibilities) {
+		case every:
+			clauses = append(clauses, product+" IN (?)")
+			args = append(args, bun.List(g.products))
+		case 1:
+			clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" = ?)")
+			args = append(args, bun.List(g.products), g.visibilities[0])
+		default:
+			clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" IN (?))")
+			args = append(args, bun.List(g.products), bun.List(g.visibilities))
+		}
 	}
 	if len(clauses) == 0 {
 		return "1 = 0", nil
@@ -608,19 +658,36 @@ func VisibleWhere(product, visibility string, both, public, private []int64) (st
 	return "(" + strings.Join(clauses, " OR ") + ")", args
 }
 
+// caseVisibilities is what a case reaches. A case is about undisclosed work
+// and the record it becomes once disclosed, and internal material is not part
+// of one.
+var caseVisibilities = []Visibility{Public, Private}
+
+// CaseReaches reports whether a case grant reaches material of this
+// visibility.
+func CaseReaches(v Visibility) bool {
+	for _, have := range caseVisibilities {
+		if have == v {
+			return true
+		}
+	}
+	return false
+}
+
 // VisibleOn is which visibilities this subject may read of one named issue in
 // one product: what the product's own grant allows, widened by a case they
 // were brought into.
 //
 // Asked wherever a read is about one issue rather than about a product. A
-// collaborator reads that issue at any visibility and reads nothing else of
-// the product, so the two questions have different answers and both are real.
+// collaborator reads that issue at every visibility a case reaches and reads
+// nothing else of the product, so the two questions have different answers
+// and both are real.
 func VisibleOn(s Subject, productID, vulnerabilityID int64) []Visibility {
 	visible := Visible(s, productID)
 	if !s.OnCase(productID, vulnerabilityID) {
 		return visible
 	}
-	for _, want := range []Visibility{Public, Private} {
+	for _, want := range caseVisibilities {
 		held := false
 		for _, have := range visible {
 			held = held || have == want
@@ -676,7 +743,7 @@ func readRefused(productID int64) error {
 // what has been disclosed cannot be handed a row that has not been.
 func Visible(s Subject, productID int64) []Visibility {
 	var visible []Visibility
-	for _, v := range []Visibility{Public, Private} {
+	for _, v := range Visibilities() {
 		if s.Reads(v, productID) {
 			visible = append(visible, v)
 		}

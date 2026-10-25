@@ -11,6 +11,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -120,6 +121,7 @@ func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 		}
 	}
 	products, all := subject.Products()
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	read := func(ids []int64, narrowed bool) error {
 		return database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			// Each issue asked is read as the issue it stands for, which
@@ -131,7 +133,8 @@ func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 				Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 				ColumnExpr(`DISTINCT "tv"."id"`).
 				Where(`"tv"."id" IN (?)`, bun.List(batch)).
-				Where(`"st"."product_id" = ?`, productID)
+				Where(`"st"."product_id" = ?`, productID).
+				Where(kinds, kindArgs...)
 			if narrowed {
 				q = onlyReadable(q, subject, products, all)
 			}

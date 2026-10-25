@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -118,10 +119,12 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 			finding.FoldIdentifier(f.Issue))
 	}
 	if f.Component != "" {
+		kinds, args := kindsOf(kind.Triage, "cf")
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
-			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND "cc"."name_folded" = ?)`,
-			graph.Folded(f.Component))
+			` WHERE `+finding.DecisionFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
+			` AND `+kinds+`)`,
+			append([]any{graph.Folded(f.Component)}, args...)...)
 	}
 	// One build, with the build's own product required to be the one that
 	// made the judgment: a place identity carries no product, so the match
@@ -138,6 +141,9 @@ func aboutTheSamePlaces(q *bun.SelectQuery, subject access.Subject, f Filter) *b
 			WHERE ` + finding.DecisionFiledAt("de", "bf") + `
 			  AND "bf"."target_id" = ? AND "bs"."product_id" = "de"."product_id"`
 		args := []any{f.TargetID}
+		kinds, kindArgs := kindsOf(kind.Triage, "bf")
+		clause += " AND " + kinds
+		args = append(args, kindArgs...)
 		if mayRead != "" {
 			clause += " AND " + mayRead
 			args = append(args, readArgs...)
@@ -435,6 +441,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ColumnExpr(`"de"."id" AS "decision_id"`).
 		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
 		Where(`"st2"."product_id" = "de"."product_id"`).
+		Apply(ofKinds(kind.Triage, "f2")).
 		Where(`"de"."id" IN (?)`, bun.List(keys)).
 		GroupExpr(`"de"."id"`)
 	err := s.db.NewSelect().

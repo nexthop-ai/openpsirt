@@ -172,6 +172,15 @@ const (
 	// weekly is not a fault.
 	DeltaShare = "scanning.delta-share"
 	DeltaFloor = "scanning.delta-floor"
+	// AnalysisDropShare and AnalysisDropFloor are when an analyzer's run
+	// would mark so much of a build's results not reproduced at once that the
+	// run is held and changes nothing.
+	//
+	// Both have to be passed, for the reason the inventory pair does. A run
+	// that analyzed a fraction of the tree and said so is not comparable and
+	// marks nothing; this catches the one that did not say so.
+	AnalysisDropShare = "scanning.analysis-drop-share"
+	AnalysisDropFloor = "scanning.analysis-drop-floor"
 	// PairShare and PairApprovers are when the same two people agreeing to
 	// each other's work is raised with administrators.
 	//
@@ -511,6 +520,22 @@ const DefaultDeltaShare = 25
 // outright to be reported at all, which is the direction to be wrong in: an
 // alert nobody believes is one nobody reads.
 const DefaultDeltaFloor = 10
+
+// DefaultAnalysisDropShare is how much of a build's open analyzer results
+// one run may mark not reproduced before it is held, as a percentage, where
+// nobody has said.
+//
+// Half: a fix sweep clears a rule's worth of results, and a run that clears
+// half of everything is likelier to have analyzed less than to have fixed
+// more.
+const DefaultAnalysisDropShare = 50
+
+// DefaultAnalysisDropFloor is the fewest results one run must mark not
+// reproduced to be held, where nobody has said.
+//
+// Twenty, so that a series with a handful of results is not held each time
+// two of them are fixed.
+const DefaultAnalysisDropFloor = 20
 
 // DefaultScanEvery is how often everything tracked is scanned again, where a
 // deployment has not said otherwise.

@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Scrutiny is how much a second pair of eyes actually did.
@@ -449,6 +450,9 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(*) AS "covers"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
+		// The kinds the count recorded at approval reads, so growth compares
+		// one population with itself.
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"de"."claim_id"`).

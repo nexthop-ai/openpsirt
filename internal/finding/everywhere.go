@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // One issue, everywhere it sits.
@@ -78,8 +79,10 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		return nil, 0, 0, nil
 	}
 
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
+			Where(kinds, kindArgs...).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
 			Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).

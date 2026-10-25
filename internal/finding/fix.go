@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -281,11 +282,13 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		Issues int    `bun:"issues"`
 		Places int    `bun:"places"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
+		Where(kinds, kindArgs...).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		Where(`"f"."target_id" = ?`, targetID).
 		Where(`"f"."closed_at" IS NULL`).
@@ -381,8 +384,10 @@ func (s *Store) packagesIn(ctx context.Context, targetID int64,
 		Upstream string `bun:"upstream"`
 		Name     string `bun:"name"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
@@ -423,8 +428,10 @@ func (s *Store) heldPerFold(ctx context.Context, targetID int64,
 		Places int    `bun:"places"`
 		Held   int    `bun:"held"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(FoldedOn+` AS "fold"`).
 		// The party rather than a name: the column holds a party, which may be

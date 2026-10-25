@@ -17,6 +17,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // Merge is the record of one issue merged into another, because a report
@@ -231,6 +232,20 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 			return 0, err
 		}
 	}
+	// A flaw recorded here stays one whatever it merges with: its findings
+	// move to the issue kept, and a flaw minted here is what that issue then
+	// holds.
+	for _, row := range held {
+		if row.Kind != kind.Flaw {
+			continue
+		}
+		if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
+			Set(`"kind" = ?`, kind.Flaw).
+			Where(`"vu"."id" = ?`, kept).Exec(ctx); err != nil {
+			return 0, fmt.Errorf("keep the issue a flaw recorded here: %w", err)
+		}
+		break
+	}
 	return kept, nil
 }
 
@@ -438,6 +453,8 @@ func (v *Vulnerabilities) moveFindings(ctx context.Context, kept int64, gone Vul
 			return fmt.Errorf("close a place held twice under %s: %w", gone.Identifier, err)
 		}
 	}
+	// Every finding under the absorbed issue moves, whatever its kind: one
+	// left under an issue that merged away is read under neither.
 	if _, err := v.db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"vulnerability_id" = ?`, kept).
 		Where(`"f"."vulnerability_id" = ?`, gone.ID).Exec(ctx); err != nil {

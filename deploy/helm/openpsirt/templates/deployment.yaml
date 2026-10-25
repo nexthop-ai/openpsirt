@@ -59,7 +59,7 @@
 {{- if and .Values.auth.trustedHeader.name (not .Values.auth.trustedHeader.sources) }}
 {{- fail "set auth.trustedHeader.sources: a header named with nothing to trust it from is a header anybody can set" }}
 {{- end }}
-{{- $roles := list "approver" "assigner" "public-read" "private-read" "public-triage" "private-triage" "admin" "audit" }}
+{{- $roles := list "approver" "assigner" "public-read" "private-read" "internal-read" "public-triage" "private-triage" "internal-triage" "admin" "audit" }}
 {{- range $i, $entry := .Values.auth.groupRoles }}
 {{- if not $entry.group }}
 {{- fail (printf "auth.groupRoles[%d] names no group: an entry grants its roles to the members of one group" $i) }}

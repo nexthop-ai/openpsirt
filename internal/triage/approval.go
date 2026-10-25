@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -461,7 +462,7 @@ func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject,
 	undisclosed := false
 	first := rows[0]
 	for _, row := range rows {
-		if row.Visibility == access.Private {
+		if row.Visibility != access.Public {
 			undisclosed = true
 		}
 		if row.ID < first.ID {
@@ -527,7 +528,7 @@ func (s *Store) proposersOf(ctx context.Context, ids []int64) ([]ForPerson, erro
 			i = len(told) - 1
 		}
 		told[i].Rows++
-		if row.Visibility == access.Private {
+		if row.Visibility != access.Public {
 			told[i].Undisclosed = true
 		}
 	}
@@ -598,6 +599,7 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.Triage, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		Count(ctx)

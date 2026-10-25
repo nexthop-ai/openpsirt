@@ -361,7 +361,11 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// a right asked at one visibility is answered at that one, and
 		// this is the identity where the two answers differ.
 		"split-triager": {access.PublicRead, access.PrivateTriage},
-		"approver":      {access.Approver},
+		// Internal material alone: an analyst reading or working results
+		// nobody has judged, and handed neither of the other halves.
+		"internal-reader":  {access.InternalRead},
+		"internal-triager": {access.InternalTriage},
+		"approver":         {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity

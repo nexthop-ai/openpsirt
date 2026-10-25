@@ -164,9 +164,10 @@ auth:
   #   - through the trusted header, a name in trustedHeader.groupsHeader
   # One of those three has to be configured, or the install fails at render.
   #
-  # roles: approver, assigner, public-read, private-read, public-triage,
-  # private-triage, admin, audit. products names the products the roles are
-  # held on; leave it out for every product, including ones declared later.
+  # roles: approver, assigner, public-read, private-read, internal-read,
+  # public-triage, private-triage, internal-triage, admin, audit. products
+  # names the products the roles are held on; leave it out for every
+  # product, including ones declared later.
   # admin and audit are held over the deployment and take no products.
   #
   #   groupRoles:
@@ -297,7 +298,11 @@ ingress:
 # and the steady state is much lower than the ceiling here.
 #
 # Raise both together with the ingest bounds. `OPENPSIRT_INGEST_*` allows about
-# 250 MB for one document being read, and that is the server's half.
+# 250 MB for one document being read, and that is the server's half. An
+# analyzer upload is held whole while it is read and placed:
+# `OPENPSIRT_ANALYSIS_MAX_BYTES` and `OPENPSIRT_ANALYSIS_MAX_HELD` are memory
+# figures, about 800 MB together at their defaults counting the placed results,
+# and an upload can be read while a scan is.
 #
 # Patch branch lookups, where `patchBranches.enabled` turns them on, add git as a
 # third process in the same cgroup: 1.3 GB at the peak of a first fetch of the

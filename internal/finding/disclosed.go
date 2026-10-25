@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -114,8 +115,10 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 // distribution label an advisory carries: one undisclosed place makes the
 // issue embargoed there, whichever place a reader happens to see first.
 func AnyUndisclosed(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (bool, error) {
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	held, err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Where(`"f"."visibility" = ?`, access.Private).
@@ -140,6 +143,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		Public int        `bun:"public"`
 		Ends   *time.Time `bun:"ends"`
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "places")).
@@ -147,6 +151,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		ColumnExpr(`COALESCE(MAX(CASE WHEN "f"."visibility" = ? AND "f"."closed_at" IS NULL THEN "f"."disclose_at" END), `+
 			`MAX(CASE WHEN "f"."visibility" = ? THEN "f"."disclose_at" END)) AS "ends"`,
 			access.Private, access.Private).
+		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		Scan(ctx, &held)
@@ -175,9 +180,11 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 // left behind is read back as the date an embargo ends that has already
 // ended. The movement just recorded keeps where it stood.
 func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) error {
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set(`"visibility" = ?`, access.Public).
 		Set(`"disclose_at" = NULL`).
+		Where(kinds, kindArgs...).
 		Where(HeldAs("vulnerability_id"), vulnerabilityID).
 		Where(`"visibility" = ?`, access.Private).
 		Where(inThisProduct, productID).
@@ -227,10 +234,12 @@ func (s *Store) ToTell(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, fmt.Errorf("read what was disclosed: %w", err)
 	}
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "person" AS "ps" ON "ps"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`DISTINCT "ps"."id"`).
+		Where(kinds, kindArgs...).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 		Where(inThisProductAs(`"f"."target_id"`), productID).
 		OrderExpr(`"ps"."id"`).

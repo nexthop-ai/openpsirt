@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
@@ -521,6 +522,10 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	handler, _ := httpapi.New(logger, db.Validate, core.Deps{
 		DB: db, Queue: work, Replica: name,
 		Interface: core.Interface{Files: pages},
+		// The bounds the upload operations refuse a request by, before the
+		// background readers apply the same ones to what was taken.
+		Limits:   cfg.Limits(),
+		Analysis: cfg.AnalysisLimits(), AnalysisDocuments: cfg.AnalysisDocuments(),
 		// The resolver reads through a store that bounds a derived grant to
 		// the session lifetime. A browser re-derives its roles at every
 		// sign-in; a personal token never signs in, so without a bound a
@@ -596,6 +601,9 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
 	routing := finding.NewSweeper(db, work, logger, name)
+	// Applies what an analyzer reported against a build, once the build has
+	// an inventory to place the results on.
+	analyze := analysis.NewWorker(analysis.NewApplier(db), work, logger, name)
 	// The tool's own health. It needs nothing configured, which is the point:
 	// an operator who never set up mail is exactly the one who would otherwise
 	// never hear that a build stopped being scanned.
@@ -666,7 +674,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	}
 	return handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: current,
-		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing,
+		watch: watch, post: post, outward: outward, talk: talk, keeper: keeper, routing: routing, analyze: analyze,
 		undertaker: undertaker, publish: writer, suppliers: suppliers, forks: forks,
 		branches:  branches,
 		records:   records,

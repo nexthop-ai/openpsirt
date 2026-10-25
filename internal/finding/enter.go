@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -401,6 +402,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// the issue reads. It is this product's rating, recorded below.
 		named := Named{
 			Identifier:  identifier,
+			Issue:       kind.Flaw,
 			Description: in.Summary,
 			Weaknesses:  kinds,
 		}

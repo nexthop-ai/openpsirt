@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -107,8 +108,8 @@ func (c *reader) read() error {
 		c.x = newBoundedXML(c.in, c.lim.MaxBytes, c.lim.MaxDepth)
 		return c.readXML()
 	}
-	c.b = newBounded(c.in, c.lim.MaxBytes, c.lim.MaxDepth)
-	err = c.b.object(func(key string) error {
+	c.b = docread.NewJSON(c.in, c.lim.MaxBytes, c.lim.MaxDepth)
+	err = c.b.Object(func(key string) error {
 		for at, v := range vocabularies {
 			handler, ours := v.top[key]
 			if !ours {
@@ -117,13 +118,13 @@ func (c *reader) read() error {
 			c.fired[at] = true
 			return handler(c)
 		}
-		return c.b.skip()
+		return c.b.Skip()
 	})
 	if err == nil {
-		err = c.b.end()
+		err = c.b.End()
 	}
 	if err != nil {
-		return c.b.refused("reading scan file", err)
+		return c.b.Refused("reading scan file", err)
 	}
 	if err := c.checkFormat(); err != nil {
 		return err

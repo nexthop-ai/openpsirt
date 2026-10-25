@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -430,6 +431,7 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		Where(`"de"."claim_id" = ?`, claim.ID).
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
+		Apply(ofKinds(kind.VersionCarry, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches).
 		Scan(ctx, &targets); err != nil {

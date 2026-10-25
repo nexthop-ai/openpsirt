@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -103,6 +104,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 	deferred, covering := StandingDeferral("?", now)
 	// The product, then whatever the standing test binds, in that order.
 	covers := append([]any{productID}, covering...)
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	// Grouped to the unit every other screen counts in — one issue at one
 	// component — rather than to the row. Counted per row, a kernel flaw at
 	// forty-five places was forty-five late things and one late thing on the
@@ -126,6 +128,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		ColumnExpr(`SUM(CASE WHEN "f"."closed_at" IS NULL AND "f"."due_at" IS NOT NULL `+
 			`AND "f"."due_at" < ? AND NOT `+deferred+` THEN 1 ELSE 0 END) AS "past_due"`,
 			append([]any{now}, covers...)...).
+		Where(kinds, kindArgs...).
 		Where(`"f"."target_id" IN (?)`, bun.List(targets)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		// A finding that was never present, or one a supplier stated is not

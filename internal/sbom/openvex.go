@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -34,12 +35,12 @@ const suppressionNamespace = "openvex.dev/ns"
 // parsers rather than one per distribution's own format.
 func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 	lim = lim.OrDefault()
-	b := newBounded(r, lim.MaxBytes, lim.MaxDepth)
+	b := docread.NewJSON(r, lim.MaxBytes, lim.MaxDepth)
 	v := &suppressions{b: b, lim: lim}
 	if err := v.read(); err != nil {
-		return nil, b.refused("reading suppressions", err)
+		return nil, b.Refused("reading suppressions", err)
 	}
-	if err := b.end(); err != nil {
+	if err := b.End(); err != nil {
 		return nil, refusal.Errorf("reading suppressions: %w", err)
 	}
 	// A document that fired both vocabularies is not either of them. Read as
@@ -64,7 +65,7 @@ func ReadSuppressions(r io.Reader, lim Limits) ([]Suppression, error) {
 }
 
 type suppressions struct {
-	b         *bounded
+	b         *docread.JSON
 	lim       Limits
 	namespace string
 	claims    []Suppression
@@ -94,17 +95,17 @@ func (v *suppressions) name() error {
 }
 
 func (v *suppressions) read() error {
-	return v.b.object(func(key string) error {
+	return v.b.Object(func(key string) error {
 		switch key {
 		case "@context":
-			value, err := v.b.str()
+			value, err := v.b.Str()
 			if err != nil {
 				return err
 			}
 			v.namespace = value
 			return nil
 		case "statements":
-			return v.b.array(func() error {
+			return v.b.Array(func() error {
 				// Compared before the element is read, so that the claim past
 				// the limit is refused rather than walked in full first.
 				if len(v.claims) >= v.lim.MaxStatements {
@@ -120,7 +121,7 @@ func (v *suppressions) read() error {
 		case "document", "product_tree", "vulnerabilities":
 			return v.asCSAF(key)
 		default:
-			return v.b.skip()
+			return v.b.Skip()
 		}
 	})
 }
@@ -137,18 +138,18 @@ func (v *suppressions) asCSAF(key string) error {
 // statement reads one claim.
 func (v *suppressions) statement() (Suppression, error) {
 	claim := Suppression{Origin: FromStatement}
-	err := v.b.object(func(key string) error {
+	err := v.b.Object(func(key string) error {
 		switch key {
 		case "vulnerability":
 			return v.vulnerability(&claim)
 		case "status":
 			return v.into(&claim.Status)
 		case "justification":
-			value, err := v.b.str()
+			value, err := v.b.Str()
 			claim.Justification = value
 			return err
 		case "impact_statement", "action_statement":
-			value, err := v.b.str()
+			value, err := v.b.Str()
 			if claim.Statement == "" {
 				claim.Statement = value
 			}
@@ -156,7 +157,7 @@ func (v *suppressions) statement() (Suppression, error) {
 		case "products":
 			return v.products(&claim)
 		default:
-			return v.b.skip()
+			return v.b.Skip()
 		}
 	})
 	if err != nil {
@@ -178,15 +179,15 @@ func (v *suppressions) statement() (Suppression, error) {
 // vulnerability reads which issue a claim is about, and the other identifiers
 // the same issue goes by.
 func (v *suppressions) vulnerability(claim *Suppression) error {
-	name, err := v.b.stringOrObject(func(key string) error {
+	name, err := v.b.StringOrObject(func(key string) error {
 		switch key {
 		case "name":
-			value, err := v.b.str()
+			value, err := v.b.Str()
 			claim.Vulnerability = value
 			return err
 		case "aliases":
-			return v.b.array(func() error {
-				alias, err := v.b.str()
+			return v.b.Array(func() error {
+				alias, err := v.b.Str()
 				if err != nil {
 					return err
 				}
@@ -199,7 +200,7 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 				return nil
 			})
 		default:
-			return v.b.skip()
+			return v.b.Skip()
 		}
 	})
 	if err != nil {
@@ -226,13 +227,13 @@ func (v *suppressions) vulnerability(claim *Suppression) error {
 // subcomponents are all of that kind targets nothing, because the statement
 // was about them and never about the product.
 func (v *suppressions) products(claim *Suppression) error {
-	return v.b.array(func() error {
+	return v.b.Array(func() error {
 		var (
 			inside []Target
 			stated bool
 		)
 		product, err := v.product(func() error {
-			return v.b.array(func() error {
+			return v.b.Array(func() error {
 				one, err := v.product(nil)
 				if err != nil || one.Purl == "" {
 					return err
@@ -283,18 +284,18 @@ func (v *suppressions) products(claim *Suppression) error {
 // reads them.
 func (v *suppressions) product(subcomponents func() error) (Target, error) {
 	var target Target
-	id, err := v.b.stringOrObject(func(key string) error {
+	id, err := v.b.StringOrObject(func(key string) error {
 		switch {
 		case key == "@id":
-			value, err := v.b.str()
+			value, err := v.b.Str()
 			target.Purl = value
 			return err
 		case key == "identifiers":
-			return v.b.object(func(kind string) error {
+			return v.b.Object(func(kind string) error {
 				if kind != "purl" {
-					return v.b.skip()
+					return v.b.Skip()
 				}
-				value, err := v.b.str()
+				value, err := v.b.Str()
 				if target.Purl == "" {
 					target.Purl = value
 				}
@@ -303,7 +304,7 @@ func (v *suppressions) product(subcomponents func() error) (Target, error) {
 		case key == "subcomponents" && subcomponents != nil:
 			return subcomponents()
 		default:
-			return v.b.skip()
+			return v.b.Skip()
 		}
 	})
 	if target.Purl == "" {
@@ -314,7 +315,7 @@ func (v *suppressions) product(subcomponents func() error) (Target, error) {
 
 // into reads one string into a status.
 func (v *suppressions) into(dst *Status) error {
-	value, err := v.b.str()
+	value, err := v.b.Str()
 	if err != nil {
 		return err
 	}

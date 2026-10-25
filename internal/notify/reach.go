@@ -29,14 +29,20 @@ import (
 // because the conditions divide on exactly that: a message about work waiting
 // goes to whoever may *act*, and one about something that has happened goes to
 // whoever may read it.
+//
+// A condition about findings asks of two classes of row: disclosed, and
+// withheld, which is every other visibility. A withheld row is told to
+// whoever reads or triages private work, which is the narrower answer for an
+// internal row: no kind these conditions include holds internal material.
 type acts struct {
 	approves                                                 bool
 	readsPublic, readsPrivate, triagesPublic, triagesPrivate bool
+	readsInternal                                            bool
 }
 
-// reads is what a condition sent to whoever may read it asks, of something at
-// one visibility. Each visibility is its own grant, so neither answers for the
-// other.
+// reads is what a condition sent to whoever may read it asks, of something
+// disclosed or withheld. Each visibility is its own grant, so neither answers
+// for the other.
 func (a acts) reads(private bool) bool {
 	if private {
 		return a.readsPrivate
@@ -59,9 +65,9 @@ func (a acts) approvesAll(public, private int) bool {
 		(private == 0 || access.MayApprove(a.approves, a.readsPrivate, a.triagesPrivate))
 }
 
-// readsIn is whether they read the product at either visibility: the question
+// readsIn is whether they read the product at any visibility: the question
 // for something about the product that names no finding.
-func (a acts) readsIn() bool { return a.readsPublic || a.readsPrivate }
+func (a acts) readsIn() bool { return a.readsPublic || a.readsPrivate || a.readsInternal }
 
 // triages is the same question for a condition sent to whoever may act: a
 // reader who cannot argue about a product can do nothing about work sitting in
@@ -124,6 +130,8 @@ func actsOf(people []access.Account, held map[int64][]access.Grant) map[int64]ma
 				at.readsPublic, at.triagesPublic = true, true
 			case access.PrivateTriage:
 				at.readsPrivate, at.triagesPrivate = true, true
+			case access.InternalRead, access.InternalTriage:
+				at.readsInternal = true
 			}
 			per[grant.ProductID] = at
 		}

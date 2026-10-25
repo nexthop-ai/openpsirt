@@ -633,6 +633,10 @@ thing that directly depends on it. Names only, no versions, hashed. Where the
 thing above is the root, the component's name stands alone, because the root's
 name differs per variant.
 
+A finding of the analysis kind has a place of its own, minted from its series
+and the result's match key and carried by matching (`DESIGN-analysis.md`
+§ Matching). It sits at a component as every finding does.
+
 A chain of names from the top down is the other form. Measured against a real
 switch image:
 

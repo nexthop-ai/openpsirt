@@ -726,3 +726,25 @@ func TestSomebodyWhoLeftIsRefusedByTheirGroupsAndTheirRolesAreLeftAsTheyWere(t *
 		}
 	})
 }
+
+// A group bound to an internal role brings it, and nothing at the other
+// visibilities.
+func TestAGroupBringsAnInternalRole(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bind(t, f, access.Mapping{Group: "analysts", Grants: string(access.InternalRead), Product: "sonic"})
+
+		subject, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"},
+			[]string{"analysts"})
+		if err != nil {
+			t.Fatalf("somebody in a group bound to internal reading was refused: %v", err)
+		}
+		if !subject.Reads(access.Internal, f.products["sonic"]) {
+			t.Error("a group bound to internal reading does not read internal work")
+		}
+		if subject.Reads(access.Public, f.products["sonic"]) ||
+			subject.Reads(access.Private, f.products["sonic"]) {
+			t.Error("a group bound to internal reading read other work")
+		}
+	})
+}

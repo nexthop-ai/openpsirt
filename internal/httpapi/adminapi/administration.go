@@ -142,12 +142,19 @@ func seesNothing(held []HeldBody) bool {
 			continue
 		}
 		inForce++
-		switch access.Role(grant.Role) {
-		case access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage:
+		if readsSomething(access.Role(grant.Role)) {
 			return false
 		}
 	}
 	return inForce > 0
+}
+
+// readsSomething reports whether a role on its own reads findings at some
+// visibility, asked of the rule every read uses rather than of a list of roles.
+func readsSomething(role access.Role) bool {
+	const product = 1
+	held := access.NewPerson(0, "", false, map[int64][]access.Role{product: {role}}, 0)
+	return held.ReadsIn(product)
 }
 
 // RecordBody is somebody being recorded, and what they are to hold.

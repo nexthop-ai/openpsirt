@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
+	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
@@ -41,6 +42,11 @@ type Deps struct {
 	DB     *database.DB
 	Queue  *queue.Queue
 	Limits sbom.Limits
+	// Analysis is what an analyzer's documents are read within, and
+	// AnalysisDocuments how many one upload may carry. Zero takes the
+	// reader's defaults.
+	Analysis          sarif.Limits
+	AnalysisDocuments int
 	// VexCeiling is the most statements one VEX document this deployment
 	// writes may carry. Zero is the ceiling a document is built to hold.
 	VexCeiling int

@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
 
 // IssueRating is what one product rates an issue, as against what was
@@ -189,6 +190,7 @@ func RatingIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 // signal that moved for the issue moves the order in each of them, and each
 // reads its own rating to work out what the order now is.
 func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]int64, error) {
+	kinds, args := kind.Ranking.Where(`"f"."kind"`)
 	var products []int64
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -197,6 +199,7 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 		ColumnExpr(`"st"."product_id"`).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
+		Where(kinds, args...).
 		GroupExpr(`"st"."product_id"`).
 		OrderExpr(`"st"."product_id"`).
 		Scan(ctx, &products)

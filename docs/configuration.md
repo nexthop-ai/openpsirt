@@ -437,7 +437,7 @@ products = ["router-os", "switch-os"]
 
 | Part | Rule |
 |---|---|
-| Roles | `approver`, `assigner`, `public-read`, `private-read`, `public-triage`, `private-triage`, and `admin` and `audit`, which are held over the whole deployment |
+| Roles | `approver`, `assigner`, `public-read`, `private-read`, `internal-read`, `public-triage`, `private-triage`, `internal-triage`, and `admin` and `audit`, which are held over the whole deployment |
 | Products | By name, in any capitals. None means every product, including one declared later. A product nobody has declared yet is accepted, and grants from each member's next sign-in after a pipeline declares it. `admin` and `audit` take none |
 | A name holding `%`, `;`, `=`, `+`, `@` or `,` | Written percent-encoded in the variable, as `%25`, `%3B`, `%3D`, `%2B`, `%40` and `%2C`: `security%40example.com=audit`. A file writes the name as it is |
 | A source of groups | Required. Mappings with none of `OPENPSIRT_OIDC_GROUPS_CLAIM` beside an issuer, `OPENPSIRT_GITHUB_ORG` beside a GitHub client, or `OPENPSIRT_TRUSTED_GROUPS_HEADER` beside a trusted header stop the process |
@@ -1172,6 +1172,37 @@ process in the same container, so the memory limit covers both — see
 | `OPENPSIRT_INGEST_MAX_STATEMENTS` | `ingest.max_statements` | How many claims a suppression document may make | 100,000 |
 | `OPENPSIRT_INGEST_MAX_DEPTH` | `ingest.max_depth` | How deeply it may nest | 64 |
 | `OPENPSIRT_INGEST_MAX_DOCUMENTS` | `ingest.max_documents` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
+
+## Analyzer result limits
+
+An analyzer's results arrive as SARIF from a build pipeline, and are read
+within bounds for the reason a scan file is. An upload past one is refused
+with a sentence naming the bound, and no run is recorded. Leave one unset and
+it keeps the built-in value.
+
+An upload's documents are held in memory together while they are read, and
+their results are placed beside them, so two of these bound memory rather than
+the document: the size, and the count of entries held. The size also bounds
+the placed results once encoded, which are what a run is held as until it is
+applied. At the defaults an upload comes to about 800 MB, which the server's
+memory limit has to leave room for beside a scan.
+
+| Variable | File key | What it does | Default |
+|---|---|---|---|
+| `OPENPSIRT_ANALYSIS_MAX_BYTES` | `analysis.max_bytes` | How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large the whole upload may be compressed, and how large its placed results may be once encoded | 256 MB |
+| `OPENPSIRT_ANALYSIS_MAX_DOCUMENTS` | `analysis.max_documents` | How many documents one upload may carry. clang writes one per translation unit, so a tool's per-unit documents are merged into one before they are sent | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_RUNS` | `analysis.max_runs` | How many runs one document may hold | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_RESULTS` | `analysis.max_results` | How many results one run may hold | 100,000 |
+| `OPENPSIRT_ANALYSIS_MAX_RULES` | `analysis.max_rules` | How many rules one run may describe | 10,000 |
+| `OPENPSIRT_ANALYSIS_MAX_LOCATIONS` | `analysis.max_locations` | How many locations and related locations one result may name | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_STEPS` | `analysis.max_steps` | How many path steps one result may take, across every flow it states | 10,000 |
+| `OPENPSIRT_ANALYSIS_MAX_MODULES` | `analysis.max_modules` | How many repositories one run may say its checkout holds | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_BASES` | `analysis.max_bases` | How many named starting points for paths one run may declare | 1,000 |
+| `OPENPSIRT_ANALYSIS_MAX_CHAIN` | `analysis.max_chain` | How many named starting points one path may pass through. A cycle is refused at any length | 16 |
+| `OPENPSIRT_ANALYSIS_MAX_PROPERTIES` | `analysis.max_properties` | How many members one property bag may hold | 256 |
+| `OPENPSIRT_ANALYSIS_MAX_TEXT` | `analysis.max_text` | The longest message or description kept. A longer one is cut rather than refused | 16 KB |
+| `OPENPSIRT_ANALYSIS_MAX_DEPTH` | `analysis.max_depth` | How deeply a document may nest | 64 |
+| `OPENPSIRT_ANALYSIS_MAX_HELD` | `analysis.max_held` | How many entries one upload's documents may hold together: results, rules, locations, path steps, invocations and the members of every list they carry. About 200 bytes of memory each, however little of the document each took | 1,000,000 |
 
 ## Scanner output limits
 

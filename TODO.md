@@ -135,15 +135,6 @@ A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 | Work | Accept an optional vulnerability report in the upload. Store its findings with the producer's scanner, version and database recorded, and show them apart from findings scanned here |
 | Waits on | Deciding how a producer's findings relate to ours: as evidence only, or as findings in their own right. REQ-10 says the scan runs here so that results are reproducible and comparable, which pulls against the second |
 
-### TODO-13 Static analysis and fuzzing findings
-
-| | |
-|---|---|
-| Today | Nothing. Only scanner matches against inventories become findings |
-| Problem | Results from static analyzers such as CodeQL or Semgrep, and crashes from fuzzers such as OSS-Fuzz, cannot be tracked, triaged or compared release to release here (REQ-14) |
-| Work | Read analyzer and fuzzer results as SARIF through one adapter per source, scoped to a product, release and variant, with identity computed here, and triage them like scanned findings (`DESIGN-ingest.md` § Analyzer findings) |
-| Waits on | Scheduling by the owner. The design says the finding model carries a kind so that a second kind needs no rewrite; no kind column exists on findings, so that claim needs checking first |
-
 ### TODO-14 External tracker hand-off
 
 | | |

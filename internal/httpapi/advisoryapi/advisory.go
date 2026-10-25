@@ -89,7 +89,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"about nothing is not a draft of anything.\n\n" +
 			"Requires a prefix configured for this deployment to mint under.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.AnyPerson, startsAdvisory, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, startsAdvisory, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Body struct {
 			Title string `json:"title,omitempty" maxLength:"191" doc:"What to call it. Left out, the document names the issues it covers"`
 		}
@@ -130,7 +130,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"`product` and `vulnerability` narrow it to what covers them, which is what a " +
 			"screen about one flaw asks before somebody starts another advisory about it.",
 		Tags: []string{"Findings"},
-	}, core.AnyPerson, "", core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `query:"product" doc:"Only advisories covering something in this product"`
 		Vulnerability string `query:"vulnerability" doc:"Only advisories covering this issue"`
 		Limit         int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
@@ -214,7 +214,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"there are.\n\n" +
 			"A product you do not triage answers 404.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Answers only what you may see.", core.TriageRights()...),
+	}, core.PerProduct, "Answers only what you may see.", core.DisclosureTriageRights()...),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 		}) (*core.ListOutput[NameableBody], error) {
@@ -252,7 +252,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"component is refused, and refused at this point rather than when the document " +
 			"is generated, so the refusal names the issue you chose.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.AnyPerson, namesAFlaw, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, namesAFlaw, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Product       string `json:"product" minLength:"1"`
@@ -290,7 +290,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"went out at a moment, and editing the advisory afterwards is how the next " +
 			"revision differs from the last.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.AnyPerson, namesAFlaw, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, namesAFlaw, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory      string `path:"advisory"`
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
@@ -394,7 +394,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"says about one of them is part of the same document as what it says about " +
 			"another.",
 		Tags: []string{"Findings"},
-	}, core.AnyPerson, changesWhatItSays, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Title string `json:"title" maxLength:"191" doc:"What to call it. Empty, the document names the issues it covers"`
@@ -426,7 +426,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"person publishes no advisory.\n\n" +
 			"Requires a triage role on every product the advisory covers.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.AnyPerson, changesWhatItSays, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 	}) (*struct {
 		Status int
@@ -457,7 +457,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"own, and the advisory cannot go out until somebody agrees again.\n\n" +
 			"Answers 422 where no agreement is standing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.AnyPerson, changesWhatItSays, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 	}) (*struct{}, error) {
 		subject, err := core.Reading(ctx)
@@ -491,7 +491,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"anything sent — a digest of whatever a caller says answers nothing.\n\n" +
 			"Answers 409 where nobody has agreed to what the advisory says.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, core.AnyPerson, changesWhatItSays, core.TriageRights()...), func(ctx context.Context, input *struct {
+	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Summary string `json:"summary,omitempty" maxLength:"191" doc:"The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads"`

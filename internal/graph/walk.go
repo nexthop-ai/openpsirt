@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -191,15 +192,18 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	if len(all) == 0 {
 		return totals, nil
 	}
+	kinds, kindArgs := kind.Inventory.Where(`"f"."kind"`)
+	args := append([]any{targetID, bun.List(visible)}, kindArgs...)
+	args = append(args, bun.List(all), productID)
 	err = s.db.NewRaw(`SELECT "g"."component_id" AS "component_id", "g"."vulnerability_id" AS "vulnerability_id",
 	       `+rating.EffectiveExpr+` AS "band"
 	FROM (SELECT "f"."component_id" AS "component_id", "f"."vulnerability_id" AS "vulnerability_id"
 	      FROM "finding" AS "f"
 	      WHERE "f"."target_id" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" IN (?)
-	        AND "f"."component_id" IN (?)
+	        AND `+kinds+` AND "f"."component_id" IN (?)
 	      GROUP BY "f"."component_id", "f"."vulnerability_id") AS "g"
 	JOIN "vulnerability" AS "v" ON "v"."id" = "g"."vulnerability_id"
-	`+rating.Here, targetID, bun.List(visible), bun.List(all), productID).
+	`+rating.Here, args...).
 		Scan(ctx, &open)
 	if err != nil {
 		return nil, fmt.Errorf("read what is open beneath each component: %w", err)

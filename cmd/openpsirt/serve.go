@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
@@ -87,6 +88,7 @@ type passes struct {
 	talk    *notify.Talk
 	keeper  *attach.Keeper
 	routing *finding.Sweeper
+	analyze *analysis.Worker
 	// undertaker sets aside work whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
@@ -144,6 +146,7 @@ func (p passes) loops() []loop {
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
 		{"route unheld work to teams", p.routing.Run, readInterval},
+		{"apply analyzer runs", p.analyze.Run, readInterval},
 		{"set aside work whose worker died", p.undertaker.Run, 0},
 	}
 	// And the ones a deployment may not have, each nil where what it works

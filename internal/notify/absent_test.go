@@ -78,7 +78,7 @@ func assignOne(t *testing.T, w *fixture.World, holder int64) {
 	}
 	for _, id := range named {
 		row := &finding.Finding{
-			TargetID: target.ID, Kind: "dependency", VulnerabilityID: id,
+			TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 			Visibility: access.Public, ComponentID: component.ID,
 			PlaceIdentity: "place-1", Urgency: 1,
 			OpenedAt: time.Now().UTC(), AssignedTo: &holder,
@@ -152,7 +152,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		for identifier, id := range named {
 			held := holder[identifier]
 			row := &finding.Finding{
-				TargetID: target.ID, Kind: "dependency", VulnerabilityID: id,
+				TargetID: target.ID, Kind: finding.Vulnerable, VulnerabilityID: id,
 				Visibility: access.Public, ComponentID: component.ID,
 				PlaceIdentity: "place-" + identifier, Urgency: 1,
 				OpenedAt: time.Now().UTC(), AssignedTo: &held,

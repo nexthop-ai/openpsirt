@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -402,6 +403,18 @@ type Progress string
 // Schema offers every state an upload can reach.
 func (Progress) Schema(huma.Registry) *huma.Schema { return words(ingest.Progresses()) }
 
+// RunStatus is what became of an analyzer run.
+type RunStatus string
+
+// Schema offers every status a run can hold.
+func (RunStatus) Schema(huma.Registry) *huma.Schema { return words(series.Statuses()) }
+
+// RunReason is why an analyzer run's absences are not evidence.
+type RunReason string
+
+// Schema offers every reason a run is not comparable.
+func (RunReason) Schema(huma.Registry) *huma.Schema { return words(series.Reasons()) }
+
 // DocumentKind is what a document a build sent is.
 type DocumentKind string
 
@@ -494,10 +507,11 @@ type SettingSection string
 // Schema offers every section, in the order a screen shows them.
 func (SettingSection) Schema(huma.Registry) *huma.Schema { return words(setting.Sections()) }
 
-// Visibility is whether something has been disclosed.
+// Visibility is whether something has been disclosed, or is internal material
+// disclosure never applies to.
 type Visibility string
 
-// Schema offers both visibilities, disclosed first.
+// Schema offers every visibility, disclosed first.
 func (Visibility) Schema(huma.Registry) *huma.Schema { return words(access.Visibilities()) }
 
 // ChangeKind is what one scan did to one name.

@@ -1259,17 +1259,17 @@ beside the scanner's data and read whole (REQ-12, REQ-31).
 
 ## Analyzer findings
 
-Findings from a static analyzer or a fuzzer are intended scope and **are not
-built** (REQ-14). What has been decided is recorded because the parts expensive
-to retrofit were settled early.
+A static analyzer's run arrives as SARIF through an upload of its own, read
+within bounds of its own; `DESIGN-analysis.md` holds the whole of it. Findings
+from a fuzzer are intended scope and **are not built** (REQ-14).
 
 | Decision | Reason |
 |---|---|
 | Scoped to a product, a release and a variant | A finding that cannot say which build it is about cannot be compared release to release |
-| SARIF is the default interchange, and not the only path | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common |
-| One adapter per source, normalizing into the internal model | The same seam the inventory producers arrive through, so the rest of the system never learns which tool produced anything |
-| Some sources are pulled rather than pushed | A hosted analyzer has its own store and no reason to call this deployment. There is no request to refuse, so a source that starts returning nothing has to be noticed the way a build that stopped being scanned is |
+| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client, which is **not built** |
+| Some sources are pulled rather than pushed | A hosted analyzer has its own store and no reason to call this deployment. Pulling is **not built** |
 | Identity is computed here, never taken from the producer | An analyzer's identifier for a result is stable until the tool is upgraded or the file is reformatted, and a finding whose identity moves reopens as new |
+| The bounded JSON reading an inventory uses is shared with the SARIF reader | One implementation of size, depth and token limits for every document read here |
 
 ## Limits
 

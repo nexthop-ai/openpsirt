@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/config"
+	"github.com/nexthop-ai/openpsirt/internal/sarif"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
@@ -39,6 +40,33 @@ func TestTheIngestBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("the ingest bounds read as %+v, want %+v", got, want)
+	}
+}
+
+// Every analyzer bound is configurable, each reaching the field it names,
+// with distinct values for the reason the ingest bounds above have them.
+func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
+	for name, value := range map[string]string{
+		"BYTES": "1048576", "DEPTH": "11", "RUNS": "12", "RESULTS": "13", "RULES": "14",
+		"LOCATIONS": "15", "STEPS": "16", "MODULES": "17", "BASES": "18", "CHAIN": "19",
+		"PROPERTIES": "20", "TEXT": "21", "HELD": "22", "DOCUMENTS": "23",
+	} {
+		t.Setenv("OPENPSIRT_ANALYSIS_MAX_"+name, value)
+	}
+	loaded, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := sarif.Limits{
+		MaxBytes: 1 << 20, MaxDepth: 11, MaxRuns: 12, MaxResults: 13, MaxRules: 14,
+		MaxLocations: 15, MaxSteps: 16, MaxModules: 17, MaxBases: 18, MaxChain: 19,
+		MaxProperties: 20, MaxText: 21, MaxHeld: 22,
+	}
+	if got := loaded.AnalysisLimits().OrDefault(); got != want {
+		t.Errorf("the analyzer bounds read as %+v, want %+v", got, want)
+	}
+	if got := loaded.AnalysisDocuments(); got != 23 {
+		t.Errorf("the analyzer document bound read as %d, want 23", got)
 	}
 }
 
