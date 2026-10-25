@@ -111,11 +111,13 @@ dist-binaries: dist-version
 
 # The upload client, one archive per system and architecture a pipeline runs
 # on. Pure Go and cgo off, so every one cross-compiles here. A Windows archive
-# is a tar.gz as well: tar ships with Windows, and one shape keeps the checksum
-# file and the name check uniform.
+# is a zip, the archive Windows opens without a tool of its own; every other
+# is a tar.gz.
 DIST_CLIENT_SYSTEMS ?= linux darwin windows
 dist-client: STAMP_VERSION := $(DIST_VERSION)
 dist-client: dist-version
+	@command -v zip >/dev/null 2>&1 \
+	  || { echo "zip is needed to archive the Windows upload client"; exit 1; }
 	@mkdir -p $(DIST_DIR)
 	@set -e; for os in $(DIST_CLIENT_SYSTEMS); do for arch in $(DIST_ARCHES); do \
 	  name=openpsirt-analysis_$(DIST_VERSION)_$${os}_$$arch; \
@@ -124,9 +126,13 @@ dist-client: dist-version
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath \
 	    -ldflags "$(LDFLAGS)" -o $(DIST_DIR)/$$name/$$exe ./cmd/openpsirt-analysis; \
 	  cp LICENSE NOTICE $(DIST_DIR)/$$name/; \
-	  tar -C $(DIST_DIR) -czf $(DIST_DIR)/$$name.tar.gz $$name; \
+	  if [ "$$os" = windows ]; then \
+	    archive=$$name.zip; (cd $(DIST_DIR) && zip -qrX $$archive $$name); \
+	  else \
+	    archive=$$name.tar.gz; tar -C $(DIST_DIR) -czf $(DIST_DIR)/$$archive $$name; \
+	  fi; \
 	  rm -rf $(DIST_DIR)/$$name; \
-	  echo "  $$name.tar.gz"; \
+	  echo "  $$archive"; \
 	done; done
 
 # The chart, with its version and the version of the application it installs
@@ -194,8 +200,9 @@ dist-sums: dist-version
 # checked where none is: a stripped binary built with -trimpath records no
 # linker flags to read the stamp from without running it.
 #
-# The upload client built for this machine is asked its version as well. The
-# others are named by the same check every asset's name takes.
+# The upload client built for this machine is asked its version as well, and
+# each Windows archive is opened to see that it holds the program. The others
+# are named by the same check every asset's name takes.
 #
 # The checksum file and anything beside it carrying the same stem are exempt
 # from the name check: a signature is written after the assets are built and
@@ -239,6 +246,13 @@ dist-verify: dist-version
 	    [ "$$said" = "$(DIST_VERSION)" ] \
 	      || { echo "the upload client reports $$said and its archive says $(DIST_VERSION)"; fail=1; }; \
 	  fi; \
+	  for arch in $(DIST_ARCHES); do \
+	    client=openpsirt-analysis_$(DIST_VERSION)_windows_$$arch; \
+	    if [ ! -f $(DIST_DIR)/$$client.zip ]; then skipped="$$skipped the $$arch Windows upload client (no archive)"; \
+	    elif ! unzip -l $(DIST_DIR)/$$client.zip | grep -q " $$client/openpsirt-analysis.exe$$"; then \
+	      echo "$$client.zip does not hold $$client/openpsirt-analysis.exe"; fail=1; \
+	    fi; \
+	  done; \
 	  chart=$(DIST_DIR)/openpsirt-$(DIST_VERSION).tgz; \
 	  if [ ! -f "$$chart" ]; then skipped="$$skipped the chart (not packaged)"; \
 	  elif ! command -v helm >/dev/null 2>&1; then skipped="$$skipped the chart (no helm)"; \
