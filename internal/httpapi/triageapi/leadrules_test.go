@@ -306,6 +306,21 @@ func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindMemoryFlaws(t *testing
 	})
 }
 
+func TestAWholeRuleDismissalStopsWhereItsRuleIsFoundToFindInjection(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		rule := proposeLeadRule(t, r, `{"rule":"clang-tidy/leak","reason":"wont_fix","reasoning":"short-lived tool"}`)
+		approveLeadRule(t, r, rule.ID)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(`"tags":["external/cwe/cwe-77"]`, ``))
+		if got := leadRulesOf(t, r)[rule.ID]; got.State != "needs-path" {
+			t.Errorf("the rule is %+v; want it to need a path once its rule finds injection", got)
+		}
+		if got := leadsOf(t, r, "internal-reader", "?state=dismissed"); len(got.Items) != 0 || got.Ruled != 0 {
+			t.Errorf("the dismissed leads are %+v; want none once the rule finds injection", got)
+		}
+	})
+}
+
 func TestARuleItsToolTagsWithNoWeaknessIsRatedByTheTableHeldForIt(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		// clang names no weakness for unix.Malloc; the table holds that it

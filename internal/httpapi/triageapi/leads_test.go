@@ -221,6 +221,19 @@ func TestADismissalLapsesWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
 	})
 }
 
+func TestAConfirmationStandsWhereItsLeadIsPairedOnlyProbably(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRunAt(12))
+		// Two lines down pairs it on its nearest line.
+		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRunAt(14))
+		if got := leadState(t, r, place); got != "confirmed" {
+			t.Errorf("a confirmed lead paired only on its nearest line is %q; want it confirmed still", got)
+		}
+	})
+}
+
 // leadsListed is a product's list of leads as somebody reads it.
 type leadsListed struct {
 	Items []struct {
