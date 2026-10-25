@@ -98,11 +98,16 @@ func leadV0110(t *columnTypes) []string {
 		)` + t.suffix,
 
 		// The weakness families a rule's weaknesses belong to, by which two
-		// analyzers' leads at one place are the same flaw.
+		// analyzers' leads at one place are the same flaw, and the analyzer
+		// the rule is of.
 		`CREATE TABLE "rule_family" (
 			"id"               ` + t.id + `,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			"family"           ` + t.name + ` NOT NULL,
+			-- The part of the rule's name before its first slash, in lower
+			-- case: two leads are one flaw only where two analyzers report
+			-- them.
+			"tool"             ` + t.name + ` NOT NULL,
 			CONSTRAINT "rule_family_unique" UNIQUE ("vulnerability_id", "family"),
 			CONSTRAINT "rule_family_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,

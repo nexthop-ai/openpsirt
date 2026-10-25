@@ -27,19 +27,23 @@ const (
 
 // nearby is whether the finding under "g", whose result is under "ag", is
 // open on the build of the finding under "f", whose result is under "ar",
-// under another rule, of a weakness family the other's rule shares, with its
-// last place in the same file within lines of the other's. Two results of one
-// rule are never one flaw: two flaws of a class on adjacent lines are told
-// apart only by the tool reporting them as two.
+// reported by another analyzer, under a rule of a weakness family the other's
+// rule shares, with its last place in the same file within lines of the
+// other's. Two results of one analyzer are never one flaw: two flaws of a
+// class on adjacent lines are told apart only by the tool reporting them as
+// two, and two rules of one tool on one line are two checks it makes.
+//
+// The last path is compared by its digest first, which is what the index on
+// it holds, and then as written.
 func nearby(lines int) string {
 	n := strconv.Itoa(lines)
-	return `"g"."target_id" = "f"."target_id" AND "g"."closed_at" IS NULL
+	return `"ag"."last_path_identity" = "ar"."last_path_identity" AND "ag"."last_path" = "ar"."last_path"
+	  AND "ag"."last_line" BETWEEN "ar"."last_line" - ` + n + ` AND "ar"."last_line" + ` + n + `
+	  AND "g"."target_id" = "f"."target_id" AND "g"."closed_at" IS NULL
 	  AND "g"."kind" = '` + string(kind.Analysis) + `'
 	  AND "g"."vulnerability_id" <> "f"."vulnerability_id"
-	  AND "ag"."last_path" = "ar"."last_path"
-	  AND "ag"."last_line" BETWEEN "ar"."last_line" - ` + n + ` AND "ar"."last_line" + ` + n + `
 	  AND EXISTS (SELECT 1 FROM "rule_family" AS "fa"
-		JOIN "rule_family" AS "fb" ON "fb"."family" = "fa"."family"
+		JOIN "rule_family" AS "fb" ON "fb"."family" = "fa"."family" AND "fb"."tool" <> "fa"."tool"
 		WHERE "fa"."vulnerability_id" = "f"."vulnerability_id" AND "fb"."vulnerability_id" = "g"."vulnerability_id")`
 }
 
@@ -47,8 +51,8 @@ func nearby(lines int) string {
 // under "f", whose result is under "ar", is the same flaw. It is worked out
 // over every lead, whoever reads it, because where a lead stands does not
 // depend on who is looking.
-var corroborated = `EXISTS (SELECT 1 FROM "finding" AS "g"
-	JOIN "analysis_result" AS "ag" ON "ag"."finding_id" = "g"."id"
+var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
+	JOIN "finding" AS "g" ON "g"."id" = "ag"."finding_id"
 	WHERE ` + nearby(groupLines) + `)`
 
 // Kin is another lead on a lead's build that is the same flaw, or possibly

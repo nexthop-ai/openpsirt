@@ -161,6 +161,14 @@ type ruleFamily struct {
 	ID              int64  `bun:"id,pk,autoincrement"`
 	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
 	Family          string `bun:"family,notnull"`
+	Tool            string `bun:"tool,notnull"`
+}
+
+// toolOf is the analyzer a rule is of: the part of its name before the first
+// slash, in lower case.
+func toolOf(rule string) string {
+	tool, _, _ := strings.Cut(strings.TrimSpace(rule), "/")
+	return strings.ToLower(tool)
 }
 
 // rateRule records the rating a rule arrived with in place of the one held,
@@ -176,7 +184,7 @@ func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) err
 	var families []ruleFamily
 	for _, w := range named {
 		tier = max(tier, weakness.TierOf(w))
-		families = append(families, ruleFamily{VulnerabilityID: id, Family: weakness.Family(w)})
+		families = append(families, ruleFamily{VulnerabilityID: id, Family: weakness.Family(w), Tool: toolOf(rule.Name)})
 	}
 	if _, err := v.db.NewDelete().Model((*ruleFamily)(nil)).
 		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {

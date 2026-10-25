@@ -54,9 +54,36 @@ func LeadRunAt(line int) string {
 		`"results":[` + results + `]}]}`
 }
 
-// ApplyRun receives and applies one run against the seeded build, built at
-// the time given.
+// ApplyRun receives and applies one run of the seeded lead's series against
+// the seeded build, built at the time given.
 func ApplyRun(t *testing.T, r *Reach, built time.Time, doc string) {
+	t.Helper()
+	ApplyRunIn(t, r, "clang-tidy/default", built, doc)
+}
+
+// OtherToolRun is one run of another analyzer, tool, over the seeded build's
+// checkout, reporting rule at each line of file given, the rule tagged with
+// the weakness CWE-tag. Its rule list holds a rule that never fires, so the
+// list is the rule set.
+func OtherToolRun(tool, rule, tag, file string, lines ...int) string {
+	results := make([]string, 0, len(lines))
+	for _, line := range lines {
+		results = append(results, `{"ruleId":"`+rule+`","message":{"text":"`+rule+` here"},`+
+			`"locations":[{"physicalLocation":{"artifactLocation":{"uri":"`+file+`","uriBaseId":"SRCROOT"},`+
+			`"region":{"startLine":`+strconv.Itoa(line)+`}}}]}`)
+	}
+	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"` + tool + `","rules":[` +
+		`{"id":"` + rule + `","properties":{"tags":["external/cwe/cwe-` + tag + `"]}},{"id":"unfired"}]}},` +
+		`"originalUriBaseIds":{"SRCROOT":{"uri":"file:///build/"}},` +
+		`"versionControlProvenance":[{"repositoryUri":"https://github.com/acme/mine","revisionId":"` + LeadCommit + `","mappedTo":{"uriBaseId":"SRCROOT"}}],` +
+		`"properties":{"openpsirt/unitsExpected":1,"openpsirt/unitsAnalyzed":1},` +
+		`"results":[` + strings.Join(results, ",") + `]}]}`
+}
+
+// ApplyRunIn receives and applies one run of a series against the seeded
+// build, built at the time given. A series is one tool, so a second tool's
+// run is applied in a series of its own.
+func ApplyRunIn(t *testing.T, r *Reach, seriesName string, built time.Time, doc string) {
 	t.Helper()
 	ctx := t.Context()
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
@@ -67,7 +94,7 @@ func ApplyRun(t *testing.T, r *Reach, built time.Time, doc string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	given := analysis.Describe([]sarif.Log{log}, analysis.Stated{Series: "clang-tidy/default", BuiltAt: built})
+	given := analysis.Describe([]sarif.Log{log}, analysis.Stated{Series: seriesName, BuiltAt: built})
 	target := r.TargetOf(t, SeededBuild)
 	var runID int64
 	if err := database.InTransaction(ctx, r.DB.DB, func(ctx context.Context, tx bun.Tx) error {

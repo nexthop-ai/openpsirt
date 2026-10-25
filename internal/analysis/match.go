@@ -5,6 +5,8 @@ package analysis
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"time"
@@ -42,6 +44,7 @@ type result struct {
 	Snippet           string `bun:"snippet,nullzero"`
 	SnippetLine       *int   `bun:"snippet_line"`
 	LastPath          string `bun:"last_path,notnull"`
+	LastPathIdentity  string `bun:"last_path_identity,notnull"`
 	LastLine          *int   `bun:"last_line"`
 }
 
@@ -60,6 +63,12 @@ func lastOf(k Keyed) (string, int) {
 		}
 	}
 	return k.Path, k.StartLine
+}
+
+// pathIdentity is the digest a path is indexed by.
+func pathIdentity(path string) string {
+	sum := sha256.Sum256([]byte(path))
+	return hex.EncodeToString(sum[:])
 }
 
 // location is another place a result names: a step on the analyzer's path,
@@ -252,7 +261,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key,
 			FunctionKey: k.FunctionKey, LineKey: k.LineKey, MatchedOn: k.On, Level: k.Level,
 			Snippet: k.Snippet, SnippetLine: stated(k.SnippetLine),
-			LastPath: lastPath, LastLine: stated(lastLine),
+			LastPath: lastPath, LastPathIdentity: pathIdentity(lastPath), LastLine: stated(lastLine),
 		})
 		ordinal := 0
 		for _, steps := range []struct {

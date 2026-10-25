@@ -220,11 +220,17 @@ func analysisV0110(t *columnTypes) []string {
 			-- one flaw agree on: the last step of its path, the last related
 			-- location in its own file, or its own location.
 			"last_path"     ` + t.text + ` NOT NULL,
+			-- A digest of the last path, which is what an index holds: the
+			-- path is text no index takes whole on MySQL.
+			"last_path_identity" ` + t.hash + ` NOT NULL,
 			"last_line"     INTEGER NULL,
 			CONSTRAINT "analysis_result_finding_unique" UNIQUE ("finding_id"),
 			CONSTRAINT "analysis_result_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,
 		`CREATE INDEX "analysis_result_key_idx" ON "analysis_result" ("match_key")`,
+		// The leads whose last place is near another's, which is how two
+		// analyzers' leads are found to be one flaw.
+		`CREATE INDEX "analysis_result_last_idx" ON "analysis_result" ("last_path_identity", "last_line")`,
 
 		// The other places a result names: related locations, and the steps
 		// of the path the analyzer took to it.
