@@ -180,11 +180,20 @@ func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) err
 		Where(`"vulnerability_id" = ?`, id).Scan(ctx, &named); err != nil {
 		return err
 	}
+	// Two weaknesses of one family are one row: MySQL refuses a statement
+	// whose own rows collide on a unique key, where it would keep the first
+	// of a row already stored.
 	tier := weakness.TierOther
 	var families []ruleFamily
+	seen := map[string]bool{}
 	for _, w := range named {
 		tier = max(tier, weakness.TierOf(w))
-		families = append(families, ruleFamily{VulnerabilityID: id, Family: weakness.Family(w), Tool: toolOf(rule.Name)})
+		family := weakness.Family(w)
+		if seen[family] {
+			continue
+		}
+		seen[family] = true
+		families = append(families, ruleFamily{VulnerabilityID: id, Family: family, Tool: toolOf(rule.Name)})
 	}
 	if _, err := v.db.NewDelete().Model((*ruleFamily)(nil)).
 		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {
