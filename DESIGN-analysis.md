@@ -517,7 +517,8 @@ and 121 from three tools. They agree about its family.
 
 | Rule | |
 |---|---|
-| A weakness's family is the nearest class or pillar up its primary parents in the catalog's research view, or itself where it is one | CWE-121, 122, 126, 787 and 788 are all CWE-119, and so are use after free and double free |
+| A weakness's family is the nearest class up its primary parents in the catalog's research view, or itself where it is a class or a pillar | CWE-121, 122, 126, 787 and 788 are all CWE-119, and so are use after free and double free |
+| A pillar is the family of no weakness under it, and a weakness reaching a pillar with no class between is its own family | The catalog files a null dereference, a condition always true and an obsolete function directly under CWE-710, and 26 cppcheck and clang rules shared that family |
 | A weakness the catalog does not place is its own family | A newer catalog than the one committed assigns numbers this one does not know |
 | The hierarchy is read from the published catalog by `make weakness-names` and committed with the names | `DESIGN-build.md` § Make targets. Nobody types a thousand parents |
 | A clang checker reporting several kinds of flaw names each | unix.Malloc reports leaks, double frees and uses after free under one name, so it is a memory-safety rule and groups in the resource family and the bounds family both |

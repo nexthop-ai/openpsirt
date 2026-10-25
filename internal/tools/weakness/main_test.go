@@ -101,6 +101,7 @@ func TestARedirectIsFollowedOnlyToHTTPS(t *testing.T) {
 
 func TestAWeaknessTakesItsPrimaryParentInTheResearchView(t *testing.T) {
 	const doc = `<Weakness_Catalog Version="4.18" Date="2025-09-09"><Weaknesses>
+<Weakness ID="664" Name="Resource" Abstraction="Pillar"/>
 <Weakness ID="119" Name="Bounds" Abstraction="Class"/>
 <Weakness ID="787" Name="Write" Abstraction="Base"><Related_Weaknesses>
 <Related_Weakness Nature="ChildOf" CWE_ID="20" View_ID="1000"/>
@@ -116,14 +117,17 @@ func TestAWeaknessTakesItsPrimaryParentInTheResearchView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	parents, classes := lineageIn(read)
+	parents, classes, pillars := lineageIn(read)
 	if parents["CWE-787"] != "CWE-119" || parents["CWE-121"] != "CWE-787" || len(parents) != 2 {
 		t.Errorf("read parents %v; want the primary one in the research view, and the first where none is", parents)
 	}
-	if !classes["CWE-119"] || len(classes) != 1 {
-		t.Errorf("read classes %v; want CWE-119 alone", classes)
+	if !classes["CWE-119"] || !classes["CWE-664"] || len(classes) != 2 {
+		t.Errorf("read classes %v; want CWE-119 and CWE-664", classes)
 	}
-	if _, err := renderLineage(parents, classes); err != nil {
+	if !pillars["CWE-664"] || len(pillars) != 1 {
+		t.Errorf("read pillars %v; want CWE-664 alone", pillars)
+	}
+	if _, err := renderLineage(parents, classes, pillars); err != nil {
 		t.Fatal(err)
 	}
 }

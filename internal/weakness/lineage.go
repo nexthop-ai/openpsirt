@@ -1075,3 +1075,18 @@ var classes = map[string]bool{
 	"CWE-1395": true,
 	"CWE-1419": true,
 }
+
+// pillars is every weakness the catalog places at the level of a pillar, the
+// top of the research view.
+var pillars = map[string]bool{
+	"CWE-284": true,
+	"CWE-435": true,
+	"CWE-664": true,
+	"CWE-682": true,
+	"CWE-691": true,
+	"CWE-693": true,
+	"CWE-697": true,
+	"CWE-703": true,
+	"CWE-707": true,
+	"CWE-710": true,
+}

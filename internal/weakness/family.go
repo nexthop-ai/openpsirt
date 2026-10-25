@@ -7,16 +7,19 @@ package weakness
 // few levels deep, so a walk this long is a cycle in a published catalog.
 const mostDepth = 16
 
-// Family is the class or pillar a weakness belongs to: itself where it is
-// one, and otherwise the nearest one up its primary parents in the research
-// view. Tools disagree about the number for one flaw — one overflow was
-// CWE-788, 119 and 121 from three tools — and agree about its family. A
-// weakness the catalog does not place is its own family.
+// Family is the class a weakness belongs to: itself where it is a class or a
+// pillar, and otherwise the nearest class up its primary parents in the
+// research view. Tools disagree about the number for one flaw — one overflow
+// was CWE-788, 119 and 121 from three tools — and agree about its family. A
+// pillar ends the walk only where it is the weakness itself: a pillar holds
+// flaws as unlike as a null dereference and a condition always true, which
+// share CWE-710. A weakness the catalog does not place, and one whose walk
+// reaches a pillar with no class between, is its own family.
 func Family(id string) string {
 	id = Canonical(id)
 	at := id
 	for range mostDepth {
-		if classes[at] {
+		if classes[at] && (at == id || !pillars[at]) {
 			return at
 		}
 		parent, ok := parents[at]

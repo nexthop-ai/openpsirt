@@ -21,6 +21,23 @@ func TestOneOverflowNumberedThreeWaysIsOneFamily(t *testing.T) {
 	}
 }
 
+func TestAPillarIsNoWeaknessFamily(t *testing.T) {
+	// The catalog files a null dereference and a condition always true
+	// directly under CWE-710, and a wrapped integer and a divide by zero
+	// under CWE-682. Neither pair is one flaw.
+	for _, pair := range [][2]string{{"CWE-476", "CWE-570"}, {"CWE-476", "CWE-571"}, {"CWE-476", "CWE-477"}, {"CWE-190", "CWE-369"}} {
+		if Family(pair[0]) == Family(pair[1]) {
+			t.Errorf("%s and %s are both in family %s", pair[0], pair[1], Family(pair[0]))
+		}
+	}
+	if got := Family("CWE-476"); got != "CWE-476" {
+		t.Errorf("a null dereference is in family %s; want itself", got)
+	}
+	if got := Family("CWE-710"); got != "CWE-710" {
+		t.Errorf("a pillar is in family %s; want itself", got)
+	}
+}
+
 func TestMemorySafetyOutranksStyle(t *testing.T) {
 	for id, want := range map[string]Tier{
 		"CWE-787":  TierMemory,
