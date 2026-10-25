@@ -89,8 +89,8 @@ and a kind it does not name never reaches it.
 
 Analysis findings are included by Evidence, Leads and Decisions alone: a
 lead is read through the lead queue, its evidence and the claims about it
-(`DESIGN-analysis.md` § Lead triage). The screens and exports that list
-leads are **not built**.
+(`DESIGN-analysis.md` § Lead triage). The exports that list leads are **not
+built**; `DESIGN-interface.md` § Static analysis leads holds the screens.
 
 ## Inclusion
 
