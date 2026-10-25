@@ -31,7 +31,8 @@ type Evidence struct {
 	LastSeen time.Time
 	NotSeen  *time.Time
 	// Compare is the address comparing the lead's repository between those
-	// two builds, and Unchanged whether both name the same commit for it.
+	// two builds, and Unchanged whether both name the same commit for it and
+	// neither patched it.
 	Compare   string
 	Unchanged bool
 }

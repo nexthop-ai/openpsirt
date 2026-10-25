@@ -97,6 +97,14 @@ func TestARepositoryOnNoNamedHostIsShownAsText(t *testing.T) {
 	}
 }
 
+func TestARemoteShownAsTextCarriesNoCredential(t *testing.T) {
+	modules := []Module{{Path: "", Remote: "https://ci-token:SECRET@code.example.org/x/y.git?private_token=SECRET", Revision: top}} //nolint:gosec // G101: a placeholder credential to be removed
+	got := hosted(t).File(modules, "z.go", 1, 1)
+	if got.Unlinked != NoHost || got.Repository != "https://code.example.org/x/y.git" {
+		t.Errorf("linked %+v; want the remote without its credential", got)
+	}
+}
+
 func TestARevisionThatIsNotACommitIsShownUnlinked(t *testing.T) {
 	if got := hosted(t).File(checkout, "src/branch/a.c", 1, 1); got.URL != "" || got.Unlinked != NotACommit {
 		t.Errorf("linked %+v; want no link to a branch the upload named", got)
@@ -143,9 +151,29 @@ func TestTwoBuildsOfOneRepositoryCompareTheirCommits(t *testing.T) {
 	if want := "https://github.com/opencomputeproject/SAI/compare/" + sai + "..." + top; address != want || unchanged {
 		t.Errorf("compared %q, unchanged %v; want %q", address, unchanged, want)
 	}
-	address, unchanged = c.Compare(checkout, checkout, "src/sonic-sairedis/SAI/inc/saiport.h")
+	address, unchanged = c.Compare(checkout, checkout, "src/sonic-frr/frr/bgpd/a.c")
 	if address != "" || !unchanged {
 		t.Errorf("compared %q, unchanged %v; want the same commit said so", address, unchanged)
+	}
+}
+
+// SAI is patched at build time in the checkout, so its commit alone does not
+// say what was analyzed.
+func TestTheSameCommitPatchedOnEitherSideIsNotUnchanged(t *testing.T) {
+	c := hosted(t)
+	clean := append([]Module(nil), checkout...)
+	clean[2].Changed = false
+	for name, runs := range map[string][2][]Module{
+		"patched before":  {checkout, clean},
+		"patched after":   {clean, checkout},
+		"patched in both": {checkout, checkout},
+	} {
+		if address, unchanged := c.Compare(runs[0], runs[1], "src/sonic-sairedis/SAI/inc/saiport.h"); address != "" || unchanged {
+			t.Errorf("%s: compared %q, unchanged %v; want neither", name, address, unchanged)
+		}
+	}
+	if _, unchanged := c.Compare(clean, clean, "src/sonic-sairedis/SAI/inc/saiport.h"); !unchanged {
+		t.Errorf("the same commit unpatched in both is not unchanged")
 	}
 }
 

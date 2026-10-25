@@ -25,8 +25,8 @@ type Link struct {
 	// URL is the address, empty where the location is shown unlinked.
 	URL string
 	// Repository is the repository the location is in: its web address
-	// where it is on a host the product names, the remote as stated
-	// otherwise.
+	// where it is on a host the product names, the remote as stated with no
+	// credential otherwise.
 	Repository string
 	// Within is the location's path inside that repository.
 	Within string
@@ -63,7 +63,7 @@ func (c Config) File(modules []Module, path string, start, end int) Link {
 	if !ok {
 		return Link{Unlinked: NoRepository}
 	}
-	link := Link{Repository: at.remote, Within: at.within, Revision: at.revision,
+	link := Link{Repository: WithoutCredential(at.remote), Within: at.within, Revision: at.revision,
 		Approximate: at.approximate, Patched: at.patched}
 	host, repo, ok := c.repository(at.remote)
 	if !ok {
@@ -100,9 +100,11 @@ func (c Config) File(modules []Module, path string, start, end int) Link {
 }
 
 // Compare is the address comparing the repository a path is in between two
-// runs, and whether its commit is the same in both, which says a
-// disappearance between them is not a change to that code. Empty where
-// either run names no commit for it, or its host has no comparison.
+// runs, and whether its commit is the same in both and neither run's working
+// tree differed from it, which says a disappearance between them is not a
+// change to that code. A patch applied at build time is a change the commit
+// does not show. Empty where either run names no commit for it, or its host
+// has no comparison.
 func (c Config) Compare(before, after []Module, path string) (address string, unchanged bool) {
 	from, ok := c.locate(before, path)
 	if !ok || from.approximate {
@@ -116,7 +118,7 @@ func (c Config) Compare(before, after []Module, path string) (address string, un
 		return "", false
 	}
 	if strings.EqualFold(from.revision, to.revision) {
-		return "", true
+		return "", !from.patched && !to.patched
 	}
 	host, repo, ok := c.repository(from.remote)
 	if !ok {

@@ -205,7 +205,7 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 			continue
 		}
 		out = append(out, series.Module{
-			Path: at, Remote: m.Repository, Revision: m.Revision, Changed: changed[at],
+			Path: at, Remote: sourcelink.WithoutCredential(m.Repository), Revision: m.Revision, Changed: changed[at],
 		})
 	}
 	return out
@@ -406,14 +406,15 @@ func printsOf(placed Placed, keyed []Keyed) string {
 	seen := map[string]bool{}
 	var parts []string
 	for _, k := range keyed {
-		scheme := k.Scheme
-		if scheme == "" {
-			scheme = "none"
+		if k.Scheme != "" && !seen[k.Scheme] {
+			seen[k.Scheme] = true
+			parts = append(parts, k.Scheme)
 		}
-		if !seen[scheme] {
-			seen[scheme] = true
-			parts = append(parts, scheme)
-		}
+	}
+	// A result carrying no fingerprint beside others that do says nothing
+	// of how the run fingerprints, so it alone never makes a re-baseline.
+	if len(parts) == 0 {
+		parts = append(parts, "none")
 	}
 	for _, r := range placed.Runs {
 		if mark := "salt " + r.Salt; r.Salt != "" && !seen[mark] {

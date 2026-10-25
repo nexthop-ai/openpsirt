@@ -44,7 +44,7 @@ type LeadEvidenceBody struct {
 	LastSeen  string      `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
 	NotSeen   string      `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
 	Compare   string      `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
-	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository, so its disappearance is not a change to that code"`
+	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
 }
 
 func registerLeads(api huma.API, in core.Deps) {

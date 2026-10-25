@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -507,6 +508,26 @@ func TestPlacedResultsPastTheByteBoundAreRefused(t *testing.T) {
 	}
 }
 
+func TestARepositoryIsRecordedWithoutItsCredential(t *testing.T) {
+	doc := strings.Replace(document(spread(1), 10), "https://github.com/FRRouting/frr.git",
+		"https://gitlab-ci-token:SECRET@github.com/FRRouting/frr.git", 1)
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	placed, err := Place([]sarif.Log{log}, "", sarif.DefaultLimits().MaxBytes, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var remotes []string
+	for _, m := range placed.Modules {
+		remotes = append(remotes, m.Remote)
+	}
+	if !slices.Contains(remotes, "https://github.com/FRRouting/frr.git") || strings.Contains(strings.Join(remotes, " "), "SECRET") {
+		t.Errorf("recorded %v; want FRR's remote without its credential", remotes)
+	}
+}
+
 func TestWhatARunSaysOnceIsHeldOnce(t *testing.T) {
 	tool := strings.Repeat("T", 4096)
 	doc := strings.Replace(document(spread(200), 10), `"name":"clang-tidy"`, `"name":"`+tool+`"`, 1)
@@ -820,6 +841,28 @@ func TestARunFingerprintedDifferentlyFromTheBuildsLastIsARebaseline(t *testing.T
 				documentOf([]interface{ json() string }{c.result}, 10, c.salt))
 			if status != series.Applied || run.Rebaseline != c.want || receiptOf(t, run).Rebaseline != c.want {
 				t.Errorf("run %d: %s, re-baseline %v; want %v", i, status, run.Rebaseline, c.want)
+			}
+		}
+	})
+}
+
+func TestAResultWithNoFingerprintBesideOthersIsNoRebaseline(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		elsewhere := inFRR
+		elsewhere.line, elsewhere.message = 90, "z used after it was moved"
+		plain := inside{elsewhere, "", ""}
+		printed := inside{inFRR, "", "a1"}
+		other := inside{inSWSS, "", "b2"}
+		for i, results := range [][]interface{ json() string }{
+			{printed, other},
+			{printed, other, plain},
+			{printed, other},
+		} {
+			run, _ := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour), documentOf(results, 10, ""))
+			if i > 0 && run.Rebaseline {
+				t.Errorf("run %d: a re-baseline where one result carried no fingerprint (%q)", i, run.Fingerprints)
 			}
 		}
 	})

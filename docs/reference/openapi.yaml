@@ -5502,7 +5502,7 @@ components:
             - array
             - "null"
         unchanged:
-          description: Whether those two builds name the same commit for the lead's repository, so its disappearance is not a change to that code
+          description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
           type: boolean
       required:
         - at

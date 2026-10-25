@@ -3,7 +3,10 @@
 
 package sourcelink
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 // Normalize is a repository's address as host, owner and name, in lower
 // case, with no scheme, credential, port, revision or suffix: the form a
@@ -32,6 +35,10 @@ func parse(remote string) (host, path string) {
 	} else if at := strings.Index(s, "@"); at >= 0 && strings.Contains(s[at:], ":") {
 		// The form an SSH remote is written in: user@host:owner/name.
 		s = strings.Replace(s[at+1:], ":", "/", 1)
+	} else if h, after, ok := strings.Cut(s, ":"); ok && !strings.Contains(h, "/") && len(h) > 1 && !strings.HasPrefix(after, "//") {
+		// The form an SSH remote with no user is written in: host:owner/name.
+		// A single letter before the colon is a drive.
+		s = h + "/" + after
 	}
 	host, path, _ = strings.Cut(s, "/")
 	if at := strings.LastIndex(host, "@"); at >= 0 {
@@ -46,6 +53,24 @@ func parse(remote string) (host, path string) {
 		path = path[:len(path)-4]
 	}
 	return strings.ToLower(host), path
+}
+
+// WithoutCredential is a remote with any credential and query taken out of
+// it, where it is written as an address. A remote comes from an upload, and a
+// token in it would reach every reader of what it is shown on.
+func WithoutCredential(remote string) string {
+	s := strings.TrimSpace(remote)
+	if !strings.Contains(s, "://") {
+		return s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		// An address that does not parse is not shown, since where its
+		// credential ends cannot be told.
+		return ""
+	}
+	u.User, u.RawQuery, u.ForceQuery = nil, "", false
+	return u.String()
 }
 
 // relative is whether a remote is written relative to the repository that

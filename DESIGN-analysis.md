@@ -236,6 +236,7 @@ re-baseline.
 | Rule | |
 |---|---|
 | A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a re-baseline |
+| `none` is recorded only where no result carried a fingerprint | One unhashable result appearing or going away beside others says nothing about how the run fingerprints |
 | The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
 | A re-baseline is matched like any other run, and says so on its receipt | Its whole keys no longer meet the leads', so its pairings are the probable layers' |
 
@@ -283,15 +284,16 @@ administrative trail.
 | Rule | |
 |---|---|
 | A path is in the run's repository with the longest prefix holding it, and the rest of the path is within that repository | `src/sonic-sairedis/SAI/inc/saiport.h` is `inc/saiport.h` in SAI, at SAI's commit |
-| A relative remote resolves against the remote of the repository holding it, itself resolved the same way; an SSH remote is read as the host and path it names | `.gitmodules` uses both |
+| A relative remote resolves against the remote of the repository holding it, itself resolved the same way; an SSH remote is read as the host and path it names, written with a user or without one | `.gitmodules` uses both |
+| A remote is recorded and shown with any credential and query taken out | It comes from the upload, and a token in it would reach every reader of the lead |
 | A remote on no host the product names is shown as text, unlinked | The remote comes from the upload, so without the list its host is the uploader's choice |
-| A link opens at a commit: 7 to 64 hexadecimal digits. A revision that is anything else is shown unlinked | A branch an upload names moves, and `?` or `#` in it would steer the link |
+| A revision an upload states opens a link only where it is a commit: 7 to 64 hexadecimal digits, and is shown unlinked otherwise | A branch an upload names moves, and `?` or `#` in it would steer the link |
 | Each path segment is percent-encoded, and a segment that is empty, `.` or `..` leaves the place unlinked | `?`, `#` and traversal in a path would otherwise steer the link |
 | A finished address must open over `https` on the host the web address names, or the place is unlinked | The last check, after every template and substitution |
 | A repository whose working tree differed from its commit when it was analyzed is marked patched | The link shows the source before the patch |
 | A path no run repository holds links to the branch a product names for its longest prefix, marked approximate | The commit is unknown |
 | A place with no line opens the file; an end before the start is the start | |
-| A lead the build no longer holds open carries a comparison of its repository between the build of the newest run that saw it and the build of the first that did not, or says the two name the same commit | A disappearance where the code did not change is not a fix in that code |
+| A lead the build no longer holds open carries a comparison of its repository between the build of the newest run that saw it and the build of the first that did not, or says the two name the same commit and neither was patched | A disappearance where the code did not change is not a fix in that code, and a patch applied at build time is a change the commit does not show |
 
 Each unlinked place says why: no repository is known, the repository is on no
 named host, the revision is not a commit, or the path leaves the repository.

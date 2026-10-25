@@ -9526,7 +9526,7 @@ export interface components {
             related: components["schemas"]["LeadPlace"][] | null;
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
-            /** @description Whether those two builds name the same commit for the lead's repository, so its disappearance is not a change to that code */
+            /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
         };
         LeadPlace: {
