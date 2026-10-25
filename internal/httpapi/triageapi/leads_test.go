@@ -172,10 +172,17 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 		if got := leadState(t, r, place); got != "fixed" {
 			t.Errorf("a lead closed as fixed is %q; want fixed", got)
 		}
+		if got := leadsOf(t, r, "internal-reader", "?state=fixed"); len(got.Items) != 1 ||
+			got.Items[0].Place != place || got.States["fixed"] != 1 {
+			t.Errorf("the fixed leads are %+v; want the one closed, listed and counted", got)
+		}
 
 		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRun(true))
 		if got := leadState(t, r, place); got == "fixed" {
 			t.Error("a fixed lead seen again is still fixed")
+		}
+		if got := leadsOf(t, r, "internal-reader", "?state=fixed"); len(got.Items) != 0 || got.States["fixed"] != 0 {
+			t.Errorf("the fixed leads are %+v; want none once the lead opened anew", got)
 		}
 	})
 }

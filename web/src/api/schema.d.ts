@@ -3475,11 +3475,11 @@ export interface paths {
         };
         /**
          * List static analysis leads
-         * @description Returns one row per lead the product holds open, however many builds it is on. Ordered by the analyzer's own security severity for the rule, then its precision, then newest first.
+         * @description Returns one row per lead the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
          *
-         *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
+         *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -9885,7 +9885,7 @@ export interface components {
         LeadRowBody: {
             /**
              * Format: int64
-             * @description The number of builds in the list's scope the lead is open on
+             * @description The number of builds in the list's scope the lead is listed on, in the state the list asks for
              */
             builds: number;
             /** @description The function the result is in, where the analyzer names one */
@@ -9985,7 +9985,7 @@ export interface components {
              * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
              */
             ruled: number;
-            /** @description The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both */
+            /** @description The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build */
             states: {
                 [key: string]: number;
             };

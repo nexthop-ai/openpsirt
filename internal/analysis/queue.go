@@ -75,12 +75,13 @@ type Queue struct {
 	Ruled   int
 }
 
-// LeadsOf is one page of the leads a product holds open where the subject
-// may read them, one row per lead however many builds it is on.
+// LeadsOf is one page of a product's leads where the subject may read them,
+// one row per lead however many builds it is on.
 //
 // With no state named it is the queue: open leads nobody's claim waits on.
 // Naming a state lists the leads in it, which is how the baseline is
-// searched. Ordered by what is likely real: the rank of the weaknesses the
+// searched. A fixed lead is one closed on a build, and listed there until the
+// lead opens anew at its place on that build. Ordered by what is likely real: the rank of the weaknesses the
 // rule names, whether another analyzer reports the same flaw, the tool's own
 // security severity for the rule, its precision, then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
@@ -108,7 +109,9 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			ColumnExpr(`CASE WHEN `+waitingClaim+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
 			ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
 			Where(`"s"."product_id" = ?`, scope.ProductID).
-			Where(`"f"."closed_at" IS NULL`).
+			Where(`("f"."closed_at" IS NULL OR NOT EXISTS (SELECT 1 FROM "finding" AS "fo"
+				WHERE "fo"."place_identity" = "f"."place_identity" AND "fo"."target_id" = "f"."target_id"
+				  AND "fo"."closed_at" IS NULL))`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(kinds, kindArgs...)
 		if scope.StreamID != nil {

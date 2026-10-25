@@ -469,11 +469,12 @@ one way to say a path does not matter is kept rather than two.
 | List | Holds |
 |---|---|
 | The queue, with no state named | Open leads with no claim waiting for a second person |
-| A state named | The open leads in that state. Naming the baseline is how it is searched |
+| A state named | The leads in that state. Naming the baseline is how it is searched. Fixed is the leads closed on a build and not opened anew there |
 
 | Rule | |
 |---|---|
 | Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves the baseline out says how many it left (REQ-30) |
+| A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same place (§ Fixed leads), and then it is what the newer finding says |
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |

@@ -1420,9 +1420,9 @@ the screens draw them.
 | Rule | |
 |---|---|
 | The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
-| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting and the baseline left out. The baseline is searched through its tab. Each tab carries its count |
+| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting and the baseline left out. The baseline is searched through its tab. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
 | What the queue leaves out is counted above it | How many wait for approval, and how many a standing rule dismisses, the second opening the dismissed tab |
-| A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others the lead is open on |
+| A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed |
 | The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
 | A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
 | The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |

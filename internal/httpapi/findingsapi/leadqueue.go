@@ -25,7 +25,7 @@ type LeadRowBody struct {
 	Stream   string    `json:"stream" doc:"The branch or tag of the newest build the lead is listed on, to link to"`
 	Variant  string    `json:"variant" doc:"The variant of that build"`
 	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
-	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is open on"`
+	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
 	Opened   string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
 }
 
@@ -36,7 +36,7 @@ type LeadsOutput struct {
 		Total int           `json:"total" doc:"The leads the list holds"`
 		// Counted rather than only listed, so that a list leaving the
 		// baseline out says how much it left (REQ-30).
-		States  map[string]int `json:"states" doc:"The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both"`
+		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
 	}
@@ -47,14 +47,16 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		OperationID: "list-leads", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/leads",
 		Summary: "List static analysis leads",
-		Description: "Returns one row per lead the product holds open, however many builds it is " +
-			"on. Ordered by the analyzer's own security severity for the rule, then its precision, " +
-			"then newest first.\n\n" +
+		Description: "Returns one row per lead the product holds, however many builds it is " +
+			"on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer " +
+			"reports the same flaw on the build, then the tool's own security severity for the rule, " +
+			"then its precision, then newest first.\n\n" +
 			"With no `state` it is the queue: open leads with no claim waiting for a second " +
-			"person. A lead in the baseline is left out until it is pulled in or its path is " +
-			"marked important. `state` lists the leads in one state instead, which is how the " +
-			"baseline is searched.\n\n" +
-			"`states` counts every open lead in the scope by state and `waiting` the open ones " +
+			"person. A lead in the baseline is left out until it is pulled in, its path is " +
+			"marked important, or another analyzer reports the same flaw. `state` lists the leads " +
+			"in one state instead, which is how the baseline is searched. `fixed` lists the leads " +
+			"closed on a build and not opened anew there.\n\n" +
+			"`states` counts every lead in the scope by state and `waiting` the open ones " +
 			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
 			"so what the list leaves out is counted. " +
 			"`stream` and `variant` are optional and independent. Supports limit and offset.",
