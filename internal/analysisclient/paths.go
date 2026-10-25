@@ -6,6 +6,7 @@ package analysisclient
 import (
 	"net/url"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -27,10 +28,20 @@ type placer struct {
 	// exact the same paths as they are.
 	index map[string]string
 	exact map[string]bool
+	// real is the top of the checkout with every link along it followed, and
+	// resolved each absolute path outside the checkout as it is with its
+	// links followed, empty where it is no file on this host.
+	real     string
+	resolved map[string]string
 }
 
 func newPlacer(root, work string, indexed []string) *placer {
-	p := &placer{root: slashed(root), work: slashed(work), index: map[string]string{}, exact: map[string]bool{}}
+	p := &placer{root: slashed(root), work: slashed(work), index: map[string]string{}, exact: map[string]bool{},
+		resolved: map[string]string{}}
+	p.real = p.root
+	if r, err := filepath.EvalSymlinks(filepath.FromSlash(p.root)); err == nil {
+		p.real = slashed(filepath.ToSlash(r))
+	}
 	for _, f := range indexed {
 		f = strings.ReplaceAll(f, `\`, "/")
 		p.exact[f] = true
@@ -102,11 +113,39 @@ func (p *placer) place(uri, base string, bases map[string]obj) (placement, strin
 	if !ok {
 		return unplaced, ""
 	}
-	rel, in := p.within(abs)
+	rel, in := p.inside(abs)
 	if !in {
 		return outside, abs
 	}
 	return inside, p.cased(rel)
+}
+
+// inside is an absolute path relative to the top of the checkout, where it is
+// inside it as written or once the links along either are followed. A tool
+// run from a directory reached through a link writes paths through the link,
+// and git names the checkout without it.
+func (p *placer) inside(abs string) (string, bool) {
+	for _, root := range []string{p.root, p.real} {
+		if rel, ok := within(abs, root); ok {
+			return rel, true
+		}
+	}
+	r, ok := p.resolved[abs]
+	if !ok {
+		if full, err := filepath.EvalSymlinks(filepath.FromSlash(abs)); err == nil {
+			r = cleanAbs(filepath.ToSlash(full))
+		}
+		p.resolved[abs] = r
+	}
+	if r == "" || r == abs {
+		return "", false
+	}
+	for _, root := range []string{p.root, p.real} {
+		if rel, ok := within(r, root); ok {
+			return rel, true
+		}
+	}
+	return "", false
 }
 
 // maxChain bounds how many starting points one address may pass through.
@@ -199,18 +238,18 @@ func cleanAbs(s string) string {
 	return path.Clean(s)
 }
 
-// within is an absolute path relative to the top of the checkout, where it
-// is inside it. A drive letter compares without regard to case, and on a
-// drive the whole path does, as the file systems that have drives compare it.
-func (p *placer) within(abs string) (string, bool) {
+// within is an absolute path relative to root, where it is inside it. A
+// drive letter compares without regard to case, and on a drive the whole path
+// does, as the file systems that have drives compare it.
+func within(abs, root string) (string, bool) {
 	same := func(a, b string) bool { return a == b }
-	if hasDrive(p.root) || hasDrive(abs) {
+	if hasDrive(root) || hasDrive(abs) {
 		same = strings.EqualFold
 	}
-	if same(abs, p.root) {
+	if same(abs, root) {
 		return "", true
 	}
-	prefix := strings.TrimSuffix(p.root, "/") + "/"
+	prefix := strings.TrimSuffix(root, "/") + "/"
 	if len(abs) <= len(prefix) || !same(abs[:len(prefix)], prefix) {
 		return "", false
 	}

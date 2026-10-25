@@ -1,6 +1,6 @@
 # Build pipelines
 
-What a build pipeline does, end to end. Everything here is one HTTP request;
+What a build pipeline does, end to end. An inventory is one HTTP request;
 there is no client to install and no agent to run. A static analyzer's run is
 sent with the upload client, as [Analyzer results](analysis.md) describes.
 

@@ -151,7 +151,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 			if opts.SeriesOf == nil {
 				opts.SeriesOf = map[string]string{}
 			}
-			opts.SeriesOf[strings.ToLower(strings.TrimSpace(tool))] = name
+			key := strings.ToLower(strings.TrimSpace(tool))
+			if _, dup := opts.SeriesOf[key]; dup {
+				return fmt.Errorf("--series names %s twice", key)
+			}
+			opts.SeriesOf[key] = name
 		}
 	}
 	if built != "" {
@@ -231,6 +235,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if _, err := fmt.Fprintln(stderr, summary); err != nil {
 		return err
 	}
+	for _, tool := range report.Uncounted {
+		if _, err := fmt.Fprintf(stderr, "%s states no count of the units it analyzed, so the units expected are not sent; "+
+			"--units-analyzed gives that count for one analyzer's output\n", tool); err != nil {
+			return err
+		}
+	}
 
 	if command == "write" {
 		if out == "" {
@@ -250,12 +260,16 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	// Each analyzer's run is its own upload, and one refused does not keep
 	// the others from being sent.
 	var failed []string
+	client := uploader()
 	for _, r := range runs {
-		answer, err := analysisclient.Send(ctx, &http.Client{Timeout: 10 * time.Minute}, to, r.Doc,
+		answer, err := analysisclient.Send(ctx, client, to, r.Doc,
 			analysisclient.Fields{Rules: rules, ThirdParty: thirdParty})
 		switch {
 		case err != nil:
 			failed = append(failed, fmt.Sprintf("%s: %v", r.Series, err))
+		case answer.Status >= 300 && answer.Status < 400:
+			failed = append(failed, fmt.Sprintf("%s: the deployment answered %d, a redirect to %q, which is not followed: name that address with --url",
+				r.Series, answer.Status, answer.Location))
 		case answer.Status >= 300:
 			failed = append(failed, fmt.Sprintf("%s: the deployment answered %d: %s", r.Series, answer.Status,
 				strings.TrimSpace(string(answer.Body))))
@@ -269,6 +283,16 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return errors.New(strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+// uploader is the HTTP client the runs are sent with. It follows no
+// redirect: the key is a bearer token, and a redirect would carry it wherever
+// the answer points, over plain HTTP included.
+func uploader() *http.Client {
+	return &http.Client{
+		Timeout:       10 * time.Minute,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
 
 // written is where write puts one analyzer's document: the path named, or,

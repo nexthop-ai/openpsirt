@@ -82,8 +82,12 @@ type Report struct {
 	Results      int
 	Fingerprints int
 	Snippets     int
+	// Uncounted is each tool whose run states no count of the units it
+	// analyzed, so the units it was meant to analyze were not sent: the
+	// deployment reads the two counts together.
+	Uncounted []string
 	// Removed counts what was taken out of forwarded output, by what it
-	// was: whole files, fixes, snippets and markdown.
+	// was: whole files, fixes, attachments, snippets and markdown.
 	Removed map[string]int
 }
 
@@ -130,6 +134,7 @@ func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, R
 			report.Removed["fixes"] += s.fixes
 			report.Removed["snippets"] += s.snippets
 			report.Removed["markdown"] += s.markdown
+			report.Removed["attachments"] += s.attachments
 			tool := strings.ToLower(strings.TrimSpace(str(child(child(r, "tool"), "driver"), "name")))
 			if _, ok := byTool[tool]; !ok {
 				order = append(order, tool)
@@ -152,8 +157,11 @@ func build(ctx context.Context, run git, opts Options, inputs []Input) ([]Run, R
 		}
 		series[tool] = named
 	}
-	if len(order) > 1 && opts.ToolVersion != "" {
-		return nil, report, fmt.Errorf("the output is of %s, and a tool version is one analyzer's", strings.Join(order, " and "))
+	// Each describes one analyzer's process, so one value stamped on every
+	// tool's run would be wrong for all but one.
+	if len(order) > 1 && (opts.ToolVersion != "" || opts.ExitStatus != nil || opts.UnitsAnalyzed != nil) {
+		return nil, report, fmt.Errorf("the output is of %s, and a tool version, an exit status and the units analyzed are each one analyzer's",
+			strings.Join(order, " and "))
 	}
 	for k, n := range report.Removed {
 		if n == 0 {
@@ -246,6 +254,8 @@ func describe(run obj, opts Options, series string, repos []repository, src *sou
 	}
 	if opts.UnitsExpected != nil && analyzed != nil {
 		props[propUnitsExpected], props[propUnitsAnalyzed] = *opts.UnitsExpected, *analyzed
+	} else if opts.UnitsExpected != nil {
+		report.Uncounted = append(report.Uncounted, str(driver, "name"))
 	}
 	if opts.Client != "" {
 		props[propClient] = opts.Client

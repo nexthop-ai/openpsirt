@@ -39,6 +39,8 @@ type Fields struct {
 type Answer struct {
 	Status int
 	Body   []byte
+	// Location is where a redirect points, which is not followed.
+	Location string
 }
 
 // attempts is how many times an upload is sent while the deployment answers
@@ -75,7 +77,7 @@ func Send(ctx context.Context, client *http.Client, to Target, doc []byte, field
 			said, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 			resp.Body.Close()
 			if resp.StatusCode != http.StatusServiceUnavailable || attempt == attempts {
-				return Answer{Status: resp.StatusCode, Body: said}, readErr
+				return Answer{Status: resp.StatusCode, Body: said, Location: resp.Header.Get("Location")}, readErr
 			}
 			if s, convErr := strconv.Atoi(resp.Header.Get("Retry-After")); convErr == nil && s >= 0 {
 				wait = time.Duration(s) * time.Second

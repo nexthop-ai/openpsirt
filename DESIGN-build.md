@@ -240,7 +240,7 @@ than for tidiness.
 | Rule | |
 |---|---|
 | **The two systems run only when a client source moved** | A macOS or Windows runner costs several Linux ones, and a change elsewhere cannot reach the client |
-| **The source list is the imports** | A test in `internal/build` fails on a package the client imports that `client-sources` does not hold |
+| **The source list is what reaches the client** | A test in `internal/build` fails on a package the client imports that `client-sources` does not hold. The list also holds the fixtures the client's tests read from another package, and the Dockerfile, whose `golang` tag is the Go release the runners build with |
 | **A skipped job satisfies the merge check** | The aggregator waits for checks to pass or be skipped. A queue entry and a pull request compare against their own base |
 | **No make on Windows** | The Linux step prints the package list and the Go release, and the two jobs run `go test` on them directly |
 

@@ -134,6 +134,38 @@ func TestEveryRepositoryTheCheckoutHoldsIsListed(t *testing.T) {
 	}
 }
 
+func TestASubmoduleWhosePathHoldsASpaceIsListed(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_ALLOW_PROTOCOL", "file")
+	base := t.TempDir()
+	inner := filepath.Join(base, "inner.git")
+	top := filepath.Join(base, "top")
+	for _, d := range []string{inner, top} {
+		if err := os.MkdirAll(d, 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gitRepo(t, inner, "")
+	runIn(t, inner, "tag", "v1")
+	gitRepo(t, top, "https://github.com/example/top.git")
+	runIn(t, top, "submodule", "add", "-q", inner, "third party/inner")
+	runIn(t, top, "config", "--file", ".gitmodules", "submodule.third party/inner.url", "https://github.com/example/inner.git")
+	runIn(t, top, "commit", "-q", "-am", "pin inner")
+
+	got, err := repositories(context.Background(), runGit, top, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[1].Path != "third party/inner" || got[1].Remote != "https://github.com/example/inner" ||
+		len(got[1].Commit) != 40 {
+		t.Errorf("repositories %+v; want the submodule at its whole path", got)
+	}
+}
+
 func contains(l []string, s string) bool {
 	for _, v := range l {
 		if v == s {

@@ -2,9 +2,9 @@
 
 A static analyzer's run over a build is sent with `openpsirt-analysis`, the
 upload client published with every release. It reads the analyzer's own
-output and the checkout, and sends one run per build. Each result is recorded
-as an internal finding of the build, and the run's receipt counts what it
-opened, saw again and no longer found.
+output and the checkout, and sends one run per analyzer per build. Each result
+is recorded as an internal finding of the build, and the run's receipt counts
+what it opened, saw again and no longer found.
 
 Sending one needs the product, stream and variant declared and a pipeline key,
 as [Build pipelines](pipeline.md) describes for an inventory. A run is applied
@@ -63,7 +63,7 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | `--series` | Which analysis this is: the tool and its configuration, the same on every build. Each run is compared with the series' last. `TOOL=NAME` names one analyzer's, where the output is of several |
 | `--built` | When the build was made, in RFC 3339. Without it, the run is dated when it arrives |
 | `--commit` | The commit analyzed. The commit checked out where unset |
-| `--units-expected`, `--units-analyzed` | How many translation units the run was meant to analyze, and did. Both or neither |
+| `--units-expected`, `--units-analyzed` | How many translation units the run was meant to analyze, and did. Both or neither: units expected for an analyzer that counts none analyzed are not sent, and the client says so |
 | `--compile-commands` | A compilation database, whose entries are the units expected. For clang, the units analyzed are the documents given |
 | `--exit-status` | The analyzer's exit status. A run that exited non-zero is recorded and not compared |
 | `--rule`, `--rules-file` | The rules enabled, so a rule that found nothing reads as checked |
@@ -73,11 +73,17 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | `--salt-file` | A file holding a secret that keys each result's fingerprint |
 | `--url` | The deployment's address, where `OPENPSIRT_URL` is not set |
 
+`--exit-status`, `--units-analyzed`, `--tool-version`, `--rule` and
+`--rules-file` each describe one analyzer, and are refused for the output of
+several.
+
 The key is read from `OPENPSIRT_KEY` and from nowhere else, so it never
 appears on a command line.
 
 A 503 is retried after the time the deployment asks for, and a request that
-reached nothing is retried after a growing pause, five attempts in all.
+reached nothing is retried after a growing pause, five attempts in all. A
+redirect is not followed: the step fails naming where it points, so the key
+never reaches another address.
 
 ### GitHub Actions
 
@@ -97,9 +103,9 @@ reached nothing is retried after a growing pause, five attempts in all.
 
 | | |
 |---|---|
-| Paths | Relative to the checkout, with `/`, in the case the checkout's index holds. A path outside the checkout is sent as it is and dropped by the deployment with its result |
+| Paths | Relative to the checkout, with `/`, in the case the checkout's index holds, whether the tool wrote it through a symbolic link or not. A path outside the checkout is sent as it is and dropped by the deployment with its result |
 | Repositories | Every repository the checkout holds, submodules included, with its commit and its remote as a web address. A repository with uncommitted changes is named as changed |
 | Fingerprints | A hash of each result's line and the line either side, with white space and line endings normalized, so a result keeps its identity when the code around it moves. With `--salt-file` the hash is keyed, and the analyzer's own fingerprints are left out |
-| Source | Nothing, unless `--snippets` is given. Whole-file contents and suggested fixes in an analyzer's SARIF are always removed |
+| Source | Nothing, unless `--snippets` is given. Whole-file contents, attachments and suggested fixes in an analyzer's SARIF are always removed |
 
 `write` stores exactly the document `upload` would send.

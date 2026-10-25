@@ -176,3 +176,99 @@ func TestOneAnalyzersRulesAreRefusedForTheOutputOfTwo(t *testing.T) {
 		t.Errorf("err %v, %d sent; want the rules refused before anything is sent", err, len(*got))
 	}
 }
+
+func TestOneUploadRefusedDoesNotKeepTheOthersFromBeingSent(t *testing.T) {
+	_, sarif := checkout(t)
+	var got []*http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r)
+		if len(got) == 1 {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			_, _ = w.Write([]byte(`{"detail":"refused"}`))
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"queued"}`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("OPENPSIRT_KEY", "secret")
+	var stdout bytes.Buffer
+	args := []string{"upload", "--url", srv.URL, "--product", "p", "--stream", "s", "--variant", "v",
+		"--series", "lint=lint/all", "--series", "check=check/all", sarif, second(t)}
+	err := run(context.Background(), args, &stdout, &bytes.Buffer{})
+	if len(got) != 2 {
+		t.Fatalf("sent %d uploads; want both, the second after the first was refused", len(got))
+	}
+	if err == nil || !strings.Contains(err.Error(), "lint/all") || strings.Contains(err.Error(), "check/all") {
+		t.Errorf("err %v; want the refused series named, and only it", err)
+	}
+	if !strings.Contains(stdout.String(), "queued") {
+		t.Errorf("printed %q; want the second upload's receipt", stdout.String())
+	}
+}
+
+func TestARedirectIsNotFollowedWithTheKey(t *testing.T) {
+	_, sarif := checkout(t)
+	var reached int
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached++
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	t.Cleanup(elsewhere.Close)
+	redirecting := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL+r.URL.Path, http.StatusPermanentRedirect) //nolint:gosec // G710: a stand-in redirecting to another stand-in
+	}))
+	t.Cleanup(redirecting.Close)
+	t.Setenv("OPENPSIRT_KEY", "secret")
+	err := run(context.Background(), upload(redirecting.URL, sarif), &bytes.Buffer{}, &bytes.Buffer{})
+	if reached != 0 {
+		t.Errorf("the redirect was followed %d times", reached)
+	}
+	if err == nil || !strings.Contains(err.Error(), "redirect") || !strings.Contains(err.Error(), elsewhere.URL) {
+		t.Errorf("err %v; want the redirect and where it points named", err)
+	}
+}
+
+func TestOneAnalyzersSeriesNamedTwiceIsRefused(t *testing.T) {
+	_, sarif := checkout(t)
+	err := run(context.Background(), []string{"write", "--series", "lint=a", "--series", "lint=b",
+		"--output", filepath.Join(t.TempDir(), "x"), sarif}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "twice") {
+		t.Errorf("err %v; want the repeated series refused", err)
+	}
+}
+
+func TestUnitsExpectedWithNoCountAnalyzedAreSaidUnsent(t *testing.T) {
+	_, sarif := checkout(t)
+	var stderr bytes.Buffer
+	if err := run(context.Background(), []string{"write", "--series", "lint", "--units-expected", "10",
+		"--output", filepath.Join(t.TempDir(), "x"), sarif}, &bytes.Buffer{}, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr.String(), "lint states no count of the units it analyzed") {
+		t.Errorf("printed %q; want the units expected said to be unsent", stderr.String())
+	}
+}
+
+// git names the checkout with every link along it followed, and a tool run
+// from a directory reached through a link writes its paths through the link.
+func TestAWorkingDirectoryReachedThroughALinkIsInTheCheckout(t *testing.T) {
+	root, sarif := checkout(t)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(root, link); err != nil {
+		t.Skipf("no symbolic link can be made here: %v", err)
+	}
+	t.Chdir(link)
+	out := filepath.Join(t.TempDir(), "out.sarif")
+	if err := run(context.Background(), []string{"write", "--series", "lint", "--output", out, sarif},
+		&bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := os.ReadFile(out) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(doc, []byte(`"uri":"file.c","uriBaseId":"SRCROOT"`)) || bytes.Contains(doc, []byte("file://")) {
+		t.Errorf("the result is not placed in the checkout: %s", doc)
+	}
+}

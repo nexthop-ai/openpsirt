@@ -94,11 +94,17 @@ func repositories(ctx context.Context, run git, root, commit string) ([]reposito
 		if line[0] == '-' {
 			continue
 		}
-		fields := strings.Fields(line[1:])
-		if len(fields) < 2 {
+		// The commit, the path, and what the commit describes as in
+		// parentheses where it describes as anything. A path may hold a
+		// space.
+		sha, p, ok := strings.Cut(line[1:], " ")
+		if !ok || p == "" {
 			continue
 		}
-		subs = append(subs, repository{Path: fields[1], Commit: fields[0]})
+		if i := strings.LastIndex(p, " ("); i >= 0 && strings.HasSuffix(p, ")") {
+			p = p[:i]
+		}
+		subs = append(subs, repository{Path: p, Commit: sha})
 	}
 	// A parent is read before what it holds, so a relative address resolves
 	// against an address already known.
@@ -150,16 +156,19 @@ func declaredURLs(ctx context.Context, run git, root, repo string) map[string]st
 	if repo != "" {
 		dir = root + "/" + repo
 	}
-	out, err := run(ctx, dir, "config", "--file", ".gitmodules", "--get-regexp", `^submodule\..*\.(path|url)$`)
+	// Each entry as its key, a line feed and its value, ended by a NUL: a
+	// submodule's name and path may hold a space.
+	out, err := run(ctx, dir, "config", "--null", "--file", ".gitmodules", "--get-regexp", `^submodule\..*\.(path|url)$`)
 	if err != nil {
 		return nil
 	}
 	paths, urls := map[string]string{}, map[string]string{}
-	for _, line := range strings.Split(out, "\n") {
-		key, value, ok := strings.Cut(strings.TrimSpace(line), " ")
+	for _, entry := range strings.Split(out, "\x00") {
+		key, value, ok := strings.Cut(entry, "\n")
 		if !ok {
 			continue
 		}
+		value = strings.TrimSpace(value)
 		switch {
 		case strings.HasSuffix(key, ".path"):
 			paths[strings.TrimSuffix(key, ".path")] = value

@@ -357,9 +357,9 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 ## Upload client
 
 `openpsirt-analysis` runs in a pipeline beside the analyzer. It reads the
-analyzer's output and the checkout, writes one SARIF run holding what the
-deployment cannot learn from the output alone, and sends it as § The upload
-describes.
+analyzer's output and the checkout, writes one SARIF run per analyzer holding
+what the deployment cannot learn from the output alone, and sends each as
+§ The upload describes.
 
 ```
 openpsirt-analysis upload --product P --stream S --variant V --series [TOOL=]NAME... \
@@ -388,7 +388,8 @@ pipeline can see exactly what would leave.
 | The outputs of one tool merge into one run | Rules merge by identifier, results and invocations are concatenated, and per-unit counts add |
 | The outputs of several tools are one upload per tool | A series is one tool. `write` stores each in a file of its own, the tool's name before the extension. One refused does not keep the others from being sent |
 | Output of several tools names each one's series, as `--series TOOL=NAME` | A series named once for all of them changes name whenever a tool is added or dropped. A bare `--series NAME` serves output of one tool |
-| `--rule`, `--rules-file` and `--tool-version` are refused for output of several tools | Each describes one tool |
+| `--rule`, `--rules-file`, `--tool-version`, `--exit-status` and `--units-analyzed` are refused for output of several tools | Each describes one tool, and one value stamped on every tool's run would be wrong for all but one |
+| `--series TOOL=NAME` naming one tool twice is refused | Neither name can be chosen without guessing |
 | An output that is none of the formats is refused | It is named, with the formats read |
 
 ### Paths
@@ -402,6 +403,7 @@ it against the source root it is given (§ Placement).
 | A path arrives absolute, as a `file://` address, relative to the working directory, or under a starting point the output defines | Each is resolved before it is placed. A chain of starting points is followed to sixteen steps |
 | A drive letter and a path on a drive compare without regard to case | Windows compares them that way |
 | A path's case is taken from the checkout's index | A tool on a case-insensitive system writes the case it was asked for. Where two indexed paths differ only by case, the path is left as the tool wrote it |
+| A path is inside the checkout where it is as written, or once the links along it and along the checkout's own path are followed | git names the checkout with its links followed, and a tool run from a directory reached through a link writes its paths through the link |
 | A path outside the checkout is written as the `file://` address it is | The deployment drops it with its result and counts it; nothing about it is placed |
 | A path under a starting point the output never defines is left as written | Guessing its root would place it somewhere it is not |
 | A region whose end is before its start loses its end | It states a line and no span |
@@ -415,6 +417,7 @@ it against the source root it is given (§ Placement).
 | The top repository's commit is `--commit`, or the commit checked out | The submodules' are the commits checked out |
 | A remote is written as a web address: `https`, no credentials, port or `.git`, an SSH or scp-style address turned into the host and path it names | A remote written for SSH and an identifier written for HTTPS name one repository. A submodule's relative address is resolved against its parent's remote |
 | A repository whose remote is a local path is left out of the list | It names no repository anybody else can reach |
+| A submodule's path and name are read whole, spaces included | `.gitmodules` and `git submodule status` both allow them |
 | A repository with tracked changes is named in `openpsirt/changed` | Its results describe code no commit holds |
 
 ### Fingerprints
@@ -437,9 +440,10 @@ it is about.
 |---|---|
 | No source text leaves unless `--snippets` is given | A run carries paths, lines and fingerprints |
 | With `--snippets`, each location carries its lines, and a context region two lines either side, each bounded at 4,096 bytes | A carriage return is removed from each line |
-| Whole-file contents, fixes, snippets and markdown messages in forwarded SARIF are removed, and counted in what the client prints | A markdown message with no text keeps its markdown as its text |
+| Whole-file contents, fixes, attachments, snippets and markdown messages in forwarded SARIF are removed, and counted in what the client prints | A markdown message with no text keeps its markdown as its text |
+| A snippet is removed from every location forwarded SARIF names: a result's own, its related places, its flow steps and stack frames, the flow steps a run lists once, and the places a notification names | Each is a region of source text |
 | A forwarded run's artifact list and starting points are removed | Every path is resolved before it is written, so nothing reads them |
-| The run parameters are written as § Run parameters reads them: `openpsirt/client`, `openpsirt/commit`, `openpsirt/series` or `automationDetails.id` where `--built` is given, the unit counts together or not at all, and an invocation from `--exit-status` | `--compile-commands` gives the units expected as its entry count; for clang, the units analyzed are the documents read |
+| The run parameters are written as § Run parameters reads them: `openpsirt/client`, `openpsirt/commit`, `openpsirt/series` or `automationDetails.id` where `--built` is given, the unit counts together or not at all, and an invocation from `--exit-status` | `--compile-commands` gives the units expected as its entry count; for clang, the units analyzed are the documents read. Units expected for a tool that counts none analyzed are not sent, and the client says so |
 | The rule set and the third-party paths are sent as the upload's fields | The deployment reads them from the fields alone |
 
 ### Sending
@@ -449,6 +453,7 @@ it is about.
 | The document is gzipped and sent as the one `sarif` part of the upload, with the key as a bearer token | An analyzer's output compresses several times over, and the request's bound is on its compressed size |
 | The address is `--url` or `OPENPSIRT_URL`; the key is `OPENPSIRT_KEY` and nothing else | A key on a command line is in every process listing on the build host |
 | A 503 is sent again after its `Retry-After`, and a request that reached nothing after a pause doubling each time, five attempts in all, no pause over two minutes | A matrix of builds finishing together each gets its turn |
+| A redirect is not followed, and fails the step naming where it points | The key is a bearer token, and a redirect would carry it wherever the answer points, over plain HTTP included |
 | The receipt is printed as the deployment returned it; a refusal fails the step with its words | A 202 says the run is queued, and the counts are read from the run's receipt afterwards |
 
 ### Distribution

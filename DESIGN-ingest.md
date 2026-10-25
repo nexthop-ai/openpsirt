@@ -1266,7 +1266,7 @@ from a fuzzer are intended scope and **are not built** (REQ-14).
 | Decision | Reason |
 |---|---|
 | Scoped to a product, a release and a variant | A finding that cannot say which build it is about cannot be compared release to release |
-| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client, which is **not built** |
+| SARIF is the interchange the deployment reads | It is what the analyzers already emit. Native output would mean one reader per tool with nothing in common, so a tool's native format is read by the upload client (`DESIGN-analysis.md` § Upload client) |
 | Some sources are pulled rather than pushed | A hosted analyzer has its own store and no reason to call this deployment. Pulling is **not built** |
 | Identity is computed here, never taken from the producer | An analyzer's identifier for a result is stable until the tool is upgraded or the file is reformatted, and a finding whose identity moves reopens as new |
 | The bounded JSON reading an inventory uses is shared with the SARIF reader | One implementation of size, depth and token limits for every document read here |

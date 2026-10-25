@@ -264,10 +264,13 @@ func TestTheOutputOfTwoToolsIsARunOfEachUnderItsOwnSeries(t *testing.T) {
 
 func TestTheOutputOfTwoToolsNeedsASeriesForEach(t *testing.T) {
 	root := sources(t)
+	zero := 0
 	for name, opts := range map[string]Options{
 		"one for both":   {Root: root, Work: root, Series: "s"},
 		"one named":      {Root: root, Work: root, SeriesOf: map[string]string{"clang": "s"}},
 		"a tool version": {Root: root, Work: root, ToolVersion: "18", SeriesOf: map[string]string{"clang": "a", "cppcheck": "b"}},
+		"an exit status": {Root: root, Work: root, ExitStatus: &zero, SeriesOf: map[string]string{"clang": "a", "cppcheck": "b"}},
+		"units analyzed": {Root: root, Work: root, UnitsAnalyzed: &zero, SeriesOf: map[string]string{"clang": "a", "cppcheck": "b"}},
 	} {
 		_, _, err := build(t.Context(), fakeGit(sourceFiles, "c"), opts,
 			[]Input{fixture(t, "clang18-a.plist"), fixture(t, "cppcheck222.xml")})
@@ -279,6 +282,24 @@ func TestTheOutputOfTwoToolsNeedsASeriesForEach(t *testing.T) {
 		[]Input{fixture(t, "clang18-a.plist"), fixture(t, "cppcheck222.xml")}); err == nil ||
 		!strings.Contains(err.Error(), "--series clang=NAME --series cppcheck=NAME") {
 		t.Errorf("err %v; want the flags to use named", err)
+	}
+}
+
+func TestUnitsExpectedOfAToolCountingNoneAreReportedUnsent(t *testing.T) {
+	root := sources(t)
+	ten := 10
+	for in, want := range map[string]string{"cppcheck222.xml": "Cppcheck", "clang18-a.plist": ""} {
+		runs, report, err := build(t.Context(), fakeGit(sourceFiles, "c"),
+			Options{Root: root, Work: root, Series: "s", UnitsExpected: &ten}, []Input{fixture(t, in)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(report.Uncounted, ","); got != want {
+			t.Errorf("%s: uncounted %q; want %q", in, got, want)
+		}
+		if sent := bytes.Contains(runs[0].Doc, []byte(propUnitsExpected)); sent != (want == "") {
+			t.Errorf("%s: units expected sent %v", in, sent)
+		}
 	}
 }
 
@@ -305,8 +326,15 @@ const carrying = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL",
   "locations":[{"physicalLocation":{"artifactLocation":{"index":0},
    "region":{"startLine":7,"startColumn":9,"endLine":7,"endColumn":2,"snippet":{"text":"return 1;"}},
    "contextRegion":{"startLine":6,"endLine":8,"snippet":{"text":"if (n > 10) {"}}}}],
+  "stacks":[{"frames":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+   "region":{"startLine":3,"snippet":{"text":"frame text"}}}}}]}],
+  "attachments":[{"artifactLocation":{"uri":"a.c"},"regions":[{"startLine":1,"snippet":{"text":"attached text"}}]}],
   "partialFingerprints":{"primaryLocationLineHash":"abc:1"},
-  "fixes":[{"description":{"text":"free it"}}]}]}]}`
+  "fixes":[{"description":{"text":"free it"}}]}],
+ "threadFlowLocations":[{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},
+  "region":{"startLine":4,"snippet":{"text":"flow text"}}}}}],
+ "invocations":[{"executionSuccessful":true,"toolExecutionNotifications":[{"message":{"text":"n"},
+  "locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":5,"snippet":{"text":"notified text"}}}}]}]}]}]}`
 
 func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 	root := sources(t)
@@ -315,12 +343,13 @@ func TestNoSourceLeavesWithoutSnippets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, text := range []string{"return 0;", "return 1;", "if (n > 10)", "free it", "markdown", "`x`"} {
+	for _, text := range []string{"return 0;", "return 1;", "if (n > 10)", "free it", "markdown", "`x`",
+		"frame text", "attached text", "flow text", "notified text"} {
 		if bytes.Contains(said, []byte(text)) {
 			t.Errorf("the run carries %q: %s", text, said)
 		}
 	}
-	want := map[string]int{"contents": 1, "fixes": 1, "snippets": 2, "markdown": 2}
+	want := map[string]int{"contents": 1, "fixes": 1, "snippets": 5, "markdown": 2, "attachments": 1}
 	if !reflect.DeepEqual(report.Removed, want) {
 		t.Errorf("removed %v; want %v", report.Removed, want)
 	}
@@ -352,8 +381,8 @@ func TestSnippetsAreTheCheckoutsLines(t *testing.T) {
 	if from, _ := num(context, "startLine"); from != 5 {
 		t.Errorf("context from line %d; want 5", from)
 	}
-	if report.Snippets != 1 {
-		t.Errorf("%d snippets; want one", report.Snippets)
+	if report.Snippets != 2 {
+		t.Errorf("%d snippets; want the result's location and its stack frame", report.Snippets)
 	}
 }
 

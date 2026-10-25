@@ -253,10 +253,11 @@ docs-check:
 #
 # Those runners start only when one of the client's sources moved, and
 # CLIENT_SOURCES is that list: its packages, every package of ours they
-# import, the module's requirements and the workflow running them. A test in
-# internal/build holds it to the imports.
+# import, the fixtures its tests read, the module's requirements, the
+# Dockerfile whose golang tag is the Go release they build with, and the
+# workflow running them. A test in internal/build holds it to the imports.
 CLIENT_PACKAGES := ./cmd/openpsirt-analysis/ ./internal/analysisclient/
-CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ go.mod go.sum .github/workflows/ci.yml
+CLIENT_SOURCES  := $(CLIENT_PACKAGES) ./internal/version/ ./internal/sarif/testdata/ Dockerfile go.mod go.sum .github/workflows/ci.yml
 client-test:
 	$(GO) test -count=1 $(CLIENT_PACKAGES)
 

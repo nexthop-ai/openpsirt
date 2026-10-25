@@ -42,14 +42,14 @@ const sarifVersion = "2.1.0"
 
 // settled is what settling a run left out, counted for the report.
 type settled struct {
-	contents, fixes, snippets, markdown int
+	contents, fixes, snippets, markdown, attachments int
 }
 
 // settle makes a run self-contained and free of source text: every reference
 // by position resolved to what it names, every path placed in the checkout,
-// and whole files, proposed fixes, snippets and markdown removed. It runs
-// before runs of one tool are merged, since a position and a named starting
-// point mean something only within the run that states them.
+// and whole files, proposed fixes, attachments, snippets and markdown
+// removed. It runs before runs of one tool are merged, since a position and a
+// named starting point mean something only within the run that states them.
 func settle(run obj, at *placer) settled {
 	var out settled
 	driver := child(child(run, "tool"), "driver")
@@ -94,10 +94,21 @@ func settle(run obj, at *placer) settled {
 			out.snippets += dropSnippets(loc)
 			out.markdown += plainMessage(child(loc, "message"))
 		})
+		// An attachment is a file the tool attached, with regions of its
+		// text, and nothing the deployment reads.
+		if _, ok := res["attachments"]; ok {
+			out.attachments += len(items(res, "attachments"))
+			delete(res, "attachments")
+		}
 		for _, flow := range objects(res, "codeFlows") {
 			out.markdown += plainMessage(child(flow, "message"))
 		}
 	}
+	eachRunLocation(run, func(loc obj) {
+		place(loc)
+		out.snippets += dropSnippets(loc)
+		out.markdown += plainMessage(child(loc, "message"))
+	})
 	for _, component := range append([]obj{driver}, extensions...) {
 		for _, rule := range objects(component, "rules") {
 			for _, key := range []string{"shortDescription", "fullDescription", "help"} {
