@@ -77,10 +77,10 @@ and a kind it does not name never reaches it.
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
 | Triage | The findings lists and their counts, one finding's page, assignment and routing, notes on an issue, and disclosure | Vulnerability, entered |
-| Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue and every read of one claim | Vulnerability, entered, analysis |
+| Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue, every read of one claim, and the record of judgments and its file | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the places it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
-| Exports | Every list written out as a file (REQ-50) | Vulnerability, entered |
+| Exports | The findings lists written out as files (REQ-50) | Vulnerability, entered |
 | VEX | The documents stating what affects a build | Vulnerability, entered |
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
@@ -89,8 +89,10 @@ and a kind it does not name never reaches it.
 
 Analysis findings are included by Evidence, Leads and Decisions alone: a
 lead is read through the lead queue, its evidence and the claims about it
-(`DESIGN-analysis.md` § Lead triage). The exports that list leads are **not
-built**; `DESIGN-interface.md` § Static analysis leads holds the screens.
+(`DESIGN-analysis.md` § Lead triage). The record's file follows Decisions and
+includes claims about leads, because it writes what the record shows, under the
+same visibility (REQ-50). A file of the lead queue is **not built**;
+`DESIGN-interface.md` § Static analysis leads holds the screens.
 
 ## Inclusion
 

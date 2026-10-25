@@ -874,6 +874,7 @@ stops is one somebody reads as whole.
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
+| The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50). The findings lists' files include no lead (`DESIGN-kinds.md` § Consumers) |
 
 ## Settings
 
