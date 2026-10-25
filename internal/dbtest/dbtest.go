@@ -992,6 +992,8 @@ var tables = []string{
 	"lead_escalation",
 	// Before product, which it points at.
 	"lead_important_path",
+	// Before person and product, which it points at.
+	"lead_rule",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",

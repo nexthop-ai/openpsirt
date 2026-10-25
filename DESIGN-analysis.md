@@ -6,7 +6,7 @@ build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
 Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
-REQ-28, REQ-30, REQ-42, REQ-43, REQ-66, REQ-69.
+REQ-27, REQ-28, REQ-30, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -387,6 +387,39 @@ on one build, with what fixed it.
 | A lead seen again opens anew at the same place | The matching that finds a closed lead carries the result to its place (§ Carrying) |
 | A claim about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one claim's reads include it; the findings lists do not |
 
+### Dismissal rules
+
+A standing rule dismisses every lead of a product it names, with one reason
+and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
+`…/products/{product}/lead-rules` lists, proposes, approves and retires them.
+
+| A rule names | Covers |
+|---|---|
+| An analyzer rule | Every lead filed under it, compared as the rule's issue is, without regard to capitals |
+| A path | Every lead at or under it, compared as an important path is (§ Escalation) |
+| Both | Every lead of the rule at or under the path |
+
+| State | When | Dismisses |
+|---|---|---|
+| `proposed` | Nobody has approved it | Nothing |
+| `in-force` | Approved, and covering no more than the leads its approver was shown times the growth factor | What it names |
+| `outgrown` | Approved, and covering more than that | What it names, and asks to be approved again |
+| `retired` | Taken out of use | Nothing |
+
+| Rule | |
+|---|---|
+| A rule is proposed by somebody holding `internal-triage` on the product, and approved by somebody else holding `approver` and `internal-read` there | The second person a dismissal has (REQ-24) |
+| A rule names an analyzer rule, a path, or both, and states one of the four reasons and its reasoning | A rule naming neither would dismiss every lead the product has |
+| Its words never change | An approval is of what was read (REQ-28). A rule worded differently is retired and proposed again |
+| Approval records the open leads the rule covers as its approved size | What the approver was shown |
+| The growth factor is `triage.lead-rule-growth`, two where nobody has said | A rule covering ten leads when approved and a thousand later is not what the approver read (REQ-27) |
+| An approval shown no lead is measured as though shown one | A rule approved over an empty path is not outgrown by its first lead |
+| An outgrown rule is approved again at its new size, and a rule in force is refused | Approving again is how the approver reads what it now covers |
+| An outgrown rule keeps dismissing what it names | Withdrawn, every lead it covers would reach the queue at once, which is the noise the rule exists to hold |
+| A rule's coverage counts open leads by place, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
+| Coverage is worked out when it is read | A new lead under a rule in force never reaches the queue |
+| Proposal, approval and retirement are recorded in the administrative trail | As routing rules are |
+
 ### Lead states
 
 A lead's state is worked out when it is read, from its finding, its sighting
@@ -396,13 +429,15 @@ and the claim standing at its place. The evidence of a lead carries it.
 |---|---|
 | Fixed | The finding is closed |
 | Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
+| Dismissed | No claim stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
 | Not reproduced | A comparable run did not see it |
 | Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did, and nothing has escalated it (§ Escalation) |
 | Open | None of the above |
 
 | Rule | |
 |---|---|
-| A standing claim comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
+| A standing claim comes before a standing rule | A judgment about one lead is more specific than one about many |
+| A standing claim or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
 | Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
 | A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
 
@@ -420,7 +455,7 @@ Newest first.
 
 | Rule | |
 |---|---|
-| Every list counts the leads in the scope by state, and the open leads a waiting claim leaves out of the queue | A list that leaves the baseline out says how many it left (REQ-30) |
+| Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves the baseline out says how many it left (REQ-30) |
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
@@ -578,7 +613,7 @@ it is about.
 |---|---|
 | The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
-| Standing rules | Not built |
+| Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
 | Escalation by a second tool reporting the same flaw | Not built. A lead leaves the baseline when somebody pulls it in or its path is important |
 | The queue ordered by what is likely real | Not built. The queue is newest first |
 | Telling anybody a lead was escalated | Not built |

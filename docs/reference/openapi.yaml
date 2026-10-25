@@ -1741,6 +1741,7 @@ components:
             - setting
             - role
             - routing
+            - lead-rule
             - support
             - release
             - credential
@@ -5772,6 +5773,78 @@ components:
         - builds
         - opened
       type: object
+    LeadRuleBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LeadRuleBody.json
+          format: uri
+          readOnly: true
+          type: string
+        approved_at:
+          format: date-time
+          type: string
+        approved_by:
+          description: The person who last approved it
+          format: int64
+          type: integer
+        approved_covering:
+          description: The open leads it covered when last approved
+          format: int64
+          type: integer
+        covering:
+          description: The open leads it names now that you may read, approved or not
+          format: int64
+          type: integer
+        id:
+          format: int64
+          type: integer
+        prefix:
+          description: The path it names, from the top of the checkout. A lead at or under it is covered. Left out, every path
+          type: string
+        proposed_at:
+          format: date-time
+          type: string
+        proposed_by:
+          description: The person who proposed it
+          format: int64
+          type: integer
+        reason:
+          description: Why the leads it covers are dismissed
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
+        reasoning:
+          description: The reasoning, in markdown
+          type: string
+        retired_at:
+          format: date-time
+          type: string
+        rule:
+          description: The analyzer rule it names, as <tool>/<rule>. Left out, every rule
+          type: string
+        state:
+          description: proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown covers more than its approver saw by the deployment's factor and asks to be approved again. retired covers nothing
+          enum:
+            - proposed
+            - in-force
+            - outgrown
+            - retired
+          type: string
+      required:
+        - id
+        - reason
+        - reasoning
+        - proposed_by
+        - proposed_at
+        - covering
+        - state
+      type: object
     LeadsOutputBody:
       additionalProperties: false
       properties:
@@ -5788,6 +5861,10 @@ components:
           type:
             - array
             - "null"
+        ruled:
+          description: Dismissed leads an approved standing rule covers, counted among the dismissed in states
+          format: int64
+          type: integer
         states:
           additionalProperties:
             format: int64
@@ -5807,6 +5884,7 @@ components:
         - total
         - states
         - waiting
+        - ruled
       type: object
     LinkBody:
       additionalProperties: false
@@ -5883,6 +5961,25 @@ components:
         - findings
         - issue_limit
         - place_limit
+      type: object
+    List-lead-rulesResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-lead-rulesResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/LeadRuleBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     List-set-aside-workResponse:
       additionalProperties: false
@@ -8896,6 +8993,39 @@ components:
           type:
             - array
             - "null"
+      type: object
+    Propose-lead-ruleRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Propose-lead-ruleRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        prefix:
+          description: A path from the top of the checkout
+          type: string
+        reason:
+          description: Why the leads it covers are dismissed
+          enum:
+            - false_positive
+            - wont_fix
+            - used_in_tests
+            - mitigated
+          type: string
+        reasoning:
+          description: The reasoning, in markdown
+          minLength: 1
+          type: string
+        rule:
+          description: An analyzer rule, as <tool>/<rule>
+          maxLength: 191
+          type: string
+      required:
+        - reason
+        - reasoning
       type: object
     ProviderBody:
       additionalProperties: false
@@ -13094,6 +13224,7 @@ paths:
               - setting
               - role
               - routing
+              - lead-rule
               - support
               - release
               - credential
@@ -13194,6 +13325,7 @@ paths:
               - setting
               - role
               - routing
+              - lead-rule
               - support
               - release
               - credential
@@ -23781,6 +23913,156 @@ paths:
         any_of:
           - public-triage
           - private-triage
+  /v1/products/{product}/lead-rules:
+    get:
+      description: |-
+        Returns the product's standing rules for static analysis leads, retired ones included, oldest first, each with how many open leads it names now.
+
+        Requires: internal-read or internal-triage on the product
+      operationId: list-lead-rules
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/List-lead-rulesResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List standing rules for leads
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-read
+          - internal-triage
+    post:
+      description: |-
+        Records a rule dismissing every open lead of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`.
+
+        It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
+
+        Requires: internal-triage on the product
+      operationId: propose-lead-rule
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Propose-lead-ruleRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadRuleBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Propose a standing rule for leads
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+  /v1/products/{product}/lead-rules/{id}:
+    delete:
+      description: |-
+        Takes a rule out of use. The leads it covered are open again where nothing else answers them. Recorded in the administrative trail.
+
+        Requires: internal-triage on the product
+      operationId: retire-lead-rule
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retire a standing rule for leads
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+  /v1/products/{product}/lead-rules/{id}/approval:
+    post:
+      description: |-
+        Puts a proposed rule in force, recording how many open leads it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
+
+        Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. Recorded in the administrative trail.
+
+        Requires: approver on the product
+      operationId: approve-lead-rule
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadRuleBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Approve a standing rule for leads
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - approver
   /v1/products/{product}/leads:
     get:
       description: |-
@@ -23788,7 +24070,7 @@ paths:
 
         With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
 
-        `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+        `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-leads

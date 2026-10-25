@@ -38,8 +38,9 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //     what it says about the code under a path prefix.
 //   - A build's node records the repository the build stated a component is
 //     built from.
-//   - A product records the leads somebody pulled into the queue, and the
-//     paths whose leads are in it.
+//   - A product records the leads somebody pulled into the queue, the
+//     paths whose leads are in it, and the standing rules that dismiss
+//     leads.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {

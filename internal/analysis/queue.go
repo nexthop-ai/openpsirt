@@ -54,11 +54,13 @@ type QueueRow struct {
 type Queue struct {
 	Rows  []QueueRow
 	Total int
-	// ByState counts the leads in each state, and Waiting the open ones
-	// whose claim waits for a second person. A lead on two builds in two
-	// states counts in both.
+	// ByState counts the leads in each state, Waiting the open ones whose
+	// claim waits for a second person, and Ruled the dismissed ones a
+	// standing rule covers. A lead on two builds in two states counts in
+	// both, and a lead seen twice in one state counts once.
 	ByState map[State]int
 	Waiting int
+	Ruled   int
 }
 
 // LeadsOf is one page of the leads a product holds open where the subject
@@ -85,6 +87,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 			ColumnExpr(`"f"."id", "f"."place_identity", "f"."opened_at"`).
 			ColumnExpr(state+` AS "stands"`, stateArgs...).
 			ColumnExpr(`CASE WHEN `+waitingClaim+` THEN 1 ELSE 0 END AS "awaits"`, scope.ProductID).
+			ColumnExpr(`CASE WHEN `+ruled+` THEN 1 ELSE 0 END AS "covered"`, scope.ProductID).
 			Where(`"s"."product_id" = ?`, scope.ProductID).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
@@ -106,13 +109,14 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 
 	out := &Queue{ByState: map[State]int{}}
 	var counted []struct {
-		State  State `bun:"stands"`
-		Awaits int   `bun:"awaits"`
-		Leads  int   `bun:"leads"`
+		State   State `bun:"stands"`
+		Awaits  int   `bun:"awaits"`
+		Covered int   `bun:"covered"`
+		Leads   int   `bun:"leads"`
 	}
 	if err := db.NewSelect().TableExpr(`(?) AS "l"`, perFinding()).
-		ColumnExpr(`"l"."stands", "l"."awaits", COUNT(DISTINCT "l"."place_identity") AS "leads"`).
-		GroupExpr(`"l"."stands", "l"."awaits"`).
+		ColumnExpr(`"l"."stands", "l"."awaits", "l"."covered", COUNT(DISTINCT "l"."place_identity") AS "leads"`).
+		GroupExpr(`"l"."stands", "l"."awaits", "l"."covered"`).
 		Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("count the leads of product %d: %w", scope.ProductID, err)
 	}
@@ -120,6 +124,9 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		out.ByState[c.State] += c.Leads
 		if c.State == Open && c.Awaits == 1 {
 			out.Waiting += c.Leads
+		}
+		if c.State == Dismissed && c.Covered == 1 {
+			out.Ruled += c.Leads
 		}
 	}
 	if err := listed(db.NewSelect().TableExpr(`(?) AS "l"`, perFinding())).

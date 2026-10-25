@@ -56,14 +56,16 @@ var escalated = `(EXISTS (SELECT 1 FROM "lead_escalation" AS "le"
 // "si" and result under "ar", in the product bound, as an expression, with
 // what it binds.
 //
-// A standing claim comes before absence: a dismissed lead a run does not see
-// stays dismissed and records the absence. Absence comes before the
+// A standing claim comes before a standing rule, which comes before absence:
+// a dismissed lead a run does not see stays dismissed and records the
+// absence. Absence comes before the
 // baseline, because a baseline lead nobody sees is no longer anything to work.
 func stateOf(productID int64) (string, []any) {
 	return `CASE
 		WHEN "f"."closed_at" IS NOT NULL THEN '` + string(Fixed) + `'
 		WHEN ` + standingOutcome + ` IS NOT NULL THEN ` + standingOutcome + `
+		WHEN ` + ruled + ` THEN '` + string(Dismissed) + `'
 		WHEN "si"."absent_run_id" IS NOT NULL THEN '` + string(NotReproduced) + `'
 		WHEN "si"."baseline" = TRUE AND NOT ` + escalated + ` THEN '` + string(Baseline) + `'
-		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID}
+		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID, productID}
 }

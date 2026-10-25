@@ -629,6 +629,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
   setting: "Settings",
   role: "Roles",
   routing: "Routing rules",
+  "lead-rule": "Standing rules",
   support: "Support dates",
   release: "Release dates",
   credential: "Keys and tokens",

@@ -126,6 +126,12 @@ func NoSuchRule() error {
 	return huma.Error404NotFound("no routing rule is recorded there")
 }
 
+// NoSuchLeadRule answers a standing rule for leads nobody proposed, one
+// retired already, and one belonging to another product.
+func NoSuchLeadRule() error {
+	return huma.Error404NotFound("no standing rule is in use there")
+}
+
 func NoSuchAssessment() error {
 	return huma.Error404NotFound("no assessment is recorded there")
 }

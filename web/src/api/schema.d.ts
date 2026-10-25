@@ -3390,6 +3390,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/lead-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List standing rules for leads
+         * @description Returns the product's standing rules for static analysis leads, retired ones included, oldest first, each with how many open leads it names now.
+         *
+         *     Requires: internal-read or internal-triage on the product
+         */
+        get: operations["list-lead-rules"];
+        put?: never;
+        /**
+         * Propose a standing rule for leads
+         * @description Records a rule dismissing every open lead of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`.
+         *
+         *     It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["propose-lead-rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/lead-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a standing rule for leads
+         * @description Takes a rule out of use. The leads it covered are open again where nothing else answers them. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        delete: operations["retire-lead-rule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/lead-rules/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a standing rule for leads
+         * @description Puts a proposed rule in force, recording how many open leads it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
+         *
+         *     Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. Recorded in the administrative trail.
+         *
+         *     Requires: approver on the product
+         */
+        post: operations["approve-lead-rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/leads": {
         parameters: {
             query?: never;
@@ -3403,7 +3479,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in or its path is marked important. `state` lists the leads in one state instead, which is how the baseline is searched.
          *
-         *     `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *     `states` counts every open lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -7531,7 +7607,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -9811,6 +9887,58 @@ export interface components {
             /** @description The variant of that build */
             variant: string;
         };
+        LeadRuleBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadRuleBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            approved_at?: string;
+            /**
+             * Format: int64
+             * @description The person who last approved it
+             */
+            approved_by?: number;
+            /**
+             * Format: int64
+             * @description The open leads it covered when last approved
+             */
+            approved_covering?: number;
+            /**
+             * Format: int64
+             * @description The open leads it names now that you may read, approved or not
+             */
+            covering: number;
+            /** Format: int64 */
+            id: number;
+            /** @description The path it names, from the top of the checkout. A lead at or under it is covered. Left out, every path */
+            prefix?: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /**
+             * Format: int64
+             * @description The person who proposed it
+             */
+            proposed_by: number;
+            /**
+             * @description Why the leads it covers are dismissed
+             * @enum {string}
+             */
+            reason: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown */
+            reasoning: string;
+            /** Format: date-time */
+            retired_at?: string;
+            /** @description The analyzer rule it names, as <tool>/<rule>. Left out, every rule */
+            rule?: string;
+            /**
+             * @description proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown covers more than its approver saw by the deployment's factor and asks to be approved again. retired covers nothing
+             * @enum {string}
+             */
+            state: "proposed" | "in-force" | "outgrown" | "retired";
+        };
         LeadsOutputBody: {
             /**
              * Format: uri
@@ -9819,6 +9947,11 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadRowBody"][] | null;
+            /**
+             * Format: int64
+             * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
+             */
+            ruled: number;
             /** @description The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both */
             states: {
                 [key: string]: number;
@@ -9874,6 +10007,15 @@ export interface components {
             place_limit: number;
             /** Format: int64 */
             total: number;
+        };
+        "List-lead-rulesResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-lead-rulesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadRuleBody"][] | null;
         };
         "List-set-aside-workResponse": {
             /**
@@ -11534,6 +11676,25 @@ export interface components {
             branches?: components["schemas"]["Branch"][] | null;
             full_product_names?: components["schemas"]["Named"][] | null;
             relationships?: components["schemas"]["Relationship"][] | null;
+        };
+        "Propose-lead-ruleRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Propose-lead-ruleRequest.json
+             */
+            readonly $schema?: string;
+            /** @description A path from the top of the checkout */
+            prefix?: string;
+            /**
+             * @description Why the leads it covers are dismissed
+             * @enum {string}
+             */
+            reason: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown */
+            reasoning: string;
+            /** @description An analyzer rule, as <tool>/<rule> */
+            rule?: string;
         };
         ProviderBody: {
             /** @description The segment in the sign-in path */
@@ -13957,7 +14118,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -13997,7 +14158,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -19438,6 +19599,134 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-lead-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-rulesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "propose-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Propose-lead-ruleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "approve-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
             };
             /** @description Error */
             default: {

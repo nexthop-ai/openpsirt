@@ -204,6 +204,7 @@ type leadsListed struct {
 	Total   int            `json:"total"`
 	States  map[string]int `json:"states"`
 	Waiting int            `json:"waiting"`
+	Ruled   int            `json:"ruled"`
 }
 
 func leadsOf(t *testing.T, r *httpapitest.Reach, who, query string) leadsListed {

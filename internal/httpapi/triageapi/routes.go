@@ -33,6 +33,7 @@ func Register(api huma.API, in core.Deps) {
 	registerLeadFixed(api, in)
 	registerLeadEscalation(api, in)
 	registerImportantPaths(api, in)
+	registerLeadRules(api, in)
 	registerPlaceDecisions(api, in)
 	registerElsewhere(api, in)
 	registerReachAcross(api, in)

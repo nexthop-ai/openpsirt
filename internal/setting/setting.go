@@ -127,6 +127,10 @@ const (
 	// one carried or re-confirmed that goes back to an approver. It counts
 	// issues rather than places, because issues are what a reviewer reads.
 	ReviewIssues = "triage.review-issues"
+	// LeadRuleGrowth is how many times the leads its approver was shown a
+	// standing rule may cover before it asks to be approved again. A rule
+	// covering far more than it did is no longer what somebody agreed to.
+	LeadRuleGrowth = "triage.lead-rule-growth"
 	// AgreedIssues is how many issues one re-confirmation may answer where
 	// nothing in it goes back to an approver: every row carries an agreement
 	// already given, so nobody is asked to read anything new.
@@ -407,6 +411,10 @@ const DefaultTogetherCap = 2000
 // one act where nobody has said. A kernel answer over 805 issues is five acts
 // at this.
 const DefaultReviewIssues = 200
+
+// DefaultLeadRuleGrowth is how far a standing rule may grow past what its
+// approver was shown, where nobody has said: twice.
+const DefaultLeadRuleGrowth = 2
 
 // DefaultAgreedIssues is how many issues one re-confirmation of answers
 // already agreed to may cover where nobody has said.

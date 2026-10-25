@@ -145,6 +145,7 @@ func statedVocabularies() map[string][]string {
 		"outcomes about a vulnerability": words(triage.VulnerabilityOutcomes()),
 		"reasons a lead is dismissed":    words(triage.LeadReasons()),
 		"lead states":                    words(analysis.States()),
+		"standing rule states":           words(analysis.RuleStates()),
 		"statement scopes":               words(triage.Scopes()),
 		"roles":                          words(access.Roles()),
 		"roles and rights":               append(words(access.Roles()), words(access.OverTheDeployment())...),

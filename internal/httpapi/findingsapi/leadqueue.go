@@ -38,6 +38,7 @@ type LeadsOutput struct {
 		// baseline out says how much it left (REQ-30).
 		States  map[string]int `json:"states" doc:"The open leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
+		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
 	}
 }
 
@@ -53,7 +54,8 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"marked important. `state` lists the leads in one state instead, which is how the " +
 			"baseline is searched.\n\n" +
 			"`states` counts every open lead in the scope by state and `waiting` the open ones " +
-			"left out for a waiting claim, so what the list leaves out is counted. " +
+			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
+			"so what the list leaves out is counted. " +
 			"`stream` and `variant` are optional and independent. Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
@@ -80,7 +82,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			return nil, core.Refused(in.Logger, err, "cannot read the leads")
 		}
 		out := &LeadsOutput{}
-		out.Body.Total, out.Body.Waiting = queue.Total, queue.Waiting
+		out.Body.Total, out.Body.Waiting, out.Body.Ruled = queue.Total, queue.Waiting, queue.Ruled
 		out.Body.States = map[string]int{}
 		for state, n := range queue.ByState {
 			out.Body.States[string(state)] = n

@@ -42,17 +42,51 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "lead_important_path_unique" UNIQUE ("product_id", "prefix_identity"),
 			CONSTRAINT "lead_important_path_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,
+
+		// A standing rule dismissing every lead of an analyzer rule, every
+		// lead under a path, or both. It covers nothing until somebody other
+		// than its author approves it, and its words never change: a rule
+		// worded differently is retired and proposed again.
+		`CREATE TABLE "lead_rule" (
+			"id"                ` + t.id + `,
+			"product_id"        ` + t.ref + ` NOT NULL,
+			-- The analyzer rule, as <tool>/<rule>, and folded as a rule's
+			-- issue is. Null where the rule names a path alone.
+			"rule"              ` + t.name + `,
+			"rule_folded"       ` + t.name + `,
+			-- Null where the rule names an analyzer rule alone. Held and
+			-- compared as an important path is.
+			"prefix"            ` + t.free + `,
+			"under"             ` + t.free + `,
+			"under_length"      INTEGER,
+			"reason"            ` + t.kind + ` NOT NULL,
+			"reasoning"         ` + t.text + ` NOT NULL,
+			"proposed_by"       ` + t.ref + ` NOT NULL,
+			"proposed_at"       ` + t.timestamp + ` NOT NULL,
+			"approved_by"       ` + t.refNull + `,
+			"approved_at"       ` + t.timestamp + `,
+			-- The leads it covered when approved, which is what the approver
+			-- read.
+			"approved_covering" INTEGER,
+			"retired_by"        ` + t.refNull + `,
+			"retired_at"        ` + t.timestamp + `,
+			CONSTRAINT "lead_rule_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "lead_rule_proposed_by_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
+			CONSTRAINT "lead_rule_approved_by_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id"),
+			CONSTRAINT "lead_rule_retired_by_fk" FOREIGN KEY ("retired_by") REFERENCES "person"("id")
+		)` + t.suffix,
+		`CREATE INDEX "lead_rule_product_idx" ON "lead_rule" ("product_id")`,
 	}
 }
 
-// createLeadV0110 makes the escalation tables, stepped over where they are
+// createLeadV0110 makes the escalation and standing rule tables, stepped over where they are
 // already there.
 func createLeadV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	for _, table := range []string{"lead_escalation", "lead_important_path"} {
+	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule"} {
 		present, err := u.hasColumn(table, "id")
 		if err != nil {
 			return err
