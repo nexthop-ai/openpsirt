@@ -14,7 +14,7 @@
         <link rel="prev" href="../trying/">
       
       
-        <link rel="next" href="../vendor-release/">
+        <link rel="next" href="../analysis/">
       
       
         
@@ -496,6 +496,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analyzer results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../vendor-release/" class="md-nav__link">
         
   
@@ -781,8 +808,9 @@
 
 
 <h1 id="build-pipelines">Build pipelines<a class="headerlink" href="#build-pipelines" title="Permanent link">&para;</a></h1>
-<p>What a build pipeline does, end to end. Everything here is one HTTP request;
-there is no client to install and no agent to run.</p>
+<p>What a build pipeline does, end to end. An inventory is one HTTP request;
+there is no client to install and no agent to run. A static analyzer's run is
+sent with the upload client, as <a href="../analysis/">Analyzer results</a> describes.</p>
 <p>The short version: declare what you ship once, mint a key once, and post the
 inventory on every build.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
