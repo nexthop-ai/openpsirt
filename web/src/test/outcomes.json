@@ -54,5 +54,26 @@
     "dated": true,
     "needs_justification": false,
     "dismisses": false
+  },
+  {
+    "outcome": "dismissed",
+    "hides_risk": true,
+    "dated": false,
+    "needs_justification": true,
+    "dismisses": false
+  },
+  {
+    "outcome": "not-security",
+    "hides_risk": true,
+    "dated": false,
+    "needs_justification": false,
+    "dismisses": false
+  },
+  {
+    "outcome": "confirmed",
+    "hides_risk": false,
+    "dated": false,
+    "needs_justification": false,
+    "dismisses": false
   }
 ]

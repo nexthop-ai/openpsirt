@@ -562,14 +562,20 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 
 // MayApprove is who may agree to somebody else's claim at one visibility: the
 // right to read there, and either the approver capability or the right to
-// triage there.
+// triage there. At internal visibility it is the capability alone beside the
+// reading: a claim there is about a lead, and a dismissed lead is a result
+// nobody acts on again, so its second person is somebody granted the right to
+// agree.
 //
 // The approver capability grants no reading of its own, so reading is asked
-// alongside it. A triager may approve too: the control that matters is that
-// claimant and approver are different people, which is checked separately.
-// The one spelling of the rule, for a signed-in subject and for the sweeps that
-// work out who to tell.
-func MayApprove(approver, reads, triages bool) bool {
+// alongside it. A triager may approve disclosed and undisclosed work too: the
+// control that matters is that claimant and approver are different people,
+// which is checked separately. The one spelling of the rule, for a signed-in
+// subject and for the sweeps that work out who to tell.
+func MayApprove(visibility Visibility, approver, reads, triages bool) bool {
+	if visibility == Internal {
+		return reads && approver
+	}
 	return reads && (approver || triages)
 }
 

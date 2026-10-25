@@ -24,6 +24,7 @@ import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./InboxRuling";
 import { allFindingsAt, claimAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
+import { reasonSaid } from "./leads";
 
 // The share of the record one page holds. The server's own ceiling is two
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -48,6 +49,9 @@ const OUTCOME_SAID: Record<Outcome, string> = {
   "upgrade-needed": "upgrade planned",
   "patch-needed": "backport planned",
   affected: "affected",
+  dismissed: "lead",
+  "not-security": "lead, not a security issue",
+  confirmed: "lead confirmed",
 };
 
 // The outcomes as the filter offers them, a dismissal named as one.
@@ -177,7 +181,8 @@ export function TheRecord() {
   // would be telling an auditor a control had failed when it had not.
   // The exception report is asked of dismissals alone: asked of everything it
   // returns a large and entirely legitimate population.
-  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.dismisses(each));
+  // A lead's dismissal counts here: it always needs a second person too.
+  const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.alwaysGated(each));
   const asked = [
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),
@@ -626,6 +631,7 @@ const CHANGE_SAID: Record<ChangeKind, string> = {
   setting: "Settings",
   role: "Roles",
   routing: "Routing rules",
+  "lead-rule": "Standing rules",
   support: "Support dates",
   release: "Release dates",
   credential: "Keys and tokens",
@@ -709,6 +715,7 @@ function Judgment({ row, states }: { row: Judged; states: string[] }) {
               <Because code={row.justification} />
             </span>
           )}
+          {row.reason && <span className="why">{reasonSaid(row.reason)}</span>}
         </span>
         <span className={`state ${stands ? "agreed" : "open"}`}>
           {stands ? "stands" : row.state}

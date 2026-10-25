@@ -13,7 +13,12 @@
 // judgment made about a leaf.
 package triage
 
-import "github.com/nexthop-ai/openpsirt/internal/finding"
+import (
+	"slices"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+)
 
 // Outcome is what somebody decided about a finding. Each word is declared
 // from the findings package's spelling, which asks about several of them in
@@ -74,12 +79,43 @@ const (
 	// carries and says what it resolves, so the finding goes without the
 	// version moving, which no version comparison could have seen.
 	PatchNeeded Outcome = finding.OutcomePatchNeeded
+
+	// Dismissed means a lead is not a flaw to act on, for the reason stated:
+	// a false positive, a flaw that will not be fixed, code used only in
+	// tests, or one already mitigated.
+	Dismissed Outcome = finding.OutcomeDismissed
+	// NotSecurity means a lead is real and harmless: a crash on a path no
+	// input reaches, a leak in a tool that exits.
+	NotSecurity Outcome = finding.OutcomeNotSecurity
+	// Confirmed means a lead is a real flaw. It takes nothing out of anybody's
+	// work, so it waits on nobody.
+	Confirmed Outcome = finding.OutcomeConfirmed
 )
 
-// Outcomes are all of them, in the order a person meets them.
+// Outcomes are all of them, in the order a person meets them: the ones about
+// a vulnerability, then the ones about a lead.
 func Outcomes() []Outcome {
+	return append(VulnerabilityOutcomes(), LeadOutcomes()...)
+}
+
+// VulnerabilityOutcomes are the outcomes a claim about a finding of the
+// vulnerability and entered kinds records.
+func VulnerabilityOutcomes() []Outcome {
 	return []Outcome{Affected, NotApplicable, Mismatched, Deferred, WontFix,
 		AlreadyFixed, UpgradeNeeded, PatchNeeded}
+}
+
+// LeadOutcomes are the outcomes a claim about a lead records. A lead is an
+// analyzer's guess, so what is asked of it is whether it is real, and none of
+// the vulnerability outcomes, which are about how a known issue applies, fits.
+func LeadOutcomes() []Outcome { return []Outcome{Dismissed, NotSecurity, Confirmed} }
+
+// OutcomesFor are the outcomes a claim about a finding of this kind records.
+func OutcomesFor(k kind.Kind) []Outcome {
+	if k == kind.Analysis {
+		return LeadOutcomes()
+	}
+	return VulnerabilityOutcomes()
 }
 
 // OutcomesOneAtATime are the outcomes one act may record against one finding.
@@ -88,8 +124,8 @@ func Outcomes() []Outcome {
 // written from the upgrade that promises it, so offering it here would be a
 // second way to record the same thing with no upgrade behind it.
 func OutcomesOneAtATime() []Outcome {
-	kept := make([]Outcome, 0, len(Outcomes()))
-	for _, each := range Outcomes() {
+	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
+	for _, each := range VulnerabilityOutcomes() {
 		if each != UpgradeNeeded {
 			kept = append(kept, each)
 		}
@@ -103,8 +139,8 @@ func OutcomesOneAtATime() []Outcome {
 // issue, a party and a date the work lands by, and a bulk write names none of
 // those.
 func OutcomesInBulk() []Outcome {
-	kept := make([]Outcome, 0, len(Outcomes()))
-	for _, each := range Outcomes() {
+	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
+	for _, each := range VulnerabilityOutcomes() {
 		if !each.Commits() {
 			kept = append(kept, each)
 		}
@@ -115,8 +151,8 @@ func OutcomesInBulk() []Outcome {
 // OutcomesThatHideRisk are the outcomes that take something out of the working
 // queue, which is what needing a second person turns on.
 func OutcomesThatHideRisk() []Outcome {
-	kept := make([]Outcome, 0, len(Outcomes()))
-	for _, each := range Outcomes() {
+	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
+	for _, each := range VulnerabilityOutcomes() {
 		if each.HidesRisk() {
 			kept = append(kept, each)
 		}
@@ -137,15 +173,26 @@ func OutcomesThatHideRisk() []Outcome {
 // wherever it is asked, an outcome added to some of those sites and not the
 // others goes quietly uncounted — which is a condition reporting that a
 // control held.
+//
+// The vulnerability outcomes alone: the reports counting dismissals read the
+// vulnerability kinds. Approval quality reads lead claims too, and asks what
+// always needs a second person rather than this.
 func OutcomesDismissing() []Outcome {
-	kept := make([]Outcome, 0, len(Outcomes()))
-	for _, each := range Outcomes() {
-		if each.HidesRisk() && !each.Dated() {
+	kept := make([]Outcome, 0, len(VulnerabilityOutcomes()))
+	for _, each := range VulnerabilityOutcomes() {
+		if each.Dismisses() {
 			kept = append(kept, each)
 		}
 	}
 	return kept
 }
+
+// Dismisses reports whether this outcome claims no further work is needed
+// about a vulnerability: it hides risk and carries no date that something
+// later checks. A lead's outcomes dismiss nothing the dismissal counts read,
+// because those read the vulnerability kinds alone. Approval quality reads
+// lead claims and files a lead's dismissal standing alone with these.
+func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.
 func (o Outcome) Valid() bool {
@@ -170,7 +217,10 @@ func (o Outcome) Valid() bool {
 // sits rather than whether there is one — a commitment inside the deadline
 // already set for the work is ordinary triage, and one past it is deferring
 // the worst thing it covers. See NeedsApproval.
-func (o Outcome) HidesRisk() bool { return o != Affected }
+//
+// Confirming a lead hides nothing either: it says the flaw is real, and the
+// work it leads to is recording it.
+func (o Outcome) HidesRisk() bool { return o != Affected && o != Confirmed }
 
 // Commits reports whether this outcome is a promise to act by a date.
 //
@@ -197,7 +247,16 @@ func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 // outcome is a judgment made under the versions it was made against, and a
 // judgment about risk that outlived them would be the bump at the top of a
 // build failing to re-open a question somebody has to answer again.
-func (o Outcome) StandsAtAnyVersion() bool { return o == Mismatched }
+//
+// Every outcome about a lead does too. A lead's place is the lead, carried by
+// matching rather than by versions, and what weakens a judgment about one is a
+// pairing that is only probable (`DESIGN-analysis.md` § Lead triage).
+func (o Outcome) StandsAtAnyVersion() bool {
+	return slices.Contains(finding.AnyVersionOutcomes(), string(o))
+}
+
+// AboutALead reports whether this is an outcome a claim about a lead records.
+func (o Outcome) AboutALead() bool { return slices.Contains(LeadOutcomes(), o) }
 
 // NeedsJustification reports whether this outcome says which recognized reason
 // applies, which is a claim two of them make.
@@ -206,8 +265,12 @@ func (o Outcome) StandsAtAnyVersion() bool { return o == Mismatched }
 // applies is the whole of what each says. The rest are claims about priority
 // or about work, and a reason on one of those states something the claim does
 // not make.
+//
+// A dismissed lead states its reason too, from the vocabulary LeadReasons
+// holds: a dismissal nobody can review is the one a second person cannot
+// agree to.
 func (o Outcome) NeedsJustification() bool {
-	return o == NotApplicable || o == Mismatched
+	return o == NotApplicable || o == Mismatched || o == Dismissed
 }
 
 // Justification is why something does not affect us.
@@ -265,6 +328,27 @@ func JustificationsCorrecting() []Justification {
 		}
 	}
 	return kept
+}
+
+// LeadReason is why a lead is dismissed. The words start from the ones code
+// scanning services offer, and a claim stores one where a vulnerability claim
+// stores its justification.
+type LeadReason string
+
+const (
+	// FalsePositive means the analyzer is wrong: the flaw is not there.
+	FalsePositive LeadReason = "false_positive"
+	// WillNotFix means the flaw is there and will not be fixed.
+	WillNotFix LeadReason = "wont_fix"
+	// UsedInTests means the code is only used in tests and does not ship.
+	UsedInTests LeadReason = "used_in_tests"
+	// Mitigated means something already in place stops it.
+	Mitigated LeadReason = "mitigated"
+)
+
+// LeadReasons are the reasons a dismissed lead may state.
+func LeadReasons() []LeadReason {
+	return []LeadReason{FalsePositive, WillNotFix, UsedInTests, Mitigated}
 }
 
 // Justifications are the recognized categories.

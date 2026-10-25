@@ -248,6 +248,8 @@ const UNDER_PRODUCT: { shape: string; carries: "nothing" | "stream" | "tail" }[]
   { shape: ROUTES.inventoryComparison, carries: "tail" },
   { shape: ROUTES.inbox, carries: "tail" },
   { shape: ROUTES.inboxReport, carries: "nothing" },
+  { shape: ROUTES.leads, carries: "tail" },
+  { shape: ROUTES.leadRules, carries: "tail" },
   { shape: ROUTES.productComponent, carries: "nothing" },
   { shape: ROUTES.product, carries: "tail" },
 ];

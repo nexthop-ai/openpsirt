@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"sort"
 	"strings"
 
@@ -43,10 +42,10 @@ type CanBody struct {
 	TriagesInternal   bool   `json:"triages_internal" doc:"Argue about an internal finding"`
 	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
 	MayHide           bool   `json:"may_hide" doc:"Triage a private finding, which nobody has disclosed"`
-	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
+	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's claim there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override"`
 	AgreesPublic      bool   `json:"agrees_public" doc:"Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"`
 	AgreesPrivate     bool   `json:"agrees_private" doc:"Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"`
-	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage"`
+	AgreesInternal    bool   `json:"agrees_internal" doc:"Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability"`
 	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
@@ -67,7 +66,7 @@ type OutcomeBody struct {
 	HidesRisk          bool         `json:"hides_risk" doc:"Whether recording it takes the issue out of the working queue"`
 	Dated              bool         `json:"dated" doc:"Whether it stores a date: when somebody looks again, or when promised work lands"`
 	NeedsJustification bool         `json:"needs_justification" doc:"Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one"`
-	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count"`
+	Dismisses          bool         `json:"dismisses" doc:"Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a lead"`
 }
 
 // WhoBody is the caller, as the caller.
@@ -207,11 +206,10 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			// first, so an interface drawing the control from this would
 			// offer an action that always fails.
 			triages := subject.TriagesIn(product.ID)
-			// Asked at one visibility, as approving a claim is: reading it,
-			// and the capability or triage there.
+			// Asked at one visibility, as approving a claim is.
 			agrees := func(v access.Visibility) bool {
-				return subject.Reads(v, product.ID) &&
-					(subject.Holds(access.Approver, product.ID) || subject.Triages(v, product.ID))
+				return access.MayApprove(v, subject.Holds(access.Approver, product.ID),
+					subject.Reads(v, product.ID), subject.Triages(v, product.ID))
 			}
 			mayAgree := false
 			for _, v := range access.Visibilities() {
@@ -260,7 +258,7 @@ func outcomeBodies() []OutcomeBody {
 		out = append(out, OutcomeBody{
 			Outcome: core.Outcome(each), HidesRisk: each.HidesRisk(), Dated: each.Dated(),
 			NeedsJustification: each.NeedsJustification(),
-			Dismisses:          slices.Contains(triage.OutcomesDismissing(), each),
+			Dismisses:          each.Dismisses(),
 		})
 	}
 	return out

@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,7 +30,7 @@ type liveDecision struct {
 }
 
 // anyVersion is whether the claim stands at whatever versions the place holds.
-func (d liveDecision) anyVersion() bool { return d.Outcome == OutcomeMismatched }
+func (d liveDecision) anyVersion() bool { return slices.Contains(AnyVersionOutcomes(), d.Outcome) }
 
 // outranks is whether one decision has more standing than another: approved
 // over proposed, and otherwise the newer.

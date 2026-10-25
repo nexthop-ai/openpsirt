@@ -30,6 +30,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // sent is one result as a document states it: a rule, a file under a
@@ -785,6 +786,51 @@ func TestTheFirstRunOnABranchTakesThePlacesOfTheLineItWasCutFrom(t *testing.T) {
 	})
 }
 
+func TestADismissalLapsesOnABranchItsLeadIsCarriedToProbably(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		tag := w.TargetFor(w.Tag, w.Customer)
+		w.inventory(t, w.Target.ID)
+		w.inventory(t, tag.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		lead := w.leads(t, w.Target.ID)[0]
+
+		// An approved dismissal at the lead's place.
+		by, err := access.NewStore(w.DB.DB).Ensure(ctx, "analyst@example.com", "analyst", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reason := string(triage.FalsePositive)
+		at := start.Add(time.Minute).Truncate(time.Microsecond)
+		claim := &triage.Claim{Kind: triage.FindingClaim, ProposedBy: by.ID, ProposedAt: at,
+			Outcome: triage.Dismissed, Justification: &reason}
+		if _, err := w.DB.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		live := "live-dismissal"
+		decided := &triage.Decision{ClaimID: claim.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
+			PlaceIdentity: lead.PlaceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
+			NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
+		if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// The tag's first run carries the lead from the branch on its
+		// nearest line, which is probable.
+		moved := inFRR
+		moved.line += 3
+		w.send(t, tag.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+		var after triage.Decision
+		if err := w.DB.DB.NewSelect().Model(&after).Where(`"de"."id" = ?`, decided.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if after.State != triage.LapsedState {
+			t.Errorf("the dismissal of a lead carried probably is %q; want it lapsed", after.State)
+		}
+	})
+}
+
 func TestALaterRunOnABranchTakesNothingFromTheLineItWasCutFrom(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		tag := w.TargetFor(w.Tag, w.Customer)
@@ -1023,6 +1069,27 @@ func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
 		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &lead, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
 			t.Errorf("an internal reader was answered %+v, %v; want the lead's place", got.At, err)
+		}
+	})
+}
+
+func TestAProductsImportantPathsAreReadAndSetOnlyWhereTheSubjectMay(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		public := w.holding(t, "public", access.PrivateTriage)
+		reader := w.holding(t, "analyst", access.InternalRead)
+		triager := w.holding(t, "lead", access.InternalTriage)
+		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, reader, w.Product.ID, []string{"src"}); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody reading internal findings set the important paths: %v", err)
+		}
+		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, triager, w.Product.ID, []string{"src"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ImportantPaths(ctx, w.DB.DB, public, w.Product.ID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody reading no internal findings read the important paths: %v", err)
+		}
+		if got, err := ImportantPaths(ctx, w.DB.DB, reader, w.Product.ID); err != nil || len(got) != 1 || got[0] != "src" {
+			t.Errorf("an internal reader read %v, %v; want the path set", got, err)
 		}
 	})
 }

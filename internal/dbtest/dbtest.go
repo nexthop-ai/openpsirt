@@ -988,6 +988,12 @@ var tables = []string{
 	"advisory",
 	// Before person, which it points at.
 	"outbound",
+	// Before person and product, which it points at.
+	"lead_escalation",
+	// Before product, which it points at.
+	"lead_important_path",
+	// Before person and product, which it points at.
+	"lead_rule",
 	// Before team and person, both of which they point at.
 	"team_member",
 	"team",
@@ -1021,6 +1027,8 @@ var tables = []string{
 	"vulnerability_alias",
 	"vulnerability_weakness",
 	"vulnerability_rating",
+	"rule_rating",
+	"rule_family",
 	"vulnerability",
 	"scan_document_chunk",
 	"scan_document",

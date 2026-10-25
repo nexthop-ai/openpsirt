@@ -2896,6 +2896,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a product's important paths
+         * @description Returns the path prefixes whose leads are in the queue from their first run, in order.
+         *
+         *     Requires: internal-read or internal-triage on the product
+         */
+        get: operations["get-important-paths"];
+        /**
+         * Set a product's important paths
+         * @description Replaces the path prefixes whose leads are in the queue from their first run. A lead in the baseline at or under one enters the queue at once, and leaves it again where its path is taken off.
+         *
+         *     Refused, naming the path, where one is empty, climbs out of the checkout or is named twice. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        put: operations["set-important-paths"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}": {
         parameters: {
             query?: never;
@@ -3354,6 +3384,130 @@ export interface paths {
          *     Requires: public-triage or private-triage on the product
          */
         post: operations["acknowledge-report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/lead-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List standing rules for leads
+         * @description Returns the product's standing rules for static analysis leads, retired ones included, oldest first, each with how many open leads it names now.
+         *
+         *     Requires: internal-read or internal-triage on the product
+         */
+        get: operations["list-lead-rules"];
+        put?: never;
+        /**
+         * Propose a standing rule for leads
+         * @description Records a rule dismissing every open lead of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule finds memory safety or injection flaws, or where no analyzer has reported it.
+         *
+         *     It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["propose-lead-rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/lead-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a standing rule for leads
+         * @description Takes a rule out of use. The leads it covered are open again where nothing else answers them. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        delete: operations["retire-lead-rule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/lead-rules/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a standing rule for leads
+         * @description Puts a proposed rule in force, recording how many open leads it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
+         *
+         *     Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. A rule with no path is refused with 422 where its analyzer rule has since been found to find memory safety or injection flaws. Recorded in the administrative trail.
+         *
+         *     Requires: approver on the product
+         */
+        post: operations["approve-lead-rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List static analysis leads
+         * @description Returns one row per lead the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
+         *
+         *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
+         *
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads/{place}/escalation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull a lead into the queue
+         * @description Takes a lead out of the baseline and into the queue on every build of the product it is on. A lead already pulled in keeps when it first was, and a lead not in the baseline is unchanged.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["escalate-lead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4586,6 +4740,56 @@ export interface paths {
         get: operations["get-lead-evidence"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a triage decision for a lead
+         * @description Records what a lead is: `dismissed`, `not-security` or `confirmed`.
+         *
+         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
+         *
+         *     The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["decide-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a lead as fixed
+         * @description Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
+         *
+         *     A lead seen again opens anew at the same place.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["fix-lead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7247,13 +7451,13 @@ export interface components {
             version: string;
         };
         CanBody: {
-            /** @description Agree to somebody else's claim about internal findings, or send it back: reading them, with the approver capability or internal-triage */
+            /** @description Agree to somebody else's claim about internal findings or a standing rule over them, or send it back: reading them, with the approver capability */
             agrees_internal: boolean;
             /** @description Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage */
             agrees_private: boolean;
             /** @description Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage */
             agrees_public: boolean;
-            /** @description Agree to somebody else's claim, or send it back, at any visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
+            /** @description Agree to somebody else's claim, or send it back, at any visibility. The approver capability, or a triage role on disclosed or undisclosed work — a triager may answer somebody else's claim there, which is the ordinary shape of a small team; internal work takes the capability. That the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
             may_approve_rulings: boolean;
@@ -7403,7 +7607,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+            kind: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -7558,6 +7762,8 @@ export interface components {
              * @enum {string}
              */
             happened: "waiting" | "sent-back" | "approved" | "withdrawn" | "lapsed" | "undone" | "mixed";
+            /** @description At least one row is about internal material, a static analysis lead. Agreeing to it takes the approver capability */
+            internal?: boolean;
             /**
              * Format: int64
              * @description The number of distinct issues it covers
@@ -8020,12 +8226,17 @@ export interface components {
              * @description The outcome
              * @enum {string}
              */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description The number of findings this decision covers
              */
             places?: number;
+            /**
+             * @description Why a lead was dismissed. Ignored in a request
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The reasoning, in markdown. Somebody else has to agree with this */
             reasoning: string;
             /**
@@ -8274,7 +8485,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             proposed_at: string;
             /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
@@ -8315,7 +8526,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The product it was decided in */
             product: string;
             /** @description The reasoning, in markdown. Empty where you may read only some of the places the claim covers */
@@ -8894,6 +9105,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        "Fix-leadRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Fix-leadRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What fixed it, in markdown */
+            because: string;
+        };
         FixBody: {
             /**
              * Format: uri
@@ -9033,7 +9254,7 @@ export interface components {
              */
             covers_now: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
         };
         "Hand-back-assignmentsRequest": {
             /**
@@ -9122,6 +9343,16 @@ export interface components {
         };
         IdentificationHelper: {
             purl?: string;
+        };
+        ImportantPathsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ImportantPathsBody.json
+             */
+            readonly $schema?: string;
+            /** @description Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run */
+            paths: string[] | null;
         };
         Info: {
             /**
@@ -9323,13 +9554,18 @@ export interface components {
             /** @description The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
             proposed_at: string;
             proposed_by: string;
+            /**
+             * @description Why a lead was dismissed, on a judgment about a lead, which states no justification
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart. Empty where you may read only some of the places the claim covers */
             reasoning: string;
             /**
@@ -9384,7 +9620,7 @@ export interface components {
             /** @description The mitigation a holder can apply */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description How many places the matching decisions are at
@@ -9401,6 +9637,11 @@ export interface components {
             products: number;
             proposed_at: string;
             proposed_by: string;
+            /**
+             * @description Why a lead was dismissed, on a claim about a lead, which states no justification
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
             /** @description The words the claim currently rests on. Editing them withdraws every agreement */
             reasoning: string;
             /**
@@ -9456,7 +9697,7 @@ export interface components {
             /** Format: int64 */
             claim_id: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             product: string;
             /** Format: int64 */
             rows: number;
@@ -9499,6 +9740,39 @@ export interface components {
             version?: string;
             vulnerability: string;
         };
+        LeadDecisionBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadDecisionBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description What the lead is: dismissed, not a security issue, or confirmed as a real flaw
+             * @enum {string}
+             */
+            outcome: "dismissed" | "not-security" | "confirmed";
+            /**
+             * @description Why it is dismissed. Required when it is, and refused otherwise
+             * @enum {string}
+             */
+            reason?: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown. Somebody else has to agree with a dismissal */
+            reasoning: string;
+        };
+        LeadEscalatedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadEscalatedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When it was pulled in. Pulled in again, the first time stands
+             */
+            at: string;
+        };
         LeadEvidenceBody: {
             /**
              * Format: uri
@@ -9510,6 +9784,10 @@ export interface components {
             at: components["schemas"]["LeadPlace"];
             /** @description The address comparing the lead's repository between those two builds */
             compare?: string;
+            /** @description The live claim at the lead, agreed to or waiting for a second person. Absent where there is none */
+            decision?: components["schemas"]["DecisionBody"];
+            /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
+            kin: components["schemas"]["LeadKin"][] | null;
             /**
              * Format: date-time
              * @description When the build of the newest run that saw the lead was made
@@ -9524,10 +9802,45 @@ export interface components {
             open: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /**
+             * @description Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to
+             * @enum {string}
+             */
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
             /** @description Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code */
             unchanged?: boolean;
+        };
+        LeadFixedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadFixedBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When it was closed
+             */
+            at: string;
+        };
+        LeadKin: {
+            /**
+             * Format: int64
+             * @description The line of the last place it names
+             */
+            line?: number;
+            /** @description The file of the last place it names */
+            path: string;
+            /** @description The other lead's place identity */
+            place: string;
+            /** @description Its analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /** @description Whether it is the same flaw: a weakness of the same family, its last place within two lines. Otherwise within ten, and offered as possibly the same */
+            same: boolean;
         };
         LeadPlace: {
             /** @description Whether the link opens on a branch the product names rather than on the analyzed commit */
@@ -9571,6 +9884,124 @@ export interface components {
             /** @description The place's path inside that repository */
             within?: string;
         };
+        LeadRowBody: {
+            /**
+             * Format: int64
+             * @description The number of builds in the list's scope the lead is listed on, in the state the list asks for
+             */
+            builds: number;
+            /** @description The function the result is in, where the analyzer names one */
+            function?: string;
+            /**
+             * Format: int64
+             * @description The line the result starts at
+             */
+            line?: number;
+            /** @description What the analyzer says */
+            message: string;
+            /**
+             * Format: date
+             * @description When the lead was first opened on any of them
+             */
+            opened: string;
+            /** @description The file, from the top of the checkout */
+            path: string;
+            /** @description The lead's place identity, which addresses it on every build it is on */
+            place: string;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /**
+             * @description Where the lead stands on that build
+             * @enum {string}
+             */
+            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+            /** @description The branch or tag of the newest build the lead is listed on, to link to */
+            stream: string;
+            /** @description The variant of that build */
+            variant: string;
+        };
+        LeadRuleBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadRuleBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            approved_at?: string;
+            /**
+             * Format: int64
+             * @description The person who last approved it
+             */
+            approved_by?: number;
+            /**
+             * Format: int64
+             * @description The open leads it covered when last approved
+             */
+            approved_covering?: number;
+            /**
+             * Format: int64
+             * @description The open leads it names now that you may read, approved or not
+             */
+            covering: number;
+            /** Format: int64 */
+            id: number;
+            /** @description The path it names, from the top of the checkout. A lead at or under it is covered. Left out, every path */
+            prefix?: string;
+            /** Format: date-time */
+            proposed_at: string;
+            /**
+             * Format: int64
+             * @description The person who proposed it
+             */
+            proposed_by: number;
+            /**
+             * @description Why the leads it covers are dismissed
+             * @enum {string}
+             */
+            reason: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown */
+            reasoning: string;
+            /** Format: date-time */
+            retired_at?: string;
+            /** @description The analyzer rule it names, as <tool>/<rule>. Left out, every rule */
+            rule?: string;
+            /**
+             * @description proposed covers nothing yet. in-force and outgrown dismiss what they name; outgrown names an analyzer rule, covers more than its approver saw by the deployment's factor, and asks to be approved again. A rule naming a path alone is never outgrown. needs-path names an analyzer rule and no path, and covers nothing since the rule was found to find memory safety or injection flaws: retire it and propose it again with a path. retired covers nothing
+             * @enum {string}
+             */
+            state: "proposed" | "in-force" | "outgrown" | "needs-path" | "retired";
+            /** @description Whether you proposed it. The proposer may not approve it */
+            yours?: boolean;
+        };
+        LeadsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/LeadsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadRowBody"][] | null;
+            /**
+             * Format: int64
+             * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
+             */
+            ruled: number;
+            /** @description The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description The leads the list holds
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description Open leads left out of the queue because a claim about them waits for a second person
+             */
+            waiting: number;
+        };
         LinkBody: {
             /** @description The destination — the issue's record, a distribution's answer about it, or the package's own page */
             name: string;
@@ -9611,6 +10042,15 @@ export interface components {
             place_limit: number;
             /** Format: int64 */
             total: number;
+        };
+        "List-lead-rulesResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-lead-rulesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadRuleBody"][] | null;
         };
         "List-set-aside-workResponse": {
             /**
@@ -10639,14 +11079,14 @@ export interface components {
         OutcomeBody: {
             /** @description Whether it stores a date: when somebody looks again, or when promised work lands */
             dated: boolean;
-            /** @description Whether it is a dismissal: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count */
+            /** @description Whether it is a dismissal of a vulnerability: it hides risk and stores no date, so nothing later re-opens it. What the reports asking for dismissals count. False for every outcome about a lead */
             dismisses: boolean;
             /** @description Whether recording it takes the issue out of the working queue */
             hides_risk: boolean;
             /** @description Whether a claim of it has to state which recognized justification applies. One that does not is refused carrying one */
             needs_justification: boolean;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
         };
         OutlierBody: {
             /**
@@ -11272,6 +11712,25 @@ export interface components {
             full_product_names?: components["schemas"]["Named"][] | null;
             relationships?: components["schemas"]["Relationship"][] | null;
         };
+        "Propose-lead-ruleRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Propose-lead-ruleRequest.json
+             */
+            readonly $schema?: string;
+            /** @description A path from the top of the checkout */
+            prefix?: string;
+            /**
+             * @description Why the leads it covers are dismissed
+             * @enum {string}
+             */
+            reason: "false_positive" | "wont_fix" | "used_in_tests" | "mitigated";
+            /** @description The reasoning, in markdown */
+            reasoning: string;
+            /** @description An analyzer rule, as <tool>/<rule> */
+            rule?: string;
+        };
         ProviderBody: {
             /** @description The segment in the sign-in path */
             name: string;
@@ -11770,7 +12229,7 @@ export interface components {
             /** @description What stops the flaw, where the decision named it. The document states it as the impact */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /** @description The decision's justification, which the document states as the reason the release is not affected */
             reason?: string;
         };
@@ -12759,7 +13218,7 @@ export interface components {
             kind: "finding" | "together" | "extension" | "returned";
             needs_approval?: boolean;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
             /**
              * Format: int64
              * @description The number of this finding's places the claim covers
@@ -13694,7 +14153,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -13734,7 +14193,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
+                kind?: "setting" | "role" | "routing" | "lead-rule" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here" | "merge" | "upstream";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -14500,7 +14959,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -14558,7 +15017,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -14614,7 +15073,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -15207,7 +15666,7 @@ export interface operations {
                 /** @description Limit to one product, by name */
                 product?: string;
                 /** @description Limit to one outcome */
-                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
                 /** @description Limit to one state */
                 state?: "proposed" | "approved" | "withdrawn" | "lapsed";
                 /** @description Only deferrals whose date has passed */
@@ -18440,6 +18899,70 @@ export interface operations {
             };
         };
     };
+    "get-important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportantPathsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-important-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportantPathsBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "add-alias": {
         parameters: {
             query?: never;
@@ -19111,6 +19634,209 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-lead-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-rulesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "propose-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Propose-lead-ruleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "approve-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "escalate-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadEscalatedBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -21073,6 +21799,84 @@ export interface operations {
             };
         };
     };
+    "decide-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "fix-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Fix-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadFixedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-match-coverage": {
         parameters: {
             query?: {
@@ -22296,7 +23100,7 @@ export interface operations {
                 /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only claims of these outcomes. Any of them, not all */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
                 release?: string;
                 /** @description The number returned. Zero returns the total alone */
@@ -22346,7 +23150,7 @@ export interface operations {
                 /** @description Keep only claims covering an issue rated this badly or worse in its product. 'low' excludes nothing */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only claims of these outcomes. Any of them, not all */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed")[] | null;
                 /** @description Keep only claims that currently cover an open finding in a branch or tag of this name, matched without regard to capitals */
                 release?: string;
             };

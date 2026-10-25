@@ -32,6 +32,7 @@ type DecisionBody struct {
 	// the claim that something does not affect us names one of the recognized
 	// reasons.
 	Justification Justification `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
+	Reason        LeadReason    `json:"reason,omitempty" doc:"Why a lead was dismissed. Ignored in a request"`
 	// Mitigation is the one claim here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the claim checkable.
@@ -289,6 +290,14 @@ type DecisionDetail struct {
 // either would be offering an act at the wrong grain.
 func ClaimArgument(c triage.Claim, reasoning string) DecisionBody {
 	body := DecisionBody{ClaimID: c.ID, Outcome: Outcome(c.Outcome), Reasoning: reasoning}
+	// A claim about a lead publishes nothing, so it has a reason and no
+	// scope.
+	if c.Outcome.AboutALead() {
+		if c.Justification != nil {
+			body.Reason = LeadReason(*c.Justification)
+		}
+		return body
+	}
 	if c.Justification != nil {
 		body.Justification = Justification(*c.Justification)
 	}

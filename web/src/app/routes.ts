@@ -78,6 +78,16 @@ export const inboxAt = (product: string, waiting = false) =>
   at("inbox", { product }, { waiting: waiting ? "1" : undefined });
 export const inboxReportAt = (product: string, reference: string) =>
   at("inboxReport", { product, reference });
+// A product's static analysis leads: the queue, or one state's leads, on
+// every build or one.
+export const leadsAt = (
+  product: string,
+  query?: { state?: string; stream?: string; variant?: string },
+) => at("leads", { product }, query);
+// One lead's evidence on one build.
+export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
+// The standing rules and important paths deciding what reaches the queue.
+export const leadRulesAt = (product: string) => at("leadRules", { product });
 
 // A component of a product, wherever it sits. The version travels with it
 // where it is known, and so does the build it was reached from, so the screen

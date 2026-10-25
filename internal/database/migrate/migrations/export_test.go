@@ -96,6 +96,8 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"series_document_chunk": seriesV0110(t), "series_module": seriesV0110(t),
 		"sighting": seriesV0110(t), "analysis_result": analysisV0110(t),
 		"analysis_location": analysisV0110(t),
+		"lead_escalation":   leadV0110(t), "lead_important_path": leadV0110(t), "lead_rule": leadV0110(t),
+		"rule_rating": leadV0110(t), "rule_family": leadV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {

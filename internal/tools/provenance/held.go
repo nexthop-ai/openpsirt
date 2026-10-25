@@ -96,8 +96,10 @@ var Held = []Entry{
 	// of the United States government.
 	{"internal/cvss/testdata/cvss4-published.txt", PublicDomain, "https://nvd.nist.gov"},
 
-	// The weakness catalog's names, generated from what MITRE publishes.
+	// The weakness catalog's names and hierarchy, generated from what MITRE
+	// publishes.
 	{"internal/weakness/names.go", CWETerms, "https://cwe.mitre.org/about/termsofuse.html"},
+	{"internal/weakness/lineage.go", CWETerms, "https://cwe.mitre.org/about/termsofuse.html"},
 
 	// Version-ordering suites, taken whole from the project defining each
 	// ordering.

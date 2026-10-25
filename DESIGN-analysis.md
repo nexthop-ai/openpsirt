@@ -5,8 +5,8 @@ is placed in the checkout, matched to what the same analysis reported on that
 build before, and recorded as a finding of the analysis kind, called a lead.
 A lead is internal until a person judges it.
 
-Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-25, REQ-42,
-REQ-43, REQ-66, REQ-69.
+Satisfies REQ-14, REQ-06, REQ-08, REQ-13, REQ-17, REQ-21, REQ-24, REQ-25,
+REQ-27, REQ-28, REQ-30, REQ-42, REQ-43, REQ-66, REQ-69.
 
 Neighboring pieces: what a kind declares, and runs and series as any kind
 uses them, are in `DESIGN-kinds.md`; who reads the internal visibility is in
@@ -23,6 +23,10 @@ shares is in `DESIGN-ingest.md`.
 - [Matching](#matching)
 - [Placement](#placement)
 - [Source](#source)
+- [Lead triage](#lead-triage)
+- [Lead queue](#lead-queue)
+- [Weakness families](#weakness-families)
+- [Grouped leads](#grouped-leads)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -208,7 +212,7 @@ whole key, then the function, then the nearest line.
 |---|---|
 | A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
 | The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
-| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and is asked to be reaffirmed on a probable one (§ Not built) |
+| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
 
 ### Carrying
 
@@ -324,10 +328,11 @@ is sent.
 ### Evidence
 
 `GET …/streams/{stream}/variants/{variant}/leads/{place}` answers one lead's
-evidence on one build: where it is, the path the analyzer took to it, the
-related places, each with its link and source, when it was last seen, and,
-for a lead no longer open, when it was first not seen with the comparison
-above. The place identity addresses a lead because a rule's name holds a
+evidence on one build: its rule, where it is, the path the analyzer took to
+it, the related places, each with its link and source, when it was last seen,
+and, for a lead no longer open, when it was first not seen with the comparison
+above. It names the live claim at the lead, agreed to or waiting, where the
+reader may read one. The place identity addresses a lead because a rule's name holds a
 slash.
 
 | Rule | |
@@ -336,6 +341,236 @@ slash.
 | It is read in the data layer at the visibilities the subject reads in the product, and a lead nobody may read there answers as a place holding nothing (REQ-42, REQ-43) | A different answer would say a lead is there |
 | The open lead is answered, or the newest where none is open | A reappearance opens a new finding at the same place |
 | Every link is built when the evidence is read, from the newest run's repositories and the product's settings | A change to the hosts reaches every place at once |
+
+## Lead triage
+
+A claim about a lead is a claim as `DESIGN-triage.md` describes one: one
+argument, its rows, its reasoning and every revision of it, and a second
+person's approval of one revision (REQ-24, REQ-28). It is keyed on the
+product, the rule the lead is filed under, and the lead's place, with no
+versions, so one judgment covers the lead on every stream and variant it is
+seen on (REQ-25).
+
+`POST …/streams/{stream}/variants/{variant}/leads/{place}/decision` records one.
+
+| Outcome | Means | Second person |
+|---|---|---|
+| `dismissed` | Not a flaw to act on, for the reason stated | Yes |
+| `not-security` | Real and harmless: a crash on a path no input reaches, a leak in a tool that exits | Yes |
+| `confirmed` | A real flaw | No |
+
+| Reason a lead is dismissed | Means |
+|---|---|
+| `false_positive` | The analyzer is wrong: the flaw is not there |
+| `wont_fix` | The flaw is there and will not be fixed |
+| `used_in_tests` | The code is only used in tests and does not ship |
+| `mitigated` | Something already in place stops it, which the reasoning names |
+
+| Rule | |
+|---|---|
+| A lead takes the lead outcomes alone, and a vulnerability takes none of them | A lead is asked whether it is real; a vulnerability, how a known issue applies |
+| A dismissal states one of the four reasons | A dismissal nobody can review is one a second person cannot agree to |
+| A claim about a lead covers its place at any version | The place is the lead, carried by matching rather than by versions |
+| A claim about a lead is approved by somebody holding `approver` and `internal-read` on the product, and never by its author | The approval every claim has, at the visibility a lead has |
+| A fixed lead takes no claim | It opens again where it is seen again |
+| A lead paired only probably, on its function or its nearest line, lapses the claim dismissing it or calling it no security issue | The judgment was about the result as it was keyed. A weaker pairing guesses it is the same result, so its author re-affirms it, one claim or many, as a lapsed claim is re-affirmed (`DESIGN-triage.md` § Re-affirmation) |
+| A claim confirming a lead stands through a probable pairing | It says the flaw is real, and a weaker pairing does not make it less so |
+| The lapse is written in the transaction that records the pairing | A pairing is never recorded with the claim on it left standing |
+
+### Fixed leads
+
+`POST …/streams/{stream}/variants/{variant}/leads/{place}/fixed` closes a lead
+on one build, with what fixed it.
+
+| Rule | |
+|---|---|
+| Only a lead the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
+| It closes the lead on the build named and nowhere else | Each build holding it is a statement of its own |
+| It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
+| A lead seen again opens anew at the same place | The matching that finds a closed lead carries the result to its place (§ Carrying) |
+| A claim about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one claim's reads include it; the findings lists do not |
+
+### Dismissal rules
+
+A standing rule dismisses every lead of a product it names, with one reason
+and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
+`…/products/{product}/lead-rules` lists, proposes, approves and retires them.
+
+| A rule names | Covers |
+|---|---|
+| An analyzer rule | Every lead filed under it, compared as the rule's issue is, without regard to capitals |
+| A path | Every lead at or under it, compared as an important path is (§ Escalation) |
+| Both | Every lead of the rule at or under the path |
+
+| State | When | Dismisses |
+|---|---|---|
+| `proposed` | Nobody has approved it | Nothing |
+| `in-force` | Approved, and covering no more than the leads its approver was shown times the growth factor | What it names |
+| `outgrown` | Approved, naming an analyzer rule, and covering more than that | What it names, and asks to be approved again |
+| `needs-path` | Naming an analyzer rule and no path, where a run has since found the rule to find memory safety or injection | Nothing, until it is retired and proposed again with a path |
+| `retired` | Taken out of use | Nothing |
+
+| Rule | |
+|---|---|
+| A rule is proposed by somebody holding `internal-triage` on the product, and approved by somebody else holding `approver` and `internal-read` there | The second person a dismissal has (REQ-24) |
+| A rule names an analyzer rule, a path, or both, and states one of the four reasons and its reasoning | A rule naming neither would dismiss every lead the product has |
+| A rule naming an analyzer rule and no path is refused, at proposal and at approval, where the rule finds memory safety or injection (§ Weakness families), or where no run has recorded the rule, and one approved before a run found that stops dismissing at once | A flaw of those kinds is judged one lead at a time. A whole checker is dismissed where it fights a convention, measures style, or cannot model the code; a leak checker is dismissed under the pool allocator it cannot see |
+| Its words never change | An approval is of what was read (REQ-28). A rule worded differently is retired and proposed again |
+| Approval records the open leads the rule covers as its approved size | What the approver was shown |
+| The growth factor is `triage.lead-rule-growth`, two where nobody has said | A rule covering ten leads when approved and a thousand later is not what the approver read (REQ-27) |
+| A rule naming a path alone is never outgrown | Code under a dismissed path grows as a matter of course, and what the approver agreed to is the path |
+| An approval shown no lead is measured as though shown one | A rule approved before its analyzer rule reports anything is not outgrown by its first lead |
+| An outgrown rule is approved again at its new size, and a rule in force is refused | Approving again is how the approver reads what it now covers |
+| An outgrown rule keeps dismissing what it names | Withdrawn, every lead it covers would reach the queue at once, which is the noise the rule exists to hold |
+| A rule's coverage counts open leads by place, approved or not, where the reader may read them | A proposal shows its approver what it would dismiss (REQ-42) |
+| Coverage is worked out when it is read | A new lead under a rule in force never reaches the queue |
+| Proposal, approval and retirement are recorded in the administrative trail | As routing rules are |
+
+### Lead states
+
+A lead's state is worked out when it is read, from its finding, its sighting
+and the claim standing at its place. The evidence of a lead carries it.
+
+| State | When |
+|---|---|
+| Fixed | The finding is closed |
+| Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
+| Dismissed | No claim stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
+| Not reproduced | A comparable run did not see it |
+| Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did, and nothing has escalated it (§ Escalation) |
+| Open | None of the above |
+
+| Rule | |
+|---|---|
+| A standing claim comes before a standing rule | A judgment about one lead is more specific than one about many |
+| A standing claim or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
+| Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
+| A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
+
+## Lead queue
+
+A product's leads are listed one row per lead, however many of the product's
+builds it is open on. A row shows the newest of those findings: its rule, its
+path, line, function and message, the build it is on, and its state there.
+
+| Order | |
+|---|---|
+| The tier of the weaknesses the rule names, highest first (§ Weakness families) | Memory safety above style |
+| Whether another analyzer reports the same flaw on the build (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real |
+| The tool's own security severity for the rule, highest first, and a rule with none after every rule with one | CodeQL and semgrep rate a rule's results from 0 to 10 |
+| The tool's own precision for the rule: `very-high`, `high`, `medium`, `low`, then none | How often the rule is right, as its tool measures it |
+| Newest first | The work that arrived last is the work nobody has looked at |
+
+Whether a path ships orders nothing. Code that does not ship — tests, tools,
+examples — is set aside by a standing rule naming its path (§ Dismissal
+rules), which takes its leads out of the queue rather than lower in it, and
+one way to say a path does not matter is kept rather than two.
+
+| List | Holds |
+|---|---|
+| The queue, with no state named | Open leads with no claim waiting for a second person |
+| A state named | The leads in that state. Naming the baseline is how it is searched. Fixed is the leads closed on a build and not opened anew there |
+
+| Rule | |
+|---|---|
+| Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves the baseline out says how many it left (REQ-30) |
+| A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same place (§ Fixed leads), and then it is what the newer finding says |
+| A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
+| Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
+| A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
+| A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
+| A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
+| A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
+
+### Escalation
+
+A baseline lead enters the queue when it is escalated.
+
+| Escalated by | |
+|---|---|
+| Somebody holding `internal-triage` pulling it in | On every build of the product the lead is on. Recorded with who pulled it in and when, and pulled in again it keeps the first |
+| Its path being at or under an important path | A product setting under `internal-triage`, recorded in the administrative trail. Taking a path off returns its leads to the baseline |
+| Another analyzer's lead on its build being the same flaw (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real. The other lead closing returns it to the baseline |
+
+| Rule | |
+|---|---|
+| An important path is a prefix from the top of the checkout, with no leading or trailing slash | `src` holds `src/a.c` and `src`, and not `src2/a.c` |
+| A path is compared exactly, character by character | Paths are case-sensitive, and SQLite's LIKE ignores the case of ASCII letters |
+| An empty path, a path climbing out of the checkout, and a path named twice are refused | The empty path would put the whole baseline in the queue |
+| A product marks at most 500 important paths | Each is asked of every baseline lead a list reads |
+| Somebody who reads a lead and does not triage it is answered as though it were not there | As closing a lead as fixed answers them |
+| Escalation is worked out when a lead is read | Marking or unmarking a path moves every lead under it at once |
+
+## Weakness families
+
+A rule names the weaknesses its tags name, as `external/cwe/cwe-N`, or as
+`CWE-N: name`, which semgrep writes. A rule
+whose tags name none takes the weaknesses a table held here names for it.
+Tools disagree about the number for one flaw: one overflow was CWE-788, 119
+and 121 from three tools. They agree about its family.
+
+| Tool | Source of its weaknesses |
+|---|---|
+| CodeQL | Its rule tags |
+| semgrep | Its rule tags |
+| cppcheck XML | The tags the upload client writes from each error's weakness |
+| cppcheck SARIF | Its rule tags from the release that writes them. Releases 2.16 to 2.18 tag a rule `security` and name no weakness, so a table generated from `cppcheck --errorlist` by `make cppcheck-weaknesses` names one, for 302 checks of cppcheck 2.22.0 |
+| clang, and the clang checkers clang-tidy runs | A table held here, by checker, over the 47 checkers clang 18 runs on C. clang tags nothing and publishes no table. A checker no weakness fits with confidence is held as naming none, and `make clang-checkers` names a checker a new release adds |
+
+| Rule | |
+|---|---|
+| A weakness's family is the nearest class up its primary parents in the catalog's research view, or itself where it is a class or a pillar | CWE-121, 122, 126, 787 and 788 are all CWE-119, and so are use after free and double free |
+| A pillar is the family of no weakness under it. A weakness reaching a pillar with no class between takes the weakness just under the pillar | The catalog files a null dereference, a condition always true and an obsolete function directly under CWE-710, and 26 cppcheck and clang rules shared that family. cppcheck names a `sizeof` on a pointer CWE-467 and clang names the same `malloc` CWE-131, the base above it under CWE-682 |
+| A weakness the catalog does not place is its own family | A newer catalog than the one committed assigns numbers this one does not know |
+| The hierarchy is read from the published catalog by `make weakness-names` and committed with the names | `DESIGN-build.md` § Make targets. Nobody types a thousand parents |
+| A clang checker reporting several kinds of flaw names each | unix.Malloc reports leaks, double frees and uses after free under one name, so it is a memory-safety rule and groups in the resource family and the bounds family both |
+| A rule whose tags name a weakness is classified by its tags alone | The tool's own word about its rule outranks a table about it |
+
+A weakness's tier says how likely it is to be a flaw worth fixing first. It is
+the tier of the nearest of itself and its ancestors the table names, so naming
+a class names everything under it, and a weakness named here outranks its own
+class.
+
+| Tier | Names |
+|---|---|
+| Memory safety | CWE-119, a bound overrun, and use after free and double free under it; CWE-476, a null pointer, which the catalog files under coding standards; CWE-824 and CWE-908, a pointer or value read before it is written, and CWE-457; CWE-190, an integer that wraps; CWE-134, a format string the caller controls |
+| Input reaching where it should not | CWE-74, CWE-77 and CWE-943, injection; CWE-20, input not validated; CWE-706, a name resolved wrongly; CWE-362, a race |
+| A resource or an error left unhandled | CWE-404, a resource not released; CWE-754, a condition not checked; CWE-665, initialization done wrongly; CWE-834, iteration with no bound; CWE-682, a calculation done wrongly |
+| Everything else | Style, dead code, a weakness no tier names, and no weakness at all |
+
+The table is a judgment no decision records: memory safety above style, for
+the C and C++ these analyzers read.
+
+## Grouped leads
+
+Two analyzers on one build report some flaws twice. Each tool's result stays
+its own lead, with its own history. Two leads are the same flaw where every
+one of these holds:
+
+| Condition | |
+|---|---|
+| Both are open on one build | A flaw is in the code one build was made from |
+| Their analyzers differ | One analyzer reporting two results on adjacent lines has already told them apart. An analyzer is the part of a rule's name before the first `/`, in any case, and a clang checker clang-tidy runs is clang's: clang-tidy runs clang's own static analyzer, so the two agreeing is one analyzer agreeing with itself |
+| Their rules' weaknesses share a family (§ Weakness families) | One overflow was CWE-788, 119 and 121 from three tools |
+| Their last places are in one file, within two lines | cppcheck names where a problem starts and the others where it bites: first places differed in 8 of 41 same-flaw pairs, last places in 2 |
+
+Within two lines grouped every same-flaw pair of clang, cppcheck, CodeQL and
+semgrep over libyaml, jq, Lua, giflib and seeded files, and none of five pairs
+of flaws a line or two apart. A wider window or a first place falsely merged
+at least one.
+
+| Rule | |
+|---|---|
+| A result's last place is the last step of its path, the last related place in its own file, or its own place | cppcheck lists the places after the first as related, in order |
+| Leads within ten lines and otherwise alike are listed as possibly the same flaw, and never grouped | A false merge hides a second real flaw behind one decision |
+| A lead's evidence lists the leads it is the same flaw with and those it possibly is, where the reader may read them | Visibility is enforced where the leads are read (REQ-42) |
+| A group is a lead and the leads within two lines of it, worked out for each lead | Two leads each the same flaw as a third and four lines apart are two groups |
+| Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead stands does not depend on who is looking |
+| The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 baseline leads of two analyzers on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
+| A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
+| A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
+| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
+| A lead possibly the same flaw is left out | It is judged on its own |
 
 ## Receipts
 
@@ -470,12 +705,17 @@ it is about.
 
 | Part | State |
 |---|---|
-| The screens, queues, counts and exports that read leads | The Evidence consumer alone includes the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is counted on its run's receipt and read through its evidence and nowhere else |
-| A screen for a product's repository settings and a lead's evidence | Not built. Both are read and written through the API |
-| Triage of a lead: dismissal with a second person's approval, standing rules, escalation from the baseline | Not built |
+| A file of the lead queue | Not built. The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it. The findings lists' files include no lead; the record's file carries claims about leads, as the record does. `DESIGN-interface.md` § Static analysis leads holds the screens |
+| A screen for a product's repository settings | Not built. They are read and written through the API |
+| Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
+| Telling anybody a lead was escalated | Not built |
+| Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
+| Telling anybody a claim on a lead waits for a second person or was sent back | Not built. Notifications include no lead (`DESIGN-kinds.md` § Consumers), so the claim notices count the claims about vulnerabilities and flaws alone; the review queue lists a claim on a lead |
 | Moving a lead into a private case | Not built |
+| Recording a flaw from a confirmed lead | Not built. A confirmed lead stays confirmed; nothing is handed off |
+| Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
-| A dismissal asked to be reaffirmed after a probable pairing, and a re-baseline's probable pairings listed together | Not built. How each lead was paired and whether a run was a re-baseline are recorded; triage of a lead is not built |
+| A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |

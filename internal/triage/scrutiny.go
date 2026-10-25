@@ -103,6 +103,18 @@ type Grown struct {
 	CoversNow int
 }
 
+// hidingNothing is the outcomes that hide no risk, which need no second
+// person and so are no exception to the rule when they stand alone.
+func hidingNothing() []Outcome {
+	var out []Outcome
+	for _, each := range Outcomes() {
+		if !each.HidesRisk() {
+			out = append(out, each)
+		}
+	}
+	return out
+}
+
 // standingAlone is risk that applies now with nobody's agreement behind it.
 //
 // Written as a test of the record rather than of a stored flag, the way the
@@ -165,7 +177,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where(`"cl"."outcome" <> ?`, Affected).
+		Where(`"cl"."outcome" NOT IN (?)`, bun.List(hidingNothing())).
 		Where(standing, held...).
 		Where(standingAlone).
 		GroupExpr(`"cl"."outcome"`).
@@ -452,7 +464,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Where(`"f"."closed_at" IS NULL`).
 		// The kinds the count recorded at approval reads, so growth compares
 		// one population with itself.
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		GroupExpr(`"de"."claim_id"`).

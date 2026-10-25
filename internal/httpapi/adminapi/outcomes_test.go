@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"flag"
 	"os"
-	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -49,8 +48,16 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 			}
 			if got.HidesRisk != want.HidesRisk() || got.Dated != want.Dated() ||
 				got.NeedsJustification != want.NeedsJustification() ||
-				got.Dismisses != slices.Contains(triage.OutcomesDismissing(), want) {
+				got.Dismisses != want.Dismisses() {
 				t.Errorf("%s is published as %+v, which is not the rule the server applies", want, got)
+			}
+		}
+
+		// The reports read dismissals from the record, which holds claims
+		// about leads, and count vulnerabilities alone.
+		for _, got := range who.Outcomes {
+			if got.Dismisses && triage.Outcome(got.Outcome).AboutALead() {
+				t.Errorf("%s, an outcome about a lead, is published as a dismissal the reports count", got.Outcome)
 			}
 		}
 

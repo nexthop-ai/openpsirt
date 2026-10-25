@@ -39,6 +39,7 @@ end rather than left to be found by clicking.
 - [Product and scan-run pages](#product-and-scan-run-pages)
 - [Flaw entry](#flaw-entry)
 - [The inbox](#the-inbox)
+- [Static analysis leads](#static-analysis-leads)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The Exploited here screen](#the-exploited-here-screen)
 - [The editor](#the-editor)
@@ -1409,6 +1410,32 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The record draws one card per claim | The issue, the outcome, the state in one word, what it is about or how many components, and how many places it covers, with the states counted where they differ. The issue opens the claim page, and "Findings there now" opens the findings list narrowed to the claim and the states asked for. `DESIGN-reporting.md` § Dismissals and scan coverage holds what is counted |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
 | The change history sits below the record, over its period, and narrows to one kind of change | The judgment filters are about findings and reach nothing here. A kind is the question an access review asks — the roles, the keys and tokens, the settings — and the kind is in the address, so the file carries it |
+
+## Static analysis leads
+
+A product's leads, reached from the product page. `DESIGN-analysis.md` holds
+what a lead is, where it stands and what a standing rule covers; this is how
+the screens draw them.
+
+| Rule | |
+|---|---|
+| The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
+| The rail carries it under the scope, beside the inbox, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
+| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting and the baseline left out. The baseline is searched through its tab. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
+| What the queue leaves out is counted above it | How many wait for approval, and how many a standing rule dismisses, the second opening the dismissed tab |
+| A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed. The build and the date it opened do not wrap |
+| The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
+| A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
+| The leads that are the same flaw and those that possibly are are two lists | One decision covers the first and never the second, and the first list says so on hover |
+| The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
+| The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
+| The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
+| A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
+| A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
+| The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
+| Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
+| A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
+| The important paths are edited as one list, one path to a line | The server stores the list whole, so a blank line and surrounding space are dropped before it is sent |
 
 ## Disclosure and advisories
 

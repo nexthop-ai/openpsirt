@@ -113,7 +113,7 @@ as an analyzer's leads (REQ-14). Analysis results are its first users.
 | `internal-read` alone lists the product and nothing open against it but internal findings | It is a read role like the other two, so the product is one its holder may know exists, and a capability granted beside it reaches something |
 | The anonymous subject reads no internal work | It reads disclosed work in a publishing product, and internal work is never disclosed. Described under [anybody at all](#anybody-at-all) |
 | A case reaches public and private work only | A case is one issue somebody intends to disclose, and internal material is no part of one. A personal token keeps a case's write half only where it carries `public-triage` or `private-triage` |
-| Approving at internal visibility needs its holder to read internal work | The rule every visibility follows: reading there, with the approver capability or triage there. The session answer states it for each visibility |
+| Approving at internal visibility needs its holder to read internal work and hold the approver capability | A claim there is about a lead, and its second person is somebody granted the right to agree (`DESIGN-analysis.md` § Lead triage). Internal triage alone agrees to nothing. The session answer states it for each visibility |
 | A message leaving the deployment carries no detail of a row that is not public | Internal rows are withheld exactly as undisclosed ones are. Whether a group may be named outside is asked as "any row not public", a question separate from "any row undisclosed", which is about disclosure alone |
 
 No consumer of vulnerability findings includes analysis results. The findings
@@ -569,7 +569,7 @@ ordering taken over a visibility column anywhere in the source.
 | Question | Asked at |
 |---|---|
 | An act on one finding — a claim, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
-| Approving somebody else's claim | Reading at the claim's visibility, with the approver capability or triage there. The session answer says which visibilities, so a screen offers it only where it succeeds |
+| Approving somebody else's claim | Reading at the claim's visibility, with the approver capability or triage there, and the capability alone at internal visibility. The session answer says which visibilities, so a screen offers it only where it succeeds |
 | An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, a record of being exploited, taking unowned work | Triage at any visibility. The finding-level question narrows further wherever there is a finding to ask it of |
 | Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
 | Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish. A document is disclosed work alone, and a row saying one went out is as much a disclosure as the document |

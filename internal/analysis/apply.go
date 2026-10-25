@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // Applier applies stored runs.
@@ -153,8 +154,10 @@ func Place(logs []sarif.Log, root string, most int64, keep func(path string) boo
 				name := ruleName(r.Tool.Name, res.RuleID)
 				if _, ok := out.Rules[name]; !ok {
 					rule, _ := r.RuleOf(res.RuleID)
+					tenths, precision := finding.RuleRating(rule.SecuritySeverity, rule.Precision)
 					out.Rules[name] = finding.Rule{Name: name, Description: rule.Description, Tags: rule.Tags,
-						Documentation: sourcelink.Documentation(rule.HelpURI)}
+						Documentation:  sourcelink.Documentation(rule.HelpURI),
+						SeverityTenths: tenths, Precision: precision}
 				}
 				out.Results = append(out.Results, res)
 				out.RunOf = append(out.RunOf, at)
@@ -391,8 +394,44 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 			receipt.Reopened++
 		}
 	}
+	if err := lapseProbable(ctx, tx, set.ProductID, matched, from, a.now()); err != nil {
+		return "", err
+	}
 	run.Status = series.Applied
 	return run.Status, a.end(ctx, store, run, receipt)
+}
+
+// lapseProbable lapses the claims dismissing each lead this run paired only
+// probably, on its function or its nearest line, whether it was a lead open on
+// the build or one carried from elsewhere.
+func lapseProbable(ctx context.Context, tx bun.IDB, productID int64, matched map[int64]Keyed,
+	from map[int]carried, now time.Time) error {
+
+	var ids []int64
+	for id, k := range matched {
+		if !strong(k.On) {
+			ids = append(ids, id)
+		}
+	}
+	var places []string
+	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var some []string
+		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."place_identity"`).
+			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &some); err != nil {
+			return fmt.Errorf("read the places of leads paired probably: %w", err)
+		}
+		places = append(places, some...)
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, c := range from {
+		if !strong(c.on) {
+			places = append(places, c.place)
+		}
+	}
+	_, err := triage.LapseLeads(ctx, tx, productID, places, now)
+	return err
 }
 
 // printsOf is what a run's results are fingerprinted with: the scheme each

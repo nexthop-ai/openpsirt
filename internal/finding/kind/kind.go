@@ -98,15 +98,19 @@ const (
 	Ranking Consumer = "ranking"
 	// Triage is the shared finding model as people work it: the findings
 	// lists and their counts, one finding's page, assignment and routing,
-	// decisions and their approvals, notes, queues and disclosure.
+	// notes on an issue, and disclosure.
 	Triage Consumer = "triage"
+	// Decisions is the claims people make about findings: their rows, the
+	// reasoning and its revisions, approvals, comments on a claim, the review
+	// queue, every read of one claim, and the record of judgments and its file.
+	Decisions Consumer = "decisions"
 	// Inventory is the screens about what a build contains: its tree, a
 	// component and the places it sits at.
 	Inventory Consumer = "inventory"
 	// Statistics is every figure about findings: trends, comparisons of two
 	// builds, coverage, the reports and the home page's numbers.
 	Statistics Consumer = "statistics"
-	// Exports is every list written out as a file.
+	// Exports is the findings lists written out as files.
 	Exports Consumer = "exports"
 	// VEX is the documents stating what affects a build.
 	VEX Consumer = "vex"
@@ -117,13 +121,17 @@ const (
 	// Evidence is one lead's evidence: where it is, the path the analyzer
 	// took to it, links into the source and the source kept beside it.
 	Evidence Consumer = "evidence"
+	// Leads is the lead queue: the leads a product holds, by where they
+	// stand, with how many each list leaves out, and what pulls one out of
+	// the baseline.
+	Leads Consumer = "leads"
 )
 
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
-		Closure, VersionCarry, Ranking, Triage, Inventory, Statistics, Exports,
-		VEX, Advisories, Notifications, Evidence,
+		Closure, VersionCarry, Ranking, Triage, Decisions, Inventory, Statistics,
+		Exports, VEX, Advisories, Notifications, Evidence, Leads,
 	}
 }
 
@@ -142,7 +150,9 @@ func (c Consumer) Kinds() []Kind {
 	case VersionCarry, Ranking, Triage, Inventory, Statistics, Exports, VEX,
 		Advisories, Notifications:
 		return []Kind{Vulnerability, Entered}
-	case Evidence:
+	case Decisions:
+		return []Kind{Vulnerability, Entered, Analysis}
+	case Evidence, Leads:
 		return []Kind{Analysis}
 	}
 	return nil

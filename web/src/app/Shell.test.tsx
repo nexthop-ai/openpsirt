@@ -5,6 +5,7 @@ import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { Shell } from "./Shell";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
+import type { Who } from "./session";
 
 const mount = mounted();
 
@@ -53,5 +54,53 @@ describe("the top search", () => {
     const at = await searched("openssl", { status: 503 });
     expect(at).toBe("/start");
     expect(mount.host().textContent).toContain("could not be looked up");
+  });
+});
+
+// The rail as drawn for one reach, at one address.
+async function railAt(at: string, reach: Record<string, unknown>[]) {
+  window.sessionStorage.clear();
+  serve(() => ({ data: { items: [], total: 0 } }));
+  mount.render(
+    screen(<Shell who={{ ...who, reach: reach as unknown as Who["reach"] }}>{null}</Shell>, at),
+  );
+  await settle();
+}
+
+const entry = (label: string) =>
+  [...mount.host().querySelectorAll<HTMLElement>("a, button")].find(
+    (each) => each.textContent?.trim() === label,
+  );
+
+describe("the leads entry", () => {
+  it("is absent for somebody who reads internal material nowhere", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_private: true }]);
+    expect(entry("Leads")).toBeUndefined();
+  });
+
+  it("declines and says so where no product is picked", async () => {
+    await railAt("/start", [{ product: "sonic", reads_internal: true }]);
+    expect(entry("Leads")?.tagName).toBe("BUTTON");
+    expect(entry("Leads")?.title).toBe("Pick a product");
+  });
+
+  it("declines and says so where the reader may not read internal material", async () => {
+    await railAt("/products/other", [{ product: "sonic", reads_internal: true }]);
+    expect(entry("Leads")?.tagName).toBe("BUTTON");
+    expect(entry("Leads")?.title).toBe("You can't read internal material in this product");
+  });
+
+  it("opens the product's queue on the branch and variant picked", async () => {
+    await railAt("/products/sonic/streams/main/variants/x86", [
+      { product: "sonic", reads_internal: true },
+    ]);
+    expect(entry("Leads")?.getAttribute("href")).toBe(
+      "/products/sonic/leads?stream=main&variant=x86",
+    );
+  });
+
+  it("opens every build's queue where only the product is picked", async () => {
+    await railAt("/products/sonic", [{ product: "sonic", reads_internal: true }]);
+    expect(entry("Leads")?.getAttribute("href")).toBe("/products/sonic/leads");
   });
 });

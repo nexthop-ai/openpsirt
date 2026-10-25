@@ -25,6 +25,12 @@ const SAMPLES: Record<string, () => string[]> = {
   inventoryComparisonAt: () => [routes.inventoryComparisonAt(odd, { from: odd, to: odd })],
   inboxAt: () => [routes.inboxAt(odd), routes.inboxAt(odd, true)],
   inboxReportAt: () => [routes.inboxReportAt(odd, odd)],
+  leadsAt: () => [
+    routes.leadsAt(odd),
+    routes.leadsAt(odd, { state: "baseline", stream: odd, variant: odd }),
+  ],
+  leadAt: () => [routes.leadAt(build, odd)],
+  leadRulesAt: () => [routes.leadRulesAt(odd)],
   componentAt: () => [routes.componentAt(odd, odd), routes.componentAt(odd, odd, odd, build)],
   allFindingsAt: () => [routes.allFindingsAt(), routes.allFindingsAt({ q: odd })],
   productFindingsAt: () => [routes.productFindingsAt(odd, { q: odd })],

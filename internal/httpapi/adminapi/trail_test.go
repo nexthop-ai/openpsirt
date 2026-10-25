@@ -25,11 +25,12 @@ import (
 // seeded is what an act needs that the fixture does not already hold: an issue
 // to name, and the identifier of a rule an earlier act made.
 type seeded struct {
-	issue  string
-	rule   string
-	record string
-	window string
-	fix    string
+	issue    string
+	rule     string
+	leadRule string
+	record   string
+	window   string
+	fix      string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
@@ -38,6 +39,7 @@ func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{record}", s.record)
 	text = strings.ReplaceAll(text, "{window}", s.window)
 	text = strings.ReplaceAll(text, "{fix}", s.fix)
+	text = strings.ReplaceAll(text, "{lead-rule}", s.leadRule)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
 
@@ -176,6 +178,36 @@ var administrativeActs = []trailedAct{
 		method: http.MethodPut, path: "/v1/products/mine/repositories",
 		body: `{"hosts":[{"remote":"github.com","web":"https://github.com","style":"github"}],"paths":[]}`,
 		kind: "setting", about: "repositories of mine",
+	},
+	{
+		id: "set-important-paths", what: "the paths whose leads are worked from their first run",
+		who: "internal-triager", method: http.MethodPut, path: "/v1/products/mine/important-paths",
+		body: `{"paths":["src"]}`, kind: "setting", about: "important paths of mine",
+	},
+	{
+		id: "propose-lead-rule", what: "a standing rule for leads", who: "internal-triager",
+		method: http.MethodPost, path: "/v1/products/mine/lead-rules",
+		body: `{"prefix":"tests","reason":"used_in_tests","reasoning":"the tests do not ship"}`,
+		kind: "lead-rule", about: "mine · {lead-rule}",
+		keep: func(t *testing.T, seen *seeded, answered []byte) {
+			var rule struct {
+				ID int64 `json:"id"`
+			}
+			if err := json.Unmarshal(answered, &rule); err != nil {
+				t.Fatal(err)
+			}
+			seen.leadRule = strconv.FormatInt(rule.ID, 10)
+		},
+	},
+	{
+		id: "approve-lead-rule", what: "a standing rule for leads approved", who: "internal-reviewer",
+		method: http.MethodPost, path: "/v1/products/mine/lead-rules/{lead-rule}/approval", body: `{}`,
+		kind: "lead-rule", about: "mine · {lead-rule}",
+	},
+	{
+		id: "retire-lead-rule", what: "a standing rule for leads retired", who: "internal-triager",
+		method: http.MethodDelete, path: "/v1/products/mine/lead-rules/{lead-rule}",
+		kind: "lead-rule", about: "mine · {lead-rule}",
 	},
 	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
@@ -584,6 +616,8 @@ var outsideTheTrail = map[string]string{
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
 	"decide-together":              "the decision record",
+	"decide-lead":                  "the decision record",
+	"fix-lead":                     "the decision record",
 	"disclose-issue":               "the decision record",
 	"edit-comment":                 "the decision record",
 	"edit-issue-note":              "the decision record",
@@ -627,6 +661,7 @@ var outsideTheTrail = map[string]string{
 	"upload-report-attachment":    "recorded on the attachment, which names who uploaded it",
 	"withdraw-advisory-approval":  "recorded on the agreement, which names who took it back and when",
 	"redact-attachment":           "recorded on the attachment",
+	"escalate-lead":               "recorded on the escalation, which names who pulled it in and when",
 	"upload-attachment":           "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                 "recorded as the scan's provenance",
 	"upload-analysis":             "recorded as the run's provenance",

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -161,6 +162,9 @@ type Place struct {
 	// Read from the finding rather than supplied, for the same reason the
 	// visibility is: what may be said about a place is a fact about the place.
 	OnTag bool
+	// Kind is the finding's kind, which decides the outcomes a claim about it
+	// may record. Unset is the vulnerability kind.
+	Kind kind.Kind
 	// ComponentUpstream and ConsumerUpstream are the versions expiry compares.
 	// They are the *upstream* versions: a shipped package carries a version of
 	// its own that moves whenever it is rebuilt, and rebuilding is not a
@@ -412,6 +416,48 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
 	return recorded, nil
 }
 
+// ProposeGrouped records one claim at a place and at every place more names,
+// as one action. more is asked inside the transaction the claim is written
+// in, on every attempt, so the places it names are the ones the write lands
+// on: a place answered, closed or covered between a read and the write is not
+// claimed. Each place more names takes the first proposal's argument.
+//
+// The first proposal's row is returned.
+func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, first Proposal,
+	more func(context.Context, bun.IDB) ([]Place, error)) (*Decision, error) {
+
+	proposals := []Proposal{first}
+	var recorded []*Decision
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		places, err := more(ctx, tx)
+		if err != nil {
+			return err
+		}
+		proposals = proposals[:1]
+		for _, place := range places {
+			also := first
+			also.Place = place
+			proposals = append(proposals, also)
+		}
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
+		claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil, "", proposals[0])
+		if err != nil {
+			return err
+		}
+		recorded, err = within.proposeAll(ctx, claim, proposals)
+		return err
+	})
+	if err != nil {
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
+	}
+	return recorded[0], nil
+}
+
 func (s *Store) propose(ctx context.Context, claim *Claim, p Proposal) (*Decision, error) {
 	written, err := s.proposeAll(ctx, claim, []Proposal{p})
 	if err != nil {
@@ -608,6 +654,16 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 	// meaningless on the others, which are claims about priority rather than
 	// about applicability.
 	switch {
+	case outcome == Dismissed:
+		// A lead's reasons are their own: the vulnerability ones describe
+		// how a known issue applies, and a lead is a guess somebody judged.
+		if !slices.Contains(LeadReasons(), LeadReason(justification)) {
+			return refusal.Errorf("%q is not a reason a lead is dismissed for: %v", justification, LeadReasons())
+		}
+		if strings.TrimSpace(mitigation) != "" {
+			return refusal.New("a dismissed lead says what stops it in its reasoning")
+		}
+		return nil
 	case outcome.NeedsJustification():
 		if !justification.Valid() {
 			return refusal.Errorf("%q is not a recognized reason for something not applying", justification)
@@ -656,6 +712,14 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return refusal.Errorf("%q is not an outcome", p.Outcome)
+	}
+	// A lead is asked whether it is real, and a vulnerability how it
+	// applies. Each kind's outcomes answer its own question and no other.
+	if !slices.Contains(OutcomesFor(p.Place.Kind), p.Outcome) {
+		if p.Place.Kind == kind.Analysis {
+			return refusal.Errorf("%q is not something a lead is judged to be: %v", p.Outcome, LeadOutcomes())
+		}
+		return refusal.Errorf("%q is a judgment about a lead", p.Outcome)
 	}
 	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing

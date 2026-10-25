@@ -599,7 +599,7 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).
 		Where(`"de"."id" IN (?)`, bun.List(ids)).
 		Where(`"f"."closed_at" IS NULL`).
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Where(finding.KeyMatches).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
 		Count(ctx)

@@ -63,6 +63,10 @@ type Whole struct {
 	// row in the set answers for the whole of it, as it does everywhere else
 	// this question is asked.
 	Undisclosed bool
+	// Internal says at least one row of the claim is about internal
+	// material, a lead, which is what decides who may agree to it: at
+	// internal visibility a second person holds the approver capability.
+	Internal bool
 }
 
 // Reach is what a claim covers now, counted the way the findings list counts.
@@ -135,6 +139,9 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 		places[row.PlaceIdentity] = true
 		if row.Visibility != access.Public {
 			whole.Undisclosed = true
+		}
+		if row.Visibility == access.Internal {
+			whole.Internal = true
 		}
 	}
 	whole.Issues, whole.Places = len(issues), len(places)
@@ -231,7 +238,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		// well its versions still match.
 		Where(`"de"."live_key" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`).
-		Apply(ofKinds(kind.Triage, "f")).
+		Apply(ofKinds(kind.Decisions, "f")).
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(finding.KeyMatches)
 	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
@@ -301,7 +308,7 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, claimID 
 		Where(`"st"."product_id" = "de"."product_id"`).
 		Where(`"f"."opened_at" <= "de"."ended_at"`).
 		Where(`("f"."closed_at" IS NULL OR "f"."closed_at" > "de"."ended_at")`).
-		Apply(ofKinds(kind.Triage, "f"))
+		Apply(ofKinds(kind.Decisions, "f"))
 	if err := readableFindings(query, subject, "f", `"st"."product_id"`).
 		GroupExpr(`"de"."state", "st"."name", "va"."name"`).
 		OrderExpr(`"de"."state", "st"."name", "va"."name"`).

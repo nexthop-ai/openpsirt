@@ -579,7 +579,7 @@ report that exists to find it.
 |---|---|
 | Asked of the record, never of a flag | The condition is that no agreement stands from somebody other than the proposer, which is the same question the row's own answer is computed from. The test writes a self-approval straight to the table: the report has to answer correctly about a row the write path should have prevented, and one that trusted the write path would be reporting on itself |
 | The product, the outcome and the state each take several answers | "Dismissed or deferred" and "waiting or sent back" are the questions somebody reading the record has, and one value cannot ask either; the parameter repeats and any of what is named matches. A product named that the reader may not see refuses the whole request rather than being dropped, because a report answering about two products when three were asked for reads as covering three |
-| It says "this should be empty" only where every outcome asked for is a dismissal | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
+| It says "this should be empty" only where every outcome asked for is a dismissal, of a vulnerability or a lead | Mixed with a deferral the answer holds legitimate rows, and saying otherwise over them would report a control as failed when it had not |
 | What was asked for is printed with every value | A sheet headed "dismissed — not applicable" over rows that also hold deferrals is a sheet nobody can check against anything |
 | The record narrows to one build, reached through the findings at each place | A decision names no build, deliberately — it is keyed on the product, the issue and the place, so that it carries across the releases that share the code. What a release sign-off asks is the other question, and it could not be asked at all. The build's own product has to be the one that made the judgment, because a place identity carries none |
 | A build is a product, a stream and a variant together, or none of them | Named alone, a stream would narrow to a stream of some other product that happens to share the name — a report about somebody else's releases under this one's heading |
@@ -787,7 +787,7 @@ reports is where the rule did not apply and where it applied in form only.
 
 | Section | What it says |
 |---|---|
-| Risk standing on one person | Split in two, because the halves read oppositely. A dismissal here is a control that did not hold. A short deferral, or an upgrade promised inside the deadline the work already had, is the exception working — deliberate, so that gating every routine act does not put ordinary triage through a queue nobody then reads. One at a time it is triage; the pattern across a program is what nothing else shows |
+| Risk standing on one person | Split in two, because the halves read oppositely. A dismissal here, of a vulnerability or a lead, is a control that did not hold. A short deferral, or an upgrade promised inside the deadline the work already had, is the exception working — deliberate, so that gating every routine act does not put ordinary triage through a queue nobody then reads. One at a time it is triage; the pattern across a program is what nothing else shows |
 | Proposer and approver pairs | Every pair, with the share of everything agreed to that ran between them. The share is the signal rather than the count: fifty of fifty-two and fifty of nine hundred are the same number and not the same situation |
 | Agreements given in bulk | An approver works at the unit the proposer acted at, so agreeing to a batch as one act is the control working. A batch of two hundred is still not a batch of two |
 | Agreed to before, covering more now | What was consented to, recorded at the moment of consent, against what the same claim reaches today. A claim reaches by matching, so a build appearing later is covered with nobody acting and nobody having agreed to the larger number |
@@ -874,6 +874,7 @@ stops is one somebody reads as whole.
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
+| The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50). The findings lists' files include no lead (`DESIGN-kinds.md` § Consumers) |
 
 ## Settings
 

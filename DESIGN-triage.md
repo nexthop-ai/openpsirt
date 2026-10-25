@@ -101,6 +101,9 @@ judgment made about a leaf.
 
 ## Outcomes
 
+These are the outcomes about a vulnerability. A lead takes its own, which
+`DESIGN-analysis.md` § Lead triage holds.
+
 | Outcome | Means |
 |---|---|
 | **Affected** | It applies, and goes to remediation |
@@ -213,7 +216,7 @@ Arguing, agreeing and reading are separate questions.
 
 | Rule | |
 |---|---|
-| A triager may approve somebody else's claim | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative |
+| A triager may approve somebody else's claim about disclosed or undisclosed work | Two triagers agreeing to each other's work is the ordinary shape of a small team, and the control that matters is that the two are different people. Asking for the triage role alone made the approver capability decorative. A claim about a lead takes the approver capability (`DESIGN-analysis.md` § Lead triage) |
 | Reading is the finding's own visibility and nothing else (REQ-43) | Asking whether the reader could decide or approve was narrower: a reader saw "deferred" with no way to see why, and on a real deployment somebody holding private reading opened a finding and was told none of its 91 decisions existed |
 | Writing is named apart from reading in the code | They are separate rules. Adding a comment had leaned on the reading rule, so widening one would let a reader comment on a decision they may not argue about |
 | Every check reads the product and visibility from the row | Never from what a caller stated |

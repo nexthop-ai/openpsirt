@@ -93,7 +93,7 @@ func TestTheInternalRolesReadInternalWorkAlone(t *testing.T) {
 		}
 		if can := who.Reach[0]; !can.MaySee || can.ReadsPublic || can.ReadsPrivate ||
 			!can.ReadsInternal || !can.MayTriage || can.TriagesPublic || can.MayHide ||
-			!can.TriagesInternal || !can.MayAgree || !can.AgreesInternal {
+			!can.TriagesInternal || can.MayAgree || can.AgreesInternal {
 			t.Errorf("the session describes internal triage as %+v", can)
 		}
 

@@ -221,6 +221,42 @@ func TestAClaimWaitingReachesWhoeverMayApproveEveryRowOfIt(t *testing.T) {
 	})
 }
 
+func TestAClaimAboutALeadIsToldNobody(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		s := aSplit(t, w)
+		rule, err := finding.NewVulnerabilities(db.DB).Rule(t.Context(), finding.Rule{Name: "clang-tidy/leak"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.issue = rule
+		proposer := s.person(t, "proposer", access.InternalTriage)
+		privateApprover := s.person(t, "private-approver", access.PrivateRead, access.Approver)
+		internalApprover := s.person(t, "internal-approver", access.InternalRead, access.Approver)
+
+		// A dismissal waiting on a second person, and one sent back and
+		// left, each at one internal place.
+		dismissed := func(c *triage.Claim) {
+			reason := string(triage.FalsePositive)
+			c.Outcome, c.Justification = triage.Dismissed, &reason
+		}
+		back := time.Now().UTC().Add(-7 * 24 * time.Hour).Truncate(time.Microsecond)
+		internal := func(d *triage.Decision) { d.Visibility = access.Internal }
+		returned := func(d *triage.Decision) { d.Visibility, d.SentBackAt = access.Internal, &back }
+		s.claim(t, proposer, 1, 0, dismissed, internal)
+		s.claim(t, proposer, 1, 0, dismissed, returned)
+		sweep(t, db)
+
+		for _, who := range []int64{proposer, privateApprover, internalApprover} {
+			for _, kind := range []notify.Kind{notify.ClaimWaiting, notify.SentBackWaiting} {
+				if told := openFor(t, db, who, kind); len(told) != 0 {
+					t.Errorf("person %d was told %s about a lead: %q", who, kind, told)
+				}
+			}
+		}
+	})
+}
+
 func TestAProposerWhoReadsOnlyPartOfAClaimIsNotToldItIsTheirTurn(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB

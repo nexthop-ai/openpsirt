@@ -256,3 +256,13 @@ func TestAPairsShareIsOfEverythingAgreed(t *testing.T) {
 		}
 	})
 }
+
+func TestAConfirmedLeadIsNoExceptionToTheSecondPersonRule(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"the free runs on the error path"}`)
+		if got := scrutiny(t, r, "internal-reviewer", ""); len(got.Alone) != 0 {
+			t.Errorf("a confirmed lead is reported as standing alone: %+v", got.Alone)
+		}
+	})
+}

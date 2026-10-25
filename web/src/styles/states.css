@@ -185,6 +185,13 @@
 .claimed.patch-needed {
   --c: var(--wait);
 }
+.claimed.dismissed,
+.claimed.not-security {
+  --c: var(--sev-high);
+}
+.claimed.confirmed {
+  --c: var(--ok);
+}
 
 /* One judgment, as an auditor reads it. */
 .judgment {

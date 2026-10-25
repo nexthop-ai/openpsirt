@@ -48,6 +48,10 @@ const (
 	// retired. Not a Role: a role is granted to a person against one product,
 	// and a routing rule grants nobody anything — it decides who is asked.
 	Routing Kind = "routing"
+	// LeadRule is a standing rule that dismisses static analysis leads:
+	// proposed, approved or retired. Not a Routing: it decides what a lead
+	// is, which is a judgment, where a routing rule decides who is asked.
+	LeadRule Kind = "lead-rule"
 	// Alias is another identifier an issue answers to. Deployment-wide and
 	// permanent: from the moment it is recorded, a scan of any product
 	// reporting that name resolves to this issue and inherits its decisions.
@@ -100,7 +104,7 @@ const (
 // which shows up as an empty screen rather than as a failure.
 func Kinds() []Kind {
 	return []Kind{
-		Setting, Role, Routing, Support, Release,
+		Setting, Role, Routing, LeadRule, Support, Release,
 		Credential, Account, Team, Case, Alias, Catalog, ExploitedHere, Merge, Upstream,
 	}
 }

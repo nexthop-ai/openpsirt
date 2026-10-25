@@ -47,6 +47,7 @@ type JudgedBody struct {
 
 	Outcome       core.Outcome        `json:"outcome"`
 	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a judgment about a lead, which states no justification"`
 	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
 	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it: portable for anybody shipping the component at that version, build for this product's own build. Absent where the reason decides"`
 	DeferredUntil string              `json:"deferred_until,omitempty"`
@@ -94,6 +95,7 @@ type JudgedClaimBody struct {
 
 	Outcome       core.Outcome        `json:"outcome"`
 	Justification core.Justification  `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
+	Reason        core.LeadReason     `json:"reason,omitempty" doc:"Why a lead was dismissed, on a claim about a lead, which states no justification"`
 	Mitigation    string              `json:"mitigation,omitempty" doc:"The mitigation a holder can apply"`
 	Scope         core.StatementScope `json:"scope,omitempty" doc:"Whom a published statement made from the claim holds for, where the claim stated it. Absent where the reason decides"`
 	DeferredUntil string              `json:"deferred_until,omitempty"`
@@ -281,7 +283,7 @@ func judgedBody(row triage.Judged) JudgedBody {
 		TwoPeople: row.BySomebodyElse(),
 		Approvals: agreedBodies(row.Approvals),
 	}
-	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Claim)
+	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(row.Claim)
 	body.Scope = statedScope(row.Claim)
 	if row.EndedAt != nil {
 		body.EndedAt = core.Stamp(*row.EndedAt)
@@ -289,13 +291,20 @@ func judgedBody(row triage.Judged) JudgedBody {
 	return body
 }
 
-// argued is what a claim says beyond its outcome, as the record writes it.
-func argued(claim *triage.Claim) (justification core.Justification, mitigation, deferred, fixed string) {
+// argued is what a claim says beyond its outcome, as the record writes it. A
+// claim about a lead holds its reason where a vulnerability's claim holds its
+// justification, and the two are drawn from different vocabularies.
+func argued(claim *triage.Claim) (justification core.Justification, reason core.LeadReason,
+	mitigation, deferred, fixed string) {
 	if claim == nil {
-		return "", "", "", ""
+		return "", "", "", "", ""
 	}
 	if claim.Justification != nil {
-		justification = core.Justification(*claim.Justification)
+		if claim.Outcome.AboutALead() {
+			reason = core.LeadReason(*claim.Justification)
+		} else {
+			justification = core.Justification(*claim.Justification)
+		}
 	}
 	if claim.Mitigation != nil {
 		mitigation = *claim.Mitigation
@@ -306,7 +315,7 @@ func argued(claim *triage.Claim) (justification core.Justification, mitigation, 
 	if claim.FixedVersion != nil {
 		fixed = *claim.FixedVersion
 	}
-	return justification, mitigation, deferred, fixed
+	return justification, reason, mitigation, deferred, fixed
 }
 
 // statedScope is whom a claim says its published statement holds for, where it
@@ -378,7 +387,7 @@ func judgedClaimBody(row triage.JudgedClaim) JudgedClaimBody {
 		TwoPeople: row.BySomebodyElse(),
 		Approvals: agreedBodies(row.Approvals),
 	}
-	body.Justification, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Claim)
+	body.Justification, body.Reason, body.Mitigation, body.DeferredUntil, body.FixedVersion = argued(&row.Claim)
 	body.Scope = statedScope(&row.Claim)
 	return body
 }

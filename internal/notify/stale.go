@@ -269,6 +269,10 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // public, so a message about them carries no detail. Each sweep adds the
 // conditions and the columns of its own.
 //
+// A row is about an issue of the kinds the findings told about are filed
+// under, so a claim about a lead is told nobody: its rule is an issue of no
+// such kind.
+//
 // The withheld rows are counted rather than taken from an aggregate over
 // the word itself. A visibility is a name, and MIN over names would answer "is
 // any of this private" by alphabetical accident.
@@ -276,6 +280,8 @@ func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
+		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "de"."vulnerability_id"`).
+		Where(`"vu"."kind" IN (?)`, bun.List(kind.IssuesOf(kind.Notifications.Kinds()...))).
 		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).

@@ -16,6 +16,7 @@ import { useRulings } from "../api/intake";
 import {
   buildFindingsAt,
   inboxAt,
+  leadsAt,
   inventoriesAt,
   productFindingsAt,
   reviewQueueAt,
@@ -38,6 +39,7 @@ export function Product() {
   const who = useWho();
   // The inbox asks what reading a report asks: reading undisclosed work.
   const mayReadReports = !!mayOf(who.data, product)?.reads_private;
+  const mayReadLeads = !!mayOf(who.data, product)?.reads_internal;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],
@@ -68,6 +70,12 @@ export function Product() {
             <> · triaged at whatever the deployment says</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
+          {mayReadLeads && (
+            <>
+              {" "}
+              · <Link to={leadsAt(product)}>Leads</Link>
+            </>
+          )}
           {mayReadReports && (
             <>
               {" "}

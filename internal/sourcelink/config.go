@@ -150,7 +150,7 @@ func (c *Config) Valid() error {
 	prefixes := map[string]bool{}
 	for i := range c.Paths {
 		p := &c.Paths[i]
-		prefix, ok := cleanPath(p.Prefix)
+		prefix, ok := CleanPath(p.Prefix)
 		if !ok {
 			return refusal.Errorf("path %d, %q, is not a path within a checkout", i+1, p.Prefix)
 		}
@@ -221,9 +221,9 @@ func template(t string, allowed []string) error {
 	return nil
 }
 
-// cleanPath is a path within a checkout with no leading or trailing slash,
+// CleanPath is a path within a checkout with no leading or trailing slash,
 // refused where a segment is empty or climbs out.
-func cleanPath(p string) (string, bool) {
+func CleanPath(p string) (string, bool) {
 	p = strings.Trim(strings.TrimSpace(p), "/")
 	if p == "" {
 		return "", true
