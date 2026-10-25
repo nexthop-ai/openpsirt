@@ -40,6 +40,8 @@ type Placed struct {
 // results.
 type HeldRun struct {
 	Tool string `json:"tool"`
+	// Salt marks the secret the client's fingerprints were taken with.
+	Salt string `json:"salt,omitempty"`
 	// Remotes is, per repository the run names, its address normalized.
 	Remotes []string `json:"remotes,omitempty"`
 }

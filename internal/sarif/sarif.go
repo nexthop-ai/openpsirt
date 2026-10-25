@@ -171,6 +171,9 @@ type RunProperties struct {
 	Series string
 	Built  string
 	Commit string
+	// Salt marks the secret the client's fingerprint is salted with: a short
+	// digest of it, so a rotation is told apart without the secret.
+	Salt string
 }
 
 // Discarded counts what reading left out: source text and proposed changes,

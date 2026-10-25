@@ -176,23 +176,64 @@ another build is in the baseline too.
 ## Matching
 
 Identity is computed here (REQ-08). A fingerprint a document carries is one
-input to the key and never the key by itself.
+input to a key and never a key by itself.
 
-The match key is a digest of:
+### Keys
+
+| Key | Digest of | Strength |
+|---|---|---|
+| Whole | The rule, the path, the fingerprint or the line where there is none, the message with its digits taken out, the enclosing function and the call chain | Strong |
+| Function | The rule, the path, the message with its digits taken out, and the enclosing function. Absent where the output names no function | Probable |
+| Line | The rule, the path and the message with its digits taken out, compared with the nearest line | Probable |
 
 | Part | |
 |---|---|
 | The rule | As filed, `<tool>/<rule>` |
 | The path | Relative to the checkout |
-| The fingerprint, or the line where there is none | The first of `openpsirt/context/v1`, `clang/issueHash/v1`, `hash/v1`, `primaryLocationLineHash`, then any other in name order |
+| The fingerprint | The first of `openpsirt/context/v1`, `clang/issueHash/v1`, `hash/v1`, `primaryLocationLineHash`, then any other in name order |
 | The message with its digits taken out | A message quoting a line number or a count changes when lines move |
-| The enclosing function | Where the output names it |
 | The call chain | The functions the result's flow passes through, each once where consecutive steps share it |
+
+### Layers
+
+A run is paired with the leads its series holds open on the build, one to
+one, a layer at a time, each layer on what the layers before it left: the
+whole key, then the function, then the nearest line.
 
 | Rule | |
 |---|---|
-| Results pair with open leads one to one on an equal key | Two results with one key are two leads |
-| A result nothing on the build matched opens a lead at a place derived from the series and the key | One result is one place on every build of the series, so a decision keyed on it reaches each (REQ-25) |
+| A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
+| The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
+| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and is asked to be reaffirmed on a probable one (§ Not built) |
+
+### Carrying
+
+A result no open lead on the build took is the same result as a lead the
+series holds elsewhere where one of these finds it. It opens at that lead's
+place, so a decision keyed on the place reaches it (REQ-25).
+
+| Order | Where | How |
+|---|---|---|
+| 1 | The leads open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer. A new branch inherits what the line it was cut from has decided |
+| 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's place |
+| 3 | Any lead of the series on another build, open or closed | The whole key, the oldest lead first. A probable pairing with a lead this build never saw is a guess |
+
+A result carried from a lead in the baseline is in the baseline too. A result
+found nowhere opens at a place derived from the series and its whole key, so
+the same result first seen on two builds at once is one place.
+
+### Re-baseline
+
+A run records the fingerprint schemes its results' keys were built from, and
+the mark of the salt the client took its own with. A run whose record differs
+from the newest one applied to the build that reported anything is a
+re-baseline.
+
+| Rule | |
+|---|---|
+| A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a re-baseline |
+| The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
+| A re-baseline is matched like any other run, and says so on its receipt | Its whole keys no longer meet the leads', so its pairings are the probable layers' |
 
 ## Placement
 
@@ -216,7 +257,8 @@ A lead is one component at one place (REQ-17).
 | Comparable, and the reason where not | § Run parameters |
 | Baseline | The series' first comparable run |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, what a held run would have marked, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, what a held run would have marked, and what was dropped, left out and discarded, each by reason |
+| Re-baseline | Whether the run's fingerprints changed from the build's last (§ Matching) |
 
 A receipt counts leads and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
@@ -230,8 +272,8 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 | The screens, queues, counts and exports that read leads | No consumer includes the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is recorded and counted on its run's receipt and read nowhere else |
 | Triage of a lead: dismissal with a second person's approval, standing rules, escalation from the baseline | Not built |
 | Moving a lead into a private case | Not built |
-| Matching a moved result: a line shifted with no fingerprint, a renamed file | Not built. Such a result opens as a new lead, and the old one is not reproduced |
-| A stream's first run matched against the stream it was cut from | Not built |
+| Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
+| A dismissal asked to be reaffirmed after a probable pairing, and a re-baseline's probable pairings listed together | Not built. How each lead was paired and whether a run was a re-baseline are recorded; triage of a lead is not built |
 | Source links into the repositories a run names, and stored snippets | Not built. The repositories are recorded; snippets are discarded |
 | Third-party paths | Recorded on the run and read by nothing |
 | Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
@@ -243,7 +285,9 @@ pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
 
 | Limit | Detail |
 |---|---|
-| Exact matching churns where an analyzer writes no fingerprint | clang-tidy, and clang before 22, give rule, path, line and message alone; every line moved above a result reopens it as a new lead |
+| A moved result with no fingerprint and no function is matched on its line alone | clang-tidy, and clang before 22, give rule, path, line and message. A line moved above such a result pairs it with the nearest lead of the same rule and message in the file, which is probable, and two such results moving past each other can swap |
+| A new variant inherits on the whole key alone | Carrying by every layer is from the stream a branch was cut from. A variant's first run of a series takes a sibling variant's places where the whole keys are equal |
+| A result whose whole key equals the one a moved lead was first seen with opens at that lead's place | Places are minted from the first key a series saw. Both are the same rule, path, fingerprint and message, which is one flaw reported twice |
 | A run that ends unread counts nothing on its receipt | A run is read only once its build has an inventory, so one superseded or failed while it waits, or held in a shape the release applying it does not read, ends with a receipt naming no drop and no discard |
 | Two identical results in one build share a place | Their key is the same, so a decision on one reaches the other. They are one flaw reported twice |
 | A rule set read from a rule list flips where every listed rule fires | A tool listing its whole rule set lists rules that never fired, and a run where all of them fire states no rule set; that run is compared as a rule set change |

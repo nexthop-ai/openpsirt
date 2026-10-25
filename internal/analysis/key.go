@@ -94,6 +94,14 @@ type Keyed struct {
 	Print  string
 	Chain  string
 	Key    string
+	// FunctionKey and LineKey are the probable keys: the rule, the path and
+	// the message without its digits, with the function, and with neither.
+	// FunctionKey is empty where the output names no function.
+	FunctionKey string
+	LineKey     string
+	// On is how the result was paired with the lead it is recorded on, and
+	// empty where it opened one nothing else matched.
+	On string
 	// Remote is the repository the result's file is in, normalized; empty
 	// where the run names none.
 	Remote string
@@ -110,13 +118,23 @@ func key(rule string, p sarif.Placed) Keyed {
 	if print == "" {
 		where = "line " + strconv.Itoa(p.StartLine)
 	}
+	message := withoutDigits(p.Message)
+	k.Key = digest(rule, p.Path, where, message, p.Function, k.Chain)
+	k.LineKey = digest(rule, p.Path, message)
+	if p.Function != "" {
+		k.FunctionKey = digest(rule, p.Path, message, "function "+p.Function)
+	}
+	return k
+}
+
+// digest is a hash over parts, each ended so no two lists of parts share one.
+func digest(parts ...string) string {
 	sum := sha256.New()
-	for _, part := range []string{rule, p.Path, where, withoutDigits(p.Message), p.Function, k.Chain} {
+	for _, part := range parts {
 		sum.Write([]byte(part))
 		sum.Write([]byte{0})
 	}
-	k.Key = hex.EncodeToString(sum.Sum(nil))
-	return k
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 // identity is the place a result first seen in a series is minted at. Matching

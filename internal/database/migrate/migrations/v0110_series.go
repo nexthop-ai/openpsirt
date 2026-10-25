@@ -83,6 +83,13 @@ func seriesV0110(t *columnTypes) []string {
 			-- Whether this run was the series' first comparable run in the
 			-- product, whose results nobody is asked to triage.
 			"baseline"       ` + t.boolean + ` DEFAULT FALSE NOT NULL,
+			-- The fingerprint schemes the run's results carry, sorted, and
+			-- the mark of the salt the client's is taken with. Null where the
+			-- run reported nothing, and "none" where nothing carried one.
+			"fingerprints"   ` + t.text + ` NULL,
+			-- Whether the fingerprints changed from the last run on the build
+			-- that stated any, which leaves every lead matched probably.
+			"rebaseline"     ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- What the sender is told: what was dropped or discarded and why,
 			-- and how many results it opened, saw again and did not see, as
 			-- JSON. It names no result.
@@ -193,6 +200,15 @@ func analysisV0110(t *columnTypes) []string {
 			-- path, the fingerprint or the line, the message with its digits
 			-- taken out, the function and the call chain.
 			"match_key"     ` + t.hash + ` NOT NULL,
+			-- The two probable keys: the rule, the path and the message with
+			-- its digits taken out, with the function where the output names
+			-- one, and with neither.
+			"function_key"  ` + t.hash + ` NULL,
+			"line_key"      ` + t.hash + ` NOT NULL,
+			-- How the newest sighting was paired with the lead: on the whole
+			-- key, which is strong, or on the function or the nearest line,
+			-- which is probable. Null where the sighting opened it.
+			"matched_on"    ` + t.kind + ` NULL,
 			-- The analyzer's own rating and how sure it is, where it gives
 			-- them.
 			"level"         ` + t.kind + ` NULL,

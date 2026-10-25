@@ -11369,6 +11369,11 @@ export interface components {
             };
             /**
              * Format: int64
+             * @description Results new to the build carried from a lead of the branch it was cut from
+             */
+            inherited?: number;
+            /**
+             * Format: int64
              * @description Results the build held open that this comparable run did not report
              */
             not_reproduced: number;
@@ -11377,6 +11382,18 @@ export interface components {
              * @description Results the run reported that the build did not hold open
              */
             opened: number;
+            /**
+             * Format: int64
+             * @description Results paired with a lead on its function or its nearest line rather than its whole key
+             */
+            probable?: number;
+            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any */
+            rebaseline?: boolean;
+            /**
+             * Format: int64
+             * @description Results found again at the place of a lead on the build that was closed
+             */
+            reopened?: number;
             /**
              * Format: int64
              * @description Of those seen again, the ones an earlier run had not reported

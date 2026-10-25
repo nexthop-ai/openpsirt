@@ -8909,12 +8909,27 @@ components:
             type: integer
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
+        inherited:
+          description: Results new to the build carried from a lead of the branch it was cut from
+          format: int64
+          type: integer
         not_reproduced:
           description: Results the build held open that this comparable run did not report
           format: int64
           type: integer
         opened:
           description: Results the run reported that the build did not hold open
+          format: int64
+          type: integer
+        probable:
+          description: Results paired with a lead on its function or its nearest line rather than its whole key
+          format: int64
+          type: integer
+        rebaseline:
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
+          type: boolean
+        reopened:
+          description: Results found again at the place of a lead on the build that was closed
           format: int64
           type: integer
         returned:

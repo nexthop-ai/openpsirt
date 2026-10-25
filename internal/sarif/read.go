@@ -972,6 +972,7 @@ const (
 	propSeries        = "openpsirt/series"
 	propBuilt         = "openpsirt/built"
 	propCommit        = "openpsirt/commit"
+	propSalt          = "openpsirt/salt"
 )
 
 // properties reads one property bag, refusing one with more members than the
@@ -1011,6 +1012,8 @@ func (rd *reader) runProperties(p *RunProperties) error {
 			return str(&p.Built)
 		case propCommit:
 			return str(&p.Commit)
+		case propSalt:
+			return str(&p.Salt)
 		case propChanged:
 			return rd.b.Array(func() error {
 				s, err := rd.b.Str()

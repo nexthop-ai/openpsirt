@@ -42,13 +42,47 @@ func (s sent) json() string {
 		s.rule, s.message, s.uri, s.base, s.line)
 }
 
+// inside is a result stated with the function it is in and a fingerprint,
+// either of which may be empty.
+type inside struct {
+	sent
+	function, print string
+}
+
+func (s inside) json() string {
+	loc := fmt.Sprintf(`{"physicalLocation":{"artifactLocation":{"uri":%q,"uriBaseId":%q},"region":{"startLine":%d}}`,
+		s.uri, s.base, s.line)
+	if s.function != "" {
+		loc += fmt.Sprintf(`,"logicalLocations":[{"fullyQualifiedName":%q}]`, s.function)
+	}
+	out := fmt.Sprintf(`{"ruleId":%q,"message":{"text":%q},"locations":[%s}]`, s.rule, s.message, loc)
+	if s.print != "" {
+		out += fmt.Sprintf(`,"partialFingerprints":{"hash/v1":%q}`, s.print)
+	}
+	return out + "}"
+}
+
 // document is one run of clang-tidy over a checkout holding FRR as a
 // submodule, analyzing units of the ten it was meant to. Its rule list holds
 // a rule that never fires, so the list is the rule set.
 func document(results []sent, units int) string {
+	rs := make([]interface{ json() string }, len(results))
+	for i, r := range results {
+		rs[i] = r
+	}
+	return documentOf(rs, units, "")
+}
+
+// documentOf is document with results stated any way, and the run's salt
+// mark where salt is set.
+func documentOf(results []interface{ json() string }, units int, salt string) string {
 	rs := make([]string, len(results))
 	for i, r := range results {
 		rs[i] = r.json()
+	}
+	salted := ""
+	if salt != "" {
+		salted = fmt.Sprintf(`,"openpsirt/salt":%q`, salt)
 	}
 	return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang-tidy","version":"18.1.3",` +
 		`"rules":[{"id":"bugprone-use-after-move","properties":{"tags":["external/cwe/cwe-416"]}},` +
@@ -58,7 +92,7 @@ func document(results []sent, units int) string {
 		`"versionControlProvenance":[` +
 		`{"repositoryUri":"https://github.com/sonic-net/sonic-buildimage","revisionId":"abc","mappedTo":{"uriBaseId":"SRCROOT"}},` +
 		`{"repositoryUri":"https://github.com/FRRouting/frr.git","revisionId":"def","mappedTo":{"uriBaseId":"FRR"}}],` +
-		fmt.Sprintf(`"properties":{"openpsirt/unitsExpected":%d,"openpsirt/unitsAnalyzed":%d},`, 10, units) +
+		fmt.Sprintf(`"properties":{"openpsirt/unitsExpected":%d,"openpsirt/unitsAnalyzed":%d%s},`, 10, units, salted) +
 		`"results":[` + strings.Join(rs, ",") + `]}]}`
 }
 
@@ -598,6 +632,219 @@ func TestAResultTheBaselineHoldsElsewhereIsInTheBaselineOnANewBuild(t *testing.T
 		}
 		if len(rows) != 2 || !in["src/sonic-frr/frr/bgpd/bgp_attr.c"] || in[inSWSS.uri] {
 			t.Errorf("baseline by path %v; want the result the baseline holds in it and the new one not", in)
+		}
+	})
+}
+
+// matchedOn is how each of the build's leads was last paired, by finding.
+func (w *world) matchedOn(t *testing.T, targetID int64) map[int64]string {
+	t.Helper()
+	var rows []result
+	if err := w.DB.DB.NewSelect().Model(&rows).Column("finding_id", "matched_on").
+		Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
+		Where(`"f"."target_id" = ?`, targetID).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	out := map[int64]string{}
+	for _, r := range rows {
+		out[r.FindingID] = r.MatchedOn
+	}
+	return out
+}
+
+func TestAResultMovedWithNoFingerprintIsSeenAgainOnItsNearestLine(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		first := w.leads(t, w.Target.ID)
+
+		moved := inFRR
+		moved.line += 6
+		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+		if r := receiptOf(t, run); r.Seen != 1 || r.Opened != 0 || r.NotReproduced != 0 || r.Probable != 1 {
+			t.Errorf("receipt %+v; want the lead seen again, probably", r)
+		}
+		leads := w.leads(t, w.Target.ID)
+		if len(leads) != 1 || leads[0].ID != first[0].ID {
+			t.Fatalf("leads %+v; want the one lead the first run opened", leads)
+		}
+		if on := w.matchedOn(t, w.Target.ID)[leads[0].ID]; on != onLine {
+			t.Errorf("paired on %q; want the nearest line", on)
+		}
+	})
+}
+
+func TestAResultMovedWithinItsFunctionIsSeenAgainOnTheFunction(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		before := inside{inFRR, "bgp_attr_parse", "a1"}
+		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{before}, 10, ""))
+		after := before
+		after.line, after.print = 400, "b2"
+		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), documentOf([]interface{ json() string }{after}, 10, ""))
+		if r := receiptOf(t, run); r.Seen != 1 || r.Opened != 0 || r.Probable != 1 {
+			t.Errorf("receipt %+v; want the lead seen again, probably", r)
+		}
+		for _, on := range w.matchedOn(t, w.Target.ID) {
+			if on != onFunction {
+				t.Errorf("paired on %q; want the function", on)
+			}
+		}
+	})
+}
+
+func TestTheFirstRunOnABranchTakesThePlacesOfTheLineItWasCutFrom(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		tag := w.TargetFor(w.Tag, w.Customer)
+		w.inventory(t, w.Target.ID)
+		w.inventory(t, tag.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+
+		moved := inFRR
+		moved.line += 3
+		run, _ := w.send(t, tag.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+		if r := receiptOf(t, run); r.Opened != 1 || r.Inherited != 1 || r.Probable != 1 {
+			t.Errorf("receipt %+v; want one lead opened, carried probably from the branch", r)
+		}
+		branch, cut := w.leads(t, w.Target.ID), w.leads(t, tag.ID)
+		if len(branch) != 1 || len(cut) != 1 || branch[0].PlaceIdentity != cut[0].PlaceIdentity {
+			t.Errorf("branch %+v, tag %+v; want one lead each at one place", branch, cut)
+		}
+	})
+}
+
+func TestALaterRunOnABranchTakesNothingFromTheLineItWasCutFrom(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		tag := w.TargetFor(w.Tag, w.Customer)
+		w.inventory(t, w.Target.ID)
+		w.inventory(t, tag.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		w.send(t, tag.ID, start.Add(time.Hour), document([]sent{inSWSS}, 10))
+
+		moved := inFRR
+		moved.line += 3
+		run, _ := w.send(t, tag.ID, start.Add(2*time.Hour), document([]sent{inSWSS, moved}, 10))
+		if r := receiptOf(t, run); r.Opened != 1 || r.Inherited != 0 {
+			t.Errorf("receipt %+v; want the moved result opened as the tag's own", r)
+		}
+	})
+}
+
+func TestAResultAnotherBuildHoldsTakesThatLeadsPlace(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		other := w.TargetFor(w.Branch, w.Internal)
+		w.inventory(t, w.Target.ID)
+		w.inventory(t, other.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		moved := inFRR
+		moved.line += 3
+		w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{moved}, 10))
+
+		// The other variant's first run reports the result where it has moved
+		// to. The lead's place was minted from where it was first seen, so only
+		// the lead's newest key finds it.
+		run, _ := w.send(t, other.ID, start.Add(2*time.Hour), document([]sent{moved}, 10))
+		if r := receiptOf(t, run); r.Opened != 1 || r.Probable != 0 || r.Inherited != 0 {
+			t.Errorf("receipt %+v; want one lead opened, carried strongly", r)
+		}
+		here, there := w.leads(t, w.Target.ID), w.leads(t, other.ID)
+		if len(here) != 1 || len(there) != 1 || here[0].PlaceIdentity != there[0].PlaceIdentity {
+			t.Errorf("leads %+v and %+v; want one place", here, there)
+		}
+	})
+}
+
+func TestAClosedLeadFoundAgainOpensAtItsPlace(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		closed := w.leads(t, w.Target.ID)[0]
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"closed_at" = ?`, start.Add(time.Minute)).
+			Where(`"id" = ?`, closed.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
+		if r := receiptOf(t, run); r.Opened != 1 || r.Reopened != 1 {
+			t.Errorf("receipt %+v; want one lead opened at a closed lead's place", r)
+		}
+		leads := w.leads(t, w.Target.ID)
+		if len(leads) != 2 || leads[1].PlaceIdentity != closed.PlaceIdentity {
+			t.Errorf("leads %+v; want a second at the first's place", leads)
+		}
+	})
+}
+
+func TestARunFingerprintedDifferentlyFromTheBuildsLastIsARebaseline(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-5 * time.Hour)
+		plain := inside{inFRR, "", ""}
+		printed := inside{inFRR, "", "a1"}
+		for i, c := range []struct {
+			result inside
+			salt   string
+			want   bool
+		}{
+			{plain, "", false},
+			{printed, "", true},
+			{printed, "", false},
+			{printed, "0123456789abcdef", true},
+			{printed, "fedcba9876543210", true},
+		} {
+			run, status := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour),
+				documentOf([]interface{ json() string }{c.result}, 10, c.salt))
+			if status != series.Applied || run.Rebaseline != c.want || receiptOf(t, run).Rebaseline != c.want {
+				t.Errorf("run %d: %s, re-baseline %v; want %v", i, status, run.Rebaseline, c.want)
+			}
+		}
+	})
+}
+
+func TestARunReportingNothingLeavesTheFingerprintsAsTheyWere(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-5 * time.Hour)
+		const salt = "0123456789abcdef"
+		printed := inside{inFRR, "", "a1"}
+		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{printed}, 10, salt))
+		// Short of its units, so it marks nothing not reproduced and is never
+		// held. Its salt mark alone says nothing of how results are
+		// fingerprinted.
+		empty, _ := w.send(t, w.Target.ID, start.Add(time.Hour), documentOf(nil, 4, salt))
+		if empty.Fingerprints != "" {
+			t.Errorf("a run reporting nothing carries %q", empty.Fingerprints)
+		}
+		run, _ := w.send(t, w.Target.ID, start.Add(2*time.Hour), documentOf([]interface{ json() string }{printed}, 10, salt))
+		if run.Rebaseline {
+			t.Errorf("a re-baseline after a run that reported nothing")
+		}
+	})
+}
+
+func TestAClosedLeadFoundAgainIsReopenedWhereAnOlderBuildHoldsItToo(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		other := w.TargetFor(w.Branch, w.Internal)
+		w.inventory(t, w.Target.ID)
+		w.inventory(t, other.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		w.send(t, other.ID, start, document([]sent{inFRR}, 10))
+		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
+		closed := w.leads(t, w.Target.ID)[0]
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"closed_at" = ?`, start.Add(time.Minute)).
+			Where(`"id" = ?`, closed.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour), document([]sent{inFRR}, 10))
+		if r := receiptOf(t, run); r.Reopened != 1 {
+			t.Errorf("receipt %+v; want the build's own closed lead reopened", r)
 		}
 	})
 }

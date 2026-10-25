@@ -68,21 +68,26 @@ type Series struct {
 type Run struct {
 	bun.BaseModel `bun:"table:series_run,alias:sr"`
 
-	ID           int64      `bun:"id,pk,autoincrement"`
-	SeriesID     int64      `bun:"series_id,notnull"`
-	TargetID     int64      `bun:"target_id,notnull"`
-	ContentHash  string     `bun:"content_hash,notnull"`
-	SourceCommit string     `bun:"source_commit,nullzero"`
-	BuiltAt      time.Time  `bun:"built_at,notnull"`
-	ReceivedAt   time.Time  `bun:"received_at,notnull"`
-	Credential   string     `bun:"credential,nullzero"`
-	Status       Status     `bun:"status,notnull"`
-	Failure      string     `bun:"failure,nullzero"`
-	Params                  // what the run says about itself
-	Comparable   *bool      `bun:"comparable"`
-	Reason       Reason     `bun:"not_comparable,nullzero"`
-	ScanID       *int64     `bun:"scan_id"`
-	Baseline     bool       `bun:"baseline,notnull"`
+	ID           int64     `bun:"id,pk,autoincrement"`
+	SeriesID     int64     `bun:"series_id,notnull"`
+	TargetID     int64     `bun:"target_id,notnull"`
+	ContentHash  string    `bun:"content_hash,notnull"`
+	SourceCommit string    `bun:"source_commit,nullzero"`
+	BuiltAt      time.Time `bun:"built_at,notnull"`
+	ReceivedAt   time.Time `bun:"received_at,notnull"`
+	Credential   string    `bun:"credential,nullzero"`
+	Status       Status    `bun:"status,notnull"`
+	Failure      string    `bun:"failure,nullzero"`
+	Params                 // what the run says about itself
+	Comparable   *bool     `bun:"comparable"`
+	Reason       Reason    `bun:"not_comparable,nullzero"`
+	ScanID       *int64    `bun:"scan_id"`
+	Baseline     bool      `bun:"baseline,notnull"`
+	// Fingerprints is the schemes the run's results carry and the mark of
+	// the salt the client's is taken with, empty where it reported nothing.
+	// A change from the build's last is a re-baseline.
+	Fingerprints string     `bun:"fingerprints,nullzero"`
+	Rebaseline   bool       `bun:"rebaseline,notnull"`
 	Receipt      string     `bun:"receipt,nullzero"`
 	AppliedAt    *time.Time `bun:"applied_at"`
 }
@@ -272,6 +277,28 @@ func (s *Store) Previous(ctx context.Context, run *Run) (*Run, error) {
 	return &prev, nil
 }
 
+// LastPrinted is the fingerprints of the newest run applied to this run's
+// build that reported anything, or empty where none has.
+func (s *Store) LastPrinted(ctx context.Context, run *Run) (string, error) {
+	var prints []string
+	err := s.db.NewSelect().Model((*Run)(nil)).Column("fingerprints").
+		Where(`"sr"."series_id" = ?`, run.SeriesID).
+		Where(`"sr"."target_id" = ?`, run.TargetID).
+		Where(`"sr"."status" = ?`, Applied).
+		Where(`"sr"."fingerprints" IS NOT NULL`).
+		Where(`"sr"."id" <> ?`, run.ID).
+		OrderExpr(`"sr"."built_at" DESC, "sr"."id" DESC`).
+		Limit(1).
+		Scan(ctx, &prints)
+	if err != nil {
+		return "", fmt.Errorf("read the fingerprints the build last carried: %w", err)
+	}
+	if len(prints) == 0 {
+		return "", nil
+	}
+	return prints[0], nil
+}
+
 // HasBaseline reports whether a series has a comparable run applied to any
 // build of its product, which is what makes a later run something other
 // than the baseline.
@@ -297,7 +324,8 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 		run.AppliedAt = &at
 	}
 	_, err := s.db.NewUpdate().Model(run).
-		Column("status", "failure", "comparable", "not_comparable", "scan_id", "baseline", "receipt",
+		Column("status", "failure", "comparable", "not_comparable", "scan_id", "baseline", "fingerprints",
+			"rebaseline", "receipt",
 			"applied_at", "tool_name", "tool_version", "client_version", "rules_digest", "rules_count",
 			"units_expected", "units_analyzed", "exit_status", "completed").
 		WherePK().Exec(ctx)
