@@ -712,7 +712,11 @@ deployment.</p>
 </tr>
 <tr>
 <td><code>private-read</code></td>
-<td>Read findings nobody has announced, and no others</td>
+<td>Read findings nobody has announced yet, and no others</td>
+</tr>
+<tr>
+<td><code>internal-read</code></td>
+<td>Read internal findings, and no others</td>
 </tr>
 <tr>
 <td><code>public-triage</code></td>
@@ -720,11 +724,15 @@ deployment.</p>
 </tr>
 <tr>
 <td><code>private-triage</code></td>
-<td>The same for findings nobody has announced, including recording one and moving its disclosure date. Disclosed findings take <code>public-triage</code></td>
+<td>The same for findings nobody has announced yet, including recording one and moving its disclosure date. Disclosed findings take <code>public-triage</code></td>
+</tr>
+<tr>
+<td><code>internal-triage</code></td>
+<td>The same for internal findings. Disclosed and undisclosed findings take their own triage roles</td>
 </tr>
 <tr>
 <td><code>approver</code></td>
-<td>Agree to somebody else's claim. A triager may also approve, and the proposer may never approve their own</td>
+<td>Agree to somebody else's claim, at a visibility its holder reads. A triager may also approve, and the proposer may never approve their own</td>
 </tr>
 <tr>
 <td><code>assigner</code></td>
@@ -737,13 +745,40 @@ deployment.</p>
 </tbody>
 </table>
 <p>Seeing is never changing. A read role reaches no act, and every act is a
-role of its own. That is why there are two read roles rather than one: what has
-been announced and what has not are different populations, and a great many
-people should see the first without seeing the second.</p>
-<p>The two visibilities are separate grants. A private role reaches findings
+role of its own. That is why there is a read role per visibility: what has
+been announced, what has not been yet, and what is internal are different
+populations, and a great many people should see the first without seeing the
+others.</p>
+<table>
+<thead>
+<tr>
+<th>Visibility</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Public</td>
+<td>Findings that have been disclosed</td>
+</tr>
+<tr>
+<td>Private</td>
+<td>Findings nobody has announced yet, which are disclosed in time</td>
+</tr>
+<tr>
+<td>Internal</td>
+<td>Unconfirmed results nobody has judged, such as an analyzer's leads. They are never disclosed and never published</td>
+</tr>
+</tbody>
+</table>
+<p>The three visibilities are separate grants. A private role reaches findings
 nobody has announced and no others, so somebody working private reports is not
-handed every public finding as well. Somebody who works both holds both. A
-triage role carries reading at its own visibility.</p>
+handed every public finding as well, and reading private findings does not read
+internal ones. Somebody who works more than one holds each. A triage role
+carries reading at its own visibility. Somebody holding <code>internal-read</code> alone
+sees the product listed with nothing open against it but internal findings.</p>
+<p>The findings lists, screens and reports show no analysis result, and analysis
+results are the only internal findings. Analysis results reach none of them.</p>
 <p>A disclosed finding assigned to somebody is listed among their work whatever
 they read, drawn in the tree of what they hold, and theirs to hand back, because
 an assignment carries what was assigned. Opening the finding, like every other
