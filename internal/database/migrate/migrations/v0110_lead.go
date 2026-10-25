@@ -96,17 +96,28 @@ func leadV0110(t *columnTypes) []string {
 			CONSTRAINT "rule_rating_rule_unique" UNIQUE ("vulnerability_id"),
 			CONSTRAINT "rule_rating_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
 		)` + t.suffix,
+
+		// The weakness families a rule's weaknesses belong to, by which two
+		// analyzers' leads at one place are the same flaw.
+		`CREATE TABLE "rule_family" (
+			"id"               ` + t.id + `,
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			"family"           ` + t.name + ` NOT NULL,
+			CONSTRAINT "rule_family_unique" UNIQUE ("vulnerability_id", "family"),
+			CONSTRAINT "rule_family_rule_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id")
+		)` + t.suffix,
 	}
 }
 
-// createLeadV0110 makes the escalation, standing rule and rule rating tables, stepped over where they are
+// createLeadV0110 makes the escalation, standing rule, rule rating and rule
+// family tables, stepped over where they are
 // already there.
 func createLeadV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule", "rule_rating"} {
+	for _, table := range []string{"lead_escalation", "lead_important_path", "lead_rule", "rule_rating", "rule_family"} {
 		present, err := u.hasColumn(table, "id")
 		if err != nil {
 			return err

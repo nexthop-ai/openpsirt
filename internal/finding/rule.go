@@ -147,6 +147,15 @@ func (v *Vulnerabilities) Rule(ctx context.Context, rule Rule) (int64, error) {
 	return id, nil
 }
 
+// ruleFamily is a weakness family a rule's weaknesses belong to.
+type ruleFamily struct {
+	bun.BaseModel `bun:"table:rule_family,alias:rf"`
+
+	ID              int64  `bun:"id,pk,autoincrement"`
+	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
+	Family          string `bun:"family,notnull"`
+}
+
 // rateRule records the rating a rule arrived with in place of the one held,
 // and ranks every weakness recorded for it. A rule arriving unrated keeps the
 // rating held: a run of the tool that omits it says nothing about the rule.
@@ -157,8 +166,17 @@ func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) err
 		return err
 	}
 	tier := weakness.TierOther
+	var families []ruleFamily
 	for _, w := range named {
 		tier = max(tier, weakness.TierOf(w))
+		families = append(families, ruleFamily{VulnerabilityID: id, Family: weakness.Family(w)})
+	}
+	if _, err := v.db.NewDelete().Model((*ruleFamily)(nil)).
+		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {
+		return err
+	}
+	if err := database.InBatchesKeeping(ctx, v.db, families); err != nil {
+		return err
 	}
 	var row ruleRating
 	err := v.db.NewSelect().Model(&row).Where(`"rr"."vulnerability_id" = ?`, id).Scan(ctx)

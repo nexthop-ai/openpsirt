@@ -26,6 +26,7 @@ shares is in `DESIGN-ingest.md`.
 - [Lead triage](#lead-triage)
 - [Lead queue](#lead-queue)
 - [Weakness families](#weakness-families)
+- [Grouped leads](#grouped-leads)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -454,6 +455,7 @@ path, line, function and message, the build it is on, and its state there.
 | Order | |
 |---|---|
 | The tier of the weaknesses the rule names, highest first (§ Weakness families) | Memory safety above style |
+| Whether another analyzer reports the same flaw on the build (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real |
 | The tool's own security severity for the rule, highest first, and a rule with none after every rule with one | CodeQL and semgrep rate a rule's results from 0 to 10 |
 | The tool's own precision for the rule: `very-high`, `high`, `medium`, `low`, then none | How often the rule is right, as its tool measures it |
 | Newest first | The work that arrived last is the work nobody has looked at |
@@ -486,6 +488,7 @@ A baseline lead enters the queue when it is escalated.
 |---|---|
 | Somebody holding `internal-triage` pulling it in | On every build of the product the lead is on. Recorded with who pulled it in and when, and pulled in again it keeps the first |
 | Its path being at or under an important path | A product setting under `internal-triage`, recorded in the administrative trail. Taking a path off returns its leads to the baseline |
+| Another analyzer's lead on its build being the same flaw (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real. The other lead closing returns it to the baseline |
 
 | Rule | |
 |---|---|
@@ -522,6 +525,33 @@ class.
 
 The table is a judgment no decision records: memory safety above style, for
 the C and C++ these analyzers read.
+
+## Grouped leads
+
+Two analyzers on one build report some flaws twice. Each tool's result stays
+its own lead, with its own history. Two leads are the same flaw where every
+one of these holds:
+
+| Condition | |
+|---|---|
+| Both are open on one build | A flaw is in the code one build was made from |
+| Their rules differ | Two flaws of one class on adjacent lines are told apart only by the tool reporting them as two |
+| Their rules' weaknesses share a family (§ Weakness families) | One overflow was CWE-788, 119 and 121 from three tools |
+| Their last places are in one file, within two lines | cppcheck names where a problem starts and the others where it bites: first places differed in 8 of 41 same-flaw pairs, last places in 2 |
+
+Within two lines grouped every same-flaw pair of clang, cppcheck, CodeQL and
+semgrep over libyaml, jq, Lua, giflib and seeded files, and none of five pairs
+of flaws a line or two apart. A wider window or a first place falsely merged
+at least one.
+
+| Rule | |
+|---|---|
+| A result's last place is the last step of its path, the last related place in its own file, or its own place | cppcheck lists the places after the first as related, in order |
+| Leads within ten lines and otherwise alike are listed as possibly the same flaw, and never grouped | A false merge hides a second real flaw behind one decision |
+| A lead's evidence lists the leads it is the same flaw with and those it possibly is, where the reader may read them | Visibility is enforced where the leads are read (REQ-42) |
+| A group is a lead and the leads within two lines of it, worked out for each lead | Two leads each the same flaw as a third and four lines apart are two groups |
+| Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead stands does not depend on who is looking |
+| A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
 
 ## Receipts
 
@@ -659,8 +689,7 @@ it is about.
 | The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
-| Escalation by a second tool reporting the same flaw | Not built. A lead leaves the baseline when somebody pulls it in or its path is important |
-| The queue ordered by a second tool reporting the same flaw | Not built. The queue is ordered by weakness tier and the tool's own rating, then newest first |
+| One decision about every lead of a group | Not built. Each lead takes its own claim, and its evidence lists the leads it is one flaw with |
 | Weaknesses for plain cppcheck and for clang | Not built. A rule names the weaknesses its tags name, which CodeQL and semgrep write and these two do not |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |

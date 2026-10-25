@@ -46,6 +46,17 @@ type LeadEvidenceBody struct {
 	Compare   string      `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
 	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
 	State     LeadState   `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
+	Kin       []LeadKin   `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
+}
+
+// LeadKin is another lead on a build that is the same flaw as a lead, or
+// possibly is.
+type LeadKin struct {
+	Place string `json:"place" doc:"The other lead's place identity"`
+	Rule  string `json:"rule" doc:"Its analyzer's rule, as <tool>/<rule>"`
+	Path  string `json:"path" doc:"The file of the last place it names"`
+	Line  int    `json:"line,omitempty" doc:"The line of the last place it names"`
+	Same  bool   `json:"same" doc:"Whether it is the same flaw: a weakness of the same family, its last place within two lines. Otherwise within ten, and offered as possibly the same"`
 }
 
 // LeadState is where a lead stands.
@@ -104,6 +115,14 @@ func registerLeads(api huma.API, in core.Deps) {
 			At: leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
+			Kin: make([]LeadKin, 0, len(evidence.Kin)),
+		}
+		for _, k := range evidence.Kin {
+			one := LeadKin{Place: k.Place, Rule: k.Rule, Path: k.Path, Same: k.Same}
+			if k.Line != nil {
+				one.Line = *k.Line
+			}
+			body.Kin = append(body.Kin, one)
 		}
 		for _, p := range evidence.Steps {
 			body.Steps = append(body.Steps, leadPlace(p))

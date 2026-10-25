@@ -216,6 +216,11 @@ func analysisV0110(t *columnTypes) []string {
 			-- product keeps source under its path.
 			"snippet"       ` + t.text + ` NULL,
 			"snippet_line"  INTEGER NULL,
+			-- The last place the result names, which two analyzers reporting
+			-- one flaw agree on: the last step of its path, the last related
+			-- location in its own file, or its own location.
+			"last_path"     ` + t.text + ` NOT NULL,
+			"last_line"     INTEGER NULL,
 			CONSTRAINT "analysis_result_finding_unique" UNIQUE ("finding_id"),
 			CONSTRAINT "analysis_result_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,

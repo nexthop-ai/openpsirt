@@ -5594,6 +5594,13 @@ components:
         compare:
           description: The address comparing the lead's repository between those two builds
           type: string
+        kin:
+          description: Other analyzers' leads on the build that are the same flaw, and those that possibly are
+          items:
+            $ref: "#/components/schemas/LeadKin"
+          type:
+            - array
+            - "null"
         last_seen:
           description: When the build of the newest run that saw the lead was made
           format: date-time
@@ -5640,6 +5647,7 @@ components:
         - open
         - last_seen
         - state
+        - kin
       type: object
     LeadFixedBody:
       additionalProperties: false
@@ -5657,6 +5665,31 @@ components:
           type: string
       required:
         - at
+      type: object
+    LeadKin:
+      additionalProperties: false
+      properties:
+        line:
+          description: The line of the last place it names
+          format: int64
+          type: integer
+        path:
+          description: The file of the last place it names
+          type: string
+        place:
+          description: The other lead's place identity
+          type: string
+        rule:
+          description: Its analyzer's rule, as <tool>/<rule>
+          type: string
+        same:
+          description: "Whether it is the same flaw: a weakness of the same family, its last place within two lines. Otherwise within ten, and offered as possibly the same"
+          type: boolean
+      required:
+        - place
+        - rule
+        - path
+        - same
       type: object
     LeadPlace:
       additionalProperties: false

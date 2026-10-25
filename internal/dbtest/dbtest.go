@@ -1028,6 +1028,7 @@ var tables = []string{
 	"vulnerability_weakness",
 	"vulnerability_rating",
 	"rule_rating",
+	"rule_family",
 	"vulnerability",
 	"scan_document_chunk",
 	"scan_document",

@@ -9772,6 +9772,8 @@ export interface components {
             at: components["schemas"]["LeadPlace"];
             /** @description The address comparing the lead's repository between those two builds */
             compare?: string;
+            /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
+            kin: components["schemas"]["LeadKin"][] | null;
             /**
              * Format: date-time
              * @description When the build of the newest run that saw the lead was made
@@ -9808,6 +9810,21 @@ export interface components {
              * @description When it was closed
              */
             at: string;
+        };
+        LeadKin: {
+            /**
+             * Format: int64
+             * @description The line of the last place it names
+             */
+            line?: number;
+            /** @description The file of the last place it names */
+            path: string;
+            /** @description The other lead's place identity */
+            place: string;
+            /** @description Its analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /** @description Whether it is the same flaw: a weakness of the same family, its last place within two lines. Otherwise within ten, and offered as possibly the same */
+            same: boolean;
         };
         LeadPlace: {
             /** @description Whether the link opens on a branch the product names rather than on the analyzed commit */

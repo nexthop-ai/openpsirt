@@ -41,7 +41,8 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A product records the leads somebody pulled into the queue, the
 //     paths whose leads are in it, and the standing rules that dismiss
 //     leads.
-//   - An analyzer's rule records the tool's own rating of its results.
+//   - An analyzer's rule records the tool's own rating of its results and
+//     the weakness families it finds, and a result the last place it names.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {

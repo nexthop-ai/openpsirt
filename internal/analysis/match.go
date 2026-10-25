@@ -41,6 +41,25 @@ type result struct {
 	Level             string `bun:"level,nullzero"`
 	Snippet           string `bun:"snippet,nullzero"`
 	SnippetLine       *int   `bun:"snippet_line"`
+	LastPath          string `bun:"last_path,notnull"`
+	LastLine          *int   `bun:"last_line"`
+}
+
+// lastOf is the last place a result names: the last step of the analyzer's
+// path, the last related location in the result's own file, or the result's
+// own location. Two analyzers reporting one flaw disagree about where it
+// starts and agree about where it bites: cppcheck names the check first and
+// the dereference last, and the others name the dereference.
+func lastOf(k Keyed) (string, int) {
+	if n := len(k.Steps); n > 0 && k.Steps[n-1].Path != "" {
+		return k.Steps[n-1].Path, k.Steps[n-1].StartLine
+	}
+	for i := len(k.Related) - 1; i >= 0; i-- {
+		if k.Related[i].Path == k.Path {
+			return k.Path, k.Related[i].StartLine
+		}
+	}
+	return k.Path, k.StartLine
 }
 
 // location is another place a result names: a step on the analyzer's path,
@@ -224,6 +243,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 	var locations []location
 	for _, id := range ids {
 		k := said[id]
+		lastPath, lastLine := lastOf(k)
 		results = append(results, result{
 			FindingID: id, Path: k.Path,
 			StartLine: stated(k.StartLine), StartColumn: stated(k.StartColumn),
@@ -232,6 +252,7 @@ func write(ctx context.Context, db bun.IDB, said map[int64]Keyed, replace bool) 
 			Fingerprint: k.Print, FingerprintScheme: k.Scheme, MatchKey: k.Key,
 			FunctionKey: k.FunctionKey, LineKey: k.LineKey, MatchedOn: k.On, Level: k.Level,
 			Snippet: k.Snippet, SnippetLine: stated(k.SnippetLine),
+			LastPath: lastPath, LastLine: stated(lastLine),
 		})
 		ordinal := 0
 		for _, steps := range []struct {

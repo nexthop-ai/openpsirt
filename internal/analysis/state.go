@@ -44,9 +44,11 @@ var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision" AS "dc"
 	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
 
 // escalated is whether the finding under "f", whose result is under "ar", is
-// out of the baseline in the product bound: somebody pulled its lead in, or
-// its path is under one the product marked important.
-var escalated = `(EXISTS (SELECT 1 FROM "lead_escalation" AS "le"
+// out of the baseline in the product bound: somebody pulled its lead in, its
+// path is under one the product marked important, or another analyzer
+// reports the same flaw on its build.
+var escalated = `(` + corroborated + `
+	OR EXISTS (SELECT 1 FROM "lead_escalation" AS "le"
 		WHERE "le"."product_id" = ? AND "le"."place_identity" = "f"."place_identity")
 	OR EXISTS (SELECT 1 FROM "lead_important_path" AS "ip"
 		WHERE "ip"."product_id" = ? AND ("ip"."prefix" = "ar"."path"

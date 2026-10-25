@@ -37,6 +37,9 @@ type Evidence struct {
 	Unchanged bool
 	// State is where the lead stands.
 	State State
+	// Kin is the other leads on the build that are the same flaw, or
+	// possibly are.
+	Kin []Kin
 }
 
 // Located is one place a run named for a lead.
@@ -123,6 +126,9 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		ColumnExpr(state, stateArgs...).
 		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State); err != nil {
 		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)
+	}
+	if out.Kin, err = KinOf(ctx, db, subject, productID, lead.ID); err != nil {
+		return Evidence{}, err
 	}
 	if seen.AbsentRunID != nil {
 		absent, after, err := runAndModules(ctx, store, *seen.AbsentRunID)
