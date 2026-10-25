@@ -328,10 +328,11 @@ is sent.
 ### Evidence
 
 `GET …/streams/{stream}/variants/{variant}/leads/{place}` answers one lead's
-evidence on one build: where it is, the path the analyzer took to it, the
-related places, each with its link and source, when it was last seen, and,
-for a lead no longer open, when it was first not seen with the comparison
-above. The place identity addresses a lead because a rule's name holds a
+evidence on one build: its rule, where it is, the path the analyzer took to
+it, the related places, each with its link and source, when it was last seen,
+and, for a lead no longer open, when it was first not seen with the comparison
+above. It names the live claim at the lead, agreed to or waiting, where the
+reader may read one. The place identity addresses a lead because a rule's name holds a
 slash.
 
 | Rule | |
@@ -700,8 +701,8 @@ it is about.
 
 | Part | State |
 |---|---|
-| The screens and exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else |
-| A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
+| The exports that read leads | The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it, and nowhere else. `DESIGN-interface.md` § Static analysis leads holds the screens |
+| A screen for a product's repository settings | Not built. They are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |

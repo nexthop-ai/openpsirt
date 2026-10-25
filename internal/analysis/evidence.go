@@ -35,6 +35,8 @@ type Evidence struct {
 	// neither patched it.
 	Compare   string
 	Unchanged bool
+	// Rule is the analyzer's rule, as the issue it is filed under names it.
+	Rule string
 	// State is where the lead stands.
 	State State
 	// Kin is the other leads on the build that are the same flaw, or
@@ -123,8 +125,10 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		ColumnExpr(state, stateArgs...).
-		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State); err != nil {
+		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
+		ColumnExpr(state+` AS "state"`, stateArgs...).
+		ColumnExpr(`"vu"."identifier" AS "rule"`).
+		Where(`"f"."id" = ?`, lead.ID).Limit(1).Scan(ctx, &out.State, &out.Rule); err != nil {
 		return Evidence{}, fmt.Errorf("read where lead %d stands: %w", lead.ID, err)
 	}
 	if out.Kin, err = KinOf(ctx, db, subject, productID, lead.ID); err != nil {

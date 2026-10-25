@@ -9772,6 +9772,8 @@ export interface components {
             at: components["schemas"]["LeadPlace"];
             /** @description The address comparing the lead's repository between those two builds */
             compare?: string;
+            /** @description The live claim at the lead, agreed to or waiting for a second person. Absent where there is none */
+            decision?: components["schemas"]["DecisionBody"];
             /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
             kin: components["schemas"]["LeadKin"][] | null;
             /**
@@ -9788,6 +9790,8 @@ export interface components {
             open: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
             /**
              * @description Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to
              * @enum {string}

@@ -327,3 +327,36 @@ func TestAClaimWaitingOnASecondPersonTakesItsLeadOutOfTheQueue(t *testing.T) {
 		}
 	})
 }
+
+func TestALeadsEvidenceNamesItsRuleAndTheClaimStandingAtIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		type evidence struct {
+			Rule     string             `json:"rule"`
+			Decision *core.DecisionBody `json:"decision"`
+		}
+		var before evidence
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &before)
+		if before.Rule != "clang-tidy/leak" || before.Decision != nil {
+			t.Fatalf("the evidence before any claim is %+v; want the rule and no claim", before)
+		}
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
+		var decided core.DecisionBody
+		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		var after evidence
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &after)
+		if after.Decision == nil || after.Decision.ClaimID != decided.ClaimID || !after.Decision.NeedsApproval {
+			t.Errorf("the evidence names the claim %+v; want claim %d, waiting", after.Decision, decided.ClaimID)
+		}
+		// A claim withdrawn stands nowhere.
+		httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, fmt.Sprintf("/v1/claims/%d", decided.ClaimID), ``)
+		var withdrawn evidence
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &withdrawn)
+		if withdrawn.Decision != nil {
+			t.Errorf("the evidence names a withdrawn claim %+v", withdrawn.Decision)
+		}
+	})
+}

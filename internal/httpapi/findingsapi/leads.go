@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // LeadPlace is one place an analyzer named for a lead.
@@ -37,16 +38,18 @@ type LeadPlace struct {
 
 // LeadEvidenceBody is what the newest run that saw a lead said about it.
 type LeadEvidenceBody struct {
-	At        LeadPlace   `json:"at" doc:"Where the lead is"`
-	Steps     []LeadPlace `json:"steps" doc:"The path the analyzer took to it, in order"`
-	Related   []LeadPlace `json:"related" doc:"The other places the analyzer names"`
-	Open      bool        `json:"open" doc:"Whether the lead is open on the build"`
-	LastSeen  string      `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
-	NotSeen   string      `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
-	Compare   string      `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
-	Unchanged bool        `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
-	State     LeadState   `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
-	Kin       []LeadKin   `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
+	Rule      string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	At        LeadPlace          `json:"at" doc:"Where the lead is"`
+	Steps     []LeadPlace        `json:"steps" doc:"The path the analyzer took to it, in order"`
+	Related   []LeadPlace        `json:"related" doc:"The other places the analyzer names"`
+	Open      bool               `json:"open" doc:"Whether the lead is open on the build"`
+	LastSeen  string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
+	NotSeen   string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
+	Compare   string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
+	Unchanged bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
+	State     LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
+	Kin       []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
+	Decision  *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
 }
 
 // LeadKin is another lead on a build that is the same flaw as a lead, or
@@ -112,7 +115,8 @@ func registerLeads(api huma.API, in core.Deps) {
 			return nil, core.Absent(in.Logger, err, "that lead's evidence could not be read", core.NoSuchFinding)
 		}
 		body := LeadEvidenceBody{
-			At: leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
+			Rule: evidence.Rule,
+			At:   leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
 			Kin: make([]LeadKin, 0, len(evidence.Kin)),
@@ -123,6 +127,19 @@ func registerLeads(api huma.API, in core.Deps) {
 				one.Line = *k.Line
 			}
 			body.Kin = append(body.Kin, one)
+		}
+		held, err := triage.NewStore(in.DB.DB).PreviouslyAt(ctx, subject, triage.Place{
+			ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID, PlaceIdentity: lead.PlaceIdentity,
+		})
+		if err != nil {
+			return nil, core.Absent(in.Logger, err, "the claim at that lead could not be read", core.NoSuchFinding)
+		}
+		for _, d := range held {
+			if d.LiveKey != nil {
+				decided := core.DecisionBodyOf(d)
+				body.Decision = &decided
+				break
+			}
 		}
 		for _, p := range evidence.Steps {
 			body.Steps = append(body.Steps, leadPlace(p))

@@ -14,6 +14,8 @@ export const EVERY_CLAIM_KEY = [
   "finding",
   "findings",
   "home",
+  "lead",
+  "leads",
   "my-claims",
   "queue",
 ].sort();

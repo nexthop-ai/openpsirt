@@ -134,6 +134,10 @@ export function useAfterClaim() {
     // change under a revision and neither list held them.
     void queries.invalidateQueries({ queryKey: ["claim"] });
     void queries.invalidateQueries({ queryKey: ["comments"] });
+    // A claim about a lead moves where the lead stands, and the queue it is
+    // listed in.
+    void queries.invalidateQueries({ queryKey: ["leads"] });
+    void queries.invalidateQueries({ queryKey: ["lead"] });
     // And the list the work came from. A claim answers findings, so agreeing
     // to one moves what the list says about every place it covers.
     void queries.invalidateQueries({ queryKey: ["findings"] });
