@@ -126,8 +126,9 @@ rules.
 ## Source locations
 
 The path, lines, columns, enclosing function, flow steps and related places
-of a finding are stored as the newest run that saw it stated them. Source
-links and snippets are **not built**.
+of a finding are stored as the newest run that saw it stated them. Links into
+the source are built when the evidence is read, and source text is kept only
+under a path the product allows it for (`DESIGN-analysis.md` § Source).
 
 ## Limits
 
