@@ -114,6 +114,38 @@ func TestASecondAnalyzerReportingTheSameFlawGroupsItAndPullsItIn(t *testing.T) {
 	})
 }
 
+func TestClangsCheckersRunByClangTidyAreNotASecondAnalyzer(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		// clang and clang-tidy both report clang's leak checker on one line,
+		// one rule in one family.
+		now := time.Now().UTC()
+		httpapitest.ApplyRunIn(t, r, "clang/default", now.Add(-90*time.Minute),
+			httpapitest.OtherToolRun("clang", "unix.Malloc", "401", "src/c.c", 7))
+		httpapitest.ApplyRunIn(t, r, "clang-tidy/analyzer", now.Add(-80*time.Minute),
+			httpapitest.OtherToolRun("clang-tidy", "clang-analyzer-unix.Malloc", "401", "src/c.c", 7))
+		var both []string
+		for _, state := range []string{"?state=baseline", ""} {
+			for _, lead := range leadsOf(t, r, "internal-reader", state).Items {
+				if lead.Path == "src/c.c" {
+					both = append(both, lead.Place)
+				}
+			}
+		}
+		if len(both) != 2 {
+			t.Fatalf("the baseline holds %v at src/c.c; want the two leak results", both)
+		}
+		for _, place := range both {
+			if kin := kinOf(t, r, place); len(kin) != 0 {
+				t.Errorf("lead %s has kin %+v; want none of clang's own checker", place, kin)
+			}
+			if got := leadState(t, r, place); got != "baseline" {
+				t.Errorf("lead %s is %q; want it in the baseline", place, got)
+			}
+		}
+	})
+}
+
 func TestTwoRulesOfOneAnalyzerOnOneLineAreNotOneFlaw(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)

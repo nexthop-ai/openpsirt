@@ -55,3 +55,18 @@ func TestEveryClangCheckerMapsToAWeaknessTheCatalogNames(t *testing.T) {
 		}
 	}
 }
+
+func TestClangCheckersClangTidyRunsAreClangs(t *testing.T) {
+	for name, want := range map[string]string{
+		"clang-tidy/clang-analyzer-unix.Malloc":          "clang",
+		"Clang-Tidy/clang-analyzer-core.NullDereference": "clang",
+		"clang/unix.Malloc":                              "clang",
+		"clang-tidy/bugprone-use-after-move":             "clang-tidy",
+		"cppcheck/nullPointer":                           "cppcheck",
+		"CodeQL/cpp/overflow":                            "codeql",
+	} {
+		if got := weakness.Analyzer(name); got != want {
+			t.Errorf("%s is of analyzer %q; want %q", name, got, want)
+		}
+	}
+}

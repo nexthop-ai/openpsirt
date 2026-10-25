@@ -550,7 +550,7 @@ one of these holds:
 | Condition | |
 |---|---|
 | Both are open on one build | A flaw is in the code one build was made from |
-| Their analyzers differ | One analyzer reporting two results on adjacent lines has already told them apart. An analyzer is the part of a rule's name before the first `/`, in any case |
+| Their analyzers differ | One analyzer reporting two results on adjacent lines has already told them apart. An analyzer is the part of a rule's name before the first `/`, in any case, and a clang checker clang-tidy runs is clang's: clang-tidy runs clang's own static analyzer, so the two agreeing is one analyzer agreeing with itself |
 | Their rules' weaknesses share a family (§ Weakness families) | One overflow was CWE-788, 119 and 121 from three tools |
 | Their last places are in one file, within two lines | cppcheck names where a problem starts and the others where it bites: first places differed in 8 of 41 same-flaw pairs, last places in 2 |
 

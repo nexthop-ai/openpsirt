@@ -164,13 +164,6 @@ type ruleFamily struct {
 	Tool            string `bun:"tool,notnull"`
 }
 
-// toolOf is the analyzer a rule is of: the part of its name before the first
-// slash, in lower case.
-func toolOf(rule string) string {
-	tool, _, _ := strings.Cut(strings.TrimSpace(rule), "/")
-	return strings.ToLower(tool)
-}
-
 // rateRule records the rating a rule arrived with in place of the one held,
 // and ranks every weakness recorded for it. A rule arriving unrated keeps the
 // rating held: a run of the tool that omits it says nothing about the rule.
@@ -193,7 +186,7 @@ func (v *Vulnerabilities) rateRule(ctx context.Context, id int64, rule Rule) err
 			continue
 		}
 		seen[family] = true
-		families = append(families, ruleFamily{VulnerabilityID: id, Family: family, Tool: toolOf(rule.Name)})
+		families = append(families, ruleFamily{VulnerabilityID: id, Family: family, Tool: weakness.Analyzer(rule.Name)})
 	}
 	if _, err := v.db.NewDelete().Model((*ruleFamily)(nil)).
 		Where(`"vulnerability_id" = ?`, id).Exec(ctx); err != nil {

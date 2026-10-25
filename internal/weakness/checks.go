@@ -70,6 +70,20 @@ var clangChecks = map[string][]string{
 // checker's name.
 const clangTidyAnalyzer = "clang-analyzer-"
 
+// Analyzer is the analyzer an analyzer's rule is of, by the name it is filed
+// under: the tool's name in lower case, before the first slash. A clang
+// checker clang-tidy runs is clang's: clang-tidy runs clang's own static
+// analyzer under its checker names, so the two agreeing is one analyzer
+// agreeing with itself.
+func Analyzer(name string) string {
+	tool, rule, _ := strings.Cut(strings.TrimSpace(name), "/")
+	tool = strings.ToLower(tool)
+	if tool == "clang-tidy" && strings.HasPrefix(rule, clangTidyAnalyzer) {
+		return "clang"
+	}
+	return tool
+}
+
 // OfRule is the weaknesses this holds for an analyzer's rule, by the name it
 // is filed under: the tool's name in lower case, a slash, and the rule. It
 // answers for cppcheck, clang, and the clang checkers clang-tidy runs, and is
