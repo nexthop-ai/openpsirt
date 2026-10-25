@@ -457,6 +457,11 @@ path, line, function and message, the build it is on, and its state there.
 | The tool's own precision for the rule: `very-high`, `high`, `medium`, `low`, then none | How often the rule is right, as its tool measures it |
 | Newest first | The work that arrived last is the work nobody has looked at |
 
+Whether a path ships orders nothing. Code that does not ship — tests, tools,
+examples — is set aside by a standing rule naming its path (§ Dismissal
+rules), which takes its leads out of the queue rather than lower in it, and
+one way to say a path does not matter is kept rather than two.
+
 | List | Holds |
 |---|---|
 | The queue, with no state named | Open leads with no claim waiting for a second person |
@@ -654,7 +659,7 @@ it is about.
 | A screen for a product's repository settings, a lead's evidence and a claim about a lead | Not built. All three are read and written through the API |
 | Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
 | Escalation by a second tool reporting the same flaw | Not built. A lead leaves the baseline when somebody pulls it in or its path is important |
-| The queue ordered by a second tool reporting the same flaw, and by whether the path ships | Not built. The queue is ordered by weakness tier and the tool's own rating, then newest first |
+| The queue ordered by a second tool reporting the same flaw | Not built. The queue is ordered by weakness tier and the tool's own rating, then newest first |
 | Weaknesses for plain cppcheck and for clang | Not built. A rule names the weaknesses its tags name, which CodeQL and semgrep write and these two do not |
 | Telling anybody a lead was escalated | Not built |
 | Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
