@@ -139,7 +139,9 @@ export function Leads() {
                         {row.stream} · {row.variant}
                         {row.builds > 1 && ` +${row.builds - 1}`}
                       </td>
-                      <td className="hint">{on(row.opened)}</td>
+                      <td className="hint" style={{ whiteSpace: "nowrap" }}>
+                        {on(row.opened)}
+                      </td>
                       <td>
                         <span className={`state ${LEAD_TONES[row.state]}`}>
                           {stateSaid(row.state)}
