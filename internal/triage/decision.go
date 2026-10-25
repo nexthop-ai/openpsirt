@@ -416,6 +416,48 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
 	return recorded, nil
 }
 
+// ProposeGrouped records one claim at a place and at every place more names,
+// as one action. more is asked inside the transaction the claim is written
+// in, on every attempt, so the places it names are the ones the write lands
+// on: a place answered, closed or covered between a read and the write is not
+// claimed. Each place more names takes the first proposal's argument.
+//
+// The first proposal's row is returned.
+func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, first Proposal,
+	more func(context.Context, bun.IDB) ([]Place, error)) (*Decision, error) {
+
+	proposals := []Proposal{first}
+	var recorded []*Decision
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		places, err := more(ctx, tx)
+		if err != nil {
+			return err
+		}
+		proposals = proposals[:1]
+		for _, place := range places {
+			also := first
+			also.Place = place
+			proposals = append(proposals, also)
+		}
+		if err := within.allowed(ctx, subject, proposals); err != nil {
+			return err
+		}
+		if err := within.gate(ctx, subject, proposals); err != nil {
+			return err
+		}
+		claim, err := within.newClaim(ctx, FindingClaim, subject.ID, nil, "", proposals[0])
+		if err != nil {
+			return err
+		}
+		recorded, err = within.proposeAll(ctx, claim, proposals)
+		return err
+	})
+	if err != nil {
+		return nil, s.alreadyDecided(ctx, err, placesOf(proposals))
+	}
+	return recorded[0], nil
+}
+
 func (s *Store) propose(ctx context.Context, claim *Claim, p Proposal) (*Decision, error) {
 	written, err := s.proposeAll(ctx, claim, []Proposal{p})
 	if err != nil {

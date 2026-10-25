@@ -81,10 +81,6 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 		case err != nil:
 			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
-		kin, err := analysis.Unanswered(ctx, in.DB.DB, subject, named.ProductID, lead.ID)
-		if err != nil {
-			return nil, core.RefusedDecision(in.Logger, err)
-		}
 		first := triage.Proposal{
 			Place: triage.Place{
 				ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID,
@@ -96,24 +92,21 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			By:            subject.ID,
 			MadeOn:        []int64{target.ID},
 		}
-		var decision *triage.Decision
-		if len(kin) == 0 {
-			decision, err = store.Propose(ctx, subject, first)
-		} else {
-			// One claim over the lead and every lead that is the same flaw,
-			// agreed to once.
-			proposals := []triage.Proposal{first}
+		// One claim over the lead and every lead that is the same flaw and
+		// that nothing answers yet, worked out where the claim is written.
+		decision, err := store.ProposeGrouped(ctx, subject, first, func(ctx context.Context, tx bun.IDB) ([]triage.Place, error) {
+			kin, err := analysis.Unanswered(ctx, tx, subject, named.ProductID, lead.ID)
+			if err != nil {
+				return nil, err
+			}
+			places := make([]triage.Place, 0, len(kin))
 			for _, k := range kin {
-				also := first
-				also.Place.VulnerabilityID, also.Place.PlaceIdentity, also.Place.Visibility =
-					k.VulnerabilityID, k.Place, k.Visibility
-				proposals = append(proposals, also)
+				also := first.Place
+				also.VulnerabilityID, also.PlaceIdentity, also.Visibility = k.VulnerabilityID, k.Place, k.Visibility
+				places = append(places, also)
 			}
-			var recorded []*triage.Decision
-			if recorded, err = store.ProposeMany(ctx, subject, proposals); err == nil {
-				decision = recorded[0]
-			}
-		}
+			return places, nil
+		})
 		if err != nil {
 			return nil, core.RefusedDecision(in.Logger, err)
 		}
