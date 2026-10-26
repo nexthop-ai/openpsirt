@@ -22,8 +22,8 @@ import (
 type ReportEditBody struct {
 	Title      string `json:"title,omitempty" maxLength:"191" doc:"A line naming the claim. Empty clears it"`
 	Summary    string `json:"summary" maxLength:"65536" doc:"What was claimed, as markdown. Required"`
-	ReportedBy string `json:"reported_by,omitempty" maxLength:"191"`
-	Contact    string `json:"contact,omitempty" maxLength:"191"`
+	ReportedBy string `json:"reported_by,omitempty" maxLength:"191" doc:"The reporter, as they gave their name. Empty clears it"`
+	Contact    string `json:"contact,omitempty" maxLength:"191" doc:"The address to reach them at. Empty clears it"`
 	Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD. Empty clears it"`
 }
@@ -31,12 +31,12 @@ type ReportEditBody struct {
 // ReportRevisionBody is what a report said before one edit replaced it.
 type ReportRevisionBody struct {
 	Version        int    `json:"version" doc:"The version number, counting from one. Version one is the report as it was recorded"`
-	Title          string `json:"title,omitempty"`
+	Title          string `json:"title,omitempty" doc:"The line naming the claim"`
 	Summary        string `json:"summary,omitempty" doc:"What was claimed, as markdown"`
-	ReportedBy     string `json:"reported_by,omitempty"`
-	Contact        string `json:"contact,omitempty"`
-	Credit         string `json:"credit,omitempty"`
-	Received       string `json:"received,omitempty"`
+	ReportedBy     string `json:"reported_by,omitempty" doc:"The reporter, as they gave their name"`
+	Contact        string `json:"contact,omitempty" doc:"The address to reach them at"`
+	Credit         string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
+	Received       string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD"`
 	ReplacedBy     string `json:"replaced_by" doc:"The person whose edit replaced it, by sign-in identity"`
 	ReplacedByName string `json:"replaced_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ReplacedAt     string `json:"replaced_at" doc:"The moment it stopped saying that"`

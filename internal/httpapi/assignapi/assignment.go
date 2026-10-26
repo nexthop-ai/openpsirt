@@ -281,7 +281,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 		OperationID: "hand-back-assignments", Method: http.MethodPost,
 		Path:    "/v1/people/{identity}/assignments/hand-back",
 		Summary: "Hand back everything one person is dealing with",
-		Description: "Returns all their open findings to the unassigned list. For when somebody " +
+		Description: "Returns all their open findings and vulnerability reports to the unassigned " +
+			"lists. For when somebody " +
 			"has left, or their last role is removed.\n\n" +
 			"Nothing tells this software that somebody has gone — membership is read at sign-in, " +
 			"and a person who has left never signs in again. So this is an action an " +

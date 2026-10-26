@@ -564,7 +564,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings handed back because that was their last role here"`
+			Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role here"`
 		}
 	}, error) {
 		subject, err := core.Requester(ctx)
@@ -633,7 +633,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings handed back because that was their last role here"`
+				Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role here"`
 			}
 		}{}
 		out.Body.Released = released
@@ -713,7 +713,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Role     string `path:"role"`
 	}) (*struct {
 		Body struct {
-			Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
+			Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role there"`
 		}
 	}, error) {
 		subject, err := core.Requester(ctx)
@@ -783,7 +783,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 
 		out := &struct {
 			Body struct {
-				Released int64 `json:"released" doc:"Findings handed back because that was their last role there"`
+				Released int64 `json:"released" doc:"Findings and vulnerability reports handed back because that was their last role there"`
 			}
 		}{}
 		out.Body.Released = released

@@ -2665,7 +2665,7 @@ components:
           description: They had already left, and the date did not move
           type: boolean
         released:
-          description: Findings handed back because they are gone
+          description: Findings and vulnerability reports handed back because they are gone
           format: int64
           type: integer
         since:
@@ -11063,6 +11063,7 @@ components:
           readOnly: true
           type: string
         contact:
+          description: The address to reach them at. Empty clears it
           maxLength: 191
           type: string
         credit:
@@ -11073,6 +11074,7 @@ components:
           description: The day it arrived, as YYYY-MM-DD. Empty clears it
           type: string
         reported_by:
+          description: The reporter, as they gave their name. Empty clears it
           maxLength: 191
           type: string
         summary:
@@ -11179,10 +11181,13 @@ components:
       additionalProperties: false
       properties:
         contact:
+          description: The address to reach them at
           type: string
         credit:
+          description: The credit they asked for in an advisory
           type: string
         received:
+          description: The day it arrived, as YYYY-MM-DD
           type: string
         replaced_at:
           description: The moment it stopped saying that
@@ -11194,11 +11199,13 @@ components:
           description: Their display name, where it differs from their identity
           type: string
         reported_by:
+          description: The reporter, as they gave their name
           type: string
         summary:
           description: What was claimed, as markdown
           type: string
         title:
+          description: The line naming the claim
           type: string
         version:
           description: The version number, counting from one. Version one is the report as it was recorded
@@ -14371,7 +14378,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings handed back because that was their last role there
+          description: Findings and vulnerability reports handed back because that was their last role there
           format: int64
           type: integer
       required:
@@ -14388,7 +14395,7 @@ components:
           readOnly: true
           type: string
         released:
-          description: Findings handed back because that was their last role here
+          description: Findings and vulnerability reports handed back because that was their last role here
           format: int64
           type: integer
       required:
@@ -19660,7 +19667,7 @@ paths:
   /v1/people/{identity}/assignments/hand-back:
     post:
       description: |-
-        Returns all their open findings to the unassigned list. For when somebody has left, or their last role is removed.
+        Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left, or their last role is removed.
 
         Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
 

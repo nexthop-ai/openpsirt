@@ -2055,7 +2055,7 @@ export interface paths {
         put?: never;
         /**
          * Hand back everything one person is dealing with
-         * @description Returns all their open findings to the unassigned list. For when somebody has left, or their last role is removed.
+         * @description Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left, or their last role is removed.
          *
          *     Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
          *
@@ -8632,7 +8632,7 @@ export interface components {
             already?: boolean;
             /**
              * Format: int64
-             * @description Findings handed back because they are gone
+             * @description Findings and vulnerability reports handed back because they are gone
              */
             released: number;
             /** @description The date they left */
@@ -13368,11 +13368,13 @@ export interface components {
              * @example https://example.com/schemas/ReportEditBody.json
              */
             readonly $schema?: string;
+            /** @description The address to reach them at. Empty clears it */
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
             /** @description The day it arrived, as YYYY-MM-DD. Empty clears it */
             received?: string;
+            /** @description The reporter, as they gave their name. Empty clears it */
             reported_by?: string;
             /** @description What was claimed, as markdown. Required */
             summary: string;
@@ -13430,8 +13432,11 @@ export interface components {
             vulnerability: string;
         };
         ReportRevisionBody: {
+            /** @description The address to reach them at */
             contact?: string;
+            /** @description The credit they asked for in an advisory */
             credit?: string;
+            /** @description The day it arrived, as YYYY-MM-DD */
             received?: string;
             /** @description The moment it stopped saying that */
             replaced_at: string;
@@ -13439,9 +13444,11 @@ export interface components {
             replaced_by: string;
             /** @description Their display name, where it differs from their identity */
             replaced_by_name?: string;
+            /** @description The reporter, as they gave their name */
             reported_by?: string;
             /** @description What was claimed, as markdown */
             summary?: string;
+            /** @description The line naming the claim */
             title?: string;
             /**
              * Format: int64
@@ -15241,7 +15248,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings handed back because that was their last role there
+             * @description Findings and vulnerability reports handed back because that was their last role there
              */
             released: number;
         };
@@ -15254,7 +15261,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description Findings handed back because that was their last role here
+             * @description Findings and vulnerability reports handed back because that was their last role here
              */
             released: number;
         };

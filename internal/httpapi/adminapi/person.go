@@ -238,14 +238,14 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		Identity string `path:"identity" maxLength:"191"`
 	}) (*struct {
 		Body struct {
-			Released int64  `json:"released" doc:"Findings handed back because they are gone"`
+			Released int64  `json:"released" doc:"Findings and vulnerability reports handed back because they are gone"`
 			Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
 			Since    string `json:"since" doc:"The date they left"`
 		}
 	}, error) {
 		out := &struct {
 			Body struct {
-				Released int64  `json:"released" doc:"Findings handed back because they are gone"`
+				Released int64  `json:"released" doc:"Findings and vulnerability reports handed back because they are gone"`
 				Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
 				Since    string `json:"since" doc:"The date they left"`
 			}
