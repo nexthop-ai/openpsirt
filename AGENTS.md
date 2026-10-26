@@ -160,9 +160,8 @@ The decisions easiest to violate by accident and costliest to unpick.
 - A value stored for speed has to earn its place, and is rewritten when its inputs move. A finding's urgency earns it: stored so a list sorts without joining four signals per row, and rewritten when they move (REQ-32).
 - Stored never means frozen.
 
-## Two eroding limits
+## Bulk judgment caps
 
-- A short-bump flag is inequality, never ordering. Ordering is per-ecosystem work (Debian epochs, RPM releases, semantic versions, and the rest), and a confident wrong order is a recommendation somebody acts on. No decision records this, REQ-21 does not cover it, and it is the owner's to revisit.
 - Every bulk judgment has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, and an unbounded write is a denial of service somebody triggers by accident.
 - A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. `DESIGN-triage.md` holds the transaction-size measurement.
 - A cap bounds what is written, never what was asked for, because one named issue expands into many places (REQ-27).
@@ -248,7 +247,7 @@ Worked through on every review (REQ-75), for this codebase.
 
 ## Testing
 
-- Every change runs against all four database engines in CI.
+- CI runs every change against all four database engines. Which engines a single test asks for is in § Non-negotiables.
 - Fixtures include a real SBOM per supported producer, and one full-size fixture for performance work.
 - Authorization is tested as a matrix of role × visibility × endpoint, including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin, never for an item on a list.
@@ -283,7 +282,7 @@ out why the code looks as it does.
 
 - Commit and push as work lands, in purposeful pieces, each with a why-body. A working tree is one accident from gone.
 - `main` is never pushed to directly and its history never rewritten. A pull request branch belongs to its author, who rebases it onto `main` and force-pushes with `--force-with-lease`.
-- Run `make gate` before every commit and `make gate full` before a push carrying more than one, rather than waiting for CI to fill the queue with entries that will not merge.
+- Run `make gate` before every commit and `make gate full` before a push carrying more than one commit, rather than waiting for CI to fill the queue with entries that will not merge.
 - `openapi-current`, `web-api` and `reserved-current` diff a regenerated file against the last commit, so they pass only once the file is committed with its change.
 - The history starts at the import: `main` has one root commit and every later commit came through a pull request. The reasoning lives in `REQUIREMENTS.md` and the design documents.
 
@@ -296,7 +295,7 @@ pinned versions. `DESIGN-build.md` § Make targets lists them all.
 |---|---|
 | `make test` | After every change. SQLite only, parallel, cached, seconds. Server engines are reported skipped by `OPENPSIRT_TEST_ENGINES`, which differs from unconfigured |
 | `make gate` | Before committing: the tier the working tree's changes land in |
-| `make gate full` | At the end of a session and before a push carrying accumulated work: `make check && make check-engines`. A clean tree gets it from `make gate` |
+| `make gate full` | Before a push carrying more than one commit, and at the end of a session: `make check && make check-engines`. A clean tree gets it from `make gate` |
 | `make test-all` | Every configured engine, uncached; what `check` runs. The race detector runs on SQLite alone, since a data race does not vary by engine |
 | `make check` | Everything CI checks except the container and chart. Names any engine it did not test |
 | `make check-engines` | That all four engines ran, each was the engine it claimed, and the reserved-word list matches them |
