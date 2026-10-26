@@ -143,6 +143,30 @@ export function useEscalateLead(product: string, place: string) {
   });
 }
 
+// A party, not a person: a team holds a lead exactly as somebody does. Nobody
+// hands it back.
+export function useAssignLead(build: Build, place: string) {
+  const after = useAfterLead();
+  return useMutation({
+    mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
+      unwrap(
+        await api.PUT(
+          "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
+          {
+            params: { path: { ...build, place } },
+            body:
+              held === null
+                ? {}
+                : held.kind === "team"
+                  ? { team: held.identity }
+                  : { person: held.identity },
+          },
+        ),
+      ),
+    onSuccess: after,
+  });
+}
+
 export function useLeadRules(product: string): UseQueryResult<LeadRule[]> {
   return useQuery({
     queryKey: ["lead-rules", product],

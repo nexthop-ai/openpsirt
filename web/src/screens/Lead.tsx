@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { mayOf, useWho } from "../app/session";
 import {
+  useAssignLead,
   useDecideLead,
   useEscalateLead,
   useFixLead,
@@ -18,6 +19,7 @@ import { claimAt, leadAt, leadsAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
 import { Editor } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
+import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
 import { labeled } from "../ui/Outcome";
 import { linkable } from "../ui/addressable";
@@ -46,6 +48,10 @@ export function Lead() {
   // A move of one already handed off concerns its flaw, and stays offered.
   const ended = !!evidence.past_end_of_life;
   const acts = triages && !ended;
+  // A lead moved into its flaw's case is the case's, and triaged at its
+  // visibility; a kept one at internal.
+  const moved = !!evidence.handoff?.moved;
+  const assigns = !ended && (moved ? !!may?.may_hide : triages);
 
   return (
     <div>
@@ -66,6 +72,15 @@ export function Lead() {
         <Place place={at} />
         {evidence.withheld && (
           <p className="hint">Part of a case you are not on. Only where it is is shown.</p>
+        )}
+        {!evidence.withheld && evidence.open && (
+          <LeadAssignee
+            build={build}
+            place={place}
+            evidence={evidence}
+            assigns={assigns}
+            moved={moved}
+          />
         )}
         <p className="hint">
           Last seen {on(evidence.last_seen)}
@@ -309,6 +324,57 @@ function DecideForm({ build, place }: { build: Build; place: string }) {
         </button>
       </div>
       {decide.error != null && <Failed error={decide.error} what="Nothing was decided." />}
+    </div>
+  );
+}
+
+// Who is dealing with the lead, and the picker that changes it for somebody
+// who triages it. Applies to every build of the product the lead is open on.
+function LeadAssignee({
+  build,
+  place,
+  evidence,
+  assigns,
+  moved,
+}: {
+  build: Build;
+  place: string;
+  evidence: Evidence;
+  assigns: boolean;
+  moved: boolean;
+}) {
+  const assign = useAssignLead(build, place);
+  const holder = evidence.assigned_to
+    ? { identity: evidence.assigned_to, name: evidence.assigned_to_name }
+    : null;
+  if (!assigns) {
+    return holder ? (
+      <p className="hint">
+        Assigned to {holder.name ?? holder.identity}
+        {evidence.assigned_team && " · team"}
+      </p>
+    ) : null;
+  }
+  return (
+    <div className="assignee">
+      <span
+        className="l"
+        title="Applies to every build with this lead. Set it to nobody to unassign"
+      >
+        Assigned to
+      </span>
+      <div style={{ minWidth: 220 }}>
+        <Holder
+          product={build.product}
+          internal={!moved}
+          undisclosed={moved}
+          value={holder}
+          disabled={assign.isPending}
+          onPick={(held) => assign.mutate(held)}
+        />
+      </div>
+      {assign.isPending && <span className="hint">Saving…</span>}
+      {assign.error != null && <Failed error={assign.error} what="That could not be recorded." />}
     </div>
   );
 }

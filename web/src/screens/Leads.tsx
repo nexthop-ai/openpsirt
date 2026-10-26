@@ -147,6 +147,7 @@ export function Leads() {
                   <th>Build</th>
                   <th>Opened</th>
                   <th>State</th>
+                  <th>Assigned to</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,6 +190,10 @@ export function Leads() {
                         <span className={`state ${LEAD_TONES[row.state]}`}>
                           {stateSaid(row.state)}
                         </span>
+                      </td>
+                      <td className="hint" style={{ whiteSpace: "nowrap" }}>
+                        {row.assigned_to && (row.assigned_to_name ?? row.assigned_to)}
+                        {row.assigned_team && " · team"}
                       </td>
                     </tr>
                   );

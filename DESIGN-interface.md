@@ -1449,6 +1449,8 @@ the screens draw them.
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
+| A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work for a kept lead and readers of undisclosed work for a moved one, and is not offered past end of life. Choosing applies to every build the lead is open on |
+| The queue's rows name who holds each lead | A team carries the word team beside its name |
 | A lead past its end of life says so beside its state and offers no decision, hand-off, queue or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
 | The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |

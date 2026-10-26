@@ -22,6 +22,9 @@ const ROWS = [
     builds: 3,
     opened: "2026-10-01",
     state: "open",
+    assigned_to: "kernel",
+    assigned_to_name: "Kernel",
+    assigned_team: true,
   },
 ];
 
@@ -83,6 +86,11 @@ describe("the leads", () => {
     expect(link?.getAttribute("href")).toBe(
       "/products/sonic/streams/master/variants/broadcom/leads/abc",
     );
+  });
+
+  it("names who holds each lead", async () => {
+    await drawn();
+    expect(text()).toContain("Kernel · team");
   });
 
   it("counts what the queue leaves out", async () => {
