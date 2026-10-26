@@ -735,6 +735,16 @@ components:
         - series
         - built_at
       type: object
+    AnalyzerSaidBody:
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+        path:
+          type: string
+      required:
+        - message
+      type: object
     AnywhereOutputBody:
       additionalProperties: false
       properties:
@@ -1085,13 +1095,16 @@ components:
         name:
           description: Their display name, where it differs from their identity
           type: string
-        writings:
-          description: The number of revisions of reasoning and comments they wrote on claims about the lead
-          format: int64
-          type: integer
+        notes:
+          description: The revisions of reasoning and the comments they wrote on claims about the lead, oldest first
+          items:
+            $ref: "#/components/schemas/NoteBody"
+          type:
+            - array
+            - "null"
       required:
         - identity
-        - writings
+        - notes
       type: object
     BecameBody:
       additionalProperties: false
@@ -3099,16 +3112,12 @@ components:
       additionalProperties: false
       properties:
         authors:
-          description: Everybody who wrote reasoning or a comment on a claim about the lead
+          description: Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims
           items:
             $ref: "#/components/schemas/AuthorBody"
           type:
             - array
             - "null"
-        messages:
-          description: The number of messages the analyzer wrote at those paths
-          format: int64
-          type: integer
         paths:
           description: Every path the lead names
           items:
@@ -3116,8 +3125,15 @@ components:
           type:
             - array
             - "null"
+        said:
+          description: Every message the analyzer wrote at those paths
+          items:
+            $ref: "#/components/schemas/AnalyzerSaidBody"
+          type:
+            - array
+            - "null"
         snippets:
-          description: The number of source snippets disclosed with the flaw
+          description: The number of source snippets disclosed with the flaw. Zero where none is
           format: int64
           type: integer
         stripped:
@@ -3127,7 +3143,7 @@ components:
       required:
         - authors
         - paths
-        - messages
+        - said
         - snippets
         - stripped
       type: object
@@ -4529,8 +4545,14 @@ components:
           description: What fixed it, in markdown
           minLength: 1
           type: string
+        fixed_in:
+          description: The run whose build fixed it
+          format: int64
+          minimum: 1
+          type: integer
       required:
         - because
+        - fixed_in
       type: object
     FixBody:
       additionalProperties: false
@@ -4613,6 +4635,148 @@ components:
       required:
         - label
         - product_ids
+      type: object
+    FlawLeadBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/FlawLeadBody.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: Why the hand-off was undone, in markdown
+          type: string
+        fixed_in:
+          description: Each build the flaw is still open on whose lead a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the hand-off is undone
+          items:
+            $ref: "#/components/schemas/FlawUnseenBody"
+          type:
+            - array
+            - "null"
+        handed_at:
+          format: date-time
+          type: string
+        handed_by:
+          description: The person who handed it off, by sign-in identity
+          type: string
+        line:
+          description: The line it starts at
+          format: int64
+          type: integer
+        path:
+          description: Where the lead is, relative to the top of the checkout
+          type: string
+        place:
+          description: The lead's place identity
+          type: string
+        proposed:
+          description: The builds the hand-off proposed the flaw against
+          items:
+            $ref: "#/components/schemas/FlawLeadBuild"
+          type:
+            - array
+            - "null"
+        rule:
+          description: The analyzer's rule, as <tool>/<rule>
+          type: string
+        state:
+          description: Where the lead stands on that build
+          enum:
+            - open
+            - not-reproduced
+            - fixed
+            - dismissed
+            - not-security
+            - confirmed
+            - handed-off
+          type: string
+        stream:
+          description: The branch or tag of the build its newest finding you read is on
+          type: string
+        suggested:
+          $ref: "#/components/schemas/FlawSuggestedBody"
+          description: The component the hand-off's offer ranked first, which the person may have turned down
+        undone_at:
+          description: When the hand-off was undone. Absent while it stands
+          format: date-time
+          type: string
+        undone_by:
+          description: The person who undid the hand-off, by sign-in identity
+          type: string
+        variant:
+          description: The variant of that build
+          type: string
+      required:
+        - place
+        - stream
+        - variant
+        - rule
+        - path
+        - state
+        - suggested
+        - proposed
+        - handed_by
+        - handed_at
+        - fixed_in
+      type: object
+    FlawLeadBuild:
+      additionalProperties: false
+      properties:
+        seen:
+          description: Whether the lead was seen in it. Otherwise it holds the chosen component and the lead's series never analyzed it
+          type: boolean
+        stream:
+          type: string
+        variant:
+          type: string
+      required:
+        - stream
+        - variant
+        - seen
+      type: object
+    FlawSuggestedBody:
+      additionalProperties: false
+      properties:
+        component:
+          description: The component, as the builds name it. Absent where the build itself was offered
+          type: string
+        ecosystem:
+          description: Its ecosystem, where its package identifier states one
+          type: string
+        from:
+          description: "Where the suggestion came from: a prefix confirmed at an earlier hand-off, the component the lead was placed on, a component whose name resembles the lead's directory, or the build itself"
+          enum:
+            - confirmed
+            - placed
+            - resembles
+            - build
+          type: string
+        namespace:
+          description: Its namespace, where its package identifier states one
+          type: string
+      required:
+        - from
+      type: object
+    FlawUnseenBody:
+      additionalProperties: false
+      properties:
+        fixed:
+          $ref: "#/components/schemas/LeadRunBody"
+          description: The build a person stated fixed the lead, where they closed it as fixed
+        not_seen:
+          $ref: "#/components/schemas/LeadRunBody"
+          description: The first run on the build that did not see the lead
+        stream:
+          type: string
+        variant:
+          type: string
+      required:
+        - stream
+        - variant
+        - not_seen
       type: object
     FoldPackageBody:
       additionalProperties: false
@@ -5917,6 +6081,9 @@ components:
         decision:
           $ref: "#/components/schemas/DecisionBody"
           description: The live claim at the lead, agreed to or waiting for a second person. Absent where there is none
+        fixed_in:
+          $ref: "#/components/schemas/LeadRunBody"
+          description: The build a person stated fixed the lead, once they closed it as fixed
         handoff:
           $ref: "#/components/schemas/LeadHandoffBody"
           description: The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead
@@ -5927,6 +6094,9 @@ components:
           type:
             - array
             - "null"
+        last_commit:
+          description: The commit the lead's own repository was at in the build of the newest run that saw the lead. Absent where the run named none
+          type: string
         last_seen:
           description: When the build of the newest run that saw the lead was made
           format: date-time
@@ -5935,6 +6105,13 @@ components:
           description: When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
           format: date-time
           type: string
+        not_seen_commit:
+          description: The commit the lead's own repository was at in the build of the first run that did not see the lead. Absent where that run named none, or while every run since has seen it
+          type: string
+        not_seen_run:
+          description: The run that did not see the lead, which a statement that it was fixed may name
+          format: int64
+          type: integer
         open:
           description: Whether the lead is open on the build
           type: boolean
@@ -5974,9 +6151,6 @@ components:
           type: boolean
         unchanged:
           description: Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code
-          type: boolean
-        withheld:
-          description: Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered
           type: boolean
       required:
         - rule
@@ -6139,7 +6313,7 @@ components:
           format: int64
           type: integer
         message:
-          description: What the analyzer says. Empty where the lead is withheld
+          description: What the analyzer says
           type: string
         opened:
           description: When the lead was first opened on any of them
@@ -6174,9 +6348,6 @@ components:
         variant:
           description: The variant of that build
           type: string
-        withheld:
-          description: Whether the lead is part of a case you are not on, so what the analyzer said is not answered
-          type: boolean
       required:
         - place
         - rule
@@ -6263,6 +6434,24 @@ components:
         - proposed_at
         - covering
         - state
+      type: object
+    LeadRunBody:
+      additionalProperties: false
+      properties:
+        built:
+          description: When the build it analyzed was made
+          format: date-time
+          type: string
+        commit:
+          description: The commit at the top of the checkout it analyzed, where the run stated one
+          type: string
+        run:
+          description: The run
+          format: int64
+          type: integer
+      required:
+        - run
+        - built
       type: object
     LeadSeriesBody:
       additionalProperties: false
@@ -7917,6 +8106,27 @@ components:
       required:
         - body
       type: object
+    NoteBody:
+      additionalProperties: false
+      properties:
+        body:
+          description: What was written, in markdown
+          type: string
+        claim:
+          description: The claim it was written on
+          format: int64
+          type: integer
+        comment:
+          description: Whether it is a comment. Otherwise it is a revision of the claim's reasoning
+          type: boolean
+        written:
+          format: date-time
+          type: string
+      required:
+        - claim
+        - body
+        - written
+      type: object
     NoteWritten:
       additionalProperties: false
       properties:
@@ -8103,7 +8313,9 @@ components:
             - analysis-quiet
             - lead-handed-off
             - lead-moved
+            - lead-reopened
             - rule-outgrown
+            - rule-waiting
             - obligation-open
             - obligation-near
             - obligation-passed
@@ -8391,7 +8603,9 @@ components:
             - analysis-quiet
             - lead-handed-off
             - lead-moved
+            - lead-reopened
             - rule-outgrown
+            - rule-waiting
             - obligation-open
             - obligation-near
             - obligation-passed
@@ -9872,7 +10086,7 @@ components:
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
         fingerprints_changed:
-          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build
           type: boolean
         inherited:
           description: Results new to the build carried from a lead of the branch it was cut from
@@ -9912,6 +10126,10 @@ components:
         sharp_drop:
           description: Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers
           type: boolean
+        uncompared:
+          description: Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set
+          format: int64
+          type: integer
       required:
         - opened
         - seen
@@ -12868,6 +13086,23 @@ components:
           type: integer
       required:
         - undone
+      type: object
+    Undo-lead-handoffRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Undo-lead-handoffRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: Why the hand-off is undone, in markdown
+          minLength: 1
+          type: string
+      required:
+        - because
       type: object
     UnmatchedBody:
       additionalProperties: false
@@ -20796,7 +21031,7 @@ paths:
 
         The line this deployment triages at is stated in the file.
 
-        Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text, and `withheld` is false on every lead. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
+        Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function` and `message` say where each is and what the analyzer said. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so. Three filters narrow no lead and keep them: `below_floor`, `planned=unplanned`, and `on=branch` with `support=in-support`, which is what the list reads when neither is asked.
 
         Takes every filter the findings list takes.
 
@@ -24258,6 +24493,49 @@ paths:
           - public-triage
           - private-triage
           - internal-triage
+  /v1/products/{product}/issues/{vulnerability}/lead:
+    get:
+      description: |-
+        Returns the static analysis lead a flaw recorded here was handed off from, with the component its hand-off was offered first, the builds it proposed, and whether the hand-off was undone.
+
+        `fixed_in` lists each build the flaw is still open on where the lead is not reproduced, with the first run that did not see it. Closing the flaw as fixed there is `POST .../findings/{vulnerability}/resolve`, which a person does.
+
+        A flaw recorded from no lead, and a lead you do not read in full, answer 404.
+
+        Requires: any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
+      operationId: get-flaw-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The flaw, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The flaw, by any name it is known under
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlawLeadBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get the lead a flaw was recorded from
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
   /v1/products/{product}/issues/{vulnerability}/notes:
     get:
       description: |-
@@ -24678,12 +24956,12 @@ paths:
               - confirmed
               - handed-off
             type: string
-        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
           explode: false
           in: query
           name: assigned
           schema:
-            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
             enum:
               - nobody
             type: string
@@ -24731,7 +25009,7 @@ paths:
       description: |-
         The lead list as a file: every row the same filters would list, not one page of them, in the same order.
 
-        Read with your own visibility, as it is written. A lead in a case you are not on is a row with an empty message and `withheld` true. No row carries source text.
+        Read with your own visibility, as it is written. No row carries source text.
 
         With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
 
@@ -24780,12 +25058,12 @@ paths:
               - confirmed
               - handed-off
             type: string
-        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
           explode: false
           in: query
           name: assigned
           schema:
-            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
             enum:
               - nobody
             type: string
@@ -27918,7 +28196,7 @@ paths:
 
         A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: list-lead-collaborators
       parameters:
         - in: path
@@ -27964,9 +28242,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}:
     delete:
       description: |-
@@ -27974,7 +28250,7 @@ paths:
 
         Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: remove-lead-collaborator
       parameters:
         - in: path
@@ -28021,9 +28297,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
     put:
       description: |-
         Grants one person this one handed-off lead in this product, to read its evidence, without granting them anything else of the product.
@@ -28032,7 +28306,7 @@ paths:
 
         Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: add-lead-collaborator
       parameters:
         - in: path
@@ -28079,9 +28353,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision:
     post:
       description: |-
@@ -28146,6 +28418,8 @@ paths:
     post:
       description: |-
         Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
+
+        `fixed_in` names the build that fixed it, as the run of the lead's series on this build that analyzed it: an applied, comparable run built at or after the first run that did not see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused with 422.
 
         A lead seen again opens anew at the same place.
 
@@ -28260,7 +28534,7 @@ paths:
 
         `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
 
-        `move` makes the linked leads part of the flaw's case: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
+        `move` makes the linked leads part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
 
         A lead nobody confirmed, or one already handed off, is refused with 409.
 
@@ -28317,10 +28591,66 @@ paths:
           - internal-triage
           - private-triage
         note: Both internal-triage and private-triage on the product.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal:
+    post:
+      description: |-
+        Undoes the hand-off of a lead while its flaw is undisclosed, with every lead linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the lead it was recorded from, marked undone.
+
+        `because` is required. Recorded in the administration trail. A lead not handed off, or one whose flaw is disclosed, is refused with 409.
+
+        Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+      operationId: undo-lead-handoff
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Undo-lead-handoffRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Undo a lead's hand-off
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - internal-triage
+          - private-triage
+        note: Both internal-triage and private-triage on the product.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move:
     delete:
       description: |-
-        Makes a moved lead internal again while its flaw is undisclosed, with the claims about it and every lead linked to the same flaw. They stay linked to the flaw.
+        Takes a moved lead out of its flaw's case while the flaw is undisclosed, with every lead linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
 
         Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
 
@@ -28369,7 +28699,7 @@ paths:
         note: Both internal-triage and private-triage on the product.
     put:
       description: |-
-        Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+        Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
 
         Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
 

@@ -4033,10 +4033,16 @@ with a sentence naming the bound, and no run is recorded. Leave one unset and
 it keeps the built-in value.</p>
 <p>An upload's documents are held in memory together while they are read, and
 their results are placed beside them, so two of these bound memory rather than
-the document: the size, and the count of entries held. The size also bounds
-the placed results once encoded, which are what a run is held as until it is
-applied. At the defaults an upload comes to about 800 MB, which the server's
-memory limit has to leave room for beside a scan.</p>
+the document: the decompressed size, and the count of entries held. The
+decompressed size also bounds the placed results once encoded, which are what a
+run is held as until it is applied. At the defaults an upload comes to about
+800 MB, which the server's memory limit has to leave room for beside a scan.</p>
+<p>The sizes as sent are the network's bounds. Each one left unset takes its
+decompressed counterpart, and one document's bound left unset takes the
+upload's, so raising <code>analysis.max_bytes</code> alone raises all four. A document
+sent without compression is bounded the same either way.
+Analyzer output compresses 7 to 17 times over, so a compressed upload meets the
+decompressed bound first.</p>
 <table>
 <thead>
 <tr>
@@ -4050,8 +4056,26 @@ memory limit has to leave room for beside a scan.</p>
 <tr>
 <td><code>OPENPSIRT_ANALYSIS_MAX_BYTES</code></td>
 <td><code>analysis.max_bytes</code></td>
-<td>How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large the whole upload may be compressed, and how large its placed results may be once encoded</td>
+<td>How large one upload's documents may be together, decompressed, counting the text their results are worded with from their rules' message strings. Also how large its placed results may be once encoded</td>
 <td>256 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ANALYSIS_MAX_PART_BYTES</code></td>
+<td><code>analysis.max_part_bytes</code></td>
+<td>How large one document may be, decompressed</td>
+<td><code>analysis.max_bytes</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ANALYSIS_MAX_COMPRESSED_BYTES</code></td>
+<td><code>analysis.max_compressed_bytes</code></td>
+<td>How large the whole upload may be as it is sent, compressed where its documents are. Past it, the upload is refused before it is read</td>
+<td><code>analysis.max_bytes</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ANALYSIS_MAX_PART_COMPRESSED_BYTES</code></td>
+<td><code>analysis.max_part_compressed_bytes</code></td>
+<td>How large one document may be as it is sent, compressed where it is</td>
+<td><code>analysis.max_part_bytes</code></td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_ANALYSIS_MAX_DOCUMENTS</code></td>
@@ -4118,6 +4142,12 @@ memory limit has to leave room for beside a scan.</p>
 <td><code>analysis.max_text</code></td>
 <td>The longest message or description kept. A longer one is cut rather than refused</td>
 <td>16 KB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ANALYSIS_MAX_SNIPPET</code></td>
+<td><code>analysis.max_snippet</code></td>
+<td>The longest source snippet kept for one place. A longer one is cut rather than refused</td>
+<td>4 KB</td>
 </tr>
 <tr>
 <td><code>OPENPSIRT_ANALYSIS_MAX_DEPTH</code></td>
