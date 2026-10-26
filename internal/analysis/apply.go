@@ -187,7 +187,7 @@ func Place(logs []sarif.Log, root string, most int64, keep func(path string) boo
 			}
 			discarded.Add(r.Discarded)
 			for _, inv := range r.Invocations {
-				out.Signals += inv.Errors
+				out.Signals += inv.Signals()
 			}
 			run := HeldRun{Tool: r.Tool.Name, Salt: r.Properties.Salt, Remotes: make([]string, len(r.Modules))}
 			for j, m := range r.Modules {

@@ -27,7 +27,8 @@ func readFile(t *testing.T, name string) Log {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	log, err := NewUpload(limits()).Read(f)
+	// A real tool's output is read within the bounds a deployment ships.
+	log, err := NewUpload(DefaultLimits()).Read(f)
 	if err != nil {
 		t.Fatalf("%s: %v", name, err)
 	}
@@ -220,7 +221,6 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 
 func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
 	step := `{"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}}`
-	notice := func(id string) string { return `{"level":"error","descriptor":{"id":"` + id + `"}}` }
 	rules := func(rules string) string {
 		return `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"t","rules":[` + rules + `]}}}]}`
 	}
@@ -239,8 +239,6 @@ func TestEveryEntryReadCountsTowardWhatTheUploadHolds(t *testing.T) {
 		"arguments":       {run(`,"results":[{"message":{"text":"x","arguments":["a","b"]}}]`), 4},
 		"fingerprints":    {run(`,"results":[{"partialFingerprints":{"a":"1","b":"2"}}]`), 4},
 		"kept steps": {run(`,"results":[{"codeFlows":[{"threadFlows":[{"locations":[` + step + `,` + step + `]}]}]}]`),
-			4},
-		"notified rules": {run(`,"invocations":[{"toolExecutionNotifications":[` + notice("a") + `,` + notice("b") + `]}]`),
 			4},
 		"changed repositories": {run(`,"properties":{"openpsirt/changed":["a","b"]}`), 3},
 	} {
@@ -465,7 +463,7 @@ func TestWhatTheClientWritesIsRead(t *testing.T) {
 	}
 	inv := r.Invocations[0]
 	if inv.ExitCode == nil || *inv.ExitCode != 1 || inv.Successful == nil || *inv.Successful ||
-		inv.Errors != 1 || len(inv.Notified) != 1 {
+		inv.Errors != 1 || inv.Signals() != 1 {
 		t.Errorf("invocation %+v", inv)
 	}
 	refused(t, run(`,"properties":{"openpsirt/unitsExpectd":1}`), limits(), "not one this deployment reads")
@@ -650,5 +648,78 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 		if got := r.Results[i]; got.RuleID != want.id || got.Level != want.level {
 			t.Errorf("result %d: rule %q at %q; want %q at %q", i, got.RuleID, got.Level, want.id, want.level)
 		}
+	}
+}
+
+func TestClangTidyOutputIsReadWithNoFingerprintAndNoFunction(t *testing.T) {
+	log := readFile(t, "clangtidy-artemis.sarif")
+	r := log.Runs[0]
+	if r.Tool.Name != "clang-tidy" || len(r.Tool.Rules) != 0 || !r.Ran || len(r.Results) != 1 {
+		t.Fatalf("tool %q with %d rules, ran %v, %d results", r.Tool.Name, len(r.Tool.Rules), r.Ran, len(r.Results))
+	}
+	res := r.Results[0]
+	if res.RuleID != "clang-analyzer-core.NullDereference" || res.Level != "warning" ||
+		res.Message != "Dereference of null pointer (loaded from variable 'p')" {
+		t.Errorf("result %+v", res)
+	}
+	// Nothing but the rule, the path, the line and the message identifies
+	// it: the matching it gets is the line layer's.
+	if len(res.Fingerprints) != 0 || res.Locations[0].Function != "" || len(res.Steps) != 0 {
+		t.Errorf("fingerprints %v, function %q, %d steps", res.Fingerprints, res.Locations[0].Function, len(res.Steps))
+	}
+	placed, dropped := Prepare(&log.Runs[0], "/var/tmp/testing-dir/assignment")
+	if len(placed) != 1 || dropped.Outside != 0 || placed[0].Path != "src/main.cpp" {
+		t.Errorf("placed %+v, dropped %+v", placed, dropped)
+	}
+}
+
+func TestCodeQLOutputIsReadWithItsRuleSetFingerprintsAndCoverage(t *testing.T) {
+	log := readFile(t, "codeql2150-cpp.sarif")
+	r := log.Runs[0]
+	if r.Tool.Name != "CodeQL" || r.Tool.Version != "2.15.0" || !r.Ran || len(r.Results) != 22 {
+		t.Fatalf("tool %q %q, ran %v, %d results", r.Tool.Name, r.Tool.Version, r.Ran, len(r.Results))
+	}
+	if len(r.Tool.Rules) <= len(r.Results) {
+		t.Errorf("%d rules; CodeQL lists every query it ran", len(r.Tool.Rules))
+	}
+	for _, res := range r.Results {
+		if res.Fingerprints["primaryLocationLineHash"] == "" {
+			t.Errorf("%s carries no line hash: %v", res.RuleID, res.Fingerprints)
+		}
+	}
+	inv := r.Invocations[0]
+	if inv.Successful == nil || !*inv.Successful || inv.Expected != 13 || inv.Extracted != 13 || inv.Signals() != 0 {
+		t.Errorf("invocation %+v, %d signals", inv, inv.Signals())
+	}
+	placed, dropped := Prepare(&log.Runs[0], "/src")
+	if len(placed) != 22 || dropped.Outside != 0 {
+		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
+	}
+}
+
+func TestACodeQLRunThatExtractedNothingItExpectedIsAFailure(t *testing.T) {
+	notify := func(id string) string {
+		return `{"level":"none","descriptor":{"id":"` + id + `"},
+			"locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}]}`
+	}
+	cases := []struct {
+		name          string
+		notifications []string
+		signals       int
+	}{
+		{"expected and extracted", []string{notify("cpp/baseline/expected-extracted-files"),
+			notify("cpp/diagnostics/successfully-extracted-files")}, 0},
+		{"expected and none extracted", []string{notify("cpp/baseline/expected-extracted-files")}, 1},
+		{"no coverage stated", nil, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			doc := run(`,"results":[],"invocations":[{"executionSuccessful":true,
+				"toolExecutionNotifications":[` + strings.Join(c.notifications, ",") + `]}]`)
+			inv := read(t, doc).Runs[0].Invocations[0]
+			if got := inv.Signals(); got != c.signals {
+				t.Errorf("%+v reports %d failures; want %d", inv, got, c.signals)
+			}
+		})
 	}
 }

@@ -954,9 +954,9 @@ func (rd *reader) invocation() (Invocation, error) {
 						s, err := rd.b.Str()
 						lvl = s
 						return err
-					case "descriptor", "associatedRule":
+					case "descriptor":
 						return rd.b.Object(func(key string) error {
-							if key == "id" && id == "" {
+							if key == "id" {
 								s, err := rd.b.Str()
 								id = bound.Head(s, docread.MostQuoted)
 								return err
@@ -967,15 +967,19 @@ func (rd *reader) invocation() (Invocation, error) {
 						return rd.b.Skip()
 					}
 				})
-				if err != nil || lvl != "error" {
+				if err != nil {
 					return err
 				}
-				inv.Errors++
-				if id == "" || len(inv.Notified) == rd.lim.MaxRules {
-					return nil
+				switch {
+				case strings.HasSuffix(id, expectedFiles):
+					inv.Expected++
+				case strings.HasSuffix(id, extractedFiles):
+					inv.Extracted++
 				}
-				inv.Notified = append(inv.Notified, id)
-				return rd.hold()
+				if lvl == "error" {
+					inv.Errors++
+				}
+				return nil
 			})
 		default:
 			return rd.b.Skip()

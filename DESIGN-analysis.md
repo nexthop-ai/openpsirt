@@ -149,6 +149,19 @@ holds is recorded:
 |---|---|
 | A comparable run marks a lead not reproduced only where it is also comparable to the run that last saw the lead: the same tool, version and rule set | A lead last seen before an upgrade says nothing by its absence from a run of the new version. It stays open, and the receipt counts it as uncompared |
 
+A tool reports a failure of its own run in three ways, and each one counts:
+
+| Signal | |
+|---|---|
+| A notification about its run at error level | CodeQL names a compilation it could not extract this way, as `cpp/diagnostics/failed-extractor-invocations` |
+| A result that is the tool's own failure | § Run contents |
+| Coverage notifications naming files it expected and none it extracted | CodeQL states its run successful with every compilation failed. It names each file its baseline expects as `<language>/baseline/expected-extracted-files` and each file it extracted as `<language>/diagnostics/successfully-extracted-files` |
+
+The coverage notifications are read as a signal and never as units. CodeQL's
+baseline is every file of the language in the tree, compiled or not, so a
+count of them against the files extracted would leave every run of a tree
+holding a file the build never compiles short of units.
+
 ## Run application
 
 A worker claims the queued job and applies the run in one transaction. The

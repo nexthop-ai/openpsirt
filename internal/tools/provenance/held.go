@@ -83,6 +83,12 @@ var Held = []Entry{
 		"https://github.com/DefectDojo/django-DefectDojo/blob/master/unittests/scans/cyclonedx/issue_9277.json"},
 	{"internal/sbom/testdata/snyk-juice-shop.cdx.json", "MIT",
 		"https://github.com/pickford-snyk/orca-juice-shop/blob/main/juice-shop-sbom.json"},
+	// Real analyzer output for producers the reader's own runs do not cover;
+	// internal/sarif/testdata/README.md says what each is kept for.
+	{"internal/sarif/testdata/clangtidy-artemis.sarif", "MIT",
+		"https://github.com/ls1intum/Artemis/blob/8f9d42bc1ddc83f932f34e68f0b6df061c0349af/src/test/resources/test-data/static-code-analysis/reports/clang-tidy.sarif"},
+	{"internal/sarif/testdata/codeql2150-cpp.sarif", "MIT",
+		"https://github.com/shellphish/artiphishell/blob/d5fcf7a2098cbde97e815b0aec5fe15edc24d096/components/codeql/examples/sample-report.sarif"},
 	{"internal/sbom/testdata/scout-python-image.spdx.json.xz", "CC0-1.0", "https://hub.docker.com/_/python"},
 	{"internal/sbom/testdata/github-dependency-graph.spdx.json.xz", "CC0-1.0",
 		"https://api.github.com/repos/grafana/loki/dependency-graph/sbom"},
