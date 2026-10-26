@@ -70,7 +70,7 @@ func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queu
 // answered as though it were not there, and giving it to somebody else asks
 // for the assigner right as a finding's assignment does.
 func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := leadAt(place) + "/assignment"
 		// Reading the lead, and triaging disclosed work alone.
@@ -112,7 +112,7 @@ func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
 // loses the line with it, though they still read the product's undisclosed
 // work.
 func TestALeadAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := leadAt(place) + "/assignment"
 		granted(t, r, "internal-triager", access.Assigner)
@@ -156,7 +156,7 @@ func TestALeadAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
 // Losing the last role on a product hands back the leads it carried, as it
 // hands back every finding.
 func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
@@ -185,7 +185,7 @@ func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
 // A team is handed a lead when one of its members reads it, and its queue is
 // named on the lead.
 func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := leadAt(place) + "/assignment"
 		granted(t, r, "internal-triager", access.Assigner)
@@ -216,7 +216,7 @@ func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
 // display name, and whether it is a team's queue, since a team and a person
 // may share a name.
 func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		granted(t, r, "internal-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
@@ -265,7 +265,7 @@ func TestTheLeadFileNamesAHolderAsTheListDoes(t *testing.T) {
 
 // A lead every release of which is past its end of life is kept as it stands.
 func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
 		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
@@ -283,7 +283,7 @@ func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
 // take, so the work nobody holds leaves it out, as the lead queue narrowed to
 // nobody does.
 func TestTheUnassignedListLeavesOutALeadPastItsEndOfLife(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
 			t.Fatalf("the unassigned list holds leads %v; want the seeded lead, or this checks nothing", got)
@@ -302,7 +302,7 @@ func TestTheUnassignedListLeavesOutALeadPastItsEndOfLife(t *testing.T) {
 // Handing everything one person holds to somebody else moves their leads too,
 // and is refused where the recipient may not read internal work.
 func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
 			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
@@ -344,7 +344,7 @@ func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (places []s
 // lead to whoever reads internal work, as one piece of work, and to nobody
 // else.
 func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
 			t.Errorf("the unassigned list holds leads %v; want the seeded lead", got)
@@ -395,7 +395,7 @@ func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
 
 // A team's queue lists a lead it holds to whoever reads internal work.
 func TestATeamsQueueListsALeadItHolds(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		granted(t, r, "internal-triager", access.Assigner)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
@@ -419,11 +419,11 @@ func TestATeamsQueueListsALeadItHolds(t *testing.T) {
 // A lead handed off as a flaw leaves the lists of held work, kept or moved:
 // its flaw is held and listed as itself.
 func TestAKeptHandedOffLeadLeavesTheListsOfHeldWork(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, false) })
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, false) })
 }
 
 func TestAMovedHandedOffLeadLeavesTheListsOfHeldWork(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, true) })
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) { handedOffUnlisted(t, r, true) })
 }
 
 // handedOffUnlisted hands the seeded lead off, kept or moved, and checks no
@@ -460,7 +460,7 @@ func TestAMovedHandedOffLeadLeavesItsHoldersWork(t *testing.T) { handedOffHeld(t
 
 // handedOffHeld hands off a lead its holder took first, kept or moved.
 func handedOffHeld(t *testing.T, move bool) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place, _ := httpapitest.HandedOffLeadHeldBy(t, r, move, "lead-handler")
 		for _, path := range []string{"/v1/people/lead-handler/assignments", "/v1/people/me/assignments"} {
 			if got, n := heldItems(t, r, "lead-handler", path); len(got) != 0 || n != 0 {
@@ -511,7 +511,7 @@ func handedOffHeld(t *testing.T, move bool) {
 // judged at its place, and grouping them would hide the second behind the
 // first.
 func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
 			httpapitest.OtherToolRun("cppcheck", "overflow", "787", "src/c.c", 3, 40))
@@ -525,7 +525,7 @@ func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
 // narrowing does: a lead somebody holds leaves the rows and every count, and
 // handed back it returns to both.
 func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
 		at := leadAt(place) + "/assignment"
 		type narrowed struct {
@@ -567,7 +567,7 @@ func TestTheQueueNarrowedToNobodyLeavesOutALeadSomebodyHolds(t *testing.T) {
 // so narrowing to work nobody holds leaves it out rather than answering who
 // holds it by whether it is listed.
 func TestTheQueueNarrowedToNobodyLeavesOutALeadInACaseTheReaderIsNotOn(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.HandedOffLead(t, r, true)
 		var all, unheld struct {
 			Items []struct {
