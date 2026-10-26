@@ -27,7 +27,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/sarif"
@@ -224,7 +223,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		run, repeat, err = store.Receive(ctx, series.Arriving{
 			ProductID: named.ProductID, TargetID: target.ID, Kind: kind.Analysis,
 			Series: stated.Series, ContentHash: hash, Commit: stated.Commit, BuiltAt: stated.BuiltAt,
-			Credential: ingest.Sender(subject), Params: stated.Params,
+			Credential: access.Sender(subject), Params: stated.Params,
 		})
 		if err != nil || repeat {
 			return err
@@ -344,7 +343,7 @@ func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, 
 	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
 	if err == nil {
 		var credential *string
-		if sender := ingest.Sender(subject); sender != "" {
+		if sender := access.Sender(subject); sender != "" {
 			credential = &sender
 		}
 		err = series.NewStore(in.DB.DB).Refused(ctx, series.Refusal{

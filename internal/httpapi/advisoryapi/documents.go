@@ -9,28 +9,37 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// DocumentBody is one third-party document a product holds statements from.
-type DocumentBody struct {
-	Publisher  string `json:"publisher" doc:"The publisher the document names, as it is matched"`
-	Identifier string `json:"identifier,omitempty" doc:"The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of"`
-	Document   string `json:"document" doc:"The file name it last arrived as, or for an advisory a feed fetched, the address it came from"`
-	Digest     string `json:"digest" doc:"SHA-256 of the copy its standing statements come from"`
-	Fetched    bool   `json:"fetched,omitempty" doc:"Whether a supplier advisory feed fetched it rather than somebody uploading it"`
-	Standing   int    `json:"standing" doc:"Statements of it that stand"`
-	SetAside   int    `json:"set_aside" doc:"Statements of it a later copy no longer made, kept and no longer applied"`
-	FirstAt    string `json:"first_received_at" doc:"When its first statement was recorded"`
-	ChangedAt  string `json:"changed_at" doc:"When an upload last recorded, repeated or set aside one of its statements. The same bytes uploaded again change nothing and leave this alone"`
+// DocumentUploadBody is one VEX document or supplier advisory that arrived for
+// a product.
+type DocumentUploadBody struct {
+	ReceivedAt     string            `json:"received_at" format:"date-time" doc:"When it arrived"`
+	Status         core.UploadStatus `json:"status" doc:"Completed where its statements were recorded, refused where it was turned away"`
+	Reason         string            `json:"reason,omitempty" doc:"Why it was turned away, as the sender was told"`
+	Publisher      string            `json:"publisher" doc:"The publisher the document names, as it is matched. Empty where it was turned away before that was read"`
+	Identifier     string            `json:"identifier,omitempty" doc:"The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of"`
+	Document       string            `json:"document" doc:"The file name it was uploaded as, or the address a supplier feed fetched it from"`
+	Digest         string            `json:"digest,omitempty" doc:"SHA-256 of what arrived. Absent where it was turned away before it was read whole"`
+	UploadedBy     string            `json:"uploaded_by,omitempty" doc:"Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it"`
+	UploadedByName string            `json:"uploaded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	FetchedBy      string            `json:"fetched_by,omitempty" doc:"The supplier whose feed fetched it. Absent where somebody uploaded it"`
+	Recorded       int               `json:"recorded" doc:"Statements it recorded"`
+	SetAside       int               `json:"set_aside" doc:"Statements an earlier copy of the same document made that it no longer did, kept and no longer applied"`
+	Current        bool              `json:"current" doc:"Whether what it says is what stands: it was completed, and no later copy of the same document has been"`
 }
 
-// DocumentsOutput is a page of the documents of one kind a product holds.
+// DocumentsOutput is a page of the documents of one kind that arrived for a
+// product.
 type DocumentsOutput struct {
 	Body struct {
-		Items []DocumentBody `json:"items"`
-		Total int            `json:"total"`
+		Items []DocumentUploadBody `json:"items"`
+		Total int                  `json:"total"`
 	}
 }
 
@@ -46,9 +55,10 @@ func registerDocuments(api huma.API, in core.Deps) {
 		OperationID: "list-vex-documents", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/vex-statements",
 		Summary: "List uploaded VEX documents",
-		Description: "Returns the VEX documents this product holds statements from, one per " +
-			"publisher, the most recently changed first: how many of its statements stand, " +
-			"how many a later upload set aside, and the file it last arrived as.\n\n" +
+		Description: "Returns every VEX document uploaded to this product, newest first, " +
+			"taken or turned away: who uploaded it, what became of it, and how many " +
+			"statements it recorded and set aside. The newest copy taken from each " +
+			"publisher is marked `current`.\n\n" +
 			"Statements a trusted upstream publishes are listed with the upstream, not here.",
 		Tags: []string{"Ingest"},
 	}, core.AnyPerson, "Answers for a product you may see."), documentsOf(in, finding.FromVex))
@@ -57,16 +67,18 @@ func registerDocuments(api huma.API, in core.Deps) {
 		OperationID: "list-supplier-advisories", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/supplier-advisories",
 		Summary: "List supplier advisories",
-		Description: "Returns the supplier security advisories this product holds statements " +
-			"from, one per publisher and advisory name, the most recently changed first: how " +
-			"many of its statements stand, how many a later copy set aside, and the file or " +
-			"address it last arrived as. An advisory a supplier advisory feed fetched is " +
-			"listed beside the uploaded ones and marked `fetched`.",
+		Description: "Returns every supplier security advisory that arrived for this product, " +
+			"newest first, taken or turned away: who uploaded it or which supplier feed " +
+			"fetched it, what became of it, and how many statements it recorded and set " +
+			"aside. The newest copy taken of each advisory is marked `current`.\n\n" +
+			"An advisory a feed fetched is listed where it said something about a component " +
+			"this product ships, set aside something an earlier copy said, or was turned away.",
 		Tags: []string{"Ingest"},
 	}, core.AnyPerson, "Answers for a product you may see."), documentsOf(in, finding.FromAdvisory))
 }
 
-// documentsOf answers a page of the documents of one kind a product holds.
+// documentsOf answers a page of the documents of one kind that arrived for a
+// product.
 func documentsOf(in core.Deps, source string) func(context.Context, *documentsInput) (*DocumentsOutput, error) {
 	return func(ctx context.Context, input *documentsInput) (*DocumentsOutput, error) {
 		subject, err := core.Reading(ctx)
@@ -77,21 +89,82 @@ func documentsOf(in core.Deps, source string) func(context.Context, *documentsIn
 		if err != nil {
 			return nil, err
 		}
-		held, total, err := finding.NewStore(in.DB.DB).Documents(ctx, subject, product.ID,
+		held, total, err := finding.NewStore(in.DB.DB).Uploads(ctx, subject, product.ID,
 			source, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.Absent(in.Logger, err, "the documents could not be read", core.NoSuchProduct)
 		}
+		senders, err := sendersOf(ctx, in, held)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "who uploaded them could not be read", err)
+		}
 		out := &DocumentsOutput{}
-		out.Body.Items, out.Body.Total = make([]DocumentBody, 0, len(held)), total
-		for _, d := range held {
-			out.Body.Items = append(out.Body.Items, DocumentBody{
-				Publisher: d.Publisher, Identifier: d.Identifier,
-				Document: d.Name, Digest: d.Digest, Fetched: d.Fetched(),
-				Standing: d.Standing, SetAside: d.SetAside,
-				FirstAt: core.Stamp(d.FirstAt), ChangedAt: core.Stamp(d.ChangedAt),
-			})
+		out.Body.Items, out.Body.Total = make([]DocumentUploadBody, 0, len(held)), total
+		for _, u := range held {
+			body := DocumentUploadBody{
+				ReceivedAt: core.Stamp(u.ReceivedAt), Status: core.UploadStatus(ingest.UploadCompleted),
+				Publisher: u.Publisher, Identifier: u.Identifier, Document: u.Document,
+				FetchedBy: u.Feed, Recorded: u.Recorded, SetAside: u.Superseded, Current: u.Current(),
+			}
+			if u.Status == finding.UploadTurnedAway {
+				body.Status = core.UploadStatus(ingest.UploadRefused)
+			}
+			body.Reason, body.Digest = core.OrBlank(u.Reason), core.OrBlank(u.Digest)
+			if u.Credential != nil {
+				body.UploadedBy, body.UploadedByName = senders.named(*u.Credential)
+			}
+			out.Body.Items = append(out.Body.Items, body)
 		}
 		return out, nil
 	}
+}
+
+// senders is the names of the people and keys that uploaded a page of
+// documents.
+type senders struct {
+	people map[int64][2]string
+	keys   map[int64]string
+}
+
+// named is a sender's identity and display name, or a key's name. A sender
+// that cannot be read back names nobody.
+func (s senders) named(credential string) (string, string) {
+	switch kind, id, ok := access.SenderOf(credential); {
+	case !ok:
+		return "", ""
+	case kind == access.Pipeline:
+		return s.keys[id], ""
+	default:
+		return s.people[id][0], s.people[id][1]
+	}
+}
+
+// sendersOf reads who uploaded each of a page of documents.
+func sendersOf(ctx context.Context, in core.Deps, held []finding.Upload) (senders, error) {
+	var people, keys []int64
+	for _, u := range held {
+		if u.Credential == nil {
+			continue
+		}
+		switch kind, id, ok := access.SenderOf(*u.Credential); {
+		case !ok:
+		case kind == access.Pipeline:
+			keys = append(keys, id)
+		default:
+			people = append(people, id)
+		}
+	}
+	out := senders{people: map[int64][2]string{}}
+	who, err := core.WhoSigned(ctx, in.DB.DB, people)
+	if err != nil {
+		return senders{}, err
+	}
+	for _, id := range people {
+		out.people[id] = [2]string{who.Identity(id), who.Label(id)}
+	}
+	out.keys, err = database.NamesByID(ctx, in.DB.DB, `"api_key"`, `"name"`, keys)
+	if err != nil {
+		return senders{}, err
+	}
+	return out, nil
 }

@@ -292,6 +292,9 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
+			if noted := f.turnedAway(ctx, by, source, one, err); noted != nil {
+				return took, noted
+			}
 		case errors.As(err, &refused), steppedOver(err):
 			// About this document rather than about the publisher, so the pass
 			// steps over it. Held instead, one withdrawn advisory still listed
@@ -302,6 +305,9 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Refused++
 			if refused.barred {
 				took.bar(one.address, err)
+			}
+			if noted := f.turnedAway(ctx, by, source, one, err); noted != nil {
+				return took, noted
 			}
 		case ctx.Err() != nil:
 			return took, nil
@@ -745,6 +751,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 				// can be checked.
 				Document: one.address,
 				Digest:   recording(sum[:], statements),
+				Arrived:  &finding.Arrival{FeedID: source.ID},
 			}, statements)
 		return err
 	})
@@ -752,6 +759,16 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 		return 0, err
 	}
 	return recorded, nil
+}
+
+// turnedAway records that a document a feed listed was refused, by the address
+// it was listed at. A failure to record it is a failure of the pass, so the
+// mark stays before the document and the next pass reads it again.
+func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, source Source, one entry, refused error) error {
+	return finding.NewStore(f.db).TurnedAway(ctx, by, source.ProductID, finding.Supplied{
+		Source: finding.FromAdvisory, Document: one.address,
+		Arrived: &finding.Arrival{FeedID: source.ID},
+	}, refused.Error())
 }
 
 // mostSumBytes bounds a digest file. One line holding a digest and a file name

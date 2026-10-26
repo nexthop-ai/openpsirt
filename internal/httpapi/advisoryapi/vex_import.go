@@ -128,8 +128,10 @@ func registerVexImport(api huma.API, in core.Deps) {
 		// it is not consulted for multipart at all — so the whole body is
 		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: core.MaxUpload(in.Limits),
-		Middlewares: huma.Middlewares{core.BoundedForm(api, in,
-			core.Admission{Limit: core.Fixed(core.MaxUpload(in.Limits))})},
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
+			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
+			Refused: turnedAwayBeforeReading(in, finding.FromVex),
+		})},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, where the document does not name itself. At most 191 characters"`
@@ -141,6 +143,11 @@ func registerVexImport(api huma.API, in core.Deps) {
 		}
 
 		file := input.RawBody.Data().Statements
+		// Every refusal past this point is recorded against the product, as
+		// far as the document had been read.
+		from := finding.Supplied{
+			Source: finding.FromVex, Document: documentName(file.Filename), Arrived: &finding.Arrival{},
+		}
 		var said []sbom.Suppression
 		digest, err := uploaded(in, file, func(r io.Reader) error {
 			var err error
@@ -148,8 +155,10 @@ func registerVexImport(api huma.API, in core.Deps) {
 			return err
 		})
 		if err != nil {
+			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
+		from.Digest = digest
 
 		// The publisher is the key a later upload supersedes on, and it is
 		// an indexed column of a fixed width. Refused rather than shortened:
@@ -167,18 +176,18 @@ func registerVexImport(api huma.API, in core.Deps) {
 		if publisher == "" {
 			publisher = strings.TrimSpace(attach.Visible(file.Filename))
 		}
+		from.Publisher = publisher
 		if utf8.RuneCountInString(publisher) > finding.MostPublisher {
-			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records; "+
 					"name it with ?publisher=", finding.MostPublisher))
+			turnedAway(ctx, in, by, product.ID, from, refused)
+			return nil, refused
 		}
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, finding.Supplied{
-			Source:    finding.FromVex,
-			Publisher: publisher,
-			Document:  documentName(file.Filename),
-			Digest:    digest,
-		}, said, "VEX statements from "+publisher)
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, said,
+			"VEX statements from "+publisher)
 		if err != nil {
+			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
 

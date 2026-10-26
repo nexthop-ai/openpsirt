@@ -5383,7 +5383,9 @@ export interface paths {
         };
         /**
          * List supplier advisories
-         * @description Returns the supplier security advisories this product holds statements from, one per publisher and advisory name, the most recently changed first: how many of its statements stand, how many a later copy set aside, and the file or address it last arrived as. An advisory a supplier advisory feed fetched is listed beside the uploaded ones and marked `fetched`.
+         * @description Returns every supplier security advisory that arrived for this product, newest first, taken or turned away: who uploaded it or which supplier feed fetched it, what became of it, and how many statements it recorded and set aside. The newest copy taken of each advisory is marked `current`.
+         *
+         *     An advisory a feed fetched is listed where it said something about a component this product ships, set aside something an earlier copy said, or was turned away.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
          */
@@ -5605,7 +5607,7 @@ export interface paths {
         };
         /**
          * List uploaded VEX documents
-         * @description Returns the VEX documents this product holds statements from, one per publisher, the most recently changed first: how many of its statements stand, how many a later upload set aside, and the file it last arrived as.
+         * @description Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken from each publisher is marked `current`.
          *
          *     Statements a trusted upstream publishes are listed with the upstream, not here.
          *
@@ -8685,31 +8687,45 @@ export interface components {
             product_tree: components["schemas"]["ProductTree"];
             vulnerabilities: components["schemas"]["Vulnerability"][] | null;
         };
-        DocumentBody: {
-            /** @description When an upload last recorded, repeated or set aside one of its statements. The same bytes uploaded again change nothing and leave this alone */
-            changed_at: string;
-            /** @description SHA-256 of the copy its standing statements come from */
-            digest: string;
-            /** @description The file name it last arrived as, or for an advisory a feed fetched, the address it came from */
+        DocumentUploadBody: {
+            /** @description Whether what it says is what stands: it was completed, and no later copy of the same document has been */
+            current: boolean;
+            /** @description SHA-256 of what arrived. Absent where it was turned away before it was read whole */
+            digest?: string;
+            /** @description The file name it was uploaded as, or the address a supplier feed fetched it from */
             document: string;
-            /** @description Whether a supplier advisory feed fetched it rather than somebody uploading it */
-            fetched?: boolean;
-            /** @description When its first statement was recorded */
-            first_received_at: string;
+            /** @description The supplier whose feed fetched it. Absent where somebody uploaded it */
+            fetched_by?: string;
             /** @description The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of */
             identifier?: string;
-            /** @description The publisher the document names, as it is matched */
+            /** @description The publisher the document names, as it is matched. Empty where it was turned away before that was read */
             publisher: string;
+            /** @description Why it was turned away, as the sender was told */
+            reason?: string;
+            /**
+             * Format: date-time
+             * @description When it arrived
+             */
+            received_at: string;
             /**
              * Format: int64
-             * @description Statements of it a later copy no longer made, kept and no longer applied
+             * @description Statements it recorded
+             */
+            recorded: number;
+            /**
+             * Format: int64
+             * @description Statements an earlier copy of the same document made that it no longer did, kept and no longer applied
              */
             set_aside: number;
             /**
-             * Format: int64
-             * @description Statements of it that stand
+             * @description Completed where its statements were recorded, refused where it was turned away
+             * @enum {string}
              */
-            standing: number;
+            status: "in-progress" | "completed" | "failed" | "refused";
+            /** @description Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it */
+            uploaded_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            uploaded_by_name?: string;
         };
         DocumentsOutputBody: {
             /**
@@ -8718,7 +8734,7 @@ export interface components {
              * @example https://example.com/schemas/DocumentsOutputBody.json
              */
             readonly $schema?: string;
-            items: components["schemas"]["DocumentBody"][] | null;
+            items: components["schemas"]["DocumentUploadBody"][] | null;
             /** Format: int64 */
             total: number;
         };
@@ -14114,7 +14130,7 @@ export interface components {
             latest?: components["schemas"]["UploadLatestBody"];
             /**
              * Format: int64
-             * @description How many are held. A VEX document and a supplier advisory are counted once however often they were uploaded, and an upload turned away is not counted
+             * @description How many the kind's own list holds. A VEX document or supplier advisory turned away is listed and counted. An SBOM or static analysis run turned away is not, because only the last refusal of each is kept
              */
             total: number;
             /**
@@ -14128,7 +14144,7 @@ export interface components {
             reason?: string;
             /**
              * Format: date-time
-             * @description When it arrived. For a VEX document or a supplier advisory, when an upload last changed what it says
+             * @description When it arrived
              */
             received_at: string;
             /**

@@ -1300,17 +1300,20 @@ What each list holds is `DESIGN-ingest.md` § Upload listing.
 |---|---|
 | SBOMs | The build's receipts, the builds gone quiet, the scanner, and what a new line inherits |
 | Static analysis | The build's runs, newest first, with their status and counts, and the last upload of each series turned away |
-| VEX documents | The product's, one row per publisher |
-| Supplier advisories | The product's, one row per advisory, uploaded or fetched by a feed |
+| VEX documents | Every one uploaded to the product, newest first, taken or refused |
+| Supplier advisories | Every one that arrived for the product, uploaded or fetched by a feed, newest first, taken or refused |
 
 | Rule | |
 |---|---|
 | The tabs are the kinds the every-kind list names | A kind the reader may not read has no tab. A reader of disclosed findings has no static analysis tab |
 | A tab whose newest upload failed or was turned away is marked | The newest upload is what a pipeline owner checks. A failure on a tab nobody opened is otherwise invisible |
-| Each tab carries how many of its kind are held | The figure the every-kind list counts, never the length of a page |
+| Each tab carries how many its list holds | The figure the every-kind list counts, never the length of a page |
 | The tab is in the address, and SBOMs is the bare address | A link lands on one kind. An address naming a kind the reader has no tab for opens SBOMs |
 | The body waits for the every-kind list | Drawn before it, an address naming a kind the reader may not read asks that kind's list and draws its refusal |
-| The product's documents are shown on every build of it | They are uploaded to the product. Each tab says whose they are by what it lists |
+| The VEX documents and supplier advisories tabs are product-wide | They are uploaded to the product, so every build of it shows the same ones. Each says "All builds of this product" above its list and on hover |
+| A document row says who sent it | The uploader's display name, or the supplier's name and "feed" where a feed fetched it |
+| A refused document says why | The reason the sender was told, under its state |
+| The newest taken copy of a document is marked Current | What it says is what stands. An earlier copy is kept and replaced |
 | An address a feed fetched an advisory from is not a link | It is a third party's URL, shown on hover |
 | Upload stays where it is | The bar and this screen upload an inventory. VEX documents and supplier advisories are uploaded from the suppliers settings, which the empty tab links |
 

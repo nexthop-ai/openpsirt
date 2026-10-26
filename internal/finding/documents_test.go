@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-func TestTheDocumentsAProductHoldsAreReadOnlyByAPersonWhoSeesIt(t *testing.T) {
+func TestTheDocumentsUploadedToAProductAreReadOnlyByAPersonWhoSeesIt(t *testing.T) {
 	// Decided in the store, so a second route over it cannot forget it.
 	catalogSeed.Two(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		ctx := t.Context()
@@ -25,11 +25,12 @@ func TestTheDocumentsAProductHoldsAreReadOnlyByAPersonWhoSeesIt(t *testing.T) {
 			map[int64][]access.Role{c.product: {access.PublicRead}}, 0)
 		if _, _, err := store.RecordStatements(ctx, reader, c.product, finding.Supplied{
 			Source: finding.FromVex, Publisher: "Debian", Document: "debian.json", Digest: "sha256:one",
+			Arrived: &finding.Arrival{},
 		}, []finding.Statement{{Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed"}}); err != nil {
 			t.Fatal(err)
 		}
 
-		held, total, err := store.Documents(ctx, reader, c.product, finding.FromVex, 50, 0)
+		held, total, err := store.Uploads(ctx, reader, c.product, finding.FromVex, 50, 0)
 		if err != nil || total != 1 || len(held) != 1 {
 			t.Fatalf("a reader of the product is answered %d of %d: %v", len(held), total, err)
 		}
@@ -40,21 +41,84 @@ func TestTheDocumentsAProductHoldsAreReadOnlyByAPersonWhoSeesIt(t *testing.T) {
 				access.Scope{ProductID: c.product}),
 			"anybody, where the product publishes": access.Published([]int64{c.product}),
 		} {
-			if _, _, err := store.Documents(ctx, who, c.product, finding.FromVex, 50, 0); !errors.Is(err, access.ErrDenied) {
+			if _, _, err := store.Uploads(ctx, who, c.product, finding.FromVex, 50, 0); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%s is answered %v, want a refusal", name, err)
 			}
 		}
 	})
 }
 
-func TestADocumentAFeedFetchedIsToldFromAnUploadByItsAddress(t *testing.T) {
-	t.Parallel()
-	for name, fetched := range map[string]bool{
-		"https://example.test/csaf/2026/dsa-1.json": true,
-		"dsa-1.json": false,
-	} {
-		if got := (finding.Document{Name: name}).Fetched(); got != fetched {
-			t.Errorf("%q reads as fetched %v, want %v", name, got, fetched)
+func TestEveryUploadOfADocumentIsListedAndTheNewestTakenStands(t *testing.T) {
+	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
+		ctx := t.Context()
+		store := finding.NewStore(db.DB)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin", nil, nil)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
+		by := access.NewPerson(person.ID, "admin@example.com", true, nil, 0)
+		uploaded := &finding.Arrival{}
+		send := func(publisher, digest, status string) {
+			t.Helper()
+			if _, _, err := store.RecordStatements(ctx, by, c.product, finding.Supplied{
+				Source: finding.FromVex, Publisher: publisher, Document: publisher + ".json",
+				Digest: digest, Arrived: uploaded,
+			}, []finding.Statement{{Vulnerability: "CVE-2026-1", Component: "libnl", Status: status}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		send("Debian", "sha256:one", "affected")
+		send("Debian", "sha256:two", "fixed")
+		send("Ubuntu", "sha256:three", "fixed")
+		if err := store.TurnedAway(ctx, by, c.product, finding.Supplied{
+			Source: finding.FromVex, Document: "broken.json", Arrived: uploaded,
+		}, "that is not a VEX document"); err != nil {
+			t.Fatal(err)
+		}
+		// Recorded by an upstream this product trusts, which arrives no way
+		// this records.
+		if _, _, err := store.RecordStatements(ctx, by, c.product, finding.Supplied{
+			Source: finding.FromVex, Publisher: "Fedora", Document: "fedora.json", Digest: "sha256:four",
+		}, []finding.Statement{{Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed"}}); err != nil {
+			t.Fatal(err)
+		}
+
+		held, total, err := store.Uploads(ctx, by, c.product, finding.FromVex, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 4 || len(held) != 4 {
+			t.Fatalf("the list holds %d of %d: %+v", len(held), total, held)
+		}
+		// Newest first.
+		refused, ubuntu, debian, first := held[0], held[1], held[2], held[3]
+		if refused.Status != finding.UploadTurnedAway || refused.Reason == nil ||
+			*refused.Reason != "that is not a VEX document" || refused.Current() || refused.Digest != nil {
+			t.Errorf("the refusal reads %+v", refused)
+		}
+		if ubuntu.Publisher != "ubuntu" || !ubuntu.Current() {
+			t.Errorf("ubuntu's reads %+v; want it standing", ubuntu)
+		}
+		if debian.Publisher != "debian" || !debian.Current() || debian.Recorded != 1 || debian.Superseded != 1 {
+			t.Errorf("debian's second reads %+v; want it standing, having set the first aside", debian)
+		}
+		if first.Publisher != "debian" || first.Current() || first.Superseded != 0 {
+			t.Errorf("debian's first reads %+v; want it replaced", first)
+		}
+		for _, u := range held {
+			if u.Credential == nil || *u.Credential != access.Sender(by) || u.FeedID != nil {
+				t.Errorf("%q arrived by %v and %v; want the uploader alone", u.Document, u.Credential, u.FeedID)
+			}
+		}
+
+		// A page is a page of uploads, and the total is of all of them.
+		page, total, err := store.Uploads(ctx, by, c.product, finding.FromVex, 1, 2)
+		if err != nil || total != 4 || len(page) != 1 || page[0].ID != debian.ID {
+			t.Errorf("the third page of one reads %+v of %d: %v", page, total, err)
+		}
+		// Another kind holds none of them.
+		if _, total, err := store.Uploads(ctx, by, c.product, finding.FromAdvisory, 50, 0); err != nil || total != 0 {
+			t.Errorf("the advisories hold %d: %v", total, err)
+		}
+	})
 }

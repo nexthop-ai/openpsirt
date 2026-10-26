@@ -10,31 +10,46 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 describe("a supplier advisory", () => {
-  it("fetched by a feed names the feed and links nowhere", async () => {
+  it("names who sent it, and a feed's links nowhere", async () => {
     serve(() => ({
       data: {
-        total: 2,
+        total: 3,
         items: [
           {
+            received_at: "2026-10-03T00:00:00Z",
+            status: "refused",
+            reason: "that is not an advisory",
+            publisher: "",
+            document: "broken.json",
+            uploaded_by: "admin@example.com",
+            uploaded_by_name: "Admin",
+            recorded: 0,
+            set_aside: 0,
+            current: false,
+          },
+          {
+            received_at: "2026-10-02T00:00:00Z",
+            status: "completed",
             publisher: "example",
             identifier: "DSA-2",
             document: "https://example.test/csaf/dsa-2.json",
-            fetched: true,
+            fetched_by: "Example Linux",
             digest: "aa",
-            standing: 3,
+            recorded: 3,
             set_aside: 0,
-            first_received_at: "2026-10-01T00:00:00Z",
-            changed_at: "2026-10-02T00:00:00Z",
+            current: true,
           },
           {
+            received_at: "2026-09-02T00:00:00Z",
+            status: "completed",
             publisher: "example",
             identifier: "DSA-1",
             document: "dsa-1.json",
+            uploaded_by: "admin@example.com",
             digest: "bb",
-            standing: 1,
+            recorded: 1,
             set_aside: 2,
-            first_received_at: "2026-09-01T00:00:00Z",
-            changed_at: "2026-09-02T00:00:00Z",
+            current: false,
           },
         ],
       },
@@ -42,11 +57,15 @@ describe("a supplier advisory", () => {
     mount.render(screen(<Documents product="sonic" type="supplier-advisory" />));
     await settle();
     const rows = Array.from(mount.host().querySelectorAll("tbody tr"));
-    expect(rows.map((row) => row.querySelectorAll("td")[2]?.textContent)).toEqual([
-      "From a feed",
-      "dsa-1.json",
-    ]);
+    const cell = (n: number) => rows.map((row) => row.querySelectorAll("td")[n]?.textContent);
+    expect(cell(1)).toEqual(["Admin", "Example Linux feed", "admin@example.com"]);
+    expect(cell(4)).toEqual(["broken.json", "From the feed", "dsa-1.json"]);
+    expect(cell(5)[0]).toContain("Refused");
+    expect(cell(5)[0]).toContain("that is not an advisory");
+    expect(cell(5)[1]).toContain("Current");
+    expect(cell(5)[2]).not.toContain("Current");
     expect(mount.host().querySelector("tbody a")).toBeNull();
+    expect(mount.host().textContent).toContain("All builds of this product");
   });
 });
 

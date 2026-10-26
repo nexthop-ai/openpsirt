@@ -162,8 +162,24 @@ const DOCUMENTS = {
   },
 } as const;
 
-// The VEX documents or supplier advisories one product holds, one row per
-// document however often it was uploaded, the most recently changed first.
+// What became of a document, as a state chip.
+const DOCUMENT_STATES = {
+  completed: { cls: "agreed", label: "Taken" },
+  refused: { cls: "bad", label: "Refused" },
+} as const;
+
+type DocumentUpload = Body<"DocumentUploadBody">;
+
+// Who sent a document: the person or key that uploaded it, or the feed that
+// fetched it.
+function sender(doc: DocumentUpload) {
+  if (doc.fetched_by) return `${doc.fetched_by} feed`;
+  return doc.uploaded_by_name || doc.uploaded_by || "—";
+}
+
+// Every VEX document or supplier advisory that arrived for one product,
+// taken and turned away, newest first. They are the product's, so every build
+// of it lists the same ones.
 export function Documents({ product, type }: { product: string; type: keyof typeof DOCUMENTS }) {
   const [offset, setOffset] = useState(0);
   const kind = DOCUMENTS[type];
@@ -184,6 +200,9 @@ export function Documents({ product, type }: { product: string; type: keyof type
 
   return (
     <>
+      <p className="hint" style={{ margin: "0 0 10px" }}>
+        All builds of this product
+      </p>
       {items.length === 0 ? (
         <Empty title={kind.none} detail="An administrator uploads them under Settings.">
           <Link to={settingsAt("suppliers")} className="linkish">
@@ -195,43 +214,62 @@ export function Documents({ product, type }: { product: string; type: keyof type
           <table>
             <thead>
               <tr>
+                <th>Received</th>
+                <th>From</th>
                 <th>Publisher</th>
                 {advisory && <th>Advisory</th>}
                 <th>File</th>
-                <th className="num" title="Statements that stand">
-                  Standing
+                <th>Status</th>
+                <th className="num" title="Statements it recorded">
+                  Recorded
                 </th>
                 <th
                   className="num"
-                  title="Statements a later copy no longer made. Kept, not applied"
+                  title="Statements an earlier copy made that this one no longer did. Kept, not applied"
                 >
                   Set aside
                 </th>
-                <th>First received</th>
-                <th title="When an upload last changed what it says">Changed</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((doc) => (
-                <tr key={`${doc.publisher} ${doc.identifier ?? ""}`}>
-                  <td>{doc.publisher}</td>
-                  {advisory && <td className="id">{doc.identifier}</td>}
-                  <td className="hint" title={`SHA-256 ${doc.digest}`}>
-                    {/* An address a feed fetched it from is shown and not
-                        linked: it is somebody else's, and nothing here checked
-                        where it leads. */}
-                    {doc.fetched ? (
-                      <span title={doc.document}>From a feed</span>
-                    ) : (
-                      doc.document || "—"
-                    )}
-                  </td>
-                  <td className="num">{doc.standing.toLocaleString()}</td>
-                  <td className="num">{doc.set_aside.toLocaleString()}</td>
-                  <td className="hint">{minute(doc.first_received_at)}</td>
-                  <td>{minute(doc.changed_at)}</td>
-                </tr>
-              ))}
+              {items.map((doc, i) => {
+                const state = DOCUMENT_STATES[doc.status === "refused" ? "refused" : "completed"];
+                return (
+                  <tr key={`${doc.received_at} ${i}`}>
+                    <td>{minute(doc.received_at)}</td>
+                    <td className="hint" title={doc.uploaded_by || undefined}>
+                      {sender(doc)}
+                    </td>
+                    <td>{doc.publisher || "—"}</td>
+                    {advisory && <td className="id">{doc.identifier || "—"}</td>}
+                    <td className="hint" title={doc.digest ? `SHA-256 ${doc.digest}` : undefined}>
+                      {/* An address a feed fetched it from is shown and not
+                          linked: it is somebody else's, and nothing here checked
+                          where it leads. */}
+                      {doc.fetched_by ? (
+                        <span title={doc.document}>From the feed</span>
+                      ) : (
+                        doc.document || "—"
+                      )}
+                    </td>
+                    <td>
+                      <span className={`state ${state.cls}`}>{state.label}</span>
+                      {doc.current && (
+                        <span className="hint" title="What stands now" style={{ marginLeft: 6 }}>
+                          Current
+                        </span>
+                      )}
+                      {doc.reason && (
+                        <div className="hint" style={{ marginTop: 4 }}>
+                          {doc.reason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="num">{doc.recorded.toLocaleString()}</td>
+                    <td className="num">{doc.set_aside.toLocaleString()}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Wide>

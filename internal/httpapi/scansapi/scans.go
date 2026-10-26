@@ -240,7 +240,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		ParserVersion: version.Get().Version,
 		// Who sent this, recorded alongside the parser version, so the
 		// provenance of the data has an answer.
-		Credential: ingest.Sender(subject),
+		Credential: access.Sender(subject),
 	}
 
 	var (

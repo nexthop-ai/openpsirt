@@ -1018,8 +1018,8 @@ takes a different body and answers a different receipt.
 |---|---|---|
 | SBOM | The build | Its receipts (§ Receipts) |
 | Static analysis run, as SARIF | The build | Its runs (`DESIGN-analysis.md`) |
-| VEX document | The product | Its documents, below |
-| Supplier advisory | The product | Its documents, below |
+| VEX document | The product | Its uploads, below |
+| Supplier advisory | The product, by upload or by a supplier's feed | Its uploads, below |
 
 One read lists every kind for a build, with how many of each are held and what
 became of the newest. It reads each kind's own list, a page of one, so each
@@ -1028,30 +1028,51 @@ kind's rule for who reads it applies unchanged.
 | Status | SBOM | Static analysis run | VEX document, supplier advisory |
 |---|---|---|---|
 | In progress | Taken, being read or scanned | Queued, or waiting for the build's inventory | — |
-| Completed | Scanned | Applied, or kept beside a run built later | Every one held |
+| Completed | Scanned | Applied, or kept beside a run built later | Its statements recorded |
 | Failed | Taken and unusable, with the reason | Unreadable, or its tool did not run, with the reason | — |
-| Refused | The last upload turned away, where it came after the newest one taken | The same, per series | — |
+| Refused | The last upload turned away, where it came after the newest one taken | The same, per series | Turned away, with the reason |
 
 | Rule | |
 |---|---|
 | A kind the caller may not read is left out | A pipeline key reads the SBOMs and the runs of a build it may send to. A person reads the runs where they read internal findings in the product, which is where those results open |
-| An upload turned away is the newest only where it came after the newest one taken | It is recorded once per build, or per series, and replaced by the next; an older refusal says nothing about the upload that followed it |
-| A refusal is not counted | Nothing of it is held but the reason |
+| An SBOM or a run turned away is the newest only where it came after the newest one taken | It is recorded once per build, or per series, and replaced by the next; an older refusal says nothing about the upload that followed it |
+| The count is what the kind's own list holds | An SBOM or a run turned away is not counted, because only the last of each is kept. A VEX document or a supplier advisory turned away is listed, and counted |
 
-### Document lists
+### Document uploads
 
-A VEX document and a supplier advisory are stored as the statements they made,
-with no record of the upload beside them. The list of each is worked out from
-those statements when it is asked for.
+Every VEX document and supplier advisory that arrives for a product is recorded
+as it arrives, taken or turned away. What it says is in its statements; the
+record holds the rest.
+
+| Recorded | |
+|---|---|
+| The kind, the publisher and the name the publisher gave it | As far as the document was read. Empty where it was turned away first |
+| The file name a client gave, or the address a feed fetched it from | |
+| The digest of what arrived | Absent where it was turned away before it was read whole |
+| Who uploaded it, or which supplier's feed fetched it | One of the two. The sender is spelled as a scan's is, so a key and a person are never the same sender |
+| When it arrived | |
+| Completed or refused, and what the sender was told where it was refused | |
+| How many statements it recorded and how many earlier ones it set aside | As it was taken. A fact about that moment, so it is stored |
 
 | Rule | |
 |---|---|
-| A document is the key a later upload replaces on | A publisher's VEX document, or one advisory by its publisher and the name the publisher gave it. Uploaded again, it is the same row |
-| It says how many of its statements stand and how many a later copy set aside | Set aside is kept and no longer applied (§ Administrator-supplied VEX) |
-| The file it last arrived as, and that copy's digest, are its standing statements' | Every statement a later copy repeats is moved onto that copy |
-| Ordered by when an upload last wrote under its key | A statement recorded, said again or set aside. The same bytes uploaded again write nothing, and move nothing |
-| A supplier advisory a feed fetched is listed with the uploaded ones, and marked | It is recorded under the address it came from, and an uploaded one under a file name, which never holds a slash |
-| A trusted upstream's documents are not listed here | They are read on a schedule, from the upstream (`DESIGN-upstream.md`) |
+| One row per arrival, never replaced | An administrator uploads by hand, and a feed steps past a document once it has read or refused it. Nothing retries on a timer the way a pipeline sending an inventory does |
+| A taken document is recorded in the transaction that records its statements | The record and the statements cannot disagree about whether it was taken |
+| A refusal is recorded wherever the upload is turned away once its sender is admitted | By the form bound before the operation runs, by the reader, and by the checks on the publisher and the name. An answer of 500 or above is this deployment failing, and is not recorded as a refusal |
+| A document a feed fetched is recorded where it said something about a component this product ships, set aside something an earlier copy said, or was refused | A distribution lists tens of thousands of advisories about nothing a product here ships |
+| A feed's refusal is a document it stepped over | Withdrawn, too large, malformed, mismatching its digest, or at an address the client turns away. A statement set listed beside the advisories is left alone and not recorded. A publisher that cannot be reached is a failure of the pass, not of a document |
+| A trusted upstream's documents are not recorded here | They are read on a schedule, from the upstream (`DESIGN-upstream.md`) |
+
+### Document lists
+
+The VEX documents and the supplier advisories of a product are each a list of
+these records.
+
+| Rule | |
+|---|---|
+| Every arrival is a row, newest first | Taken and turned away alike |
+| A row names who uploaded it, or the supplier whose feed fetched it | A person by sign-in identity and display name, a key by name |
+| The newest taken upload of a document is marked current | A document is the key a later upload replaces on: a publisher's VEX document, or one advisory by its publisher and the name the publisher gave it. What the current one said is what stands |
 | Read by a person who may know the product exists | The rule the SBOM receipts hold for a person. A pipeline key sends inventories and reads none of these. Decided in the store |
 
 ## Administrator-supplied VEX
@@ -1321,7 +1342,8 @@ from a fuzzer are intended scope and **are not built** (REQ-14).
 
 | Limit | Detail |
 |---|---|
-| An upload of a VEX document or a supplier advisory is not recorded as an upload | Its statements are. Who uploaded each copy, and a copy that wrote nothing because it matched what stands, are in the history of administrative changes and not on the list. A refused one is answered and recorded nowhere |
+| An upload refused by the request's own validation is not recorded | A missing document part, or a query parameter past its bound, is refused before the operation runs and before anything reads which product it names |
+| Document uploads begin at v0.11.0 | A database upgraded from v0.10.0 has statements and no record of the uploads that made them. Who uploaded those is in the history of administrative changes |
 | The list of uploads is per build, with the product's documents on every build of it | The SBOM and SARIF paths name a build, and the other two name a product. A product-wide list of every build's uploads is not built |
 | A day's whole archive is downloaded to keep half a megabyte of it | 622 MB on 2026-10-07. The List's hourly files of what changed are not read: a day's delay is what the scanner's own data has, and a second path to keep right has not been measured as worth it |
 | A deployment reaching the internet only through a proxy fetches no CVE records | The guarded client dials directly, so the check on the address it connects to is a check on the host it reaches. Such a deployment imports an archive instead |

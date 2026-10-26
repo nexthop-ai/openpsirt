@@ -29,8 +29,16 @@ const UNSETTLED = 15_000;
 const TABS: { type: UploadType; label: string; title: string }[] = [
   { type: "sbom", label: "SBOMs", title: "Software bills of materials" },
   { type: "sarif", label: "Static analysis", title: "SARIF runs from static analyzers" },
-  { type: "vex", label: "VEX documents", title: "Vulnerability Exploitability eXchange" },
-  { type: "supplier-advisory", label: "Supplier advisories", title: "CSAF security advisories" },
+  {
+    type: "vex",
+    label: "VEX documents",
+    title: "Vulnerability Exploitability eXchange. All builds of this product",
+  },
+  {
+    type: "supplier-advisory",
+    label: "Supplier advisories",
+    title: "CSAF security advisories. All builds of this product",
+  },
 ];
 
 // Everything one build was sent, one tab per kind of upload. SBOMs and static

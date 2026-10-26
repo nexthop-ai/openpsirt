@@ -3270,46 +3270,64 @@ components:
         - product_tree
         - vulnerabilities
       type: object
-    DocumentBody:
+    DocumentUploadBody:
       additionalProperties: false
       properties:
-        changed_at:
-          description: When an upload last recorded, repeated or set aside one of its statements. The same bytes uploaded again change nothing and leave this alone
-          type: string
+        current:
+          description: "Whether what it says is what stands: it was completed, and no later copy of the same document has been"
+          type: boolean
         digest:
-          description: SHA-256 of the copy its standing statements come from
+          description: SHA-256 of what arrived. Absent where it was turned away before it was read whole
           type: string
         document:
-          description: The file name it last arrived as, or for an advisory a feed fetched, the address it came from
+          description: The file name it was uploaded as, or the address a supplier feed fetched it from
           type: string
-        fetched:
-          description: Whether a supplier advisory feed fetched it rather than somebody uploading it
-          type: boolean
-        first_received_at:
-          description: When its first statement was recorded
+        fetched_by:
+          description: The supplier whose feed fetched it. Absent where somebody uploaded it
           type: string
         identifier:
           description: The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of
           type: string
         publisher:
-          description: The publisher the document names, as it is matched
+          description: The publisher the document names, as it is matched. Empty where it was turned away before that was read
           type: string
+        reason:
+          description: Why it was turned away, as the sender was told
+          type: string
+        received_at:
+          description: When it arrived
+          format: date-time
+          type: string
+        recorded:
+          description: Statements it recorded
+          format: int64
+          type: integer
         set_aside:
-          description: Statements of it a later copy no longer made, kept and no longer applied
+          description: Statements an earlier copy of the same document made that it no longer did, kept and no longer applied
           format: int64
           type: integer
-        standing:
-          description: Statements of it that stand
-          format: int64
-          type: integer
+        status:
+          description: Completed where its statements were recorded, refused where it was turned away
+          enum:
+            - in-progress
+            - completed
+            - failed
+            - refused
+          type: string
+        uploaded_by:
+          description: "Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it"
+          type: string
+        uploaded_by_name:
+          description: Their display name, where it differs from their identity
+          type: string
       required:
+        - received_at
+        - status
         - publisher
         - document
-        - digest
-        - standing
+        - recorded
         - set_aside
-        - first_received_at
-        - changed_at
+        - current
       type: object
     DocumentsOutputBody:
       additionalProperties: false
@@ -3323,7 +3341,7 @@ components:
           type: string
         items:
           items:
-            $ref: "#/components/schemas/DocumentBody"
+            $ref: "#/components/schemas/DocumentUploadBody"
           type:
             - array
             - "null"
@@ -12914,7 +12932,7 @@ components:
           $ref: "#/components/schemas/UploadLatestBody"
           description: The newest upload of this kind. Absent where none has arrived
         total:
-          description: How many are held. A VEX document and a supplier advisory are counted once however often they were uploaded, and an upload turned away is not counted
+          description: How many the kind's own list holds. A VEX document or supplier advisory turned away is listed and counted. An SBOM or static analysis run turned away is not, because only the last refusal of each is kept
           format: int64
           type: integer
         type:
@@ -12936,7 +12954,7 @@ components:
           description: Why it failed or was turned away, as the sender was told
           type: string
         received_at:
-          description: When it arrived. For a VEX document or a supplier advisory, when an upload last changed what it says
+          description: When it arrived
           format: date-time
           type: string
         status:
@@ -29609,7 +29627,9 @@ paths:
   /v1/products/{product}/supplier-advisories:
     get:
       description: |-
-        Returns the supplier security advisories this product holds statements from, one per publisher and advisory name, the most recently changed first: how many of its statements stand, how many a later copy set aside, and the file or address it last arrived as. An advisory a supplier advisory feed fetched is listed beside the uploaded ones and marked `fetched`.
+        Returns every supplier security advisory that arrived for this product, newest first, taken or turned away: who uploaded it or which supplier feed fetched it, what became of it, and how many statements it recorded and set aside. The newest copy taken of each advisory is marked `current`.
+
+        An advisory a feed fetched is listed where it said something about a component this product ships, set aside something an earlier copy said, or was turned away.
 
         Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
       operationId: list-supplier-advisories
@@ -30091,7 +30111,7 @@ paths:
   /v1/products/{product}/vex-statements:
     get:
       description: |-
-        Returns the VEX documents this product holds statements from, one per publisher, the most recently changed first: how many of its statements stand, how many a later upload set aside, and the file it last arrived as.
+        Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken from each publisher is marked `current`.
 
         Statements a trusted upstream publishes are listed with the upstream, not here.
 

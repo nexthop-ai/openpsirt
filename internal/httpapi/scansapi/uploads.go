@@ -24,13 +24,13 @@ import (
 // UploadKindBody is one kind of upload a build takes.
 type UploadKindBody struct {
 	Type   core.UploadType   `json:"type" doc:"The kind of upload: an SBOM, a static analysis run in SARIF, a VEX document, or a supplier security advisory"`
-	Total  int               `json:"total" doc:"How many are held. A VEX document and a supplier advisory are counted once however often they were uploaded, and an upload turned away is not counted"`
+	Total  int               `json:"total" doc:"How many the kind's own list holds. A VEX document or supplier advisory turned away is listed and counted. An SBOM or static analysis run turned away is not, because only the last refusal of each is kept"`
 	Latest *UploadLatestBody `json:"latest,omitempty" doc:"The newest upload of this kind. Absent where none has arrived"`
 }
 
 // UploadLatestBody is what became of the newest upload of one kind.
 type UploadLatestBody struct {
-	ReceivedAt string            `json:"received_at" format:"date-time" doc:"When it arrived. For a VEX document or a supplier advisory, when an upload last changed what it says"`
+	ReceivedAt string            `json:"received_at" format:"date-time" doc:"When it arrived"`
 	Status     core.UploadStatus `json:"status" doc:"What became of it: still being read or applied, completed, failed after it was accepted, or turned away when it arrived"`
 	Reason     string            `json:"reason,omitempty" doc:"Why it failed or was turned away, as the sender was told"`
 }
@@ -103,7 +103,7 @@ func registerUploads(api huma.API, in core.Deps) {
 		}{
 			{ingest.UploadVEX, finding.FromVex}, {ingest.UploadAdvisory, finding.FromAdvisory},
 		} {
-			held, total, err := finding.NewStore(in.DB.DB).Documents(ctx, subject, named.ProductID,
+			held, total, err := finding.NewStore(in.DB.DB).Uploads(ctx, subject, named.ProductID,
 				each.source, 1, 0)
 			switch {
 			case errors.Is(err, access.ErrDenied):
@@ -113,9 +113,14 @@ func registerUploads(api huma.API, in core.Deps) {
 			}
 			body := kindOf(each.kind, total)
 			if len(held) > 0 {
-				// Nothing of one is stored unless it was taken, so what is
-				// held of one is complete.
-				body.Latest = latestOf(held[0].ChangedAt, ingest.UploadCompleted, "")
+				// A document is recorded as it is taken or turned away, so
+				// nothing of one is still being read.
+				newest := held[0]
+				body.Latest = latestOf(newest.ReceivedAt, ingest.UploadCompleted, "")
+				if newest.Status == finding.UploadTurnedAway {
+					body.Latest = latestOf(newest.ReceivedAt, ingest.UploadRefused,
+						core.OrBlank(newest.Reason))
+				}
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}
