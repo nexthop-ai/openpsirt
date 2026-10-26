@@ -195,7 +195,7 @@ found, and each is about internal work, so it is withheld on the terms of
 
 | Alert | Kind | Says | Clears |
 |---|---|---|---|
-| Sharp drop | event | A comparable run marked more of the build's open leads not reproduced than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's leads not reproduced | Acknowledged |
+| Sharp drop | event | A comparable run marked more of the build's open leads not reproduced than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's leads of the series not reproduced | Acknowledged |
 | Not comparable | condition | The series' newest applied run on the build could not be compared, and why. Nothing it stops reporting there is marked not reproduced | The next comparable run |
 | Gone quiet | condition | No run of the series has been applied to the build for three of its usual gaps, and never under a day. Names the last upload of the series to the build turned away since, with what its sender was told | The next applied run |
 

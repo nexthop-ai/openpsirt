@@ -154,7 +154,7 @@ func (w *sweep) analysesNotComparable(ctx context.Context) (map[int64][]Holds, e
 			Body: fmt.Sprintf("%s %s %s: the last run of %s could not be compared, because %s. "+
 				"Nothing it stops reporting is marked not reproduced until a run can be.",
 				row.Product, row.Stream, row.Variant, row.Series, uncomparable(row.Reason)),
-			Link: weblink.Leads(row.ProductName, row.StreamName, row.VariantName, ""),
+			Link: weblink.Leads(row.ProductName, row.StreamName, row.VariantName, "", ""),
 		})
 	}
 	return out, nil
@@ -240,7 +240,7 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 		if !quiet {
 			continue
 		}
-		body := fmt.Sprintf("%s %s %s: nothing from %s has arrived for %s.",
+		body := fmt.Sprintf("%s %s %s: no run of %s has been applied for %s.",
 			build.Product, build.Stream, build.Variant, build.Series, plainly(int(silent.Hours()/24)))
 		turned, err := w.lastRefused(ctx, build, runs[at][0])
 		if err != nil {
@@ -255,7 +255,7 @@ func (w *sweep) analysesQuiet(ctx context.Context) (map[int64][]Holds, error) {
 			About: identify("analysis-quiet", strconv.FormatInt(at.series, 10),
 				strconv.FormatInt(at.target, 10)),
 			Body: body,
-			Link: weblink.Leads(build.ProductName, build.StreamName, build.VariantName, ""),
+			Link: weblink.Leads(build.ProductName, build.StreamName, build.VariantName, "", ""),
 		})
 	}
 	return out, nil

@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
@@ -51,9 +52,9 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 	if r.At.IsZero() {
 		r.At = time.Now().UTC()
 	}
-	if len(r.Reason) > mostReason {
-		r.Reason = r.Reason[:mostReason]
-	}
+	// Cut where a character starts, since an engine checking the encoding
+	// refuses a split one.
+	r.Reason = bound.Head(r.Reason, mostReason)
 	// An update and then an insert, for the reason a scan refusal is written
 	// so: no portable upsert, and a series refused once is usually refused
 	// again.

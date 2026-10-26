@@ -135,7 +135,7 @@
     "query": ["change", "from", "from_variant", "to", "to_variant"]
   },
   "inbox": { "path": "/products/:product/inbox", "query": ["waiting"] },
-  "leads": { "path": "/products/:product/leads", "query": ["state", "stream", "variant"] },
+  "leads": { "path": "/products/:product/leads", "query": ["state", "stream", "variant", "series"] },
   "lead": { "path": "/products/:product/streams/:stream/variants/:variant/leads/:place" },
   "leadRules": { "path": "/products/:product/lead-rules" },
   "repositories": { "path": "/products/:product/repositories" },

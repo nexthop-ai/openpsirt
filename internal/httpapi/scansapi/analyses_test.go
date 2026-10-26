@@ -199,19 +199,8 @@ func TestAnAnalyzerUploadTurnedAwayIsRecordedAgainstItsSeries(t *testing.T) {
 				t.Fatalf("answered %d (%s); want 422", code, body)
 			}
 		}
-		// Somebody nothing admits is answered and nothing is recorded.
-		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
-			httpapitest.Part{Field: "series", Content: "stranger"})
-		req := httptest.NewRequest(http.MethodPost, analyses(f), body)
-		req.Header.Set("Content-Type", form)
+		req := httptest.NewRequest(http.MethodGet, analyses(f), nil)
 		rec := httptest.NewRecorder()
-		f.Handler.ServeHTTP(rec, req)
-		if rec.Code != http.StatusUnauthorized {
-			t.Fatalf("an unsigned upload answered %d; want 401", rec.Code)
-		}
-
-		req = httptest.NewRequest(http.MethodGet, analyses(f), nil)
-		rec = httptest.NewRecorder()
 		f.Handler.ServeHTTP(rec, f.Sending(req))
 		var listed struct {
 			Refused []scansapi.AnalysisRefusalBody `json:"refused"`
@@ -226,6 +215,27 @@ func TestAnAnalyzerUploadTurnedAwayIsRecordedAgainstItsSeries(t *testing.T) {
 		if len(got) != 2 || !strings.Contains(got["nightly"], "whole number") ||
 			!strings.Contains(got[""], "names no series") {
 			t.Errorf("refused %+v; want the last refusal of nightly and the one naming no series", listed.Refused)
+		}
+	})
+}
+
+func TestAnAnalyzerUploadFromSomebodyNotAdmittedIsRecordedNowhere(t *testing.T) {
+	// Signed in and reading the product's internal work, but not triaging
+	// it, so the upload is refused by admission rather than before it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
+			httpapitest.Part{Field: "series", Content: "stranger"})
+		got := r.Post(t, "internal-reader", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/analyses", body, form)
+		if got.Code != http.StatusForbidden {
+			t.Fatalf("an upload from somebody who does not triage internal work answered %d: %s", got.Code, got.Body)
+		}
+		held, err := r.DB.DB.NewSelect().TableExpr(`"series_refusal"`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d refusals were recorded for an upload its sender was not admitted to send", held)
 		}
 	})
 }

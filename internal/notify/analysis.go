@@ -53,7 +53,7 @@ func dropped(ctx context.Context, db *bun.DB, drop analysis.Drop) error {
 	body := fmt.Sprintf("%s %s %s: one run of %s marked %d of %d open leads not reproduced. "+
 		"It was applied.", placed.Product, placed.Stream, placed.Variant, name, drop.Missed, drop.Live)
 	where := weblink.Leads(placed.Addressed.Product, placed.Addressed.Stream, placed.Addressed.Variant,
-		string(analysis.NotReproduced))
+		string(analysis.NotReproduced), name)
 	together := identify("analysis-dropped " + strconv.FormatInt(drop.RunID, 10))
 	productID := placed.ProductID
 	var failed error

@@ -59,7 +59,8 @@ func TestASharpDropIsToldToTheProductsInternalReadersAlone(t *testing.T) {
 		}
 		heard := told(internal, access.InternalRead)
 		if len(heard) != 1 || !strings.Contains(heard[0].Body, "clang-tidy/default marked 30 of 40") ||
-			!strings.Contains(heard[0].Link, "state=not-reproduced") {
+			!strings.Contains(heard[0].Link, "state=not-reproduced") ||
+			!strings.Contains(heard[0].Link, "series=clang-tidy%2Fdefault") {
 			t.Errorf("the internal reader was told %+v; want the run, its counts and a link to what it marked", heard)
 		}
 		if got := told(public, access.PublicRead); len(got) != 0 {
@@ -179,7 +180,7 @@ func TestASeriesSilentForThreeOfItsUsualGapsHasGoneQuiet(t *testing.T) {
 		// A third a day later makes a daily series, silent for eight days.
 		analyzed(t, w, set, now.Add(-8*24*time.Hour), true)
 		heard := toldOf(t, w, analyst, access.InternalRead, notify.AnalysisQuiet)
-		if len(heard) != 1 || !strings.Contains(heard[0].Body, "nothing from clang-tidy/default has arrived") {
+		if len(heard) != 1 || !strings.Contains(heard[0].Body, "no run of clang-tidy/default has been applied") {
 			t.Fatalf("the analyst was told %+v; want the series named as quiet", heard)
 		}
 

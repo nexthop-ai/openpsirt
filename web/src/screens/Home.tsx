@@ -700,7 +700,9 @@ function greeting(): string {
 function holdings(who: Who): string {
   if (who.admin) return "You administer this deployment";
   const reach = who.reach ?? [];
-  const triage = reach.filter((each) => each.may_triage).map((each) => each.product);
+  const triage = reach
+    .filter((each) => each.may_triage || each.triages_internal)
+    .map((each) => each.product);
   const agree = reach.filter((each) => each.may_agree).map((each) => each.product);
   const parts: string[] = [];
   if (triage.length) parts.push(`triage on ${triage.join(", ")}`);
