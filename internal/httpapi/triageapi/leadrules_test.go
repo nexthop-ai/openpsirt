@@ -425,3 +425,25 @@ func TestAStandingRuleWaitingForApprovalIsToldToWhoeverMayApproveIt(t *testing.T
 		}
 	})
 }
+
+func TestAClaimAboutALeadOverridesTheStandingRuleDismissingIt(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		rule := proposeLeadRule(t, r,
+			`{"rule":"clang-tidy/leak","reason":"false_positive","reasoning":"every allocation here is pooled"}`)
+		approveLeadRule(t, r, rule.ID)
+		if got := leadState(t, r, place); got != "dismissed" {
+			t.Fatalf("a lead under a rule in force is %q; want dismissed", got)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+			`{"outcome":"confirmed","reasoning":"this one is not pooled"}`); got.Code != http.StatusCreated {
+			t.Fatalf("the confirmation answered %d: %s", got.Code, got.Body)
+		}
+		if got := leadState(t, r, place); got != "confirmed" {
+			t.Errorf("a lead confirmed under a rule dismissing it is %q; want confirmed", got)
+		}
+		if got := leadsOf(t, r, "internal-reader", "?state=confirmed"); len(got.Items) != 1 || got.Items[0].Place != place {
+			t.Errorf("the confirmed leads are %+v; want the lead the rule covers", got.Items)
+		}
+	})
+}

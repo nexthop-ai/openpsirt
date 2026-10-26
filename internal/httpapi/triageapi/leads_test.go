@@ -439,3 +439,37 @@ func TestALeadSeenOnlyInReleasesPastTheirEndOfLifeLeavesTheQueueAndIsKeptAsItSta
 		}
 	})
 }
+
+func TestWithdrawingAnAgreedDismissalOfALeadReopensIt(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, fmt.Sprintf(leadDecisionAt, place),
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("the dismissal answered %d: %s", got.Code, got.Body)
+		}
+		var decided core.DecisionBody
+		if err := json.Unmarshal(got.Body.Bytes(), &decided); err != nil {
+			t.Fatal(err)
+		}
+		claim := fmt.Sprintf("/v1/claims/%d", decided.ClaimID)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, claim+"/approval", `{}`); got.Code != http.StatusOK {
+			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
+		}
+		if got := leadState(t, r, place); got != "dismissed" {
+			t.Fatalf("a lead whose dismissal was agreed to is %q; want dismissed", got)
+		}
+		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 0 {
+			t.Fatalf("the queue holds %+v beside an agreed dismissal; want nothing", queued.Items)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ``); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing the claim answered %d: %s", got.Code, got.Body)
+		}
+		if got := leadState(t, r, place); got != "open" {
+			t.Errorf("a lead whose dismissal was withdrawn is %q; want open", got)
+		}
+		if queued := leadsOf(t, r, "internal-reader", ""); len(queued.Items) != 1 || queued.Items[0].Place != place {
+			t.Errorf("the queue holds %+v after the dismissal was withdrawn; want the lead back", queued.Items)
+		}
+	})
+}
