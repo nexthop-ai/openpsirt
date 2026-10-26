@@ -24,6 +24,23 @@ func TestWhoMayReachWhat(t *testing.T) {
 	// and it is why so many rows below expect 404 where 403 would look more
 	// natural.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// A lead handed off as a flaw and kept internal, so its collaborators
+		// are a list to reach.
+		place, _ := httpapitest.HandedOffLead(t, r, false)
+		var (
+			lead      = "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+			theirLead = "/v1/products/theirs/streams/master/variants/broadcom/leads/" + place
+		)
+		const (
+			leads      = "/v1/products/mine/leads"
+			leadFile   = "/v1/products/mine/leads.csv"
+			leadSeries = "/v1/products/mine/lead-series"
+			leadRules  = "/v1/products/mine/lead-rules"
+			theirLeads = "/v1/products/theirs/leads"
+			repos      = "/v1/products/mine/repositories"
+			runs       = "/v1/products/mine/streams/master/variants/broadcom/analyses"
+			theirRuns  = "/v1/products/theirs/streams/master/variants/broadcom/analyses"
+		)
 		const (
 			products   = "/v1/products"
 			mine       = "/v1/products/mine/streams"
@@ -219,6 +236,99 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodGet, theirsUnmatched, http.StatusNotFound},
 			{"reader", http.MethodGet, theirsUnmatched + ".csv", http.StatusNotFound},
 			{"", http.MethodGet, mineUnmatched, http.StatusUnauthorized},
+
+			// The lead queue, its file, its counts by series and the standing
+			// rules are internal work. The queue and its file answer a reader
+			// of the product with what they may read of it, which for a
+			// reader of no internal work is nothing.
+			{"", http.MethodGet, leads, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, leads, http.StatusOK},
+			{"internal-triager", http.MethodGet, leads, http.StatusOK},
+			{"reader", http.MethodGet, leads, http.StatusOK},
+			{"private", http.MethodGet, leads, http.StatusOK},
+			{"approver", http.MethodGet, leads, http.StatusNotFound},
+			{"outsider", http.MethodGet, leads, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, theirLeads, http.StatusNotFound},
+			{"", http.MethodGet, leadFile, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, leadFile, http.StatusOK},
+			{"approver", http.MethodGet, leadFile, http.StatusNotFound},
+			{"outsider", http.MethodGet, leadFile, http.StatusNotFound},
+			{"", http.MethodGet, leadSeries, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, leadSeries, http.StatusOK},
+			{"reader", http.MethodGet, leadSeries, http.StatusForbidden},
+			{"private-triage", http.MethodGet, leadSeries, http.StatusForbidden},
+			{"approver", http.MethodGet, leadSeries, http.StatusNotFound},
+			{"", http.MethodGet, leadRules, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, leadRules, http.StatusOK},
+			{"internal-triager", http.MethodGet, leadRules, http.StatusOK},
+			{"reader", http.MethodGet, leadRules, http.StatusForbidden},
+			{"approver", http.MethodGet, leadRules, http.StatusNotFound},
+			{"reader", http.MethodPost, leadRules, http.StatusForbidden},
+			{"internal-reader", http.MethodPost, leadRules, http.StatusForbidden},
+
+			// One lead's evidence is read where its visibility is, and a lead
+			// nobody may read there answers as a place holding nothing.
+			{"", http.MethodGet, lead, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, lead, http.StatusOK},
+			{"internal-triager", http.MethodGet, lead, http.StatusOK},
+			{"lead-handler", http.MethodGet, lead, http.StatusOK},
+			{"reader", http.MethodGet, lead, http.StatusNotFound},
+			{"private", http.MethodGet, lead, http.StatusNotFound},
+			{"triager", http.MethodGet, lead, http.StatusNotFound},
+			{"private-triage", http.MethodGet, lead, http.StatusNotFound},
+			{"approver", http.MethodGet, lead, http.StatusNotFound},
+			{"outsider", http.MethodGet, lead, http.StatusNotFound},
+			{"admin", http.MethodGet, lead, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, theirLead, http.StatusNotFound},
+			// A lead handed off as a flaw takes no judgment, which its readers
+			// are told, since its evidence says it was handed off. Closing one
+			// as fixed is internal triage, and a reader who does not hold it is
+			// answered as though nothing were open to close.
+			{"internal-reader", http.MethodPost, lead + "/decision", http.StatusConflict},
+			{"internal-triager", http.MethodPost, lead + "/decision", http.StatusConflict},
+			{"reader", http.MethodPost, lead + "/decision", http.StatusNotFound},
+			{"internal-reader", http.MethodPost, lead + "/fixed", http.StatusNotFound},
+			{"reader", http.MethodPost, lead + "/fixed", http.StatusNotFound},
+			// A hand-off takes triage of the internal lead and of the private
+			// flaw, asked before anything the request names is resolved.
+			{"lead-handler", http.MethodGet, lead + "/hand-off", http.StatusOK},
+			{"internal-triager", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
+			{"private-triage", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
+			{"internal-reader", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
+			{"internal-triager", http.MethodPut, lead + "/move", http.StatusForbidden},
+			{"internal-triager", http.MethodDelete, lead + "/move", http.StatusForbidden},
+			// Who is granted a kept lead is managed by whoever reads it at
+			// internal visibility, and by nobody else.
+			{"internal-reader", http.MethodGet, lead + "/collaborators", http.StatusOK},
+			{"internal-triager", http.MethodGet, lead + "/collaborators", http.StatusOK},
+			{"lead-handler", http.MethodGet, lead + "/collaborators", http.StatusOK},
+			{"private", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
+			{"reader", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
+			{"approver", http.MethodGet, lead + "/collaborators", http.StatusNotFound},
+			{"", http.MethodGet, lead + "/collaborators", http.StatusUnauthorized},
+			{"private", http.MethodPut, lead + "/collaborators/reader", http.StatusNotFound},
+			{"private", http.MethodDelete, lead + "/collaborators/reader", http.StatusNotFound},
+
+			// A product's repository settings are administration.
+			{"", http.MethodGet, repos, http.StatusUnauthorized},
+			{"admin", http.MethodGet, repos, http.StatusOK},
+			{"reader", http.MethodGet, repos, http.StatusForbidden},
+			{"internal-triager", http.MethodGet, repos, http.StatusForbidden},
+			{"lead-handler", http.MethodGet, repos, http.StatusForbidden},
+			{"reader", http.MethodPut, repos, http.StatusForbidden},
+			{"internal-triager", http.MethodPut, repos, http.StatusForbidden},
+
+			// A person reads a build's analyzer runs where they read internal
+			// work in the product, since the counts are of internal findings,
+			// and anybody else reads them as runs nobody sent.
+			{"", http.MethodGet, runs, http.StatusUnauthorized},
+			{"internal-reader", http.MethodGet, runs, http.StatusOK},
+			{"internal-triager", http.MethodGet, runs, http.StatusOK},
+			{"reader", http.MethodGet, runs, http.StatusNotFound},
+			{"private", http.MethodGet, runs, http.StatusNotFound},
+			{"approver", http.MethodGet, runs, http.StatusNotFound},
+			{"outsider", http.MethodGet, runs, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, theirRuns, http.StatusNotFound},
 
 			// Administration is administration. Holding every product role
 			// there is does not amount to any of it.

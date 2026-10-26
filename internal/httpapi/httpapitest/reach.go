@@ -57,6 +57,15 @@ func DeclaredBody(method, path, name string) io.Reader {
 	if method != http.MethodPost {
 		return nil
 	}
+	if strings.HasSuffix(path, "/lead-rules") {
+		return strings.NewReader(`{"prefix": "tests", "reason": "used_in_tests", "reasoning": "` + name + `"}`)
+	}
+	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/decision") {
+		return strings.NewReader(`{"outcome": "confirmed", "reasoning": "` + name + `"}`)
+	}
+	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/fixed") {
+		return strings.NewReader(`{"because": "` + name + `"}`)
+	}
 	if strings.HasSuffix(path, "/reports") {
 		return strings.NewReader(`{"summary": "` + name + `"}`)
 	}
