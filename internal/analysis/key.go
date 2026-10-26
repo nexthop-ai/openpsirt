@@ -95,7 +95,7 @@ type Keyed struct {
 	Chain  string
 	Key    string
 	// UnprintedKey is the whole key without the fingerprint or the line,
-	// which a re-baseline compares where one result and one lead hold it.
+	// which a fingerprint change compares where one result and one lead hold it.
 	UnprintedKey string
 	// FunctionKey and LineKey are the probable keys: the rule, the path and
 	// the message without its digits, with the function, and with neither.

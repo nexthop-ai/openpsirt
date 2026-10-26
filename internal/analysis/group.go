@@ -51,7 +51,7 @@ func nearby(lines int) string {
 
 // corroborated is whether another analyzer's lead on the build of the finding
 // under "f", whose result is under "ar", is the same flaw. It is worked out
-// over every lead, whoever reads it, because where a lead stands does not
+// over every lead, whoever reads it, because where a lead sorts does not
 // depend on who is looking.
 var corroborated = `EXISTS (SELECT 1 FROM "analysis_result" AS "ag"
 	JOIN "finding" AS "g" ON "g"."id" = "ag"."finding_id"

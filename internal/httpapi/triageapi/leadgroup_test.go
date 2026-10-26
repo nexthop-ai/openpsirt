@@ -31,15 +31,11 @@ func overflowsBesideTheLeak(t *testing.T, r *httpapitest.Reach, leakTag, overflo
 	overflowsIn(t, r, "src/b.c", leakTag, overflowTag, lines...)
 }
 
-// overflowsIn is overflowsBesideTheLeak reporting the overflows in file. The
-// second analyzer's first run reports nothing, so its overflows arrive after
-// its baseline, as the seeded leak's do not.
+// overflowsIn is overflowsBesideTheLeak reporting the overflows in file.
 func overflowsIn(t *testing.T, r *httpapitest.Reach, file, leakTag, overflowTag string, lines ...int) {
 	t.Helper()
 	now := time.Now().UTC()
 	httpapitest.ApplyRun(t, r, now.Add(-90*time.Minute), taggedLeak(leakTag))
-	httpapitest.ApplyRunIn(t, r, "cppcheck/default", now.Add(-80*time.Minute),
-		httpapitest.OtherToolRun("cppcheck", "overflow", overflowTag, file))
 	httpapitest.ApplyRunIn(t, r, "cppcheck/default", now.Add(-70*time.Minute),
 		httpapitest.OtherToolRun("cppcheck", "overflow", overflowTag, file, lines...))
 }
@@ -78,12 +74,9 @@ func kinOf(t *testing.T, r *httpapitest.Reach, place string) []struct {
 	return got.Kin
 }
 
-func TestASecondAnalyzerReportingTheSameFlawGroupsItAndPullsItIn(t *testing.T) {
+func TestASecondAnalyzerReportingTheSameFlawGroupsItAndSortsItFirst(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		if got := leadState(t, r, place); got != "baseline" {
-			t.Fatalf("the seeded lead is %q; want it in the baseline", got)
-		}
 		// CWE-416 and CWE-787 are both the bounds family. The overflow a
 		// line past the leak's last place is the same flaw, the one nine
 		// past possibly is, and the one twelve past is not.
@@ -91,9 +84,6 @@ func TestASecondAnalyzerReportingTheSameFlawGroupsItAndPullsItIn(t *testing.T) {
 		kin := kinOf(t, r, place)
 		if len(kin) != 2 || !kin[0].Same || kin[0].Line != 4 || kin[1].Same || kin[1].Line != 12 {
 			t.Fatalf("the leak's kin are %+v; want the overflow on line 4 the same and line 12 possibly", kin)
-		}
-		if got := leadState(t, r, place); got != "open" {
-			t.Errorf("a lead another analyzer reports is %q; want it out of the baseline", got)
 		}
 		// The queue puts the flaw two analyzers report above the one only
 		// one does.
@@ -125,22 +115,17 @@ func TestClangsCheckersRunByClangTidyAreNotASecondAnalyzer(t *testing.T) {
 		httpapitest.ApplyRunIn(t, r, "clang-tidy/analyzer", now.Add(-80*time.Minute),
 			httpapitest.OtherToolRun("clang-tidy", "clang-analyzer-unix.Malloc", "401", "src/c.c", 7))
 		var both []string
-		for _, state := range []string{"?state=baseline", ""} {
-			for _, lead := range leadsOf(t, r, "internal-reader", state).Items {
-				if lead.Path == "src/c.c" {
-					both = append(both, lead.Place)
-				}
+		for _, lead := range leadsOf(t, r, "internal-reader", "").Items {
+			if lead.Path == "src/c.c" {
+				both = append(both, lead.Place)
 			}
 		}
 		if len(both) != 2 {
-			t.Fatalf("the baseline holds %v at src/c.c; want the two leak results", both)
+			t.Fatalf("the queue holds %v at src/c.c; want the two leak results", both)
 		}
 		for _, place := range both {
 			if kin := kinOf(t, r, place); len(kin) != 0 {
 				t.Errorf("lead %s has kin %+v; want none of clang's own checker", place, kin)
-			}
-			if got := leadState(t, r, place); got != "baseline" {
-				t.Errorf("lead %s is %q; want it in the baseline", place, got)
 			}
 		}
 	})
@@ -155,9 +140,6 @@ func TestTwoRulesOfOneAnalyzerOnOneLineAreNotOneFlaw(t *testing.T) {
 		if kin := kinOf(t, r, place); len(kin) != 0 {
 			t.Errorf("the leak's kin are %+v; want none of its own analyzer", kin)
 		}
-		if got := leadState(t, r, place); got != "baseline" {
-			t.Errorf("a lead only its own analyzer reports again is %q; want it in the baseline", got)
-		}
 	})
 }
 
@@ -168,9 +150,6 @@ func TestLeadsOfUnrelatedWeaknessesAreNotOneFlaw(t *testing.T) {
 		overflowsBesideTheLeak(t, r, "563", "787", 3)
 		if kin := kinOf(t, r, place); len(kin) != 0 {
 			t.Errorf("the leak's kin are %+v; want none", kin)
-		}
-		if got := leadState(t, r, place); got != "baseline" {
-			t.Errorf("a lead no analyzer corroborates is %q; want it in the baseline", got)
 		}
 	})
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// ratedRun is the seeded run reporting two more leads after the baseline, a
+// ratedRun is the seeded run reporting two more leads after the first, a
 // leak in src/d.c and an overflow in src/c.c, with each rule carrying the
 // properties given.
 func ratedRun(leak, overflow string) string {
@@ -46,13 +46,13 @@ func TestTheQueueIsOrderedByTheToolsOwnRating(t *testing.T) {
 				httpapitest.SeededLead(t, r)
 				httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), ratedRun(c.leak, c.overflow))
 				got := leadsOf(t, r, "internal-reader", "")
-				if len(got.Items) != 2 || got.Items[0].Path != c.first {
+				if len(got.Items) != 3 || got.Items[0].Path != c.first {
 					t.Fatalf("the queue is %+v; want %s first", got.Items, c.first)
 				}
 				// A run of the tool that rates nothing and tags nothing
 				// leaves the rating and the weaknesses recorded.
 				httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Minute), ratedRun(``, ``))
-				if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 2 || got.Items[0].Path != c.first {
+				if got := leadsOf(t, r, "internal-reader", ""); len(got.Items) != 3 || got.Items[0].Path != c.first {
 					t.Errorf("after an unrated run the queue is %+v; want %s first still", got.Items, c.first)
 				}
 			})

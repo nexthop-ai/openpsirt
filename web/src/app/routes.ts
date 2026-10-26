@@ -86,7 +86,7 @@ export const leadsAt = (
 ) => at("leads", { product }, query);
 // One lead's evidence on one build.
 export const leadAt = (build: Build, place: string) => at("lead", { ...build, place });
-// The standing rules and important paths deciding what reaches the queue.
+// The standing rules dismissing a product's leads.
 export const leadRulesAt = (product: string) => at("leadRules", { product });
 // The hosts a product's source links open on, and what it says per path.
 export const repositoriesAt = (product: string) => at("repositories", { product });

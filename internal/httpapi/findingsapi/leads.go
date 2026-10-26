@@ -50,12 +50,12 @@ type LeadEvidenceBody struct {
 	NotSeen    string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
 	Compare    string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
 	Unchanged  bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
-	State      LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
+	State      LeadState          `json:"state" doc:"Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
 	Kin        []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
 	Decision   *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
 	Withheld   bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
 	ThirdParty bool               `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
-	Ended      bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off"`
+	Ended      bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off"`
 	Handoff    *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
 	// Who is dealing with the lead on this build, while it is open there.
 	core.HolderBody

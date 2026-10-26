@@ -17,8 +17,7 @@ import { on } from "../ui/when";
 import { LEAD_STATES, LEAD_TONES, located, stateSaid } from "./leads";
 
 // A product's static analysis leads. With no state it is the queue: open
-// leads nothing waits on, the baseline left out. A state lists that state's
-// leads instead, which is how the baseline is searched.
+// leads nothing waits on. A state lists that state's leads instead.
 export function Leads() {
   const { product = "" } = useParams();
   const [params, setParams] = useSearchParams();

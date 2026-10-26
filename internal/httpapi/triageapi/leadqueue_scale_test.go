@@ -4,10 +4,9 @@
 //go:build measure
 
 // What reading a product's lead queue costs on one build holding the first
-// run of two analyzers, so every lead arrives in the baseline.
-//
-// The baseline is the worst case: where a baseline lead stands asks whether
-// another analyzer reports the same flaw on its build, of every row.
+// run of two analyzers, every lead of which is open and in the queue. The
+// order asks of every row whether another analyzer reports the same flaw on
+// its build.
 //
 // Behind a build tag because it is a measurement and not a gate. `make
 // measure` runs it.
@@ -56,7 +55,7 @@ func TestMeasureTheLeadQueueOfOneBuild(t *testing.T) {
 				built := time.Now().UTC().Add(-time.Hour)
 				httpapitest.ApplyRunIn(t, r, "clang/measured", built, measuredRun("clang", leads/2, 0))
 				httpapitest.ApplyRunIn(t, r, "cppcheck/measured", built, measuredRun("cppcheck", leads/2, 3))
-				for _, query := range []string{"", "?state=baseline"} {
+				for _, query := range []string{"", "?state=open"} {
 					path := "/v1/products/mine/leads" + query
 					began := time.Now()
 					got := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, path, "")

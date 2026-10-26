@@ -304,9 +304,8 @@ func TestAResultIsAnInternalFindingOnTheComponentItsRepositoryBuilt(t *testing.T
 		if r := receiptOf(t, run); r.Opened != 2 {
 			t.Errorf("receipt %+v; want two opened", r)
 		}
-		if !run.Baseline || run.Comparable == nil || !*run.Comparable {
-			t.Errorf("the series' first comparable run is its baseline: baseline %v, comparable %v",
-				run.Baseline, run.Comparable)
+		if run.Comparable == nil || !*run.Comparable {
+			t.Errorf("the series' first run with nothing before it is comparable: %v", run.Comparable)
 		}
 		leads := w.leads(t, w.Target.ID)
 		if len(leads) != 2 {
@@ -659,37 +658,21 @@ func TestAResultOnAnotherBuildCarriesThePlaceItWasJudgedAt(t *testing.T) {
 	})
 }
 
-func TestAResultTheBaselineHoldsElsewhereIsInTheBaselineOnANewBuild(t *testing.T) {
+func TestASeriesFirstRunPutsEveryLeadInTheQueue(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
-		tag, err := w.Catalog.TargetFor(t.Context(), w.Tag.ID, w.Customer.ID)
+		if _, status := w.send(t, w.Target.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR, inSWSS}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		reader := w.holding(t, "analyst", access.InternalRead)
+		queue, err := LeadsOf(t.Context(), w.DB.DB, reader, Scope{ProductID: w.Product.ID}, "", 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
-		w.inventory(t, tag.ID)
-		built := time.Now().UTC().Add(-time.Hour)
-		w.send(t, w.Target.ID, built, document([]sent{inFRR}, 10))
-		run, _ := w.send(t, tag.ID, built, document([]sent{inFRR, inSWSS}, 10))
-		if run.Baseline {
-			t.Fatal("the series' second comparable run is not its baseline")
-		}
-		var rows []struct {
-			Path     string `bun:"path"`
-			Baseline bool   `bun:"baseline"`
-		}
-		if err := w.DB.DB.NewSelect().TableExpr(`"sighting" AS "si"`).
-			Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "si"."finding_id"`).
-			Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
-			ColumnExpr(`"ar"."path", "si"."baseline"`).
-			Where(`"f"."target_id" = ?`, tag.ID).Scan(t.Context(), &rows); err != nil {
-			t.Fatal(err)
-		}
-		in := map[string]bool{}
-		for _, r := range rows {
-			in[r.Path] = r.Baseline
-		}
-		if len(rows) != 2 || !in["src/sonic-frr/frr/bgpd/bgp_attr.c"] || in[inSWSS.uri] {
-			t.Errorf("baseline by path %v; want the result the baseline holds in it and the new one not", in)
+		if queue.Total != 2 || queue.ByState[Open] != 2 {
+			t.Errorf("queue of %d, %v by state; want both leads of the first run open in it",
+				queue.Total, queue.ByState)
 		}
 	})
 }
@@ -836,8 +819,8 @@ func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
 		lone.print, tied.print, twin.print = "c1", "c2", "c3"
 		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour),
 			documentOf([]interface{ json() string }{lone, tied, twin}, 10, "fedcba9876543210"))
-		if r := receiptOf(t, run); !r.Rebaseline || r.Opened != 0 || r.Seen != 3 || r.Probable != 2 {
-			t.Errorf("receipt %+v; want a re-baseline seeing all three, the two ties probably", r)
+		if r := receiptOf(t, run); !r.FingerprintsChanged || r.Opened != 0 || r.Seen != 3 || r.Probable != 2 {
+			t.Errorf("receipt %+v; want a fingerprint change seeing all three, the two ties probably", r)
 		}
 		on := w.matchedOn(t, w.Target.ID)
 		for _, lead := range leads {
@@ -943,7 +926,7 @@ func TestAClosedLeadFoundAgainOpensAtItsPlace(t *testing.T) {
 	})
 }
 
-func TestARunFingerprintedDifferentlyFromTheBuildsLastIsARebaseline(t *testing.T) {
+func TestARunFingerprintedDifferentlyFromTheBuildsLastIsAFingerprintChange(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		start := time.Now().UTC().Add(-5 * time.Hour)
@@ -962,14 +945,14 @@ func TestARunFingerprintedDifferentlyFromTheBuildsLastIsARebaseline(t *testing.T
 		} {
 			run, status := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour),
 				documentOf([]interface{ json() string }{c.result}, 10, c.salt))
-			if status != series.Applied || run.Rebaseline != c.want || receiptOf(t, run).Rebaseline != c.want {
-				t.Errorf("run %d: %s, re-baseline %v; want %v", i, status, run.Rebaseline, c.want)
+			if status != series.Applied || run.FingerprintsChanged != c.want || receiptOf(t, run).FingerprintsChanged != c.want {
+				t.Errorf("run %d: %s, fingerprints changed %v; want %v", i, status, run.FingerprintsChanged, c.want)
 			}
 		}
 	})
 }
 
-func TestAResultWithNoFingerprintBesideOthersIsNoRebaseline(t *testing.T) {
+func TestAResultWithNoFingerprintBesideOthersIsNoFingerprintChange(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Target.ID)
 		start := time.Now().UTC().Add(-3 * time.Hour)
@@ -984,8 +967,8 @@ func TestAResultWithNoFingerprintBesideOthersIsNoRebaseline(t *testing.T) {
 			{printed, other},
 		} {
 			run, _ := w.send(t, w.Target.ID, start.Add(time.Duration(i)*time.Hour), documentOf(results, 10, ""))
-			if i > 0 && run.Rebaseline {
-				t.Errorf("run %d: a re-baseline where one result carried no fingerprint (%q)", i, run.Fingerprints)
+			if i > 0 && run.FingerprintsChanged {
+				t.Errorf("run %d: a fingerprint change where one result carried no fingerprint (%q)", i, run.Fingerprints)
 			}
 		}
 	})
@@ -1006,8 +989,8 @@ func TestARunReportingNothingLeavesTheFingerprintsAsTheyWere(t *testing.T) {
 			t.Errorf("a run reporting nothing carries %q", empty.Fingerprints)
 		}
 		run, _ := w.send(t, w.Target.ID, start.Add(2*time.Hour), documentOf([]interface{ json() string }{printed}, 10, salt))
-		if run.Rebaseline {
-			t.Errorf("a re-baseline after a run that reported nothing")
+		if run.FingerprintsChanged {
+			t.Errorf("a fingerprint change after a run that reported nothing")
 		}
 	})
 }
@@ -1116,27 +1099,6 @@ func TestALeadsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T) {
 		got, err := EvidenceOf(t.Context(), w.DB.DB, w.holding(t, "analyst", access.InternalRead), &lead, w.Product.ID)
 		if err != nil || got.At.Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" {
 			t.Errorf("an internal reader was answered %+v, %v; want the lead's place", got.At, err)
-		}
-	})
-}
-
-func TestAProductsImportantPathsAreReadAndSetOnlyWhereTheSubjectMay(t *testing.T) {
-	eachWorld(t, func(t *testing.T, w *world) {
-		ctx := t.Context()
-		public := w.holding(t, "public", access.PrivateTriage)
-		reader := w.holding(t, "analyst", access.InternalRead)
-		triager := w.holding(t, "lead", access.InternalTriage)
-		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, reader, w.Product.ID, []string{"src"}); !errors.Is(err, access.ErrDenied) {
-			t.Errorf("somebody reading internal findings set the important paths: %v", err)
-		}
-		if _, err := ReplaceImportantPaths(ctx, w.DB.DB, triager, w.Product.ID, []string{"src"}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := ImportantPaths(ctx, w.DB.DB, public, w.Product.ID); !errors.Is(err, access.ErrDenied) {
-			t.Errorf("somebody reading no internal findings read the important paths: %v", err)
-		}
-		if got, err := ImportantPaths(ctx, w.DB.DB, reader, w.Product.ID); err != nil || len(got) != 1 || got[0] != "src" {
-			t.Errorf("an internal reader read %v, %v; want the path set", got, err)
 		}
 	})
 }

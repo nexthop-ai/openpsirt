@@ -991,10 +991,6 @@ var tables = []string{
 	// Before person, which it points at.
 	"outbound",
 	// Before person and product, which it points at.
-	"lead_escalation",
-	// Before product, which it points at.
-	"lead_important_path",
-	// Before person and product, which it points at.
 	"lead_rule",
 	// Before person, product and vulnerability, which they point at.
 	"lead_handoff",

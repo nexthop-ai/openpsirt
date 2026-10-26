@@ -96,11 +96,6 @@ describe("a lead", () => {
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);
   });
 
-  it("offers no way into the queue to somebody who only reads it", async () => {
-    await drawn(false, { ...EVIDENCE, state: "baseline" });
-    expect(text()).not.toContain("Add to the queue");
-  });
-
   it("names the claim standing at it in place of the form", async () => {
     await drawn(true, {
       ...EVIDENCE,
@@ -138,11 +133,6 @@ describe("a lead", () => {
     });
   });
 
-  it("offers to take a lead out of the baseline", async () => {
-    await drawn(true, { ...EVIDENCE, state: "baseline" });
-    expect(text()).toContain("Add to the queue");
-  });
-
   it("is kept as it stands once every release it was seen in is past its end of life", async () => {
     await drawn(true, { ...EVIDENCE, past_end_of_life: true });
     expect(text()).toContain("Past end of life");
@@ -157,11 +147,6 @@ describe("a lead", () => {
   it("says nothing about third-party code where the run declared none", async () => {
     await drawn(true, EVIDENCE);
     expect(text()).not.toContain("Third-party");
-  });
-
-  it("offers no way into the queue once it is past its end of life", async () => {
-    await drawn(true, { ...EVIDENCE, state: "baseline", past_end_of_life: true });
-    expect(text()).not.toContain("Add to the queue");
   });
 
   it("gives it to a team, across the product, from among readers of internal work", async () => {

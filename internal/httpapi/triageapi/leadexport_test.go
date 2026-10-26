@@ -74,11 +74,7 @@ func leadRowsIn(t *testing.T, header []string, rows [][]string) []map[string]str
 // products the lead is written under its product.
 func TestTheFindingsFileCarriesTheQueueToInternalReadersAlone(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/"+place+"/escalation", `{}`); got.Code >= 300 {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
-		}
+		httpapitest.SeededLead(t, r)
 		const message, snippet = "p is leaked", "return;"
 		for _, path := range []string{
 			"/v1/products/mine/findings.csv",
@@ -129,11 +125,7 @@ func TestTheFindingsFileCarriesTheQueueToInternalReadersAlone(t *testing.T) {
 // narrowed by anything but its order holds none, and says so.
 func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/"+place+"/escalation", `{}`); got.Code >= 300 {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
-		}
+		httpapitest.SeededLead(t, r)
 		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?sort=age&asc=true")
 		if leads := leadRowsIn(t, header, rows); len(leads) != 1 {
 			t.Fatalf("a file asking only an order holds the leads %v; want the one in the queue", leads)
@@ -160,11 +152,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 // because no outcome a lead takes is one the document states.
 func TestALeadInTheQueueReachesNoFigure(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		place := httpapitest.SeededLead(t, r)
-		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			"/v1/products/mine/leads/"+place+"/escalation", `{}`); got.Code >= 300 {
-			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
-		}
+		httpapitest.SeededLead(t, r)
 		if got := leadsOf(t, r, "internal-reader", ""); got.Total != 1 {
 			t.Fatalf("the queue holds %d leads; want the one pulled in, or this checks nothing", got.Total)
 		}

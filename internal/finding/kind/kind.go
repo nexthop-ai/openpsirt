@@ -134,9 +134,8 @@ const (
 	// took to it, links into the source and the source kept beside it.
 	Evidence Consumer = "evidence"
 	// Leads is the lead queue: the leads a product holds, by where they
-	// stand, with how many each list leaves out, what pulls one out of the
-	// baseline, the queue's file, the leads a findings list's file carries,
-	// and the counts by analyzer series. The counts are here rather than
+	// stand, with how many each list leaves out, the queue's file, the leads
+	// a findings list's file carries, and the counts by analyzer series. The counts are here rather than
 	// under Statistics, which feeds the vulnerability figures.
 	Leads Consumer = "leads"
 )

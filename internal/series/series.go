@@ -78,14 +78,13 @@ type Run struct {
 	Comparable   *bool     `bun:"comparable"`
 	Reason       Reason    `bun:"not_comparable,nullzero"`
 	ScanID       *int64    `bun:"scan_id"`
-	Baseline     bool      `bun:"baseline,notnull"`
 	// Fingerprints is the schemes the run's results carry and the mark of
 	// the salt the client's is taken with, empty where it reported nothing.
-	// A change from the build's last is a re-baseline.
-	Fingerprints string     `bun:"fingerprints,nullzero"`
-	Rebaseline   bool       `bun:"rebaseline,notnull"`
-	Receipt      string     `bun:"receipt,nullzero"`
-	AppliedAt    *time.Time `bun:"applied_at"`
+	// A change from the build's last is a fingerprint change.
+	Fingerprints        string     `bun:"fingerprints,nullzero"`
+	FingerprintsChanged bool       `bun:"fingerprints_changed,notnull"`
+	Receipt             string     `bun:"receipt,nullzero"`
+	AppliedAt           *time.Time `bun:"applied_at"`
 }
 
 // Params is what a run says about itself: in its documents, or beside them in
@@ -295,24 +294,9 @@ func (s *Store) LastPrinted(ctx context.Context, run *Run) (string, error) {
 	return prints[0], nil
 }
 
-// HasBaseline reports whether a series has a comparable run applied to any
-// build of its product, which is what makes a later run something other
-// than the baseline.
-func (s *Store) HasBaseline(ctx context.Context, seriesID int64) (bool, error) {
-	found, err := s.db.NewSelect().Model((*Run)(nil)).
-		Where(`"sr"."series_id" = ?`, seriesID).
-		Where(`"sr"."status" = ?`, Applied).
-		Where(`"sr"."comparable" = ?`, true).
-		Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("read whether the series has a baseline: %w", err)
-	}
-	return found, nil
-}
-
 // Mark records what became of a run. The status, the failure, whether it is
-// comparable and why not, the inventory it was read against, whether it is
-// the baseline, the receipt and when it was applied are written; everything
+// comparable and why not, the inventory it was read against, the
+// fingerprints and whether they changed, the receipt and when it was applied are written; everything
 // else on the run is as it arrived.
 func (s *Store) Mark(ctx context.Context, run *Run) error {
 	if run.Status == Applied && run.AppliedAt == nil {
@@ -320,8 +304,8 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 		run.AppliedAt = &at
 	}
 	_, err := s.db.NewUpdate().Model(run).
-		Column("status", "failure", "comparable", "not_comparable", "scan_id", "baseline", "fingerprints",
-			"rebaseline", "receipt",
+		Column("status", "failure", "comparable", "not_comparable", "scan_id", "fingerprints",
+			"fingerprints_changed", "receipt",
 			"applied_at", "tool_name", "tool_version", "client_version", "rules_digest", "rules_count",
 			"units_expected", "units_analyzed", "exit_status", "completed").
 		WherePK().Exec(ctx)
@@ -334,7 +318,7 @@ func (s *Store) Mark(ctx context.Context, run *Run) error {
 // Take holds a run's series until the transaction ends, so two runs of one
 // series are applied one after the other. Each reads what the series last
 // saw, and two at once would both read it before either wrote: one result
-// opened twice, or two baselines.
+// opened twice.
 //
 // The write puts a new value in the row every time. An update setting a
 // column to what it already holds is matched and not written on MySQL and

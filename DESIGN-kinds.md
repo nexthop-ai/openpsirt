@@ -87,7 +87,7 @@ and a kind it does not name never reaches it.
 | Advisories | The documents about flaws recorded here | Vulnerability, entered |
 | Notifications | What is said to people about findings | Vulnerability, entered |
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
-| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, what pulls one out of the baseline, the leads a standing rule covers, the queue's file, the leads a findings list's file carries, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
+| Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, the leads a standing rule covers, the queue's file, the leads a findings list's file carries, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
 
 Analysis findings are included by Evidence, Leads, Decisions, Assignment and
 Exports alone: a lead is read through the lead queue, its evidence and the

@@ -40,8 +40,8 @@ type LeadsOutput struct {
 	Body struct {
 		Items []LeadRowBody `json:"items"`
 		Total int           `json:"total" doc:"The leads the list holds"`
-		// Counted rather than only listed, so that a list leaving the
-		// baseline out says how much it left (REQ-30).
+		// Counted rather than only listed, so that a list leaving leads
+		// out says how much it left (REQ-30).
 		States  map[string]int `json:"states" doc:"The leads in the scope by where they stand, the listed ones included. A lead on two builds in two states counts in both, and a fixed lead counts until it opens anew on its build"`
 		Waiting int            `json:"waiting" doc:"Open leads left out of the queue because a claim about them waits for a second person"`
 		Ruled   int            `json:"ruled" doc:"Dismissed leads an approved standing rule covers, counted among the dismissed in states"`
@@ -147,15 +147,13 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"reports the same flaw on the build, then the tool's own security severity for the rule, " +
 			"then its precision, then newest first.\n\n" +
 			"With no `state` it is the queue: open leads with no claim waiting for a second " +
-			"person. A lead in the baseline is left out until it is pulled in, its path is " +
-			"marked important, or another analyzer reports the same flaw. `state` lists the leads " +
-			"in one state instead, which is how the baseline is searched. `fixed` lists the leads " +
+			"person. `state` lists the leads in one state instead. `fixed` lists the leads " +
 			"closed on a build and not opened anew there.\n\n" +
 			"`states` counts every lead in the scope by state and `waiting` the open ones " +
 			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
 			"so what the list leaves out is counted. The queue also leaves out a lead open only in " +
 			"releases past their end of life, and `past_end_of_life` counts those. A lead seen only in " +
-			"such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing " +
+			"such releases is kept as it stands: a decision, a fixed closure, an assignment and handing " +
 			"it off are refused with 409. " +
 			"`stream`, `variant` and `series` are optional and independent. Supports limit and offset.",
 		Tags: []string{"Findings"},
@@ -206,7 +204,7 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		listing := "the queue: open leads nothing waits on, the baseline and leads open only in releases past their end of life left out"
+		listing := "the queue: open leads nothing waits on, leads open only in releases past their end of life left out"
 		if input.State != "" {
 			listing = "the leads " + string(input.State)
 		}

@@ -7,7 +7,6 @@ import { mayOf, useWho } from "../app/session";
 import {
   useAssignLead,
   useDecideLead,
-  useEscalateLead,
   useFixLead,
   useLead,
   type Evidence,
@@ -29,9 +28,8 @@ import { Handoff } from "./LeadHandoff";
 
 // One lead on one build: what the analyzer said, the path it took, the leads
 // that are the same flaw, and where the lead stands. Somebody who triages
-// internal material judges it here, pulls it out of the baseline, or closes it
-// as fixed once a run no longer sees it, and hands a confirmed one off as a
-// flaw.
+// internal material judges it here, closes it as fixed once a run no longer
+// sees it, and hands a confirmed one off as a flaw.
 export function Lead() {
   const { product = "", stream = "", variant = "", place = "" } = useParams();
   const build: Build = { product, stream, variant };
@@ -159,7 +157,6 @@ export function Lead() {
           ) : (
             <p className="hint">None.</p>
           )}
-          {acts && evidence.state === "baseline" && <Escalate product={product} place={place} />}
           {acts && evidence.state === "not-reproduced" && evidence.open && (
             <FixForm build={build} place={place} />
           )}
@@ -381,24 +378,6 @@ function LeadAssignee({
       </div>
       {assign.isPending && <span className="hint">Saving…</span>}
       {assign.error != null && <Failed error={assign.error} what="That could not be recorded." />}
-    </div>
-  );
-}
-
-function Escalate({ product, place }: { product: string; place: string }) {
-  const escalate = useEscalateLead(product, place);
-  return (
-    <div style={{ marginTop: 10 }}>
-      <button
-        type="button"
-        className="btn quiet"
-        disabled={escalate.isPending}
-        onClick={() => escalate.mutate()}
-        title="Takes it out of the baseline on every build of the product."
-      >
-        Add to the queue
-      </button>
-      {escalate.error != null && <Failed error={escalate.error} what="It was not added." />}
     </div>
   );
 }

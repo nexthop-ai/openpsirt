@@ -159,7 +159,7 @@ placed results are read before it, since they do not change once stored.
 
 Two runs of one series are applied one after the other. Each reads what the
 series last saw and writes what it sees, so two at once would open one result
-twice or record two baselines. Each takes the series' row first, by writing a value to it that
+twice. Each takes the series' row first, by writing a value to it that
 no run wrote before, because a cluster certifies only rows that were written
 (`DESIGN-database.md` § Retryable transactions).
 
@@ -188,9 +188,8 @@ An applied run, in order:
 Not reproduced is absence, and a lead stays open (`DESIGN-kinds.md` § Kinds).
 A not-comparable run opens and updates leads and marks none.
 
-A run is the baseline where it is the series' first comparable run on any
-build of the product. A lead opened for a result the baseline already holds on
-another build is in the baseline too.
+A lead is open and in the queue from the run that opens it, the series' first
+run in the product included.
 
 ## Matching
 
@@ -202,7 +201,7 @@ input to a key and never a key by itself.
 | Key | Digest of | Strength |
 |---|---|---|
 | Whole | The rule, the path, the fingerprint or the line where there is none, the message with its digits taken out, the enclosing function and the call chain | Strong |
-| Unprinted | The whole key without the fingerprint or the line. Compared by a re-baseline alone, and only where one result and one lead hold it (§ Re-baseline) | Strong |
+| Unprinted | The whole key without the fingerprint or the line. Compared by a fingerprint change alone, and only where one result and one lead hold it (§ Fingerprint change) | Strong |
 | Function | The rule, the path, the message with its digits taken out, and the enclosing function. Absent where the output names no function | Probable |
 | Line | The rule, the path and the message with its digits taken out, compared with the nearest line | Probable |
 
@@ -218,8 +217,8 @@ input to a key and never a key by itself.
 
 A run is paired with the leads its series holds open on the build, one to
 one, a layer at a time, each layer on what the layers before it left: the
-whole key, then the function, then the nearest line. A re-baseline compares
-the unprinted key after the whole key and before the function.
+whole key, then the function, then the nearest line. A fingerprint change
+compares the unprinted key after the whole key and before the function.
 
 | Rule | |
 |---|---|
@@ -239,27 +238,26 @@ place, so a decision keyed on the place reaches it (REQ-25).
 | 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's place |
 | 3 | Any lead of the series on another build, open or closed | The whole key, the oldest lead first. A probable pairing with a lead this build never saw is a guess |
 
-A result carried from a lead in the baseline is in the baseline too. A result
-found nowhere opens at a place derived from the series and its whole key, so
+A result found nowhere opens at a place derived from the series and its whole key, so
 the same result first seen on two builds at once is one place.
 
-### Re-baseline
+### Fingerprint change
 
 A run records the fingerprint schemes its results' keys were built from, and
 the mark of the salt the client took its own with. A run whose record differs
 from the newest one applied to the build that reported anything is a
-re-baseline.
+fingerprint change.
 
 | Rule | |
 |---|---|
-| A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a re-baseline |
+| A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a fingerprint change |
 | `none` is recorded only where no result carried a fingerprint | One unhashable result appearing or going away beside others says nothing about how the run fingerprints |
 | The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
-| A re-baseline says so on its receipt | Its whole keys no longer meet the leads' |
-| A re-baseline pairs a result and a lead on the unprinted key where they are the only result and the only lead holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
+| A fingerprint change says so on its receipt | Its whole keys no longer meet the leads' |
+| A fingerprint change pairs a result and a lead on the unprinted key where they are the only result and the only lead holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
 | A result or a lead sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
-| The unprinted key is compared for the re-baseline alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
-| Carrying from a closed lead or another build is on the whole key, on a re-baseline too | A result carried across a rotation opens as a new lead there |
+| The unprinted key is compared for a fingerprint change alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
+| Carrying from a closed lead or another build is on the whole key, on a fingerprint change too | A result carried across a rotation opens as a new lead there |
 
 ## Placement
 
@@ -418,7 +416,7 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | A rule names | Covers |
 |---|---|
 | An analyzer rule | Every lead filed under it, compared as the rule's issue is, without regard to capitals |
-| A path | Every lead at or under it, compared as an important path is (§ Escalation) |
+| A path | Every lead at or under it |
 | Both | Every lead of the rule at or under the path |
 
 | State | When | Dismisses |
@@ -434,6 +432,9 @@ and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
 | A rule is proposed by somebody holding `internal-triage` on the product, and approved by somebody else holding `approver` and `internal-read` there | The second person a dismissal has (REQ-24) |
 | A rule names an analyzer rule, a path, or both, and states one of the four reasons and its reasoning | A rule naming neither would dismiss every lead the product has |
 | A rule naming an analyzer rule and no path is refused, at proposal and at approval, where the rule finds memory safety or injection (§ Weakness families), or where no run has recorded the rule, and one approved before a run found that stops dismissing at once | A flaw of those kinds is judged one lead at a time. A whole checker is dismissed where it fights a convention, measures style, or cannot model the code; a leak checker is dismissed under the pool allocator it cannot see |
+| A path is a prefix from the top of the checkout, with no leading or trailing slash | `src` holds `src/a.c` and `src`, and not `src2/a.c` |
+| A path is compared exactly, character by character | Paths are case-sensitive, and SQLite's LIKE ignores the case of ASCII letters |
+| A path climbing out of the checkout or holding an empty segment is refused | It names nothing a run reports |
 | Its words never change | An approval is of what was read (REQ-28). A rule worded differently is retired and proposed again |
 | Approval records the open leads the rule covers as its approved size | What the approver was shown |
 | The growth factor is `triage.lead-rule-growth`, two where nobody has said | A rule covering ten leads when approved and a thousand later is not what the approver read (REQ-27) |
@@ -457,14 +458,12 @@ and the claim standing at its place. The evidence of a lead carries it.
 | Dismissed, Not a security issue, Confirmed | A claim with that outcome stands at the place: approved, or waiting on nobody and not sent back |
 | Dismissed | No claim stands, and a standing rule in force or outgrown covers it (§ Dismissal rules) |
 | Not reproduced | A comparable run did not see it |
-| Baseline | It arrived in its series' first comparable run in the product, or was carried from a lead that did, and nothing has escalated it (§ Escalation) |
 | Open | None of the above |
 
 | Rule | |
 |---|---|
 | A standing claim comes before a standing rule | A judgment about one lead is more specific than one about many |
 | A standing claim or rule comes before absence | A dismissed lead a run does not see stays dismissed and records the absence |
-| Absence comes before the baseline | A baseline lead nobody sees is no longer anything to work |
 | A claim waiting for a second person leaves the lead where it was | It answers nothing until somebody agrees |
 | A handed-off lead leaves the queue and takes no claim | Its flaw is what is judged |
 
@@ -490,11 +489,11 @@ one way to say a path does not matter is kept rather than two.
 | List | Holds |
 |---|---|
 | The queue, with no state named | Open leads with no claim waiting for a second person |
-| A state named | The leads in that state. Naming the baseline is how it is searched. Fixed is the leads closed on a build and not opened anew there |
+| A state named | The leads in that state. Fixed is the leads closed on a build and not opened anew there |
 
 | Rule | |
 |---|---|
-| Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves the baseline out says how many it left (REQ-30) |
+| Every list counts the leads in the scope by state, the open leads a waiting claim leaves out of the queue, and the dismissed leads a standing rule covers | A list that leaves leads out says how many it left (REQ-30) |
 | A lead closed as fixed is listed and counted as fixed on its build until it opens anew there | A lead seen again opens at the same place (§ Fixed leads), and then it is what the newer finding says |
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
@@ -503,25 +502,6 @@ one way to say a path does not matter is kept rather than two.
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
-
-### Escalation
-
-A baseline lead enters the queue when it is escalated.
-
-| Escalated by | |
-|---|---|
-| Somebody holding `internal-triage` pulling it in | On every build of the product the lead is on. Recorded with who pulled it in and when, and pulled in again it keeps the first |
-| Its path being at or under an important path | A product setting under `internal-triage`, recorded in the administrative trail. Taking a path off returns its leads to the baseline |
-| Another analyzer's lead on its build being the same flaw (§ Grouped leads) | Two tools agreeing is the strongest sign a result is real. The other lead closing returns it to the baseline |
-
-| Rule | |
-|---|---|
-| An important path is a prefix from the top of the checkout, with no leading or trailing slash | `src` holds `src/a.c` and `src`, and not `src2/a.c` |
-| A path is compared exactly, character by character | Paths are case-sensitive, and SQLite's LIKE ignores the case of ASCII letters |
-| An empty path, a path climbing out of the checkout, and a path named twice are refused | The empty path would put the whole baseline in the queue |
-| A product marks at most 500 important paths | Each is asked of every baseline lead a list reads |
-| Somebody who reads a lead and does not triage it is answered as though it were not there | As closing a lead as fixed answers them |
-| Escalation is worked out when a lead is read | Marking or unmarking a path moves every lead under it at once |
 
 ### Queue file
 
@@ -535,7 +515,7 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 | A lead in a case the reader is not on is a row with an empty message, marked withheld | What the analyzer said is the case's once the lead is moved, as the list withholds it |
 | A row says whether the lead is in third-party code, as the list does | Read from the newest run that saw the lead, as its evidence is (§ Third-party code) |
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
-| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves the baseline out |
+| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves out leads a waiting claim holds and leads past their end of life |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
 | A findings list's file writes the queue of its selection below its findings, through this read (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
 
@@ -638,8 +618,8 @@ at least one.
 | Leads within ten lines and otherwise alike are listed as possibly the same flaw, and never grouped | A false merge hides a second real flaw behind one decision |
 | A lead's evidence lists the leads it is the same flaw with and those it possibly is, where the reader may read them | Visibility is enforced where the leads are read (REQ-42) |
 | A group is a lead and the leads within two lines of it, worked out for each lead | Two leads each the same flaw as a third and four lines apart are two groups |
-| Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead stands does not depend on who is looking |
-| The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 baseline leads of two analyzers on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
+| Whether another analyzer reports a lead is worked out over every lead on the build, whoever reads it | Where a lead sorts does not depend on who is looking |
+| The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 leads of two analyzers' first runs on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
 | A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
 | A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
 | A lead of the group already answered, waiting on a claim, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
@@ -754,7 +734,7 @@ is in `DESIGN-data-model.md` § End of support.
 | A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
 | The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
 | A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
-| A decision, a fixed closure, pulling it into the queue, an assignment and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| A decision, a fixed closure, an assignment and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
 | A re-affirmation of a lapsed claim leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes a decision. The list of what is yours to re-affirm counts the same places and leaves off a claim with none |
 | A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
 | A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
@@ -770,10 +750,9 @@ is in `DESIGN-data-model.md` § End of support.
 |---|---|
 | Status, failure | § Run application |
 | Comparable, and the reason where not | § Run parameters |
-| Baseline | The series' first comparable run |
 | Tool and version | As recorded |
 | Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
-| Re-baseline | Whether the run's fingerprints changed from the build's last (§ Matching) |
+| Fingerprint change | Whether the run's fingerprints changed from the build's last (§ Fingerprint change) |
 | Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
 
 Beside the runs, the list carries the last upload of each series to the
@@ -928,6 +907,6 @@ it is about.
 | An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
 | The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
 | A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
+| Every lead of a series' first run is in the queue | A vulnerability scanner's first scan has no baseline either, and starting to analyze a codebase leaves what it already holds to be triaged and fixed. A codebase analyzed for the first time puts every result in front of a triager at once, and the order and the standing rules are what thin it |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
 | The lists of held work list no lead | Unassigned work, one person's work, a team's queue and the work of somebody who has left are lists of findings (`DESIGN-kinds.md` § Consumers). A lead's holder is read on the lead and in the lead queue, which takes no narrowing by holder |
-| A routing rule places a baseline lead | A rule matches a lead by its component, and nothing in that asks whether the lead is in the queue. It is held, and still in the baseline |

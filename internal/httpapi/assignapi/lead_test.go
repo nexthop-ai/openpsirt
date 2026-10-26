@@ -54,7 +54,7 @@ func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queu
 			heldLead
 		} `json:"items"`
 	}
-	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=baseline", &listed)
+	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=open", &listed)
 	for _, row := range listed.Items {
 		if row.Place == place {
 			queue = row.heldLead

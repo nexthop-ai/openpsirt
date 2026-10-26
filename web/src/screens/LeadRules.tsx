@@ -6,11 +6,9 @@ import { Link, useParams } from "react-router-dom";
 import { mayOf, useWho } from "../app/session";
 import {
   useApproveLeadRule,
-  useImportantPaths,
   useLeadRules,
   useProposeLeadRule,
   useRetireLeadRule,
-  useSetImportantPaths,
   type LeadReason,
   type LeadRule,
 } from "../api/leads";
@@ -24,9 +22,8 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { LEAD_REASONS, RULE_STATE_HINTS, reasonSaid, ruleStateSaid } from "./leads";
 
-// The rules deciding which leads reach a product's queue: standing dismissals
-// of an analyzer's rule, a path, or both, and the paths whose leads are pulled
-// out of the baseline.
+// The rules deciding which leads leave a product's queue: standing dismissals
+// of an analyzer's rule, a path, or both.
 export function LeadRules() {
   const { product = "" } = useParams();
   const may = mayOf(useWho().data, product);
@@ -43,7 +40,6 @@ export function LeadRules() {
       </div>
       <Rules product={product} triages={triages} agrees={agrees} />
       {triages && <ProposeForm product={product} />}
-      <ImportantPaths product={product} triages={triages} />
     </div>
   );
 }
@@ -235,60 +231,6 @@ function ProposeForm({ product }: { product: string }) {
         Propose
       </button>
       {propose.error != null && <Failed error={propose.error} what="The rule was not proposed." />}
-    </div>
-  );
-}
-
-// The paths whose leads are taken out of the baseline, one to a line.
-function ImportantPaths({ product, triages }: { product: string; triages: boolean }) {
-  const paths = useImportantPaths(product);
-  const set = useSetImportantPaths(product);
-  const [typed, setTyped] = useState<string | undefined>(undefined);
-
-  if (paths.isPending) return <Loading />;
-  if (paths.isError)
-    return <Failed error={paths.error} what="The important paths could not be read." />;
-  const shown = typed ?? paths.data.join("\n");
-  const asked = shown
-    .split("\n")
-    .map((each) => each.trim())
-    .filter((each) => each !== "");
-
-  return (
-    <div className="card">
-      <h3 title="Leads under these paths are in the queue from the first run.">Important paths</h3>
-      {triages ? (
-        <>
-          <textarea
-            {...notACredential}
-            aria-label="Important paths"
-            rows={Math.max(3, asked.length + 1)}
-            value={shown}
-            placeholder="src/net/"
-            onChange={(event) => setTyped(event.target.value)}
-          />
-          <button
-            type="button"
-            className="btn"
-            style={{ marginTop: 8 }}
-            disabled={typed === undefined || set.isPending}
-            onClick={() => set.mutate(asked, { onSuccess: () => setTyped(undefined) })}
-          >
-            Save
-          </button>
-          {set.error != null && <Failed error={set.error} what="The paths were not saved." />}
-        </>
-      ) : paths.data.length === 0 ? (
-        <p className="hint">None.</p>
-      ) : (
-        <ul>
-          {paths.data.map((each) => (
-            <li key={each} className="mono">
-              {each}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

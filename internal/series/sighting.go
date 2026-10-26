@@ -24,7 +24,6 @@ type Sighting struct {
 	FirstRunID  int64  `bun:"first_run_id,notnull"`
 	LastRunID   int64  `bun:"last_run_id,notnull"`
 	AbsentRunID *int64 `bun:"absent_run_id"`
-	Baseline    bool   `bun:"baseline,notnull"`
 }
 
 // Sightings is the open findings of a kind a series reports against one build,
@@ -47,7 +46,7 @@ func (s *Store) Sightings(ctx context.Context, k kind.Kind, seriesID, targetID i
 
 // Saw records that a run saw these findings: first seen here where the series
 // had not seen them, and present again where it had.
-func (s *Store) Saw(ctx context.Context, run *Run, findingIDs []int64, baseline bool) error {
+func (s *Store) Saw(ctx context.Context, run *Run, findingIDs []int64) error {
 	if len(findingIDs) == 0 {
 		return nil
 	}
@@ -81,7 +80,7 @@ func (s *Store) Saw(ctx context.Context, run *Run, findingIDs []int64, baseline 
 		if !seen[id] {
 			seen[id] = true
 			fresh = append(fresh, Sighting{
-				FindingID: id, SeriesID: run.SeriesID, FirstRunID: run.ID, LastRunID: run.ID, Baseline: baseline,
+				FindingID: id, SeriesID: run.SeriesID, FirstRunID: run.ID, LastRunID: run.ID,
 			})
 		}
 	}

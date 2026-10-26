@@ -18,7 +18,6 @@ import { byProduct } from "./catalog";
 // what has been answered.
 const COLUMNS: LeadState[] = [
   "open",
-  "baseline",
   "not-reproduced",
   "dismissed",
   "not-security",

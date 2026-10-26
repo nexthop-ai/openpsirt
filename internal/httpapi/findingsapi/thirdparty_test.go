@@ -86,9 +86,9 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=baseline", &listed)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &listed)
 		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet,
-			"/v1/products/mine/leads.csv?state=baseline", "")
+			"/v1/products/mine/leads.csv", "")
 		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
 		if err != nil {
 			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
@@ -163,7 +163,7 @@ func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T)
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads?state=baseline", &listed)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &listed)
 		seen := false
 		for _, item := range listed.Items {
 			if item.Path != vendored {

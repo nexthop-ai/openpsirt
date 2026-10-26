@@ -98,10 +98,10 @@ type Queue struct {
 // one row per lead however many builds it is on.
 //
 // With no state named it is the queue: open leads nobody's claim waits on.
-// Naming a state lists the leads in it, which is how the baseline is
-// searched. A fixed lead is one closed on a build, and listed there until the
-// lead opens anew at its place on that build. Ordered by what is likely real: the rank of the weaknesses the
-// rule names, whether another analyzer reports the same flaw, the tool's own
+// Naming a state lists the leads in it. A fixed lead is one closed on a
+// build, and listed there until the lead opens anew at its place on that
+// build. Ordered by what is likely real: the rank of the weaknesses the rule
+// names, whether another analyzer reports the same flaw, the tool's own
 // security severity for the rule, its precision, then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {

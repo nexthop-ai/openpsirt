@@ -7,7 +7,6 @@ import type { LeadOutcome, LeadReason, LeadRuleState, LeadState } from "../api/l
 // unions, so a word the server adds is a compile error here until it has one.
 
 export const LEAD_STATES: Record<LeadState, string> = {
-  baseline: "Baseline",
   open: "Open",
   "not-reproduced": "Not reproduced",
   fixed: "Fixed",
@@ -19,7 +18,6 @@ export const LEAD_STATES: Record<LeadState, string> = {
 
 // The chip each state is drawn as.
 export const LEAD_TONES: Record<LeadState, string> = {
-  baseline: "closed",
   open: "open",
   "not-reproduced": "lapsed",
   fixed: "closed",

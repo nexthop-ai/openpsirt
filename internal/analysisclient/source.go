@@ -158,7 +158,7 @@ func utf8Start(b byte) bool { return b&0xC0 != 0x80 }
 
 // saltID names a salt without revealing it: the first eight bytes of its
 // SHA-256, in lower-case hexadecimal. A changed salt changes every
-// fingerprint, and the deployment reads a changed name as a re-baseline.
+// fingerprint, and the deployment reads a changed name as a fingerprint change.
 func saltID(salt []byte) string {
 	sum := sha256.Sum256(salt)
 	return hex.EncodeToString(sum[:8])

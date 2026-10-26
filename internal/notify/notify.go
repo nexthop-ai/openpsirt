@@ -71,7 +71,7 @@ func Kinds() []Kind {
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
-		LeadEscalated, LeadHandedOff, LeadMoved, RuleOutgrown,
+		LeadHandedOff, LeadMoved, RuleOutgrown,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -279,10 +279,6 @@ const (
 	// build it ran on regularly, naming the last upload of it turned away
 	// where there was one. A condition: the next run clears it.
 	AnalysisQuiet Kind = "analysis-quiet"
-	// LeadEscalated is a lead somebody pulled out of the baseline and into
-	// the queue, told to the product's internal triagers, who now have it to
-	// judge.
-	LeadEscalated Kind = "lead-escalated"
 	// LeadHandedOff is a confirmed lead recorded as a flaw, told to the
 	// product's internal triagers. Recording the flaw tells what recording
 	// any flaw tells; this is the lead's side of it.

@@ -2902,36 +2902,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/important-paths": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a product's important paths
-         * @description Returns the path prefixes whose leads are in the queue from their first run, in order.
-         *
-         *     Requires: internal-read or internal-triage on the product
-         */
-        get: operations["get-important-paths"];
-        /**
-         * Set a product's important paths
-         * @description Replaces the path prefixes whose leads are in the queue from their first run. A lead in the baseline at or under one enters the queue at once, and leaves it again where its path is taken off.
-         *
-         *     Refused, naming the path, where one is empty, climbs out of the checkout or is named twice. Recorded in the administrative trail.
-         *
-         *     Requires: internal-triage on the product
-         */
-        put: operations["set-important-paths"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}": {
         parameters: {
             query?: never;
@@ -3509,9 +3479,9 @@ export interface paths {
          * List static analysis leads
          * @description Returns one row per lead the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
          *
-         *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
+         *     With no `state` it is the queue: open leads with no claim waiting for a second person. `state` lists the leads in one state instead. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3544,28 +3514,6 @@ export interface paths {
         get: operations["export-leads"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/leads/{place}/escalation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Pull a lead into the queue
-         * @description Takes a lead out of the baseline and into the queue on every build of the product it is on. A lead already pulled in keeps when it first was, and a lead not in the baseline is unchanged.
-         *
-         *     Requires: internal-triage on the product
-         */
-        post: operations["escalate-lead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7144,8 +7092,6 @@ export interface components {
             name?: string;
         };
         AnalysisReceiptBody: {
-            /** @description Whether this was the series' first comparable run */
-            baseline?: boolean;
             /** @description The build time the run states, or the time it arrived where it states none */
             built_at: string;
             /** @description The commit analyzed */
@@ -9692,16 +9638,6 @@ export interface components {
         IdentificationHelper: {
             purl?: string;
         };
-        ImportantPathsBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ImportantPathsBody.json
-             */
-            readonly $schema?: string;
-            /** @description Path prefixes from the top of the checkout. A lead at or under one is in the queue from its first run */
-            paths: string[] | null;
-        };
         Info: {
             /**
              * Format: uri
@@ -10114,19 +10050,6 @@ export interface components {
             /** @description The reasoning, in markdown. Somebody else has to agree with a dismissal */
             reasoning: string;
         };
-        LeadEscalatedBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/LeadEscalatedBody.json
-             */
-            readonly $schema?: string;
-            /**
-             * Format: date-time
-             * @description When it was pulled in. Pulled in again, the first time stands
-             */
-            at: string;
-        };
         LeadEvidenceBody: {
             /**
              * Format: uri
@@ -10162,17 +10085,17 @@ export interface components {
             not_seen?: string;
             /** @description Whether the lead is open on the build */
             open: boolean;
-            /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off */
+            /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off */
             past_end_of_life?: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
             /**
-             * @description Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw
+             * @description Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw
              * @enum {string}
              */
-            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            state: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The path the analyzer took to it, in order */
             steps: components["schemas"]["LeadPlace"][] | null;
             /** @description Whether the lead is in code the newest run that saw it declared third-party */
@@ -10302,7 +10225,7 @@ export interface components {
              * @description Where the lead stands on that build
              * @enum {string}
              */
-            state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            state: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             /** @description The branch or tag of the newest build the lead is listed on, to link to */
             stream: string;
             /** @description Whether the lead is in code the newest run that saw it declared third-party */
@@ -11333,7 +11256,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-escalated" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11480,7 +11403,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-escalated" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12376,6 +12299,8 @@ export interface components {
             dropped?: {
                 [key: string]: number;
             };
+            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any */
+            fingerprints_changed?: boolean;
             /**
              * Format: int64
              * @description Results new to the build carried from a lead of the branch it was cut from
@@ -12396,8 +12321,6 @@ export interface components {
              * @description Results paired with a lead on its function or its nearest line rather than its whole key
              */
             probable?: number;
-            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any */
-            rebaseline?: boolean;
             /**
              * Format: int64
              * @description Results found again at the place of a lead on the build that was closed
@@ -19339,70 +19262,6 @@ export interface operations {
             };
         };
     };
-    "get-important-paths": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ImportantPathsBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-important-paths": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImportantPathsBody"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "add-alias": {
         parameters: {
             query?: never;
@@ -20255,7 +20114,7 @@ export interface operations {
                 /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
-                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
                 /** @description The number returned */
                 limit?: number;
                 /** @description The number skipped */
@@ -20299,7 +20158,7 @@ export interface operations {
                 /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
-                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
             };
             header?: never;
             path: {
@@ -20316,39 +20175,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "escalate-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadEscalatedBody"];
-                };
             };
             /** @description Error */
             default: {

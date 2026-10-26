@@ -99,7 +99,7 @@ Run it inside the checkout, or name the checkout with `--source-root`.
 | `--third-party` | A directory of code the product did not write, relative to the checkout. Repeatable |
 | `--tool-version` | The analyzer's version, where its output does not state one |
 | `--snippets` | Send the source lines of each location. Without it, no source leaves the pipeline |
-| `--salt-file` | A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt makes the next run a re-baseline |
+| `--salt-file` | A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change |
 | `--url` | The deployment's address, where `OPENPSIRT_URL` is not set |
 | `--output` | Where `write` stores the document |
 

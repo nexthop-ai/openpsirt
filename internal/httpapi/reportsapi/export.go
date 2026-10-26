@@ -264,7 +264,7 @@ func findingCells(g finding.Group) []string {
 
 // leadsListed is what a findings file says about its leads where it holds
 // them.
-const leadsListed = "the lead queue, below the findings: open leads nothing waits on, the baseline left out"
+const leadsListed = "the lead queue, below the findings: open leads nothing waits on"
 
 // withLeads is the fact a findings file states about the leads it holds. A
 // lead carries no rating, component, upstream, decision or deadline, so a

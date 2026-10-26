@@ -12,7 +12,7 @@ const (
 	onKey      = "key"
 	onFunction = "function"
 	onLine     = "line"
-	// onUnprinted is a re-baseline's pairing on the whole key without its
+	// onUnprinted is a fingerprint change's pairing on the whole key without its
 	// fingerprint, where one result and one lead hold it.
 	onUnprinted = "unprinted"
 )
@@ -53,7 +53,7 @@ func pair(candidates []candidate, results []Keyed) []pairing {
 	return layered(candidates, results, false)
 }
 
-// pairAcross is pair for a re-baseline. After the whole key, a result and a
+// pairAcross is pair for a fingerprint change. After the whole key, a result and a
 // lead holding the whole key without its fingerprint are paired strongly
 // where they are the only result and the only lead holding it; the rest fall
 // to the probable layers. A rotated salt changes every fingerprint and nothing
@@ -62,7 +62,7 @@ func pairAcross(candidates []candidate, results []Keyed) []pairing {
 	return layered(candidates, results, true)
 }
 
-func layered(candidates []candidate, results []Keyed, rebaseline bool) []pairing {
+func layered(candidates []candidate, results []Keyed, printsChanged bool) []pairing {
 	takenC := make([]bool, len(candidates))
 	takenR := make([]bool, len(results))
 	var out []pairing
@@ -87,9 +87,9 @@ func layered(candidates []candidate, results []Keyed, rebaseline bool) []pairing
 		{onKey, func(c candidate) string { return c.key }, func(k Keyed) string { return k.Key }},
 		{onFunction, func(c candidate) string { return c.functionKey }, func(k Keyed) string { return k.FunctionKey }},
 	} {
-		// A re-baseline's unique keys come after the whole key and before
+		// A fingerprint change's unique keys come after the whole key and before
 		// anything probable.
-		if layer.on == onFunction && rebaseline {
+		if layer.on == onFunction && printsChanged {
 			unique(candidates, results, takenC, takenR, &out)
 		}
 		waiting := map[string][]int{}

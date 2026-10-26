@@ -47,7 +47,7 @@ async function drawn(at = "/products/sonic/leads", rows: object[] = ROWS) {
         data: {
           items: rows,
           total: 1,
-          states: { baseline: 40, open: 1 },
+          states: { "not-reproduced": 40, open: 1 },
           waiting: 2,
           ruled: 5,
           past_end_of_life: 3,
@@ -65,15 +65,17 @@ const text = () => mount.host().textContent ?? "";
 
 describe("the leads", () => {
   it("offers the list as a file asked with the same narrowing", async () => {
-    const asked = await drawn("/products/sonic/leads?state=baseline&series=semgrep%2Fdefault");
-    expect(asked[0]).toMatchObject({ state: "baseline", series: "semgrep/default" });
+    const asked = await drawn(
+      "/products/sonic/leads?state=not-reproduced&series=semgrep%2Fdefault",
+    );
+    expect(asked[0]).toMatchObject({ state: "not-reproduced", series: "semgrep/default" });
     const file = Array.from(mount.host().querySelectorAll("a")).find(
       (each) => each.textContent === "CSV",
     );
     const at = new URL(file?.getAttribute("href") ?? "", "http://x");
     expect(at.pathname).toBe("/v1/products/sonic/leads.csv");
     expect(Object.fromEntries(at.searchParams)).toEqual({
-      state: "baseline",
+      state: "not-reproduced",
       series: "semgrep/default",
     });
   });
@@ -108,15 +110,15 @@ describe("the leads", () => {
     expect(text()).toContain("2 waiting for approval");
     expect(text()).toContain("3 open only past end of life");
     expect(text()).toContain("5 dismissed by a rule");
-    expect(text()).toContain("Baseline 40");
+    expect(text()).toContain("Not reproduced 40");
   });
 
   it("lists one state's leads, which the address carries", async () => {
     const asked = await drawn();
-    await press(mount.host(), "Baseline 40");
+    await press(mount.host(), "Not reproduced 40");
     await settle();
-    expect(location()).toBe("/products/sonic/leads?state=baseline");
-    expect(asked.at(-1)).toMatchObject({ state: "baseline" });
+    expect(location()).toBe("/products/sonic/leads?state=not-reproduced");
+    expect(asked.at(-1)).toMatchObject({ state: "not-reproduced" });
   });
 
   it("asks for the build the address names", async () => {

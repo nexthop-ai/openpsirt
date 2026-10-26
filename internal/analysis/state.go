@@ -12,9 +12,6 @@ import (
 type State string
 
 const (
-	// Baseline is a lead in its series' first comparable run in the product,
-	// tracked and searchable and in nobody's queue until it is escalated.
-	Baseline State = "baseline"
 	// Open is a lead to be judged.
 	Open State = "open"
 	// NotReproduced is a lead a comparable run did not see.
@@ -32,7 +29,7 @@ const (
 
 // States are every state a lead is in, in the order a lead meets them.
 func States() []State {
-	return []State{Baseline, Open, NotReproduced, Fixed, Dismissed, NotSecurity, Confirmed, HandedOff}
+	return []State{Open, NotReproduced, Fixed, Dismissed, NotSecurity, Confirmed, HandedOff}
 }
 
 // standingOutcome is the outcome of the claim standing at the place of the
@@ -45,23 +42,12 @@ var standingOutcome = `(SELECT MAX("sc"."outcome") FROM "decision" AS "dc"
 	  AND ` + finding.DecisionFiledAt("dc", "f") + `
 	  AND ("dc"."state" = 'approved' OR ("dc"."needs_approval" = FALSE AND "dc"."sent_back_at" IS NULL)))`
 
-// escalated is whether the finding under "f", whose result is under "ar", is
-// out of the baseline in the product bound: somebody pulled its lead in, its
-// path is under one the product marked important, or another analyzer
-// reports the same flaw on its build.
-var escalated = `(` + corroborated + `
-	OR EXISTS (SELECT 1 FROM "lead_escalation" AS "le"
-		WHERE "le"."product_id" = ? AND "le"."place_identity" = "f"."place_identity")
-	OR EXISTS (SELECT 1 FROM "lead_important_path" AS "ip"
-		WHERE "ip"."product_id" = ? AND ("ip"."prefix" = "ar"."path"
-		  OR SUBSTR("ar"."path", 1, "ip"."under_length") = "ip"."under")))`
-
 // handedOff is whether the lead under "f" in the product bound was handed off.
 var handedOff = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity")`
 
 // stateOf is the state of the finding under "f", whose sighting is under
-// "si" and result under "ar", in the product bound, as an expression, with
+// "si", in the product bound, as an expression, with
 // what it binds.
 //
 // A hand-off comes after a closure and before everything else: the lead is
@@ -69,8 +55,7 @@ var handedOff = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 //
 // A standing claim comes before a standing rule, which comes before absence:
 // a dismissed lead a run does not see stays dismissed and records the
-// absence. Absence comes before the
-// baseline, because a baseline lead nobody sees is no longer anything to work.
+// absence.
 func stateOf(productID int64) (string, []any) {
 	return `CASE
 		WHEN "f"."closed_at" IS NOT NULL THEN '` + string(Fixed) + `'
@@ -78,6 +63,5 @@ func stateOf(productID int64) (string, []any) {
 		WHEN ` + standingOutcome + ` IS NOT NULL THEN ` + standingOutcome + `
 		WHEN ` + ruled + ` THEN '` + string(Dismissed) + `'
 		WHEN "si"."absent_run_id" IS NOT NULL THEN '` + string(NotReproduced) + `'
-		WHEN "si"."baseline" = TRUE AND NOT ` + escalated + ` THEN '` + string(Baseline) + `'
-		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID, productID, productID}
+		ELSE '` + string(Open) + `' END`, []any{productID, productID, productID, productID}
 }

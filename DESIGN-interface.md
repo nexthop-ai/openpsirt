@@ -1438,7 +1438,7 @@ the screens draw them.
 |---|---|
 | The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
 | The rail carries it under the scope, beside the inbox, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
-| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting and the baseline left out. The baseline is searched through its tab. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
+| The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
 | What the queue leaves out is counted above it | How many wait for approval, how many a standing rule dismisses, the second opening the dismissed tab, and how many are past end of life |
 | A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed. The build and the date it opened do not wrap |
 | The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
@@ -1447,16 +1447,15 @@ the screens draw them.
 | The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
 | The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
-| A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
+| A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
 | A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work for a kept lead and readers of undisclosed work for a moved one, and is not offered past end of life. Choosing applies to every build the lead is open on |
 | The queue's rows name who holds each lead | A team carries the word team beside its name |
-| A lead past its end of life says so beside its state and offers no decision, hand-off, queue or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
+| A lead past its end of life says so beside its state and offers no decision, hand-off or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
 | A lead in code its run declared third-party reads Third-party beside its state, on its page and on its row in the leads screen, and its hand-off says to report the flaw upstream | The flaw is the upstream's (`DESIGN-analysis.md` § Third-party code). The hand-off is still offered, and what declared it is said on hover |
 | The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
-| The important paths are edited as one list, one path to a line | The server stores the list whole, so a blank line and surrounding space are dropped before it is sent |
 | A confirmed lead offers a hand-off to somebody who triages internal material and undisclosed work | The components offered are cards, most likely first, each saying where it came from; a build that does not hold the one picked is unticked and cannot be ticked |
 | The first component is picked for the person unless it only resembles the lead's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`DESIGN-analysis.md` § Hand-off offer) |
 | A build holding the component picked that nothing analyzes is listed unticked beside the builds the lead was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
