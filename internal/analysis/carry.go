@@ -58,7 +58,7 @@ func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fir
 			return nil, err
 		}
 		if parent != 0 {
-			if err := fromParentBuild(ctx, db, seriesID, parent, fresh, out); err != nil {
+			if err := fromParentBuild(ctx, db, seriesID, parent, fresh, run.FingerprintsChanged, out); err != nil {
 				return nil, err
 			}
 		}
@@ -89,8 +89,11 @@ func parentBuild(ctx context.Context, db bun.IDB, targetID int64) (int64, error)
 	return ids[0], nil
 }
 
-// fromParentBuild pairs the results with the leads open on the parent build.
-func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fresh []Keyed, out map[int]carried) error {
+// fromParentBuild pairs the results with the leads open on the parent build,
+// on the unprinted key too where the run's fingerprints differ from that
+// build's last.
+func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fresh []Keyed, printsChanged bool,
+	out map[int]carried) error {
 	open, err := series.NewStore(db).Sightings(ctx, kind.Analysis, seriesID, parent)
 	if err != nil {
 		return err
@@ -109,7 +112,11 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	if err != nil {
 		return err
 	}
-	for _, p := range pair(candidates, fresh) {
+	layers := pair
+	if printsChanged {
+		layers = pairAcross
+	}
+	for _, p := range layers(candidates, fresh) {
 		id := candidates[p.candidate].findingID
 		out[p.result] = carried{place: places[id], on: p.on, from: fromParent}
 	}

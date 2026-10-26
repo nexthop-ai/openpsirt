@@ -275,10 +275,17 @@ func (s *Store) Previous(ctx context.Context, run *Run) (*Run, error) {
 // LastPrinted is the fingerprints of the newest run applied to this run's
 // build that reported anything, or empty where none has.
 func (s *Store) LastPrinted(ctx context.Context, run *Run) (string, error) {
+	return s.LastPrintedOn(ctx, run, run.TargetID)
+}
+
+// LastPrintedOn is the fingerprints of the newest run of this run's series
+// applied to a build that reported anything, other than this run, or empty
+// where none has.
+func (s *Store) LastPrintedOn(ctx context.Context, run *Run, targetID int64) (string, error) {
 	var prints []string
 	err := s.db.NewSelect().Model((*Run)(nil)).Column("fingerprints").
 		Where(`"sr"."series_id" = ?`, run.SeriesID).
-		Where(`"sr"."target_id" = ?`, run.TargetID).
+		Where(`"sr"."target_id" = ?`, targetID).
 		Where(`"sr"."status" = ?`, Applied).
 		Where(`"sr"."fingerprints" IS NOT NULL`).
 		Where(`"sr"."id" <> ?`, run.ID).

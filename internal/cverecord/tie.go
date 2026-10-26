@@ -31,9 +31,9 @@ import (
 func tied(entry Entry, component graph.Described) bool {
 	parts := graph.PartsOfPurl(component.Purl)
 	if !Distribution(parts.Type) {
-		if vendor, product, ok := cpeProduct(component.CPE); ok {
+		if vendor, product, ok := CPEProduct(component.CPE); ok {
 			for _, stated := range entry.CPEs {
-				v, p, ok := cpeProduct(stated)
+				v, p, ok := CPEProduct(stated)
 				if ok && v == vendor && p == product && upstreams(entry, v, p) {
 					return true
 				}
@@ -136,7 +136,7 @@ func (n name) describes(entry Entry) bool {
 
 func (n name) covers(component graph.Described, parts graph.Parts) bool {
 	if !Distribution(parts.Type) {
-		vendor, product, ok := cpeProduct(component.CPE)
+		vendor, product, ok := CPEProduct(component.CPE)
 		if !ok {
 			return false
 		}
@@ -160,12 +160,12 @@ func (n name) covers(component graph.Described, parts graph.Parts) bool {
 	return false
 }
 
-// cpeProduct is the vendor and product a CPE names, folded, in either of the
+// CPEProduct is the vendor and product a CPE names, folded, in either of the
 // two forms the format has: the formatted string and the older URI.
 //
 // A backslash escapes the character after it in the formatted form, so it is
 // dropped before comparing: "linux\-image" and "linux-image" are one name.
-func cpeProduct(cpe string) (vendor, product string, ok bool) {
+func CPEProduct(cpe string) (vendor, product string, ok bool) {
 	_, vendor, product, ok = cpeParts(cpe)
 	return vendor, product, ok
 }

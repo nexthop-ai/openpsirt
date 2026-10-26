@@ -41,24 +41,26 @@ type LeadPlace struct {
 
 // LeadEvidenceBody is what the newest run that saw a lead said about it.
 type LeadEvidenceBody struct {
-	Rule       string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	At         LeadPlace          `json:"at" doc:"Where the lead is"`
-	Steps      []LeadPlace        `json:"steps" doc:"The path the analyzer took to it, in order"`
-	Related    []LeadPlace        `json:"related" doc:"The other places the analyzer names"`
-	Open       bool               `json:"open" doc:"Whether the lead is open on the build"`
-	LastSeen   string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
-	NotSeen    string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
-	NotSeenRun int64              `json:"not_seen_run,omitempty" doc:"The run that did not see the lead, which a statement that it was fixed may name"`
-	FixedIn    *LeadRunBody       `json:"fixed_in,omitempty" doc:"The build a person stated fixed the lead, once they closed it as fixed"`
-	Compare    string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
-	Unchanged  bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
-	State      LeadState          `json:"state" doc:"Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
-	Kin        []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
-	Decision   *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
-	Withheld   bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
-	ThirdParty bool               `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
-	Ended      bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off"`
-	Handoff    *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
+	Rule          string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	At            LeadPlace          `json:"at" doc:"Where the lead is"`
+	Steps         []LeadPlace        `json:"steps" doc:"The path the analyzer took to it, in order"`
+	Related       []LeadPlace        `json:"related" doc:"The other places the analyzer names"`
+	Open          bool               `json:"open" doc:"Whether the lead is open on the build"`
+	LastSeen      string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
+	NotSeen       string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
+	LastCommit    string             `json:"last_commit,omitempty" doc:"The commit the lead's own repository was at in the build of the newest run that saw the lead. Absent where the run named none"`
+	NotSeenCommit string             `json:"not_seen_commit,omitempty" doc:"The commit the lead's own repository was at in the build of the first run that did not see the lead. Absent where that run named none, or while every run since has seen it"`
+	NotSeenRun    int64              `json:"not_seen_run,omitempty" doc:"The run that did not see the lead, which a statement that it was fixed may name"`
+	FixedIn       *LeadRunBody       `json:"fixed_in,omitempty" doc:"The build a person stated fixed the lead, once they closed it as fixed"`
+	Compare       string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
+	Unchanged     bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
+	State         LeadState          `json:"state" doc:"Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
+	Kin           []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
+	Decision      *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
+	Withheld      bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
+	ThirdParty    bool               `json:"third_party,omitempty" doc:"Whether the lead is in code the newest run that saw it declared third-party"`
+	Ended         bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off"`
+	Handoff       *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
 	// Who is dealing with the lead on this build, while it is open there.
 	core.HolderBody
 }
@@ -169,6 +171,7 @@ func registerLeads(api huma.API, in core.Deps) {
 			At:   leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			NotSeenRun: evidence.NotSeenRun, FixedIn: leadRunBody(evidence.FixedIn),
+			LastCommit: evidence.LastCommit, NotSeenCommit: evidence.NotSeenCommit,
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
 			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub, ThirdParty: evidence.ThirdParty,
 		}

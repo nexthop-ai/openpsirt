@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
@@ -66,8 +67,11 @@ func inventoryOf(ctx context.Context, db bun.IDB, targetID int64) (*inventory, e
 }
 
 // componentsOf is, for each repository a result is in, the component of the
-// build the inventory says was built from it. A repository the inventory
-// names no component for is absent, and its results are placed on the build.
+// build the inventory says was built from it: the first whose package
+// identifier or stated repository names it, and otherwise the first whose
+// platform enumeration names the repository's owner and name. A repository
+// the inventory names no component for is absent, and its results are
+// placed on the build.
 func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed) (map[string]int64, error) {
 	wanted := map[string]bool{}
 	for _, k := range fresh {
@@ -83,13 +87,14 @@ func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed
 		ComponentID int64  `bun:"component_id"`
 		Purl        string `bun:"purl"`
 		Repository  string `bun:"repository"`
+		CPE         string `bun:"cpe"`
 	}
 	if err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
-		ColumnExpr(`"n"."component_id", "n"."purl", "n"."repository"`).
+		ColumnExpr(`"n"."component_id", "n"."purl", "n"."repository", "n"."cpe"`).
 		Where(`"n"."target_id" = ?`, targetID).
 		Where(`"n"."closed_scan_id" IS NULL`).
-		Where(`("n"."purl" IS NOT NULL OR "n"."repository" IS NOT NULL)`).
+		Where(`("n"."purl" IS NOT NULL OR "n"."repository" IS NOT NULL OR "n"."cpe" IS NOT NULL)`).
 		OrderExpr(`"n"."id" ASC`).
 		Scan(ctx, &nodes); err != nil {
 		return nil, fmt.Errorf("read the build's components: %w", err)
@@ -103,7 +108,54 @@ func componentsOf(ctx context.Context, db bun.IDB, targetID int64, fresh []Keyed
 			out[remote] = n.ComponentID
 		}
 	}
+	// A platform enumeration is weaker than an identifier naming the
+	// repository, so it places only a repository nothing else named.
+	named := map[string]int64{}
+	for _, n := range nodes {
+		if key := cpeRepository(n.CPE); key != "" {
+			if _, ok := named[key]; !ok {
+				named[key] = n.ComponentID
+			}
+		}
+	}
+	for remote := range wanted {
+		if _, ok := out[remote]; ok {
+			continue
+		}
+		if id, ok := named[ownerAndName(remote)]; ok {
+			out[remote] = id
+		}
+	}
 	return out, nil
+}
+
+// cpeRepository is the owner and name a platform enumeration's vendor and
+// product would be as a repository, folded as ownerAndName folds them, or
+// empty where it names neither.
+func cpeRepository(cpe string) string {
+	vendor, product, ok := cverecord.CPEProduct(cpe)
+	if !ok {
+		return ""
+	}
+	return foldedName(vendor) + "/" + foldedName(product)
+}
+
+// ownerAndName is the last two segments of a normalized repository address,
+// its owner and its name, folded so that a hyphen and an underscore compare
+// alike: the enumeration's dictionary writes the one where a repository
+// writes the other. Empty where the address has no owner.
+func ownerAndName(remote string) string {
+	segments := strings.Split(remote, "/")
+	if len(segments) < 3 {
+		return ""
+	}
+	return foldedName(segments[len(segments)-2]) + "/" + foldedName(segments[len(segments)-1])
+}
+
+// foldedName is a name in lower case with every underscore written as a
+// hyphen.
+func foldedName(name string) string {
+	return strings.ReplaceAll(strings.ToLower(name), "_", "-")
 }
 
 // hosts is the package identifier types that name a repository on a hosting

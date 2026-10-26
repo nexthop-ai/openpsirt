@@ -83,7 +83,8 @@ type Receipt struct {
 	Probable            int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
 	Inherited           int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
 	Reopened            int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
-	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any"`
+	Uncompared          int            `json:"uncompared,omitempty" doc:"Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set"`
+	FingerprintsChanged bool           `json:"fingerprints_changed,omitempty" doc:"Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build"`
 	Dropped             map[string]int `json:"dropped,omitempty" doc:"Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"`
 	Scanners            []string       `json:"scanners,omitempty" doc:"The dependency and secret scanners whose runs were left out whole"`
 	Discarded           map[string]int `json:"discarded,omitempty" doc:"What was left out of the results kept, by what it was: snippets, markdown, contents or fixes"`
@@ -331,6 +332,20 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		if err != nil {
 			return "", err
 		}
+		// The series' first run on a build cut from another stream is
+		// matched against the parent build's leads, so its fingerprints are
+		// compared with what that build last carried.
+		if last == "" && previous == nil {
+			parent, err := parentBuild(ctx, tx, run.TargetID)
+			if err != nil {
+				return "", err
+			}
+			if parent != 0 {
+				if last, err = store.LastPrintedOn(ctx, run, parent); err != nil {
+					return "", err
+				}
+			}
+		}
 		run.FingerprintsChanged = last != "" && last != run.Fingerprints
 	}
 	open, err := store.Sightings(ctx, kind.Analysis, set.ID, run.TargetID)
@@ -340,6 +355,12 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed, run.FingerprintsChanged)
 	if err != nil {
 		return "", err
+	}
+	var uncompared int
+	if comparable {
+		if missed, uncompared, err = comparedTo(ctx, store, run, open, missed); err != nil {
+			return "", err
+		}
 	}
 
 	receipt := placed.Receipt
@@ -412,6 +433,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 			return "", err
 		}
 		receipt.NotReproduced = len(missed)
+		receipt.Uncompared = uncompared
 	}
 	if err := store.Modules(ctx, run.ID, placed.Modules); err != nil {
 		return "", err
@@ -442,6 +464,43 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	said.lapsed = lapsed.Told
 	run.Status = series.Applied
 	return run.Status, a.end(ctx, store, run, receipt)
+}
+
+// comparedTo is the leads a comparable run missed that it is also comparable
+// to the run that last saw: the same tool, version and rule set. A lead last
+// seen by another is left open and counted, since its absence says nothing
+// about the code. Each of those runs is read once.
+func comparedTo(ctx context.Context, store *series.Store, run *series.Run, open []series.Sighting,
+	missed []int64) ([]int64, int, error) {
+
+	if len(missed) == 0 {
+		return missed, 0, nil
+	}
+	lastRun := make(map[int64]int64, len(open))
+	for _, s := range open {
+		lastRun[s.FindingID] = s.LastRunID
+	}
+	alike := map[int64]bool{}
+	kept := missed[:0:0]
+	uncompared := 0
+	for _, id := range missed {
+		last := lastRun[id]
+		same, read := alike[last]
+		if !read {
+			earlier, err := store.ByID(ctx, last)
+			if err != nil {
+				return nil, 0, err
+			}
+			same, _ = series.Against(run.Params, earlier)
+			alike[last] = same
+		}
+		if same {
+			kept = append(kept, id)
+		} else {
+			uncompared++
+		}
+	}
+	return kept, uncompared, nil
 }
 
 // lapseProbable lapses the claims dismissing each lead this run paired only

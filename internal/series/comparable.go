@@ -55,10 +55,17 @@ func Comparability(p Params, previous *Run, signals int) (bool, Reason) {
 	if previous == nil {
 		return true, ""
 	}
-	if previous.ToolName != p.ToolName || previous.ToolVersion != p.ToolVersion {
+	return Against(p, previous)
+}
+
+// Against says whether a run that is comparable on its own is comparable to
+// an earlier run of its series, and the first reason it is not: the same tool
+// at the same version, running the same rule set.
+func Against(p Params, earlier *Run) (bool, Reason) {
+	if earlier.ToolName != p.ToolName || earlier.ToolVersion != p.ToolVersion {
 		return false, ToolChanged
 	}
-	if previous.RulesDigest != p.RulesDigest {
+	if earlier.RulesDigest != p.RulesDigest {
 		return false, RulesChanged
 	}
 	return true, ""

@@ -34,6 +34,10 @@ type Evidence struct {
 	// person stated fixed it in, nil until somebody did.
 	NotSeenRun int64
 	FixedIn    *RunAt
+	// LastCommit and NotSeenCommit are the commits the lead's own repository
+	// was at in those two builds, empty where the run named none.
+	LastCommit    string
+	NotSeenCommit string
 	// Compare is the address comparing the lead's repository between those
 	// two builds, and Unchanged whether both name the same commit for it and
 	// neither patched it.
@@ -133,6 +137,7 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 			Link: config.File(link, said.Path, atLeast(said.StartLine), atLeast(said.EndLine)),
 		},
 		LastSeen:   last.BuiltAt,
+		LastCommit: sourcelink.CommitOf(link, last.SourceCommit, said.Path),
 		ThirdParty: declaredThirdParty(last, said.Path) != "",
 	}
 	for _, p := range places {
@@ -179,6 +184,7 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 			return Evidence{}, err
 		}
 		out.NotSeen, out.NotSeenRun = &absent.BuiltAt, absent.ID
+		out.NotSeenCommit = sourcelink.CommitOf(modulesOfRun(after), absent.SourceCommit, said.Path)
 		out.Compare, out.Unchanged = config.Compare(link, modulesOfRun(after), said.Path)
 	}
 	if seen.FixedRunID != nil {

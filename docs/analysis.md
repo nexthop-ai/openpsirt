@@ -120,7 +120,8 @@ never reaches another address.
 A run is compared with its series' last, and a result missing from it is
 recorded as no longer found, only where the run states its coverage and
 exited cleanly. A run that is not comparable is still recorded, and its
-receipt says why.
+receipt says why. A result last reported by another tool version or rule set
+stays open, and the receipt counts it as uncompared.
 
 | Analyzer | Coverage stated by |
 |---|---|

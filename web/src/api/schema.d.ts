@@ -10195,6 +10195,8 @@ export interface components {
             handoff?: components["schemas"]["LeadHandoffBody"];
             /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
             kin: components["schemas"]["LeadKin"][] | null;
+            /** @description The commit the lead's own repository was at in the build of the newest run that saw the lead. Absent where the run named none */
+            last_commit?: string;
             /**
              * Format: date-time
              * @description When the build of the newest run that saw the lead was made
@@ -10205,6 +10207,8 @@ export interface components {
              * @description When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
              */
             not_seen?: string;
+            /** @description The commit the lead's own repository was at in the build of the first run that did not see the lead. Absent where that run named none, or while every run since has seen it */
+            not_seen_commit?: string;
             /**
              * Format: int64
              * @description The run that did not see the lead, which a statement that it was fixed may name
@@ -12440,7 +12444,7 @@ export interface components {
             dropped?: {
                 [key: string]: number;
             };
-            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any */
+            /** @description Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build */
             fingerprints_changed?: boolean;
             /**
              * Format: int64
@@ -12481,6 +12485,11 @@ export interface components {
             seen: number;
             /** @description Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers */
             sharp_drop?: boolean;
+            /**
+             * Format: int64
+             * @description Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set
+             */
+            uncompared?: number;
         };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */

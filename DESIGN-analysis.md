@@ -145,6 +145,10 @@ holds is recorded:
 | `tool-changed` | Ran another tool or version than the series' last applied run on the build |
 | `rules-changed` | Ran another rule set than that run |
 
+| Rule | |
+|---|---|
+| A comparable run marks a lead not reproduced only where it is also comparable to the run that last saw the lead: the same tool, version and rule set | A lead last seen before an upgrade says nothing by its absence from a run of the new version. It stays open, and the receipt counts it as uncompared |
+
 ## Run application
 
 A worker claims the queued job and applies the run in one transaction. The
@@ -181,7 +185,7 @@ An applied run, in order:
 2. Files each rule as an issue of the rule kind, named `<tool>/<rule>` in lower-case tool name, and records the weaknesses its `external/cwe/cwe-N` tags name (`DESIGN-kinds.md` § Name resolution).
 3. Opens a lead for each result nothing matched, internal, at the place § Matching gives it and the component § Placement gives it.
 4. Replaces what the last run said about each lead it saw again: path, lines, columns, enclosing function, call chain, message, fingerprint, and the flow steps and related places.
-5. Records each lead as seen by this run. A comparable run records each open lead it did not see as not reproduced by it, and a lead not reproduced that is seen again is counted as returned.
+5. Records each lead as seen by this run. A comparable run records each open lead it did not see as not reproduced by it, where it is comparable to the run that last saw the lead, and a lead not reproduced that is seen again is counted as returned.
 6. Records the repositories the run says its checkout held.
 7. Lets the placed results go, and writes the receipt.
 
@@ -234,7 +238,7 @@ place, so a decision keyed on the place reaches it (REQ-25).
 
 | Order | Where | How |
 |---|---|---|
-| 1 | The leads open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer. A new branch inherits what the line it was cut from has decided |
+| 1 | The leads open on the build of the same variant in the stream this one was cut from, on the series' first run on the build | Every layer, and the unprinted key where the run is a fingerprint change against that build. A new branch inherits what the line it was cut from has decided |
 | 2 | A closed lead on this build | The whole key. The result is the same flaw found again, and opens a new lead at the closed one's place |
 | 3 | Any lead of the series on another build, open or closed | The whole key, the oldest lead first. A probable pairing with a lead this build never saw is a guess |
 
@@ -246,7 +250,9 @@ the same result first seen on two builds at once is one place.
 A run records the fingerprint schemes its results' keys were built from, and
 the mark of the salt the client took its own with. A run whose record differs
 from the newest one applied to the build that reported anything is a
-fingerprint change.
+fingerprint change. The series' first run on a build cut from another stream
+is compared with the newest such run on the parent build, whose leads it
+inherits.
 
 | Rule | |
 |---|---|
@@ -258,6 +264,7 @@ fingerprint change.
 | A result or a lead sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
 | The unprinted key is compared for a fingerprint change alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
 | Carrying from a closed lead or another build is on the whole key, on a fingerprint change too | A result carried across a rotation opens as a new lead there |
+| Carrying from the parent build on a fingerprint change pairs on the unprinted key as the build's own leads are paired | A branch cut after a salt rotation inherits its line's decisions rather than re-asking them |
 
 ## Placement
 
@@ -268,6 +275,7 @@ A lead is one component at one place (REQ-17).
 | A result in a repository the run names is placed on the build's component built from that repository | The innermost repository holding its path |
 | A component is built from a repository where its package identifier names it: the `github`, `gitlab` and `bitbucket` types by namespace and name, and any type by a `vcs_url` qualifier | The inventory is the only statement of which component a directory became |
 | A component whose identifier names no repository is built from the one its inventory states in a CycloneDX external reference of type `vcs`, the first where it states several | A distribution package's identifier names no repository. sonic-buildimage states one this way on packages whose identifier is `pkg:deb` |
+| A repository no identifier or reference names is built into the first component whose platform enumeration names its owner as the vendor and its name as the product, compared in lower case with a hyphen and an underscore alike | `cpe:2.3:a:frrouting:frr` is `github.com/FRRouting/frr`. The enumeration is a weaker statement than an identifier naming the repository, so it is read only where nothing else names one |
 | Repository addresses compare as host, owner and name, in lower case, without scheme, credentials, port, revision or `.git` | A remote written for SSH and an identifier written for HTTPS name one repository |
 | A result in no repository the inventory names is placed on the build itself | Every build has a root |
 | The inventory placed against is the build's newest that has been read | A run arriving before its inventory waits for it |
@@ -348,7 +356,10 @@ is sent.
 evidence on one build: its rule, where it is, the path the analyzer took to
 it, the related places, each with its link and source, when it was last seen,
 and, for a lead no longer open, when it was first not seen, by which run, with
-the comparison above, and the run a person named as the build that fixed it. It names the live claim at the lead, agreed to or waiting, where the
+the comparison above, and the run a person named as the build that fixed it.
+Beside each of the two builds it names the commit the lead's own repository was
+at: the run's repository holding the lead's path, or the top of the checkout
+where none does, and nothing where that is not a commit. It names the live claim at the lead, agreed to or waiting, where the
 reader may read one. The place identity addresses a lead because a rule's name holds a
 slash.
 
@@ -797,7 +808,7 @@ is in `DESIGN-data-model.md` § End of support.
 | Status, failure | § Run application |
 | Comparable, and the reason where not | § Run parameters |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, not reproduced, left open as uncompared, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
 | Fingerprint change | Whether the run's fingerprints changed from the build's last (§ Fingerprint change) |
 | Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
 

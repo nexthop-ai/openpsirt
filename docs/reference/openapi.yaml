@@ -5973,6 +5973,9 @@ components:
           type:
             - array
             - "null"
+        last_commit:
+          description: The commit the lead's own repository was at in the build of the newest run that saw the lead. Absent where the run named none
+          type: string
         last_seen:
           description: When the build of the newest run that saw the lead was made
           format: date-time
@@ -5980,6 +5983,9 @@ components:
         not_seen:
           description: When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
           format: date-time
+          type: string
+        not_seen_commit:
+          description: The commit the lead's own repository was at in the build of the first run that did not see the lead. Absent where that run named none, or while every run since has seen it
           type: string
         not_seen_run:
           description: The run that did not see the lead, which a statement that it was fixed may name
@@ -9940,7 +9946,7 @@ components:
           description: "Results left out, by reason: advisory-identifier, outside-the-checkout, repeat, failure-signal, not-a-problem, suppressed or absent"
           type: object
         fingerprints_changed:
-          description: Whether the fingerprints the results carry changed from the last run on the build that carried any
+          description: Whether the fingerprints the results carry changed from the last run on the build that carried any, or, on the series' first run on a build cut from another stream, from the last run on that stream's build
           type: boolean
         inherited:
           description: Results new to the build carried from a lead of the branch it was cut from
@@ -9980,6 +9986,10 @@ components:
         sharp_drop:
           description: Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers
           type: boolean
+        uncompared:
+          description: Results the build held open that this comparable run did not report, left open because the run that last reported each ran another tool, version or rule set
+          format: int64
+          type: integer
       required:
         - opened
         - seen
