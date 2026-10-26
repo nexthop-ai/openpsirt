@@ -4757,9 +4757,9 @@ export interface paths {
          * List who has been granted a handed-off lead
          * @description Everybody granted this one handed-off lead in this product, oldest first.
          *
-         *     A grant reads the lead's evidence and nothing else of the product, while the lead is internal or private.
+         *     A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
          */
         get: operations["list-lead-collaborators"];
         put?: never;
@@ -4784,9 +4784,9 @@ export interface paths {
          *
          *     It is an access change: it lands in the administration trail, and they are told in the notification area inside the application.
          *
-         *     Adding somebody who already holds it succeeds and changes nothing.
+         *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
          */
         put: operations["add-lead-collaborator"];
         post?: never;
@@ -4794,9 +4794,9 @@ export interface paths {
          * Withdraw somebody's grant of a handed-off lead
          * @description Withdraws the grant. The record of it is kept.
          *
-         *     Withdrawing a grant somebody does not hold answers 404 and records nothing.
+         *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds.
+         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
          */
         delete: operations["remove-lead-collaborator"];
         options?: never;
@@ -9451,15 +9451,15 @@ export interface components {
             /** @description The namespace, where two share a name and an ecosystem */
             namespace?: string;
             /**
-             * @description The severity. Worked out from the vector where one is given
+             * @description The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given
              * @enum {string}
              */
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
             /** @description The flaw, in your own words */
             summary: string;
-            /** @description A CVSS 3.0 or 3.1 base vector */
+            /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
-            /** @description The kind of flaw, as CWE- and a number, the root cause first */
+            /** @description The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         HandedOffBody: {
@@ -10041,7 +10041,7 @@ export interface components {
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
             /**
-             * @description Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to
+             * @description Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw
              * @enum {string}
              */
             state: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";

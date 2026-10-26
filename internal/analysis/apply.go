@@ -343,6 +343,15 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 	if err := describeAgain(ctx, tx, matched); err != nil {
 		return "", err
 	}
+	// What the run kept beside a lead disclosed with its flaw is stripped
+	// again, as disclosure stripped it.
+	described := append([]int64{}, opened...)
+	for id := range matched {
+		described = append(described, id)
+	}
+	if err := finding.StripDisclosedLeads(ctx, tx, set.ProductID, described); err != nil {
+		return "", err
+	}
 
 	// A result the baseline holds on another build is in it here too: it is
 	// the same result, seen first by another build.
@@ -511,6 +520,7 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 	return missed >= floor && missed*100 > share*live, nil
 }
 
-// OpensAt is the visibility every lead opens at, and the one a receipt
-// counting leads is read at: a result nobody has judged is internal.
+// OpensAt is the visibility a lead opens at unless it was handed off, and the
+// one a receipt counting leads is read at: a result nobody has judged is
+// internal.
 const OpensAt = access.Internal

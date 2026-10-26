@@ -592,7 +592,8 @@ hand-off is offered, and `POST` on the same address records it.
 | A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
 | The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its place rather than by versions |
 | The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
-| A handed-off lead takes no claim; one is refused with 409 | The flaw's decisions replace the lead's |
+| A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409 | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
+| A hand-off, a move and an undo are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 
 ### Hand-off offer
 
@@ -607,7 +608,7 @@ hand-off is offered, and `POST` on the same address records it.
 
 | Rule | |
 |---|---|
-| The component chosen is recorded for the prefix, replacing what it was confirmed as before | The next lead under the prefix is offered it first |
+| The component chosen is recorded for the prefix, replacing what it was confirmed as before, and the build itself leaves the prefix confirmed as nothing | The next lead under the prefix is offered it first. A component a person turned down is not offered first again |
 | The longest recorded prefix holding a lead's path is the one offered | A repository nested in another names its own component |
 | A resembling component is offered and never chosen for the person | A name contained in a directory's name is a guess |
 
@@ -622,15 +623,17 @@ takes a moved one back out.
 | Visibility of the lead and the claims at its place | Internal | Private |
 | An internal reader reads | The whole lead, and nothing of the case | A stub: the state, the rule, the location and when it was seen |
 | A reader of undisclosed work reads | Nothing | The whole lead, and its flaw |
-| A reader on the flaw's case reads | The whole lead, and its flaw | The whole lead, and its flaw |
+| A reader on the flaw's case reads | Nothing, unless they were granted the lead | The whole lead, and its flaw |
 | When the flaw is disclosed | The lead stays internal | The lead and its claims go public with the flaw (REQ-40) |
 | A later sighting opens | Internal | Private, in the case |
 
 | Rule | |
 |---|---|
 | A move discloses, with the flaw, everybody who wrote reasoning or a comment on a claim about the lead, every path it names and every message the analyzer wrote there, and the offer says so before the move | People writing in the record have to know that from the first word (REQ-40) |
-| At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets) | A product's source is not published because one flaw in it was |
-| A move or its undo is refused with 409 once the flaw is disclosed | Disclosure is one way |
+| At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
+| Disclosure records the time on the hand-off of every lead handed off as the flaw, kept or moved | A kept lead stays internal, so its visibility does not say its flaw is public |
+| A move or its undo is refused with 409 once the flaw is disclosed, kept lead or moved | Disclosure is one way |
+| A move, its undo and a disclosure each change the hand-off only as it was read in their transaction | One that lost a race to another is asked again |
 | A move and its undo are recorded in the administrative trail, as the change of access they are | A move changes who reads the lead |
 | A move and its undo are made by somebody holding `internal-triage` and `private-triage` | The hand-off's own rule |
 
@@ -642,10 +645,11 @@ one handed-off lead, as case collaborators are brought into one flaw
 
 | Rule | |
 |---|---|
-| A grant reaches the lead's evidence at the internal and private visibilities, and nothing else | It is one lead, never a list, and ends at disclosure by itself |
-| A grant does not reach the build's inventory or tree | It is a grant of one lead, not of the build it is on |
-| Collaborators are managed by somebody who reads the lead at the visibility the hand-off holds | Whoever reads the lead decides who else does |
-| A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in | As a case collaborator is |
+| A grant reaches the lead's evidence at the internal and private visibilities while its flaw is undisclosed, and nothing else | It is one lead, never a list. Disclosure ends it, kept lead or moved |
+| A grant does not reach the build's inventory or tree, or the lead's kin | It is a grant of one lead, not of the build it is on or the leads beside it |
+| Collaborators are managed by somebody who reads the lead at the visibility it holds while its flaw is undisclosed: internal where it was kept, private where it was moved | Whoever reads the lead decides who else does. A grant of the lead is not one of those readings |
+| A grant or a withdrawal is refused with 409 once the flaw is disclosed, and is made in one transaction with the read of the hand-off it depends on | The grants have ended |
+| A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
 | A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
 
 ## Receipts
@@ -816,4 +820,5 @@ it is about.
 | A tool is told apart by the name its output gives it | Two configurations of one tool in one invocation are one series. A pipeline running a tool twice runs the client twice |
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
+| The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
 | The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |

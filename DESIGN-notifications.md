@@ -82,6 +82,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
+| Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
@@ -483,6 +484,7 @@ name are what a later read has to ask about.
 | It is about nothing undisclosed | Most of the table, and no rule narrows it |
 | It names a product where this person reads undisclosed work now | The role is the reason it arrived, so withdrawing the role is what takes it away |
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
+| It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and a place, and the line granting it is about that lead, so it is the one line the grant reaches |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
 
 Filtered, never deleted. Destroying the row destroys the record that somebody

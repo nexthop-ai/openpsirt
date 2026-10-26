@@ -37,10 +37,26 @@ type Handoff struct {
 	HandedAt   time.Time         `bun:"handed_at,notnull"`
 	MovedBy    *int64            `bun:"moved_by"`
 	MovedAt    *time.Time        `bun:"moved_at"`
+	// DisclosedAt is when its flaw was disclosed, kept or moved. A kept lead
+	// stays internal past it, so the visibility alone does not say so.
+	DisclosedAt *time.Time `bun:"disclosed_at"`
 }
 
 // Moved reports whether the lead was moved into its flaw's case.
 func (h Handoff) Moved() bool { return h.MovedAt != nil }
+
+// Disclosed reports whether the lead's flaw is disclosed.
+func (h Handoff) Disclosed() bool { return h.DisclosedAt != nil }
+
+// Undisclosed is the visibility the lead holds while its flaw is undisclosed:
+// internal where it was kept, private where it was moved. Who manages a lead
+// is asked at it, before and after disclosure alike.
+func (h Handoff) Undisclosed() access.Visibility {
+	if h.Moved() {
+		return access.Private
+	}
+	return access.Internal
+}
 
 // HandoffAt is the hand-off of the lead at a place in a product, or nil where
 // it was not handed off.
@@ -71,6 +87,12 @@ const movedInto = `EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
 	  AND ` + `"lh"."vulnerability_id" IN (SELECT "mv"."id" FROM "vulnerability" AS "mv"
 	    JOIN "vulnerability" AS "mi" ON "mi"."issue_id" = "mv"."issue_id" WHERE "mi"."id" IN (?)))`
 
+// undisclosedLead is the condition that the lead finding under "f", in the
+// product bound, has a flaw nobody disclosed: a lead grant reaches it only
+// then.
+const undisclosedLead = `NOT EXISTS (SELECT 1 FROM "lead_handoff" AS "lh"
+	WHERE "lh"."product_id" = ? AND "lh"."place_identity" = "f"."place_identity" AND "lh"."disclosed_at" IS NOT NULL)`
+
 // caseVisibilities is what a moved lead holds while its flaw is a case and
 // once it is disclosed.
 var caseVisibilities = []access.Visibility{access.Private, access.Public}
@@ -79,8 +101,8 @@ var caseVisibilities = []access.Visibility{access.Private, access.Public}
 // two conditions with what each binds.
 //
 // Full is the lead itself. It is read at the visibilities the subject reads
-// in the product, on the leads they were granted while those are internal or
-// private, and on a lead moved into a case they were brought into.
+// in the product, on the leads they were granted while their flaw is
+// undisclosed, and on a lead moved into a case they were brought into.
 //
 // Stub is the lead without the case: state, rule, location and sightings, and
 // never what the analyzer said. It is a lead moved into a case, to somebody
@@ -109,8 +131,8 @@ func LeadReach(s access.Subject, productID int64) LeadReading {
 		}
 	}
 	if places := s.Leads(productID); len(places) > 0 {
-		clauses = append(clauses, `("f"."visibility" IN (?) AND "f"."place_identity" IN (?))`)
-		args = append(args, bun.List(access.LeadGrantVisibilities()), bun.List(places))
+		clauses = append(clauses, `("f"."visibility" IN (?) AND "f"."place_identity" IN (?) AND `+undisclosedLead+`)`)
+		args = append(args, bun.List(access.LeadGrantVisibilities()), bun.List(places), productID)
 	}
 	if cases := s.Cases(productID); len(cases) > 0 && s.Kind == access.Person {
 		clauses = append(clauses, `("f"."visibility" IN (?) AND `+movedInto+`)`)
@@ -135,8 +157,17 @@ func (r LeadReading) Either() (string, []any) {
 // leadsFollow carries the leads moved into one issue's case in one product to
 // public with it: their findings, the claims about them and their hand-off.
 // The snippets under a path the product does not disclose snippets for are
-// stripped first. Run inside the disclosure's transaction.
-func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) error {
+// stripped first. Every lead handed off as the issue, kept or moved, is marked
+// disclosed. Run inside the disclosure's transaction.
+func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64, now time.Time) error {
+	if _, err := db.NewUpdate().Model((*Handoff)(nil)).
+		Set(`"disclosed_at" = ?`, now).
+		Where(`"product_id" = ?`, productID).
+		Where(filed.Under(filed.Column(`"vulnerability_id"`)), vulnerabilityID).
+		Where(`"disclosed_at" IS NULL`).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("record the leads handed off as this flaw as disclosed: %w", err)
+	}
 	var moved []Handoff
 	if err := db.NewSelect().Model(&moved).
 		Where(`"lh"."product_id" = ?`, productID).
@@ -161,13 +192,50 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 	if err := SetLeadVisibility(ctx, db, productID, places, access.Private, access.Public); err != nil {
 		return err
 	}
-	if _, err := db.NewUpdate().Model((*Handoff)(nil)).
+	// Matched on what was read: a lead taken out of the case since is a
+	// lost race, which the retry reads again.
+	result, err := db.NewUpdate().Model((*Handoff)(nil)).
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"id" IN (?)`, bun.List(ids)).
-		Exec(ctx); err != nil {
+		Where(`"visibility" = ?`, access.Private).
+		Exec(ctx)
+	if err != nil {
 		return fmt.Errorf("record the leads disclosed with their flaw: %w", err)
 	}
+	if n, err := database.Affected(result); err != nil {
+		return fmt.Errorf("record the leads disclosed with their flaw: %w", err)
+	} else if n != int64(len(ids)) {
+		return fmt.Errorf("record the leads disclosed with their flaw: %w", database.ErrGoAgain)
+	}
 	return nil
+}
+
+// StripDisclosedLeads strips the source a run kept beside these lead findings
+// in one product where the lead went public with its flaw, under every path the
+// product does not disclose snippets for. A run describing a disclosed lead
+// again writes what the analyzer sent, so it is asked after every run.
+func StripDisclosedLeads(ctx context.Context, db bun.IDB, productID int64, findingIDs []int64) error {
+	var public []string
+	if err := database.IDsInBatches(ctx, findingIDs, func(ctx context.Context, batch []int64) error {
+		var some []string
+		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "lead_handoff" AS "lh" ON "lh"."place_identity" = "f"."place_identity"`).
+			ColumnExpr(`DISTINCT "f"."place_identity"`).
+			Where(`"lh"."product_id" = ?`, productID).
+			Where(`"lh"."visibility" = ?`, access.Public).
+			Where(`"f"."id" IN (?)`, bun.List(batch)).
+			Scan(ctx, &some); err != nil {
+			return err
+		}
+		public = append(public, some...)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("read which of the leads were disclosed: %w", err)
+	}
+	if len(public) == 0 {
+		return nil
+	}
+	return stripUndisclosedSnippets(ctx, db, productID, public)
 }
 
 // SetLeadVisibility moves the lead findings at these places in one product,

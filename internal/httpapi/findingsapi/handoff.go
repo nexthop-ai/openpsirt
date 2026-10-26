@@ -193,15 +193,12 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Variant string `path:"variant"`
 		Place   string `path:"place" doc:"The lead's place identity"`
 		Body    struct {
-			Builds     []LeadBuild     `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
-			Component  string          `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
-			Ecosystem  string          `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
-			Namespace  string          `json:"namespace,omitempty" doc:"The namespace, where two share a name and an ecosystem"`
-			Summary    string          `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
-			Severity   core.Recordable `json:"severity,omitempty" doc:"The severity. Worked out from the vector where one is given"`
-			Vector     string          `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector"`
-			Weaknesses []string        `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, as CWE- and a number, the root cause first"`
-			Move       bool            `json:"move,omitempty" doc:"Whether the lead moves into the flaw's case. Kept internal by default"`
+			Builds    []LeadBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
+			Component string      `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
+			Ecosystem string      `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
+			Namespace string      `json:"namespace,omitempty" doc:"The namespace, where two share a name and an ecosystem"`
+			FlawFields
+			Move bool `json:"move,omitempty" doc:"Whether the lead moves into the flaw's case. Kept internal by default"`
 		}
 	}) (*struct {
 		Status int
@@ -212,6 +209,11 @@ func registerHandoff(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		subject := at.subject
+		// Before any build the body names is resolved, so a refusal says
+		// nothing about which of them exist.
+		if err := analysis.MayHandOff(subject, at.named.ProductID); err != nil {
+			return nil, refusedHandoff(in, err)
+		}
 		names := catalog.NewStore(in.DB.DB)
 		targets := make([]int64, 0, len(input.Body.Builds))
 		for _, b := range input.Body.Builds {
@@ -347,39 +349,55 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		Identity string `path:"identity"`
 	}
 	// handed is the hand-off of the lead a route names, where the reader
-	// reads the lead in the product at the visibility it holds: who is on a
-	// lead is managed by whoever reads it there.
-	handed := func(ctx context.Context, product, stream, variant, place string) (*leadAt, *finding.Handoff, error) {
-		at, err := locateLead(ctx, in, product, stream, variant)
-		if err != nil {
-			return nil, nil, err
+	// reads the lead in the product at the visibility it holds while its flaw
+	// is undisclosed: who is on a lead is managed by whoever reads it there.
+	handed := func(ctx context.Context, db bun.IDB, at *leadAt, place string) (*finding.Handoff, error) {
+		if _, err := finding.NewStore(db).LeadAt(ctx, at.subject, at.target, place); err != nil {
+			return nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
 		}
-		if _, err := finding.NewStore(in.DB.DB).LeadAt(ctx, at.subject, at.target, place); err != nil {
-			return nil, nil, core.Absent(in.Logger, err, "that lead could not be looked up", core.NoSuchFinding)
-		}
-		h, err := finding.HandoffAt(ctx, in.DB.DB, at.named.ProductID, place)
+		h, err := finding.HandoffAt(ctx, db, at.named.ProductID, place)
 		if err != nil {
-			return nil, nil, core.WentWrong(in.Logger, "that lead could not be looked up", err)
+			return nil, core.WentWrong(in.Logger, "that lead could not be looked up", err)
 		}
 		if h == nil {
-			return nil, nil, huma.Error404NotFound(analysis.ErrNotHandedOff.Error())
+			return nil, huma.Error404NotFound(analysis.ErrNotHandedOff.Error())
 		}
-		if !at.subject.Reads(h.Visibility, at.named.ProductID) {
-			return nil, nil, core.NoSuchFinding()
+		if !at.subject.Reads(h.Undisclosed(), at.named.ProductID) {
+			return nil, core.NoSuchFinding()
 		}
-		return at, h, nil
+		return h, nil
+	}
+	// changing is handed asked inside the transaction granting or withdrawing,
+	// where a disclosed flaw ends the grants.
+	changing := func(ctx context.Context, tx bun.IDB, at *leadAt, place string) (*finding.Handoff, string, error) {
+		h, err := handed(ctx, tx, at, place)
+		if err != nil {
+			return nil, "", err
+		}
+		if h.Disclosed() {
+			return nil, "", huma.Error409Conflict(analysis.ErrFlawDisclosed.Error())
+		}
+		name, err := analysis.LeadName(ctx, tx, h)
+		if err != nil {
+			return nil, "", core.WentWrong(in.Logger, "that lead could not be looked up", err)
+		}
+		return h, name, nil
 	}
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-lead-collaborators", Method: http.MethodGet, Path: path,
 		Summary: "List who has been granted a handed-off lead",
 		Description: "Everybody granted this one handed-off lead in this product, oldest first.\n\n" +
-			"A grant reads the lead's evidence and nothing else of the product, while the lead " +
-			"is internal or private.",
+			"A grant reads the lead's evidence and nothing else of the product, until its flaw " +
+			"is disclosed.",
 		Tags: []string{"Findings"},
-	}, core.PerProduct, "Where you read the lead at the visibility it holds.", leadReaders()...),
+	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
 		func(ctx context.Context, input *leadInput) (*core.ListOutput[LeadCollaboratorBody], error) {
-			at, h, err := handed(ctx, input.Product, input.Stream, input.Variant, input.Place)
+			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
+			if err != nil {
+				return nil, err
+			}
+			h, err := handed(ctx, in.DB.DB, at, input.Place)
 			if err != nil {
 				return nil, err
 			}
@@ -403,23 +421,25 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 			"evidence, without granting them anything else of the product.\n\n" +
 			"It is an access change: it lands in the administration trail, and they are told in " +
 			"the notification area inside the application.\n\n" +
-			"Adding somebody who already holds it succeeds and changes nothing.",
+			"Adding somebody who already holds it succeeds and changes nothing. Once the flaw is " +
+			"disclosed, a grant is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read the lead at the visibility it holds.", leadReaders()...),
+	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
-			at, h, err := handed(ctx, input.Product, input.Stream, input.Variant, input.Place)
+			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
 				return nil, err
 			}
-			name, err := analysis.LeadName(ctx, in.DB.DB, h)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "that lead could not be looked up", err)
-			}
+			var h *finding.Handoff
 			var person *access.Account
 			var added bool
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-				rights := access.NewStore(tx)
+				var name string
 				var err error
+				if h, name, err = changing(ctx, tx, at, input.Place); err != nil {
+					return err
+				}
+				rights := access.NewStore(tx)
 				if person, err = core.PersonNamed(ctx, a.Logger, rights, input.Identity); err != nil {
 					return err
 				}
@@ -452,9 +472,11 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 				Link:    weblink.Lead(at.named.Product, at.named.Stream, at.named.Variant, h.PlaceIdentity),
 				Private: true,
 				// The flaw, so somebody on its case reads the line as well as
-				// somebody reading the product's undisclosed work.
+				// somebody reading the product's undisclosed work, and the
+				// lead, so the person granted it alone does.
 				ProductID:       &at.named.ProductID,
 				VulnerabilityID: &h.VulnerabilityID,
+				Concerns:        notify.ConcerningLead(at.named.ProductID, h.PlaceIdentity),
 			}, "person", person.Identity)
 			return &struct{}{}, nil
 		})
@@ -463,19 +485,20 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		OperationID: "remove-lead-collaborator", Method: http.MethodDelete, Path: path + "/{identity}",
 		Summary: "Withdraw somebody's grant of a handed-off lead",
 		Description: "Withdraws the grant. The record of it is kept.\n\n" +
-			"Withdrawing a grant somebody does not hold answers 404 and records nothing.",
+			"Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the " +
+			"flaw is disclosed, a withdrawal is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "Where you read the lead at the visibility it holds.", leadReaders()...),
+	}, core.PerProduct, "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.", leadReaders()...),
 		func(ctx context.Context, input *personInput) (*struct{}, error) {
-			at, h, err := handed(ctx, input.Product, input.Stream, input.Variant, input.Place)
+			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
 				return nil, err
 			}
-			name, err := analysis.LeadName(ctx, in.DB.DB, h)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "that lead could not be looked up", err)
-			}
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+				h, name, err := changing(ctx, tx, at, input.Place)
+				if err != nil {
+					return err
+				}
 				rights := access.NewStore(tx)
 				person, err := core.PersonNamed(ctx, a.Logger, rights, input.Identity)
 				if err != nil {

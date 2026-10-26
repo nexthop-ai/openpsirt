@@ -128,6 +128,9 @@ func leadV0110(t *columnTypes) []string {
 			-- Who moved it into the case and when. Null where it is kept.
 			"moved_by"         ` + t.refNull + `,
 			"moved_at"         ` + t.timestamp + `,
+			-- When its flaw was disclosed, kept or moved. Null while the
+			-- flaw is undisclosed.
+			"disclosed_at"     ` + t.timestamp + `,
 			CONSTRAINT "lead_handoff_place_unique" UNIQUE ("product_id", "place_identity"),
 			CONSTRAINT "lead_handoff_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "lead_handoff_flaw_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),

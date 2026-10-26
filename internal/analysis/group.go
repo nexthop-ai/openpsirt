@@ -69,6 +69,10 @@ type Kin struct {
 // KinOf is the leads on a lead's build that are the same flaw as it, or
 // possibly are, where the subject may read them: same first, then by line.
 func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Kin, error) {
+	// A grant of one lead, or of one case, reads no other lead.
+	if !subject.Sees(productID) {
+		return []Kin{}, nil
+	}
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
 		return nil, err

@@ -66,10 +66,10 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 	reach := finding.LeadReach(subject, productID)
 	either, eitherArgs := reach.Either()
 	var read struct {
-		Full int `bun:"full"`
+		Whole int `bun:"whole"`
 	}
 	err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`CASE WHEN `+reach.Full+` THEN 1 ELSE 0 END AS "full"`, reach.FullArgs...).
+		ColumnExpr(`CASE WHEN `+reach.Full+` THEN 1 ELSE 0 END AS "whole"`, reach.FullArgs...).
 		Where(`"f"."id" = ?`, lead.ID).
 		Where(either, eitherArgs...).
 		Scan(ctx, &read)
@@ -79,7 +79,7 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 	case err != nil:
 		return Evidence{}, fmt.Errorf("read whether lead %d may be read: %w", lead.ID, err)
 	}
-	stub := read.Full == 0
+	stub := read.Whole == 0
 	var said result
 	err = db.NewSelect().Model(&said).Where(`"ar"."finding_id" = ?`, lead.ID).Scan(ctx)
 	switch {

@@ -48,7 +48,7 @@ type LeadEvidenceBody struct {
 	NotSeen   string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
 	Compare   string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
 	Unchanged bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
-	State     LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, or answered by a claim somebody agreed to"`
+	State     LeadState          `json:"state" doc:"Where the lead stands: in the baseline, open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
 	Kin       []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
 	Decision  *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
 	Withheld  bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
@@ -149,7 +149,7 @@ func registerLeads(api huma.API, in core.Deps) {
 			body.Kin = append(body.Kin, one)
 		}
 		if evidence.Stub {
-			// The claims about a moved lead are part of the case.
+			// The claims about a moved lead are private with it.
 			return &struct{ Body LeadEvidenceBody }{Body: body}, nil
 		}
 		held, err := triage.NewStore(in.DB.DB).PreviouslyAt(ctx, subject, triage.Place{
@@ -204,16 +204,12 @@ func leadHandoff(ctx context.Context, in core.Deps, subject access.Subject, prod
 	if err != nil {
 		return nil, err
 	}
-	disclosed, err := finding.AnyUndisclosed(ctx, in.DB.DB, productID, h.VulnerabilityID)
-	if err != nil {
-		return nil, err
-	}
 	who, err := core.WhoSigned(ctx, in.DB.DB, []int64{h.HandedBy})
 	if err != nil {
 		return nil, err
 	}
 	return &LeadHandoffBody{
-		Flaw: names[h.VulnerabilityID], Moved: h.Moved(), Disclosed: !disclosed,
+		Flaw: names[h.VulnerabilityID], Moved: h.Moved(), Disclosed: h.Disclosed(),
 		HandedBy: who.Identity(h.HandedBy), HandedByName: who.Label(h.HandedBy),
 		HandedAt: core.Stamp(h.HandedAt),
 	}, nil

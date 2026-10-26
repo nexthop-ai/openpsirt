@@ -361,6 +361,20 @@ func (s Subject) CaseProducts() []int64 {
 	return products
 }
 
+// LeadProducts is every product this subject was granted a handed-off lead
+// in, kept apart from Products for the reason CaseProducts is.
+func (s Subject) LeadProducts() []int64 {
+	if s.Kind != Person {
+		return nil
+	}
+	products := make([]int64, 0, len(s.leads))
+	for id := range s.leads {
+		products = append(products, id)
+	}
+	sort.Slice(products, func(i, j int) bool { return products[i] < products[j] })
+	return products
+}
+
 // Party is this subject's own name in the assignable space: what work assigned
 // to them personally is assigned to. Zero for anything that is not a person.
 func (s Subject) Party() int64 { return s.party }

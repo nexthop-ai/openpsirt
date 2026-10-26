@@ -266,5 +266,90 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if first := offer.Suggestions[0]; first.From != "confirmed" || first.Component != "zlib" || len(first.Lacking) != 0 {
 			t.Errorf("the second lead under src was offered %+v first; want zlib, as src was confirmed", first)
 		}
+		// The build itself replaces what src was confirmed as.
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(other)+"/hand-off",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`); got.Code != http.StatusCreated {
+			t.Fatalf("the second hand-off answered %d: %s", got.Code, got.Body)
+		}
+		remembered, err := r.DB.DB.NewSelect().TableExpr(`"lead_component" AS "lco"`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if remembered != 0 {
+			t.Errorf("%d prefixes are remembered after the build itself was chosen; want src confirmed as nothing", remembered)
+		}
+	})
+}
+
+func TestADisclosedLeadSeenAgainKeepsItsSourceStripped(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		disclosed(t, r, flaw)
+		// The next run describes the lead again, with its snippet.
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(true))
+		if got := evidenceAs(t, r, "reader", place); got.At.Message != "p is leaked" || got.At.Snippet != "" {
+			t.Errorf("a reader of disclosed work read %q with snippet %q after the next run; want the lead without its source",
+				got.At.Message, got.At.Snippet)
+		}
+	})
+}
+
+func TestSomebodyGrantedOnlyALeadReadsItAndIsToldSo(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
+			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
+		}
+		// The outsider holds nothing on the product.
+		got := evidenceAs(t, r, "outsider", place)
+		if got.At.Message != "p is leaked" || got.Handoff == nil || got.Handoff.Flaw != flaw {
+			t.Errorf("somebody granted only the lead read %+v; want the lead and its flaw", got)
+		}
+		if told := r.Told(t, "outsider", "brought-in"); len(told) != 1 {
+			t.Errorf("somebody granted only the lead was told %q; want the one line granting it", told)
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
+			leadAt(place)+"/collaborators/outsider", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing the grant answered %d: %s", got.Code, got.Body)
+		}
+	})
+}
+
+func TestAKeptLeadStaysWhereItIsOnceItsFlawIsDisclosed(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
+			leadAt(place)+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("granting the lead answered %d: %s", got.Code, got.Body)
+		}
+		disclosed(t, r, flaw)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
+			leadAt(place)+"/move", ""), http.StatusConflict)
+		if got := evidenceAs(t, r, "internal-reader", place); got.Withheld || got.At.Message != "p is leaked" {
+			t.Errorf("an internal reader read %+v; want the kept lead, internal still", got)
+		}
+		if got := evidenceAs(t, r, "lead-handler", place); got.Handoff == nil || !got.Handoff.Disclosed || got.Handoff.Moved {
+			t.Errorf("the hand-off reads %+v; want it kept, and its flaw disclosed", got.Handoff)
+		}
+		// The grant ends with the disclosure.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
+			http.StatusNotFound)
+	})
+}
+
+func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, false)
+		var claim int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."claim_id"`).
+			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
+			t.Fatal(err)
+		}
+		at := fmt.Sprintf("/v1/claims/%d", claim)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at+"/reasoning",
+			`{"reasoning":"p leaks, and more besides"}`), http.StatusConflict)
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, at, ""),
+			http.StatusConflict)
 	})
 }

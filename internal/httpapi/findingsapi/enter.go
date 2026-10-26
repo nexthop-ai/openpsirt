@@ -66,6 +66,16 @@ type EnteredBody struct {
 	Places int `json:"places" doc:"The number of findings that opened. One per place the component sits in, in each build"`
 }
 
+// FlawFields is what a recorded flaw says of itself, wherever one is recorded.
+type FlawFields struct {
+	Summary  string          `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
+	Severity core.Recordable `json:"severity,omitempty" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
+	// The vector rather than a score. The number is derived from it here, so
+	// the two cannot say different things.
+	Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
+	Weaknesses []string `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"`
+}
+
 func registerEntry(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-finding", Method: http.MethodPost,
@@ -111,17 +121,12 @@ func registerEntry(api huma.API, in core.Deps) {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
-			Summary  string          `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
-			Severity core.Recordable `json:"severity,omitempty" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
-			// The vector rather than a score. The number is derived from it
-			// here, so the two cannot say different things.
-			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
-			Weaknesses []string `json:"weaknesses,omitempty" maxItems:"16" pattern:"^(\\s*[Cc][Ww][Ee]-[1-9][0-9]{0,5})?\\s*$" doc:"The kind of flaw, by the classification the world uses, such as CWE-125: CWE- and a number, at most 16 of them. The first is the root cause — a published advisory states one weakness, and this is what says which"`
-			Component  string   `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
-			Version    string   `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
-			Ecosystem  string   `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
-			Namespace  string   `json:"namespace,omitempty" doc:"The namespace, where two share a name, a version and an ecosystem"`
-			Disclosed  bool     `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
+			FlawFields
+			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
+			Version   string `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
+			Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
+			Namespace string `json:"namespace,omitempty" doc:"The namespace, where two share a name, a version and an ecosystem"`
+			Disclosed bool   `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
 			// ReportedBy is who told us, where somebody did. Every
 			// field is optional: a flaw found by whoever is typing
 			// has no reporter, and a form demanding one asks them

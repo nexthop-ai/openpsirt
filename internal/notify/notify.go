@@ -861,11 +861,21 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // that product's embargo list, which is the whole of what the grant is not.
 // Followed through a merge, so a row about the issue their case merged into is
 // still about their case.
+//
+// A lead grant is one place in one product, and reaches the line telling its
+// holder they were granted it, which is about that lead and names it.
 func onCases(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	for _, product := range subject.CaseProducts() {
 		for _, issue := range subject.Cases(product) {
 			q = q.WhereOr(`("product_id" = ? AND `+finding.FiledUnder(filed.Issue)+")", product, issue)
 		}
+	}
+	for _, product := range subject.LeadProducts() {
+		leads := make([]string, 0, len(subject.Leads(product)))
+		for _, place := range subject.Leads(product) {
+			leads = append(leads, ConcerningLead(product, place))
+		}
+		q = q.WhereOr(`("product_id" = ? AND "concerns" IN (?))`, product, bun.List(leads))
 	}
 	return q
 }
@@ -1026,4 +1036,10 @@ func (s *Store) AcknowledgeAll(ctx context.Context, subject access.Subject) (int
 // asked about another is the same piece of work.
 func Concerning(productID, vulnerabilityID, componentID int64) string {
 	return fmt.Sprintf("%d/%d/%d", productID, vulnerabilityID, componentID)
+}
+
+// ConcerningLead is what a line about one handed-off lead is about: the lead
+// grant reaching it is on the place, which no issue names.
+func ConcerningLead(productID int64, placeIdentity string) string {
+	return fmt.Sprintf("lead/%d/%s", productID, placeIdentity)
 }

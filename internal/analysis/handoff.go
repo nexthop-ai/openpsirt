@@ -24,11 +24,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // ErrHandedOff refuses a judgment about a lead handed off as a flaw, and a
 // second hand-off of it.
-var ErrHandedOff = refusal.New("that lead was handed off as a flaw, which is judged instead")
+var ErrHandedOff = triage.ErrLeadHandedOff
 
 // ErrNotConfirmed refuses a hand-off of a lead nobody confirmed.
 var ErrNotConfirmed = refusal.New("only a confirmed lead is handed off: confirm it first")
@@ -45,7 +46,7 @@ var (
 )
 
 // ErrFlawDisclosed refuses moving a lead in or out of a case that is
-// disclosed. Disclosure is one way.
+// disclosed, and a change to who is granted it. Disclosure is one way.
 var ErrFlawDisclosed = refusal.New("that lead's flaw is disclosed, so the lead stays where it is")
 
 // MostSuggestions bounds the components offered as resembling a lead's
@@ -157,9 +158,10 @@ type learned struct {
 	ConfirmedAt    time.Time `bun:"confirmed_at,notnull"`
 }
 
-// mayHandOff refuses somebody who may not record a flaw from a lead: it takes
-// triage of the internal lead and of the private flaw.
-func mayHandOff(subject access.Subject, productID int64) error {
+// MayHandOff refuses somebody who may not record a flaw from a lead, move it
+// or take it back out: it takes triage of the internal lead and of the private
+// flaw. Asked before any name a request carries is resolved.
+func MayHandOff(subject access.Subject, productID int64) error {
 	if !subject.Triages(access.Internal, productID) || !subject.Triages(access.Private, productID) {
 		return access.Denied(fmt.Sprintf("hand off a lead in product %d", productID))
 	}
@@ -215,7 +217,7 @@ func confirmedAt(ctx context.Context, db bun.IDB, productID, findingID int64) (b
 func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	placeIdentity string) (*Offer, error) {
 
-	if err := mayHandOff(subject, productID); err != nil {
+	if err := MayHandOff(subject, productID); err != nil {
 		return nil, err
 	}
 	l, err := newestLead(ctx, db, subject, productID, placeIdentity)
@@ -547,8 +549,6 @@ type Handing struct {
 	// a person confirmed and the component they chose.
 	Flaw finding.Entering
 	Move bool
-	// Named is what the trail calls the product and the lead.
-	Product string
 }
 
 // Recorded is a flaw recorded from a lead: the identifier it was filed under,
@@ -565,7 +565,7 @@ type Recorded struct {
 // component chosen is learned for the lead's prefix, and the lead moves into
 // the case where the person asked.
 func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing) (*Recorded, error) {
-	if err := mayHandOff(subject, in.ProductID); err != nil {
+	if err := MayHandOff(subject, in.ProductID); err != nil {
 		return nil, err
 	}
 	in.Flaw.Disclosed = false
@@ -599,15 +599,13 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			}
 			return fmt.Errorf("link the lead to its flaw: %w", err)
 		}
-		if name := strings.TrimSpace(in.Flaw.Component); name != "" {
-			modules, err := series.NewStore(tx).ModulesOf(ctx, l.LastRunID)
-			if err != nil {
-				return err
-			}
-			if err := learn(ctx, tx, in.ProductID, prefixOf(l.Path, modules), name,
-				strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
-				return err
-			}
+		modules, err := series.NewStore(tx).ModulesOf(ctx, l.LastRunID)
+		if err != nil {
+			return err
+		}
+		if err := learn(ctx, tx, in.ProductID, prefixOf(l.Path, modules), strings.TrimSpace(in.Flaw.Component),
+			strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
+			return err
 		}
 		if in.Move {
 			return moveIn(ctx, tx, subject, row, now)
@@ -656,7 +654,8 @@ func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, product
 }
 
 // learn records the component a path prefix was confirmed as, replacing what
-// it was confirmed as before.
+// it was confirmed as before. The build itself is an empty component, and
+// leaves the prefix confirmed as nothing.
 func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, ecosystem, namespace string,
 	by int64, now time.Time) error {
 
@@ -670,6 +669,9 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 		Exec(ctx); err != nil {
 		return fmt.Errorf("let go of what the prefix was confirmed as: %w", err)
 	}
+	if component == "" {
+		return nil
+	}
 	row := &learned{
 		ProductID: productID, Prefix: prefix, PrefixIdentity: ident,
 		Under: prefix + "/", UnderLength: len([]rune(prefix)) + 1,
@@ -677,6 +679,11 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 		ConfirmedBy: by, ConfirmedAt: now,
 	}
 	if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
+		// Two hand-offs under one new prefix at once: the second deleted
+		// nothing, and its retry replaces the first's.
+		if database.IsDuplicate(err) {
+			return database.ErrGoAgain
+		}
 		return fmt.Errorf("record what the prefix was confirmed as: %w", err)
 	}
 	return nil
@@ -686,7 +693,7 @@ func learn(ctx context.Context, tx bun.IDB, productID int64, prefix, component, 
 func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string,
 	now time.Time) error {
 
-	if err := mayHandOff(subject, productID); err != nil {
+	if err := MayHandOff(subject, productID); err != nil {
 		return err
 	}
 	return database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
@@ -694,11 +701,11 @@ func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int
 		if err != nil {
 			return err
 		}
-		switch h.Visibility {
-		case access.Private:
-			return ErrAlreadyMoved
-		case access.Public:
+		switch {
+		case h.Disclosed():
 			return ErrFlawDisclosed
+		case h.Moved():
+			return ErrAlreadyMoved
 		}
 		return moveIn(ctx, tx, subject, h, now.UTC().Truncate(time.Microsecond))
 	})
@@ -707,7 +714,7 @@ func Move(ctx context.Context, db bun.IDB, subject access.Subject, productID int
 // Unmove takes a moved lead back out of its flaw's case while the flaw is
 // undisclosed: it is internal again, and the claims about it with it.
 func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID int64, placeIdentity string) error {
-	if err := mayHandOff(subject, productID); err != nil {
+	if err := MayHandOff(subject, productID); err != nil {
 		return err
 	}
 	return database.Within(ctx, db, func(ctx context.Context, tx bun.IDB) error {
@@ -715,21 +722,20 @@ func Unmove(ctx context.Context, db bun.IDB, subject access.Subject, productID i
 		if err != nil {
 			return err
 		}
-		switch h.Visibility {
-		case access.Internal:
-			return ErrNotMoved
-		case access.Public:
+		switch {
+		case h.Disclosed():
 			return ErrFlawDisclosed
+		case !h.Moved():
+			return ErrNotMoved
 		}
 		if err := finding.SetLeadVisibility(ctx, tx, productID, []string{placeIdentity},
 			access.Private, access.Internal); err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().Model((*finding.Handoff)(nil)).
+		if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
 			Set(`"visibility" = ?`, access.Internal).
-			Set(`"moved_by" = NULL`).Set(`"moved_at" = NULL`).
-			Where(`"id" = ?`, h.ID).Exec(ctx); err != nil {
-			return fmt.Errorf("take the lead out of its case: %w", err)
+			Set(`"moved_by" = NULL`).Set(`"moved_at" = NULL`), h); err != nil {
+			return err
 		}
 		return recordMove(ctx, tx, subject, h, false)
 	})
@@ -744,14 +750,30 @@ func moveIn(ctx context.Context, tx bun.IDB, subject access.Subject, h *finding.
 		return err
 	}
 	by := subject.ID
-	if _, err := tx.NewUpdate().Model((*finding.Handoff)(nil)).
+	if err := updateAsRead(ctx, tx.NewUpdate().Model((*finding.Handoff)(nil)).
 		Set(`"visibility" = ?`, access.Private).
-		Set(`"moved_by" = ?`, by).Set(`"moved_at" = ?`, now).
-		Where(`"id" = ?`, h.ID).Exec(ctx); err != nil {
-		return fmt.Errorf("move the lead into its case: %w", err)
+		Set(`"moved_by" = ?`, by).Set(`"moved_at" = ?`, now), h); err != nil {
+		return err
 	}
 	h.Visibility, h.MovedBy, h.MovedAt = access.Private, &by, &now
 	return recordMove(ctx, tx, subject, h, true)
+}
+
+// updateAsRead runs an update of one hand-off matched on what the transaction
+// read of it: a move, an undo or a disclosure landing since is a lost race,
+// which the retry reads again.
+func updateAsRead(ctx context.Context, q *bun.UpdateQuery, h *finding.Handoff) error {
+	result, err := q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
+		Where(`"disclosed_at" IS NULL`).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("move the lead: %w", err)
+	}
+	if n, err := database.Affected(result); err != nil {
+		return fmt.Errorf("move the lead: %w", err)
+	} else if n != 1 {
+		return fmt.Errorf("move the lead: %w", database.ErrGoAgain)
+	}
+	return nil
 }
 
 // handedFor is the hand-off of a lead the subject reads in full, for a move or

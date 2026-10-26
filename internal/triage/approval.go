@@ -82,7 +82,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		return Revised{}, err
 	}
 
-	claim, rows, err := s.claimRows(ctx, subject, claimID, mayDecideOn)
+	claim, rows, err := s.writableRows(ctx, subject, claimID, mayDecideOn)
 	if err != nil {
 		return Revised{}, err
 	}
@@ -208,7 +208,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 	// with every agreement marked withdrawn — which is the state the whole
 	// approval record exists to make impossible.
 	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		_, rows, err := within.claimRows(ctx, subject, claimID, mayDecideOn)
+		_, rows, err := within.writableRows(ctx, subject, claimID, mayDecideOn)
 		if err != nil {
 			return err
 		}
