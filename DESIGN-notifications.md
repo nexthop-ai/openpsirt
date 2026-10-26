@@ -412,6 +412,7 @@ and still holds assigned work (REQ-45).
 | It asks rather than acts | Long leave and having left look identical from here, and nothing detects somebody leaving |
 | Never having signed in counts as absent, measured from when they were added | Otherwise an administrator adding a colleague and assigning them something raises an alert in the same breath |
 | Counted in pieces of work rather than findings | "6 items" meaning 288 findings would make an ordinary absence look like a catastrophe |
+| An open vulnerability report held is one piece; a judged one is none | A report is often told to its holder alone, so this alert is what prompts handing one back |
 
 ## Work arriving by rule
 
