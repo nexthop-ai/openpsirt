@@ -26,9 +26,10 @@ func TestWhoMayReachWhat(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		// A lead handed off as a flaw and kept internal, so its collaborators
 		// are a list to reach.
-		place, _ := httpapitest.HandedOffLead(t, r, false)
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
 		var (
 			lead      = "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+			flawLead  = "/v1/products/mine/issues/" + flaw + "/lead"
 			theirLead = "/v1/products/theirs/streams/master/variants/broadcom/leads/" + place
 		)
 		const (
@@ -295,6 +296,17 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"internal-triager", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
 			{"private-triage", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
 			{"internal-reader", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
+			{"internal-triager", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
+			{"private-triage", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
+			{"internal-reader", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
+			{"", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusUnauthorized},
+			// The lead a flaw was recorded from is read by whoever reads both
+			// the flaw and the lead in full, and answers as no lead elsewhere.
+			{"lead-handler", http.MethodGet, flawLead, http.StatusOK},
+			{"private-triage", http.MethodGet, flawLead, http.StatusNotFound},
+			{"internal-reader", http.MethodGet, flawLead, http.StatusNotFound},
+			{"outsider", http.MethodGet, flawLead, http.StatusNotFound},
+			{"", http.MethodGet, flawLead, http.StatusUnauthorized},
 			{"internal-triager", http.MethodPut, lead + "/move", http.StatusForbidden},
 			{"internal-triager", http.MethodDelete, lead + "/move", http.StatusForbidden},
 			// Who is granted a kept lead is managed by whoever reads it at

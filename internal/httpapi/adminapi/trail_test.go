@@ -454,6 +454,15 @@ var administrativeActs = []trailedAct{
 		kind:   "case", about: "mine · {flaw} · clang-tidy/leak · reader",
 	},
 	{
+		// The lead is internal again, so who reads it changes. With no grant
+		// left standing, the one row is the hand-off's own.
+		id: "undo-lead-handoff", what: "a lead's hand-off undone", who: "lead-handler",
+		method: http.MethodPost,
+		path:   "/v1/products/mine/streams/master/variants/broadcom/leads/{lead}/hand-off/withdrawal",
+		body:   `{"because":"handed off against the wrong component"}`,
+		kind:   "case", about: "mine · {flaw} · clang-tidy/leak",
+	},
+	{
 		// Deployment-wide and permanent: from here on a scan of any product
 		// reporting that name resolves to this issue.
 		id: "add-alias", what: "another name for an issue", who: "private-triage",

@@ -298,7 +298,7 @@ func TestTheLeadReadsRefuseEveryOtherKind(t *testing.T) {
 			// Not reproduced, so the closure would otherwise be taken.
 			r.PatchedRows(t, `UPDATE "sighting" SET "absent_run_id" = "last_run_id"`)
 			if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at+"/fixed",
-				`{"because":"the parser was rewritten"}`); got.Code != http.StatusNotFound {
+				`{"because":"the parser was rewritten","fixed_in":1}`); got.Code != http.StatusNotFound {
 				t.Errorf("closing a finding of kind %s as a fixed lead answered %d: %s", other, got.Code, got.Body)
 			}
 			if got := queued(); got != 0 {

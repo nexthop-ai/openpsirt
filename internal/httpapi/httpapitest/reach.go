@@ -63,8 +63,11 @@ func DeclaredBody(method, path, name string) io.Reader {
 	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/decision") {
 		return strings.NewReader(`{"outcome": "confirmed", "reasoning": "` + name + `"}`)
 	}
-	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/fixed") {
+	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/hand-off/withdrawal") {
 		return strings.NewReader(`{"because": "` + name + `"}`)
+	}
+	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/fixed") {
+		return strings.NewReader(`{"because": "` + name + `", "fixed_in": 1}`)
 	}
 	if strings.HasSuffix(path, "/reports") {
 		return strings.NewReader(`{"summary": "` + name + `"}`)
