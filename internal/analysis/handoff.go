@@ -95,22 +95,37 @@ type Suggestion struct {
 	Unanalyzed []BuildName
 }
 
-// Authored is how much one person wrote about a lead.
+// Note is one piece of writing on a claim about a lead: a revision of its
+// reasoning or a comment.
+type Note struct {
+	ClaimID   int64
+	Comment   bool
+	Body      string
+	WrittenAt time.Time
+}
+
+// Authored is what one person wrote about a lead, oldest first.
 type Authored struct {
-	PersonID int64 `bun:"person_id"`
-	Writings int   `bun:"writings"`
+	PersonID int64
+	Notes    []Note
+}
+
+// Said is one message the analyzer wrote at a path.
+type Said struct {
+	Path    string
+	Message string
 }
 
 // Disclosure is what moving a lead into its flaw's case discloses with the
 // flaw (REQ-40).
 type Disclosure struct {
 	// Authors is everybody who wrote reasoning or a comment on a claim about
-	// the lead, with how many pieces each wrote.
+	// the lead or the leads linked with it, with what each wrote.
 	Authors []Authored
-	// Paths is every path the lead names, and Messages how many messages
-	// the analyzer wrote at them.
-	Paths    []string
-	Messages int
+	// Paths is every path the lead names, and Said every message the
+	// analyzer wrote at them.
+	Paths []string
+	Said  []Said
 	// Snippets is how many snippets the product discloses with the flaw,
 	// and Stripped how many it strips at disclosure.
 	Snippets int
@@ -326,7 +341,7 @@ func Propose(ctx context.Context, db bun.IDB, subject access.Subject, productID 
 		return nil, err
 	}
 	out.Together = len(together) - 1
-	if out.Discloses, err = disclosing(ctx, db, productID, together); err != nil {
+	if out.Discloses, err = disclosing(ctx, db, subject, productID, together); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -574,23 +589,49 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 }
 
 // disclosing is what disclosing the leads at these places in a product with
-// their flaw discloses.
-func disclosing(ctx context.Context, db bun.IDB, productID int64, places []string) (Disclosure, error) {
+// their flaw discloses. The writing on claims is read at the visibilities the
+// subject reads in the product.
+func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
+	places []string) (Disclosure, error) {
+
 	var out Disclosure
-	claims := `SELECT "dc"."claim_id" FROM "decision" AS "dc"
-		JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"
-		WHERE "dc"."product_id" = ? AND "dc"."place_identity" IN (?) AND "rv"."kind" = ?`
-	if err := db.NewSelect().
-		TableExpr(`(SELECT "cr"."written_by" AS "person_id" FROM "claim_revision" AS "cr"
-			WHERE "cr"."claim_id" IN (`+claims+`)
-			UNION ALL SELECT "cm"."written_by" AS "person_id" FROM "claim_comment" AS "cm"
-			WHERE "cm"."claim_id" IN (`+claims+`)) AS "w"`,
-			productID, bun.List(places), string(kind.Rule), productID, bun.List(places), string(kind.Rule)).
-		ColumnExpr(`"w"."person_id", COUNT(*) AS "writings"`).
-		GroupExpr(`"w"."person_id"`).
-		OrderExpr(`"w"."person_id" ASC`).
-		Scan(ctx, &out.Authors); err != nil {
-		return out, fmt.Errorf("read who wrote about the lead: %w", err)
+	visible := []access.Visibility{}
+	if subject.Sees(productID) {
+		visible = access.Visible(subject, productID)
+	}
+	if len(visible) > 0 {
+		claims := `SELECT "dc"."claim_id" FROM "decision" AS "dc"
+			JOIN "vulnerability" AS "rv" ON "rv"."id" = "dc"."vulnerability_id"
+			WHERE "dc"."product_id" = ? AND "dc"."place_identity" IN (?) AND "rv"."kind" = ?
+			  AND "dc"."visibility" IN (?)`
+		claimArgs := []any{productID, bun.List(places), string(kind.Rule), bun.List(visible)}
+		var notes []struct {
+			PersonID  int64     `bun:"person_id"`
+			ClaimID   int64     `bun:"claim_id"`
+			Comment   int       `bun:"comment"`
+			Body      string    `bun:"body"`
+			WrittenAt time.Time `bun:"written_at"`
+		}
+		if err := db.NewSelect().
+			TableExpr(`(SELECT "cr"."written_by" AS "person_id", "cr"."claim_id", 0 AS "comment", "cr"."body",
+					"cr"."written_at" FROM "claim_revision" AS "cr"
+				WHERE "cr"."claim_id" IN (`+claims+`)
+				UNION ALL SELECT "cm"."written_by" AS "person_id", "cm"."claim_id", 1 AS "comment", "cm"."body",
+					"cm"."written_at" FROM "claim_comment" AS "cm"
+				WHERE "cm"."claim_id" IN (`+claims+`)) AS "w"`, append(claimArgs, claimArgs...)...).
+			ColumnExpr(`"w"."person_id", "w"."claim_id", "w"."comment", "w"."body", "w"."written_at"`).
+			OrderExpr(`"w"."person_id" ASC, "w"."written_at" ASC, "w"."claim_id" ASC, "w"."comment" ASC`).
+			Scan(ctx, &notes); err != nil {
+			return out, fmt.Errorf("read what was written about the lead: %w", err)
+		}
+		for _, n := range notes {
+			if len(out.Authors) == 0 || out.Authors[len(out.Authors)-1].PersonID != n.PersonID {
+				out.Authors = append(out.Authors, Authored{PersonID: n.PersonID})
+			}
+			last := &out.Authors[len(out.Authors)-1]
+			last.Notes = append(last.Notes, Note{ClaimID: n.ClaimID, Comment: n.Comment == 1, Body: n.Body,
+				WrittenAt: n.WrittenAt})
+		}
 	}
 
 	config, err := sourcelink.NewStore(db).Config(ctx, productID)
@@ -624,13 +665,15 @@ func disclosing(ctx context.Context, db bun.IDB, productID int64, places []strin
 		said = append(said, some...)
 	}
 	paths := map[string]bool{}
+	written := map[Said]bool{}
 	for _, s := range said {
 		if s.Path != "" && !paths[s.Path] {
 			paths[s.Path] = true
 			out.Paths = append(out.Paths, s.Path)
 		}
-		if s.Message != "" {
-			out.Messages++
+		if one := (Said{Path: s.Path, Message: s.Message}); s.Message != "" && !written[one] {
+			written[one] = true
+			out.Said = append(out.Said, one)
 		}
 		if s.Snippet != nil {
 			if s.Path != "" && config.DisclosesSnippets(s.Path) {
@@ -641,6 +684,12 @@ func disclosing(ctx context.Context, db bun.IDB, productID int64, places []strin
 		}
 	}
 	sort.Strings(out.Paths)
+	sort.Slice(out.Said, func(i, j int) bool {
+		if out.Said[i].Path != out.Said[j].Path {
+			return out.Said[i].Path < out.Said[j].Path
+		}
+		return out.Said[i].Message < out.Said[j].Message
+	})
 	return out, nil
 }
 

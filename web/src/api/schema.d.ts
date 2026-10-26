@@ -4823,7 +4823,7 @@ export interface paths {
          *
          *     A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         get: operations["list-lead-collaborators"];
         put?: never;
@@ -4850,7 +4850,7 @@ export interface paths {
          *
          *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         put: operations["add-lead-collaborator"];
         post?: never;
@@ -4860,7 +4860,7 @@ export interface paths {
          *
          *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
          *
-         *     Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
          */
         delete: operations["remove-lead-collaborator"];
         options?: never;
@@ -4943,7 +4943,7 @@ export interface paths {
          *
          *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
          *
-         *     `move` makes the linked leads part of the flaw's case: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
+         *     `move` makes the linked leads part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
          *
          *     A lead nobody confirmed, or one already handed off, is refused with 409.
          *
@@ -4990,7 +4990,7 @@ export interface paths {
         get?: never;
         /**
          * Move a handed-off lead into its flaw's case
-         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
          *
          *     Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
          *
@@ -5000,7 +5000,7 @@ export interface paths {
         post?: never;
         /**
          * Take a lead back out of its flaw's case
-         * @description Makes a moved lead internal again while its flaw is undisclosed, with the claims about it and every lead linked to the same flaw. They stay linked to the flaw.
+         * @description Takes a moved lead out of its flaw's case while the flaw is undisclosed, with every lead linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
          *
          *     Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
          *
@@ -7228,6 +7228,10 @@ export interface components {
             /** @description The series the run belongs to */
             series: string;
         };
+        AnalyzerSaidBody: {
+            message: string;
+            path?: string;
+        };
         AnywhereOutputBody: {
             /**
              * Format: uri
@@ -7446,11 +7450,8 @@ export interface components {
             identity: string;
             /** @description Their display name, where it differs from their identity */
             name?: string;
-            /**
-             * Format: int64
-             * @description The number of revisions of reasoning and comments they wrote on claims about the lead
-             */
-            writings: number;
+            /** @description The revisions of reasoning and the comments they wrote on claims about the lead, oldest first */
+            notes: components["schemas"]["NoteBody"][] | null;
         };
         BecameBody: {
             /** @description The person who did it, where a person did, by sign-in identity */
@@ -8617,18 +8618,15 @@ export interface components {
             reason: string;
         };
         DisclosesBody: {
-            /** @description Everybody who wrote reasoning or a comment on a claim about the lead */
+            /** @description Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims */
             authors: components["schemas"]["AuthorBody"][] | null;
-            /**
-             * Format: int64
-             * @description The number of messages the analyzer wrote at those paths
-             */
-            messages: number;
             /** @description Every path the lead names */
             paths: string[] | null;
+            /** @description Every message the analyzer wrote at those paths */
+            said: components["schemas"]["AnalyzerSaidBody"][] | null;
             /**
              * Format: int64
-             * @description The number of source snippets disclosed with the flaw
+             * @description The number of source snippets disclosed with the flaw. Zero where none is
              */
             snippets: number;
             /**
@@ -11298,6 +11296,19 @@ export interface components {
             readonly $schema?: string;
             /** @description The text, in markdown */
             body: string;
+        };
+        NoteBody: {
+            /** @description What was written, in markdown */
+            body: string;
+            /**
+             * Format: int64
+             * @description The claim it was written on
+             */
+            claim: number;
+            /** @description Whether it is a comment. Otherwise it is a revision of the claim's reasoning */
+            comment?: boolean;
+            /** Format: date-time */
+            written: string;
         };
         NoteWritten: {
             /**

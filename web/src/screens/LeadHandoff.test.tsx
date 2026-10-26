@@ -44,9 +44,23 @@ const OFFER = {
     { from: "build", lacking: [], unanalyzed: [] },
   ],
   discloses: {
-    authors: [{ identity: "ana", name: "Ana", writings: 2 }],
+    authors: [
+      {
+        identity: "ana",
+        name: "Ana",
+        notes: [
+          { claim: 7, body: "p leaks on the early return", written: "2026-10-01T00:00:00Z" },
+          {
+            claim: 7,
+            comment: true,
+            body: "seen on mellanox too",
+            written: "2026-10-01T01:00:00Z",
+          },
+        ],
+      },
+    ],
     paths: ["src/zlib/a.c"],
-    messages: 1,
+    said: [{ path: "src/zlib/a.c", message: "p is leaked" }],
     snippets: 0,
     stripped: 1,
   },
@@ -152,8 +166,14 @@ describe("handing off a lead", () => {
     await drawn(CONFIRMED);
     expect(text()).not.toContain("Disclosed with the flaw");
     pick(mount.host(), "Move into the case");
-    expect(text()).toContain("What Ana wrote about it");
-    expect(text()).toContain("1 source snippets are removed at disclosure");
+    expect(text()).toContain("Disclosed with the flaw");
+    expect(text()).toContain("readable by everyone signed in with public access to this product");
+    expect(text()).toContain("Not included in published VEX or CSAF");
+    expect(text()).toContain("Ana");
+    expect(text()).toContain("p leaks on the early return");
+    expect(text()).toContain("seen on mellanox too");
+    expect(text()).toContain("p is leaked");
+    expect(text()).toContain("Source snippets: not published · 1 removed at disclosure");
   });
 
   it("records the flaw against the build itself on every build it was seen in", async () => {
@@ -197,7 +217,7 @@ describe("a handed-off lead", () => {
     expect(text()).not.toContain("Decision");
     expect(text()).toContain("Grants reading this lead only.");
     // What the move discloses is said before it is made.
-    expect(text()).toContain("What Ana wrote about it");
+    expect(text()).toContain("p leaks on the early return");
     await press(mount.host(), "Move into the case");
     await settle();
     expect(sent()[0]?.[0]).toBe(`${LEAD}/move`);

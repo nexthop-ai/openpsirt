@@ -735,6 +735,16 @@ components:
         - series
         - built_at
       type: object
+    AnalyzerSaidBody:
+      additionalProperties: false
+      properties:
+        message:
+          type: string
+        path:
+          type: string
+      required:
+        - message
+      type: object
     AnywhereOutputBody:
       additionalProperties: false
       properties:
@@ -1085,13 +1095,16 @@ components:
         name:
           description: Their display name, where it differs from their identity
           type: string
-        writings:
-          description: The number of revisions of reasoning and comments they wrote on claims about the lead
-          format: int64
-          type: integer
+        notes:
+          description: The revisions of reasoning and the comments they wrote on claims about the lead, oldest first
+          items:
+            $ref: "#/components/schemas/NoteBody"
+          type:
+            - array
+            - "null"
       required:
         - identity
-        - writings
+        - notes
       type: object
     BecameBody:
       additionalProperties: false
@@ -3099,16 +3112,12 @@ components:
       additionalProperties: false
       properties:
         authors:
-          description: Everybody who wrote reasoning or a comment on a claim about the lead
+          description: Everybody who wrote reasoning or a comment on a claim about the lead or the leads linked with it, with what each wrote, as you read the claims
           items:
             $ref: "#/components/schemas/AuthorBody"
           type:
             - array
             - "null"
-        messages:
-          description: The number of messages the analyzer wrote at those paths
-          format: int64
-          type: integer
         paths:
           description: Every path the lead names
           items:
@@ -3116,8 +3125,15 @@ components:
           type:
             - array
             - "null"
+        said:
+          description: Every message the analyzer wrote at those paths
+          items:
+            $ref: "#/components/schemas/AnalyzerSaidBody"
+          type:
+            - array
+            - "null"
         snippets:
-          description: The number of source snippets disclosed with the flaw
+          description: The number of source snippets disclosed with the flaw. Zero where none is
           format: int64
           type: integer
         stripped:
@@ -3127,7 +3143,7 @@ components:
       required:
         - authors
         - paths
-        - messages
+        - said
         - snippets
         - stripped
       type: object
@@ -7984,6 +8000,27 @@ components:
           type: string
       required:
         - body
+      type: object
+    NoteBody:
+      additionalProperties: false
+      properties:
+        body:
+          description: What was written, in markdown
+          type: string
+        claim:
+          description: The claim it was written on
+          format: int64
+          type: integer
+        comment:
+          description: Whether it is a comment. Otherwise it is a revision of the claim's reasoning
+          type: boolean
+        written:
+          format: date-time
+          type: string
+      required:
+        - claim
+        - body
+        - written
       type: object
     NoteWritten:
       additionalProperties: false
@@ -27988,7 +28025,7 @@ paths:
 
         A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: list-lead-collaborators
       parameters:
         - in: path
@@ -28034,9 +28071,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}:
     delete:
       description: |-
@@ -28044,7 +28079,7 @@ paths:
 
         Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: remove-lead-collaborator
       parameters:
         - in: path
@@ -28091,9 +28126,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
     put:
       description: |-
         Grants one person this one handed-off lead in this product, to read its evidence, without granting them anything else of the product.
@@ -28102,7 +28135,7 @@ paths:
 
         Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
 
-        Requires: internal-read or internal-triage or private-read or private-triage on the product. Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one.
+        Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
       operationId: add-lead-collaborator
       parameters:
         - in: path
@@ -28149,9 +28182,7 @@ paths:
         any_of:
           - internal-read
           - internal-triage
-          - private-read
-          - private-triage
-        note: "Where you read the lead at the visibility it holds while its flaw is undisclosed: internal work for a kept lead, undisclosed work for a moved one."
+        note: Where you read internal work in the product, kept lead or moved.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision:
     post:
       description: |-
@@ -28332,7 +28363,7 @@ paths:
 
         `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
 
-        `move` makes the linked leads part of the flaw's case: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
+        `move` makes the linked leads part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
 
         A lead nobody confirmed, or one already handed off, is refused with 409.
 
@@ -28448,7 +28479,7 @@ paths:
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move:
     delete:
       description: |-
-        Makes a moved lead internal again while its flaw is undisclosed, with the claims about it and every lead linked to the same flaw. They stay linked to the flaw.
+        Takes a moved lead out of its flaw's case while the flaw is undisclosed, with every lead linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
 
         Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
 
@@ -28497,7 +28528,7 @@ paths:
         note: Both internal-triage and private-triage on the product.
     put:
       description: |-
-        Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: they become private, internal readers keep only their state, rule, location and sightings, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
+        Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
 
         Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -307,9 +308,13 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if offer.Prefix != "src" || len(offer.Seen) != 1 || last.From != "build" || last.Component != "" {
 			t.Fatalf("offered %+v; want the build last, for the prefix src", offer)
 		}
-		if len(offer.Discloses.Authors) != 1 || offer.Discloses.Authors[0].Identity != "internal-triager" ||
-			offer.Discloses.Messages == 0 || offer.Discloses.Stripped != 1 {
-			t.Errorf("a move discloses %+v; want the one author, the messages and the stripped snippet", offer.Discloses)
+		if d := offer.Discloses; len(d.Authors) != 1 || d.Authors[0].Identity != "internal-triager" ||
+			len(d.Authors[0].Notes) != 1 || d.Authors[0].Notes[0].Body != "p leaks on the early return" ||
+			d.Stripped != 1 || d.Snippets != 0 {
+			t.Errorf("a move discloses %+v; want the one author's reasoning and the stripped snippet", d)
+		}
+		if said := offer.Discloses.Said; !slices.Contains(said, findingsapi.AnalyzerSaidBody{Path: "src/a.c", Message: "p is leaked"}) {
+			t.Errorf("a move discloses the messages %+v; want the analyzer's message at src/a.c", said)
 		}
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {

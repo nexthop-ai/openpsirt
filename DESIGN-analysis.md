@@ -726,7 +726,7 @@ hand-off is offered, and `POST` on the same address records it.
 | Prefix | The innermost repository the run names or third-party path it declared holding the file, or else the file's directory |
 | Third-party | Whether the file is under a path the run declared third-party, so the flaw is reported to the upstream (§ Third-party code) |
 | Together | How many other leads the hand-off links to the flaw with this one, and a move moves with it |
-| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw (§ Keep or move) |
+| Disclosure | What moving the lead and the leads linked with it into the case discloses with the flaw: every note on a claim about them, by author, the paths and messages the analyzer wrote, and whether snippets are published (§ Keep or move) |
 
 | Rule | |
 |---|---|
@@ -760,7 +760,10 @@ takes a moved one back out.
 
 | Rule | |
 |---|---|
-| A move discloses, with the flaw, everybody who wrote reasoning or a comment on a claim about the lead, every path it names and every message the analyzer wrote there, and the offer says so before the move | People writing in the record have to know that from the first word (REQ-40) |
+| A move discloses, with the flaw, every revision of reasoning and every comment on a claim about the lead or the leads linked with it, every path they name and every message the analyzer wrote there | People writing in the record have to know that from the first word (REQ-40) |
+| The offer shows that writing before the move, grouped by author, with the paths and messages, and says whether snippets are published and how many are stripped | What goes public is read, not counted |
+| The writing in the offer is read at the visibilities the caller reads in the product | A hand-off takes both triage roles, and the read is narrowed in the data layer all the same (REQ-42) |
+| Disclosed means readable in the portal by everybody signed in with public access to the product | A lead is never in a published VEX or CSAF document, and the anonymous subject reads no lead |
 | At disclosure a moved lead's kept source is stripped, except under a path whose setting discloses it (§ Snippets), and a later run describing the disclosed lead again is stripped the same way | A product's source is not published because one flaw in it was, and a run writes what the analyzer sent |
 | Disclosure records the time on the hand-off of every lead handed off as the flaw, kept or moved | A kept lead stays internal, so its visibility does not say its flaw is public |
 | A move or its undo is refused with 409 once the flaw is disclosed, kept lead or moved | Disclosure is one way |
