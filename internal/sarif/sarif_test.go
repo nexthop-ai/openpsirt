@@ -734,3 +734,29 @@ func TestACodeQLRunThatExtractedNothingItExpectedIsAFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestARelativeAddressIsRelativeToWhereTheToolRan(t *testing.T) {
+	results := `,"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"lib/a.c"}}}]},
+		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"b.c","uriBaseId":"%SRCROOT%"}}}]}]`
+	for _, c := range []struct {
+		name, invocations, first string
+	}{
+		{"run in a directory of the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///home/builder/sonic/src"}}]`, "src/lib/a.c"},
+		{"run in a directory named relative to the root",
+			`,"invocations":[{"workingDirectory":{"uri":"src","uriBaseId":"SRCROOT"}}]`, "src/lib/a.c"},
+		{"run at the top of the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///home/builder/sonic/"}}]`, "lib/a.c"},
+		{"run outside the checkout",
+			`,"invocations":[{"workingDirectory":{"uri":"file:///tmp/build"}}]`, "lib/a.c"},
+		{"stating no working directory", ``, "lib/a.c"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			log := read(t, run(results+c.invocations))
+			placed, _ := Prepare(&log.Runs[0], "/home/builder/sonic")
+			if len(placed) != 2 || placed[0].Path != c.first || placed[1].Path != "b.c" {
+				t.Errorf("placed %+v; want %s, then b.c under the root's own name", placed, c.first)
+			}
+		})
+	}
+}

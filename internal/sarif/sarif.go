@@ -146,6 +146,9 @@ type Invocation struct {
 	// Errors counts the notifications the tool raised at error level about
 	// its own run.
 	Errors int
+	// WorkingDirectory is where the tool was run, which an address with no
+	// starting point is relative to.
+	WorkingDirectory ArtifactLocation
 	// Expected and Extracted count the files a tool's coverage notifications
 	// name: the files its baseline expected to analyze, and the files it
 	// analyzed. CodeQL writes both, and states its run successful with every

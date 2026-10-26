@@ -946,6 +946,10 @@ func (rd *reader) invocation() (Invocation, error) {
 			v, err := rd.b.Bool()
 			inv.Successful = v
 			return err
+		case "workingDirectory":
+			a, err := rd.artifactLocation()
+			inv.WorkingDirectory = a
+			return err
 		case "toolExecutionNotifications", "toolConfigurationNotifications":
 			return rd.b.Array(func() error {
 				lvl, id := "", ""

@@ -109,6 +109,7 @@ placing them added 103 MB beside that, an encoding of 98 MB.
 | A result covered by a suppression in force is dropped and counted as `suppressed` | A suppression stating no status, or `accepted`, is the tool honoring a person's decision in the source; one `underReview` or `rejected` is not in force |
 | A result whose `baselineState` is `absent` is dropped and counted as `absent` | The tool says it is no longer found, and opening it would leave a lead no later run could find again |
 | A path is resolved through its named starting points and placed against the source root | Paths arrive absolute, as `file://` addresses, relative to the working directory, and under a starting point left undefined |
+| A path naming no starting point is relative to the working directory the run's first invocation states where that is in the checkout, and to the top of the checkout otherwise; a path under the source root's own name left undefined is relative to the top | cppcheck run from a subdirectory writes its paths relative to that directory |
 | A path outside the checkout is dropped with its result, and counted | A build host's home directory never lands |
 | A result repeating another of the same upload on rule, path, line, column and message is dropped and counted | clang repeats a header's result once per translation unit that includes it |
 | Whole-file contents, fixes and markdown messages are left out of everything a run records, and counted on the receipt | No whole file or replacement text is stored, and a message is its text |
