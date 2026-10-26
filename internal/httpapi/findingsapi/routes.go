@@ -58,6 +58,7 @@ func Register(api huma.API, in core.Deps) {
 	})
 	// A confirmed lead recorded as a flaw, and the people granted it.
 	registerHandoff(api, in)
+	registerFlawLead(api, in)
 	registerLeadCollaborators(api, in, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
 	})

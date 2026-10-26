@@ -207,3 +207,21 @@ func HandedOffLeadHeldBy(t *testing.T, r *Reach, move bool, holder string) (stri
 	}
 	return place, done.Identifier
 }
+
+// FixedBody is the body of a statement that the lead at an address was
+// fixed for the reason given, naming as the build that fixed it the first run
+// that did not see it. A lead every run since has seen names a run that
+// cannot be one, so the refusal answered is the one for a lead still seen.
+func FixedBody(t *testing.T, r *Reach, lead, because string) string {
+	t.Helper()
+	var evidence struct {
+		NotSeenRun int64 `json:"not_seen_run"`
+	}
+	Read(t, r, "lead-handler", lead, &evidence)
+	run := max(evidence.NotSeenRun, 1)
+	written, err := json.Marshal(map[string]any{"because": because, "fixed_in": run})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(written)
+}

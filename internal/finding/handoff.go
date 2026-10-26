@@ -64,6 +64,29 @@ func (h Handoff) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
 		Where(`"disclosed_at" IS NULL`))
 }
 
+// Unlink deletes the hand-off as it was read: its visibility, its flaw
+// undisclosed, and the last run to describe it. A move, a disclosure or a run
+// landing since is a lost race, answered with database.ErrGoAgain.
+func (h Handoff) Unlink(ctx context.Context, db bun.IDB) error {
+	q := db.NewDelete().Model((*Handoff)(nil)).
+		Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).Where(`"disclosed_at" IS NULL`)
+	if h.LastRunID == nil {
+		q = q.Where(`"last_run_id" IS NULL`)
+	} else {
+		q = q.Where(`"last_run_id" = ?`, *h.LastRunID)
+	}
+	result, err := q.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("undo the hand-off: %w", err)
+	}
+	if n, err := database.Affected(result); err != nil {
+		return fmt.Errorf("undo the hand-off: %w", err)
+	} else if n != 1 {
+		return fmt.Errorf("undo the hand-off: %w", database.ErrGoAgain)
+	}
+	return nil
+}
+
 // Describing writes a run onto the hand-offs of the leads it is about to
 // describe in one product: those at the places given, and those of the
 // findings given. Written before the run reads a hand-off or writes a lead's

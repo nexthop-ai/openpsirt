@@ -164,12 +164,14 @@ func TestALeadStandsWhereTheClaimAgreedToPutsIt(t *testing.T) {
 func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := httpapitest.SeededLead(t, r)
-		at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place + "/fixed"
-		body := `{"because":"the bounds check landed"}`
+		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		at := lead + "/fixed"
+		body := httpapitest.FixedBody(t, r, lead, "the bounds check landed")
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, body),
 			http.StatusConflict)
 
 		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(false))
+		body = httpapitest.FixedBody(t, r, lead, "the bounds check landed")
 		if got := leadState(t, r, place); got != "not-reproduced" {
 			t.Fatalf("a lead the newest run did not see is %q; want not-reproduced", got)
 		}
@@ -196,11 +198,47 @@ func TestALeadIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 
 		// Fixed a second time on the one build, it is listed on one build.
 		httpapitest.ApplyRun(t, r, time.Now().UTC(), httpapitest.LeadRun(false))
+		body = httpapitest.FixedBody(t, r, lead, "the bounds check landed")
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, at, body); got.Code != http.StatusOK {
 			t.Fatalf("closing the lead again answered %d: %s", got.Code, got.Body)
 		}
 		if got := leadsOf(t, r, "internal-reader", "?state=fixed"); len(got.Items) != 1 || got.Items[0].Builds != 1 {
 			t.Errorf("the fixed leads are %+v; want the one lead on its one build", got)
+		}
+	})
+}
+
+func TestAFixedLeadNamesARunOfItsBuildThatDidNotSeeIt(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		lead := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		var saw int64
+		if err := r.DB.DB.NewSelect().TableExpr(`"series_run" AS "sr"`).ColumnExpr(`MIN("sr"."id")`).
+			Scan(t.Context(), &saw); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.LeadRun(false))
+		// The run that saw it is not the build that fixed it.
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, lead+"/fixed",
+			fmt.Sprintf(`{"because":"the bounds check landed","fixed_in":%d}`, saw)), http.StatusUnprocessableEntity)
+		var evidence struct {
+			NotSeenRun int64 `json:"not_seen_run"`
+			FixedIn    *struct {
+				Run int64 `json:"run"`
+			} `json:"fixed_in"`
+		}
+		httpapitest.Read(t, r, "internal-reader", lead, &evidence)
+		if evidence.NotSeenRun == 0 || evidence.FixedIn != nil {
+			t.Fatalf("a lead not reproduced reads %+v; want the run that did not see it, and no fix", evidence)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, lead+"/fixed",
+			fmt.Sprintf(`{"because":"the bounds check landed","fixed_in":%d}`, evidence.NotSeenRun)); got.Code != http.StatusOK {
+			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
+		}
+		httpapitest.Read(t, r, "internal-reader", lead, &evidence)
+		if evidence.FixedIn == nil || evidence.FixedIn.Run != evidence.NotSeenRun {
+			t.Errorf("a lead closed as fixed names %+v as the build that fixed it; want run %d",
+				evidence.FixedIn, evidence.NotSeenRun)
 		}
 	})
 }

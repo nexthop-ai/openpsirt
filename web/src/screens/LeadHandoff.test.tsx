@@ -208,9 +208,23 @@ describe("a handed-off lead", () => {
     expect(text()).toContain("Moves with 2 other leads linked to this flaw.");
   });
 
+  it("undoes the hand-off with a reason", async () => {
+    await drawn(HANDED);
+    const sent = accept(() => ({ status: 204 }));
+    await press(mount.host(), "Undo hand-off…");
+    change(mount.host().querySelector("textarea"), "handed off against the wrong component");
+    await press(mount.host(), "Undo hand-off");
+    await settle();
+    expect(sent()[0]?.[0]).toBe(`${LEAD}/hand-off/withdrawal`);
+    expect(sent()[0]?.[1]).toMatchObject({
+      body: { because: "handed off against the wrong component" },
+    });
+  });
+
   it("offers no move once its flaw is disclosed", async () => {
     await drawn({ ...HANDED, handoff: { ...HANDED.handoff, moved: true, disclosed: true } });
     expect(text()).not.toContain("Take out of the case");
+    expect(text()).not.toContain("Undo hand-off");
     expect(text()).not.toContain("Collaborators");
   });
 

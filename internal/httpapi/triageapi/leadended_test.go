@@ -96,7 +96,8 @@ func TestALeadPastItsEndOfLifeRefusesEveryChangeButAnAgreementAndAMove(t *testin
 		endMaster(t, r)
 
 		refusedAsEnded(t, "a fixed closure", httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			leadsAtMaster+overflow+"/fixed", `{"because":"the bounds check landed"}`))
+			leadsAtMaster+overflow+"/fixed",
+			httpapitest.FixedBody(t, r, leadsAtMaster+overflow, "the bounds check landed")))
 		refusedAsEnded(t, "a hand-off", httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost,
 			leadsAtMaster+overflow+"/hand-off",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows","move":false}`))

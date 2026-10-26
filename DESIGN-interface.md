@@ -1449,7 +1449,7 @@ the screens draw them.
 | The decision card names the claim standing at the lead, or offers the form | A lead under a claim takes no second one, so the form is not offered beside it. The claim opens on the claim page, which is where it is agreed to |
 | The claim page offers Agree on a claim about a lead to somebody holding `approver` and `internal-read`, and never to its proposer | A claim says it is internal, and the screen asks the reader's reach there, as the server does |
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
-| A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it |
+| A lead not reproduced offers to close it as fixed | Where the reader triages internal material. Closing takes what fixed it, and names the build of the first run that did not see it. A fixed lead names the build it was fixed in |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
 | A lead's result card names who holds it, and offers the holder picker to somebody who triages it | The picker a finding's page draws. It searches readers of internal work for a kept lead and readers of undisclosed work for a moved one, and is not offered past end of life. Choosing applies to every build the lead is open on |
 | The queue's rows name who holds each lead | A team carries the word team beside its name |
@@ -1463,6 +1463,8 @@ the screens draw them.
 | A build holding the component picked that nothing analyzes is listed unticked beside the builds the lead was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
 | Keeping or moving the lead is a choice of two cards, and moving lists what goes public with the flaw before it is sent | The people whose writing is disclosed are named, as are the paths, and the snippets removed at disclosure are counted |
 | A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
+| Undoing a hand-off is offered beside the move while the flaw is undisclosed, and asks why | It closes the flaw on every build, which hover says before it is asked for |
+| A recorded flaw's page shows the lead it came from, to a reader who reads the lead | The rule and place, linked to the lead, its state, the component suggested, the builds proposed, and whether the hand-off was undone. On a build where its lead is not reproduced, Fixed here starts from the build that did not see it, and a person closes it |
 | A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
 | The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
 | A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |

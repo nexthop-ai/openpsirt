@@ -710,6 +710,13 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 				return err
 			}
 		}
+		// What the hand-off is offered, read in the transaction recording
+		// it: the flaw keeps the component ranked first and the builds
+		// proposed beside the lead it was recorded from.
+		offer, err := Propose(ctx, tx, subject, in.ProductID, in.PlaceIdentity)
+		if err != nil {
+			return err
+		}
 		// Every lead the confirming claim covers is the one flaw, and is
 		// linked to it: a lead of the group left behind holds a claim
 		// nothing may change and no flaw.
@@ -738,6 +745,10 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		prefix := prefixOf(l.Path, modules, declaredThirdParty(run, l.Path))
 		if err := learn(ctx, tx, in.ProductID, prefix, strings.TrimSpace(in.Flaw.Component),
 			strings.TrimSpace(in.Flaw.Ecosystem), strings.TrimSpace(in.Flaw.Namespace), subject.ID, now); err != nil {
+			return err
+		}
+		if err := recordOrigin(ctx, tx, in.ProductID, in.PlaceIdentity, vulnerabilityID, offer, in.Flaw,
+			subject.ID, now); err != nil {
 			return err
 		}
 		if in.Move {

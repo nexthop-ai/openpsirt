@@ -156,12 +156,16 @@ func seriesV0110(t *columnTypes) []string {
 			"last_run_id"         ` + t.ref + ` NOT NULL,
 			-- Null while the last comparable run saw it.
 			"absent_run_id"       ` + t.refNull + ` NULL,
+			-- The run whose build a person stated fixed it in, once they
+			-- closed it as fixed.
+			"fixed_run_id"        ` + t.refNull + ` NULL,
 			CONSTRAINT "sighting_finding_unique" UNIQUE ("finding_id"),
 			CONSTRAINT "sighting_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id"),
 			CONSTRAINT "sighting_series_fk" FOREIGN KEY ("series_id") REFERENCES "series"("id"),
 			CONSTRAINT "sighting_first_fk" FOREIGN KEY ("first_run_id") REFERENCES "series_run"("id"),
 			CONSTRAINT "sighting_last_fk" FOREIGN KEY ("last_run_id") REFERENCES "series_run"("id"),
-			CONSTRAINT "sighting_absent_fk" FOREIGN KEY ("absent_run_id") REFERENCES "series_run"("id")
+			CONSTRAINT "sighting_absent_fk" FOREIGN KEY ("absent_run_id") REFERENCES "series_run"("id"),
+			CONSTRAINT "sighting_fixed_fk" FOREIGN KEY ("fixed_run_id") REFERENCES "series_run"("id")
 		)` + t.suffix,
 		// What a run saw and did not see, counted on its receipt.
 		`CREATE INDEX "sighting_last_idx" ON "sighting" ("last_run_id")`,

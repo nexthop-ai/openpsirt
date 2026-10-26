@@ -994,6 +994,10 @@ var tables = []string{
 	"lead_rule",
 	// Before person, product and vulnerability, which they point at.
 	"lead_handoff",
+	// Before flaw_lead and target, which it points at.
+	"flaw_lead_build",
+	// Before person, product and vulnerability, which it points at.
+	"flaw_lead",
 	"lead_component",
 	"lead_collaborator",
 	// Before team and person, both of which they point at.

@@ -231,7 +231,7 @@ func TestALaterSightingOfAMovedLeadOpensInItsCase(t *testing.T) {
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/fixed",
-			`{"because":"the early return frees p"}`); got.Code != http.StatusOK {
+			httpapitest.FixedBody(t, r, leadAt(place), "the early return frees p")); got.Code != http.StatusOK {
 			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
 		}
 		httpapitest.ApplyRun(t, r, now.Add(-30*time.Minute), httpapitest.LeadRun(true))
@@ -449,7 +449,7 @@ func TestAMoveLandingWhileARunAppliesTakesTheSightingTheRunOpened(t *testing.T) 
 		now := time.Now().UTC()
 		httpapitest.ApplyRun(t, r, now.Add(-time.Hour), httpapitest.LeadRun(false))
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/fixed",
-			`{"because":"the early return frees p"}`); got.Code != http.StatusOK {
+			httpapitest.FixedBody(t, r, leadAt(place), "the early return frees p")); got.Code != http.StatusOK {
 			t.Fatalf("closing the lead answered %d: %s", got.Code, got.Body)
 		}
 		// The lead is moved after the run has read its hand-off, and before

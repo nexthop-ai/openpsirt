@@ -3274,6 +3274,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/issues/{vulnerability}/lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the lead a flaw was recorded from
+         * @description Returns the static analysis lead a flaw recorded here was handed off from, with the component its hand-off was offered first, the builds it proposed, and whether the hand-off was undone.
+         *
+         *     `fixed_in` lists each build the flaw is still open on where the lead is not reproduced, with the first run that did not see it. Closing the flaw as fixed there is `POST .../findings/{vulnerability}/resolve`, which a person does.
+         *
+         *     A flaw recorded from no lead, and a lead you do not read in full, answer 404.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
+         */
+        get: operations["get-flaw-lead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/notes": {
         parameters: {
             query?: never;
@@ -4881,6 +4907,8 @@ export interface paths {
          * Close a lead as fixed
          * @description Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
          *
+         *     `fixed_in` names the build that fixed it, as the run of the lead's series on this build that analyzed it: an applied, comparable run built at or after the first run that did not see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused with 422.
+         *
          *     A lead seen again opens anew at the same place.
          *
          *     Requires: internal-triage on the product
@@ -4922,6 +4950,30 @@ export interface paths {
          *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
          */
         post: operations["hand-off-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a lead's hand-off
+         * @description Undoes the hand-off of a lead while its flaw is undisclosed, with every lead linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the lead it was recorded from, marked undone.
+         *
+         *     `because` is required. Recorded in the administration trail. A lead not handed off, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        post: operations["undo-lead-handoff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9332,6 +9384,11 @@ export interface components {
             readonly $schema?: string;
             /** @description What fixed it, in markdown */
             because: string;
+            /**
+             * Format: int64
+             * @description The run whose build fixed it
+             */
+            fixed_in: number;
         };
         FixBody: {
             /**
@@ -9377,6 +9434,67 @@ export interface components {
         Flag: {
             label: string;
             product_ids: string[] | null;
+        };
+        FlawLeadBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/FlawLeadBody.json
+             */
+            readonly $schema?: string;
+            /** @description Why the hand-off was undone, in markdown */
+            because?: string;
+            /** @description Each build the flaw is still open on whose lead a comparable run no longer sees, which a person may close the flaw as fixed in. Empty once the hand-off is undone */
+            fixed_in: components["schemas"]["FlawUnseenBody"][] | null;
+            /** Format: date-time */
+            handed_at: string;
+            /** @description The person who handed it off, by sign-in identity */
+            handed_by: string;
+            /**
+             * Format: int64
+             * @description The line it starts at
+             */
+            line?: number;
+            /** @description Where the lead is, relative to the top of the checkout */
+            path: string;
+            /** @description The lead's place identity */
+            place: string;
+            /** @description The builds the hand-off proposed the flaw against */
+            proposed: components["schemas"]["FlawLeadBuild"][] | null;
+            /** @description The analyzer's rule, as <tool>/<rule> */
+            rule: string;
+            /**
+             * @description Where the lead stands on that build
+             * @enum {string}
+             */
+            state: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            /** @description The branch or tag of the build its newest finding you read is on */
+            stream: string;
+            /** @description The component the hand-off's offer ranked first, which the person may have turned down. Absent for the build itself */
+            suggested: components["schemas"]["SuggestionBody"];
+            /**
+             * Format: date-time
+             * @description When the hand-off was undone. Absent while it stands
+             */
+            undone_at?: string;
+            /** @description The person who undid the hand-off, by sign-in identity */
+            undone_by?: string;
+            /** @description The variant of that build */
+            variant: string;
+        };
+        FlawLeadBuild: {
+            /** @description Whether the lead was seen in it. Otherwise it holds the chosen component and the lead's series never analyzed it */
+            seen: boolean;
+            stream: string;
+            variant: string;
+        };
+        FlawUnseenBody: {
+            /** @description The build a person stated fixed the lead, where they closed it as fixed */
+            fixed?: components["schemas"]["LeadRunBody"];
+            /** @description The first run on the build that did not see the lead */
+            not_seen: components["schemas"]["LeadRunBody"];
+            stream: string;
+            variant: string;
         };
         FoldPackageBody: {
             /**
@@ -10071,6 +10189,8 @@ export interface components {
             compare?: string;
             /** @description The live claim at the lead, agreed to or waiting for a second person. Absent where there is none */
             decision?: components["schemas"]["DecisionBody"];
+            /** @description The build a person stated fixed the lead, once they closed it as fixed */
+            fixed_in?: components["schemas"]["LeadRunBody"];
             /** @description The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead */
             handoff?: components["schemas"]["LeadHandoffBody"];
             /** @description Other analyzers' leads on the build that are the same flaw, and those that possibly are */
@@ -10085,6 +10205,11 @@ export interface components {
              * @description When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it
              */
             not_seen?: string;
+            /**
+             * Format: int64
+             * @description The run that did not see the lead, which a statement that it was fixed may name
+             */
+            not_seen_run?: number;
             /** @description Whether the lead is open on the build */
             open: boolean;
             /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, assignment or hand-off */
@@ -10290,6 +10415,20 @@ export interface components {
             state: "proposed" | "in-force" | "outgrown" | "needs-path" | "retired";
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
+        };
+        LeadRunBody: {
+            /**
+             * Format: date-time
+             * @description When the build it analyzed was made
+             */
+            built: string;
+            /** @description The commit at the top of the checkout it analyzed, where the run stated one */
+            commit?: string;
+            /**
+             * Format: int64
+             * @description The run
+             */
+            run: number;
         };
         LeadSeriesBody: {
             /**
@@ -14000,6 +14139,16 @@ export interface components {
             readonly $schema?: string;
             /** Format: int64 */
             undone: number;
+        };
+        "Undo-lead-handoffRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Undo-lead-handoffRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Why the hand-off is undone, in markdown */
+            because: string;
         };
         UnmatchedBody: {
             /** @description The platform enumeration the scanner is given, where there is one */
@@ -19817,6 +19966,39 @@ export interface operations {
             };
         };
     };
+    "get-flaw-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The flaw, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlawLeadBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-issue-notes": {
         parameters: {
             query?: never;
@@ -22425,6 +22607,43 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HandedOffBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "undo-lead-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Undo-lead-handoffRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

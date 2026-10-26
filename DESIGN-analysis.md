@@ -347,8 +347,8 @@ is sent.
 `GET …/streams/{stream}/variants/{variant}/leads/{place}` answers one lead's
 evidence on one build: its rule, where it is, the path the analyzer took to
 it, the related places, each with its link and source, when it was last seen,
-and, for a lead no longer open, when it was first not seen with the comparison
-above. It names the live claim at the lead, agreed to or waiting, where the
+and, for a lead no longer open, when it was first not seen, by which run, with
+the comparison above, and the run a person named as the build that fixed it. It names the live claim at the lead, agreed to or waiting, where the
 reader may read one. The place identity addresses a lead because a rule's name holds a
 slash.
 
@@ -397,12 +397,13 @@ seen on (REQ-25).
 ### Fixed leads
 
 `POST …/streams/{stream}/variants/{variant}/leads/{place}/fixed` closes a lead
-on one build, with what fixed it.
+on one build, with what fixed it and the build that fixed it.
 
 | Rule | |
 |---|---|
 | Only a lead the newest comparable run did not see is closed as fixed | That absence is the evidence the statement is made with; a run still reporting the result is the authority on what it found |
 | It closes the lead on the build named and nowhere else | Each build holding it is a statement of its own |
+| It names the run whose build fixed it: one of the lead's series on that build, applied and comparable, built at or after the first run that did not see the lead, and any other run is refused | A statement of a fix names the build it shipped in. The lead's evidence names the first run that did not see it, and once it is fixed, the run named |
 | It is closed by somebody holding `internal-triage` on the product, who says what fixed it | The closure a person writes, with who, when and why on the record (`DESIGN-findings.md` § Recorded flaws) |
 | A lead seen again opens anew at the same place | The matching that finds a closed lead carries the result to its place (§ Carrying) |
 | A claim about a lead is read through the Decisions consumer (`DESIGN-kinds.md` § Consumers) | The review queue, approval and one claim's reads include it; the findings lists do not |
@@ -654,7 +655,10 @@ hand-off is offered, and `POST` on the same address records it.
 | The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
 | A hand-off changes the stamp of the claim standing at the lead, matched on the stamp it read, as every write to a claim does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the hand-off would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
 | A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a claim out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
-| A hand-off, a move and an undo are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
+| A hand-off, a move, an undone move and an undone hand-off are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
+
+| The flaw records the lead it was recorded from, the component the offer ranked first, and the builds it proposed: every build the lead was seen in, and the builds holding the chosen component that the series never analyzed | `DESIGN-findings.md` § Recorded flaws. The record outlasts the link, so a flaw whose hand-off was undone still says where it came from |
+| The flaw's page names its lead to a reader who reads the flaw there and the lead in full, and to nobody else | A kept lead is internal, and a reader of the private flaw has not been handed it (REQ-42) |
 
 ### Hand-off offer
 
@@ -701,6 +705,37 @@ takes a moved one back out.
 | A move, its undo and a disclosure each change the hand-off only as it was read in their transaction: its visibility, its flaw undisclosed, and the last run to describe it | One that lost a race to another, or to a run, is asked again. A disclosure that read the hand-off before a run cannot see the source the run wrote, and a move cannot see the sighting it opened |
 | A move and its undo are recorded in the administrative trail, as the change of access they are | A move changes who reads the lead |
 | A move and its undo are made by somebody holding `internal-triage` and `private-triage` | The hand-off's own rule |
+
+### Undone hand-off
+
+`POST …/leads/{place}/hand-off/withdrawal` undoes a hand-off, with why.
+
+| Rule | |
+|---|---|
+| It takes every lead handed off as the flaw | The leads of one flaw are one case, as a move takes them |
+| It is refused with 409 once the flaw is disclosed, and asks for a reason | Disclosure is one way. Undoing takes the flaw out of every build, which a person explains |
+| Each lead is confirmed again: the link goes, the claim confirming it stands, and it returns to the queue's lists of held work with whoever held it | The judgment that it is real was not undone, the recording was |
+| A moved lead is internal again, with the claims at its place | A lead with no case to be in is the internal material it was |
+| Every grant of the leads ends, each recorded in the administrative trail as a withdrawal | A grant brings somebody into a case, and there is none |
+| The flaw's open findings close as `invalid`, with the reason, on every build | A flaw recorded from a hand-off somebody undid should not have been recorded, and a hand-off made again records a flaw of its own. Invalid counts as no fix and names no release fixed (`DESIGN-findings.md` § Affected build sets) |
+| The flaw keeps the record of its lead, marked undone with who, when and why | What was recorded and taken back stays on the record |
+| It is written in one transaction that reads each hand-off again and deletes it only as read | A move, a disclosure or a run describing the lead since is a lost race, asked again (REQ-71) |
+| It is recorded in the administrative trail | It changes who reads the leads and what the flaw is |
+
+### Fixed in
+
+A flaw recorded from a lead is offered as fixed on each build it is open on
+where its lead is not reproduced, with the first run there that did not see
+it and, where a person closed the lead as fixed, the run they named. A person
+closes the flaw there (`DESIGN-findings.md` § Closure by a person), and the
+advisory names the build fixed from that closure (`DESIGN-remediation.md`
+§ The advisory).
+
+| Rule | |
+|---|---|
+| The lead read is the one the hand-off was made at, its newest finding on each build | A lead seen again after a fixed closure opens anew, and the new finding speaks |
+| Nothing closes the flaw but a person | Absence is weak evidence: of 28 comparable absences hand-checked, 10 were fixes |
+| The offer is read where the flaw's lead is, under the reader's visibility | It is part of the lead |
 
 ### Lead collaborators
 

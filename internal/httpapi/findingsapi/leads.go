@@ -48,6 +48,8 @@ type LeadEvidenceBody struct {
 	Open       bool               `json:"open" doc:"Whether the lead is open on the build"`
 	LastSeen   string             `json:"last_seen" format:"date-time" doc:"When the build of the newest run that saw the lead was made"`
 	NotSeen    string             `json:"not_seen,omitempty" format:"date-time" doc:"When the build of the first run after it that did not see the lead was made. Absent while every run since has seen it"`
+	NotSeenRun int64              `json:"not_seen_run,omitempty" doc:"The run that did not see the lead, which a statement that it was fixed may name"`
+	FixedIn    *LeadRunBody       `json:"fixed_in,omitempty" doc:"The build a person stated fixed the lead, once they closed it as fixed"`
 	Compare    string             `json:"compare,omitempty" doc:"The address comparing the lead's repository between those two builds"`
 	Unchanged  bool               `json:"unchanged,omitempty" doc:"Whether those two builds name the same commit for the lead's repository and neither patched it at build time, so its disappearance is not a change to that code"`
 	State      LeadState          `json:"state" doc:"Where the lead stands: open, not reproduced, fixed, answered by a claim somebody agreed to, or handed off as a flaw"`
@@ -59,6 +61,21 @@ type LeadEvidenceBody struct {
 	Handoff    *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
 	// Who is dealing with the lead on this build, while it is open there.
 	core.HolderBody
+}
+
+// LeadRunBody is one run of a lead's series, by the build it analyzed.
+type LeadRunBody struct {
+	Run    int64  `json:"run" doc:"The run"`
+	Built  string `json:"built" format:"date-time" doc:"When the build it analyzed was made"`
+	Commit string `json:"commit,omitempty" doc:"The commit at the top of the checkout it analyzed, where the run stated one"`
+}
+
+// leadRunBody is a run as an answer states it, nil for none.
+func leadRunBody(run *analysis.RunAt) *LeadRunBody {
+	if run == nil {
+		return nil
+	}
+	return &LeadRunBody{Run: run.ID, Built: core.Stamp(run.BuiltAt), Commit: run.Commit}
 }
 
 // LeadHandoffBody is the flaw a lead was handed off as.
@@ -151,6 +168,7 @@ func registerLeads(api huma.API, in core.Deps) {
 			Rule: evidence.Rule,
 			At:   leadPlace(evidence.At), Steps: []LeadPlace{}, Related: []LeadPlace{},
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
+			NotSeenRun: evidence.NotSeenRun, FixedIn: leadRunBody(evidence.FixedIn),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
 			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub, ThirdParty: evidence.ThirdParty,
 		}

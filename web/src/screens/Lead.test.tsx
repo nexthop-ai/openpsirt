@@ -91,6 +91,27 @@ describe("a lead", () => {
     expect(hrefs.some((h) => h?.startsWith("javascript:"))).toBe(false);
   });
 
+  it("closes a lead nobody sees any more as fixed in the build of the run that did not see it", async () => {
+    await drawn(true, { ...EVIDENCE, state: "not-reproduced", not_seen_run: 9 });
+    const sent = accept(() => ({ data: { at: "2026-10-02T00:00:00Z" } }));
+    const fields = mount.host().querySelectorAll("textarea");
+    change(fields[fields.length - 1] ?? null, "the bounds check landed");
+    await press(mount.host(), "Close as fixed");
+    await settle();
+    const fixed = sent().find((call) => String(call[0]).endsWith("/fixed"));
+    expect(fixed?.[1]).toMatchObject({ body: { because: "the bounds check landed", fixed_in: 9 } });
+  });
+
+  it("names the build a lead was stated fixed in", async () => {
+    await drawn(true, {
+      ...EVIDENCE,
+      open: false,
+      state: "fixed",
+      fixed_in: { run: 9, built: "2026-10-02T00:00:00Z", commit: "0123456789abcdef" },
+    });
+    expect(mount.host().textContent).toContain("0123456789ab");
+  });
+
   it("offers no judgment to somebody who only reads it", async () => {
     await drawn(false);
     expect(mount.host().querySelectorAll('[role="radio"]')).toHaveLength(0);

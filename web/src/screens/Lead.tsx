@@ -150,8 +150,22 @@ export function Lead() {
           ) : (
             <p className="hint">None.</p>
           )}
-          {acts && evidence.state === "not-reproduced" && evidence.open && (
-            <FixForm build={build} place={place} />
+          {acts &&
+            evidence.state === "not-reproduced" &&
+            evidence.open &&
+            evidence.not_seen_run !== undefined && (
+              <FixForm build={build} place={place} fixedIn={evidence.not_seen_run} />
+            )}
+          {evidence.fixed_in && (
+            <p className="hint">
+              Fixed in the build made {on(evidence.fixed_in.built)}
+              {evidence.fixed_in.commit && (
+                <>
+                  {" "}
+                  at <span className="mono">{evidence.fixed_in.commit.slice(0, 12)}</span>
+                </>
+              )}
+            </p>
           )}
         </div>
       )}
@@ -372,11 +386,12 @@ function LeadAssignee({
   );
 }
 
-function FixForm({ build, place }: { build: Build; place: string }) {
+function FixForm({ build, place, fixedIn }: { build: Build; place: string; fixedIn: number }) {
   const [because, setBecause] = useState("");
   const fix = useFixLead(build, place);
   return (
     <div style={{ marginTop: 10 }}>
+      <p className="hint">Fixed in the build of the first run that did not see it.</p>
       <Editor
         label="Fixed by"
         value={because}
@@ -389,7 +404,9 @@ function FixForm({ build, place }: { build: Build; place: string }) {
         className="btn"
         style={{ marginTop: 8 }}
         disabled={because.trim() === "" || fix.isPending}
-        onClick={() => fix.mutate(because.trim(), { onSuccess: () => setBecause("") })}
+        onClick={() =>
+          fix.mutate({ because: because.trim(), fixedIn }, { onSuccess: () => setBecause("") })
+        }
       >
         Close as fixed
       </button>

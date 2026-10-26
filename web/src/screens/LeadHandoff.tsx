@@ -16,6 +16,7 @@ import {
   useHandOff,
   useHandoffOffer,
   useMoveLead,
+  useUndoHandOff,
   type Evidence,
   type HandoffOffer,
 } from "../api/leads";
@@ -115,6 +116,7 @@ function HandedOff({
           </button>
         )}
         {move.error != null && <Failed error={move.error} what="Nothing was moved." />}
+        {handsOff && !handed.disclosed && <UndoHandOff build={build} place={place} />}
       </div>
       {!handed.disclosed && (
         <People
@@ -152,6 +154,52 @@ function HandedOff({
         />
       )}
     </>
+  );
+}
+
+// Undoing the hand-off: the lead is confirmed again and the flaw is taken
+// back out of every build as invalid, so it asks why.
+function UndoHandOff({ build, place }: { build: Build; place: string }) {
+  const [open, setOpen] = useState(false);
+  const [because, setBecause] = useState("");
+  const undo = useUndoHandOff(build, place);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn quiet"
+        style={{ marginLeft: 8 }}
+        onClick={() => setOpen(true)}
+        title="The lead is confirmed again. The flaw is closed as invalid on every build."
+      >
+        Undo hand-off…
+      </button>
+    );
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <Editor
+        label="Why undo it"
+        value={because}
+        onChange={setBecause}
+        rows={3}
+        draftKey={`lead-undo:${build.product}:${place}`}
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button
+          type="button"
+          className="btn"
+          disabled={because.trim() === "" || undo.isPending}
+          onClick={() => undo.mutate(because.trim(), { onSuccess: () => setBecause("") })}
+        >
+          Undo hand-off
+        </button>
+        <button type="button" className="btn quiet" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      {undo.error != null && <Failed error={undo.error} what="The hand-off was not undone." />}
+    </div>
   );
 }
 

@@ -29,6 +29,11 @@ type Evidence struct {
 	// it was, nil while every run since has seen it.
 	LastSeen time.Time
 	NotSeen  *time.Time
+	// NotSeenRun is the first run after it that did not see the lead, zero
+	// while every run since has seen it, and FixedIn the run whose build a
+	// person stated fixed it in, nil until somebody did.
+	NotSeenRun int64
+	FixedIn    *RunAt
 	// Compare is the address comparing the lead's repository between those
 	// two builds, and Unchanged whether both name the same commit for it and
 	// neither patched it.
@@ -47,6 +52,14 @@ type Evidence struct {
 	// ThirdParty says the lead is under a path the newest run that saw it
 	// declared as third-party code.
 	ThirdParty bool
+}
+
+// RunAt is one run, by the build it analyzed: when it was made and the
+// commit at the top of its checkout, empty where the run stated none.
+type RunAt struct {
+	ID      int64
+	BuiltAt time.Time
+	Commit  string
 }
 
 // Located is one place a run named for a lead.
@@ -165,8 +178,15 @@ func EvidenceOf(ctx context.Context, db bun.IDB, subject access.Subject, lead *f
 		if err != nil {
 			return Evidence{}, err
 		}
-		out.NotSeen = &absent.BuiltAt
+		out.NotSeen, out.NotSeenRun = &absent.BuiltAt, absent.ID
 		out.Compare, out.Unchanged = config.Compare(link, modulesOfRun(after), said.Path)
+	}
+	if seen.FixedRunID != nil {
+		fixed, err := store.ByID(ctx, *seen.FixedRunID)
+		if err != nil {
+			return Evidence{}, err
+		}
+		out.FixedIn = &RunAt{ID: fixed.ID, BuiltAt: fixed.BuiltAt, Commit: fixed.SourceCommit}
 	}
 	return out, nil
 }
