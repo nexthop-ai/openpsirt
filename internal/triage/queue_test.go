@@ -270,7 +270,7 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 			Where(`"claim_id" = ?`, first.ClaimID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, first.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 

@@ -203,18 +203,34 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 //
 // No approval needed, for the same reason revising needs none: it puts risk
 // back on the table rather than taking it off.
-func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID int64) error {
+//
+// It answers the leads whose agreed dismissal it took back, each of which is
+// back in the queue.
+func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID int64) ([]Reopened, error) {
+	var reopened []Reopened
 	// Both writes or neither. Half of this leaves a claim reading as agreed to
 	// with every agreement marked withdrawn — which is the state the whole
 	// approval record exists to make impossible.
-	return s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		_, rows, err := within.writableRows(ctx, subject, claimID, mayDecideOn)
+	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
+		claim, rows, err := within.writableRows(ctx, subject, claimID, mayDecideOn)
 		if err != nil {
 			return err
 		}
+		reopened = nil
 		for _, row := range rows {
 			if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
 				return ErrNotTheirs
+			}
+		}
+		if claim.Outcome == Dismissed || claim.Outcome == NotSecurity {
+			if err := tx.NewSelect().TableExpr(`"decision" AS "de"`).
+				ColumnExpr(`DISTINCT "de"."product_id" AS "product_id", "de"."place_identity" AS "place_identity"`).
+				Where(`"de"."claim_id" = ?`, claimID).
+				Where(`"de"."state" = ?`, Approved).
+				Where(`"de"."vulnerability_id" IN (SELECT "rv"."id" FROM "vulnerability" AS "rv" WHERE "rv"."kind" = ?)`,
+					string(kind.Rule)).
+				Scan(ctx, &reopened); err != nil {
+				return fmt.Errorf("read the leads the claim dismissed: %w", err)
 			}
 		}
 		now := s.now().Truncate(time.Microsecond)
@@ -241,6 +257,16 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, claimID in
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return reopened, nil
+}
+
+// Reopened is a lead an agreed dismissal no longer holds out of the queue.
+type Reopened struct {
+	ProductID     int64  `bun:"product_id"`
+	PlaceIdentity string `bun:"place_identity"`
 }
 
 // UndoBatch takes back everything one bulk approval agreed to.

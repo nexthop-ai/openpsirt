@@ -291,7 +291,7 @@ func TestWithdrawingIsWhatEndsACorrection(t *testing.T) {
 		if err := agreeTo(ctx, f.store, f.reviewer, corrected.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
-		if err := f.store.Withdraw(ctx, f.triager, corrected.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, corrected.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 		if state := f.stateOf(t, corrected.ID); state != triage.Withdrawn {

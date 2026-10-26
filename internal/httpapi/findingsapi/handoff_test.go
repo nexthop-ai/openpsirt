@@ -655,3 +655,50 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 		expect("once the move was undone", none)
 	})
 }
+
+// dismissedLead is the seeded lead dismissed by one claim, and the claim.
+func dismissedLead(t *testing.T, r *httpapitest.Reach) (string, string) {
+	t.Helper()
+	place := httpapitest.SeededLead(t, r)
+	if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
+		`{"outcome":"dismissed","reason":"false_positive","reasoning":"freed by the caller"}`); got.Code != http.StatusCreated {
+		t.Fatalf("dismissing answered %d: %s", got.Code, got.Body)
+	}
+	return place, claimAt(t, r, place)
+}
+
+func TestAWithdrawnDismissalOfALeadIsToldToTheInternalTriagersAndAnApprovalIsNot(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		_, claim := dismissedLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost, claim+"/approval", `{}`); got.Code != http.StatusOK {
+			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body)
+		}
+		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 0 {
+			t.Errorf("an internal triager was told %q of an approval; want nothing", got)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
+		}
+		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 1 || !strings.Contains(got[0], "back in the queue") {
+			t.Errorf("an internal triager was told %q; want the lead back in the queue", got)
+		}
+		if got := toldOf(t, r, "internal-triager", "lead-reopened"); len(got) != 0 {
+			t.Errorf("whoever withdrew it was told %q; want nothing", got)
+		}
+		if got := toldOf(t, r, "private-triage", "lead-reopened"); len(got) != 0 {
+			t.Errorf("a triager of undisclosed work was told %q; want nothing", got)
+		}
+	})
+}
+
+func TestAWithdrawnDismissalNobodyAgreedToTellsNobody(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		_, claim := dismissedLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, claim, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing answered %d: %s", got.Code, got.Body)
+		}
+		if got := toldOf(t, r, "lead-handler", "lead-reopened"); len(got) != 0 {
+			t.Errorf("an internal triager was told %q of a dismissal that never held the lead out; want nothing", got)
+		}
+	})
+}

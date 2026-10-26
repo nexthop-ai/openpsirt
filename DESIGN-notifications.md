@@ -90,7 +90,7 @@ true is cleared, and running the same pass twice changes nothing.
 | An analyzer run that marked much of a build not reproduced | event | Below, under analyzer alerts |
 | An analyzer series whose newest run on a build could not be compared | condition | Below, under analyzer alerts |
 | An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
-| A lead assigned, handed off, or moved into or out of its flaw's case | event | Below, under lead notices |
+| A lead assigned, handed off, moved into or out of its flaw's case, or put back in the queue by a withdrawn dismissal | event | Below, under lead notices |
 | A standing rule on leads outgrowing its approval | condition | Below, under lead notices |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
 | The same window near its end, where it names a warning | condition | Described under obligation notices below |
@@ -223,6 +223,7 @@ line is withheld as internal (§ The notification list).
 | An agreement to a claim on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
 | A lead handed off as a flaw | event | The product's internal triagers, never whoever handed it off. The flaw recorded tells what recording any flaw tells | Acknowledged |
 | A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
+| A lead's agreed dismissal or not-a-security-issue ruling withdrawn, putting it back in the queue | event | The product's internal triagers, never whoever withdrew it | Acknowledged |
 | A lead assigned | event | The person given it, while they read it at every visibility it is open at. Never a team, never whoever gave it out, and nobody for handing one back | Acknowledged |
 | A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
 | A standing rule on leads waiting for its approval | condition | Whoever may approve at internal visibility, never its proposer, once it has waited the period a claim waits | Approved or retired |
@@ -232,6 +233,7 @@ line is withheld as internal (§ The notification list).
 |---|---|
 | A claim's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
 | A lead sent back links to the lead | A rule names no finding page |
+| Agreeing to a dismissal of a lead tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
 | A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 | A lead assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the lead's page |
 | A lead open at internal and at private visibility is withheld as internal | Its recipient reads both, and a reader of undisclosed work reads no internal row |

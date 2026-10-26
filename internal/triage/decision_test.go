@@ -564,7 +564,7 @@ func TestDecidingIsItsOwnRight(t *testing.T) {
 		if _, err := f.store.Revise(ctx, f.onlooker, claimed.ClaimID, "words"); !errors.Is(err, triage.ErrNotTheirs) {
 			t.Errorf("somebody holding only a read role revised one: %v", err)
 		}
-		if err := f.store.Withdraw(ctx, f.onlooker, claimed.ClaimID); !errors.Is(err, triage.ErrNotTheirs) {
+		if _, err := f.store.Withdraw(ctx, f.onlooker, claimed.ClaimID); !errors.Is(err, triage.ErrNotTheirs) {
 			t.Errorf("somebody holding only a read role withdrew one: %v", err)
 		}
 	})
@@ -855,7 +855,7 @@ func TestADeadDecisionDoesNotBlockThePlaceForever(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		claimed := f.claims(t, f.at())
-		if err := f.store.Withdraw(ctx, f.triager, claimed.ClaimID); err != nil {
+		if _, err := f.store.Withdraw(ctx, f.triager, claimed.ClaimID); err != nil {
 			t.Fatal(err)
 		}
 

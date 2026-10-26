@@ -115,7 +115,7 @@ func TestAnIssuanceRetriedAfterAClaimWasWithdrawnRecordsTheDocumentAsItNowStands
 	}
 
 	between = func() {
-		if err := decisions.Withdraw(ctx, proposer, decision.ClaimID); err != nil {
+		if _, err := decisions.Withdraw(ctx, proposer, decision.ClaimID); err != nil {
 			t.Errorf("withdrawing between the attempts: %v", err)
 		}
 	}

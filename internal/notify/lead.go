@@ -16,8 +16,8 @@ import (
 )
 
 // LeadAct is something a person did to a lead that the product's internal
-// triagers hear about: handed it off as a flaw, or moved it into or out of
-// the flaw's case.
+// triagers hear about: handed it off as a flaw, moved it into or out of the
+// flaw's case, or withdrew the agreed dismissal holding it out of the queue.
 type LeadAct struct {
 	Kind      Kind
 	ProductID int64
@@ -52,6 +52,8 @@ func TellLeadTriagers(ctx context.Context, db *bun.DB, act LeadAct) error {
 		if !act.Into {
 			body = what + " was taken back out of its flaw's case and is internal again."
 		}
+	case LeadReopened:
+		body = what + " is back in the queue: its dismissal was withdrawn."
 	default:
 		return fmt.Errorf("%s is not something done to a lead", act.Kind)
 	}

@@ -71,7 +71,7 @@ func Kinds() []Kind {
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		UpstreamFailing, UpstreamRecovered,
 		InventoryMoved, AnalysisDropped, AnalysisNotComparable, AnalysisQuiet,
-		LeadHandedOff, LeadMoved, RuleOutgrown, RuleWaiting,
+		LeadHandedOff, LeadMoved, LeadReopened, RuleOutgrown, RuleWaiting,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -287,6 +287,11 @@ const (
 	// out, told to the product's internal triagers, whose reading of it
 	// narrows or returns.
 	LeadMoved Kind = "lead-moved"
+	// LeadReopened is a lead an agreed dismissal held out of the queue, back
+	// in it because the dismissal was withdrawn, told to the product's
+	// internal triagers. An approval tells nobody; a withdrawal puts work
+	// back.
+	LeadReopened Kind = "lead-reopened"
 	// RuleOutgrown is an approved standing rule on leads covering more than
 	// its approver saw by the deployment's factor. A condition: approving it
 	// again, retiring it or its covering less clears it.

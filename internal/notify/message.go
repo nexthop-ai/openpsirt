@@ -66,6 +66,7 @@ var called = map[Kind]string{
 	AnalysisQuiet:         "An analyzer has gone quiet",
 	LeadHandedOff:         "A lead was handed off as a flaw",
 	LeadMoved:             "A lead moved into or out of a case",
+	LeadReopened:          "A lead's dismissal was withdrawn",
 	RuleOutgrown:          "A standing rule outgrew its approval",
 	RuleWaiting:           "A standing rule is waiting for a second person",
 	ObligationOpen:        "A window after an attack is running",

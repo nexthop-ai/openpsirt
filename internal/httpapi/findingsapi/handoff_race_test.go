@@ -132,7 +132,7 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = triage.NewStore(hooked).Withdraw(t.Context(), subject, claim)
+		_, err = triage.NewStore(hooked).Withdraw(t.Context(), subject, claim)
 		if rivalErr := rival(); rivalErr != nil {
 			t.Fatal(rivalErr)
 		}
