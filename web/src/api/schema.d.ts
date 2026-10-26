@@ -1405,7 +1405,7 @@ export interface paths {
          *
          *     Each product applies its own triage line, so the file states that rather than naming one line, and `product` is a column.
          *
-         *     Below the findings come the static analysis leads of every product, as each product's lead queue lists them, where you read them, by product name. The columns and the rule about filters are the product export's.
+         *     Below the findings come the open static analysis leads of every product, by product name, as the product export writes them. The columns and the rule about filters are the product export's.
          *
          *     Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
          *
@@ -2689,7 +2689,7 @@ export interface paths {
          *
          *     The line this deployment triages at is stated in the file.
          *
-         *     Below the findings come the static analysis leads of the same branch or tag and variant, as the lead queue lists them, where you read them: `lead` is true on those rows, and `path`, `line`, `function`, `message` and `withheld` say where each is and what the analyzer said. A lead in a case you are not on has an empty message and `withheld` true. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so.
+         *     Below the findings come every open static analysis lead of the same branch or tag and variant, in the lead queue's order, where you read them, those a claim waits on included and those open only in releases past their end of life left out: `lead` is true on those rows, and `path`, `line`, `function`, `message` and `withheld` say where each is and what the analyzer said. A lead in a case you are not on has an empty message and `withheld` true. No row carries source text. A lead carries no rating, component or decision, so a file narrowed by any filter but the order holds no lead, and says so.
          *
          *     Takes every filter the findings list takes.
          *

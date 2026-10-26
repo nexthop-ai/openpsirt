@@ -67,12 +67,12 @@ func leadRowsIn(t *testing.T, header []string, rows [][]string) []map[string]str
 	return out
 }
 
-// The findings lists' files carry the leads of the selection, as the queue
-// lists them, to the readers who read them: an internal reader gets the lead,
+// The findings lists' files carry the open leads of the selection, under the
+// queue's visibility, to the readers who read them: an internal reader gets the lead,
 // a reader of disclosed or undisclosed work alone gets none, and somebody who
 // may not read the product is refused before a byte is written. Across
 // products the lead is written under its product.
-func TestTheFindingsFileCarriesTheQueueToInternalReadersAlone(t *testing.T) {
+func TestTheFindingsFileCarriesTheOpenLeadsToInternalReadersAlone(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		const message, snippet = "p is leaked", "return;"
@@ -85,7 +85,7 @@ func TestTheFindingsFileCarriesTheQueueToInternalReadersAlone(t *testing.T) {
 				_, said, header, rows := findingsFile(t, r, who, path)
 				leads := leadRowsIn(t, header, rows)
 				if len(leads) != 1 {
-					t.Fatalf("%s: %s's file holds the leads %v; want the one in the queue", path, who, leads)
+					t.Fatalf("%s: %s's file holds the leads %v; want the seeded lead", path, who, leads)
 				}
 				l := leads[0]
 				if l["issue"] != "clang-tidy/leak" || l["path"] != "src/a.c" || l["line"] != "12" ||
@@ -96,7 +96,7 @@ func TestTheFindingsFileCarriesTheQueueToInternalReadersAlone(t *testing.T) {
 				if strings.HasPrefix(path, "/v1/findings") && l["product"] != "mine" {
 					t.Errorf("%s: the lead is written under the product %q", path, l["product"])
 				}
-				if !strings.Contains(said["leads"], "the lead queue") {
+				if !strings.HasPrefix(said["leads"], "every open lead") {
 					t.Errorf("%s: the file says its leads are %q", path, said["leads"])
 				}
 				for _, row := range rows {
@@ -128,7 +128,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 		httpapitest.SeededLead(t, r)
 		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?sort=age&asc=true")
 		if leads := leadRowsIn(t, header, rows); len(leads) != 1 {
-			t.Fatalf("a file asking only an order holds the leads %v; want the one in the queue", leads)
+			t.Fatalf("a file asking only an order holds the leads %v; want the seeded lead", leads)
 		}
 		for _, asked := range []string{"severity=high", "q=leak", "exploited=true", "beneath=zlib"} {
 			code, said, header, rows := findingsFile(t, r, "internal-reader",
@@ -146,6 +146,24 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 	})
 }
 
+// A lead whose dismissal waits for a second person is open, and a findings
+// file holds it, as it holds a finding a claim waits on, though the queue
+// leaves it out.
+func TestAFindingsFileHoldsAnOpenLeadAClaimWaitsOn(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		decideLead(t, r, place,
+			`{"outcome":"dismissed","reason":"false_positive","reasoning":"checked a line above"}`)
+		if queue := leadsOf(t, r, "internal-reader", ""); queue.Total != 0 || queue.Waiting != 1 {
+			t.Fatalf("the queue is %+v; want the lead left out as waiting, or this checks nothing", queue)
+		}
+		_, _, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv")
+		if leads := leadRowsIn(t, header, rows); len(leads) != 1 || leads[0]["issue"] != "clang-tidy/leak" {
+			t.Errorf("the findings file holds the leads %v; want the lead a claim waits on", leads)
+		}
+	})
+}
+
 // A lead in the queue reaches none of the vulnerability figures: a product's
 // overview counts nothing open for a reader of internal work alone. The VEX
 // document's exclusion is pinned beside the other vulnerability consumers,
@@ -154,7 +172,7 @@ func TestALeadInTheQueueReachesNoFigure(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		httpapitest.SeededLead(t, r)
 		if got := leadsOf(t, r, "internal-reader", ""); got.Total != 1 {
-			t.Fatalf("the queue holds %d leads; want the one pulled in, or this checks nothing", got.Total)
+			t.Fatalf("the queue holds %d leads; want the seeded lead, or this checks nothing", got.Total)
 		}
 		var overview struct {
 			Open      int `json:"open"`

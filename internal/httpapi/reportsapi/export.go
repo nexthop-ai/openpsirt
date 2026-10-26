@@ -80,8 +80,10 @@ func registerExport(api huma.API, in core.Deps) {
 			"Read with your own visibility, as it streams. It is the same query the screen " +
 			"reads, paged and written out as it goes.\n\n" +
 			"The line this deployment triages at is stated in the file.\n\n" +
-			"Below the findings come the static analysis leads of the same branch or tag and " +
-			"variant, as the lead queue lists them, where you read them: `lead` is true on those " +
+			"Below the findings come every open static analysis lead of the same branch or tag " +
+			"and variant, in the lead queue's order, where you read them, those a claim waits on " +
+			"included and those open only in releases past their end of life left out: `lead` is " +
+			"true on those " +
 			"rows, and `path`, `line`, `function`, `message` and `withheld` say where each is and " +
 			"what the analyzer said. A lead in a case you are not on has an empty message and " +
 			"`withheld` true. No row carries source text. A lead carries no rating, component or " +
@@ -161,9 +163,9 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"screen reads, paged and written out as it goes.\n\n" +
 			"Each product applies its own triage line, so the file states that rather than " +
 			"naming one line, and `product` is a column.\n\n" +
-			"Below the findings come the static analysis leads of every product, as each " +
-			"product's lead queue lists them, where you read them, by product name. The columns " +
-			"and the rule about filters are the product export's.\n\n" +
+			"Below the findings come the open static analysis leads of every product, by " +
+			"product name, as the product export writes them. The columns and the rule about " +
+			"filters are the product export's.\n\n" +
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
 			"not offered here, for the reason that list gives.",
 		Tags: []string{"Findings"},
@@ -264,7 +266,7 @@ func findingCells(g finding.Group) []string {
 
 // leadsListed is what a findings file says about its leads where it holds
 // them.
-const leadsListed = "the lead queue, below the findings: open leads nothing waits on"
+const leadsListed = "every open lead, below the findings, those a claim waits on included and those open only in releases past their end of life left out"
 
 // withLeads is the fact a findings file states about the leads it holds. A
 // lead carries no rating, component, upstream, decision or deadline, so a
@@ -280,15 +282,16 @@ func withLeads(by core.Narrowing, at core.AtOneBuild) core.Stated {
 	return core.Stated{Label: "leads", Value: leadsListed}
 }
 
-// leadRows is the leads of one product's queue in a selection, as findings
-// file rows, with the product's name in front where the file spans products.
+// leadRows is the open leads of one product in a selection, as findings file
+// rows, with the product's name in front where the file spans products.
 //
-// The queue's own read, under its visibility: a lead in a case the reader is
+// The lead queue's read, under its visibility, with the leads a claim waits
+// on kept in: a lead in a case the reader is
 // not on is a row with an empty message, and none carries source text. A
 // product whose leads the reader may not read is a part holding no row.
 func leadRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
 	return func(ctx context.Context, limit, offset int) ([][]string, error) {
-		queue, err := analysis.LeadsOf(ctx, in.DB.DB, subject, scope, "", limit, offset)
+		queue, err := analysis.OpenLeadsOf(ctx, in.DB.DB, subject, scope, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil
 		}

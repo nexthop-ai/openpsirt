@@ -105,6 +105,23 @@ type Queue struct {
 // security severity for the rule, its precision, then newest first.
 func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
+	return leadsOf(ctx, db, subject, scope, want, false, limit, offset)
+}
+
+// OpenLeadsOf is one page of the leads a findings file holds: every open lead
+// of the selection, the ones a claim waits on included, as the file's findings
+// rows include a finding a claim waits on. A lead open only in releases past
+// their end of life is left out, as the queue leaves it out. Ordered as the
+// queue is.
+func OpenLeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
+	limit, offset int) (*Queue, error) {
+	return leadsOf(ctx, db, subject, scope, "", true, limit, offset)
+}
+
+// leadsOf is LeadsOf, with the open leads a claim waits on kept in where
+// waiting is set and no state is named.
+func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
+	waiting bool, limit, offset int) (*Queue, error) {
 
 	visible, err := access.Readable(subject, scope.ProductID)
 	if err != nil {
@@ -121,7 +138,11 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		return nil, err
 	}
 	queued := func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where(`"l"."stands" = ?`, string(Open)).Where(`"l"."awaits" = 0`)
+		q = q.Where(`"l"."stands" = ?`, string(Open))
+		if waiting {
+			return q
+		}
+		return q.Where(`"l"."awaits" = 0`)
 	}
 	listed := func(q *bun.SelectQuery) *bun.SelectQuery {
 		if want != "" {

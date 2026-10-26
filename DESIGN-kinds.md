@@ -92,15 +92,15 @@ and a kind it does not name never reaches it.
 Analysis findings are included by Evidence, Leads, Decisions, Assignment and
 Exports alone: a lead is read through the lead queue, its evidence and the
 claims about it (`DESIGN-analysis.md` § Lead triage), held the way a finding
-is, and a findings list's file writes out the queue of its selection beside the
-list's rows. The record's file follows Decisions and includes claims about
+is, and a findings list's file writes out the open leads of its selection
+beside the list's rows. The record's file follows Decisions and includes claims about
 leads, because it writes what the record shows, under the same visibility
 (REQ-50). `DESIGN-interface.md` § Static analysis leads holds the screens.
 
 | Rule | |
 |---|---|
 | Exports names the findings lists' files alone, and the disposition register is Register | The register states the decision at every place of a build beside its VEX document, and reads findings rows by the consumer it names. Naming analysis on one consumer covering both would put every lead into a statement about what a build ships |
-| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-reporting.md` § Exports), and the queue's file and a findings file then hold one population of leads |
+| A findings list's file reads its leads through the Leads consumer's read, and its other rows through the list's own | A list and its file are one read (`DESIGN-reporting.md` § Exports), and a findings file holds the open leads under the queue's visibility and in its order |
 | The counts by series are part of Leads, not of Statistics | Statistics feeds the vulnerability figures, and a lead nobody has judged is not one of them |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
 | Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |
