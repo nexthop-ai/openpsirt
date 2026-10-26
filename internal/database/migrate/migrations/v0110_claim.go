@@ -13,8 +13,9 @@ import (
 // match on.
 func claimStampV0110(t *columnTypes) []string {
 	return []string{
-		// Changed by every write to the claim or its rows, and by a lead's
-		// hand-off resting on it, each matching the value it read. A write
+		// Changed by a lead's hand-off resting on the claim, and by revising,
+		// withdrawing, approving, setting aside, sending back or undoing the
+		// approval of it, each matching the value it read. A write
 		// matching none lost a race with another and is taken again, so a
 		// hand-off and a withdrawal of the claim it rests on cannot both
 		// commit. A claim with no row here holds the stamp zero.
