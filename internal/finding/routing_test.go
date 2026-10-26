@@ -6,6 +6,7 @@ package finding_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -17,8 +18,32 @@ import (
 // team declares a team to route work to.
 func (f *fixture) team(t *testing.T, name string) int64 {
 	t.Helper()
-	one, err := access.NewStore(f.db.DB).DeclareTeam(t.Context(), name, name)
+	return f.teamReading(t, name, access.PublicRead, access.PrivateRead, access.InternalRead)
+}
+
+// teamReading declares a team whose one member holds these roles on the
+// fixture's product, or a team of nobody where none is named.
+func (f *fixture) teamReading(t *testing.T, name string, roles ...access.Role) int64 {
+	t.Helper()
+	ctx := t.Context()
+	rights := access.NewStore(f.db.DB)
+	one, err := rights.DeclareTeam(ctx, name, name)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if len(roles) == 0 {
+		return one.ID
+	}
+	member, err := rights.Ensure(ctx, name+"@example.com", name, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range roles {
+		if err := rights.GrantRole(ctx, member.ID, f.productID, role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := rights.AddToTeam(ctx, one.ID, member.ID, member.ID); err != nil {
 		t.Fatal(err)
 	}
 	return one.ID
@@ -521,9 +546,15 @@ func leadsAt(t *testing.T, f *fixture) {
 // placed on its build, leads and the rest apart.
 func placedByRule(t *testing.T, f *fixture) (leads map[access.Visibility]int, others int) {
 	t.Helper()
+	return placedWith(t, f, f.team(t, "platform"))
+}
+
+// placedWith is placedByRule with the rule pointing at the team named.
+func placedWith(t *testing.T, f *fixture, team int64) (leads map[access.Visibility]int, others int) {
+	t.Helper()
 	ctx := t.Context()
 	who := f.planner(t, access.PublicTriage, access.Assigner)
-	if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "platform"), "the library",
+	if _, err := f.store.AddRule(ctx, who, f.productID, team, "the library",
 		"", "libnl-3-*"); err != nil {
 		t.Fatal(err)
 	}
@@ -579,6 +610,16 @@ func TestARoutingRulePlacesNoLeadPastItsEndOfLife(t *testing.T) {
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
+		// The preview asks what the sweep asks: the vulnerability is the one
+		// piece left to place.
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "", "libnl-3-*", 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Work != 1 || caught.Unheld != 1 {
+			t.Errorf("the preview counts %d pieces, %d unheld; want the vulnerability alone", caught.Work, caught.Unheld)
+		}
 		leads, others := placedByRule(t, f)
 		if len(leads) != 0 {
 			t.Errorf("the rule placed leads past their end of life: %v", leads)
@@ -614,4 +655,34 @@ func TestARulePreviewCountsEachLeadItWouldPlace(t *testing.T) {
 				caught.Work, caught.Unheld, leads)
 		}
 	})
+}
+
+// A rule places work only at a visibility one member of its team reads, as a
+// hand assignment to the team asks: what nobody on it reads stays with nobody.
+func TestARoutingRulePlacesOnlyWhatOneMemberOfItsTeamReads(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		roles  []access.Role
+		leads  []access.Visibility
+		others bool
+	}{
+		{"disclosed", []access.Role{access.PublicRead}, nil, true},
+		{"internal", []access.Role{access.InternalRead}, []access.Visibility{access.Internal}, true},
+		{"nobody", nil, nil, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				leadsAt(t, f)
+				leads, others := placedWith(t, f, f.teamReading(t, "desk", c.roles...))
+				for _, v := range []access.Visibility{access.Internal, access.Private} {
+					if want := slices.Contains(c.leads, v); (leads[v] > 0) != want {
+						t.Errorf("the rule placed %d leads at %s; want them placed: %v", leads[v], v, want)
+					}
+				}
+				if (others > 0) != c.others {
+					t.Errorf("the rule placed %d vulnerabilities; want them placed: %v", others, c.others)
+				}
+			})
+		})
+	}
 }

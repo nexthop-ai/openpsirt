@@ -255,11 +255,19 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 	// the write re-checks the holder so that an assignment landing between the
 	// read and the write is not overwritten.
 	var ids []int64
+	holdable, err := s.holdableBy(ctx, rule.TeamID, productID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if len(holdable) == 0 {
+		return 0, 0, nil
+	}
 	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	page := s.db.NewSelect().Model((*Finding)(nil)).
 		Column("id").
 		Where(`"closed_at" IS NULL`).
 		Where(`"assigned_to" IS NULL`).
+		Where(`"f"."visibility" IN (?)`, bun.List(holdable)).
 		Where(inThisProduct, productID).
 		Where(kinds, kindArgs...).
 		Limit(int64(room))
@@ -314,6 +322,36 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule Routing,
 		return 0, 0, fmt.Errorf("place what that rule matched: %w", err)
 	}
 	return len(ids), int(n), nil
+}
+
+// holdableBy is every visibility a team may be handed work at in a product:
+// undisclosed and internal work where one member reads it, and disclosed work
+// where one member reads the product at any visibility, because disclosed
+// work travels with the assignment. The rule a hand assignment to the team
+// asks.
+//
+// Asked of each place rather than of a group, so an undisclosed place nobody
+// on the team reads is left with nobody while the disclosed places beside it
+// are placed. A person who reads it picks it up from the unassigned list.
+func (s *Store) holdableBy(ctx context.Context, teamID, productID int64) ([]access.Visibility, error) {
+	rights := access.NewStore(s.db)
+	var out []access.Visibility
+	for _, v := range []access.Visibility{access.Private, access.Internal} {
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, v)
+		if err != nil {
+			return nil, err
+		}
+		if reads {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, access.Public)
+		if err != nil || !reads {
+			return nil, err
+		}
+	}
+	return append(out, access.Public), nil
 }
 
 // bySource narrows to the components a source-package rule names.
@@ -397,6 +435,9 @@ type Catches struct {
 // than spelling them twice, because a preview that disagreed with the rule
 // would be a confident wrong answer about the one thing nobody can otherwise
 // see.
+//
+// It names no team, so it counts work at every visibility the asker reads,
+// where the sweep places only what one member of the rule's team reads.
 //
 // It does not account for the rules already there. First match wins, so
 // what this catches is what it would place only where no earlier rule claimed

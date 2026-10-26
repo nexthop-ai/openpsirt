@@ -122,8 +122,10 @@ func TestRetiringARuleLeavesWhatItPlaced(t *testing.T) {
 	// that holds for a team's queue as much as for a person.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
+		// A member who reads the product, so the rule has somewhere to place
+		// what it matches.
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
-			`{"name":"curlers"}`); made.Code != http.StatusCreated {
+			`{"name":"curlers","members":["reader"]}`); made.Code != http.StatusCreated {
 			t.Fatal(made.Body.String())
 		}
 		made := httpapitest.AsPerson(t, r, "assigner", http.MethodPost, "/v1/products/mine/routing-rules",
