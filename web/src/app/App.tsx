@@ -11,7 +11,7 @@ import { snapshot, subscribe } from "./ended";
 import { Boundary } from "./Boundary";
 import { Moved, built } from "./moved";
 import { retrying } from "./retrying";
-import { ROUTES, dependenciesAt, inventoriesAt, inventoryChangesAt, personAt } from "./routes";
+import { ROUTES, dependenciesAt, uploadsAt, inventoryChangesAt, personAt } from "./routes";
 import { Shell } from "./Shell";
 import { SignIn, forgetForward } from "../screens/SignIn";
 import { Component } from "../screens/Component";
@@ -63,7 +63,7 @@ const Upgrades = retrying(() => import("../screens/Upgrades").then((m) => m.Upgr
 const MatchCoverage = retrying(() =>
   import("../screens/MatchCoverage").then((m) => m.MatchCoverage),
 );
-const Inventories = retrying(() => import("../screens/Inventories").then((m) => m.Inventories));
+const Uploads = retrying(() => import("../screens/Uploads").then((m) => m.Uploads));
 const Settings = retrying(() => import("../screens/Settings").then((m) => m.Settings));
 const System = retrying(() => import("../screens/System").then((m) => m.System));
 const TheRecord = retrying(() => import("../screens/TheRecord").then((m) => m.TheRecord));
@@ -175,7 +175,8 @@ export function App() {
               <Route path={ROUTES.finding} element={<Finding />} />
               <Route path={ROUTES.dependencies} element={<Dependencies />} />
               <Route path={ROUTES.decide} element={<Together />} />
-              <Route path={ROUTES.inventories} element={<Inventories />} />
+              <Route path={ROUTES.uploads} element={<Uploads />} />
+              <Route path={ROUTES.uploadsOf} element={<Uploads />} />
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
@@ -235,10 +236,18 @@ export function App() {
               />
               <Route
                 path={ROUTES.formerInventories}
-                element={<Moved to={(at) => inventoriesAt(built(at))} />}
+                element={<Moved to={(at) => uploadsAt(built(at))} />}
               />
               <Route
                 path={ROUTES.formerInventoryChanges}
+                element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
+              />
+              <Route
+                path={ROUTES.formerUploads}
+                element={<Moved to={(at) => uploadsAt(built(at))} />}
+              />
+              <Route
+                path={ROUTES.formerUploadChanges}
                 element={<Moved to={(at) => inventoryChangesAt(built(at), Number(at.scan))} />}
               />
               {/* An address this application does not answer. It says so, and

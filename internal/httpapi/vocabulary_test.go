@@ -195,6 +195,8 @@ func statedVocabularies() map[string][]string {
 		"run statuses":                   words(series.Statuses()),
 		"reasons a run is not compared":  words(series.Reasons()),
 		"document kinds":                 words(ingest.Kinds()),
+		"upload types":                   words(ingest.UploadTypes()),
+		"upload statuses":                words(ingest.UploadStatuses()),
 		"access modes":                   words(access.Modes()),
 		"grant sources":                  words(access.Sources()),
 		"email sources":                  words(access.EmailSources()),

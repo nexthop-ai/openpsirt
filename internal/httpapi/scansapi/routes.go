@@ -18,6 +18,8 @@ func Register(api huma.API, in core.Deps) {
 	registerAnalyses(api, in)
 	registerAnalysisReceipts(api, in)
 	registerReceipts(api, in)
+	// Every kind of upload a build takes, with the newest of each.
+	registerUploads(api, in)
 	// Reading back a document a build sent.
 	registerRetained(api, in)
 	// One run of the scanner.

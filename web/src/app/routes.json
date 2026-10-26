@@ -113,9 +113,10 @@
     "path": "/products/:product/streams/:stream/variants/:variant/components/:component/decide",
     "query": ["contains", "ecosystem", "namespace", "version"]
   },
-  "inventories": { "path": "/products/:product/streams/:stream/variants/:variant/inventories" },
+  "uploads": { "path": "/products/:product/streams/:stream/variants/:variant/uploads" },
+  "uploadsOf": { "path": "/products/:product/streams/:stream/variants/:variant/uploads/:type" },
   "inventoryChanges": {
-    "path": "/products/:product/streams/:stream/variants/:variant/inventories/:scan/changes"
+    "path": "/products/:product/streams/:stream/variants/:variant/uploads/:scan/changes"
   },
   "run": { "path": "/products/:product/streams/:stream/variants/:variant/runs/:run" },
   "upgrades": { "path": "/products/:product/streams/:stream/variants/:variant/pending-upgrades" },
@@ -169,6 +170,12 @@
     "path": "/products/:product/streams/:stream/variants/:variant/components"
   },
   "formerInventories": { "path": "/products/:product/streams/:stream/variants/:variant/scans" },
+  "formerUploads": {
+    "path": "/products/:product/streams/:stream/variants/:variant/inventories"
+  },
+  "formerUploadChanges": {
+    "path": "/products/:product/streams/:stream/variants/:variant/inventories/:scan/changes"
+  },
   "formerInventoryChanges": {
     "path": "/products/:product/streams/:stream/variants/:variant/scans/:scan/changes"
   }

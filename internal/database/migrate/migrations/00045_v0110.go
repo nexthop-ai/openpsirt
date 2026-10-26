@@ -44,6 +44,9 @@ func upV0110(ctx context.Context, sqldb *sql.DB) error {
 //   - A notification records whether what it withholds is internal work.
 //   - A claim has a stamp, in a table of its own, that a hand-off resting on
 //     it and the writes that could take that support away change.
+//   - A product records each VEX document and supplier advisory that arrived
+//     for it: who sent it or which feed fetched it, when, and what became of
+//     it.
 func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
@@ -55,7 +58,7 @@ func upgradeV0110(ctx context.Context, tx bun.Tx) error {
 	}
 	for _, step := range []func(context.Context, bun.Tx) error{
 		issueKindV0110, createSeriesV0110, createRepositoryV0110, graphNodeRepositoryV0110, createLeadV0110,
-		notificationInternalV0110, createClaimStampV0110,
+		notificationInternalV0110, createClaimStampV0110, createDocumentUploadV0110,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

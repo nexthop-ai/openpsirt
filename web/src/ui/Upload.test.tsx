@@ -41,8 +41,8 @@ describe("an upload that is already held", () => {
     mount.render(
       screen(
         <UploadDrawer open onClose={() => undefined} />,
-        "/products/sonic/streams/master/variants/broadcom/inventories",
-        "/products/:product/streams/:stream/variants/:variant/inventories",
+        "/products/sonic/streams/master/variants/broadcom/uploads",
+        "/products/:product/streams/:stream/variants/:variant/uploads",
       ),
     );
     await settle();
@@ -84,8 +84,8 @@ describe("the inventory picker", () => {
     mount.render(
       screen(
         <UploadDrawer open onClose={() => undefined} />,
-        "/products/sonic/streams/master/variants/broadcom/inventories",
-        "/products/:product/streams/:stream/variants/:variant/inventories",
+        "/products/sonic/streams/master/variants/broadcom/uploads",
+        "/products/:product/streams/:stream/variants/:variant/uploads",
       ),
     );
     await settle();

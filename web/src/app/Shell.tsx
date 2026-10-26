@@ -12,7 +12,7 @@ import { TO_THE_TOP, useTopOnArrival } from "./arrival";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import {
   inboxAt,
-  inventoriesAt,
+  uploadsAt,
   leadsAt,
   issueAt,
   streamsAt,
@@ -255,12 +255,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               label="Dependencies"
               needs={whole}
             />
-            <Rail
-              to={build ? inventoriesAt(build) : ""}
-              icon="scan"
-              label="Inventories"
-              needs={whole}
-            />
+            <Rail to={build ? uploadsAt(build) : ""} icon="scan" label="Uploads" needs={whole} />
             {/* What this build is waiting on, which is the fix-bundle view read
               from the other end. */}
             <Rail

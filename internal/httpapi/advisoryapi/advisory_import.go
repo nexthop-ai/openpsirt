@@ -68,8 +68,10 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		// it is not consulted for multipart at all — so the whole body is
 		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: core.MaxUpload(in.Limits),
-		Middlewares: huma.Middlewares{core.BoundedForm(api, in,
-			core.Admission{Limit: core.Fixed(core.MaxUpload(in.Limits))})},
+		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
+			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
+			Refused: turnedAwayBeforeReading(in, finding.FromAdvisory),
+		})},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		RawBody huma.MultipartFormFiles[advisoryParts]
@@ -80,6 +82,11 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		}
 
 		file := input.RawBody.Data().Advisory
+		// Every refusal past this point is recorded against the product, as
+		// far as the document had been read.
+		from := finding.Supplied{
+			Source: finding.FromAdvisory, Document: documentName(file.Filename), Arrived: &finding.Arrival{},
+		}
 		var advisory sbom.Advisory
 		digest, err := uploaded(in, file, func(r io.Reader) error {
 			var err error
@@ -87,8 +94,10 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 			return err
 		})
 		if err != nil {
+			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
+		from.Digest = digest
 
 		// Both names are part of the key a later upload supersedes on, and
 		// both are stored in a column of a fixed width. Refused rather than
@@ -103,25 +112,26 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		// or hide text.
 		advisory.Publisher = strings.TrimSpace(attach.Visible(advisory.Publisher))
 		advisory.Identifier = strings.TrimSpace(attach.Visible(advisory.Identifier))
+		from.Publisher, from.Identifier = advisory.Publisher, advisory.Identifier
 		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
-			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records",
 				finding.MostPublisher))
+			turnedAway(ctx, in, by, product.ID, from, refused)
+			return nil, refused
 		}
 		if utf8.RuneCountInString(advisory.Identifier) > finding.MostDocumentName {
-			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"the name the publisher gave it is longer than the %d characters this records",
 				finding.MostDocumentName))
+			turnedAway(ctx, in, by, product.ID, from, refused)
+			return nil, refused
 		}
 
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, finding.Supplied{
-			Source:     finding.FromAdvisory,
-			Identifier: advisory.Identifier,
-			Publisher:  advisory.Publisher,
-			Document:   documentName(file.Filename),
-			Digest:     digest,
-		}, advisory.Claims, "Advisory "+advisory.Identifier+" from "+advisory.Publisher)
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, advisory.Claims,
+			"Advisory "+advisory.Identifier+" from "+advisory.Publisher)
 		if err != nil {
+			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
 

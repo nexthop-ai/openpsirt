@@ -9,7 +9,7 @@ import {
   ROUTES,
   allFindingsAt,
   buildFindingsAt,
-  inventoriesAt,
+  uploadsAt,
   productAt,
   productFindingsAt,
   sameProductScreenAt,
@@ -77,7 +77,7 @@ export function onFindings(pathname: string): boolean {
 // The address of the findings list for a selection.
 //
 // A whole build keeps the path it has, because the screens around it — the
-// finding, the tree, the inventories — are that build's and share the prefix.
+// finding, the tree, the uploads — are that build's and share the prefix.
 // Anything wider is the product's list carrying the levels that are set, so
 // the address says what is being answered for and can be sent to somebody.
 // The parameters the list writes into its own address when the address says
@@ -273,9 +273,9 @@ export function rescoped(pathname: string, to: Scoped): string | null {
     if (!to.product || !to.stream || !to.variant) return null;
     const whole = { product: to.product, stream: to.stream, variant: to.variant };
     // A run and an inventory are the old build's, and the new one has neither
-    // under that number, so a change lands on the new build's inventories.
+    // under that number, so a change lands on the new build's uploads.
     if (matchPath(ROUTES.run, pathname) || matchPath(ROUTES.inventoryChanges, pathname)) {
-      return inventoriesAt(whole);
+      return uploadsAt(whole);
     }
     // Cut from the address as it stands rather than read from the match,
     // whose splat has an escaped slash turned back into a separator.

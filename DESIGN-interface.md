@@ -35,7 +35,7 @@ end rather than left to be found by clicking.
 - [The review queue](#the-review-queue)
 - [The claim page](#the-claim-page)
 - [Assignments and routing rules](#assignments-and-routing-rules)
-- [Catalog and inventories](#catalog-and-inventories)
+- [Catalog and uploads](#catalog-and-uploads)
 - [Product and scan-run pages](#product-and-scan-run-pages)
 - [Flaw entry](#flaw-entry)
 - [The inbox](#the-inbox)
@@ -236,11 +236,11 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Reporting a flaw, what is disclosing, the advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The findings, the dependency tree, the uploads and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Reporting a flaw, what is disclosing, the advisories and what is exploited here sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
-With a product, branch or variant unpicked, the tree and inventories entries are
+With a product, branch or variant unpicked, the tree and Uploads entries are
 disabled and say why. Findings is not one of them: it takes whatever is
 selected, and the count beside it is of what the list it opens will show. It is
 asked with the narrowings the list writes into its own address when the address
@@ -251,7 +251,7 @@ Other bar rules:
 - The search in the bar is the findings list's own search, reached without
   going there first. "/" focuses it, unless somebody is already typing.
 - Upload is in the bar on every screen (REQ-05), because the form picks its own
-  target; the inventories screen has it too, because that is where the result
+  target; the Uploads screen has it too, because that is where the result
   appears.
 - On a narrow screen the rail goes and a tab bar of three arrives — home,
   findings, queue — which is what somebody reviews and responds from on a
@@ -320,7 +320,7 @@ screen answering the question just asked of it.
 | **The variant column does not empty while it narrows** | Picking a branch swaps what the column offers from the product's variants to that release's, which is a different question and a different read. The first stands in until the second arrives: it is a superset, and a column that goes blank in front of somebody halfway through choosing reads as the picker losing what it had |
 | **The picker asks for no counts** | What is open against a row is the expensive half of a catalog read — a list of two products answered in 0.39s against 1ms for a liveness probe, and the time went with the findings rather than the rows. This panel draws names. So the counts are a parameter the two screens whose subject they are pass, and everybody else gets the cheap answer |
 | Variants are unselectable on a build screen until a branch is picked | A build screen cannot be given half a scope, and a variant picked over no branch changes nothing and says nothing |
-| A run or an inventory's changes, rescoped, lands on the new build's inventories | Both are numbered within the old build, and the new one holds nothing under that number |
+| A run or an inventory's changes, rescoped, lands on the new build's uploads | Both are numbered within the old build, and the new one holds nothing under that number |
 | A screen saying what it needs picked opens this picker | One picker, in the bar. A report entry waiting on a product or a build opens it rather than drawing a second picker of its own, and brings the bar into view, since the bar does not follow the page down |
 
 ## Home
@@ -1238,7 +1238,7 @@ work nobody holds, and the rule will not take it back. Both are read off the
 places the reader may read, the places the card shows: read off one they may
 not, the holder names who is working undisclosed work.
 
-## Catalog and inventories
+## Catalog and uploads
 
 Adding to the catalog is an action, not a form above the table (REQ-60).
 Products, branches and tags, variants and users each carry an "add" control in
@@ -1259,8 +1259,9 @@ is what the screen is about.
 | A retired tag opens on its own release page and says it is retired | Its address is reached by a link somebody kept, so the page reads retired lines to resolve it. Nothing offers a retired tag as the release before another |
 | A retired variant is marked on the release that was built as it | It is gone from what the product declares and still named by the releases it was built as, because the findings filed against it are still open. Unmarked, a release names a build nothing will ever scan again and says nothing about why |
 | The edit says when a name can no longer be corrected | A published document is held by readers under the name it carried. The drawer says so where somebody is about to type a new one, rather than leaving the refusal to explain it afterwards |
-| An inventory can be uploaded from the interface (REQ-05) | From the bar and from the inventories screen. The drawer takes the target — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the inventories screen, where the receipt shows "queued" until the run says what it changed |
-| The screen that lists receipts is called Inventories | A scan is what the deployment does to an inventory after it arrives; what a person uploads is inventories |
+| An inventory can be uploaded from the interface (REQ-05) | From the bar and from the Uploads screen. The drawer takes the target — prefilled from the scope, refused by the server if undeclared — one inventory — CycloneDX or SPDX, as the file itself says — and any number of OpenVEX suppression documents, which is what the endpoint takes. It posts the same multipart request a pipeline sends, then opens the Uploads screen, where the receipt shows "queued" until the run says what it changed |
+| The screen that lists receipts is called Uploads, with one tab per kind of upload | SBOMs, static analysis runs, VEX documents and supplier advisories. § The Uploads screen holds the tabs |
+| The SBOM tab is the receipts | Everything below about receipts is that tab's |
 | It says what each run changed, and what the numbers were measured against | Which scanner, at which version, reading which vulnerability database. Without it, a build with nothing wrong and a build last measured against a months-old database read identically. A run covers a build rather than an upload, so where several uploads are answered by one run the numbers sit on the newest and the rest are blank |
 | A run that changed nothing says 0; a row with no numbers to report is blank | Both were drawn as a dash, so an upload superseded before anything read it read as a scan that found the build clean. The wire tells them apart too — a count that drops its zero cannot |
 | Each receipt says what its upload did to the build's contents, and opens the names behind it | Removals are marked and drawn first: a build that stopped describing a dependency looks exactly like one that stopped shipping it. An upload that moved nothing says so, and the first upload read for a build says nothing at all, because it is a picture rather than a change to one |
@@ -1289,6 +1290,35 @@ carries the two builds picked there, and picks its own pair the same way.
 | The chosen kind is in the address | A link somebody shares opens the same narrowing |
 | The file is the narrowing on the screen | CSV and JSON take the same two builds and the same kind |
 | A build with no inventory is said in words | The server refuses rather than listing every name of the other build as added |
+
+### The Uploads screen
+
+One build's uploads, a tab per kind, each tab reading that kind's own list.
+What each list holds is `DESIGN-ingest.md` § Upload listing.
+
+| Tab | Holds |
+|---|---|
+| SBOMs | The build's receipts, the builds gone quiet, the scanner, and what a new line inherits |
+| Static analysis | The build's runs, newest first, with their status and counts, and the last upload of each series turned away |
+| VEX documents | Every one uploaded to the product, newest first, taken or refused |
+| Supplier advisories | Every one that arrived for the product, uploaded or fetched by a feed, newest first, taken or refused |
+
+| Rule | |
+|---|---|
+| The tabs are the kinds the every-kind list names | A kind the reader may not read has no tab. A reader of disclosed findings has no static analysis tab |
+| A tab whose newest upload failed or was turned away is marked | The newest upload is what a pipeline owner checks. A failure on a tab nobody opened is otherwise invisible |
+| Each tab carries how many its list holds | The figure the every-kind list counts, never the length of a page |
+| The tab is in the address, and SBOMs is the bare address | A link lands on one kind. An address naming a kind the reader has no tab for opens SBOMs |
+| The body waits for the every-kind list | Drawn before it, an address naming a kind the reader may not read asks that kind's list and draws its refusal |
+| The VEX documents and supplier advisories tabs are product-wide | They are uploaded to the product, so every build of it shows the same ones. Each says "All builds of this product" above its list and on hover |
+| A document row says who sent it | The uploader's display name, or the supplier's name and "feed" where a feed fetched it |
+| A refused document says why | The reason the sender was told, under its state |
+| The newest taken copy of a document is marked Current | What it says is what stands. An earlier copy is kept and replaced |
+| An address a feed fetched an advisory from is not a link | It is a third party's URL, shown on hover |
+| Upload stays where it is | The bar and this screen upload an inventory. VEX documents and supplier advisories are uploaded from the suppliers settings, which the empty tab links |
+| An empty document tab says earlier uploads are not listed | Uploads before v0.11.0 have no record, and their statements still apply. Read as "nothing applies here" otherwise |
+| An upload from anywhere asks the every-kind list again | A refusal is recorded too, so the counts and the marks move whatever the answer |
+| Each document tab opens on its first page | The page reached on one kind is not carried to the other |
 
 ### The repositories screen
 
@@ -1668,7 +1698,7 @@ right answer's confidence.
 |---|---|
 | Every read has an arm for its failure, beside the arm for its data | A 500 drawn as zero, as an empty list or as a spinner that never stops is a screen stating something nobody computed. "Nothing changed between those two releases" was what a failed release-note read said |
 | A read is asked again only where asking again could answer differently | A fault, a request that never arrived, a timeout and a rate limit are retried twice. Every other refusal is drawn at once: retried, a 403 or a 404 holds the not-yours card back about three seconds behind identical requests |
-| A page is asked for on a timer only while something on it is moving | The receipts on Inventories are asked for again every 15 s while an upload on the page is still being read or scanned, and not once every upload has settled. An answer that cannot move costs the server the same each time, for every screen left open on it |
+| A page is asked for on a timer only while something on it is moving | The receipts on Uploads are asked for again every 15 s while an upload on the page is still being read or scanned, and not once every upload has settled. An answer that cannot move costs the server the same each time, for every screen left open on it |
 | A refusal is an answer; a fault is not | 403 and 404 say this is not yours to see, and the card that shows it stays quiet. Anything else is a question nobody answered, and it is said. The two were one test — "the read failed" — so a card hiding itself for the first hid itself for the second |
 | A count from a page is not a count | Where the server reports how many there are, that is the figure. Where it only caps what it returns, the list says the cap was reached. A tile counting its own page said 200 over a list of 462 |
 | A set read under a cap is never written back whole | The affected-build editor sends the complete list and the server closes everything absent from it, so a page short of the answer is a write that closes the rest. It refuses to edit rather than editing part |
@@ -1881,7 +1911,7 @@ since a person only ever sees products they hold a role on.
 | A setting whose value is one of a few words is a select, not a text box | A free field invites a value the server then refuses, and for a switch it invites "true", "yes" and "1", none of which are what it takes |
 | The server takes a word without regard to capitals or surrounding spaces, and stores it as its list spells it | A word is typed by whoever calls the API. The deployment's triage floor and a product's own take `High` alike |
 | A setting nobody has set is composed like one that is set | Nothing to read is not a value the composer refuses. The embargo periods arrive with no value at all, and they fell to the plain box kept for a duration this cannot say — which is the one control that cannot ask whether a typed 90 means hours, days or weeks. An empty composer opens on days, because a period nobody has set here is an embargo and an embargo is said in days |
-| What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already, how many are past their date and how many cover nothing here, and offers the rest as a list to tick. A promised upgrade that moved is counted on a line of its own that says to plan it again from the component. Only two of the six groups are questions, and the screen says which |
+| What a new line inherits is on the SBOM tab of Uploads | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already, how many are past their date and how many cover nothing here, and offers the rest as a list to tick. A promised upgrade that moved is counted on a line of its own that says to plan it again from the component. Only two of the six groups are questions, and the screen says which |
 | What was recorded here is a filter | A flaw somebody entered is the only kind a person may close by hand (REQ-19), and the screen that records one is where "is this already filed" gets asked. Offered on the list and linked from the recording screen, with the line off, because the question is what exists rather than what is worth an afternoon |
 | **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
 | **A setting's control is identified by a generated id, never by its key** | The prose moved off the control and the key stayed on it as `id`, and `signin.claim-window` is a sign-in field to a manager reading attributes however many ignore flags sit beside it. `name` was already pinned to a constant for this; `id` was the half that was missed. Generated rather than sanitized, because sanitizing moves the problem to the next key somebody adds |
@@ -2165,7 +2195,7 @@ than inherited.
 | A personal token's reach is chosen after it is made | The narrowing is fixed at creation, so it is asked for there. The list carries what each token reaches, because a credential whose scope is invisible is one nobody withdraws with confidence |
 | A withdrawn credential leaves the list | Withdrawing marks rather than deletes, so that what used it stays answerable — so the row stays, dimmed, with the button replaced by the word. Drawing it unchanged, with a live button still on it, made withdrawing look like nothing had happened |
 | The sign-in screen is drawn where there is one way in | It is sent straight on to the provider. Nothing is collected there and there is nothing to choose, so the screen was a button whose only purpose was to be pressed. Three arrivals still draw it: the offer made over live work after a session ended, the one straight after a sign-out — where the provider still holds its own session, so forwarding signs somebody back in and makes signing out impossible — and any second arrival in a tab that already forwarded, because somebody refused after authenticating has to be able to reach a screen rather than be sent round again |
-| The inventories table carries product, branch and variant columns | The screen is scoped to one build, so those are the scope bar rather than a column repeated on every row. What it adds is when the producer says the build was made |
+| The SBOM table on Uploads carries product, branch and variant columns | The screen is scoped to one build, so those are the scope bar rather than a column repeated on every row. What it adds is when the producer says the build was made |
 | Settings write "3 days" in the field | The server takes and returns its own duration syntax, so what is typed is what is stored and the reading — "= 3 days" — sits beside it rather than in it |
 | A gray canvas with white cards raised on a shadow | One white plane with hairlines. § The work surface holds the whole of it |
 | Uppercase, letter-spaced labels over every block | Sentence case, at the small step, in the muted tone |

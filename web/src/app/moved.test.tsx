@@ -46,6 +46,6 @@ describe("a former address", () => {
         ROUTES.formerInventoryChanges,
         (at) => inventoryChangesAt(built(at), Number(at.scan)),
       ),
-    ).toBe("/products/sonic/streams/main/variants/broadcom/inventories/7/changes");
+    ).toBe("/products/sonic/streams/main/variants/broadcom/uploads/7/changes");
   });
 });

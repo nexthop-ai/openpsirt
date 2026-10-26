@@ -166,7 +166,7 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		"InboxWaiting":        weblink.InboxWaiting,
 		"InboxReport":         func(n string) string { return weblink.InboxReport(n, n) },
 		"Finding":             func(n string) string { return weblink.Finding(n, n, n, n, n, n) },
-		"Inventories":         func(n string) string { return weblink.Inventories(n, n, n) },
+		"Uploads":             func(n string) string { return weblink.Uploads(n, n, n) },
 		"Lead":                func(n string) string { return weblink.Lead(n, n, n, n) },
 		"Leads":               func(n string) string { return weblink.Leads(n, n, n, n, n) },
 		"LeadRules":           func(n string) string { return weblink.LeadRules(n) },

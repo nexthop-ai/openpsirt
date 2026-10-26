@@ -334,6 +334,12 @@ function Upload({ product }: { product: string }) {
       setFile(null);
       void queries.invalidateQueries({ queryKey: ["finding"] });
     },
+    // A refusal is recorded too, so the lists of uploads are asked again
+    // whatever the answer.
+    onSettled: () => {
+      void queries.invalidateQueries({ queryKey: ["uploads"] });
+      void queries.invalidateQueries({ queryKey: ["upload-documents"] });
+    },
   });
 
   return (

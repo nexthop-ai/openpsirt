@@ -188,6 +188,10 @@ type Supplied struct {
 	Publisher string
 	Document  string
 	Digest    string
+	// Arrived is how the document came to be recorded, which the record of
+	// uploads keeps beside the statements. Nil records the statements alone,
+	// which is how an upstream's documents are recorded.
+	Arrived *Arrival
 }
 
 // Sources are the kinds of document a third party's judgment arrives in, in
@@ -345,7 +349,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	}
 	publisher := typedname.Matching(from.Publisher)
 	identifier := strings.TrimSpace(from.Identifier)
-	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+	replace := func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
 		now := s.now().UTC().Truncate(time.Microsecond)
 
@@ -492,6 +496,12 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			recorded += len(batch)
 		}
 		return nil
+	}
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		if err := replace(ctx, tx); err != nil {
+			return err
+		}
+		return s.arrived(ctx, tx, by, productID, from, recorded, superseded)
 	})
 	return recorded, superseded, err
 }

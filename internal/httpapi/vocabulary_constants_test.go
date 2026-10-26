@@ -96,6 +96,8 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 		listed(notify.Lifetimes()),
 		listed(ingest.Progresses()),
 		listed(ingest.Kinds()),
+		listed(ingest.UploadTypes()),
+		listed(ingest.UploadStatuses()),
 		listed(patchbranch.States()),
 		listed(patchbranch.Steps()),
 		listed(currency.Whys()),

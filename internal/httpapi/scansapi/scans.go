@@ -240,7 +240,7 @@ func upload(ctx context.Context, in core.Deps, input *UploadInput) (*UploadOutpu
 		ParserVersion: version.Get().Version,
 		// Who sent this, recorded alongside the parser version, so the
 		// provenance of the data has an answer.
-		Credential: ingest.Sender(subject),
+		Credential: access.Sender(subject),
 	}
 
 	var (
@@ -352,8 +352,8 @@ func refusedAt(ctx context.Context, in core.Deps, subject access.Subject, refusa
 // refusedBeforeReading records an upload the form bound turned away before the
 // operation ran, against the build it names. The bound asks it only once the
 // sender has been admitted to that build.
-func refusedBeforeReading(in core.Deps) func(huma.Context, string) {
-	return func(hctx huma.Context, reason string) {
+func refusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
+	return func(hctx huma.Context, _ int, reason string) {
 		ctx := hctx.Context()
 		subject, named, err := admitted(ctx, in, hctx.Param("product"), hctx.Param("stream"),
 			hctx.Param("variant"))

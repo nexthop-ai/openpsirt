@@ -9,7 +9,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { BANDS } from "../ui/severities";
 import { lasted, on } from "../ui/when";
-import { buildFindingsAt, inventoriesAt } from "../app/routes";
+import { buildFindingsAt, uploadsAt } from "../app/routes";
 
 type Changed = {
   total?: number;
@@ -49,8 +49,8 @@ export function Run() {
     <div>
       <div className="screen-head">
         <span className="crumbs">
-          <Link to={inventoriesAt(build)} className="linkish" style={{ fontWeight: 500 }}>
-            Inventories
+          <Link to={uploadsAt(build)} className="linkish" style={{ fontWeight: 500 }}>
+            Uploads
           </Link>{" "}
           › <b>run {it.run_id}</b>
         </span>

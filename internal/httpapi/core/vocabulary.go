@@ -425,6 +425,18 @@ type Progress string
 // Schema offers every state an upload can reach.
 func (Progress) Schema(huma.Registry) *huma.Schema { return words(ingest.Progresses()) }
 
+// UploadType is one kind of upload.
+type UploadType string
+
+// Schema offers every kind of upload.
+func (UploadType) Schema(huma.Registry) *huma.Schema { return words(ingest.UploadTypes()) }
+
+// UploadStatus is what became of an upload, in the vocabulary every kind shares.
+type UploadStatus string
+
+// Schema offers every status an upload may hold.
+func (UploadStatus) Schema(huma.Registry) *huma.Schema { return words(ingest.UploadStatuses()) }
+
 // RunStatus is what became of an analyzer run.
 type RunStatus string
 

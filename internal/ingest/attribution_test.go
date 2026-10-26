@@ -379,7 +379,7 @@ func TestAKeyReadsEveryReceiptOnABuildItMayUploadTo(t *testing.T) {
 		for i, by := range []access.Subject{person, key} {
 			scan, _, err := s.Record(ctx, ingest.Arriving{
 				TargetID: target, ContentHash: string(by.Kind), BuiltAt: now.Add(time.Duration(i-3) * time.Hour),
-				ParserVersion: "test", Credential: ingest.Sender(by),
+				ParserVersion: "test", Credential: access.Sender(by),
 			})
 			if err != nil {
 				t.Fatal(err)

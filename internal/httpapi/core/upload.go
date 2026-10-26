@@ -36,9 +36,9 @@ type Admission struct {
 	// Limit is the largest request the route reads, decided per request.
 	Limit func(context.Context) (int64, error)
 	// Refused is told what was turned away after Admit let the caller
-	// through, so a route that records its refusals records these too. Nil
-	// records nothing.
-	Refused func(huma.Context, string)
+	// through, with the status it was answered, so a route that records its
+	// refusals records these too. Nil records nothing.
+	Refused func(huma.Context, int, string)
 }
 
 // Uploads counts the requests spooling a form at once, across every route
@@ -90,7 +90,7 @@ func BoundedForm(api huma.API, in Deps, admission Admission) func(ctx huma.Conte
 		r, w := humachi.Unwrap(ctx)
 		refuse := func(status int, said string) {
 			if admission.Refused != nil {
-				admission.Refused(ctx, said)
+				admission.Refused(ctx, status, said)
 			}
 			_ = huma.WriteErr(api, ctx, status, said)
 		}

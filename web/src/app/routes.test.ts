@@ -60,7 +60,7 @@ const SAMPLES: Record<string, () => string[]> = {
     routes.dependenciesAt(build, { at: odd, path: odd }),
   ],
   decideAt: () => [routes.decideAt(build, odd, { version: odd, ecosystem: odd, namespace: odd })],
-  inventoriesAt: () => [routes.inventoriesAt(build)],
+  uploadsAt: () => [routes.uploadsAt(build), routes.uploadsAt(build, "sarif")],
   inventoryChangesAt: () => [routes.inventoryChangesAt(build, 7)],
   runAt: () => [routes.runAt(build, 7)],
   upgradesAt: () => [routes.upgradesAt(build)],

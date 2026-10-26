@@ -24,7 +24,7 @@ import { Count, known, type Readable } from "../ui/Count";
 import {
   allFindingsAt,
   comparisonAt,
-  inventoriesAt,
+  uploadsAt,
   exploitedAt,
   productFindingsAt,
   reviewQueueAt,
@@ -1092,14 +1092,14 @@ function Status() {
       {whole && (
         <footer>
           <Link
-            to={inventoriesAt({
+            to={uploadsAt({
               product: at.product ?? "",
               stream: at.stream ?? "",
               variant: at.variant ?? "",
             })}
             className="linkish"
           >
-            View inventories →
+            View uploads →
           </Link>
         </footer>
       )}
