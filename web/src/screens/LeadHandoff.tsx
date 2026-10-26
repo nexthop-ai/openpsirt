@@ -74,6 +74,9 @@ function HandedOff({
 }) {
   const move = useMoveLead(build, place);
   const handed = evidence.handoff;
+  // What moving a kept lead in discloses, said before the button is pressed.
+  const offering = handsOff && handed !== undefined && !handed.moved && !handed.disclosed;
+  const offer = useHandoffOffer(build, place, offering);
   if (!handed) return null;
   return (
     <>
@@ -89,11 +92,15 @@ function HandedOff({
             {handed.disclosed && " · disclosed"}
           </span>
         </p>
+        {offering && offer.data && <Discloses discloses={offer.data.discloses} />}
+        {offering && offer.isError && (
+          <Failed error={offer.error} what="What a move discloses could not be read." />
+        )}
         {handsOff && !handed.disclosed && (
           <button
             type="button"
             className="btn quiet"
-            disabled={move.isPending}
+            disabled={move.isPending || (offering && !offer.data)}
             onClick={() => move.mutate(!handed.moved)}
             title={
               handed.moved
@@ -150,6 +157,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
   const handOff = useHandOff(build, place);
   const [picked, setPicked] = useState("");
   const [left, setLeft] = useState<Set<string>>(new Set());
+  const [added, setAdded] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState("");
   const [keep, setKeep] = useState<"keep" | "move">("keep");
 
@@ -166,9 +174,17 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
   const prefix = data.prefix ?? "";
   const suggestions = data.suggestions ?? [];
   const seen = data.seen ?? [];
-  const chosen = suggestions[Number(picked === "" ? 0 : picked)];
+  // A resembling component is a guess, so it is never picked for the person.
+  const first = suggestions[0];
+  const initial = first && first.from !== "resembles" ? "0" : "";
+  const value = picked === "" ? initial : picked;
+  const chosen = value === "" ? undefined : suggestions[Number(value)];
   const lacking = new Set((chosen?.lacking ?? []).map(buildKey));
-  const builds = seen.filter((b) => !left.has(buildKey(b)) && !lacking.has(buildKey(b)));
+  const unanalyzed = chosen?.unanalyzed ?? [];
+  const builds = [
+    ...seen.filter((b) => !left.has(buildKey(b)) && !lacking.has(buildKey(b))),
+    ...unanalyzed.filter((b) => added.has(buildKey(b))),
+  ];
   const ready = chosen !== undefined && builds.length > 0 && summary.trim() !== "";
   const discloses = data.discloses;
 
@@ -192,7 +208,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
       <h3>Hand off</h3>
       <ChoiceCards
         label="Component"
-        value={picked === "" ? "0" : picked}
+        value={value}
         onChange={setPicked}
         options={suggestions.map((each, i) => ({
           value: String(i),
@@ -231,18 +247,31 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
             </label>
           );
         })}
-        {(chosen?.unanalyzed ?? []).map((b) => (
-          <div
-            key={buildKey(b)}
-            className="hint"
-            title="Nothing analyzes it, and it ships the code."
-          >
-            <span className="mono">
-              {b.stream} · {b.variant}
-            </span>{" "}
-            · not analyzed
-          </div>
-        ))}
+        {unanalyzed.map((b) => {
+          const key = buildKey(b);
+          return (
+            <label
+              key={key}
+              style={{ display: "block" }}
+              title="Nothing analyzes it, and it holds the component."
+            >
+              <input
+                type="checkbox"
+                checked={added.has(key)}
+                onChange={(event) => {
+                  const next = new Set(added);
+                  if (event.target.checked) next.add(key);
+                  else next.delete(key);
+                  setAdded(next);
+                }}
+              />{" "}
+              <span className="mono">
+                {b.stream} · {b.variant}
+              </span>
+              <span className="hint"> · not analyzed</span>
+            </label>
+          );
+        })}
       </fieldset>
       <div className="field" style={{ marginTop: 10 }}>
         <Editor
@@ -268,29 +297,7 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
           ]}
         />
       </div>
-      {keep === "move" && (
-        <div className="reading" style={{ marginTop: 10 }}>
-          <p>Disclosed with the flaw:</p>
-          <ul>
-            {(discloses.authors ?? []).length > 0 && (
-              <li>
-                What {(discloses.authors ?? []).map((a) => a.name || a.identity).join(", ")} wrote
-                about it
-              </li>
-            )}
-            {(discloses.paths ?? []).length > 0 && (
-              <li>
-                The paths <span className="mono">{(discloses.paths ?? []).join(", ")}</span>
-              </li>
-            )}
-            {discloses.messages > 0 && <li>{discloses.messages} analyzer messages</li>}
-            {discloses.snippets > 0 && <li>{discloses.snippets} source snippets</li>}
-          </ul>
-          {discloses.stripped > 0 && (
-            <p className="hint">{discloses.stripped} source snippets are removed at disclosure.</p>
-          )}
-        </div>
-      )}
+      {keep === "move" && <Discloses discloses={discloses} />}
       <button
         type="button"
         className="btn"
@@ -311,6 +318,33 @@ function HandOffForm({ build, place }: { build: Build; place: string }) {
         Hand off
       </button>
       {handOff.error != null && <Failed error={handOff.error} what="Nothing was handed off." />}
+    </div>
+  );
+}
+
+// What moving a lead into its flaw's case discloses with the flaw.
+function Discloses({ discloses }: { discloses: HandoffOffer["discloses"] }) {
+  return (
+    <div className="reading" style={{ marginTop: 10 }}>
+      <p>Disclosed with the flaw:</p>
+      <ul>
+        {(discloses.authors ?? []).length > 0 && (
+          <li>
+            What {(discloses.authors ?? []).map((a) => a.name || a.identity).join(", ")} wrote about
+            it
+          </li>
+        )}
+        {(discloses.paths ?? []).length > 0 && (
+          <li>
+            The paths <span className="mono">{(discloses.paths ?? []).join(", ")}</span>
+          </li>
+        )}
+        {discloses.messages > 0 && <li>{discloses.messages} analyzer messages</li>}
+        {discloses.snippets > 0 && <li>{discloses.snippets} source snippets</li>}
+      </ul>
+      {discloses.stripped > 0 && (
+        <p className="hint">{discloses.stripped} source snippets are removed at disclosure.</p>
+      )}
     </div>
   );
 }

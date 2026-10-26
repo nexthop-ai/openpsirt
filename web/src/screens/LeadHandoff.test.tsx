@@ -38,7 +38,7 @@ const OFFER = {
       component: "zlib",
       from: "resembles",
       lacking: [{ stream: "master", variant: "mellanox" }],
-      unanalyzed: [],
+      unanalyzed: [{ stream: "release", variant: "broadcom" }],
     },
     { from: "build", lacking: [], unanalyzed: [] },
   ],
@@ -84,6 +84,7 @@ describe("handing off a lead", () => {
       status: 201,
       data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, places: 1 },
     }));
+    pick(mount.host(), "zlib");
     expect(text()).toContain("does not hold it");
     change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "p leaks");
     await press(mount.host(), "Hand off");
@@ -96,6 +97,29 @@ describe("handing off a lead", () => {
       component: "zlib",
     });
     expect(text()).toContain("SONIC-2026-000001");
+  });
+
+  it("picks no resembling component for the person", async () => {
+    await drawn(CONFIRMED);
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "p leaks");
+    const send = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Hand off",
+    );
+    expect(send?.disabled).toBe(true);
+  });
+
+  it("records the flaw against a build holding the component that nothing analyzes", async () => {
+    await drawn(CONFIRMED);
+    const sent = accept(() => ({ status: 201, data: { identifier: "SONIC-2026-000003" } }));
+    pick(mount.host(), "zlib");
+    tick(mount.host(), "release · broadcom");
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "p leaks");
+    await press(mount.host(), "Hand off");
+    await settle();
+    expect((sent()[0]?.[1] as { body: { builds: unknown } }).body.builds).toEqual([
+      { stream: "master", variant: "broadcom" },
+      { stream: "release", variant: "broadcom" },
+    ]);
   });
 
   it("says what a move discloses before it is sent", async () => {
@@ -146,6 +170,8 @@ describe("a handed-off lead", () => {
     expect(text()).toContain("kept internal");
     expect(text()).not.toContain("Decision");
     expect(text()).toContain("Grants reading this lead only.");
+    // What the move discloses is said before it is made.
+    expect(text()).toContain("What Ana wrote about it");
     await press(mount.host(), "Move into the case");
     await settle();
     expect(sent()[0]?.[0]).toBe(`${LEAD}/move`);

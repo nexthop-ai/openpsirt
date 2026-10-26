@@ -1437,8 +1437,10 @@ the screens draw them.
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
 | The important paths are edited as one list, one path to a line | The server stores the list whole, so a blank line and surrounding space are dropped before it is sent |
 | A confirmed lead offers a hand-off to somebody who triages internal material and undisclosed work | The components offered are cards, most likely first, each saying where it came from; a build that does not hold the one picked is unticked and cannot be ticked |
+| The first component is picked for the person unless it only resembles the lead's directory | A resembling name is a guess, so with nothing confirmed or placed nothing is picked (`DESIGN-analysis.md` § Hand-off offer) |
+| A build holding the component picked that nothing analyzes is listed unticked beside the builds the lead was seen in, and may be ticked | It ships the code, and is a guess about a build the analyzer never read (REQ-19) |
 | Keeping or moving the lead is a choice of two cards, and moving lists what goes public with the flaw before it is sent | The people whose writing is disclosed are named, as are the paths, and the snippets removed at disclosure are counted |
-| A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it |
+| A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
 | A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
 
 ## Disclosure and advisories
