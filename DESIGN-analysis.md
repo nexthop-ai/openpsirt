@@ -861,8 +861,6 @@ it is about.
 | Part | State |
 |---|---|
 | Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
-| Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
-| A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
@@ -887,4 +885,5 @@ it is about.
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
 | The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
-| The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |
+| A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
+| An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
