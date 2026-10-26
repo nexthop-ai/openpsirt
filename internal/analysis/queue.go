@@ -131,7 +131,7 @@ func OpenLeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 func leadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	waiting bool, limit, offset int) (*Queue, error) {
 
-	visible, err := access.Readable(subject, scope.ProductID)
+	visible, err := finding.LeadVisible(subject, scope.ProductID)
 	if err != nil {
 		return nil, err
 	}

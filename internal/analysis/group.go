@@ -75,7 +75,7 @@ func KinOf(ctx context.Context, db bun.IDB, subject access.Subject, productID, l
 	if !subject.Sees(productID) {
 		return []Kin{}, nil
 	}
-	visible, err := access.Readable(subject, productID)
+	visible, err := finding.LeadVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ type Member struct {
 // seen in a release still in support. A lead already answered keeps its own
 // answer, and a lead past its end of life is kept as it stands.
 func Unanswered(ctx context.Context, db bun.IDB, subject access.Subject, productID, leadID int64) ([]Member, error) {
-	visible, err := access.Readable(subject, productID)
+	visible, err := finding.LeadVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}

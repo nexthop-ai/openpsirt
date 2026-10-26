@@ -224,6 +224,18 @@ func LeadReach(s access.Subject, productID int64) LeadReading {
 	return out
 }
 
+// LeadVisible is the visibilities at which a subject reads a product's leads
+// in a list, a count or a group: the product's own, refused where it reads
+// none. The anonymous subject reads none, whatever it reads of the product: a
+// disclosed lead is public, and a lead is not one of the security documents a
+// product publishes.
+func LeadVisible(s access.Subject, productID int64) ([]access.Visibility, error) {
+	if s.Kind == access.Anonymous {
+		return nil, access.Denied(fmt.Sprintf("read the leads of product %d", productID))
+	}
+	return access.Readable(s, productID)
+}
+
 // Either is the condition that the lead is read in full or as a stub.
 func (r LeadReading) Either() (string, []any) {
 	return "(" + r.Full + " OR " + r.Stub + ")", append(append([]any{}, r.FullArgs...), r.StubArgs...)

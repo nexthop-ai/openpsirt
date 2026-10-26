@@ -377,7 +377,7 @@ func ruleIn(ctx context.Context, tx bun.IDB, productID, ruleID int64) (*leadRule
 func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID int64,
 	ids []int64) (map[int64]int, error) {
 
-	visible, err := access.Readable(subject, productID)
+	visible, err := finding.LeadVisible(subject, productID)
 	if err != nil {
 		return nil, err
 	}
