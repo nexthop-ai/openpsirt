@@ -48,9 +48,7 @@ type Scope struct {
 	// Series is a series' name, matched without regard to capitals. A name
 	// no series of the product holds lists nothing.
 	Series string
-	// Unassigned keeps the leads nobody holds on the build a row names. A
-	// lead in a case the reader is not on names no holder, so it is left
-	// out rather than answered by who holds it.
+	// Unassigned keeps the leads nobody holds on the build a row names.
 	Unassigned bool
 }
 

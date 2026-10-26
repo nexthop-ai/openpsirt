@@ -94,9 +94,10 @@ func leadV0110(t *columnTypes) []string {
 			"place_identity"   ` + t.hash + ` NOT NULL,
 			-- The flaw it was recorded as.
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
-			-- The visibility the lead's findings hold: internal where it was
-			-- kept, private once moved into the case, public once its flaw
-			-- is disclosed. A sighting opening later opens at it.
+			-- The visibility the lead's findings hold: internal while its
+			-- flaw is undisclosed, kept or moved, and public once a moved
+			-- lead is disclosed with its flaw. A sighting opening later
+			-- opens at it.
 			"visibility"       ` + t.kind + ` NOT NULL,
 			"handed_by"        ` + t.ref + ` NOT NULL,
 			"handed_at"        ` + t.timestamp + ` NOT NULL,

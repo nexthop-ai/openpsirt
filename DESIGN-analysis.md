@@ -558,7 +558,6 @@ one way to say a path does not matter is kept rather than two.
 | A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no lead |
 | Narrowed to work nobody holds, the list keeps the leads with no holder on the build each row names, under the parameter and value the findings list uses | The findings list holds no lead, so this is where unheld leads are found (§ Lead assignment) |
 | Narrowed to work nobody holds, every count is of the leads the narrowing keeps | A count beside a narrowed list describes what that list leaves out |
-| Narrowed to work nobody holds, a lead in a case the reader is not on is left out | That row is read without its holder, so listing it would say who holds it |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |

@@ -497,7 +497,7 @@ export function Comments({
   // calls them to something they will be refused, and on an undisclosed one
   // the mention itself says a finding exists.
   undisclosed?: boolean;
-  // Whether it is internal material, a lead not in a case.
+  // Whether it is internal material: a lead's, until its flaw is disclosed.
   internal?: boolean;
 }) {
   const comment = useComment();
