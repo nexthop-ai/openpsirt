@@ -1,7 +1,7 @@
 # Agent instructions for OpenPSIRT
 
 OpenPSIRT takes in the inventory a build produced, scans it for known
-vulnerabilities, tracks what changes release to release, and gives people
+vulnerabilities here, never in the build, tracks what changes release to release, and gives people
 somewhere to triage findings through to a fix. It is Apache 2.0, installed and
 run by other people (REQ-01 and REQ-10).
 
@@ -28,7 +28,7 @@ and a decision says why.
 - The other direction is checked by the gate: `make check` fails on a decision in force that no design document names, built or not.
 - A decision not built yet is named in its area's document, which says in words that it is not built.
 - Naming a decision means describing it. An identifier on a `Satisfies` line with no description is an audit trail that lies.
-- The gate matches identifiers, not prose: a mention anywhere satisfies it, and `REQ-23, REQ-24, REQ-25` names all three. Whether each is described is a person's judgment.
+- The gate matches identifiers, not prose: a mention anywhere satisfies it, and a range such as `REQ-23 to REQ-25` names all three, within one area. Whether each is described is a person's judgment.
 
 ## Design documents
 
@@ -52,7 +52,7 @@ does not explain, argue, or recount what used to be.
 | Code comments | Spec, without the `Contents` and `Limits` rules |
 | The published API document | Spec, with § The published API document |
 | `REQUIREMENTS.md` rows | Spec, plus one clause of reason |
-| This file | Spec, and the one place a register's history belongs |
+| This file | Spec. § The Spec register is the one place a register's history belongs |
 | `TODO.md` | Spec; § The work list says what may reference it |
 | Interface strings | Labels, skimmed: `DESIGN-interface.md` § Screen copy |
 | Commit messages, pull request descriptions | Why, including what the behavior was and what the change makes of it |
@@ -85,10 +85,10 @@ behavior.
 
 A defect that produced a rule is kept as its constraint, in the present tense:
 "Candidates are built from the list of ecosystems with an index, never from its
-complement", not the story of every ecosystem that passed the filter.
+complement". The story of the defect goes in the commit message.
 
 A drifted section has a question for a heading, paragraphs opening on a bolded
-claim, a reason sentences past its rule, or a past tense. Rewrite it; do not
+claim, a reason several sentences past its rule, or a past tense. Rewrite it; do not
 append to it.
 
 Checked, because they regress silently: heading form over every markdown file,
@@ -138,14 +138,14 @@ The decisions easiest to violate by accident and costliest to unpick.
 | Visibility is enforced in the data-access layer, never per handler, and every query carries a subject: counts, aggregates, search and exports as well as rows | REQ-42 and REQ-43 |
 | A finding is a component at a specific place. Never deduplicate up to the package; grouping is presentation | REQ-17 |
 | Identity is structural; expiry is version-based. Mixed, an unrelated top-level bump invalidates a leaf decision. The one other expiry is risk lapsing when its issue is rated worse, which concerns the issue, never identity | REQ-25 |
-| A test pinning what a query does runs on every engine; SQLite catches no portability trap. A test pinning routing, role reach or a response's shape runs on SQLite and PostgreSQL. The test's SQL decides which | REQ-71 |
+| A test pinning what a query does runs on every engine; SQLite catches no portability trap. A test pinning routing, which role reaches which endpoint, or a response's shape runs on SQLite and PostgreSQL, because nothing it pins varies by engine. The test's SQL decides which | REQ-71 |
 | Every transaction is retryable as a whole, through the one helper. A cluster certifies at `COMMIT`, so a write whose statements all succeeded can still roll back | REQ-71 |
-| Nothing a transaction depends on is read outside it. A retry re-runs the closure against a moved database | REQ-71 |
+| Nothing a transaction depends on is read outside it. A retry re-runs the closure against a moved database, so anything the closure uses but does not fetch is a defect | REQ-71 |
 | SQL values are parameterized; SQL identifiers come from an allowlist. A placeholder cannot bind a column, so a sort column from a query parameter is the real risk | REQ-66 |
 | Every identifier is quoted: declared, named and invented. Engines reserve different words, and a word is reserved only bare. `make reserved` reports bare names; it cannot see a string constant holding one qualified name or a column built from an alias at run time, which are quoted where written. See `DESIGN-database.md` § Identifier quoting | REQ-71 |
 | A name a query invents also avoids reserved words. A derived table `groups` fails on MySQL 8; quoting makes it legal, not readable | REQ-71 |
 | An affected-row count means rows matched, not changed, so a write whose values were already correct still reports its row. The connection settings make that true on all four engines | REQ-71 |
-| Exported code with no caller is a defect. The check counts a test as a caller, so a symbol only its tests reach is a person's to catch | — |
+| Exported code with no caller is a defect. `make unreachable` counts a test as a caller, so a symbol only its tests reach is a person's to catch | — |
 | A decision no design document names is a defect. The gate counts a mention, so naming means describing is a person's to enforce | — |
 | The gate never checks that a document is true. Read the code against it; where something is half built, say which half | — |
 | A test for a control is verified by breaking the control: watch it fail for the reason it names, then restore it. A control whose test has never been seen to fail is a control nobody has tested | — |
@@ -158,12 +158,13 @@ The decisions easiest to violate by accident and costliest to unpick.
 - Work out an answer when asked. No cache, precomputed total, refresh job or denormalized copy until a measured real deployment shows a real problem. A stale answer brings invalidation, drift and a wrong number nothing reports; copying a hosted product's hourly snapshots adopts its constraints.
 - A fact about a moment that cannot be worked out later is stored, for correctness: what a place held before a version moved, how many builds an approval reached.
 - A value stored for speed has to earn its place, and is rewritten when its inputs move. A finding's urgency earns it: stored so a list sorts without joining four signals per row, and rewritten when they move (REQ-32).
-- Stored never means frozen.
+- A value that can still be worked out is never frozen by storing it: correctness keeps a stored value, and speed has to earn it.
 
 ## Bulk judgment caps
 
-- Every bulk judgment has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, and an unbounded write is a denial of service somebody triggers by accident.
-- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. `DESIGN-triage.md` holds the transaction-size measurement.
+- A cap follows reversibility: what nothing re-checks is capped.
+- Every bulk judgment has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
+- A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`DESIGN-triage.md`).
 - A cap bounds what is written, never what was asked for, because one named issue expands into many places (REQ-27).
 
 ## Source file size
@@ -183,7 +184,7 @@ the hash covers is detail. Assume it is not a decision.
 - A row is one plain sentence, with no contractions and no variable, key path, function or version of another specification.
 - Adding or removing a row is the owner's call. Ask, quote the wording, wait for a yes, then write it. A yes to the work is not a yes to the row.
 - A row may land in the same commit and pull request as its implementation, and usually should.
-- `REQUIREMENTS.md` is never edited to record what was built, add a row new behavior seems to want, or reword one. Every change is asked for in those words.
+- `REQUIREMENTS.md` is never edited to record what was built, add a row new behavior seems to want, or reword one that reads awkwardly beside the code. Every change, a reword included, is asked for in those words and agreed before it is written.
 
 ## Decision identifiers
 
@@ -193,9 +194,9 @@ the hash covers is detail. Assume it is not a decision.
 ## Compatibility below 1.0
 
 Below 1.0 there is no schema or API compatibility (REQ-76); the API path version
-is a shape, not a promise.
+is the shape 1.0 will have, and promises nothing.
 
-- A schema change edits the declaration within the untagged release's own migration, and a development database is recreated.
+- A schema change edits the declaration in the untagged release's own migration, never a new migration beside it, and a development database is recreated.
 - What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`DESIGN-database.md` § Migrations).
 - Migration 41 is the baseline, v0.7.0's schema at once. An older database is refused.
 - Migrations 42, 43 and 44 upgrade databases v0.7.0, v0.8.0 and v0.9.0 built.
@@ -212,8 +213,8 @@ was believed, what was measured, and which was wrong.
 
 ## Code conventions
 
-- No timeline language: "for now", "temporarily", "first cut", "later", "in this phase", "step N". Describe a missing behavior as a limitation.
-- A comment describes the code that is there: would it still be true had the code always looked like this? Keep the constraint that forces the shape ("a float compares differently, and this has to sort in an index") and its measurement. The story of the edit goes in the commit message.
+- No timeline language: "for now", "temporarily", "first cut", "later", "in this phase", "step N", or anything saying when in the build something happens. Describe a missing behavior as a limitation.
+- A comment describes the code that is there: would it still be true had the code always looked like this? Keep the constraint that forces the shape ("a float compares differently, and this has to sort in an index"), including that the obvious alternative fails, and its measurement. The story of the edit goes in the commit message.
 - Comments narrating history are fixed as their files are touched, not in a sweep.
 - No count of the tree's own contents in comments, documents or descriptions, such as "fifteen class names are styled by nothing"; it is false as soon as anybody edits what it counts. Say the shape; a gate prints the count.
 - A measurement of something outside the repository stays, such as "1,415 against 38".
@@ -233,7 +234,7 @@ Worked through on every review (REQ-75), for this codebase.
 |---|---|
 | Injection: SQL | Values parameterized; identifiers from an allowlist, since a sort column or filter field cannot be bound (REQ-66). Nothing is partitioned, so no partition names to guard |
 | Injection: output | SBOM names, versions and descriptions come from a third party and reach the staff with the most access: encoded on output, never through the markdown renderer (REQ-66). A URL from a scan or feed has its scheme allowlisted before it becomes a link, and is shown unlinked where it fails |
-| Injection: markdown | At submission, before storage: raw HTML refused naming its line (never escaped; a parser option reaches nothing); only `http`, `https` and `mailto` links, and `//` or `/\` is another host; nothing remote fetched, images included. Source stored, never HTML. Nothing on the server renders, so the renderer sanitizes: the interface, or an integrator's own application. The renderer allowlists the fenced-block language tag before it reaches a class attribute (REQ-67) |
+| Injection: markdown | At submission, before storage: raw HTML refused naming its line (never escaped; a parser option reaches nothing); only `http`, `https` and `mailto` links, and `//` or `/\` is another host; nothing remote fetched, images included. Source stored, never HTML. Nothing on the server renders, so the renderer sanitizes: the interface, or an integrator's own application, which catches what submission does not. The renderer allowlists the fenced-block language tag before it reaches a class attribute (REQ-67) |
 | Broken access control | Data layer with a subject, including counts, aggregates, search and exports (REQ-42 and REQ-43). An attachment fetch is authorized against its finding's visibility before any signed URL is issued (REQ-70) |
 | Cryptographic failures | API keys and personal tokens hashed at rest and shown once (REQ-68). Session identifiers unguessable |
 | Insecure design | Does the change contradict a recorded decision? Cite it |
@@ -243,7 +244,7 @@ Worked through on every review (REQ-75), for this codebase.
 | Data integrity | A scan file is hostile: bounded size, depth and component count, never a filesystem path (REQ-66 and REQ-69). Markdown fields are length-bounded and never rendered on the server (REQ-69) |
 | Separation of duties | An approval points at one revision of a justification. Anything letting approved text change without withdrawing the approval defeats REQ-24 (REQ-28) |
 | Logging failures | Secrets never logged. Triage actions land in the append-only history (REQ-68) |
-| Request forgery | Where a document chooses the host (a patch link's repository through the loopback proxy, REQ-78; a supplier's directory and documents), the request reaches nothing inside this network or on the administrator's excluded list, checked at connect time on the resolved address, and follows no redirect; the excluded list alone keeps out an internal service on a public name. Every other outbound request goes only to a configured or application-named host: sign-in and package indexes pinned; webhooks, mail and the object store where configured, private addresses included (REQ-69) |
+| Request forgery | Where a document chooses the host (a patch link's repository through the loopback proxy, REQ-78; a supplier's directory and documents, wherever its description names them), the request reaches nothing inside this network or on the administrator's excluded list, checked at connect time on the resolved address, and follows no redirect; the excluded list alone keeps out an internal service on a public name. Every other outbound request goes only to a configured or application-named host: sign-in and package indexes pinned; webhooks, mail and the object store where configured, private addresses included (REQ-69) |
 
 ## Testing
 
@@ -253,29 +254,33 @@ Worked through on every review (REQ-75), for this codebase.
 - Regression tests are named for the invariant they pin, never for an item on a list.
 - A gate iterating a collection counts what it examined and fails on zero, and a gate joining two sets reports both directions. `internal/config/documented_test.go` is the form: `if len(reads) == 0 { t.Fatal("no settings were found in the source, so this checked nothing") }`, reporting a setting documented and not read, and one read and not documented.
 - A gate never rests on a hand-written list of what to check, or an exit code with its message discarded. A gate reached only by running the program over the tree has its detection lifted into a function, with one input it must report and one it must not.
-- A test named for an arm has an input reaching only that arm. Check coverage of the named line with `go test -coverprofile`; a passing test proves nothing when its corpus misses the arm.
-- Two tests are redundant only when they take the same path through the code. In `sharedVersion` (`web/src/ui/versions.ts`), "says nothing where the versions differ" reaches the comparison and "leaves a level of one alone" returns at the length test, so both stay. A level of none takes the second's path and has no test of its own. Cite tests by name, never by line.
+- A test named for an arm has an input reaching only that arm. Check coverage of the named line with `go test -coverprofile` over the package under test; a passing test proves nothing when its corpus misses the arm.
+- Redundancy is judged by the path a test takes, never by its assertion text. One behavior at two layers, or one predicate over different inputs, is not redundant.
+- In `sharedVersion` (`web/src/ui/versions.ts`), "says nothing where the versions differ" reaches the comparison and "leaves a level of one alone" returns at the length test, so both stay.
+- Two tests that read differently and run one path are redundant. A level of none runs the path of "leaves a level of one alone", so it has no test of its own.
+- Cite tests by name, never by line.
 
 ## Commits and pull requests
 
-- No `Co-Authored-By` trailers; tell tooling that adds one not to. Under DCO only `Signed-off-by` carries meaning, and a co-author trailer claims authorship nobody signed for. This holds from the root commit; the imported history, where tooling added one to 79 of the last 400 commits, was not brought across.
+- Every commit carries `Signed-off-by`, the one trailer that carries meaning, as under DCO.
+- No `Co-Authored-By` trailers; tell tooling that adds one not to. A co-author trailer claims authorship nobody signed for. None appears from the root commit. The imported history is not in this repository; in its last 400 commits tooling had added one to 79.
 - Nothing about how a change was produced: no tool, assistant, session or generated-by footer in a description, title, commit, branch name, code or review comment. The sign-off says a person wrote it and stands behind it.
 - The body explains why; the diff shows what.
 - Design document updates go in the same commit as the behavior they describe.
 - Every change reaches `main` through a pull request and the merge queue, administrators included.
-- `Merge Status` is the one required check. It waits for every other check to pass or be skipped, so every workflow meant to gate a merge declares `merge_group:` beside `pull_request:`; a workflow with no check run on an event looks like one not yet started.
+- `Merge Status` is the one required check. It waits for every other check to pass or be skipped, so every workflow meant to gate a merge declares `merge_group:` beside `pull_request:`; a workflow with no check run on an event looks like one not yet started, so `Merge Status` waits on it.
 
 ### Pull request descriptions
 
 Read by somebody deciding whether to review now, and later by somebody working
 out why the code looks as it does.
 
-- The title is an imperative verb, then the feature, screen or defect by its searchable name, in one clause of about 50 characters with no "and": "Speed up the Inventories page", "Make v0.7.0 the oldest supported schema". Never a paraphrase naming nothing, such as "Report failures as what they are". Squash-merge makes it the subject on `main` and a release-notes line.
+- The title is an imperative verb, then the feature, screen or defect by its searchable name, in one clause of about 50 characters, with no "and" joining two halves: "Speed up the Inventories page", "Publish CSAF and OpenVEX documents", "Make v0.7.0 the oldest supported schema". Never a paraphrase naming nothing, such as "Report failures as what they are". Squash-merge makes it the subject on `main` and a release-notes line.
 - Short, plain spoken English, as `DESIGN-interface.md` § Screen copy describes.
 - Lists, tables and before-and-after examples before prose.
 - A measurement where there is one.
 - No count of the tree's own contents: "every trailed act", not "38 trailed acts", because the description changes as the branch does.
-- A screenshot where the layout moved, attached with `--attach './shot.png#alt text'` on `gh pr create`, `gh pr edit` or `gh pr comment`. Never hosted on a branch, whose deletion breaks the links, and never a `data:` image, which GitHub strips.
+- A screenshot where the layout moved, attached with `--attach './shot.png#alt text'` on `gh pr create`, `gh pr edit` or `gh pr comment`, and referenced in the body as `![alt](./shot.png)`, which the upload rewrites. Never hosted on a branch, whose deletion breaks the links, and never a `data:` image, which GitHub strips.
 - What is left undone is said.
 
 ### Development workflow
@@ -283,7 +288,7 @@ out why the code looks as it does.
 - Commit and push as work lands, in purposeful pieces, each with a why-body. A working tree is one accident from gone.
 - `main` is never pushed to directly and its history never rewritten. A pull request branch belongs to its author, who rebases it onto `main` and force-pushes with `--force-with-lease`.
 - Run `make gate` before every commit and `make gate full` before a push carrying more than one commit, rather than waiting for CI to fill the queue with entries that will not merge.
-- `openapi-current`, `web-api` and `reserved-current` diff a regenerated file against the last commit, so they pass only once the file is committed with its change.
+- `openapi-current`, `web-api` (the TypeScript client) and `reserved-current` diff a regenerated file against the last commit, so on an uncommitted tree they report it stale. Regenerate, commit the file with the change that produced it, and they pass.
 - The history starts at the import: `main` has one root commit and every later commit came through a pull request. The reasoning lives in `REQUIREMENTS.md` and the design documents.
 
 ## Building
@@ -320,22 +325,23 @@ the OpenAPI drift check, the frontend, the race detector and three engines.
 ### The second command
 
 A skipped engine passes, so a green suite proves only that nothing failed.
-`check-engines` refuses when any engine is unconfigured, and asks each server
-what it is, because four URLs differing by a port digit pass a grep for labels.
+`check-engines` greps for each engine's label, refuses when any is unconfigured,
+and asks each server what it is, because four URLs differing by a port digit
+pass a grep for labels.
 It proves the configuration is real and that the migrations, lock, identity
 checks and word list ran on all four, and that a half-applied migration was
 re-run on the two engines that leave one. It does not prove every test ran on
-every engine. A table missing from test cleanup once passed on SQLite and failed
-40 tests on the other three.
+every engine. A table missing from test cleanup passes on SQLite and fails 40
+tests on the other three.
 
 ### The four engines
 
 - Configure them with `make engines-up`, which starts containers at CI's versions and writes their URLs to the git-ignored `local.mk`. Never set them up by hand or write `local.mk` yourself; change the target instead. A hand setup is how three engines go unconfigured while the suite reports green.
 - An existing `local.mk` is never overwritten; it may point at somebody's own servers.
 - Make reads the URLs when it starts, so run `make engines-up` first, then `make check && make check-engines`.
-- Its settings use `?=`, so an environment variable wins for one run.
-- One server is below the supported floor (postgres:13 in CI), so the refusal is exercised.
-- `OPENPSIRT_TEST_RELAX_DURABILITY` marks the MySQL and MariaDB servers as throwaway, because their durability setting is global to the server. Left out, a server keeps its own.
+- It writes `OPENPSIRT_TEST_POSTGRES_URL`, `OPENPSIRT_TEST_MYSQL_URL`, `OPENPSIRT_TEST_MARIADB_URL` and `OPENPSIRT_TEST_TOO_OLD_URL`. Each is set with `?=`, so the same variable in the environment points one run elsewhere.
+- `OPENPSIRT_TEST_TOO_OLD_URL` is a server below the supported floor (postgres:13 in CI), so the refusal to run against it is exercised rather than skipped.
+- `OPENPSIRT_TEST_RELAX_DURABILITY` lets the harness turn off commit durability on the MySQL and MariaDB servers, which is server-wide, so it is for throwaway servers only (`DESIGN-build.md` § Commit durability). Left out, a server keeps its own.
 
 ### A new table
 

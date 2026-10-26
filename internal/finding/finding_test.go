@@ -212,10 +212,9 @@ func found(id string, component graph.Described, aliases ...string) finding.Repo
 }
 
 // openClaims is what the build currently argues about what it ships, read
-// straight from the table. It was a store method once, exported and reached by
-// nothing but these two tests — which is the shape AGENTS.md calls a defect
-// rather than spare capacity, and a test reading the row it is asserting about
-// is the honest way to assert it.
+// straight from the table. A store method only these tests reach is exported
+// code with no caller, which AGENTS.md calls a defect, and a test reading the
+// row it is asserting about is the honest way to assert it.
 func (f *fixture) openClaims(t *testing.T) []finding.Claim {
 	t.Helper()
 	var rows []finding.Claim
