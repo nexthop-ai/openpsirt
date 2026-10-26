@@ -198,6 +198,9 @@ type Unanswered struct {
 	ReportedBy      string
 	ReceivedOn      *time.Time
 	Undisclosed     bool
+	// AssignedTo is the party holding it, a person or a team's queue, and
+	// absent where nobody does. It decides who is told.
+	AssignedTo *int64
 }
 
 // Unacknowledged is every report from outside nobody has answered yet, across
@@ -239,6 +242,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ReportedBy      string     `bun:"reported_by"`
 		ReceivedOn      *time.Time `bun:"received_on"`
 		Undisclosed     int        `bun:"undisclosed"`
+		AssignedTo      *int64     `bun:"assigned_to"`
 	}
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	err := s.db.NewSelect().
@@ -257,6 +261,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`MIN("v"."identifier") AS "identifier"`).
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
+		ColumnExpr(`MIN("fr"."assigned_to") AS "assigned_to"`).
 		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "undisclosed")).
 		Where(nothingSent).
 		// A flaw found here has nobody outside to answer.
@@ -280,7 +285,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 			VulnerabilityID: row.VulnerabilityID, ProductID: row.ProductID,
 			Product: row.Product, Identifier: row.Identifier,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
-			Undisclosed: row.Undisclosed > 0,
+			Undisclosed: row.Undisclosed > 0, AssignedTo: row.AssignedTo,
 		})
 	}
 	return out, nil
@@ -300,6 +305,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		Product    string     `bun:"product"`
 		ReportedBy string     `bun:"reported_by"`
 		ReceivedOn *time.Time `bun:"received_on"`
+		AssignedTo *int64     `bun:"assigned_to"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"flaw_report" AS "fr"`).
@@ -310,6 +316,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(`"fr"."reported_by" AS "reported_by"`).
 		ColumnExpr(`"fr"."received_on" AS "received_on"`).
+		ColumnExpr(`"fr"."assigned_to" AS "assigned_to"`).
 		Where(nothingSent).
 		Where(`"fr"."found_here" = ?`, false).
 		Where(`"fr"."vulnerability_id" IS NULL`).
@@ -323,7 +330,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 			ReportID: row.ReportID, Reference: row.Reference,
 			ProductID: row.ProductID, Product: row.Product,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
-			Undisclosed: true,
+			Undisclosed: true, AssignedTo: row.AssignedTo,
 		})
 	}
 	return out, nil

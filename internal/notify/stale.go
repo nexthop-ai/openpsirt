@@ -631,11 +631,11 @@ func itemsWaiting(n int) string {
 // acknowledgment is the part of coordinated disclosure a reporter judges us
 // on, and it costs nothing and is missed by being nobody's job.
 //
-// To whoever may triage work nobody has announced in that product, which is
-// who may open the report. A report is about somebody outside this deployment
-// and the reply goes to them from a person, so this reaches the people who
-// could be that person — and narrowing it that way is what keeps the notice
-// from naming a report the reader is refused.
+// To the report's audience: the person holding it, the members of the team
+// whose queue it is in, or, where nobody holds it, whoever may triage work
+// nobody has announced in that product. A holder and a team member are told
+// only where they read the product's reports, so the notice never names a
+// report the reader is refused.
 //
 // Judged or not. A claim that turned out to be announced work is still a
 // letter a stranger sent, and reading it asks the same thing it asked
@@ -647,6 +647,14 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	}
 	reach := w.reach
 	out, err := w.everybody(ctx, Unanswered)
+	if err != nil {
+		return nil, err
+	}
+	held := make([]*int64, 0, len(rows))
+	for _, row := range rows {
+		held = append(held, row.AssignedTo)
+	}
+	audience, err := newReportAudience(ctx, w.db, reach, held)
 	if err != nil {
 		return nil, err
 	}
@@ -685,13 +693,11 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			holds.Link = weblink.InboxReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}
-		for personID, per := range reach {
-			// Whoever may work reports there, judged or not, because
-			// answering is working one. Everybody told may also open it,
-			// since reading a report asks for less.
-			if !per[row.ProductID].triages(true) {
-				continue
-			}
+		told, err := audience.of(ctx, row.ProductID, row.AssignedTo)
+		if err != nil {
+			return nil, err
+		}
+		for _, personID := range told {
 			out[personID] = append(out[personID], holds)
 		}
 	}

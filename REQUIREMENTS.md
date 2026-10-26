@@ -100,6 +100,7 @@ inputs.
 | REQ-17 | A finding is one component at one place in one build. Twelve places is twelve findings, and grouping is presentation only | A dismissal that is true where a library is used one way is not true where it is used another |
 | REQ-18 | An issue is one issue across every name it goes by, and everything a report says about it is kept | The same vulnerability arrives as a CVE identifier in one report and an advisory-database identifier in another, and a later report knowing more must not erase what an earlier one knew |
 | REQ-19 | A flaw in our own product is recorded by hand, under an identifier this deployment mints, against every build that ships it | Nothing scans for it, and it is the class the disclosure process exists for |
+| REQ-85 | A vulnerability report is worked as a case: its claim is edited while it is open with every version kept, its correspondence with the reporter is recorded rather than sent, and the first message sent is its acknowledgement | A claim that cannot be corrected, discussed or answered on the record leaves the evidence of how it was handled outside the system |
 
 ### 3.5 State and history
 

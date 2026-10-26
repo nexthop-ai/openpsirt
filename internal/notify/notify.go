@@ -239,8 +239,8 @@ const (
 	// is raised from the moment a report is recorded rather than after a
 	// threshold, and clears when the first message sent to the reporter is recorded.
 	Unanswered Kind = "unanswered-report"
-	// ReportMessage is a message from a reporter, logged on a report a person
-	// holds by somebody else. The reporter is waiting on the answer.
+	// ReportMessage is a message from a reporter, logged on a report, told to
+	// the report's audience. The reporter is waiting on the answer.
 	ReportMessage Kind = "report-message"
 
 	// The two conditions about the deployment rather than about anybody's

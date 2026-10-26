@@ -790,8 +790,10 @@ act, because whoever typed it in said what the flaw is as they did.
 
 ### The case
 
-A report is worked as a case: edited while it is open, written to and from,
-noted on, handed to somebody, and judged. Every act is kept and readable.
+A report is worked as a case (REQ-85): edited while it is open with every
+version kept, written to and from on the record, noted on, handed to somebody,
+and judged. The first message recorded as sent is the acknowledgement. Every
+act is kept and readable.
 
 | Part | Rule |
 |---|---|
@@ -807,7 +809,7 @@ noted on, handed to somebody, and judged. Every act is kept and readable.
 | Held lists | Open reports by holder: one person with their teams' queues, one team's queue, or nobody. Narrowed to the products where the reader reads reports, and to one of them when asked. A team's queue is not in the list of reports nobody holds |
 | Routing | A routing rule may place a product's reports instead of findings, naming no package and no place since a report sits at neither. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when the rule is added. First match wins, as for findings |
 | Hand-over | Releasing a person's work and an administrator's hand-over move their open reports with their findings |
-| Notices | The person given a report is told, where that is not whoever gave it. A message received is told to the person holding the report. A mention in a note is told to the person named. Each is undisclosed work, so nothing leaving the deployment names the report. No one watches a report; the holder is the one person told |
+| Notices | The person given a report is told, where that is not whoever gave it. A message received and an unanswered report reach the report's audience (`DESIGN-notifications.md` § Report audience). A mention in a note is told to the person named. Each is undisclosed work, so nothing leaving the deployment names the report |
 | History | Every act, oldest first: recorded, edited, noted, a note edited, a message sent or received, assigned or handed back with the rule that routed it, a file attached, a ruling proposed, in force or withdrawn, and accepted as an issue. Assembled from the rows that hold each act rather than stored twice |
 
 ### Judgment

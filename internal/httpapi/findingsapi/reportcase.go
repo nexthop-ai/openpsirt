@@ -339,8 +339,12 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 			return nil, refusedReport(in, err, "that message could not be recorded")
 		}
 		if message.Direction == finding.Received {
-			tellHolder(ctx, in, subject, *row, product.Name, notify.ReportMessage,
-				"The reporter of "+row.Reference+" wrote again, in "+product.Name)
+			if err := notify.TellReportWritten(ctx, in.DB.DB, notify.ReportWritten{
+				ProductID: row.ProductID, Product: product.Name, Reference: row.Reference,
+				AssignedTo: row.AssignedTo, By: subject.ID,
+			}); err != nil {
+				in.Log().ErrorContext(ctx, "could not say that a reporter wrote", "error", err)
+			}
 		}
 		return &struct{ Body MessageBody }{Body: messageBody(*message, subject.Identity, "")}, nil
 	})
@@ -353,48 +357,6 @@ func messageBody(row finding.ReportMessage, by, name string) MessageBody {
 		Dated: row.Dated.UTC().Format(time.DateOnly), Body: row.Body,
 		LoggedBy: by, LoggedByName: name, LoggedAt: core.Stamp(row.LoggedAt),
 	}
-}
-
-// tellHolder tells the person holding a report about something done to it by
-// somebody else, where they still read the product's reports. A team's queue
-// tells nobody, and a failure is logged rather than failing the act.
-func tellHolder(ctx context.Context, in core.Deps, subject access.Subject, row finding.FlawReport,
-	product string, kind notify.Kind, said string) {
-
-	if row.AssignedTo == nil || *row.AssignedTo == subject.Party() {
-		return
-	}
-	held, err := access.NewStore(in.DB.DB).WhoHolds(ctx, []int64{*row.AssignedTo})
-	if err != nil {
-		in.Log().ErrorContext(ctx, "could not tell who holds a report", "error", err)
-		return
-	}
-	holder, ok := held[*row.AssignedTo]
-	if !ok || holder.Team {
-		return
-	}
-	TellReportHolder(ctx, in, holder.Address, row, product, kind, said)
-}
-
-// TellReportHolder tells one person, by sign-in identity, about a report,
-// where they read the product's reports. The line is undisclosed work, so it
-// carries nothing out of the deployment.
-func TellReportHolder(ctx context.Context, in core.Deps, identity string, row finding.FlawReport,
-	product string, kind notify.Kind, said string) {
-
-	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
-	if err != nil {
-		return
-	}
-	if !them.Reads(access.Private, row.ProductID) {
-		return
-	}
-	productID := row.ProductID
-	core.Tell(ctx, in, "could not tell who holds a report", notify.Telling{
-		PersonID: them.ID, Kind: kind, Body: said,
-		Link:    weblink.InboxReport(product, row.Reference),
-		Private: true, ProductID: &productID,
-	}, "person", them.ID)
 }
 
 // registerReportNotes is the notes people here write on a report, and their

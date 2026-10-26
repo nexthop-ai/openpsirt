@@ -16,6 +16,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Analyzer alerts](#analyzer-alerts)
 - [Lead notices](#lead-notices)
 - [Staleness conditions](#staleness-conditions)
+- [Report audience](#report-audience)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
 - [Work arriving by rule](#work-arriving-by-rule)
@@ -81,9 +82,9 @@ true is cleared, and running the same pass twice changes nothing.
 | Work sitting in a team queue | condition | Per team and product, with a count |
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
-| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
+| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. To the report's audience (§ Report audience). Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
 | A report given to you | event | To the person a report is assigned to, where that is not whoever assigned it, and only where they read the product's reports. Never to a team. Undisclosed |
-| A reporter writing back | event | A message recorded as received on a report, to the person holding it. Undisclosed. Nobody watches a report, so a report nobody holds, or one in a team's queue, tells nobody |
+| A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
@@ -274,9 +275,7 @@ A claim nobody has judged is raised the same way and named differently. It has
 no issue to name, so the alert carries the reference it was minted with and
 points at the report.
 
-Both are told to whoever may triage work nobody has announced there, because
-answering a report is working it. Everybody told may also open it: reading a
-report asks for less.
+Both reach the report's audience (§ Report audience).
 
 A ruling waiting for approval takes the period a waiting claim does, because it
 is the same thing: one act setting something aside, which takes effect only
@@ -313,6 +312,19 @@ person's action and one thing to read, however many rows it wrote. A queue is a
 population: one routing rule places thousands of findings in a sweep. Within it
 the unit is an issue in a component, whatever its places' visibility, and the
 condition is undisclosed where any of those places is.
+
+## Report audience
+
+Who hears about a vulnerability report turns on who holds it.
+
+| Holder | Told |
+|---|---|
+| A person | That person, where they read the product's reports |
+| A team's queue, unclaimed | The team's members who read the product's reports |
+| Nobody | Everybody who may triage undisclosed work in the product, since answering a report is working it |
+
+The unanswered condition and a reporter writing back both use it. Everybody
+told may open the report, so neither names a report the reader is refused.
 
 ## Reports that must come back empty
 
