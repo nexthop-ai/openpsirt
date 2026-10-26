@@ -712,7 +712,8 @@ is in `DESIGN-data-model.md` § End of support.
 | A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
 | The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
 | A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
-| A decision, a re-affirmation of a lapsed claim, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports. A re-affirmation writes a decision |
+| A decision, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| A re-affirmation of a lapsed claim leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes a decision. The list of what is yours to re-affirm counts the same places and leaves off a claim with none |
 | A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
 | A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
 | A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |

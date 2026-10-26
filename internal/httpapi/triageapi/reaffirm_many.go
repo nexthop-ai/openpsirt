@@ -53,7 +53,9 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			"A claim lapses when a version moves under it, and when the issue is rated into a " +
 			"higher band on a claim a severity bears on. `code_moved` and `rated_worse` say " +
 			"which, and both can hold.\n\n" +
-			"Narrowed to the claims you may still argue about, every lapsed row of them.",
+			"Narrowed to the claims you may still argue about, every lapsed row of them. A " +
+			"lapsed row at a lead past its end of life is not counted, and a claim with no " +
+			"other is not listed.",
 		Tags: []string{"Triage"},
 	}, core.AnyPerson, "Answers only what you may act on."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"A product to narrow to, by name"`
@@ -118,8 +120,8 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 			"re-affirming one claim follows. `waiting` on each entry says which.\n\n" +
 			"Only the person who made a claim may re-affirm it. Where somebody else made any of " +
 			"them the whole act is refused, naming the issues. A claim with no lapsed row that " +
-			"nothing has replaced answers as though it were not there. A claim at a lead past " +
-			"its end of life refuses the whole act with 409.\n\n" +
+			"nothing has replaced answers as though it were not there. A lead past its end of " +
+			"life is not re-made, and a claim at no other place refuses the whole act with 409.\n\n" +
 			"Bounded over the whole act, promises to upgrade aside. The issues it covers count " +
 			"against `triage.agreed-issues` where no claim goes back to an approver, and " +
 			"against `triage.review-issues` where any does; the findings it writes count " +

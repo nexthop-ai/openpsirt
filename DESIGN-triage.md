@@ -1049,7 +1049,9 @@ The lapsed population is reached by the findings list's `lapsed` state, and by
 the review queue's To reaffirm tab, which lists the reader's own lapsed claims.
 A claim with a withdrawn row is neither listed there nor offered on its page:
 its author took it back, and a withdrawal leaves a row that had already lapsed
-as it was. The act sits on the claim, or on several claims from that tab
+as it was. A row at a lead past its end of life is not re-made, and a claim
+with no other row is neither listed nor offered (`DESIGN-analysis.md` § End of
+life). The act sits on the claim, or on several claims from that tab
 (§ Re-affirmation across claims).
 
 ### Approval gate

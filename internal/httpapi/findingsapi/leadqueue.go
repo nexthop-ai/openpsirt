@@ -131,9 +131,10 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 			"closed on a build and not opened anew there.\n\n" +
 			"`states` counts every lead in the scope by state and `waiting` the open ones " +
 			"left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, " +
-			"so what the list leaves out is counted. The queue also leaves out a lead seen only in " +
-			"releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it " +
-			"stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. " +
+			"so what the list leaves out is counted. The queue also leaves out a lead open only in " +
+			"releases past their end of life, and `past_end_of_life` counts those. A lead seen only in " +
+			"such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing " +
+			"it off are refused with 409. " +
 			"`stream`, `variant` and `series` are optional and independent. Supports limit and offset.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {

@@ -162,6 +162,23 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 // in is past its end of life. It is kept as it stands.
 var ErrLeadPastEndOfLife = refusal.New("every release this lead was seen in is past its end of life, so it is kept as it stands")
 
+// LeadInSupport is the condition, as SQL, under which LeadEnded accepts a
+// change to the lead at a place in a product at a moment: the place holds no
+// lead, or a lead of it is in a release not past its end of life. The product
+// and the place are columns of the caller's query, quoted as it names them.
+func LeadInSupport(product, place string, at time.Time) (string, []any) {
+	kinds, kindArgs := kind.Leads.Where(`"lsf"."kind"`)
+	past, pastArgs := catalog.PastEndOfLife("lss", "lsp", at)
+	seen := `SELECT 1 FROM "finding" AS "lsf"
+		JOIN "target" AS "lst" ON "lst"."id" = "lsf"."target_id"
+		JOIN "stream" AS "lss" ON "lss"."id" = "lst"."stream_id"
+		JOIN "product" AS "lsp" ON "lsp"."id" = "lss"."product_id"
+		WHERE "lss"."product_id" = ` + product + ` AND "lsf"."place_identity" = ` + place + ` AND ` + kinds
+	args := append(slices.Clone(kindArgs), kindArgs...)
+	args = append(args, pastArgs...)
+	return `(NOT EXISTS (` + seen + `) OR EXISTS (` + seen + ` AND NOT ` + past + `))`, args
+}
+
 // LeadEnded refuses, with ErrLeadPastEndOfLife, a change to the lead at a
 // place in a product where every release it was seen in is past its end of
 // life at now. A lead seen nowhere is left to the caller's own answer.

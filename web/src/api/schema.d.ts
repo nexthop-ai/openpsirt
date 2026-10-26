@@ -849,7 +849,7 @@ export interface paths {
          *
          *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
          *
-         *     A claim at a lead past its end of life is refused with 409.
+         *     A lead past its end of life is not re-made, and a claim at no other place is refused with 409.
          *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
@@ -3507,7 +3507,7 @@ export interface paths {
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead seen only in releases past their end of life, and `past_end_of_life` counts those. Such a lead is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -5633,7 +5633,7 @@ export interface paths {
          *
          *     Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
          *
-         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there. A claim at a lead past its end of life refuses the whole act with 409.
+         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there. A lead past its end of life is not re-made, and a claim at no other place refuses the whole act with 409.
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
@@ -6401,7 +6401,7 @@ export interface paths {
          *
          *     A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
          *
-         *     Narrowed to the claims you may still argue about, every lapsed row of them.
+         *     Narrowed to the claims you may still argue about, every lapsed row of them. A lapsed row at a lead past its end of life is not counted, and a claim with no other is not listed.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may act on.
          */
@@ -7987,7 +7987,7 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
-            /** @description Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it */
+            /** @description Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and a place of it is not a lead past its end of life */
             reaffirmable?: boolean;
             /**
              * Format: int64

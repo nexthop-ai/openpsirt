@@ -492,7 +492,7 @@ func (s *Store) StreamsEndingBy(ctx context.Context, by time.Time) ([]int64, err
 // answering to its own date where it states one and to its product's
 // otherwise.
 func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
-	past, args := pastEndOfLife("s", "p", at)
+	past, args := PastEndOfLife("s", "p", at)
 	var ids []int64
 	err := s.db.NewSelect().
 		TableExpr(`"stream" AS "s"`).
@@ -507,13 +507,13 @@ func (s *Store) streamsEndingBy(ctx context.Context, at time.Time) ([]int64, err
 	return ids, nil
 }
 
-// pastEndOfLife is the condition, as SQL, under which a release has gone out
+// PastEndOfLife is the condition, as SQL, under which a release has gone out
 // of support by a date, over a stream and its product under the aliases given.
 //
 // The release's own date where it has one, the product's otherwise — the same
 // precedence a single read applies, written as a condition rather than fetched
 // and compared, so a deployment with thousands of releases is one statement.
-func pastEndOfLife(stream, product string, at time.Time) (string, []any) {
+func PastEndOfLife(stream, product string, at time.Time) (string, []any) {
 	day := at.UTC().Truncate(24 * time.Hour)
 	s, p := `"`+stream+`"."eol_on"`, `"`+product+`"."eol_on"`
 	return `((` + s + ` IS NOT NULL AND ` + s + ` <= ?)
@@ -528,7 +528,7 @@ func pastEndOfLife(stream, product string, at time.Time) (string, []any) {
 // that a recount reaching findings across many releases leaves the same ones
 // off the clock that the scan did.
 func OnTheClock(stream, product string, at time.Time) (string, []any) {
-	past, args := pastEndOfLife(stream, product, at)
+	past, args := PastEndOfLife(stream, product, at)
 	return `("` + stream + `"."kind" = ? AND NOT ` + past + `)`, append([]any{string(Branch)}, args...)
 }
 
