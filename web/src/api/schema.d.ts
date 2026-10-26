@@ -517,7 +517,7 @@ export interface paths {
          * List assignment totals
          * @description Returns everyone holding open work you can see, with how much.
          *
-         *     Counted in pieces of work — an issue in a component in a product — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
+         *     Counted in pieces of work — an issue in a component in a product, or one static analysis lead — which is the unit the list behind each person is in. `places` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
          *
          *     The number worth watching is not how many findings exist but how many are waiting behind somebody: an idle account holding nothing is harmless, and work stuck behind a person who has gone is the problem — nothing tells this software that somebody has left.
          *
@@ -2025,7 +2025,7 @@ export interface paths {
         };
         /**
          * List what one person is dealing with
-         * @description The open findings assigned to somebody, most urgent first, in the same units as what nobody is dealing with: one item per issue in a component in a product, not one per build. The same code built several ways is one piece of work, and it was taken on as one.
+         * @description The open findings assigned to somebody, most urgent first, in the same units as what nobody is dealing with: one item per issue in a component in a product, not one per build. The same code built several ways is one piece of work, and it was taken on as one. A static analysis lead is one item, with `place` set, where you read it.
          *
          *     Send `me` as the identity for your own.
          *
@@ -6323,7 +6323,7 @@ export interface paths {
         };
         /**
          * List what one team is dealing with
-         * @description The open findings routed to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product.
+         * @description The open findings routed to a team, most urgent first, in the same units as everywhere else: one item per issue in a component in a product, and one per static analysis lead you read, with `place` set.
          *
          *     Work goes to a team by standing rule and by an assignment naming one, so a team holds work the way a person does — and the totals list says so. This is the list behind that number.
          *
@@ -6541,7 +6541,7 @@ export interface paths {
         };
         /**
          * List findings nobody is dealing with
-         * @description Returns open findings with no assignee, across every product you can see, most urgent first.
+         * @description Returns open findings with no assignee, across every product you can see, most urgent first. Static analysis leads are included where you read them, one item per lead, with `place` set.
          *
          *     Deliberately not scoped to one product: work falling between people is exactly what hides when every screen shows one product and nobody looks at the others.
          *
@@ -13955,6 +13955,8 @@ export interface components {
             exploited_here?: boolean;
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
+            /** @description The place of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built */
+            place?: string;
             /**
              * Format: int64
              * @description The number of findings a judgment here would be recorded against, across every build it is in

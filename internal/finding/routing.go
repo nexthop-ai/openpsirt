@@ -120,11 +120,12 @@ func (s *Store) AddRule(ctx context.Context, by access.Subject, productID, teamI
 
 // Rules lists a product's standing rules, in the order they are tried.
 //
-// Read by whoever triages the product. The rules are its triage configuration
-// and carry no finding, so there is nothing to narrow: a reader gets the whole
+// Read by whoever triages the product at any visibility, internal included,
+// because a rule places leads too. The rules are its triage configuration and
+// carry no finding, so there is nothing to narrow: a reader gets the whole
 // precedence order or none of it.
 func (s *Store) Rules(ctx context.Context, subject access.Subject, productID int64) ([]Routing, error) {
-	if !subject.TriagesIn(productID) {
+	if !subject.TriagesAnyIn(productID) {
 		return nil, access.Denied(fmt.Sprintf("read the routing rules of product %d", productID))
 	}
 	return s.rules(ctx, productID)

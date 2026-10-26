@@ -247,3 +247,126 @@ func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
 		}
 	})
 }
+
+// heldItems is the places of the leads a list of held work answers one reader,
+// and how many items it holds in all.
+func heldItems(t *testing.T, r *httpapitest.Reach, who, path string) (places []string, items int) {
+	t.Helper()
+	var got struct {
+		Items []struct {
+			Vulnerability string `json:"vulnerability"`
+			Place         string `json:"place"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, path, &got)
+	for _, item := range got.Items {
+		if item.Place != "" {
+			places = append(places, item.Place)
+		}
+	}
+	return places, len(got.Items)
+}
+
+// The unassigned list, one person's work and the totals behind them list a
+// lead to whoever reads internal work, as one piece of work, and to nobody
+// else.
+func TestTheListsOfHeldWorkListALeadToItsReadersAlone(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
+			t.Errorf("the unassigned list holds leads %v; want the seeded lead", got)
+		}
+		if got, _ := heldItems(t, r, "reader", "/v1/unassigned"); len(got) != 0 {
+			t.Errorf("a reader of disclosed work was listed leads %v", got)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
+			t.Errorf("the unassigned list holds the lead taken: %v", got)
+		}
+		const theirs = "/v1/people/internal-triager/assignments"
+		if got, n := heldItems(t, r, "internal-reader", theirs); len(got) != 1 || got[0] != place || n != 1 {
+			t.Errorf("their work holds leads %v of %d items; want the seeded lead alone", got, n)
+		}
+		if got, _ := heldItems(t, r, "internal-triager", "/v1/people/me/assignments"); len(got) != 1 {
+			t.Errorf("the holder's own work holds leads %v; want the seeded lead", got)
+		}
+		if got, n := heldItems(t, r, "reader", theirs); len(got) != 0 || n != 0 {
+			t.Errorf("a reader of disclosed work was listed %d items of their work, leads %v", n, got)
+		}
+		holding := func(who string) int {
+			var got struct {
+				Items []struct {
+					Person string `json:"person"`
+					Open   int    `json:"open"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, who, "/v1/assignments", &got)
+			for _, row := range got.Items {
+				if row.Person == "internal-triager" {
+					return row.Open
+				}
+			}
+			return 0
+		}
+		if n := holding("internal-reader"); n != 1 {
+			t.Errorf("the totals count %d pieces held by the lead's holder; want one", n)
+		}
+		if n := holding("reader"); n != 0 {
+			t.Errorf("a reader of disclosed work was counted %d pieces of the lead's holder", n)
+		}
+	})
+}
+
+// A team's queue lists a lead it holds to whoever reads internal work.
+func TestATeamsQueueListsALeadItHolds(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		granted(t, r, "internal-triager", access.Assigner)
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"analysis-desk","members":["internal-reader"]}`); made.Code != http.StatusCreated {
+			t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("queueing the lead with the team answered %d: %s", got.Code, got.Body)
+		}
+		const queue = "/v1/teams/analysis-desk/assignments"
+		if got, _ := heldItems(t, r, "internal-reader", queue); len(got) != 1 || got[0] != place {
+			t.Errorf("the team's queue holds leads %v; want the seeded lead", got)
+		}
+		if got, n := heldItems(t, r, "reader", queue); len(got) != 0 || n != 0 {
+			t.Errorf("a reader of disclosed work was listed %d items of the team's queue, leads %v", n, got)
+		}
+	})
+}
+
+// A lead moved into its flaw's case is listed at the case's visibility: to a
+// reader of undisclosed work, and no longer to a reader of internal work alone.
+func TestAMovedLeadIsListedAtItsCasesVisibility(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, _ := httpapitest.HandedOffLead(t, r, true)
+		if got, _ := heldItems(t, r, "embargo-reader", "/v1/unassigned"); len(got) != 1 || got[0] != place {
+			t.Errorf("a reader of undisclosed work is listed leads %v; want the moved lead", got)
+		}
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 0 {
+			t.Errorf("a reader of internal work alone is listed the moved lead: %v", got)
+		}
+	})
+}
+
+// Two leads of one rule in one component are two pieces of work: a lead is
+// judged at its place, and grouping them would hide the second behind the
+// first.
+func TestEachLeadIsOnePieceOfHeldWork(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		httpapitest.SeededLead(t, r)
+		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),
+			httpapitest.OtherToolRun("cppcheck", "overflow", "787", "src/c.c", 3, 40))
+		if got, _ := heldItems(t, r, "internal-reader", "/v1/unassigned"); len(got) != 3 {
+			t.Errorf("the unassigned list holds leads %v; want the seeded lead and both overflows", got)
+		}
+	})
+}

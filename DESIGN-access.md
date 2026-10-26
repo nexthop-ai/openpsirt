@@ -489,6 +489,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | Rules are ordered, first match wins, and the finding records which rule placed it | An unwritten precedence rule is forgettable, and "where did this come from" is asked months later |
 | The order is settled | The ordinal is one past the highest under ordinary isolation, so two rules created at the same moment take the same number. Ties break by identifier rather than letting two rules swap places between batches |
 | Writing a rule asks for the assigner right | Reading the rules asks only for triage, because knowing where work goes is part of working it |
+| Reading and previewing the rules ask for triage at any visibility, internal included | A rule places leads, so whoever triages internal work in the product reads where its leads go. Writing a rule still asks for disclosed or undisclosed triage beside the assigner right |
 | Somebody who can see the product and lacks the right is refused with 403 | The same answer an issue act gives them. A product they cannot see answers as not declared, as every product route does |
 | A rule pointing at a retired team places nothing | Rather than placing work into a queue nothing can be picked up from. Retiring a rule leaves what it placed |
 | The rule listing names a rule's team by identifier and marks a retired one | The list read is the list the sweep applies, so a rule that places nothing says so. A team past the first page of teams, or retired, still has a name |

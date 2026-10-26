@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -255,7 +256,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 		// And the two screens say the same thing. This is the check the
 		// numbers are for: what one person is reported to hold, and what that
 		// person's own list has in it, are one measurement.
-		theirs, total, err := f.store.AssignedTo(t.Context(), triager, []int64{7}, finding.Scope{}, 50, 0)
+		theirs, total, err := f.store.AssignedTo(t.Context(), kind.Assignment, triager, []int64{7}, finding.Scope{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

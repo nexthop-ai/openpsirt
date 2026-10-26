@@ -650,7 +650,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		return nil, nil
 	}
 
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
@@ -680,7 +680,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	// syntax error on one engine and fine on the other three.
 	pieces := mine().
 		ColumnExpr(`"f"."assigned_to" AS "person_id"`).
-		GroupExpr(`"f"."assigned_to", "f"."vulnerability_id", "f"."component_id", "st"."product_id"`)
+		GroupExpr(`"f"."assigned_to", ` + pieceOfWork)
 
 	// Bounded like every other list. It is a name-yielding projection —
 	// one row per person holding open work the caller can see — and it was
@@ -753,7 +753,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		Where(`"f"."due_at" < ?`, s.now().UTC()).
 		Where(NotArguedAway).
 		Where("NOT "+standing, args...).
-		GroupExpr(`"f"."assigned_to", "f"."vulnerability_id", "f"."component_id", "st"."product_id"`)
+		GroupExpr(`"f"."assigned_to", ` + pieceOfWork)
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "work"`, late).
 		ColumnExpr(`"work"."person_id" AS "person_id"`).
@@ -816,7 +816,22 @@ type Owned struct {
 	// Builds is how many builds hold it. One is the ordinary answer and reads
 	// as it always did; more than one is the whole point of collapsing them.
 	Builds int `bun:"builds"`
+	// Place is the lead's place where this is a lead, and empty for any
+	// other finding. A lead is one piece of work at one place, whatever
+	// component its builds name.
+	Place string `bun:"place"`
 }
+
+// leadPlace is the place of the finding under "f" where it is a lead, and
+// the empty string for any other kind.
+const leadPlace = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."place_identity" ELSE '' END`
+
+// pieceOfWork is what one piece of work held is grouped by, over the finding
+// under "f" and its stream under "st": an issue in a component in a product,
+// or one lead in a product. A lead's builds may name different versions of
+// its component, and it is still one place to judge.
+const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
+	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + leadPlace
 
 // Unassigned reports the work nobody is dealing with, across every product the
 // subject may see, most urgent first.
@@ -844,20 +859,22 @@ type Owned struct {
 // answered separately.
 func (s *Store) Unassigned(ctx context.Context, subject access.Subject, scope Scope,
 	limit, offset int) ([]Owned, int, error) {
-	return s.work(ctx, subject, scope, nil, limit, offset)
+	return s.work(ctx, kind.Assignment, subject, scope, nil, limit, offset)
 }
 
 // AssignedTo reports what one party is dealing with — a person, or a team the
-// work is queued with — in the same units as what nobody is.
+// work is queued with — in the same units as what nobody is, of the kinds the
+// consumer asking names: the lists of held work name leads, and the digest
+// does not.
 //
 // The same shape deliberately. "What is waiting for me" and "what is waiting
 // for nobody" are the same question asked of a different holder, and answering
 // them in two shapes is how a screen ends up saying somebody holds ninety
 // things because it counted places where the other counted judgments.
-func (s *Store) AssignedTo(ctx context.Context, subject access.Subject, parties []int64,
+func (s *Store) AssignedTo(ctx context.Context, c kind.Consumer, subject access.Subject, parties []int64,
 	scope Scope, limit, offset int) ([]Owned, int, error) {
 
-	return s.work(ctx, subject, scope, parties, limit, offset)
+	return s.work(ctx, c, subject, scope, parties, limit, offset)
 }
 
 // UnassignedSince is what nobody owns that arrived after a moment.
@@ -868,7 +885,7 @@ func (s *Store) AssignedTo(ctx context.Context, subject access.Subject, parties 
 func (s *Store) UnassignedSince(ctx context.Context, subject access.Subject, scope Scope,
 	since time.Time, limit int) ([]Owned, int, error) {
 
-	return s.workSince(ctx, subject, scope, nil, &since, limit, 0)
+	return s.workSince(ctx, kind.Notifications, subject, scope, nil, &since, limit, 0)
 }
 
 // work is what some set of parties holds, or what nobody does.
@@ -876,10 +893,10 @@ func (s *Store) UnassignedSince(ctx context.Context, subject access.Subject, sco
 // A set rather than one, because "assigned to me" means mine or my team's
 // everywhere the phrase appears, and a screen that asked twice and merged
 // would page and count two half-lists.
-func (s *Store) work(ctx context.Context, subject access.Subject, scope Scope,
+func (s *Store) work(ctx context.Context, c kind.Consumer, subject access.Subject, scope Scope,
 	holders []int64, limit, offset int) ([]Owned, int, error) {
 
-	return s.workSince(ctx, subject, scope, holders, nil, limit, offset)
+	return s.workSince(ctx, c, subject, scope, holders, nil, limit, offset)
 }
 
 // workSince is the same, bounded to what opened after a moment.
@@ -887,7 +904,7 @@ func (s *Store) work(ctx context.Context, subject access.Subject, scope Scope,
 // Only the digest passes one, and it passes the moment the last digest went:
 // what it carries is what has arrived since, rather than everything that is
 // open, which after a month is a list nobody reads.
-func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Scope,
+func (s *Store) workSince(ctx context.Context, c kind.Consumer, subject access.Subject, scope Scope,
 	holders []int64, since *time.Time, limit, offset int) ([]Owned, int, error) {
 
 	// Not merely empty: "here is nothing" and "you cannot ask" are different
@@ -906,7 +923,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	}
 	limit = database.AList.Of(limit)
 
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	kinds, kindArgs := c.Where(`"f"."kind"`)
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
@@ -959,13 +976,17 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		Exploited       int       `bun:"exploited"`
 		ExploitedHere   int       `bun:"exploited_here"`
 		Places          int       `bun:"places"`
+		Place           string    `bun:"place"`
 		Total           int       `bun:"total"`
 		Undisclosed     bool      `bun:"undisclosed"`
 		OpenedAt        time.Time `bun:"opened_at"`
 	}
 	err := narrow(s.db.NewSelect()).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		// The lowest of a lead's components, as one of its builds names it.
+		// Every other piece of work is one component.
+		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
+		ColumnExpr(`MAX(`+leadPlace+`) AS "place"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		// One of the builds, and how many there are. The one is what a link
 		// and an action need somewhere to point; the count is what stops a
@@ -992,8 +1013,9 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		// groups the narrowing admits, counted after the grouping and before
 		// the limit, in the statement that groups them.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id"`).
-		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", "f"."component_id", "st"."product_id"`).
+		GroupExpr(pieceOfWork).
+		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", MIN("f"."component_id"), "st"."product_id", `+
+			`MAX(`+leadPlace+`)`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {
@@ -1006,7 +1028,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		counted, err := s.db.NewSelect().
 			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
 				ColumnExpr(`"f"."vulnerability_id"`).
-				GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id"`)).
+				GroupExpr(pieceOfWork)).
 			Count(ctx)
 		if err != nil {
 			return nil, 0, fmt.Errorf("count what nobody is dealing with: %w", err)
@@ -1056,7 +1078,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 			VulnerabilityID: head.VulnerabilityID, ComponentID: head.ComponentID,
 			ProductID: head.ProductID,
 			Urgency:   head.Urgency, Places: head.Places, Builds: head.Builds,
-			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt,
+			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt, Place: head.Place,
 			Exploited: head.Exploited == 1, ExploitedHere: head.ExploitedHere == 1,
 		}
 		if issue, held := named[head.VulnerabilityID]; held {

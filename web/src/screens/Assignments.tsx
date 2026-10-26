@@ -16,7 +16,7 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf } from "../app/routes";
+import { findingOf, leadAt } from "../app/routes";
 
 // One page of what somebody holds. The answer carries a total, so this is a
 // page rather than a cap and the footer pages through the rest.
@@ -339,7 +339,8 @@ function ByPerson({
 
 // One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
-// built several ways is one piece of work and was taken on as one.
+// built several ways is one piece of work and was taken on as one. A static
+// analysis lead is a row of its own, named by its rule, and opens its page.
 function Held({
   rows,
   total,
@@ -385,10 +386,15 @@ function Held({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const to = findingOf(row);
+              const to = row.place
+                ? leadAt(
+                    { product: row.product, stream: row.stream, variant: row.variant },
+                    row.place,
+                  )
+                : findingOf(row);
               return (
                 <tr
-                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version}`}
+                  key={`${row.product} ${row.vulnerability} ${row.component} ${row.version} ${row.place ?? ""}`}
                   className="row opens"
                   onClick={opener(to)}
                 >
@@ -399,6 +405,7 @@ function Held({
                     <Link to={to} className="id">
                       {row.vulnerability}
                     </Link>{" "}
+                    {row.place && <span className="hint">lead</span>}{" "}
                     <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                   </td>
                   <td>

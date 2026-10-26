@@ -122,13 +122,15 @@ func registerRouting(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		// Declared triage, like the rule it previews. What comes back is
-		// narrowed to what the asker may read, but a preview is part of
-		// writing a rule and nobody who may not write one has a reason to run
-		// it.
-		product, err := core.TriagedProduct(ctx, in, subject, input.Product)
+		// Triage at any visibility, as reading the rules asks. What comes
+		// back is narrowed to what the asker may read, so somebody who
+		// triages leads alone counts the leads a rule would place.
+		product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
+		}
+		if !subject.TriagesAnyIn(product.ID) {
+			return nil, huma.Error403Forbidden("not authorized")
 		}
 		if input.Upstream == "" && input.Beneath == "" {
 			return nil, huma.Error422UnprocessableEntity(

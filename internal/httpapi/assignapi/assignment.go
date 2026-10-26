@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -42,7 +43,7 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 			Stream: row.Stream, Variant: row.Variant,
 			StreamName:  row.StreamName,
 			VariantName: row.VariantName,
-			Places:      row.Places, Builds: row.Builds,
+			Places:      row.Places, Builds: row.Builds, Place: row.Place,
 		})
 	}
 	out.Body.Total = total
@@ -71,6 +72,7 @@ type UnassignedBody struct {
 	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
 	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
+	Place       string `json:"place,omitempty" doc:"The place of a static analysis lead, which addresses its page with the stream and variant. Absent for any other finding. The vulnerability is then the analyzer's rule, and the component the one its repository built"`
 }
 
 // HoldingBody is how much work one person has.
@@ -350,7 +352,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-unassigned", Method: http.MethodGet, Path: "/v1/unassigned",
 		Summary: "List findings nobody is dealing with",
 		Description: "Returns open findings with no assignee, across every product you can see, " +
-			"most urgent first.\n\n" +
+			"most urgent first. Static analysis leads are included where you read them, one item " +
+			"per lead, with `place` set.\n\n" +
 			"Deliberately not scoped to one product: work falling between people is exactly what " +
 			"hides when every screen shows one product and nobody looks at the others.\n\n" +
 			"One item per issue in a component in a product, not one per build. The same code " +
@@ -387,7 +390,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "The open findings assigned to somebody, most urgent first, in the same " +
 			"units as what nobody is dealing with: one item per issue in a component in a " +
 			"product, not one per build. The same code built several ways is one piece of " +
-			"work, and it was taken on as one.\n\n" +
+			"work, and it was taken on as one. A static analysis lead is one item, with `place` " +
+			"set, where you read it.\n\n" +
 			"Send `me` as the identity for your own.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
 			"also what an identity somebody holds answers when none of their work is yours to " +
@@ -452,7 +456,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 				}
 			}
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what they are dealing with could not be read", err)
@@ -471,7 +475,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Path:    "/v1/teams/{team}/assignments",
 		Summary: "List what one team is dealing with",
 		Description: "The open findings routed to a team, most urgent first, in the same units " +
-			"as everywhere else: one item per issue in a component in a product.\n\n" +
+			"as everywhere else: one item per issue in a component in a product, and one per static " +
+			"analysis lead you read, with `place` set.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +
@@ -516,7 +521,7 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		case !errors.Is(err, access.ErrNoSuchTeam):
 			return nil, core.WentWrong(in.Logger, "that team could not be looked up", err)
 		}
-		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, subject, holders,
+		rows, total, err := finding.NewStore(in.DB.DB).AssignedTo(ctx, kind.Assignment, subject, holders,
 			scope, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what the team is dealing with could not be read", err)
@@ -531,8 +536,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		OperationID: "list-holdings", Method: http.MethodGet, Path: "/v1/assignments",
 		Summary: "List assignment totals",
 		Description: "Returns everyone holding open work you can see, with how much.\n\n" +
-			"Counted in pieces of work — an issue in a component in a product — which is the " +
-			"unit the list behind each person is in. `places` says how many findings those " +
+			"Counted in pieces of work — an issue in a component in a product, or one static " +
+			"analysis lead — which is the unit the list behind each person is in. `places` says how many findings those " +
 			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
 			"write.\n\n" +
 			"The number worth watching is not how many findings exist but how many are waiting " +

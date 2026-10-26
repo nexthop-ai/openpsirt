@@ -76,8 +76,8 @@ and a kind it does not name never reaches it.
 | Closure | A run's sweep: what it opens, updates and closes | Vulnerability |
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
-| Triage | The findings lists and their counts, one finding's page, the lists of who holds what, notes on an issue, and disclosure | Vulnerability, entered |
-| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, and routing by a team's rules and its preview (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
+| Triage | The findings lists and their counts, one finding's page, notes on an issue, and disclosure | Vulnerability, entered |
+| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, routing by a team's rules and its preview, and the lists of who holds what: unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
 | Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue, every read of one claim, the record of judgments and its file, and the notices about claims: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the places it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
@@ -104,7 +104,8 @@ leads, because it writes what the record shows, under the same visibility
 | The counts by series are part of Leads, not of Statistics | Statistics feeds the vulnerability figures, and a lead nobody has judged is not one of them |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
 | Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |
-| The lists of who holds what stay with Triage | Unassigned work, one person's work, a team's queue and the work of somebody who has left list findings. A lead's holder is read on the lead and in the lead queue |
+| The lists of who holds what are Assignment's | Holding work is one act whatever the work is, so a lead held is listed where held work is. The digest of what somebody holds is Notifications', and names no lead |
+| A lead is one piece of held work at its place | A vulnerability's piece of work is an issue in a component in a product. A lead is judged at its place, and its builds may name different versions of its component |
 
 ## Inclusion
 

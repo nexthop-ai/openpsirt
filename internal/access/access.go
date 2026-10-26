@@ -644,6 +644,16 @@ func (s Subject) TriagesIn(productID int64) bool {
 	return false
 }
 
+// TriagesAnyIn reports whether this subject triages findings at any
+// visibility in this product: disclosed, undisclosed or internal.
+//
+// The question reading and previewing the routing rules ask. A rule places
+// leads as it places every other finding, so whoever triages the leads it
+// places reads what it would place.
+func (s Subject) TriagesAnyIn(productID int64) bool {
+	return s.TriagesIn(productID) || s.Triages(Internal, productID)
+}
+
 // Readings is a set of products sorted by exactly which visibilities a rule
 // allows in each. A product the rule allows none in is in no group.
 type Readings struct {

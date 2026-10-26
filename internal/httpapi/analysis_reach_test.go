@@ -17,7 +17,8 @@ import (
 // would carry it on its visibility alone, since a lead moved into a private
 // case is private and only its kind keeps it out. A findings file writes a
 // lead only through the lead queue's read, which needs the analyzer's result
-// these rows have none of.
+// these rows have none of. The lists of held work list leads, and are pinned
+// with the assignment routes.
 func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
@@ -38,7 +39,7 @@ func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) 
 			} `json:"items"`
 			Total int `json:"total"`
 		}
-		for _, path := range []string{"/v1/products/mine/findings", "/v1/findings", "/v1/unassigned"} {
+		for _, path := range []string{"/v1/products/mine/findings", "/v1/findings"} {
 			for _, who := range []string{"private", "internal-triager"} {
 				var out listed
 				httpapitest.Read(t, r, who, path, &out)

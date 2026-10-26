@@ -1195,7 +1195,8 @@ its reasoning and its history with no way to answer it.
 
 Assignments is two tabs: what is due soon and undecided, and who holds what.
 A row nobody holds says "unassigned" in muted text rather than drawing nobody
-as a person with an avatar.
+as a person with an avatar. A lead somebody holds is a row of its own, named by
+its rule and marked lead, and opens the lead's page.
 
 Work nobody holds is the findings list under two filters, not a screen of
 its own: nobody assigned, and nothing decided. The rail entry keeps its label,
