@@ -172,6 +172,27 @@ func seriesV0110(t *columnTypes) []string {
 		// What a run saw and did not see, counted on its receipt.
 		`CREATE INDEX "sighting_last_idx" ON "sighting" ("last_run_id")`,
 		`CREATE INDEX "sighting_absent_idx" ON "sighting" ("absent_run_id")`,
+
+		// The last upload of a series to a build that was turned away, and
+		// why. One row per build and series, replaced each time: what is
+		// asked is whether the series is being refused now, and a pipeline
+		// retrying a document nothing can read would otherwise write one a
+		// minute.
+		`CREATE TABLE "series_refusal" (
+			"id"           ` + t.id + `,
+			"target_id"    ` + t.ref + ` NOT NULL,
+			-- As the upload named it, and folded. Empty where the upload was
+			-- turned away before it named one.
+			"series"       ` + t.name + ` NOT NULL,
+			"series_folded" ` + t.name + ` NOT NULL,
+			"kind"         ` + t.kind + ` NOT NULL,
+			"at"           ` + t.timestamp + ` NOT NULL,
+			-- What the sender was told.
+			"reason"       ` + t.text + ` NOT NULL,
+			"credential"   ` + t.name + ` NULL,
+			CONSTRAINT "series_refusal_unique" UNIQUE ("target_id", "kind", "series_folded"),
+			CONSTRAINT "series_refusal_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+		)` + t.suffix,
 	}
 }
 
@@ -273,6 +294,7 @@ func createSeriesV0110(ctx context.Context, tx bun.Tx) error {
 		{"series_document_chunk", seriesV0110},
 		{"series_module", seriesV0110},
 		{"sighting", seriesV0110},
+		{"series_refusal", seriesV0110},
 		{"analysis_result", analysisV0110},
 		{"analysis_location", analysisV0110},
 	} {

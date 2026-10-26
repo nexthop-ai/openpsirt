@@ -633,13 +633,12 @@ components:
           description: The series the run belongs to
           type: string
         status:
-          description: "What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed"
+          description: "What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, or failed"
           enum:
             - queued
             - waiting
             - applied
             - superseded
-            - held
             - failed
           type: string
         tool:
@@ -671,12 +670,38 @@ components:
           type:
             - array
             - "null"
+        refused:
+          description: For each series, the last upload to this build that was turned away, newest first
+          items:
+            $ref: "#/components/schemas/AnalysisRefusalBody"
+          type:
+            - array
+            - "null"
         total:
           format: int64
           type: integer
       required:
         - items
         - total
+        - refused
+      type: object
+    AnalysisRefusalBody:
+      additionalProperties: false
+      properties:
+        at:
+          description: When it was turned away
+          format: date-time
+          type: string
+        reason:
+          description: What the sender was told
+          type: string
+        series:
+          description: The series as the upload named it. Empty where it was turned away before naming one
+          type: string
+      required:
+        - series
+        - at
+        - reason
       type: object
     AnalysisResult:
       additionalProperties: false
@@ -7937,6 +7962,9 @@ components:
             - upstream-failing
             - upstream-recovered
             - inventory-moved
+            - analysis-dropped
+            - analysis-not-comparable
+            - analysis-quiet
             - obligation-open
             - obligation-near
             - obligation-passed
@@ -8219,6 +8247,9 @@ components:
             - upstream-failing
             - upstream-recovered
             - inventory-moved
+            - analysis-dropped
+            - analysis-not-comparable
+            - analysis-quiet
             - obligation-open
             - obligation-near
             - obligation-passed
@@ -9736,10 +9767,9 @@ components:
           description: Results the build held open that the run reported again
           format: int64
           type: integer
-        would_mark:
-          description: How many a held run would have marked not reproduced
-          format: int64
-          type: integer
+        sharp_drop:
+          description: Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers
+          type: boolean
       required:
         - opened
         - seen
@@ -25890,7 +25920,7 @@ paths:
   /v1/products/{product}/streams/{stream}/variants/{variant}/analyses:
     get:
       description: |-
-        Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see.
+        Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
 
         An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
 

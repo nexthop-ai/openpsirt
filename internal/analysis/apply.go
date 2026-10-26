@@ -32,11 +32,30 @@ import (
 type Applier struct {
 	db  *database.DB
 	now func() time.Time
+	// drops is told of each applied run that dropped sharply, once its
+	// transaction has committed.
+	drops func(context.Context, Drop)
 }
 
 // NewApplier returns an applier.
 func NewApplier(db *database.DB) *Applier {
 	return &Applier{db: db, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// Drop is an applied run that marked more of a build's open leads not
+// reproduced than the deployment expects of one run.
+type Drop struct {
+	RunID, SeriesID, TargetID int64
+	// Missed is how many it marked, and Live how many it could have.
+	Missed, Live int
+}
+
+// TellingDrops has the applier tell somebody of each run that drops sharply.
+// It is told after the run's transaction commits, so a retried transaction
+// tells once.
+func (a *Applier) TellingDrops(tell func(context.Context, Drop)) *Applier {
+	a.drops = tell
+	return a
 }
 
 // Receipt is what a pipeline is told about a run it sent. It counts and
@@ -46,7 +65,7 @@ type Receipt struct {
 	Seen          int            `json:"seen" doc:"Results the build held open that the run reported again"`
 	Returned      int            `json:"returned" doc:"Of those seen again, the ones an earlier run had not reported"`
 	NotReproduced int            `json:"not_reproduced" doc:"Results the build held open that this comparable run did not report"`
-	WouldMark     int            `json:"would_mark,omitempty" doc:"How many a held run would have marked not reproduced"`
+	SharpDrop     bool           `json:"sharp_drop,omitempty" doc:"Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers"`
 	Probable      int            `json:"probable,omitempty" doc:"Results paired with a lead on its function or its nearest line rather than its whole key"`
 	Inherited     int            `json:"inherited,omitempty" doc:"Results new to the build carried from a lead of the branch it was cut from"`
 	Reopened      int            `json:"reopened,omitempty" doc:"Results found again at the place of a lead on the build that was closed"`
@@ -105,10 +124,15 @@ func (a *Applier) Apply(ctx context.Context, runID int64) (series.Status, error)
 		read = &h
 	}
 	var status series.Status
+	var drop *Drop
 	err = database.InTransaction(ctx, a.db.DB, func(ctx context.Context, tx bun.Tx) error {
-		status, err = a.apply(ctx, tx, runID, read)
+		drop = nil
+		status, err = a.apply(ctx, tx, runID, read, &drop)
 		return err
 	})
+	if err == nil && drop != nil && a.drops != nil {
+		a.drops(ctx, *drop)
+	}
 	return status, err
 }
 
@@ -215,7 +239,7 @@ func modulesOf(r *sarif.Run, root string) []series.Module {
 }
 
 // apply applies a placed run inside one transaction.
-func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held) (series.Status, error) {
+func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held, drop **Drop) (series.Status, error) {
 	store := series.NewStore(tx)
 	if err := store.Take(ctx, runID); err != nil {
 		return "", err
@@ -307,14 +331,14 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held)
 
 	receipt := placed.Receipt
 	if comparable && previous != nil {
-		drop, err := sharpDrop(ctx, tx, len(missed), live(open))
+		sharp, err := sharpDrop(ctx, tx, len(missed), live(open))
 		if err != nil {
 			return "", err
 		}
-		if drop {
-			run.Status = series.Held
-			receipt.WouldMark = len(missed)
-			return run.Status, a.end(ctx, store, run, receipt)
+		if sharp {
+			receipt.SharpDrop = true
+			*drop = &Drop{RunID: run.ID, SeriesID: set.ID, TargetID: run.TargetID,
+				Missed: len(missed), Live: live(open)}
 		}
 	}
 
@@ -509,8 +533,8 @@ func live(open []series.Sighting) int {
 }
 
 // sharpDrop is whether marking this many of a build's live results not
-// reproduced is more than the deployment allows in one run. Both the share
-// and the floor have to be passed, so a small series does not hold every
+// reproduced is more than the deployment expects of one run. Both the share
+// and the floor have to be passed, so a small series does not raise it every
 // time two results go.
 func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) {
 	if missed == 0 || live == 0 {
@@ -523,7 +547,7 @@ func sharpDrop(ctx context.Context, db bun.IDB, missed, live int) (bool, error) 
 	}
 	floor, err := settings.Count(ctx, setting.AnalysisDropFloor, setting.DefaultAnalysisDropFloor)
 	if err != nil {
-		return false, fmt.Errorf("read how few results going is worth holding a run for: %w", err)
+		return false, fmt.Errorf("read how few results going is worth saying so: %w", err)
 	}
 	return missed >= floor && missed*100 > share*live, nil
 }

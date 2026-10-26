@@ -13,6 +13,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [An inventory that moved sharply](#an-inventory-that-moved-sharply)
+- [Analyzer alerts](#analyzer-alerts)
 - [Staleness conditions](#staleness-conditions)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
@@ -85,6 +86,9 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
+| An analyzer run that marked much of a build not reproduced | event | Below, under analyzer alerts |
+| An analyzer series whose newest run on a build could not be compared | condition | Below, under analyzer alerts |
+| An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
 | The same window near its end, where it names a warning | condition | Described under obligation notices below |
 | The same window passed | condition | Described under obligation notices below |
@@ -178,6 +182,27 @@ An inventory that held nothing has no share to be part of, so the share stops
 nothing that arrives. The floor still applies: both thresholds are asked of
 every upload, and a build given three names back after being emptied is three
 names.
+
+## Analyzer alerts
+
+What an analyzer series is doing on a build, told to everybody who reads the
+product's internal findings. Each names a series and a build and nothing it
+found, and each is about internal work, so it is withheld on the terms of
+§ The notification list.
+
+| Alert | Kind | Says | Clears |
+|---|---|---|---|
+| Sharp drop | event | A comparable run marked more of the build's open leads not reproduced than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's leads not reproduced | Acknowledged |
+| Not comparable | condition | The series' newest applied run on the build could not be compared, and why. Nothing it stops reporting there is marked not reproduced | The next comparable run |
+| Gone quiet | condition | No run of the series has been applied to the build for three of its usual gaps, and never under a day. Names the last upload of the series to the build turned away since, with what its sender was told | The next applied run |
+
+| Rule | Reason |
+|---|---|
+| A sharp drop is applied rather than held | A run set aside leaves every later run superseded behind it, and a fix sweep looks the same as a partial run |
+| The usual gap is the median of the newest ten | One long weekend or a burst of reruns does not move it, and a pipeline that moved from weekly to nightly is judged by what it does now |
+| A series with fewer than three applied runs on a build is never quiet | Two runs are one gap, which is a guess |
+| Builds retired at any level, and releases past their end of life, are left out | Nobody analyzes them on purpose |
+| The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `DESIGN-analysis.md` § Run application |
 
 ## Staleness conditions
 
@@ -483,6 +508,7 @@ name are what a later read has to ask about.
 |---|---|
 | It is about nothing undisclosed | Most of the table, and no rule narrows it |
 | It names a product where this person reads undisclosed work now | The role is the reason it arrived, so withdrawing the role is what takes it away |
+| It is about internal work, in a product where this person reads internal work now | A reader of undisclosed work reads no internal finding, so a line about one is withheld from them on the same terms |
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
 | It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and a place, and the line granting it is about that lead, so it is the one line the grant reaches |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
@@ -493,7 +519,7 @@ back returns the line, because they were told and that is a fact about a moment.
 It also avoids a clear-on-revoke path somebody has to remember, and there is
 more than one way to lose a role.
 
-A row marked private carries the product it is about, or the write is refused. A
+A row marked private carries the product it is about, or the write is refused, and a row about internal work is marked private. A
 private row attributable to nothing could only be shown to everybody or to
 nobody. Refusing where it is written makes that a failure at the producer rather
 than a leak, or a silent disappearance, at the reader.

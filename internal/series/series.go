@@ -41,16 +41,12 @@ const (
 	// Superseded is a run older than one already applied to its build. It is
 	// kept and changes nothing.
 	Superseded Status = "superseded"
-	// Held is a comparable run that would have marked more of its series'
-	// open results not reproduced than the deployment allows. It changes
-	// nothing.
-	Held Status = "held"
 	// Failed is a run that could not be read, or whose tool did not run.
 	Failed Status = "failed"
 )
 
 // Statuses is every status a run may hold.
-func Statuses() []Status { return []Status{Queued, Waiting, Applied, Superseded, Held, Failed} }
+func Statuses() []Status { return []Status{Queued, Waiting, Applied, Superseded, Failed} }
 
 // Series is one analysis a product runs the same way on every build.
 type Series struct {

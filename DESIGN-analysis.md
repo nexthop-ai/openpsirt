@@ -151,7 +151,6 @@ placed results are read before it, since they do not change once stored.
 |---|---|
 | `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival. The placed results are not read while a run waits |
 | `superseded` | The series has applied a run to this build built at or after this one. Nothing changes |
-| `held` | A comparable run would mark more of the build's open leads not reproduced than the deployment allows at once. Nothing changes |
 | `failed` | The placed results are held in a shape the release applying them does not read, or the build had no inventory read within a day of the run arriving |
 | `applied` | Results matched, opened and recorded |
 
@@ -161,9 +160,17 @@ twice or record two baselines. Each takes the series' row first, by writing a va
 no run wrote before, because a cluster certifies only rows that were written
 (`DESIGN-database.md` § Retryable transactions).
 
-The hold is two settings, the analyzer drop share and floor, and both have to
-be passed. The share is of the leads the last comparable run saw; the floor
-keeps a small series from being held each time two leads are fixed.
+A comparable run marking more of the build's open leads not reproduced than
+the deployment expects of one run is a sharp drop. It is applied, its receipt
+says so, and the product's internal readers are told once, after the run
+commits (`DESIGN-notifications.md` § Analyzer alerts). A run that analyzed
+part of the tree without saying so reads like a fix sweep, so a person is
+asked to look; setting the run aside would leave every later run superseded
+behind it.
+
+A sharp drop is two settings, the analyzer drop share and floor, and both
+have to be passed. The share is of the leads the last comparable run saw; the
+floor keeps a small series from raising one each time two leads are fixed.
 
 An applied run, in order:
 
@@ -666,8 +673,16 @@ one handed-off lead, as case collaborators are brought into one flaw
 | Comparable, and the reason where not | § Run parameters |
 | Baseline | The series' first comparable run |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, what a held run would have marked, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
 | Re-baseline | Whether the run's fingerprints changed from the build's last (§ Matching) |
+| Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
+
+Beside the runs, the list carries the last upload of each series to the
+build that was turned away after its sender was admitted: the series as the
+upload named it, when, and the words the sender was told. One is kept per
+series and build, replaced by the next. An upload refused before its sender
+was admitted to the build is recorded nowhere, because recording it would
+tell whoever reads the build that somebody without access tried.
 
 A receipt counts leads and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
@@ -801,7 +816,6 @@ it is about.
 | A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
-| Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
 | Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 

@@ -1011,6 +1011,8 @@ var tables = []string{
 	"analysis_location",
 	"analysis_result",
 	"sighting",
+	// Before target, which it points at.
+	"series_refusal",
 	// Before series_run, which they point at.
 	"series_module",
 	"series_document_chunk",

@@ -4193,7 +4193,7 @@ export interface paths {
         };
         /**
          * List uploaded analyzer runs and their status
-         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see.
+         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
          *
          *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
          *
@@ -7083,10 +7083,10 @@ export interface components {
             /** @description The series the run belongs to */
             series: string;
             /**
-             * @description What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed
+             * @description What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, or failed
              * @enum {string}
              */
-            status: "queued" | "waiting" | "applied" | "superseded" | "held" | "failed";
+            status: "queued" | "waiting" | "applied" | "superseded" | "failed";
             /** @description The analyzer that ran */
             tool?: string;
             /** @description Its version */
@@ -7100,8 +7100,21 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AnalysisReceiptBody"][] | null;
+            /** @description For each series, the last upload to this build that was turned away, newest first */
+            refused: components["schemas"]["AnalysisRefusalBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        AnalysisRefusalBody: {
+            /**
+             * Format: date-time
+             * @description When it was turned away
+             */
+            at: string;
+            /** @description What the sender was told */
+            reason: string;
+            /** @description The series as the upload named it. Empty where it was turned away before naming one */
+            series: string;
         };
         AnalysisResult: {
             /**
@@ -11168,7 +11181,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11315,7 +11328,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12250,11 +12263,8 @@ export interface components {
              * @description Results the build held open that the run reported again
              */
             seen: number;
-            /**
-             * Format: int64
-             * @description How many a held run would have marked not reproduced
-             */
-            would_mark?: number;
+            /** @description Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers */
+            sharp_drop?: boolean;
         };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */

@@ -132,6 +132,16 @@ func Lead(product, stream, variant, place string) string {
 	return build(product, stream, variant) + "/leads/" + url.PathEscape(place)
 }
 
+// Leads is a product's leads in one state on one build.
+func Leads(product, stream, variant, state string) string {
+	if climbs(product) {
+		return Home()
+	}
+	return "/products/" + url.PathEscape(product) + "/leads?" + url.Values{
+		"state": {state}, "stream": {stream}, "variant": {variant},
+	}.Encode()
+}
+
 // Inventories is the list of what one build sent.
 func Inventories(product, stream, variant string) string {
 	if climbs(product, stream, variant) {

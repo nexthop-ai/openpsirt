@@ -241,19 +241,7 @@ func spread(n int) []sent {
 	return out
 }
 
-// sightings is every sighting the build's leads have.
-func (w *world) sightings(t *testing.T, targetID int64) []series.Sighting {
-	t.Helper()
-	var rows []series.Sighting
-	if err := w.DB.DB.NewSelect().Model(&rows).
-		Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
-		Where(`"f"."target_id" = ?`, targetID).Scan(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	return rows
-}
-
-// drops sets the share and floor a run is held past.
+// drops sets the share and floor past which a run is a sharp drop.
 func (w *world) drops(t *testing.T, share, floor string) {
 	t.Helper()
 	settings := setting.NewStore(w.DB.DB)
@@ -396,23 +384,23 @@ func TestARunBuiltBeforeTheLastAppliedIsSuperseded(t *testing.T) {
 	})
 }
 
-func TestARunThatWouldMarkMostOfABuildIsHeld(t *testing.T) {
+func TestARunThatMarksMostOfABuildIsAppliedAndToldOnce(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
+		var told []Drop
+		w.applier.TellingDrops(func(_ context.Context, d Drop) { told = append(told, d) })
 		w.inventory(t, w.Target.ID)
 		w.drops(t, "50", "1")
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
 		run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(nil, 10))
-		if status != series.Held {
-			t.Fatalf("status %s; want held", status)
+		if status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
 		}
-		if r := receiptOf(t, run); r.WouldMark != 2 || r.NotReproduced != 0 {
-			t.Errorf("receipt %+v; want two it would mark and none marked", r)
+		if r := receiptOf(t, run); !r.SharpDrop || r.NotReproduced != 2 {
+			t.Errorf("receipt %+v; want a sharp drop that marked both", r)
 		}
-		for _, s := range w.sightings(t, w.Target.ID) {
-			if s.AbsentRunID != nil {
-				t.Errorf("finding %d marked not reproduced by a held run", s.FindingID)
-			}
+		if len(told) != 1 || told[0].RunID != run.ID || told[0].Missed != 2 || told[0].Live != 2 {
+			t.Errorf("told %+v; want this run once, two of two", told)
 		}
 	})
 }
@@ -438,8 +426,8 @@ func TestARunPastOnlyOneOfTheTwoDropBoundsIsApplied(t *testing.T) {
 				if status != series.Applied {
 					t.Fatalf("status %s; want applied", status)
 				}
-				if r := receiptOf(t, run); r.NotReproduced != c.missed {
-					t.Errorf("receipt %+v; want %d not reproduced", r, c.missed)
+				if r := receiptOf(t, run); r.NotReproduced != c.missed || r.SharpDrop {
+					t.Errorf("receipt %+v; want %d not reproduced and no sharp drop", r, c.missed)
 				}
 			})
 		})

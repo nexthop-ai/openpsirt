@@ -187,3 +187,45 @@ func TestTheTextAProducerStatesIsRecordedAtAnyLength(t *testing.T) {
 		}
 	})
 }
+
+func TestAnAnalyzerUploadTurnedAwayIsRecordedAgainstItsSeries(t *testing.T) {
+	httpapitest.IngestOn(t, dbtest.Two, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		for _, fields := range []map[string]string{
+			{"series": "nightly", "built": "yesterday"},
+			{"series": "nightly", "exit-status": "zero"},
+			nil,
+		} {
+			if code, _, body := sendRun(t, f, []string{clangRun}, fields); code != http.StatusUnprocessableEntity {
+				t.Fatalf("answered %d (%s); want 422", code, body)
+			}
+		}
+		// Somebody nothing admits is answered and nothing is recorded.
+		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
+			httpapitest.Part{Field: "series", Content: "stranger"})
+		req := httptest.NewRequest(http.MethodPost, analyses(f), body)
+		req.Header.Set("Content-Type", form)
+		rec := httptest.NewRecorder()
+		f.Handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("an unsigned upload answered %d; want 401", rec.Code)
+		}
+
+		req = httptest.NewRequest(http.MethodGet, analyses(f), nil)
+		rec = httptest.NewRecorder()
+		f.Handler.ServeHTTP(rec, f.Sending(req))
+		var listed struct {
+			Refused []scansapi.AnalysisRefusalBody `json:"refused"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+			t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+		}
+		got := map[string]string{}
+		for _, r := range listed.Refused {
+			got[r.Series] = r.Reason
+		}
+		if len(got) != 2 || !strings.Contains(got["nightly"], "whole number") ||
+			!strings.Contains(got[""], "names no series") {
+			t.Errorf("refused %+v; want the last refusal of nightly and the one naming no series", listed.Refused)
+		}
+	})
+}

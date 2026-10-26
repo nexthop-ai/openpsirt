@@ -178,8 +178,8 @@ const (
 	DeltaShare = "scanning.delta-share"
 	DeltaFloor = "scanning.delta-floor"
 	// AnalysisDropShare and AnalysisDropFloor are when an analyzer's run
-	// would mark so much of a build's results not reproduced at once that the
-	// run is held and changes nothing.
+	// marks so much of a build's results not reproduced at once that the
+	// product's internal readers are told.
 	//
 	// Both have to be passed, for the reason the inventory pair does. A run
 	// that analyzed a fraction of the tree and said so is not comparable and
@@ -531,8 +531,8 @@ const DefaultDeltaShare = 25
 const DefaultDeltaFloor = 10
 
 // DefaultAnalysisDropShare is how much of a build's open analyzer results
-// one run may mark not reproduced before it is held, as a percentage, where
-// nobody has said.
+// one run may mark not reproduced before anybody is told, as a percentage,
+// where nobody has said.
 //
 // Half: a fix sweep clears a rule's worth of results, and a run that clears
 // half of everything is likelier to have analyzed less than to have fixed
@@ -540,10 +540,10 @@ const DefaultDeltaFloor = 10
 const DefaultAnalysisDropShare = 50
 
 // DefaultAnalysisDropFloor is the fewest results one run must mark not
-// reproduced to be held, where nobody has said.
+// reproduced for anybody to be told, where nobody has said.
 //
-// Twenty, so that a series with a handful of results is not held each time
-// two of them are fixed.
+// Twenty, so that a series with a handful of results does not raise it each
+// time two of them are fixed.
 const DefaultAnalysisDropFloor = 20
 
 // DefaultScanEvery is how often everything tracked is scanned again, where a

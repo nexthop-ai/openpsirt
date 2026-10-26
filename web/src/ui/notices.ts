@@ -61,6 +61,9 @@ const WORDS: Record<Kind, string> = {
   // was rather than as what it might mean: nothing here knows whether the
   // base image moved or the pipeline broke.
   "inventory-moved": "a build's contents changed sharply",
+  "analysis-dropped": "an analyzer run dropped sharply",
+  "analysis-not-comparable": "an analyzer run could not be compared",
+  "analysis-quiet": "an analyzer has gone quiet",
   // A window after an attack, counted from when it became known, with
   // nobody outside recorded as told. Said as the fact; whether anybody owed
   // anything is not the tool's answer to give.
