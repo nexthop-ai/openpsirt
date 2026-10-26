@@ -666,8 +666,9 @@ to ask.
 | A pipeline | An API key | Send scans and analyzer runs, and read back what became of its own |
 | Anybody at all | None, and none is looked at | Read the security documents of the products that publish. § Anybody at all |
 
-A pipeline may send and nothing else — no reading findings, no triage, no
-reporting. A build server has no business holding a person's permissions, and
+A pipeline sends, and reads back the receipts of what was sent to the builds
+its key covers. It reads no finding, triages nothing and reports nothing. A
+build server has no business holding a person's permissions, and
 this keeps the visibility rules out of its reach rather than relying on them
 being applied correctly to it.
 

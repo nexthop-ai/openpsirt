@@ -181,9 +181,11 @@ type Kind string
 const (
 	// Person is somebody who signed in.
 	Person Kind = "person"
-	// Pipeline is a build authenticating with a key. It may send scans and do
-	// nothing else — no reading, no triage, no reporting — which is what keeps
-	// the visibility rules out of a build server's reach entirely.
+	// Pipeline is a build authenticating with a key. It sends scans and
+	// analyzer runs to the builds its key covers, and reads back the receipts
+	// of those builds, which count what each upload did and name no finding.
+	// It reads no finding, triages nothing and reports nothing, which keeps
+	// the visibility rules out of a build server's reach.
 	Pipeline Kind = "pipeline"
 	// Anonymous is anybody at all, reading the security documents this
 	// deployment publishes. It holds no credential and reads disclosed work
