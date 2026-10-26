@@ -880,6 +880,9 @@ A receipt counts leads and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
 findings in the product, since the counts are of internal findings. A
 pipeline key's other reads are unchanged (`DESIGN-access.md` § Subject kinds).
+Anybody else is answered as for a build nothing was sent to, before the
+build's runs are looked up, so the answer is the same whether or not the build
+holds any (REQ-42).
 
 ## Upload client
 

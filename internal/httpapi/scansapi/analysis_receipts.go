@@ -80,6 +80,12 @@ func registerAnalysisReceipts(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		// Asked before the build is looked up: a refusal that came only where
+		// something was sent would say which builds hold runs.
+		if !subject.ReadsBuild(named.ProductID, named.StreamID, named.VariantID) ||
+			(subject.Kind != access.Pipeline && !subject.Reads(analysis.OpensAt, named.ProductID)) {
+			return nil, core.NothingScannedThere()
+		}
 		out := &AnalysisReceiptsOutput{}
 		out.Body.Items, out.Body.Refused = []AnalysisReceiptBody{}, []AnalysisRefusalBody{}
 		target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, named.StreamID, named.VariantID)
