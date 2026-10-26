@@ -19,6 +19,8 @@ func Register(api huma.API, in core.Deps) {
 	registerReleases(api, in)
 	registerVexImport(api, in)
 	registerAdvisoryImport(api, in)
+	// What those two uploads left standing, one row per document.
+	registerDocuments(api, in)
 	// The suppliers whose published advisories are read on a schedule, which
 	// is the same evidence arriving without anybody choosing each document.
 	registerAdvisorySources(api, in)

@@ -632,3 +632,23 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	}
 	return nil
 }
+
+// LastRefusal is the last upload to a target that was turned away, or nil
+// where none has been. Who may read it is the rule the receipts hold, because
+// it is the receipt of an upload that stored nothing else.
+func (s *Store) LastRefusal(ctx context.Context, subject access.Subject, targetID int64) (*Refusal, error) {
+	if err := s.mayRead(ctx, subject, targetID); err != nil {
+		return nil, err
+	}
+	var held []Refusal
+	if err := s.db.NewSelect().Model(&held).
+		Where(`"sr"."target_id" = ?`, targetID).
+		OrderExpr(`"sr"."at" DESC, "sr"."id" DESC`).Limit(1).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the last upload turned away: %w", err)
+	}
+	if len(held) == 0 {
+		return nil, nil
+	}
+	return &held[0], nil
+}

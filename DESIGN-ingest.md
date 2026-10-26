@@ -30,6 +30,7 @@ REQ-69.
 - [Receipts](#receipts)
 - [Receipt cost](#receipt-cost)
 - [Document retrieval](#document-retrieval)
+- [Upload listing](#upload-listing)
 - [Administrator-supplied VEX](#administrator-supplied-vex)
 - [Supplier advisories](#supplier-advisories)
 - [Supplier directories](#supplier-directories)
@@ -1008,6 +1009,51 @@ the build system, which is the copy that may have moved since.
 | Narrowed in the store, not the handler | A key reads what was filed on a build it may upload to, and the two endpoints cannot come to differ |
 | Named by its encoding, `.xml` or `.json` | Told from its first character by the reader's own rule, before anything is sent. A copy named for the other encoding is misread by any tool that goes by the extension |
 
+## Upload listing
+
+A build takes four kinds of upload, each at a path of its own because each
+takes a different body and answers a different receipt.
+
+| Kind | Sent to | Listed by |
+|---|---|---|
+| SBOM | The build | Its receipts (§ Receipts) |
+| Static analysis run, as SARIF | The build | Its runs (`DESIGN-analysis.md`) |
+| VEX document | The product | Its documents, below |
+| Supplier advisory | The product | Its documents, below |
+
+One read lists every kind for a build, with how many of each are held and what
+became of the newest. It reads each kind's own list, a page of one, so each
+kind's rule for who reads it applies unchanged.
+
+| Status | SBOM | Static analysis run | VEX document, supplier advisory |
+|---|---|---|---|
+| In progress | Taken, being read or scanned | Queued, or waiting for the build's inventory | — |
+| Completed | Scanned | Applied, or kept beside a run built later | Every one held |
+| Failed | Taken and unusable, with the reason | Unreadable, or its tool did not run, with the reason | — |
+| Refused | The last upload turned away, where it came after the newest one taken | The same, per series | — |
+
+| Rule | |
+|---|---|
+| A kind the caller may not read is left out | A pipeline key reads the SBOMs and the runs of a build it may send to. A person reads the runs where they read internal findings in the product, which is where those results open |
+| An upload turned away is the newest only where it came after the newest one taken | It is recorded once per build, or per series, and replaced by the next; an older refusal says nothing about the upload that followed it |
+| A refusal is not counted | Nothing of it is held but the reason |
+
+### Document lists
+
+A VEX document and a supplier advisory are stored as the statements they made,
+with no record of the upload beside them. The list of each is worked out from
+those statements when it is asked for.
+
+| Rule | |
+|---|---|
+| A document is the key a later upload replaces on | A publisher's VEX document, or one advisory by its publisher and the name the publisher gave it. Uploaded again, it is the same row |
+| It says how many of its statements stand and how many a later copy set aside | Set aside is kept and no longer applied (§ Administrator-supplied VEX) |
+| The file it last arrived as, and that copy's digest, are its standing statements' | Every statement a later copy repeats is moved onto that copy |
+| Ordered by when an upload last wrote under its key | A statement recorded, said again or set aside. The same bytes uploaded again write nothing, and move nothing |
+| A supplier advisory a feed fetched is listed with the uploaded ones, and marked | It is recorded under the address it came from, and an uploaded one under a file name, which never holds a slash |
+| A trusted upstream's documents are not listed here | They are read on a schedule, from the upstream (`DESIGN-upstream.md`) |
+| Read by a person who may know the product exists | The rule the SBOM receipts hold for a person. A pipeline key sends inventories and reads none of these. Decided in the store |
+
 ## Administrator-supplied VEX
 
 VEX statements arrive by administrator upload (REQ-31), as a conforming VEX or
@@ -1275,6 +1321,8 @@ from a fuzzer are intended scope and **are not built** (REQ-14).
 
 | Limit | Detail |
 |---|---|
+| An upload of a VEX document or a supplier advisory is not recorded as an upload | Its statements are. Who uploaded each copy, and a copy that wrote nothing because it matched what stands, are in the history of administrative changes and not on the list. A refused one is answered and recorded nowhere |
+| The list of uploads is per build, with the product's documents on every build of it | The SBOM and SARIF paths name a build, and the other two name a product. A product-wide list of every build's uploads is not built |
 | A day's whole archive is downloaded to keep half a megabyte of it | 622 MB on 2026-10-07. The List's hourly files of what changed are not read: a day's delay is what the scanner's own data has, and a second path to keep right has not been measured as worth it |
 | A deployment reaching the internet only through a proxy fetches no CVE records | The guarded client dials directly, so the check on the address it connects to is a check on the host it reaches. Such a deployment imports an archive instead |
 | A build dated on arrival is ordered by when it was sent, not when it was made | An older undated document sent late is taken as the newest. Documents that state a time are ordered by it, so this reaches only producers that state none |

@@ -5256,6 +5256,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List upload types and their status
+         * @description Returns each kind of upload a build takes, with how many are held and what became of the newest: SBOMs and static analysis runs sent to this build, and VEX documents and supplier advisories uploaded to its product. Each kind's own list carries the uploads themselves.
+         *
+         *     A kind the caller may not read is left out. An API key reads the SBOMs and the static analysis runs of a build it may upload to. A person reads static analysis runs where they read internal findings in the product.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-uploads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/vex": {
         parameters: {
             query?: never;
@@ -5357,7 +5381,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List supplier advisories
+         * @description Returns the supplier security advisories this product holds statements from, one per publisher and advisory name, the most recently changed first: how many of its statements stand, how many a later copy set aside, and the file or address it last arrived as. An advisory a supplier advisory feed fetched is listed beside the uploaded ones and marked `fetched`.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
+         */
+        get: operations["list-supplier-advisories"];
         put?: never;
         /**
          * Upload a supplier security advisory
@@ -5573,7 +5603,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List uploaded VEX documents
+         * @description Returns the VEX documents this product holds statements from, one per publisher, the most recently changed first: how many of its statements stand, how many a later upload set aside, and the file it last arrived as.
+         *
+         *     Statements a trusted upstream publishes are listed with the upstream, not here.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
+         */
+        get: operations["list-vex-documents"];
         put?: never;
         /**
          * Upload a VEX document
@@ -8646,6 +8684,43 @@ export interface components {
             document: components["schemas"]["Meta"];
             product_tree: components["schemas"]["ProductTree"];
             vulnerabilities: components["schemas"]["Vulnerability"][] | null;
+        };
+        DocumentBody: {
+            /** @description When an upload last recorded, repeated or set aside one of its statements. The same bytes uploaded again change nothing and leave this alone */
+            changed_at: string;
+            /** @description SHA-256 of the copy its standing statements come from */
+            digest: string;
+            /** @description The file name it last arrived as, or for an advisory a feed fetched, the address it came from */
+            document: string;
+            /** @description Whether a supplier advisory feed fetched it rather than somebody uploading it */
+            fetched?: boolean;
+            /** @description When its first statement was recorded */
+            first_received_at: string;
+            /** @description The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of */
+            identifier?: string;
+            /** @description The publisher the document names, as it is matched */
+            publisher: string;
+            /**
+             * Format: int64
+             * @description Statements of it a later copy no longer made, kept and no longer applied
+             */
+            set_aside: number;
+            /**
+             * Format: int64
+             * @description Statements of it that stand
+             */
+            standing: number;
+        };
+        DocumentsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/DocumentsOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["DocumentBody"][] | null;
+            /** Format: int64 */
+            total: number;
         };
         DueBody: {
             /** @description Whether a notice recorded against this incident names this window */
@@ -14034,6 +14109,34 @@ export interface components {
             /** @description The version, as whoever packages the component wrote it */
             to: string;
         };
+        UploadKindBody: {
+            /** @description The newest upload of this kind. Absent where none has arrived */
+            latest?: components["schemas"]["UploadLatestBody"];
+            /**
+             * Format: int64
+             * @description How many are held. A VEX document and a supplier advisory are counted once however often they were uploaded, and an upload turned away is not counted
+             */
+            total: number;
+            /**
+             * @description The kind of upload: an SBOM, a static analysis run in SARIF, a VEX document, or a supplier security advisory
+             * @enum {string}
+             */
+            type: "sbom" | "sarif" | "vex" | "supplier-advisory";
+        };
+        UploadLatestBody: {
+            /** @description Why it failed or was turned away, as the sender was told */
+            reason?: string;
+            /**
+             * Format: date-time
+             * @description When it arrived. For a VEX document or a supplier advisory, when an upload last changed what it says
+             */
+            received_at: string;
+            /**
+             * @description What became of it: still being read or applied, completed, failed after it was accepted, or turned away when it arrived
+             * @enum {string}
+             */
+            status: "in-progress" | "completed" | "failed" | "refused";
+        };
         UploadResult: {
             /**
              * Format: uri
@@ -14057,6 +14160,16 @@ export interface components {
             scan_id: number;
             /** @description The identity the inventory carries for itself */
             serial?: string;
+        };
+        UploadsOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UploadsOutputBody.json
+             */
+            readonly $schema?: string;
+            /** @description One per kind the caller may read, in a fixed order */
+            items: components["schemas"]["UploadKindBody"][] | null;
         };
         UpstreamBody: {
             /**
@@ -22963,6 +23076,39 @@ export interface operations {
             };
         };
     };
+    "list-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-vex": {
         parameters: {
             query?: {
@@ -23098,6 +23244,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-supplier-advisories": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsOutputBody"];
                 };
             };
             /** @description Error */
@@ -23464,6 +23646,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-vex-documents": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsOutputBody"];
+                };
             };
             /** @description Error */
             default: {

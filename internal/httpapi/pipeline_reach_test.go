@@ -26,13 +26,14 @@ import (
 // refused it.
 func TestAPipelineReadsNothingButWhatItSent(t *testing.T) {
 	// What a sender may read, and what each answers here: the build's
-	// receipts, what one upload changed, and a document it kept. The
+	// receipts and its uploads, what one upload changed, and a document it kept. The
 	// fixture's scan is the first the build had, so it changed nothing, and
 	// it kept no document by that name.
 	const build = "/v1/products/{product}/streams/{stream}/variants/{variant}"
 	sent := map[string]int{
 		build + "/scans":                             http.StatusOK,
 		build + "/analyses":                          http.StatusOK,
+		build + "/uploads":                           http.StatusOK,
 		build + "/scans/{scan}/changes":              http.StatusOK,
 		build + "/scans/{scan}/documents/{document}": http.StatusNotFound,
 	}

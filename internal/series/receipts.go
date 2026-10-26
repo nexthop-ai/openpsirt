@@ -21,6 +21,14 @@ type Sent struct {
 	SeriesName string
 }
 
+// ReadsReceipts reports whether a subject reads the receipts of runs whose
+// results open at a visibility in a product, on a build it reads. A key reads
+// them on a build it may send to, which the build check decides; a person
+// reads them where they read those results.
+func ReadsReceipts(subject access.Subject, productID int64, opensAt access.Visibility) bool {
+	return subject.Kind == access.Pipeline || subject.Reads(opensAt, productID)
+}
+
 // Receipts is what became of the runs of a kind sent against one build,
 // newest first, with how many there are.
 //
@@ -33,7 +41,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, productID,
 	if err := catalog.ReadsBuild(ctx, s.db, subject, targetID); err != nil {
 		return nil, 0, err
 	}
-	if subject.Kind != access.Pipeline && !subject.Reads(opensAt, productID) {
+	if !ReadsReceipts(subject, productID, opensAt) {
 		return nil, 0, access.Denied(fmt.Sprintf("read what analyzers sent against product %d", productID))
 	}
 	limit = database.AList.Of(limit)
