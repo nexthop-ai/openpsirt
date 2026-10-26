@@ -265,3 +265,79 @@ func TestAnAbsenceShorterThanADayIsSaidPlainly(t *testing.T) {
 		}
 	})
 }
+
+// An open report counts as one piece of work its holder holds, and a judged
+// one counts as nothing: somebody away holding only reports is raised, and
+// somebody holding a finding and a report holds two items.
+func TestSomebodyAwayHoldingOnlyReportsIsRaised(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		hush := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", new(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reports, err := rights.Ensure(ctx, "reports@example.com", "Rita Reports", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		both, err := rights.Ensure(ctx, "both@example.com", "Bo Both", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		long := time.Now().UTC().Add(-30 * 24 * time.Hour)
+		for _, who := range []int64{reports.ID, both.ID} {
+			if _, err := db.DB.NewUpdate().Table("person").
+				Set(`"last_seen_at" = ?`, long).Where(`"id" = ?`, who).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		report := func(reference string, holder int64, judged bool) {
+			t.Helper()
+			row := &finding.FlawReport{
+				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				RecordedBy: admin.ID, RecordedAt: now, AssignedTo: &holder, AssignedAt: &now,
+			}
+			if judged {
+				row.EvaluatedAt, row.EvaluatedBy = &now, &admin.ID
+			}
+			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		report("SONIC-R-2026-000001", reports.PartyID, false)
+		report("SONIC-R-2026-000002", reports.PartyID, true)
+		report("SONIC-R-2026-000003", both.PartyID, false)
+		assignOne(t, w, both.PartyID)
+
+		if _, _, err := notify.NewWatch(db.DB, hush).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		items, _, err := notify.NewStore(db.DB).Waiting(ctx,
+			access.NewPerson(admin.ID, admin.Identity, true, nil, 0), 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		said := map[string]string{}
+		for _, item := range items {
+			if item.Kind != notify.HoldingAbsent {
+				continue
+			}
+			for _, name := range []string{"Rita Reports", "Bo Both"} {
+				if contains(item.Body, name) {
+					said[name] = item.Body
+				}
+			}
+		}
+		for name, want := range map[string]string{"Rita Reports": "1 item", "Bo Both": "2 items"} {
+			if !contains(said[name], want) {
+				t.Errorf("the alert about %s says %q, want %q", name, said[name], want)
+			}
+		}
+	})
+}

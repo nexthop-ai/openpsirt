@@ -22,10 +22,13 @@ export const PAGE = 50;
 
 // Everything an act on a report or a ruling can move. A duplicate ruling moves
 // an issue's disclosure date, and withdrawing one moves it back, so every read
-// carrying that date is among them.
+// carrying that date is among them. A judgment takes a report out of the held
+// lists and the holdings counted beside them.
 export function useAfterReport() {
   const queries = useQueryClient();
   return () => {
+    void queries.invalidateQueries({ queryKey: ["held-reports"] });
+    void queries.invalidateQueries({ queryKey: ["holdings"] });
     void queries.invalidateQueries({ queryKey: ["reports"] });
     void queries.invalidateQueries({ queryKey: ["recorded-report"] });
     void queries.invalidateQueries({ queryKey: ["rulings"] });
@@ -174,16 +177,220 @@ export function useRecordReport(product: string) {
   });
 }
 
-export function useAcknowledgeReport(product: string, reference: string) {
+// A report's case: what it said before an edit, what was written to and
+// from the reporter, the notes on it, and every act on it.
+
+export type Message = Body<"MessageBody">;
+export type ReportEvent = Body<"ReportEventBody">;
+
+export function useEditReport(product: string, reference: string) {
   const after = useAfterReport();
   return useMutation({
-    mutationFn: async () =>
+    mutationFn: async (body: Body<"ReportEditBody">) =>
       unwrap(
-        await api.POST("/v1/products/{product}/reports/{reference}/acknowledgement", {
+        await api.PUT("/v1/products/{product}/reports/{reference}", {
           params: { path: { product, reference } },
+          body,
         }),
       ),
     onSuccess: after,
+  });
+}
+
+export function useRevisions(product: string, reference: string, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: ["recorded-report", product, reference, "revisions"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/reports/{reference}/revisions", {
+          params: { path: { product, reference } },
+        }),
+      ),
+  });
+}
+
+export function useMessages(product: string, reference: string) {
+  return useQuery({
+    queryKey: ["recorded-report", product, reference, "messages"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/reports/{reference}/messages", {
+          params: { path: { product, reference } },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useLogMessage(product: string, reference: string) {
+  const after = useAfterReport();
+  return useMutation({
+    mutationFn: async (body: Body<"MessageLogBody">) =>
+      unwrap(
+        await api.POST("/v1/products/{product}/reports/{reference}/messages", {
+          params: { path: { product, reference } },
+          body,
+        }),
+      ),
+    onSuccess: after,
+  });
+}
+
+export function useReportNotes(product: string, reference: string) {
+  return useQuery({
+    queryKey: ["recorded-report", product, reference, "notes"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/reports/{reference}/notes", {
+          params: { path: { product, reference } },
+        }),
+      ),
+    retry: false,
+  });
+}
+
+export function useNoteOnReport(product: string, reference: string) {
+  const after = useAfterReport();
+  return useMutation({
+    mutationFn: async (body: string) =>
+      unwrap(
+        await api.POST("/v1/products/{product}/reports/{reference}/notes", {
+          params: { path: { product, reference } },
+          body: { body },
+        }),
+      ),
+    onSuccess: after,
+  });
+}
+
+// The edit a report note's thread asks for, bound to its report so the
+// thread's own shape stays the one every thread shares.
+export function editReportNote(product: string, reference: string) {
+  return function useEditReportNote() {
+    const after = useAfterReport();
+    return useMutation({
+      mutationFn: async ({ id, body }: { id: number; body: string }) =>
+        unwrap(
+          await api.PUT("/v1/products/{product}/reports/{reference}/notes/{note}", {
+            params: { path: { product, reference, note: id } },
+            body: { body },
+          }),
+        ),
+      onSuccess: after,
+    });
+  };
+}
+
+export function reportNoteHistory(product: string, reference: string) {
+  return function useReportNoteHistory(note: number) {
+    return useQuery({
+      queryKey: ["recorded-report", product, reference, "notes", note, "history"],
+      queryFn: async () =>
+        unwrap(
+          await api.GET("/v1/products/{product}/reports/{reference}/notes/{note}/history", {
+            params: { path: { product, reference, note } },
+          }),
+        ),
+    });
+  };
+}
+
+export function useReportHistory(product: string, reference: string) {
+  return useQuery({
+    queryKey: ["recorded-report", product, reference, "history"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/products/{product}/reports/{reference}/history", {
+          params: { path: { product, reference } },
+        }),
+      ),
+  });
+}
+
+export function useAssignReport(product: string, reference: string) {
+  const after = useAfterReport();
+  return useMutation({
+    mutationFn: async (body: Body<"Assign-reportRequest">) =>
+      unwrap(
+        await api.PUT("/v1/products/{product}/reports/{reference}/assignment", {
+          params: { path: { product, reference } },
+          body,
+        }),
+      ),
+    onSuccess: after,
+  });
+}
+
+// What a hand-back moves: who holds work, every list of held or unheld work,
+// and Home. Withdrawing a role, a team change and a deactivation hand work
+// back as well, so each refreshes these beside its own lists.
+export const handedBack = [
+  "holdings",
+  "held-reports",
+  "findings",
+  "leads",
+  "reports",
+  "assigned",
+  "team-assigned",
+  "home",
+];
+
+export function useAfterHandBack() {
+  const queries = useQueryClient();
+  return () => {
+    for (const key of handedBack) {
+      void queries.invalidateQueries({ queryKey: [key] });
+    }
+  };
+}
+
+// Everything one person holds handed back to nobody: their findings and their
+// open reports.
+export function useHandBack() {
+  const after = useAfterHandBack();
+  return useMutation({
+    mutationFn: async (identity: string) =>
+      unwrap(
+        await api.POST("/v1/people/{identity}/assignments/hand-back", {
+          params: { path: { identity } },
+          body: {},
+        }),
+      ),
+    onSuccess: after,
+  });
+}
+
+// Open reports by who holds them: one person and their teams' queues, one
+// team's queue, or nobody. In one product, or every product where the reader
+// reads reports.
+export function useHeldReports(
+  whose: { person: string } | { team: string } | "nobody",
+  product: string | undefined,
+  offset = 0,
+  enabled = true,
+): UseQueryResult<{ items: Body<"HeldReportBody">[] | null; total?: number }> {
+  return useQuery({
+    enabled,
+    queryKey: ["held-reports", whose, product ?? "", offset],
+    queryFn: async () => {
+      const query = { limit: PAGE, offset, ...(product ? { product } : {}) };
+      if (whose === "nobody") {
+        return unwrap(await api.GET("/v1/unassigned/reports", { params: { query } }));
+      }
+      if ("team" in whose) {
+        return unwrap(
+          await api.GET("/v1/teams/{team}/assignments/reports", {
+            params: { path: { team: whose.team }, query },
+          }),
+        );
+      }
+      return unwrap(
+        await api.GET("/v1/people/{identity}/assignments/reports", {
+          params: { path: { identity: whose.person }, query },
+        }),
+      );
+    },
   });
 }
 

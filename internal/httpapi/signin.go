@@ -17,12 +17,21 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
+
+// Rights is the access store a request signs people in through: a sign-in
+// that takes a role away hands back, inside the write that took it, what that
+// leaves them unable to read.
+func Rights(db bun.IDB) *access.Store {
+	return access.NewStore(db).HandingBack(finding.HandBack)
+}
 
 // pendingCookie holds what a sign-in has to remember while the browser is away
 // at the provider.
@@ -161,7 +170,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		return
 	}
 
-	rights := access.NewStore(in.DB.DB)
+	rights := Rights(in.DB.DB)
 
 	// Authenticating is not being authorized. The question asked here follows
 	// from where this deployment says roles come from.

@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useApprovable } from "../api/intake";
+import { useApprovable, useHeldReports } from "../api/intake";
 import { BANDS } from "../ui/severities";
 import { useQuery } from "@tanstack/react-query";
 import { on } from "../ui/when";
@@ -432,6 +432,10 @@ function Figures({
         }),
       ),
   });
+  // The open vulnerability reports this person and their teams hold. A report
+  // belongs to a product and no build, so it is counted beside the findings
+  // rather than among them.
+  const reports = useHeldReports({ person: "me" }, at.product);
   // Sent back is derived from a claim's rows rather than stored on them, so
   // there is no count to ask the server for: a page is read and what is on it
   // is counted, and the tile says "+" where the page was cut. The same
@@ -540,7 +544,11 @@ function Figures({
         <span className="n">
           <Count of={assigned}>{() => (assigned.data?.total ?? 0).toLocaleString()}</Count>
         </span>
-        <span className="d">yours and your teams&rsquo;</span>
+        <span className="d">
+          yours and your teams&rsquo;
+          {(reports.data?.total ?? 0) > 0 &&
+            `, and ${reports.data?.total?.toLocaleString()} ${reports.data?.total === 1 ? "report" : "reports"}`}
+        </span>
       </button>
       <button
         type="button"
@@ -818,7 +826,7 @@ function InProgress({ me }: { me: string }) {
     ...rows.filter((each) => !each.team && each.person === me),
     ...rows.filter((each) => each.team || each.person !== me),
   ];
-  const total = mine.reduce((sum, each) => sum + (each.open ?? 0), 0);
+  const total = mine.reduce((sum, each) => sum + (each.open ?? 0) + (each.reports ?? 0), 0);
   const overdue = mine.reduce((sum, each) => sum + (each.overdue ?? 0), 0);
 
   return (
@@ -839,7 +847,7 @@ function InProgress({ me }: { me: string }) {
               <Count of={everywhere}>
                 {() =>
                   (everywhere.data?.items ?? [])
-                    .reduce((sum, each) => sum + (each.open ?? 0), 0)
+                    .reduce((sum, each) => sum + (each.open ?? 0) + (each.reports ?? 0), 0)
                     .toLocaleString()
                 }
               </Count>{" "}
@@ -861,7 +869,11 @@ function InProgress({ me }: { me: string }) {
             <span className="id">
               {!each.team && each.person === me ? "you" : each.person_name || each.person}
             </span>
-            <span className="what">{each.open} open</span>
+            <span className="what">
+              {each.open} open
+              {(each.reports ?? 0) > 0 &&
+                `, ${each.reports} ${each.reports === 1 ? "report" : "reports"}`}
+            </span>
             {(each.overdue ?? 0) > 0 && <span className="when">{each.overdue} overdue</span>}
           </li>
         ))}

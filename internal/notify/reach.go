@@ -104,7 +104,7 @@ func (a acts) triages(private bool) bool {
 // part that matters more — that many places for "may read" to be spelled
 // slightly differently.
 func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) {
-	people, held, err := access.NewStore(db).People(ctx)
+	people, held, err := access.NewStore(db).PeopleReaching(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read who may hear about this: %w", err)
 	}

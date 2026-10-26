@@ -8,6 +8,7 @@ package assignapi
 import (
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -19,12 +20,18 @@ func Register(api huma.API, in core.Deps) {
 	registerAssignment(api, in)
 	registerAssignMatching(api, in)
 	registerLeadAssigning(api, in)
+	registerReportAssignment(api, in)
 	registerBundles(api, in)
 	registerPendingUpgrades(api, in)
 	registerRouting(api, in)
 	registerBulk(api, in)
+	// A change to a team's membership hands back what no remaining member
+	// reads.
 	registerTeams(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
+		Findings: func() *finding.Store {
+			return finding.NewStore(in.DB.DB)
+		},
 	})
 	// The words people put on findings.
 	registerTags(api, in)

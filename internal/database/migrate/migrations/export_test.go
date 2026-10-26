@@ -100,6 +100,10 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"analysis_location": analysisV0110(t),
 		"lead_rule":         leadV0110(t), "rule_rating": leadV0110(t), "rule_family": leadV0110(t),
 		"document_upload": documentUploadV0110(t),
+		"flaw_report":     flawReportV0110(t), "flaw_report_revision": flawReportV0110(t),
+		"report_note": flawReportV0110(t), "report_note_revision": flawReportV0110(t),
+		"report_message": flawReportV0110(t), "report_assignment": flawReportV0110(t),
+		"routing_rule": routingRuleV0110(t),
 	} {
 		made, indexes, err := pick(declared, table)
 		if err != nil {
@@ -108,4 +112,34 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		out[table] = append([]string{made}, indexes...)
 	}
 	return out
+}
+
+// RunV0110ReportStep runs the v0.11.0 upgrade's report step alone, in a
+// transaction of its own as on MySQL and MariaDB: a start that stopped after
+// it, at a later step.
+func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, reportCaseV0110)
+}
+
+// StopV0110AfterAcknowledgements makes the report step's tables and writes
+// each acknowledgement as the first message sent, in a transaction of its
+// own, and stops before the acknowledged stamp is dropped: a start that
+// stopped there, as one on MySQL and MariaDB can.
+func StopV0110AfterAcknowledgements(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		declared := flawReportV0110(u.t)
+		for _, table := range []string{"report_message", "flaw_report_revision", "report_note",
+			"report_note_revision", "report_assignment"} {
+			if err := u.create(declared, table); err != nil {
+				return err
+			}
+		}
+		return acknowledgedAsSentV0110(ctx, tx)
+	})
 }

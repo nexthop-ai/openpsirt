@@ -254,6 +254,7 @@ yourself is still doing it.
 | Handing something back is the same operation as giving it out | With nobody as the recipient |
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
+| A vulnerability report is assigned under the rows above, at undisclosed work | A report is undisclosed whatever it claims (`DESIGN-findings.md` § Report visibility), so the recipient reads the product's reports, or one member of the team does. A judged report is not handed over. Moving everything one person holds moves their open reports too |
 
 ### Assignment by narrowing
 
@@ -309,9 +310,36 @@ it is assigned, and not in anybody's own because they are not here.
 Only an administrator does either; a person hands back their own by assigning it
 to nobody.
 
-Two triggers happen on their own: withdrawing somebody's last role on a product
-hands back what they were dealing with *there*, and only there; and deactivating
-an account hands back everything it held, everywhere.
+### Lost reading
+
+Work goes back on its own wherever its holder stops reading it. Each write that
+can take reading away hands back, in its own transaction, what it leaves with a
+holder who cannot open it.
+
+| Write | What goes back |
+|---|---|
+| A role withdrawn on one product | Their work there they may no longer read: everything where it was their last role, and otherwise the undisclosed or internal work, and the vulnerability reports, the role let them read |
+| A role withdrawn across every product | The same, product by product |
+| A group-bound sign-in deriving less than the last | The same, in every product. Asked only when a derived role went or nothing was derived before, because a trusted-header sign-in runs on every request |
+| The first group-bound sign-in after a switch into group-bound mode | What the roles an administrator assigned let them hold and their groups do not let them read. Nothing derived before counts as every role taken away, so the question is asked against what the groups derive |
+| A switch out of group-bound mode | The same, for everybody holding work, judged against the assigned roles it restores |
+| Somebody taken off a team | The team's work no remaining member reads |
+| A team retired | Everything in its queue |
+| An account deactivated | Everything it held, everywhere, and its teams' work no remaining member reads |
+| Any of the above for a team member | Also their teams' work no remaining member reads |
+
+| Rule | Reason |
+|---|---|
+| A person keeps undisclosed and internal work where they read it, and disclosed work while they hold any role in the product | Disclosed work travels with its assignment. Anything else left with somebody who cannot open it is in no list at all |
+| A team keeps work at a visibility one member reads, and disclosed work while one member reads the product at any visibility | The rule a hand assignment to a team asks (§ Teams) |
+| A report goes where undisclosed work goes | A report is read under undisclosed reading (`DESIGN-findings.md` § Report visibility) |
+| Leads go by the same rule as findings | A lead is work at its visibility like any other |
+| It goes back to nobody, and no sweep is queued | Exactly as when somebody leaves. The unassigned list holds it until somebody takes it, and a routing rule places it when a rule is next recorded in the product. Queuing a sweep would let a full queue refuse a withdrawal of access |
+| Asked of whoever the write named, and of every team they are on | A team holds work only while a member reads it, so a member's reading going can strand the team's queue |
+| Inside the write that took the reading away | Done after it, a failure leaves the reading gone, the work with somebody who cannot open it, and no request that reaches the hand-back again. Deactivation hands back after its write commits, for the reason under § Somebody who has left |
+| Nobody is told | The same as any other work handed back (§ Assignment by narrowing) |
+| A switch into group-bound mode hands nothing back | What somebody reads there is what their groups derive, known only at their next sign-in. Judged at the switch, every assignment would read as unread and go back, including work their groups cover |
+| A switch out of group-bound mode hands back at once | Nothing derives a role after it, so the restored assignments are final and there is no later event to wait for |
 
 ## Statistics and the audit permission
 
@@ -395,7 +423,7 @@ Recorded by an administrator, as a date on the person.
 | A departed administrator does not satisfy the startup check | Otherwise configuration can map no group to admin and the deployment starts cleanly with nobody able to administer it — which is the state that check exists to prevent |
 | Naming somebody in configuration readmits them | It is the documented way back into a deployment nobody can administer, and nothing else clears the date. Done there rather than wherever a person is recorded: an administrator re-recording a departed colleague must not silently readmit them |
 | Sessions are ended rather than left to expire | Roles are re-read at sign-in, so withdrawing one takes effect then. This is what makes leaving immediate instead |
-| Everything they held is handed back | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
+| Everything they held is handed back, and so is their teams' work no member still here reads | Work held by somebody who is gone is work nobody is doing, and it does not look like it |
 | Granting what is already held succeeds, and only where the insert was refused as a duplicate | Five paths ran a second query on *any* insert failure and reported success if a row was there — including a failure caused by a concurrent insert that was then rolled back. What "already held" means is the part that differs, so it stays with each caller: a grant asks whether it is in force |
 | Deactivating somebody who has already left succeeds and moves no date | An administrator clicking again, or two of them acting at once, is the ordinary case — and the date is when they left, not when it was last asserted. It still hands back whatever they hold, because the hand-back runs after the deactivation commits, and asking again is how one that failed is finished |
 | An administrator may not deactivate themselves | It leaves nobody able to undo it, and the bootstrap account is often the one doing it |
@@ -456,6 +484,7 @@ precedence rule nobody would remember.
 | A team assignment is a queue, not a holding | Work routed to a team is unheld until a person takes it, and taking it is the ordinary act of picking up unowned work — triage alone, no dispatch right. *Filling* the queue is dispatching. The alternative marks rows as held by the team, and hundreds then read as owned while nobody has looked at them |
 | Routing asks that at least one member may read it, not every member | Asked at every visibility the open places carry, of one member reading each of them, so one undisclosed place among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list. A rule's sweep asks it of each place (§ Routing rules) |
 | The queue is narrowed per viewer, counts included | A badge reading "Kernel team · 14" shown to everybody says two embargoed items exist. Asserted by a matrix test rather than assumed from the row query being right |
+| A team gives up the work in its queue that no remaining member reads | Asked whenever who is on it, or what one of them reads, changes (§ Lost reading). Retiring a team empties it, so its whole queue goes back |
 | Retiring a team keeps its row and does not free its name | Work already routed has to keep resolving to something a screen can name. Declaring that name again brings the team back, because declaring is idempotent everywhere else and the alternative was a refusal citing a team the person asking cannot see |
 
 ## Routing rules
@@ -483,6 +512,7 @@ numbers are shown because the gap between them is the thing worth knowing.
 | The preview names a sample of the components and counts all of them | A rule beneath a kernel matches hundreds of modules; the names are a sample to read and the total is its own count over the same narrowing |
 | How many one pass places is a setting | A bulk write is bounded and the bound belongs where an operator can move it: a pass too large holds a connection through the whole of it, and one too small leaves a fifty-thousand-finding product re-queuing twenty-five times. It was a constant in the sweeper and a second constant in the writer — two numbers for one bound — under a comment declining the decision without citing it |
 | The preview is narrowed like every other count (REQ-42, REQ-43) | Read unnarrowed, the gap between the preview and the same person's findings list is exactly the amount of undisclosed work. Somebody who may see nothing is told nothing rather than zero |
+| A rule may place vulnerability reports instead of findings | Such a rule names no package and no place, since a report sits at neither, and either key on it is refused. It places a report nobody holds as the report is recorded, and sweeps the product's open unheld reports when it is added. Its preview counts the product's open reports and those nobody holds, where the asker reads the product's reports and as zero elsewhere |
 | A rule places leads as well as findings | A lead is matched by the component it sits in, like any finding, and is one piece of work in the preview. A lead past its end of life is neither placed nor counted, because it is kept as it stands (`DESIGN-analysis.md` § End of life) |
 | A rule places work only at a visibility one member of its team reads | The rule a hand assignment to the team asks (§ Teams). It is asked of each place, so an undisclosed or internal place nobody on the team reads stays with nobody while the disclosed places beside it are placed, and is picked up from the unassigned list by somebody who reads it. A team of nobody is placed nothing |
 | The preview names no team, and counts what the asker reads | It takes the keys alone. Work at a visibility nobody on the team reads is counted and then not placed |
@@ -967,6 +997,8 @@ lifetime. The deliberate case is handled at once by ending their sessions.
 | The mapping is the authorization | Somebody arriving for the first time in a mapped group is admitted and recorded then. The operator stated the mapping before anybody arrived. What is never true is somebody being admitted because a provider vouched for them and nothing else |
 | Switching modes is reversible | The first mapping marks assignments **inactive rather than deleting** them, and removing the last makes them active again. An inactive row grants nothing and is never counted as access — not in a query, not in a report, not in a review |
 | Derived grants are cleared on the way out | They are a cache of what a provider said at somebody's last sign-in |
+| A sign-in that takes reading away, and a switch out of group-bound mode, hand back the work they covered | Work held under a grant that no longer grants is in no list at all (§ Lost reading) |
+| A switch into group-bound mode hands back nothing, and each person's first sign-in after it hands back what their groups do not cover | Somebody whose groups cover their work keeps it (§ Lost reading) |
 | What makes a grant unique includes where it came from | An assignment set aside and a live derived grant for the same role on the same product can exist at once |
 | Granting a role and reading one are different shapes (REQ-61) | A grant is written with which product and which role, and read back with two more the writer cannot decide: whether it is in force, and whether an administrator assigned it or a group derived it. A request refused the right to grant a role would otherwise be answered with its own claim that the role was granted and in force |
 
@@ -1068,8 +1100,8 @@ re-granted anything (REQ-42).
 | What it covers is worked out when somebody asks | The catalog is read as the subject is resolved, which is what makes "declared afterwards" true without anything being rewritten |
 | It narrows by visibility exactly as a per-product grant does | A role held across the estate is still a role of one visibility. This is the trap: the queries carry a flag for "every product" that means no narrowing at all, visibility included, and it belongs to the deployment's own background passes. An estate grant setting it would hand somebody granted disclosed reading every undisclosed finding there is (REQ-43) |
 | Withdrawn whole, leaving nothing behind | Expanding into per-product grants at withdrawal records the catalog of that day, which is the same defect by the back door. Anything still wanted on one product is granted there deliberately |
-| Withdrawing it hands back the work it was holding | It is the last role in every product at once, and a finding assigned to somebody who can no longer open it is in no list at all: out of the shared queue because it is assigned, and out of theirs because they cannot reach it. Asked per product, exactly as withdrawing a per-product role is |
-| Every question about what somebody holds asks this table too | A grant that only a resolved subject can see is invisible to the predicates that read the grant tables directly — whether somebody may be handed a finding, who may be mentioned, whether their last role in a product has gone, and whether an approver still holds the right they used. Each of those is asked of both tables |
+| Withdrawing it hands back the work it let them read | Product by product, by the rule a per-product withdrawal follows (§ Lost reading). A finding assigned to somebody who can no longer open it is in no list at all: out of the shared queue because it is assigned, and out of theirs because they cannot reach it |
+| Every question about what somebody holds asks this table too | A grant that only a resolved subject can see is invisible to the predicates that read the grant tables directly — whether somebody may be handed a finding, who may be mentioned, whether they still read the work they hold, and whether an approver still holds the right they used. Each of those is asked of both tables |
 | The people list and one person's page both state it, first, as every product | An access review is read from either, and the broadest grant there is is the one it must not miss. One builder answers both, so the two cannot disagree about one person |
 | A query naming one table and not the other is refused, in every package | Checked rather than remembered. Five predicates missed the second kind of grant the day it was added, each answering no for somebody who held the role — which compiles and passes. The access package was exempt whole, and four hand-written copies of the union then lived in the one place the check could not see; the union is written once now, and the files that name one table alone are named individually with the reason |
 | The union is one builder, and what it attaches to is the caller's | Whether the question is about one person, a team's members, or everybody who may be mentioned differs; the two halves do not. The column naming the person comes from the code, because a placeholder cannot bind one |
@@ -1232,7 +1264,7 @@ that is neither.
 | | |
 |---|---|
 | **Leaves a row** | Anything that changes what somebody may reach, what the deployment is set to, or what a later scan will mean: grants and group mappings, credentials minted and withdrawn, accounts, teams, routing rules, support dates, the triage floor, destinations, who is on a case, and another name for an issue |
-| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as acknowledging a report or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
+| **Leaves none, deliberately** | A triage judgment and the argument around it, which is the decision record (REQ-22); an act already recorded on the thing it changed, with actor and moment, such as editing a report, recording a message to or from its reporter, assigning it, or uploading an attachment; one person's own notifications, saved filters, mail and session; declaring what exists in the catalog; and operating the queue. A declaration that brings back something retired, or fills in what a tag was cut from, leaves the row retiring it or setting it would, in the same transaction |
 
 The second list carries a reason per route rather than a count, because
 absorbing a route that should leave a row is the failure the walk exists to
@@ -1548,6 +1580,18 @@ notice the absence and say so.
   place as naming none, through the setting that is supposed to be the guard.
   An IPv4-mapped range is held as the IPv4 range it is, so `::ffff:0:0/96`,
   which matches every IPv4 client, is refused with `0.0.0.0/0`.
+- After a switch into group-bound mode, work assigned to somebody who never
+  signs in again stays with them until they do, they are deactivated, or it is
+  handed back by hand. Their set-aside roles grant nothing in the meantime, so
+  the work is in no list at all. A person whose groups derive no role is
+  asked about on every sign-in, which finds nothing to move once they hold
+  nothing.
+- A derived grant older than the token window stops granting through a token
+  without any write, and a mapping removed from configuration leaves the
+  grants it derived until each person's next sign-in. Neither hands work back
+  when it happens. Every hand-back question, and every question of whether
+  somebody may be handed work, reads the grant rows, which stand until a
+  sign-in rewrites them, so the two agree.
 - Granting a role somebody already holds succeeds. An administrator scripting
   grants should not have to check first. The refused insert stands on a
   savepoint of its own, because on PostgreSQL a refused statement aborts the

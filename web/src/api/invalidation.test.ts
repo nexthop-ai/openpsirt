@@ -19,7 +19,7 @@ vi.mock("@tanstack/react-query", async (actual) => ({
 }));
 
 const { useAfterAdvisory } = await import("./advisories");
-const { useAfterReport } = await import("./intake");
+const { useAfterReport, useAfterHandBack } = await import("./intake");
 
 beforeEach(() => {
   invalidated.length = 0;
@@ -46,7 +46,7 @@ describe("what an act invalidates", () => {
     );
   });
 
-  it("a change to a report reaches the reports, the rulings, the duplicates and every disclosure date", () => {
+  it("a change to a report reaches the reports, the rulings, the duplicates, every disclosure date and the held lists", () => {
     expect(after(useAfterReport)).toEqual(
       [
         "disclosing",
@@ -54,12 +54,29 @@ describe("what an act invalidates", () => {
         "duplicates",
         "finding",
         "findings",
+        "held-reports",
+        "holdings",
         "home",
         "issue",
         "recorded-report",
         "report",
         "reports",
         "rulings",
+      ].sort(),
+    );
+  });
+
+  it("a hand-back reaches who holds what, every list of held or unheld work, and Home", () => {
+    expect(after(useAfterHandBack)).toEqual(
+      [
+        "assigned",
+        "findings",
+        "held-reports",
+        "holdings",
+        "home",
+        "leads",
+        "reports",
+        "team-assigned",
       ].sort(),
     );
   });

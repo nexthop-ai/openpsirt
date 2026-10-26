@@ -109,6 +109,38 @@ func (s *Store) EveryEstateGrant(ctx context.Context) (map[int64][]EstateGrant, 
 	return held, nil
 }
 
+// PeopleReaching is People with every role held across every product written
+// out as a grant on each product, for an audience worked out from grants: a
+// role across every product is a role held in each one.
+//
+// The rows written out are not stored and carry no identifier. An access
+// review reads People, where an estate grant is stated as itself.
+func (s *Store) PeopleReaching(ctx context.Context) ([]Account, map[int64][]Grant, error) {
+	people, held, err := s.People(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	estate, err := s.EveryEstateGrant(ctx)
+	if err != nil || len(estate) == 0 {
+		return people, held, err
+	}
+	products, err := s.everyProduct(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	for personID, grants := range estate {
+		for _, grant := range grants {
+			for _, productID := range products {
+				held[personID] = append(held[personID], Grant{
+					PersonID: personID, ProductID: productID, Role: grant.Role,
+					Source: grant.Source, Active: grant.Active, CreatedAt: grant.CreatedAt,
+				})
+			}
+		}
+	}
+	return people, held, nil
+}
+
 // everyProduct is the catalog, for resolving an estate grant.
 //
 // Read at the moment somebody asks rather than written into their grants when
@@ -155,14 +187,4 @@ func holds(roles []Role, role Role) bool {
 		}
 	}
 	return false
-}
-
-// ProductsCovered is every product an estate grant reaches, which is the
-// catalog.
-//
-// Named rather than reusing everyProduct at the call site: what the withdrawal
-// path needs is "what did that grant cover", and spelling it as "every
-// product" there would read as an assumption rather than as the rule.
-func (s *Store) ProductsCovered(ctx context.Context) ([]int64, error) {
-	return s.everyProduct(ctx)
 }

@@ -467,7 +467,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// back — editing the database by hand — and nobody discovers that at a
 	// good moment. Applying the mappings refuses one, and changes nothing
 	// when it does.
-	mapped, mode, err := trail.MapGroups(ctx, db.DB, cfg.GroupRoles)
+	mapped, mode, err := trail.MapGroups(ctx, db.DB, cfg.GroupRoles, finding.HandBack)
 	switch {
 	case errors.Is(err, access.ErrNobodyAdministers) && len(cfg.GroupRoles) > 0:
 		return nil, passes{}, fmt.Errorf("nobody can administer this deployment: OPENPSIRT_GROUP_ROLES maps no " +
@@ -487,7 +487,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			"mapping", mapping.String(), "grants", mapping.Grants)
 	}
 	settings := setting.NewStore(db.DB)
-	rights := access.NewStore(db.DB)
+	rights := httpapi.Rights(db.DB)
 	logger.Info("roles are assigned", "mode", mode)
 
 	// One provider at a time is a rule across time, not only at one instant

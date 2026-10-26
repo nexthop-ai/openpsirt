@@ -121,3 +121,236 @@ func kindOf(db *database.DB) string {
 	}
 	return "VARCHAR(16)"
 }
+
+// acknowledgedV0100 records two reports in a v0.10.0 database: one somebody
+// acknowledged late on 3 October, and one nobody answered. It answers the
+// person who recorded both.
+func acknowledgedV0100(t *testing.T, ctx context.Context, db *database.DB) int64 {
+	t.Helper()
+	declared, err := world.Declare(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)
+	answered := time.Date(2026, 10, 3, 23, 30, 0, 0, time.UTC)
+	report := func(reference string, acknowledged *time.Time) {
+		t.Helper()
+		var by *int64
+		if acknowledged != nil {
+			by = &declared.Person.ID
+		}
+		if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
+			("reference", "product_id", "summary", "recorded_by", "recorded_at",
+			 "acknowledged_at", "acknowledged_by", "found_here")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			reference, declared.Product.ID, "A claim.", declared.Person.ID, recorded,
+			acknowledged, by, false).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report("SONIC-R-2026-111111", &answered)
+	report("SONIC-R-2026-222222", nil)
+	return declared.Person.ID
+}
+
+// sentOnce asserts the acknowledged report holds exactly one message, sent on
+// the day it was acknowledged by whoever acknowledged it, and the other none.
+func sentOnce(t *testing.T, ctx context.Context, db *database.DB, by int64) {
+	t.Helper()
+	var rows []struct {
+		Reference string    `bun:"reference"`
+		Direction string    `bun:"direction"`
+		Dated     time.Time `bun:"dated"`
+		LoggedBy  int64     `bun:"logged_by"`
+	}
+	if err := db.DB.NewRaw(`SELECT "fr"."reference", "rm"."direction", "rm"."dated", "rm"."logged_by"
+		FROM "report_message" AS "rm" JOIN "flaw_report" AS "fr" ON "fr"."id" = "rm"."flaw_report_id"`).
+		Scan(ctx, &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("the upgrade wrote %d messages, want the one acknowledgement: %+v", len(rows), rows)
+	}
+	got := rows[0]
+	if got.Reference != "SONIC-R-2026-111111" || got.Direction != "sent" ||
+		got.Dated.Format(time.DateOnly) != "2026-10-03" || got.LoggedBy != by {
+		t.Errorf("the acknowledgement became %+v", got)
+	}
+}
+
+// A v0.10.0 report's acknowledgement becomes the first message sent to its
+// reporter, dated the day it was recorded, by whoever recorded it, and a
+// report nobody answered has no correspondence.
+func TestAnAcknowledgementBecomesTheFirstMessageSent(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		by := acknowledgedV0100(t, ctx, db)
+		dbtest.MigrateTo(t, db, v0110)
+		sentOnce(t, ctx, db, by)
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A start that stopped after writing the acknowledgements as messages, and
+// before dropping the stamp they came from, writes none of them twice: on
+// MySQL and MariaDB the messages commit at the next change to the schema.
+func TestAStoppedUpgradeWritesNoAcknowledgementTwice(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		by := acknowledgedV0100(t, ctx, db)
+		if err := migrations.StopV0110AfterAcknowledgements(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		sentOnce(t, ctx, db, by)
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A start that stopped after the report step, at a later one, carries on
+// over everything the report step made. MySQL and MariaDB adopt the holder
+// index for the holder's foreign key and refuse to drop it, so the index is
+// made once and never replaced.
+func TestTheV0110UpgradeCarriesOnPastItsReportStep(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		by := acknowledgedV0100(t, ctx, db)
+		if err := migrations.RunV0110ReportStep(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		sentOnce(t, ctx, db, by)
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A stopped upgrade can leave the report step's tables made without the
+// indexes made after them, and its columns changed without the holder's
+// foreign key. Starting again makes what is missing.
+func TestTheV0110UpgradeMakesWhatAStopLeftUnmade(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		if err := migrations.RunV0110ReportStep(ctx, db); err != nil {
+			t.Fatalf("make what a stopped upgrade left: %v", err)
+		}
+		// On MySQL and MariaDB the index serves a foreign key, so the key
+		// goes with it and comes back alone, as it stands where the table
+		// was made and the index was not.
+		var unmade []string
+		switch db.Server.Engine {
+		case database.MySQL, database.MariaDB:
+			unmade = []string{
+				`ALTER TABLE "report_message" DROP FOREIGN KEY "report_message_report_fk"`,
+				`DROP INDEX "report_message_log_idx" ON "report_message"`,
+				`ALTER TABLE "report_message" ADD CONSTRAINT "report_message_report_fk"
+					FOREIGN KEY ("flaw_report_id") REFERENCES "flaw_report"("id")`,
+				`ALTER TABLE "flaw_report" DROP FOREIGN KEY "flaw_report_holder_fk"`,
+			}
+		case database.Postgres:
+			unmade = []string{
+				`DROP INDEX "report_message_log_idx"`,
+				`ALTER TABLE "flaw_report" DROP CONSTRAINT "flaw_report_holder_fk"`,
+			}
+		default:
+			unmade = []string{`DROP INDEX "report_message_log_idx"`}
+		}
+		for _, stmt := range unmade {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatalf("%s: %v", stmt, err)
+			}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// The report v0.10.0 wrote beside a flaw recorded by hand, with no claim of
+// its own, carries the flaw's summary as its claim after the upgrade. A
+// report on a published vulnerability is left as it was: that issue's
+// description is the publisher's, never what the reporter claimed.
+func TestAHandRecordedFlawsReportCarriesItsSummaryAsItsClaim(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0100)
+		issues := seedIssuesV0100(t, ctx, db)
+		var product, person int64
+		if err := db.DB.NewRaw(`SELECT "id" FROM "product"`).Scan(ctx, &product); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.DB.NewRaw(`SELECT "id" FROM "person"`).Scan(ctx, &person); err != nil {
+			t.Fatal(err)
+		}
+		at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
+		for issue, words := range map[int64]string{
+			issues.recorded: "The flaw as somebody here described it.",
+			issues.scanned:  "The publisher's description.",
+		} {
+			if _, err := db.DB.NewRaw(`UPDATE "vulnerability" SET "description" = ? WHERE "id" = ?`,
+				words, issue).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// The third is a report a flaw was recorded from, which carries the
+		// reporter's own claim and keeps it. Its issue is made a flaw
+		// recorded here the way the seed makes the first.
+		if _, err := db.DB.NewRaw(`INSERT INTO "finding" ("target_id", "kind", "visibility",
+			"vulnerability_id", "component_id", "place_identity", "urgency", "urgency_exploited",
+			"urgency_exploited_here", "urgency_shipped", "opened_at")
+			SELECT "target_id", "kind", "visibility", ?, "component_id", 'place-other', "urgency",
+				"urgency_exploited", "urgency_exploited_here", "urgency_shipped", "opened_at"
+			FROM "finding" WHERE "vulnerability_id" = ?`, issues.untouched, issues.recorded).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewRaw(`UPDATE "vulnerability" SET "description" = ? WHERE "id" = ?`,
+			"A flaw recorded here.", issues.untouched).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for reference, seeded := range map[string]struct {
+			issue int64
+			claim string
+		}{
+			"SONIC-R-2026-333333": {issues.recorded, ""},
+			"SONIC-R-2026-444444": {issues.scanned, ""},
+			"SONIC-R-2026-555555": {issues.untouched, "The reporter's own words."},
+		} {
+			if _, err := db.DB.NewRaw(`INSERT INTO "flaw_report"
+				("reference", "product_id", "vulnerability_id", "summary", "recorded_by", "recorded_at",
+				 "evaluated_at", "evaluated_by", "found_here")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				reference, product, seeded.issue, seeded.claim, person, at, at, person, false).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		dbtest.MigrateTo(t, db, v0110)
+		for reference, want := range map[string]string{
+			"SONIC-R-2026-333333": "The flaw as somebody here described it.",
+			"SONIC-R-2026-444444": "",
+			"SONIC-R-2026-555555": "The reporter's own words.",
+		} {
+			var got *string
+			if err := db.DB.NewRaw(`SELECT "summary" FROM "flaw_report" WHERE "reference" = ?`,
+				reference).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			said := ""
+			if got != nil {
+				said = *got
+			}
+			if said != want {
+				t.Errorf("report %s claims %q after the upgrade, want %q", reference, said, want)
+			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}

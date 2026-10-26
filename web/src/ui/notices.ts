@@ -49,6 +49,9 @@ const WORDS: Record<Kind, string> = {
   "brought-in": "brought into a case",
   disclosed: "disclosed",
   "unanswered-report": "report not answered",
+  "report-message": "reporter wrote back",
+  "report-sent": "reporter written to",
+  "report-noted": "note on a report",
   // The conditions about the deployment rather than about anybody's work,
   // all told to administrators.
   "vulnerability-data-stale": "vulnerability data not moving",

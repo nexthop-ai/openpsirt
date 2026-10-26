@@ -153,6 +153,11 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 		byName[strings.ToLower(reader.Identity)] = reader.ID
 	}
 
+	// A note on a report with no issue is about the product alone.
+	var issue *int64
+	if about.VulnerabilityID != 0 {
+		issue = &about.VulnerabilityID
+	}
 	return tellEach(names, byName, subject.ID, dropped, func(who int64) error {
 		return notify.NewStore(in.DB.DB).Tell(ctx, notify.Telling{
 			PersonID: who, Kind: notify.Mentioned,
@@ -168,7 +173,7 @@ func Mentioned(ctx context.Context, in Deps, subject access.Subject,
 			// matches on; these are what a read narrows by, and a
 			// narrowing cannot rest on a shape another pass invented.
 			ProductID:       &about.ProductID,
-			VulnerabilityID: &about.VulnerabilityID,
+			VulnerabilityID: issue,
 		})
 	})
 }

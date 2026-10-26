@@ -225,7 +225,8 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		Description: "Records that somebody has left. They are refused at every way in — a " +
 			"session, a personal token, a group-bound sign-in — from the next request " +
 			"onward, their sessions are ended, and what they were dealing with is handed " +
-			"back so it is not held by somebody who is gone.\n\n" +
+			"back so it is not held by somebody who is gone. So is work in the queue of a " +
+			"team they were on that no remaining member reads.\n\n" +
 			"Nobody is deleted. The record names them as the proposer of judgments and the " +
 			"approver of others, and their roles are left where they are: what somebody " +
 			"held is part of why the record reads as it does, and bringing them back should " +
@@ -238,14 +239,14 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		Identity string `path:"identity" maxLength:"191"`
 	}) (*struct {
 		Body struct {
-			Released int64  `json:"released" doc:"Findings handed back because they are gone"`
+			Released int64  `json:"released" doc:"Findings, leads and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads"`
 			Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
 			Since    string `json:"since" doc:"The date they left"`
 		}
 	}, error) {
 		out := &struct {
 			Body struct {
-				Released int64  `json:"released" doc:"Findings handed back because they are gone"`
+				Released int64  `json:"released" doc:"Findings, leads and vulnerability reports handed back: theirs, and what their teams' queues held that no remaining member reads"`
 				Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
 				Since    string `json:"since" doc:"The date they left"`
 			}
@@ -303,7 +304,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		}); err != nil {
 			return nil, err
 		}
-		// Handed back for the reason losing a last role hands work back: work
+		// Handed back for the reason losing reading hands work back: work
 		// held by somebody who is gone is work nobody is doing, and it does
 		// not look like it. Outside the act, because it is bounded by how much
 		// they were holding.
@@ -317,7 +318,13 @@ func registerDeactivation(api huma.API, a core.Administering) {
 				if err != nil {
 					return nil, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 				}
-				out.Body.Released = released
+				// And each team they were on gives up what no member still
+				// here reads.
+				queued, err := findings.HandBackUnread(ctx, access.Narrowed{People: []int64{person.ID}})
+				if err != nil {
+					return nil, core.WentWrong(a.Logger, "cannot hand back what their teams held", err)
+				}
+				out.Body.Released = released + queued
 			}
 		}
 		return out, nil

@@ -16,10 +16,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // ClaimedBody is a claim somebody sends us, as it is recorded.
 type ClaimedBody struct {
+	Title      string `json:"title,omitempty" maxLength:"191" doc:"A line naming the claim"`
 	Summary    string `json:"summary" maxLength:"65536" doc:"What was claimed, in the words it was claimed in"`
 	ReportedBy string `json:"reported_by,omitempty" maxLength:"191"`
 	Contact    string `json:"contact,omitempty" maxLength:"191"`
@@ -33,8 +35,7 @@ type ReportIssueBody struct {
 	Vulnerability string `json:"vulnerability" maxLength:"191" doc:"The issue it turned out to be, under any identifier it goes by"`
 }
 
-// registerIntake is the record of what arrived, what it turned out to be,
-// and the act of saying the reporter was answered.
+// registerIntake is the record of what arrived and what it turned out to be.
 func registerIntake(api huma.API, in core.Deps) {
 	const list = "/v1/products/{product}/reports"
 	const one = list + "/{reference}"
@@ -56,7 +57,10 @@ func registerIntake(api huma.API, in core.Deps) {
 			"`received` is the day it arrived, which is what an embargo would be counted " +
 			"from. A date that cannot be read is treated as one nobody gave.\n\n" +
 			"`found_here` marks a flaw somebody here found. Recorded as a flaw, it carries " +
-			"no disclosure date, and it is never listed as waiting for an answer.",
+			"no disclosure date, and it is never listed as waiting for an answer.\n\n" +
+			"`title` is an optional line naming the claim, and is refused across lines.\n\n" +
+			"Where a standing rule places this product's reports, the report goes to the " +
+			"first such rule's team that has a member who reads undisclosed work here.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -70,7 +74,7 @@ func registerIntake(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		row, err := finding.NewStore(in.DB.DB).Record(ctx, subject, product.ID, finding.Claimed{
-			Summary: input.Body.Summary,
+			Title: input.Body.Title, Summary: input.Body.Summary,
 			Told: finding.Told{
 				ReportedBy: input.Body.ReportedBy, Contact: input.Body.Contact,
 				Credit: input.Body.Credit, Received: input.Body.Received,
@@ -125,7 +129,7 @@ func registerIntake(api huma.API, in core.Deps) {
 		OperationID: "get-recorded-report", Method: http.MethodGet, Path: one,
 		Summary: "Show a vulnerability report",
 		Description: "What was claimed, who claimed it, when it arrived, when somebody " +
-			"answered them, and what it turned out to be.\n\n" +
+			"answered them, who holds it, and what it turned out to be.\n\n" +
 			"A reference nobody minted and one recorded against another product answer " +
 			"alike, so asking is not a way to find out which references exist.",
 		Tags: []string{"Findings"},
@@ -146,33 +150,6 @@ func registerIntake(api huma.API, in core.Deps) {
 			return nil, core.WentWrong(in.Logger, "that report could not be read", err)
 		}
 		return &struct{ Body ReportBody }{Body: body}, nil
-	})
-
-	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "acknowledge-recorded-report", Method: http.MethodPost,
-		Path:    one + "/acknowledgement",
-		Summary: "Record that a reporter was answered",
-		Description: "Records that somebody replied to whoever sent this, and when.\n\n" +
-			"It records that it happened rather than doing it. What reaches a researcher " +
-			"is a mail somebody sends from an address they already have; recording it is " +
-			"what turns \"somebody probably replied\" into a date the timeline can be " +
-			"evidenced from, and what clears the condition an unanswered report opens.\n\n" +
-			"Acknowledging twice keeps the first date: when somebody was answered is a fact " +
-			"about the past, and the second person to press it did not change it.",
-		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, core.PerProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"593"`
-	}) (*struct{}, error) {
-		subject, product, err := productForReports(ctx, in, input.Product)
-		if err != nil {
-			return nil, err
-		}
-		if err := finding.NewStore(in.DB.DB).AcknowledgeReport(ctx, subject,
-			product.ID, input.Reference); err != nil {
-			return nil, refusedReport(in, err, "that could not be recorded")
-		}
-		return &struct{}{}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -367,9 +344,11 @@ func refusedReport(in core.Deps, err error, what string) error {
 		return huma.Error404NotFound(finding.ErrNoSuchReport.Error())
 	case errors.As(err, &faults):
 		return core.RefusedText(faults)
-	case errors.Is(err, finding.ErrNothingClaimed),
-		errors.Is(err, finding.ErrAlreadyJudged),
-		errors.Is(err, finding.ErrIssueReported):
+	case errors.Is(err, finding.ErrNoSuchReportNote):
+		return huma.Error404NotFound(finding.ErrNoSuchReportNote.Error())
+	case errors.Is(err, finding.ErrReportJudged):
+		return huma.Error409Conflict(err.Error())
+	case refusal.In(err):
 		return core.Asked(in.Logger, err)
 	}
 	return core.Refused(in.Logger, err, what)

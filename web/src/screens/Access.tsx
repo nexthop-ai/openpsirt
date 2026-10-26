@@ -7,6 +7,7 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useAfterHandBack } from "../api/intake";
 import { AddButton, Declare, Field } from "../ui/Declare";
 import { Suggest } from "../ui/Suggest";
 import { useCatalog, useProducts } from "../api/catalog";
@@ -29,6 +30,7 @@ import { personAt } from "../app/routes";
 // through a configured provider.
 export function Access({ who: me }: { who: Who }) {
   const queries = useQueryClient();
+  const handedBack = useAfterHandBack();
   const [adding, setAdding] = useState(false);
   // Whose grid is open. One at a time: the grid is as wide as the table and
   // two of them stacked is a screen nobody can read a row out of.
@@ -125,7 +127,10 @@ export function Access({ who: me }: { who: Who }) {
       unwrap(
         await api.DELETE("/v1/people/{identity}/roles/{product}/{role}", { params: { path: who } }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ["people"] });
+      handedBack();
+    },
   });
 
   // A role held across every product, including ones declared later. One
@@ -147,7 +152,10 @@ export function Access({ who: me }: { who: Who }) {
   const withdrawEverywhere = useMutation({
     mutationFn: async (who: { identity: string; role: string }) =>
       unwrap(await api.DELETE("/v1/people/{identity}/roles/{role}", { params: { path: who } })),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
+    onSuccess: () => {
+      void queries.invalidateQueries({ queryKey: ["people"] });
+      handedBack();
+    },
   });
 
   // Administration is global rather than granted against a product, so it sits

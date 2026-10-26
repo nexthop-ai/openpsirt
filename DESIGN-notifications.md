@@ -16,6 +16,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Analyzer alerts](#analyzer-alerts)
 - [Lead notices](#lead-notices)
 - [Staleness conditions](#staleness-conditions)
+- [Report audience](#report-audience)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
 - [Work arriving by rule](#work-arriving-by-rule)
@@ -60,6 +61,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A reconcile writes a batch of rows a statement | One sweep can open, restate or clear every condition one person holds at once, and a statement a row is a round trip a row. Opening 152,859 claim-waiting conditions for 204 people took 700.9 and 704.4 s a row at a time, and 7.0 to 8.0 s a batch at a time, on PostgreSQL 16 at one processor over a 1 ms link. A sweep that changes nothing takes 7.0 to 7.5 s there |
 | A restated condition is written by a statement carrying every row's new sentence | Each row of a batch says something different, so the statement chooses each column's value by the row's identifier |
 | Who may do what is read once per sweep | Every condition reads the same people and grants, and administrators are the same people read again |
+| A role across every product counts in every audience as a role on each product | An audience worked out from per-product grants alone treats somebody reading through an estate role as nobody, so a report they hold is told to the product's triagers instead (`DESIGN-access.md` § A role across every product) |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds
@@ -78,10 +80,14 @@ true is cleared, and running the same pass twice changes nothing.
 | A claim waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
 | A claim sent back and not revised | condition | The event told them at the moment it was sent back; an event cannot report that it has since been ignored |
 | A deferral running out | condition | Before the date. What follows the date is the finding arriving back as late work |
-| Work sitting in a team queue | condition | Per team and product, with a count |
+| Work sitting in a team queue | condition | Per team and product, with a count. Open reports in the queue are a condition of their own, to the members who read the product's reports, because a report is undisclosed and folded into the findings' count it would withhold the whole queue from a member who reads only disclosed work |
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
-| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
+| A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. To the report's audience (§ Report audience). Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
+| A report given to you | event | To the person a report is assigned to, where that is not whoever assigned it, and only where they read the product's reports. Never to a team. Undisclosed |
+| A reporter writing back | event | A message recorded as received on a report, to the report's audience (§ Report audience), apart from whoever recorded it. Undisclosed |
+| A message sent to a reporter | event | A message recorded as sent on a report, to the report's audience, apart from whoever recorded it. Undisclosed |
+| A note on a report | event | To the report's audience, apart from its author and anybody it names, who is told of the mention instead. An edit tells the names its new text holds, and nobody else. Undisclosed |
 | An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
@@ -100,6 +106,11 @@ A new build notifies nobody. A build arriving is the ordinary state of a tool
 scanned nightly. What a build changed is on the receipts and in the trend, and
 the one exception is below: an upload that changed much of what a build is made
 of.
+
+Work handed back because its holder stopped reading it notifies nobody, as no
+hand-back does (`DESIGN-access.md` § Lost reading). It leaves the holder's
+counts, the absence alert and their digest at the next sweep, and waits in the
+unassigned list.
 
 ## The in-application area
 
@@ -272,9 +283,7 @@ A claim nobody has judged is raised the same way and named differently. It has
 no issue to name, so the alert carries the reference it was minted with and
 points at the report.
 
-Both are told to whoever may triage work nobody has announced there, because
-answering a report is working it. Everybody told may also open it: reading a
-report asks for less.
+Both reach the report's audience (§ Report audience).
 
 A ruling waiting for approval takes the period a waiting claim does, because it
 is the same thing: one act setting something aside, which takes effect only
@@ -283,7 +292,7 @@ covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
 and reaches whoever may approve it under the report rule: the approver
 capability or triage of undisclosed work, over reading it, and never its
 proposer. A ruling answers what a claim is and not
-the reporter, so a rejected report nobody acknowledged is still raised as
+the reporter, so a rejected report with no message sent is still raised as
 unanswered.
 
 A report about an issue long closed is history rather than an unanswered
@@ -311,6 +320,21 @@ person's action and one thing to read, however many rows it wrote. A queue is a
 population: one routing rule places thousands of findings in a sweep. Within it
 the unit is an issue in a component, whatever its places' visibility, and the
 condition is undisclosed where any of those places is.
+
+## Report audience
+
+Who hears about a vulnerability report turns on who holds it.
+
+| Holder | Told |
+|---|---|
+| A person | That person, where they read the product's reports |
+| A team's queue, unclaimed | The team's members who read the product's reports |
+| Nobody | Everybody who may triage undisclosed work in the product, since answering a report is working it |
+| A person or a queue nobody here can tell | As nobody: a holder who has left or no longer reads the reports, or a queue with no member who reads them, would leave the report told to nobody |
+
+The audience is who watches a report. The unanswered condition, a reporter
+writing back, a message sent to them and a note all use it. Everybody told may
+open the report, so none names a report the reader is refused.
 
 ## Reports that must come back empty
 
@@ -397,6 +421,7 @@ and still holds assigned work (REQ-45).
 | It asks rather than acts | Long leave and having left look identical from here, and nothing detects somebody leaving |
 | Never having signed in counts as absent, measured from when they were added | Otherwise an administrator adding a colleague and assigning them something raises an alert in the same breath |
 | Counted in pieces of work rather than findings | "6 items" meaning 288 findings would make an ordinary absence look like a catastrophe |
+| An open vulnerability report held is one piece; a judged one is none | A report is often told to its holder alone, so this alert is what prompts handing one back |
 
 ## Work arriving by rule
 
@@ -465,13 +490,13 @@ Everything else leaves immediately, so a daily message carrying what was left
 would carry nothing — and a channel that arrives empty is one people stop
 opening.
 
-The digest carries what nothing else told the reader, and there are exactly two
-of those:
+The digest carries what nothing else told the reader:
 
 | Content | Detail |
 |---|---|
 | Work that became yours without a message | The immediate one is not sent when somebody assigns something to themselves, when nothing could send at that moment, or when the person had no address yet |
 | Findings nobody owns | For whoever asks. Somebody triaging a product wants to know what arrived; somebody who only holds their own assigned work does not |
+| Vulnerability reports in your teams' queues | A count, never a name, because a report is undisclosed. A rule placing a report in a queue tells nobody |
 
 Both switches are off by default, and neither is derived from a role. A role says
 what somebody may do, not what they want to read.
@@ -871,3 +896,4 @@ finding it names may since have been decided, closed or reopened.
 | A chat account registered to somebody's address is taken to be theirs | The platform's administrator controls which addresses its accounts hold, and a deployment that does not trust them should not configure the bot |
 | Chat carries nothing opened more than a day ago | A backlog from before a platform was configured, or from a day it refused, is in the application, and delivered at once it buries what is new |
 | A team's channel carries only the queue condition | It is the one notification that names a team. Assignment to a team and routing by rule make none |
+| A report's watchers are its audience, with no list of their own | Nobody joins or leaves a report except by who holds it. Findings and leads have no watch list to follow, and the audience already decides who may open the report |

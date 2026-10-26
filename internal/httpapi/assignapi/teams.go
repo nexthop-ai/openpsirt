@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -176,8 +177,9 @@ func registerTeams(api huma.API, a core.Administering) {
 		OperationID: "retire-team", Method: http.MethodDelete, Path: "/v1/teams/{team}",
 		Summary: "Retire a team",
 		Description: "Takes a team out of use. Nothing new is routed to it and its membership " +
-			"goes, while work already routed to it still names it — the row stays for the " +
-			"same reason an account is deactivated rather than deleted.",
+			"goes. Work in its queue goes back to the unassigned list, since nobody is left on " +
+			"it to read that work. The row stays, so where work was routed before still names " +
+			"it, for the same reason an account is deactivated rather than deleted.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Team string `path:"team"`
@@ -196,6 +198,9 @@ func registerTeams(api huma.API, a core.Administering) {
 					return core.NoSuchTeam(in.Team)
 				}
 				return core.WentWrong(a.Logger, "cannot retire that team", err)
+			}
+			if err := handBackFrom(ctx, a, tx, team.ID); err != nil {
+				return err
 			}
 			if err := core.Noted(ctx, tx, trail.Team, team.Name, trail.Said("in use", true), nil); err != nil {
 				return core.NotRecorded(a.Logger, err)
@@ -262,7 +267,9 @@ func registerTeams(api huma.API, a core.Administering) {
 		Path:    "/v1/teams/{team}/members/{identity}",
 		Summary: "Take somebody off a team",
 		Description: "Removes somebody from a team. Work they have already taken stays " +
-			"theirs: membership says where work arrives, not who holds what has arrived.",
+			"theirs: membership says where work arrives, not who holds what has arrived.\n\n" +
+			"Work in the team's queue that no remaining member may read goes back to the " +
+			"unassigned list.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Team     string `path:"team"`
@@ -290,6 +297,9 @@ func registerTeams(api huma.API, a core.Administering) {
 				return huma.Error404NotFound("they are not on that team")
 			case err != nil:
 				return core.WentWrong(a.Logger, "cannot take somebody off a team", err)
+			}
+			if err := handBackFrom(ctx, a, tx, team.ID); err != nil {
+				return err
 			}
 			if err := core.Noted(ctx, tx, trail.Team, team.Name+" · "+person.Identity,
 				trail.Said("a member", true), nil); err != nil {
@@ -320,4 +330,17 @@ func teamBody(ctx context.Context, store *access.Store, team access.Team) (TeamB
 		body.Members = append(body.Members, named[person])
 	}
 	return body, nil
+}
+
+// handBackFrom hands back, inside the act that changed a team's membership,
+// the work in its queue no remaining member reads.
+func handBackFrom(ctx context.Context, a core.Administering, tx bun.Tx, teamID int64) error {
+	if a.Findings == nil {
+		return nil
+	}
+	if _, err := finding.NewStore(tx).HandBackUnread(ctx,
+		access.Narrowed{Teams: []int64{teamID}}); err != nil {
+		return core.WentWrong(a.Logger, "cannot hand back what the team held", err)
+	}
+	return nil
 }

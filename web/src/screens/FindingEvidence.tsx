@@ -17,10 +17,10 @@ import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
 import { mayOf, useWho } from "../app/session";
 import { linkable } from "../ui/addressable";
-import { at } from "../ui/when";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
+import { Correspondence, ReportNotes } from "./InboxReport";
 import { decisionAt, inboxReportAt, refiled, dependenciesAt, type Build } from "../app/routes";
 
 // Away is an address somebody else supplied, shown as a link only where it is
@@ -326,13 +326,9 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
 // The reporter of a flaw, and the other names it goes by.
 //
 // The reporter is the party the timeline is evidenced to. Received,
-// acknowledged, triaged, fixed, disclosed — and the acknowledgment is the step
-// that costs nothing and is missed by being nobody's job, so it is a button
-// here rather than a field somebody remembers to fill in.
-//
-// Acknowledging records that it happened rather than doing it. What
-// reaches a researcher is a mail somebody sends from an address they already
-// have; recording it turns "somebody probably replied" into a date.
+// acknowledged, triaged, fixed, disclosed — and the acknowledgement is the
+// first message recorded as sent to them. The report's correspondence and
+// notes carry over to the issue it became, read under the report's rule.
 export function Reporter({
   product,
   vulnerability,
@@ -347,9 +343,10 @@ export function Reporter({
   const navigate = useNavigate();
   const location = useLocation();
   const [alias, setAlias] = useState("");
-  // Reading who reported it asks for reading undisclosed work; answering them
-  // is working the report, which asks for triage of it.
-  const mayAnswer = !!mayOf(useWho().data, product)?.may_hide;
+  // Reading who reported it asks for reading undisclosed work; writing to the
+  // case is working the report, which asks for triage of it.
+  const who = useWho().data;
+  const works = !!mayOf(who, product)?.may_hide;
   const told = useQuery({
     queryKey: ["report", product, vulnerability],
     queryFn: async () =>
@@ -361,15 +358,6 @@ export function Reporter({
     // No report is the record of this issue, which is every issue a scan
     // reported that nobody wrote in about.
     retry: false,
-  });
-  const answered = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.POST("/v1/products/{product}/issues/{vulnerability}/report/acknowledgement", {
-          params: { path: { product, vulnerability } },
-        }),
-      ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["report"] }),
   });
   const alsoKnown = useMutation({
     mutationFn: async (name: string) =>
@@ -436,35 +424,20 @@ export function Reporter({
             {report.received && <> · arrived {report.received}</>}
             {report.credit && <> · credited as {report.credit}</>}
           </p>
-          {/* Nobody outside sent a flaw found here, so nobody is owed an
-              answer. */}
-          {report.found_here ? null : report.acknowledged ? (
-            <p className="hint">
-              Answered {at(report.acknowledged)}
-              {report.acknowledged_by && (
-                <> by {report.acknowledged_by_name || report.acknowledged_by}</>
-              )}
-              .
-            </p>
-          ) : (
-            <div className="alert" style={{ margin: "6px 0 0" }}>
-              <strong>Nobody has answered them.</strong>
-              <span>Send them a note, then record it here.</span>
-              <button
-                type="button"
-                className="btn"
-                hidden={!mayAnswer}
-                style={{ marginLeft: "auto" }}
-                disabled={answered.isPending}
-                onClick={() => answered.mutate()}
-              >
-                Mark as answered
-              </button>
-            </div>
-          )}
-          {answered.error != null && (
-            <Failed error={answered.error} what="That could not be recorded." />
-          )}
+          <p className="hint">
+            <Link className="id" to={inboxReportAt(report.product, report.reference)}>
+              {report.reference}
+            </Link>
+            {report.title && <> · {report.title}</>}
+          </p>
+          <Correspondence report={report} works={works} within />
+          <h4 style={{ margin: "14px 0 6px" }}>Notes on the report</h4>
+          <ReportNotes
+            product={report.product}
+            reference={report.reference}
+            mine={(writtenBy) => writtenBy === who?.identity}
+            works={works}
+          />
         </>
       )}
 

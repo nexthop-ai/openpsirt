@@ -38,6 +38,10 @@ type Digest struct {
 	// HeldTold is how many of what they hold the walk passed over as already
 	// told, which is not something cut from the list.
 	HeldTold int
+	// QueuedReports is how many open vulnerability reports sit in their
+	// teams' queues. A rule placing one there tells nobody, so this is where
+	// it is mentioned, and it is a number: a report is undisclosed.
+	QueuedReports int
 }
 
 // Item is one piece of work, as a digest names it.
@@ -68,7 +72,7 @@ type Withheld struct {
 // is how somebody learns to stop opening the daily message, and then the ones
 // that say something go unread with it.
 func (d Digest) Empty() bool {
-	return len(d.Mine) == 0 && len(d.Unowned) == 0 && d.Withheld.Count == 0
+	return len(d.Mine) == 0 && len(d.Unowned) == 0 && d.Withheld.Count == 0 && d.QueuedReports == 0
 }
 
 // Message renders the digest for a channel.
@@ -95,6 +99,13 @@ func (d Digest) Message(baseURL string) Message {
 			text.WriteString("\n")
 		}
 		text.WriteString(d.Withheld.said())
+	}
+	if d.QueuedReports > 0 {
+		if text.Len() > 0 {
+			text.WriteString("\n")
+		}
+		fmt.Fprintf(&text, "%s in your teams' queues, not named here because reports are undisclosed.\n",
+			count(d.QueuedReports, "vulnerability report waits", "vulnerability reports wait"))
 	}
 	if where := link(baseURL, weblink.Home()); where != "" {
 		text.WriteString("\n" + where + "\n")
@@ -237,6 +248,16 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 		if taken >= most || len(held) < most {
 			break
 		}
+	}
+
+	// The reports in their teams' queues, which a rule placed without a
+	// message.
+	if teams := subject.Mine(); len(teams) > 1 {
+		_, queued, err := findings.HeldReports(ctx, subject, 0, teams[1:], 1, 0)
+		if err != nil {
+			return digest, fmt.Errorf("read the reports in %q's teams' queues: %w", person.Identity, err)
+		}
+		digest.QueuedReports = queued
 	}
 
 	// The work that arrived since the last one and nobody has picked up, for

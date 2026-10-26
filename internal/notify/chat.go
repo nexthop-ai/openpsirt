@@ -85,6 +85,7 @@ var sharedKinds = map[Kind]bool{
 	ApprovalUndone: false, ApprovalWithdrawn: false, ClaimLapsed: false,
 	MergeSuperseded: true,
 	BroughtIn:       false, Disclosed: false, Unanswered: true,
+	ReportMessage: false, ReportSent: false, ReportNoted: false,
 	VulnerabilityDataStale: true, RiskUnagreed: true, PairsConcentrated: true,
 	SupplierSilent: true, InventoryMoved: true, AnalysisDropped: true,
 	AnalysisNotComparable: true, AnalysisQuiet: true,

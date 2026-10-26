@@ -610,7 +610,7 @@ assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 | A lead past its end of life is refused with 409 | § End of life |
 | A lead handed off as a flaw, kept or moved, is refused with 409, and its page offers no holder | It is closed work for its holder, and its flaw is assigned instead |
 | A lead seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
-| Losing the last role on a product, deactivation and a handover move leads with everything else, but for the handed-off lead below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
+| Losing the reading a lead needs, deactivation and a handover move leads with everything else, but for the handed-off lead below | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
 | A team's routing rules place leads nobody holds, and no lead handed off | `DESIGN-access.md` § Routing rules. Whoever triages internal work in the product reads and previews them |
 | The lists of held work list a lead, one row per lead, to whoever reads it | Unassigned work, one person's work, a team's queue and the totals per holder (`DESIGN-kinds.md` § Consumers). A lead is listed to readers of internal work in the product. A row names the analyzer's rule and opens the lead's page |
 | The unassigned list leaves out a lead's sightings in releases past their end of life | Nobody may take a lead seen only there, and the lead queue narrowed to work nobody holds leaves it out the same way (§ End of life) |

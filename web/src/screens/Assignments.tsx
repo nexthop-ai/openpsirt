@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
 import { initials } from "../ui/initials";
 import { Link, useSearchParams } from "react-router-dom";
@@ -16,7 +16,9 @@ import { useRowOpener } from "../ui/opens";
 import { Wide } from "../ui/Wide";
 import { Paged } from "../ui/Paged";
 import { usePaging } from "./list";
-import { findingOf, leadAt, leadsAt } from "../app/routes";
+import { findingOf, inboxReportAt, leadAt, leadsAt } from "../app/routes";
+import { useHandBack, useHeldReports } from "../api/intake";
+import { on } from "../ui/when";
 
 // One page of what somebody holds. The answer carries a total, so this is a
 // page rather than a cap and the footer pages through the rest.
@@ -158,15 +160,18 @@ export function Assignments() {
       )}
 
       {tab === "due" ? (
-        <Held
-          rows={mine.data?.items ?? []}
-          total={mine.data?.total ?? 0}
-          query={mine}
-          offset={offset}
-          onGo={goTo}
-          empty="Nothing is assigned to you."
-          detail="Work you take on from a finding, or that somebody hands you, appears here."
-        />
+        <>
+          <Held
+            rows={mine.data?.items ?? []}
+            total={mine.data?.total ?? 0}
+            query={mine}
+            offset={offset}
+            onGo={goTo}
+            empty="Nothing is assigned to you."
+            detail="Work you take on from a finding, or that somebody hands you, appears here."
+          />
+          <Reports whose={{ person: "me" }} product={scope.product} />
+        </>
       ) : holder ? (
         <>
           <div className="filters" style={{ marginBottom: 10 }}>
@@ -196,6 +201,7 @@ export function Assignments() {
             empty={team ? "The team is not holding anything." : "They are not holding anything."}
             detail="Either it has been decided, or somebody handed it back."
           />
+          <Reports whose={team ? { team } : { person }} product={scope.product} />
         </>
       ) : (
         <ByPerson
@@ -211,6 +217,85 @@ export function Assignments() {
             setParams(now);
           }}
         />
+      )}
+      {tab === "people" && !holder && (
+        <Reports whose="nobody" product={scope.product} title="Reports nobody holds" />
+      )}
+    </>
+  );
+}
+
+// Open vulnerability reports somebody holds, or nobody does. Drawn only where
+// there are any, because most people read no reports at all.
+function Reports({
+  whose,
+  product,
+  title = "Vulnerability reports",
+}: {
+  whose: { person: string } | { team: string } | "nobody";
+  product?: string;
+  title?: string;
+}) {
+  const opener = useRowOpener();
+  const held = useHeldReports(whose, product);
+  if (held.isPending) return null;
+  if (held.isError) {
+    return <Failed error={held.error} what="The vulnerability reports could not be read." />;
+  }
+  const rows = held.data.items ?? [];
+  const total = held.data.total ?? rows.length;
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <h3 style={{ margin: "18px 0 8px" }}>
+        {title} <span className="n">{total.toLocaleString()}</span>
+      </h3>
+      <Wide>
+        <table>
+          <thead>
+            <tr>
+              <th>Report</th>
+              <th>Product</th>
+              <th>From</th>
+              <th>Arrived</th>
+              {whose !== "nobody" && <th>Held by</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const to = inboxReportAt(row.product, row.reference);
+              return (
+                <tr
+                  key={`${row.product} ${row.reference}`}
+                  className="row opens"
+                  onClick={opener(to)}
+                >
+                  <td>
+                    <Link className="id" style={{ whiteSpace: "nowrap" }} to={to}>
+                      {row.reference}
+                    </Link>
+                    {row.title && <span className="hint"> · {row.title}</span>}
+                    {row.waiting && <span className="hint"> · ruling waiting</span>}
+                  </td>
+                  <td className="hint">{row.product}</td>
+                  <td>{row.reported_by || <span className="hint">—</span>}</td>
+                  <td className="hint">{row.received || on(row.recorded_at)}</td>
+                  {whose !== "nobody" && (
+                    <td className="hint">
+                      {row.assigned_to_name || row.assigned_to}
+                      {row.assigned_team && " · team queue"}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Wide>
+      {total > rows.length && (
+        <p className="hint">
+          The {rows.length} oldest of {total.toLocaleString()}.
+        </p>
       )}
     </>
   );
@@ -229,23 +314,7 @@ function ByPerson({
   leadsIn?: string;
   onPick: (name: string, team: boolean) => void;
 }) {
-  const queries = useQueryClient();
-  const release = useMutation({
-    mutationFn: async (identity: string) =>
-      unwrap(
-        await api.POST("/v1/people/{identity}/assignments/hand-back", {
-          params: { path: { identity } },
-          body: {},
-        }),
-      ),
-    onSuccess: () => {
-      void queries.invalidateQueries({ queryKey: ["holdings"] });
-      // The badge for what nobody holds is counted from the findings list, so
-      // that is the key to invalidate. Returning a whole queue is the single
-      // act that moves the number most.
-      void queries.invalidateQueries({ queryKey: ["findings"] });
-    },
-  });
+  const release = useHandBack();
 
   if (query.isPending) return <Loading />;
   if (query.isError) {
@@ -277,6 +346,7 @@ function ByPerson({
               <th className="num">Open</th>
               <th className="num">Findings</th>
               <th className="num">Overdue</th>
+              <th className="num">Reports</th>
               <th />
             </tr>
           </thead>
@@ -313,6 +383,7 @@ function ByPerson({
                     <span style={{ color: "var(--faint)" }}>0</span>
                   )}
                 </td>
+                <td className="num">{(row.reports ?? 0).toLocaleString()}</td>
                 <td>
                   {/* A team queue is not emptied here. What this calls is a
                       route per person, and a team is not one — so the control

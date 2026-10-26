@@ -4,7 +4,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Teams } from "./Teams";
 import { Person } from "./Person";
-import { screen, serve, settle, mounted } from "../test/mount";
+import { act } from "react";
+import { handedBack } from "../api/intake";
+import { answer, client, screen, serve, settle, mounted, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
 
@@ -42,6 +44,28 @@ describe("the teams screen", () => {
     expect(text).toContain("alice");
   });
 
+  for (const [act_, control] of [
+    ["retiring a team", "Retire"],
+    ["taking somebody off a team", "Take alice off this team"],
+  ] as const) {
+    it(`refreshes the lists of held work after ${act_}, which hands work back`, async () => {
+      deployment(true);
+      const sent = answer("DELETE", () => ({ status: 204 }));
+      const queries = client();
+      const invalidated = watchInvalidations(queries);
+      mount.render(screen(<Teams />, "/", "*", queries));
+      await settle();
+      const button = [...mount.host().querySelectorAll("button")].find(
+        (one) => one.textContent?.trim() === control || one.title === control,
+      );
+      expect(button).toBeDefined();
+      await act(async () => button?.click());
+      await settle();
+      expect(sent()).toHaveLength(1);
+      expect(invalidated()).toEqual(expect.arrayContaining(["teams", ...handedBack]));
+    });
+  }
+
   it("offers anybody else no control and no membership it cannot read", async () => {
     deployment(false);
     mount.render(screen(<Teams />));
@@ -65,6 +89,19 @@ describe("one person", () => {
     mount.render(screen(<Person />, "/access/alice", "/access/:identity"));
     await settle();
     expect(leave()?.disabled).toBe(false);
+  });
+
+  it("refreshes the lists of held work after a departure, which hands work back", async () => {
+    deployment(true);
+    const sent = answer("PUT", () => ({ data: { released: 0, since: "" } }));
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
+    mount.render(screen(<Person />, "/access/alice", "/access/:identity", queries));
+    await settle();
+    await act(async () => leave()?.click());
+    await settle();
+    expect(sent()).toHaveLength(1);
+    expect(invalidated()).toEqual(expect.arrayContaining(["people", ...handedBack]));
   });
 
   it("holds recording a departure back from an auditor, and says why", async () => {

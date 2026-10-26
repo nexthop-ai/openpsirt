@@ -467,7 +467,60 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// The open reports a team's queue holds, in a condition of their own. A
+	// report is undisclosed, so one folded into the findings' count would
+	// withhold the whole queue from a member who reads only disclosed work.
+	var reports []struct {
+		TeamID    int64  `bun:"team_id"`
+		Team      string `bun:"team"`
+		TeamName  string `bun:"team_name"`
+		ProductID int64  `bun:"product_id"`
+		Product   string `bun:"product"`
+		Waiting   int    `bun:"waiting"`
+	}
+	if err := w.db.NewSelect().
+		TableExpr(`"flaw_report" AS "fr"`).
+		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "fr"."assigned_to"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "fr"."product_id"`).
+		ColumnExpr(`"tm"."id" AS "team_id"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF("tm"."display_name", ''), "tm"."name")) AS "team"`).
+		ColumnExpr(`MIN("tm"."name") AS "team_name"`).
+		ColumnExpr(`"fr"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`COUNT(*) AS "waiting"`).
+		// Untouched only, as a finding is: one judged, or under a ruling,
+		// has been acted on.
+		Where(`"fr"."evaluated_at" IS NULL`).
+		Where(`"fr"."vulnerability_id" IS NULL`).
+		Where(`"fr"."ruling_id" IS NULL`).
+		Where(`"fr"."assigned_at" <= ?`, since).
+		Where(`"tm"."retired_at" IS NULL`).
+		GroupExpr(`"tm"."id", "fr"."product_id"`).
+		Scan(ctx, &reports); err != nil {
+		return nil, fmt.Errorf("read the reports sitting in a queue: %w", err)
+	}
 	rights := access.NewStore(w.db)
+	for _, row := range reports {
+		members, err := rights.MembersOf(ctx, row.TeamID)
+		if err != nil {
+			return nil, fmt.Errorf("read who is on that team: %w", err)
+		}
+		holds := Holds{
+			About: identify(fmt.Sprintf("queue-untaken-reports %d %d", row.TeamID, row.ProductID)),
+			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken.",
+				row.Team, count(row.Waiting, "vulnerability report", "vulnerability reports"), row.Product),
+			Link:      weblink.AssignmentsTeam(row.TeamName),
+			Private:   true,
+			ProductID: &row.ProductID,
+			TeamID:    &row.TeamID,
+		}
+		for _, personID := range members {
+			if reach[personID][row.ProductID].reads(true) {
+				out[personID] = append(out[personID], holds)
+			}
+		}
+	}
 	for _, row := range rows {
 		members, err := rights.MembersOf(ctx, row.TeamID)
 		if err != nil {
@@ -631,11 +684,11 @@ func itemsWaiting(n int) string {
 // acknowledgment is the part of coordinated disclosure a reporter judges us
 // on, and it costs nothing and is missed by being nobody's job.
 //
-// To whoever may triage work nobody has announced in that product, which is
-// who may open the report. A report is about somebody outside this deployment
-// and the reply goes to them from a person, so this reaches the people who
-// could be that person — and narrowing it that way is what keeps the notice
-// from naming a report the reader is refused.
+// To the report's audience: the person holding it, the members of the team
+// whose queue it is in, or, where nobody holds it, whoever may triage work
+// nobody has announced in that product. A holder and a team member are told
+// only where they read the product's reports, so the notice never names a
+// report the reader is refused.
 //
 // Judged or not. A claim that turned out to be announced work is still a
 // letter a stranger sent, and reading it asks the same thing it asked
@@ -647,6 +700,14 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	}
 	reach := w.reach
 	out, err := w.everybody(ctx, Unanswered)
+	if err != nil {
+		return nil, err
+	}
+	held := make([]*int64, 0, len(rows))
+	for _, row := range rows {
+		held = append(held, row.AssignedTo)
+	}
+	audience, err := newReportAudience(ctx, w.db, reach, held)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +724,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		holds := Holds{
 			About: identify(fmt.Sprintf("unanswered %d", row.VulnerabilityID)),
 			Body: fmt.Sprintf("%s reported %s in %s%s and has not been answered. "+
-				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
+				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Identifier, row.Product, when),
 			Link:    weblink.ProductFindings(row.Product, row.Identifier),
@@ -679,19 +740,17 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 		if row.VulnerabilityID == 0 {
 			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
-				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
+				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
 			holds.Link = weblink.InboxReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}
-		for personID, per := range reach {
-			// Whoever may work reports there, judged or not, because
-			// answering is working one. Everybody told may also open it,
-			// since reading a report asks for less.
-			if !per[row.ProductID].triages(true) {
-				continue
-			}
+		told, err := audience.of(ctx, row.ProductID, row.AssignedTo)
+		if err != nil {
+			return nil, err
+		}
+		for _, personID := range told {
 			out[personID] = append(out[personID], holds)
 		}
 	}

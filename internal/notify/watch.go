@@ -216,7 +216,7 @@ func fanOut(out map[int64][]Holds, acts map[int64]map[int64]acts, productID int6
 
 // Once derives every condition and reconciles it against what is being said.
 func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
-	people, held, err := access.NewStore(w.db).People(ctx)
+	people, held, err := access.NewStore(w.db).PeopleReaching(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("read who may hear about this: %w", err)
 	}
@@ -553,7 +553,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 	// however many places it sits at, and "6 items" meaning 288 findings is a
 	// number that makes somebody's absence look like a catastrophe.
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
-	held := w.db.NewSelect().
+	pieces := w.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`"f"."assigned_to" AS "person_id"`).
@@ -562,18 +562,36 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 		Where(kinds, kindArgs...).
 		Where(`"f"."assigned_to" IS NOT NULL`).
 		Where(`"f"."closed_at" IS NULL`)
+	findings := w.db.NewSelect().
+		TableExpr(`(?) AS "pc"`, pieces).
+		ColumnExpr(`"pc"."person_id" AS "person_id"`).
+		ColumnExpr(`COUNT(*) AS "held"`).
+		GroupExpr(`"pc"."person_id"`)
+	// And the open reports, one piece each. A report is often told to its
+	// holder alone, so this alert is what prompts handing one back.
+	reports := w.db.NewSelect().
+		TableExpr(`"flaw_report" AS "fr"`).
+		ColumnExpr(`"fr"."assigned_to" AS "person_id"`).
+		ColumnExpr(`COUNT(*) AS "held"`).
+		Where(`"fr"."assigned_to" IS NOT NULL`).
+		Where(`"fr"."evaluated_at" IS NULL`).
+		GroupExpr(`"fr"."assigned_to"`)
 
 	if err := w.db.NewSelect().
 		TableExpr(`"person" AS "p"`).
 		// Joined on the party a person is assignable as, because that
 		// is what the assignment column holds.
-		Join(`JOIN (?) AS "work" ON "work"."person_id" = "p"."party_id"`, held).
+		Join(`LEFT JOIN (?) AS "hf" ON "hf"."person_id" = "p"."party_id"`, findings).
+		Join(`LEFT JOIN (?) AS "hr" ON "hr"."person_id" = "p"."party_id"`, reports).
 		ColumnExpr(`"p"."id" AS "id"`).
 		ColumnExpr(`"p"."identity" AS "identity"`).
 		ColumnExpr(`COALESCE("p"."display_name", '') AS "name"`).
 		ColumnExpr(`"p"."last_seen_at" AS "last_seen_at"`).
 		ColumnExpr(`"p"."created_at" AS "created_at"`).
-		ColumnExpr(`COUNT(*) AS "holding"`).
+		ColumnExpr(`COALESCE("hf"."held", 0) + COALESCE("hr"."held", 0) AS "holding"`).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr(`"hf"."held" IS NOT NULL`).WhereOr(`"hr"."held" IS NOT NULL`)
+		}).
 		// Never signed in counts too — somebody granted a role and given work
 		// who has not arrived is exactly the case worth raising — but it is
 		// measured from when they were added, not from the beginning of
@@ -587,8 +605,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 			return q.WhereOr(`"p"."last_seen_at" IS NOT NULL AND "p"."last_seen_at" < ?`, since).
 				WhereOr(`"p"."last_seen_at" IS NULL AND "p"."created_at" < ?`, since)
 		}).
-		GroupExpr(`"p"."id", "p"."identity", "p"."display_name", "p"."last_seen_at", "p"."created_at"`).
-		OrderExpr(`holding DESC, "p"."identity"`).
+		OrderExpr(`"holding" DESC, "p"."identity"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read who is away and still holding work: %w", err)
 	}

@@ -39,6 +39,7 @@ type RuleBody struct {
 	// catches every binary package built from it, wherever they sit.
 	Upstream string `json:"upstream,omitempty" doc:"A source package name. Catches every binary package built from it"`
 	Beneath  string `json:"beneath,omitempty" doc:"A component name. Catches it and everything sitting under it, in every build"`
+	Reports  bool   `json:"reports,omitempty" doc:"Whether it places the product's vulnerability reports rather than findings. A rule placing reports names no package and no place"`
 }
 
 // CatchesOutput is what a rule would match, before anybody saves it.
@@ -98,6 +99,7 @@ func registerRouting(api huma.API, in core.Deps) {
 				TeamDisplayName: teams[rule.TeamID].Display,
 				TeamRetired:     teams[rule.TeamID].Retired,
 				Order:           rule.Ordinal, Upstream: rule.Upstream, Beneath: rule.Beneath,
+				Reports: rule.Reports,
 			})
 		}
 		return out, nil
@@ -111,12 +113,16 @@ func registerRouting(api huma.API, in core.Deps) {
 			"many of those nobody holds.\n\n" +
 			"`*` matches any run of characters in either key.\n\n" +
 			"It does not account for the rules already there. First match wins, so what " +
-			"this catches is what it would place only where no earlier rule claimed it first.",
+			"this catches is what it would place only where no earlier rule claimed it first.\n\n" +
+			"Send `reports` instead of either key for a rule placing vulnerability reports: " +
+			"`work` is then the product's open reports and `unheld` those nobody holds, " +
+			"counted where you read the product's reports and zero elsewhere.",
 		Tags: []string{"Administration"},
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product  string `path:"product"`
 		Upstream string `query:"upstream" maxLength:"191" doc:"A source package name, with * for any run of characters"`
 		Beneath  string `query:"beneath" maxLength:"191" doc:"A component name, with * for any run of characters"`
+		Reports  bool   `query:"reports" doc:"Preview a rule placing vulnerability reports"`
 	}) (*CatchesOutput, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -131,6 +137,19 @@ func registerRouting(api huma.API, in core.Deps) {
 		}
 		if !subject.TriagesAnyIn(product.ID) {
 			return nil, huma.Error403Forbidden("not authorized")
+		}
+		if input.Reports {
+			if input.Upstream != "" || input.Beneath != "" {
+				return nil, huma.Error422UnprocessableEntity(reportRuleKeyed)
+			}
+			caught, err := finding.NewStore(in.DB.DB).ReportsWouldMatch(ctx, subject, product.ID)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "what that rule would catch could not be read", err)
+			}
+			out := &CatchesOutput{}
+			out.Body.Components = []string{}
+			out.Body.Work, out.Body.Unheld = caught.Open, caught.Unheld
+			return out, nil
 		}
 		if input.Upstream == "" && input.Beneath == "" {
 			return nil, huma.Error422UnprocessableEntity(
@@ -170,6 +189,9 @@ func registerRouting(api huma.API, in core.Deps) {
 			"adding a rule never takes something out of somebody's hands.\n\n" +
 			"It places work only at a visibility one member of the team reads. Undisclosed " +
 			"or internal work nobody on the team reads stays unassigned.\n\n" +
+			"Send `reports` and neither key for a rule placing the product's vulnerability " +
+			"reports nobody holds. A report is placed only where one member of the team reads " +
+			"undisclosed work here, and a report recorded later is placed as it is recorded.\n\n" +
 			"Applying it to what is open is queued rather than done here. The reply says " +
 			"the rule was recorded, not that the sweep has finished. Where the queue is " +
 			"full the rule is not recorded and the answer is 503: send it again later.",
@@ -182,11 +204,15 @@ func registerRouting(api huma.API, in core.Deps) {
 			Team     string `json:"team" minLength:"1" doc:"The team work lands on, by name"`
 			Upstream string `json:"upstream,omitempty" maxLength:"191" doc:"A source package name"`
 			Beneath  string `json:"beneath,omitempty" maxLength:"191" doc:"A component name, matching it and everything under it"`
+			Reports  bool   `json:"reports,omitempty" doc:"Whether it places vulnerability reports rather than findings. Refused with either key"`
 		}
 	}) (*struct{ Body RuleBody }, error) {
 		subject, product, err := routable(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
+		}
+		if input.Body.Reports && (input.Body.Upstream != "" || input.Body.Beneath != "") {
+			return nil, huma.Error422UnprocessableEntity(reportRuleKeyed)
 		}
 		var rule *finding.Routing
 		var team *access.Team
@@ -195,8 +221,14 @@ func registerRouting(api huma.API, in core.Deps) {
 			if team, err = core.TeamNamed(ctx, in.Logger, access.NewStore(tx), input.Body.Team); err != nil {
 				return err
 			}
-			if rule, err = finding.NewStore(tx).AddRule(ctx, subject, product, team.ID,
-				input.Body.Name, input.Body.Upstream, input.Body.Beneath); err != nil {
+			store := finding.NewStore(tx)
+			if input.Body.Reports {
+				rule, err = store.AddReportRule(ctx, subject, product, team.ID, input.Body.Name)
+			} else {
+				rule, err = store.AddRule(ctx, subject, product, team.ID,
+					input.Body.Name, input.Body.Upstream, input.Body.Beneath)
+			}
+			if err != nil {
 				return core.Asked(in.Logger, err)
 			}
 			if err := core.Noted(ctx, tx, trail.Routing, input.Product+" · "+rule.Name,
@@ -215,7 +247,7 @@ func registerRouting(api huma.API, in core.Deps) {
 		return &struct{ Body RuleBody }{Body: RuleBody{
 			ID: rule.ID, Name: rule.Name, Team: team.Name, TeamDisplayName: shown,
 			Order:    rule.Ordinal,
-			Upstream: rule.Upstream, Beneath: rule.Beneath,
+			Upstream: rule.Upstream, Beneath: rule.Beneath, Reports: rule.Reports,
 		}}, nil
 	})
 
@@ -252,6 +284,9 @@ func registerRouting(api huma.API, in core.Deps) {
 			return &struct{}{}, nil
 		})
 }
+
+// reportRuleKeyed refuses a rule placing reports that names a key.
+const reportRuleKeyed = "a rule placing reports names no package and no place: a report sits at neither"
 
 // routable resolves who is asking and the product they are asking about, and
 // refuses somebody who may not hand work to anybody.

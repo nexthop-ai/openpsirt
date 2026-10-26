@@ -204,54 +204,6 @@ func TestTheAssignerRightDoesNotStandOnItsOwn(t *testing.T) {
 
 func ptr[T any](v T) *T { return &v }
 
-func TestWorkComesBackWhenTheirLastRoleOnAProductGoes(t *testing.T) {
-	// the half that has a trigger today. Without it their work is in no
-	// list at all — assigned, so not in the shared one, and assigned to
-	// somebody who can no longer open it.
-	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
-			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
-			t.Fatal(err)
-		}
-		open := f.open(t)
-		triager := f.holding(t, access.PublicTriage, access.Assigner)
-		if _, _, err := f.store.Assign(t.Context(), triager, f.target,
-			open[0].VulnerabilityID, open[0].ComponentID, ptr(int64(7)), nil); err != nil {
-			t.Fatal(err)
-		}
-
-		// Administrative, like every other move of somebody else's work.
-		if _, err := f.store.ReleaseIn(t.Context(), triager, 7, f.productID); err == nil {
-			t.Error("a triager handed back somebody else's work")
-		}
-
-		admin := access.NewPerson(99, "admin", true, nil, 199)
-		// Another product's findings are not this product's business.
-		released, err := f.store.ReleaseIn(t.Context(), admin, 7, f.productID+1000)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if released != 0 {
-			t.Errorf("handing back in one product moved %d findings in another", released)
-		}
-		if len(f.assigned(t)) == 0 {
-			t.Fatal("the work was released by a product it does not belong to")
-		}
-
-		released, err = f.store.ReleaseIn(t.Context(), admin, 7, f.productID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if released == 0 {
-			t.Error("handing back in this product moved nothing")
-		}
-		if held := f.assigned(t); len(held) != 0 {
-			t.Errorf("%d findings are still held by somebody with no role here", len(held))
-		}
-	})
-}
-
 func TestTheCountsBesideTheseListsAreAskedForOnEveryEngine(t *testing.T) {
 	// Both lists carry a total, and both totals come from a derived table
 	// wrapped around the grouped query. That shape is the one that breaks

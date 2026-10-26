@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
+import { useAfterHandBack } from "../api/intake";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Empty } from "../ui/Empty";
@@ -36,6 +37,7 @@ export function Person() {
   const me = useWho();
   const admin = !!me.data?.admin;
   const queries = useQueryClient();
+  const handedBack = useAfterHandBack();
   const about = useQuery({
     queryKey: ["person", identity],
     queryFn: async () =>
@@ -56,6 +58,7 @@ export function Person() {
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["person", identity] });
       void queries.invalidateQueries({ queryKey: ["people"] });
+      handedBack();
     },
   });
 

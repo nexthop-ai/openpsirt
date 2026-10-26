@@ -3,9 +3,15 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  editReportNote,
+  handedBack,
   useAcceptReport,
-  useAcknowledgeReport,
   useApproveRuling,
+  useAssignReport,
+  useEditReport,
+  useHandBack,
+  useLogMessage,
+  useNoteOnReport,
   useRecordReport,
   useRule,
   useWithdrawRuling,
@@ -24,6 +30,8 @@ const EVERY_REPORT_KEY = [
   "duplicates",
   "finding",
   "findings",
+  "held-reports",
+  "holdings",
   "home",
   "issue",
   "recorded-report",
@@ -35,7 +43,21 @@ const EVERY_REPORT_KEY = [
 describe("an act on a report, once it lands", () => {
   it.each([
     ["filing one", "POST", () => useRecordReport("sonic"), { summary: "A socket answers." }],
-    ["acknowledging one", "POST", () => useAcknowledgeReport("sonic", "R-1"), undefined],
+    [
+      "recording a message",
+      "POST",
+      () => useLogMessage("sonic", "R-1"),
+      { direction: "sent", body: "Thanks." },
+    ],
+    ["editing one", "PUT", () => useEditReport("sonic", "R-1"), { summary: "A socket answers." }],
+    ["noting on one", "POST", () => useNoteOnReport("sonic", "R-1"), "Seen before."],
+    [
+      "editing a note on one",
+      "PUT",
+      editReportNote("sonic", "R-1"),
+      { id: 7, body: "Seen twice." },
+    ],
+    ["assigning one", "PUT", () => useAssignReport("sonic", "R-1"), { person: "bo" }],
     ["accepting one as an issue", "PUT", () => useAcceptReport("sonic", "R-1"), "CVE-2026-1"],
     ["proposing a ruling", "POST", () => useRule("sonic"), { reports: ["R-1"], outcome: "spam" }],
     ["approving a ruling", "POST", () => useApproveRuling("sonic"), 4],
@@ -69,5 +91,18 @@ describe("an act on a report, once it lands", () => {
         },
       ],
     ]);
+  });
+});
+
+describe("handing back everything somebody holds", () => {
+  it("refreshes who holds what, every list of held or unheld work, and Home", async () => {
+    const { sent, invalidated } = await acted(mount.render, mount.host, "POST", useHandBack, "bo");
+    expect(sent).toEqual([
+      [
+        "/v1/people/{identity}/assignments/hand-back",
+        { params: { path: { identity: "bo" } }, body: {} },
+      ],
+    ]);
+    expect(invalidated).toEqual([...handedBack].sort());
   });
 });
