@@ -55,21 +55,33 @@ func (h Handoff) matchedOn(q *bun.UpdateQuery) *bun.UpdateQuery {
 	return q.Where(`"last_run_id" = ?`, *h.LastRunID)
 }
 
-// AsRead narrows an update of one hand-off to the row as it was read: its
-// visibility, its flaw undisclosed, and the last run to describe it. A move,
-// an undo, a disclosure or a run landing since is a lost race, which the
-// retry reads again.
-func (h Handoff) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
-	return h.matchedOn(q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
-		Where(`"disclosed_at" IS NULL`))
+// asPlaced narrows a write of one hand-off to whether it was in its flaw's
+// case when it was read. A move leaves the visibility alone, so the visibility
+// does not say so.
+func (h Handoff) asPlaced() string {
+	if h.Moved() {
+		return `"moved_at" IS NOT NULL`
+	}
+	return `"moved_at" IS NULL`
 }
 
-// Unlink deletes the hand-off as it was read: its visibility, its flaw
-// undisclosed, and the last run to describe it. A move, a disclosure or a run
-// landing since is a lost race, answered with database.ErrGoAgain.
+// AsRead narrows an update of one hand-off to the row as it was read: its
+// visibility, whether it was moved, its flaw undisclosed, and the last run to
+// describe it. A move, an undo, a disclosure or a run landing since is a lost
+// race, which the retry reads again.
+func (h Handoff) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
+	return h.matchedOn(q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
+		Where(h.asPlaced()).Where(`"disclosed_at" IS NULL`))
+}
+
+// Unlink deletes the hand-off as it was read: its visibility, whether it was
+// moved, its flaw undisclosed, and the last run to describe it. A move, an
+// undo, a disclosure or a run landing since is a lost race, answered with
+// database.ErrGoAgain.
 func (h Handoff) Unlink(ctx context.Context, db bun.IDB) error {
 	q := db.NewDelete().Model((*Handoff)(nil)).
-		Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).Where(`"disclosed_at" IS NULL`)
+		Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).Where(h.asPlaced()).
+		Where(`"disclosed_at" IS NULL`)
 	if h.LastRunID == nil {
 		q = q.Where(`"last_run_id" IS NULL`)
 	} else {
@@ -246,12 +258,14 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 	}
 	var moved []Handoff
 	for _, h := range handed {
-		// Matched on the run it was read after: a run describing the lead
-		// since wrote source this transaction cannot see, and the retry
-		// strips it.
+		// Matched on whether it was moved and on the run it was read after:
+		// a lead taken out of the case since stays internal, and a run
+		// describing the lead since wrote source this transaction cannot
+		// see. The retry reads both again.
 		result, err := h.matchedOn(db.NewUpdate().Model((*Handoff)(nil)).
 			Set(`"disclosed_at" = ?`, now).
 			Where(`"id" = ?`, h.ID).
+			Where(h.asPlaced()).
 			Where(`"disclosed_at" IS NULL`)).
 			Exec(ctx)
 		if err != nil {
@@ -287,6 +301,7 @@ func leadsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int
 		Set(`"visibility" = ?`, access.Public).
 		Where(`"id" IN (?)`, bun.List(ids)).
 		Where(`"visibility" = ?`, access.Internal).
+		Where(`"moved_at" IS NOT NULL`).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record the leads disclosed with their flaw: %w", err)

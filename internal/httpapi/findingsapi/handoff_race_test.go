@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -150,5 +151,47 @@ func TestAWithdrawalLosingToAHandOffIsRefused(t *testing.T) {
 		if live == 0 {
 			t.Error("the confirmation a hand-off rests on was withdrawn beside it")
 		}
+	})
+}
+
+// A move undone after a disclosure read the lead's hand-off and before the
+// disclosure writes it leaves the lead internal: the disclosure is asked
+// again, finds the lead kept, and leaves it where it is.
+func TestAnUndoneMoveLandingWhileADisclosureAppliesKeepsTheLeadInternal(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, true)
+		movement := askToDisclose(t, r, flaw)
+		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "lead_handoff", 3*time.Second, func() error {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+				return fmt.Errorf("undoing the move answered %d: %s", got.Code, got.Body)
+			}
+			return nil
+		})
+		subject, err := r.Rights.Resolve(t.Context(), "private-dispatcher")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = finding.NewStore(hooked).AgreeToMovement(t.Context(), subject, movement)
+		if rivalErr := rival(); rivalErr != nil {
+			t.Fatal(rivalErr)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		var held []string
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."visibility"`).
+			Where(`"f"."place_identity" = ?`, place).Scan(t.Context(), &held); err != nil {
+			t.Fatal(err)
+		}
+		var claims []string
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision" AS "de"`).ColumnExpr(`"de"."visibility"`).
+			Where(`"de"."place_identity" = ?`, place).Scan(t.Context(), &claims); err != nil {
+			t.Fatal(err)
+		}
+		if len(held) == 0 || len(claims) == 0 || slices.ContainsFunc(append(held, claims...), func(v string) bool { return v != "internal" }) {
+			t.Errorf("the lead's findings are %v and its claims %v; want both internal, the lead taken out of the case", held, claims)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodGet, leadAt(place), ""),
+			http.StatusNotFound)
 	})
 }
