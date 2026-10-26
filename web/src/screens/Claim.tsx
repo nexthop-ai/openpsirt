@@ -68,7 +68,8 @@ export function Claim({ who }: { who: Who }) {
   const again = () => void queries.invalidateQueries({ queryKey: ["claim", id] });
   // Reading a claim about internal material is not arguing it: the flaw's
   // readers read a moved lead's claims and take no part in them. A comment
-  // takes triage or approval there, and a link takes triage.
+  // takes triage or approval there, and a link, a revision and a withdrawal
+  // take triage.
   const here = mayOf(who, it.place.product ?? "");
   const comments = !it.internal || !!(here?.triages_internal || here?.agrees_internal);
   const links = !it.internal || !!here?.triages_internal;
@@ -105,7 +106,7 @@ export function Claim({ who }: { who: Who }) {
       </div>
 
       <Argument claim={it} id={id} links={links} onChanged={again} />
-      <Reasoning claim={it} about={about} onChanged={again} />
+      <Reasoning claim={it} about={about} onChanged={again} writes={links} />
       <Reaffirm claim={it} id={id} mine={mine} />
       <Answer claim={it} mine={mine} onAnswered={again} />
       <HoldBack claim={it} mine={mine} onHeld={again} />
@@ -408,10 +409,12 @@ function Reasoning({
   claim,
   about,
   onChanged,
+  writes,
 }: {
   claim: Claimed;
   about: { product: string; vulnerability: string };
   onChanged: () => void;
+  writes: boolean;
 }) {
   const id = claim.claim.id;
   // The card names the screen so the reasoning block is styled as something
@@ -428,6 +431,7 @@ function Reasoning({
         undisclosed={!!claim.undisclosed}
         internal={!!claim.internal}
         onDone={onChanged}
+        writes={writes}
       />
     </div>
   );

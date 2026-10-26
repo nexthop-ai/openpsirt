@@ -189,6 +189,7 @@ describe("a claim about internal material read by somebody who may not argue it"
             claim: { id: 4, proposed_by: "ana" },
             place: { product: "sonic", vulnerability: "clang-tidy/leak" },
             argument: { outcome: "confirmed" },
+            happened: "waiting",
             internal: true,
             issues: 1,
             places: 1,
@@ -202,15 +203,31 @@ describe("a claim about internal material read by somebody who may not argue it"
     await settle();
     const text = mount.host().textContent ?? "";
     const buttons = Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent);
-    return { comments: text.includes("Add a comment"), links: buttons.includes("Link it") };
+    return {
+      comments: text.includes("Add a comment"),
+      links: buttons.includes("Link it"),
+      revises: buttons.includes("Revise reasoning") && buttons.includes("Withdraw"),
+    };
   }
 
-  it("offers no comment box and no link to somebody who only reads it", async () => {
-    expect(await drawn({ reads_private: true })).toEqual({ comments: false, links: false });
+  it("offers no comment box, link, revision or withdrawal to somebody who only reads it", async () => {
+    expect(await drawn({ reads_private: true })).toEqual({
+      comments: false,
+      links: false,
+      revises: false,
+    });
   });
 
-  it("offers a comment box to an approver and both to a triager", async () => {
-    expect(await drawn({ agrees_internal: true })).toEqual({ comments: true, links: false });
-    expect(await drawn({ triages_internal: true })).toEqual({ comments: true, links: true });
+  it("offers a comment box to an approver and every write to a triager", async () => {
+    expect(await drawn({ agrees_internal: true })).toEqual({
+      comments: true,
+      links: false,
+      revises: false,
+    });
+    expect(await drawn({ triages_internal: true })).toEqual({
+      comments: true,
+      links: true,
+      revises: true,
+    });
   });
 });
