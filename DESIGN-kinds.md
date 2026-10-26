@@ -33,7 +33,7 @@ what is particular to analyzer results is in `DESIGN-analysis.md`.
 | Place identity | Component and consumer (`DESIGN-data-model.md` § Place identity) | Component and consumer | A lead identity, minted at the first sighting and carried by matching |
 | Carry across builds | Version and chain match (REQ-25) | Stated by a person | Matching (`DESIGN-analysis.md`) |
 | Absence | The run closes it, with a reason | Nothing; a person closes it | Not reproduced; the finding stays open |
-| Visibilities | Public, private | Private, public | Internal; private once moved into a case, and public once its flaw is disclosed |
+| Visibilities | Public, private | Private, public | Internal, and public once its flaw is disclosed |
 
 The issue kinds are data the code reads: a producer's names resolve among the
 ones its kind declares. What absence means is what each kind's own reader

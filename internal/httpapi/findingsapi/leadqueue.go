@@ -60,7 +60,7 @@ type LeadsAsked struct {
 	State   LeadState `query:"state" doc:"List the leads in one state. Left out, the queue"`
 	// Assigned is the findings list's parameter and value for work nobody
 	// holds, so the two read alike.
-	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out"`
+	Assigned LeadAssignee `query:"assigned" doc:"Limit to the leads with no holder on the build each row names. Every count is then of those leads"`
 }
 
 // scoped resolves what is asked for against what the reader may see. A

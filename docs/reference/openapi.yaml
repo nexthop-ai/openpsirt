@@ -24810,12 +24810,12 @@ paths:
               - confirmed
               - handed-off
             type: string
-        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
           explode: false
           in: query
           name: assigned
           schema:
-            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
             enum:
               - nobody
             type: string
@@ -24912,12 +24912,12 @@ paths:
               - confirmed
               - handed-off
             type: string
-        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+        - description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
           explode: false
           in: query
           name: assigned
           schema:
-            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out
+            description: Limit to the leads with no holder on the build each row names. Every count is then of those leads
             enum:
               - nobody
             type: string

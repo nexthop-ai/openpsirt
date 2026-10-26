@@ -236,7 +236,7 @@ line is withheld as internal (§ The notification list).
 | Agreeing to a dismissal of a lead tells nobody, and withdrawing one tells only where it was agreed to | An approval is what was asked for. A withdrawal puts work back in the queue, and a dismissal nobody agreed to never took it out |
 | A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 | A lead assigned names the analyzer's rule, its path and line, and the build it was assigned from | The line is internal work, and names no more than the lead's page |
-| A lead open at internal and at private visibility is withheld as internal | Its recipient reads both, and a reader of undisclosed work reads no internal row |
+| A lead assigned is withheld as internal while it is open at internal visibility | Its recipient reads it at every visibility it holds, and a reader of disclosed work reads no internal row |
 | A standing rule waiting for approval is one condition per rule | It dismisses nothing while it waits, so every lead it names stays in the queue, and one approval answers all of them |
 | Leads in a team's queue are counted one per place, for each team and product, apart from the team's other queued work, and the condition names the team | A lead is one piece of work at its place (`DESIGN-kinds.md` § Consumers). Kept apart, a member reading only disclosed work is told of the disclosed queue and nothing of the internal one |
 | A lead a claim stands on, or one handed off as a flaw, is not waiting | A claim is somebody judging it, and a handed-off lead is closed work for its holder |

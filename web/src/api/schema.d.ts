@@ -20330,7 +20330,7 @@ export interface operations {
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out */
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
                 assigned?: "nobody";
                 /** @description The number returned */
                 limit?: number;
@@ -20376,7 +20376,7 @@ export interface operations {
                 series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads, and a lead in a case you are not on is left out */
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
                 assigned?: "nobody";
             };
             header?: never;
