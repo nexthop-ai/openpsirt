@@ -9,8 +9,9 @@ import { ROUTES as NAMED } from "../../app/routes";
 import { classesOf } from "../../ui/outcomes";
 import { PUBLISHED } from "../../test/outcomes";
 
-// The outcomes the server calls dismissals, as a session answer publishes them.
-const DISMISSING = classesOf(PUBLISHED).dismissing;
+// The outcomes that always need a second person, as a session answer
+// publishes them.
+const GATED = classesOf(PUBLISHED).gated;
 
 // The router's patterns as a list, because what is asked here is whether an
 // address matches any of them rather than which.
@@ -37,7 +38,7 @@ describe("the catalog and the addresses that answer it", () => {
   // find the same page.
   it("lists each address once", () => {
     const whole = { product: "sonic", stream: "master", variant: "broadcom" };
-    const addresses = CATALOG.map((report) => leadsTo(report, whole, DISMISSING).to);
+    const addresses = CATALOG.map((report) => leadsTo(report, whole, GATED).to);
     expect(addresses.length).toBeGreaterThan(0);
     expect(new Set(addresses).size).toBe(addresses.length);
   });
@@ -52,7 +53,7 @@ describe("where a catalog row leads", () => {
   it("addresses a report the catalog owns by its name", () => {
     const overview = CATALOG.find((report) => report.slug === "program-overview");
     expect(overview).toBeDefined();
-    expect(leadsTo(overview!, {}, DISMISSING)).toEqual({
+    expect(leadsTo(overview!, {}, GATED)).toEqual({
       to: "/reports/program-overview",
       needs: null,
     });
@@ -60,8 +61,8 @@ describe("where a catalog row leads", () => {
 
   it("says what to pick rather than leading nowhere", () => {
     const compare = CATALOG.find((report) => report.name === "Release comparison")!;
-    expect(leadsTo(compare, {}, DISMISSING)).toEqual({ to: null, needs: "product" });
-    expect(leadsTo(compare, { product: "sonic" }, DISMISSING)).toEqual({
+    expect(leadsTo(compare, {}, GATED)).toEqual({ to: null, needs: "product" });
+    expect(leadsTo(compare, { product: "sonic" }, GATED)).toEqual({
       to: "/products/sonic/comparison",
       needs: null,
     });
@@ -72,22 +73,20 @@ describe("where a catalog row leads", () => {
     // A product alone is not enough: the screen exists for one build and no
     // other, so an entry into it on a partial scope would open on a selection
     // that means nothing.
-    expect(leadsTo(upgrades, { product: "sonic" }, DISMISSING)).toEqual({
+    expect(leadsTo(upgrades, { product: "sonic" }, GATED)).toEqual({
       to: null,
       needs: "build",
     });
-    expect(leadsTo(upgrades, { product: "sonic", stream: "master" }, DISMISSING).needs).toBe(
-      "build",
-    );
+    expect(leadsTo(upgrades, { product: "sonic", stream: "master" }, GATED).needs).toBe("build");
     const whole = { product: "sonic", stream: "master", variant: "broadcom" };
-    expect(leadsTo(upgrades, whole, DISMISSING).to).toBe(
+    expect(leadsTo(upgrades, whole, GATED).to).toBe(
       "/products/sonic/streams/master/variants/broadcom/pending-upgrades",
     );
   });
 
   it("leads somewhere that needs nothing picked", () => {
     const disclosing = CATALOG.find((report) => report.name === "Disclosing")!;
-    expect(leadsTo(disclosing, {}, DISMISSING).to).toBe("/disclosing");
+    expect(leadsTo(disclosing, {}, GATED).to).toBe("/disclosing");
   });
 });
 
@@ -113,7 +112,7 @@ describe("every address a report leads to", () => {
     const leading = CATALOG.filter((report) => report.to);
     expect(leading.length).toBeGreaterThan(0);
     for (const report of leading) {
-      const address = report.to?.(anywhere, DISMISSING) ?? "";
+      const address = report.to?.(anywhere, GATED) ?? "";
       const [path] = address.split("?");
       const hit = ROUTES.some((pattern) => matchPath(pattern, path ?? "") !== null);
       expect(hit, `${report.name} leads to ${address}, which matches no route`).toBe(true);
@@ -142,11 +141,11 @@ describe("what a catalog row carries with it", () => {
   // the same name.
   it("carries the product into the record", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
-    const wide = leadsTo(exception, {}, DISMISSING).to!;
+    const wide = leadsTo(exception, {}, GATED).to!;
     expect(wide).toContain("alone=true");
     expect(wide).not.toContain("product=");
 
-    const narrowed = leadsTo(exception, { product: "sonic" }, DISMISSING).to!;
+    const narrowed = leadsTo(exception, { product: "sonic" }, GATED).to!;
     expect(narrowed).toContain("product=sonic");
     // And the filters the entry exists for are still on it.
     expect(narrowed).toContain("alone=true");
@@ -154,23 +153,26 @@ describe("what a catalog row carries with it", () => {
   });
 
   // An outcome typed here and not the server's would go uncounted while the
-  // record said no dismissal stands alone.
-  it("asks the record about every outcome the server calls a dismissal, and no other", () => {
+  // record said no dismissal stands alone. A lead's dismissal needs a second
+  // person as a vulnerability's does, so the exception report asks for both.
+  it("asks the record about every outcome that always needs a second person, a lead's included", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
-    const asked = new URL(leadsTo(exception, {}, DISMISSING).to!, "http://x").searchParams;
-    expect(DISMISSING.length).toBeGreaterThan(0);
-    expect(asked.getAll("outcome")).toEqual(DISMISSING);
+    const asked = new URL(leadsTo(exception, {}, GATED).to!, "http://x").searchParams;
+    expect(GATED.length).toBeGreaterThan(0);
+    expect(asked.getAll("outcome")).toEqual(GATED);
+    expect(asked.getAll("outcome")).toEqual(expect.arrayContaining(["dismissed", "not-security"]));
+    expect(asked.getAll("outcome")).not.toContain("confirmed");
     expect(leadsTo(exception, {}, ["wont-fix"]).to).toBe("/record?alone=true&outcome=wont-fix");
   });
 
-  it("leads nowhere before the server has said which outcomes dismiss", () => {
+  it("leads nowhere before the server has said which outcomes need a second person", () => {
     const exception = CATALOG.find((report) => report.name === "The exception report")!;
     expect(leadsTo(exception, {}, []).to).toBeNull();
   });
 
   it("carries it into an address that has no query of its own yet", () => {
     const changes = CATALOG.find((report) => report.name === "Administrative changes")!;
-    expect(leadsTo(changes, { product: "sonic" }, DISMISSING).to).toBe("/record?product=sonic");
-    expect(leadsTo(changes, {}, DISMISSING).to).toBe("/record");
+    expect(leadsTo(changes, { product: "sonic" }, GATED).to).toBe("/record?product=sonic");
+    expect(leadsTo(changes, {}, GATED).to).toBe("/record");
   });
 });

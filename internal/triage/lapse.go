@@ -220,12 +220,14 @@ func markLapsed(ctx context.Context, tx bun.IDB, ids []int64, moment time.Time) 
 // pairing does not make it less so.
 //
 // Written inside the transaction that records the pairing, so a pairing is
-// never recorded with the claim on it left standing.
-func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []string, moment time.Time) (int64, error) {
+// never recorded with the claim on it left standing. Who proposed each is
+// returned for the caller to tell once the transaction commits.
+func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []string, moment time.Time) (Lapsed, error) {
+	var out Lapsed
 	if len(places) == 0 {
-		return 0, nil
+		return out, nil
 	}
-	var total int64
+	var lapsed []int64
 	for start := 0; start < len(places); start += database.BatchSize {
 		batch := places[start:min(start+database.BatchSize, len(places))]
 		var ids []int64
@@ -237,16 +239,30 @@ func LapseLeads(ctx context.Context, tx bun.IDB, productID int64, places []strin
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
 			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
 			Scan(ctx, &ids); err != nil {
-			return total, fmt.Errorf("read the claims on leads paired probably: %w", err)
+			return out, fmt.Errorf("read the claims on leads paired probably: %w", err)
 		}
 		if len(ids) == 0 {
 			continue
 		}
 		n, err := markLapsed(ctx, tx, ids, moment.Truncate(time.Microsecond))
 		if err != nil {
-			return total, fmt.Errorf("lapse the claims on leads paired probably: %w", err)
+			return out, fmt.Errorf("lapse the claims on leads paired probably: %w", err)
 		}
-		total += n
+		out.Rows += n
+		lapsed = append(lapsed, ids...)
 	}
-	return total, nil
+	if len(lapsed) == 0 {
+		return out, nil
+	}
+	// Read in the transaction that lapsed them, so a retry reads who to tell
+	// again rather than trusting a list from a world that is gone.
+	told, err := NewStore(tx).proposersOfAll(ctx, lapsed, database.InBulk.Most)
+	if err != nil {
+		return out, err
+	}
+	for i := range told {
+		told[i].Probable = true
+	}
+	out.Told = told
+	return out, nil
 }

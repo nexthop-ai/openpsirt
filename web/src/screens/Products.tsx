@@ -16,7 +16,7 @@ import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
-import { productAt, streamsAt } from "../app/routes";
+import { productAt, repositoriesAt, streamsAt } from "../app/routes";
 import { UpstreamDrawer } from "./Upstream";
 
 // You pick a product first, and everything below is bound to it. What each one
@@ -338,6 +338,13 @@ export function Products({ who }: { who: Who }) {
                           >
                             Upstream
                           </button>
+                          <Link
+                            to={repositoriesAt(product.name ?? "")}
+                            className="linkish"
+                            title="The hosts its source links open on, and which source is kept."
+                          >
+                            Repositories
+                          </Link>
                           <button
                             type="button"
                             className="linkish"

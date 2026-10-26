@@ -849,6 +849,8 @@ export interface paths {
          *
          *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
          *
+         *     A lead past its end of life is not re-made, and a claim at no other place is refused with 409.
+         *
          *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
          *
          *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
@@ -3466,6 +3468,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/lead-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count leads by analyzer series
+         * @description Returns one entry per analyzer series the product holds, ordered by name, with how many of its leads stand in each state across every build of the product. A series with no leads is listed with every count zero.
+         *
+         *     Each count is the total the lead list answers for the same `series` and `state`.
+         *
+         *     Refused, with no count, to anybody who does not read internal material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires internal-read on the product.
+         */
+        get: operations["list-lead-series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/leads": {
         parameters: {
             query?: never;
@@ -3479,11 +3507,37 @@ export interface paths {
          *
          *     With no `state` it is the queue: open leads with no claim waiting for a second person. A lead in the baseline is left out until it is pulled in, its path is marked important, or another analyzer reports the same flaw. `state` lists the leads in one state instead, which is how the baseline is searched. `fixed` lists the leads closed on a build and not opened anew there.
          *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. `stream` and `variant` are optional and independent. Supports limit and offset.
+         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, pulling it in and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. Supports limit and offset.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/leads.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export static analysis leads
+         * @description The lead list as a file: every row the same filters would list, not one page of them, in the same order.
+         *
+         *     Read with your own visibility, as it is written. A lead in a case you are not on is a row with an empty message and `withheld` true. No row carries source text.
+         *
+         *     With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-leads"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4193,7 +4247,7 @@ export interface paths {
         };
         /**
          * List uploaded analyzer runs and their status
-         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see.
+         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
          *
          *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
          *
@@ -5579,7 +5633,7 @@ export interface paths {
          *
          *     Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
          *
-         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
+         *     Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there. A lead past its end of life is not re-made, and a claim at no other place refuses the whole act with 409.
          *
          *     Bounded over the whole act, promises to upgrade aside. The issues it covers count against `triage.agreed-issues` where no claim goes back to an approver, and against `triage.review-issues` where any does; the findings it writes count against `triage.write-ceiling`. At most 2000 claims per request. `reasoning` is required.
          *
@@ -6347,7 +6401,7 @@ export interface paths {
          *
          *     A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
          *
-         *     Narrowed to the claims you may still argue about, every lapsed row of them.
+         *     Narrowed to the claims you may still argue about, every lapsed row of them. A lapsed row at a lead past its end of life is not counted, and a claim with no other is not listed.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may act on.
          */
@@ -7083,10 +7137,10 @@ export interface components {
             /** @description The series the run belongs to */
             series: string;
             /**
-             * @description What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, held because it would mark too much not reproduced at once, or failed
+             * @description What became of it: queued to be applied, waiting for the build's inventory to be read, applied, superseded by a run built later, or failed
              * @enum {string}
              */
-            status: "queued" | "waiting" | "applied" | "superseded" | "held" | "failed";
+            status: "queued" | "waiting" | "applied" | "superseded" | "failed";
             /** @description The analyzer that ran */
             tool?: string;
             /** @description Its version */
@@ -7100,8 +7154,21 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AnalysisReceiptBody"][] | null;
+            /** @description For each series, the last upload to this build that was turned away, newest first */
+            refused: components["schemas"]["AnalysisRefusalBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        AnalysisRefusalBody: {
+            /**
+             * Format: date-time
+             * @description When it was turned away
+             */
+            at: string;
+            /** @description What the sender was told */
+            reason: string;
+            /** @description The series as the upload named it. Empty where it was turned away before naming one */
+            series: string;
         };
         AnalysisResult: {
             /**
@@ -7603,7 +7670,7 @@ export interface components {
             may_hide: boolean;
             /** @description Read findings here at any visibility */
             may_see: boolean;
-            /** @description Argue about a finding here at any visibility */
+            /** @description Argue about a disclosed or undisclosed finding here */
             may_triage: boolean;
             /** @description The label shown for it */
             name: string;
@@ -7920,7 +7987,7 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
-            /** @description Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it */
+            /** @description Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and a place of it is not a lead past its end of life */
             reaffirmable?: boolean;
             /**
              * Format: int64
@@ -10041,6 +10108,8 @@ export interface components {
             not_seen?: string;
             /** @description Whether the lead is open on the build */
             open: boolean;
+            /** @description Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off */
+            past_end_of_life?: boolean;
             /** @description The other places the analyzer names */
             related: components["schemas"]["LeadPlace"][] | null;
             /** @description The analyzer's rule, as <tool>/<rule> */
@@ -10233,6 +10302,24 @@ export interface components {
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
         };
+        LeadSeriesBody: {
+            /**
+             * Format: int64
+             * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
+             */
+            ruled: number;
+            /** @description The series' name, as its producer first sent it */
+            series: string;
+            /** @description The series' leads by where they stand, every state named. A lead on two builds in two states counts in both */
+            states: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Open leads a claim waiting for a second person leaves out of the queue, counted among the open in states
+             */
+            waiting: number;
+        };
         LeadsOutputBody: {
             /**
              * Format: uri
@@ -10241,6 +10328,11 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadRowBody"][] | null;
+            /**
+             * Format: int64
+             * @description Open leads left out of the queue because every release they are open in is past its end of life. Zero for a list by state
+             */
+            past_end_of_life: number;
             /**
              * Format: int64
              * @description Dismissed leads an approved standing rule covers, counted among the dismissed in states
@@ -10310,6 +10402,15 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["LeadRuleBody"][] | null;
+        };
+        "List-lead-seriesResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-lead-seriesResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["LeadSeriesBody"][] | null;
         };
         "List-set-aside-workResponse": {
             /**
@@ -11168,7 +11269,7 @@ export interface components {
              * @description What it is about
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-escalated" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed";
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
@@ -11315,7 +11416,7 @@ export interface components {
              * @description The notifications that go here, or * for all of them
              * @enum {string}
              */
-            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
+            kind: "assigned" | "mentioned" | "sent-back" | "build-quiet" | "holding-absent" | "critical-on-release" | "disclosure-due" | "disclosure-near" | "statement-revised" | "claim-waiting" | "sent-back-waiting" | "deferral-ending" | "queue-untaken" | "approval-undone" | "approval-withdrawn" | "claim-lapsed" | "merge-superseded" | "brought-in" | "disclosed" | "unanswered-report" | "vulnerability-data-stale" | "risk-unagreed" | "pairs-concentrated" | "supplier-silent" | "upstream-failing" | "upstream-recovered" | "inventory-moved" | "analysis-dropped" | "analysis-not-comparable" | "analysis-quiet" | "lead-escalated" | "lead-handed-off" | "lead-moved" | "rule-outgrown" | "obligation-open" | "obligation-near" | "obligation-passed" | "*";
             /** @description The name as it was typed. Matched without regard to capitals, so retiring it takes any spelling */
             name: string;
             /**
@@ -12250,11 +12351,8 @@ export interface components {
              * @description Results the build held open that the run reported again
              */
             seen: number;
-            /**
-             * Format: int64
-             * @description How many a held run would have marked not reproduced
-             */
-            would_mark?: number;
+            /** @description Whether the run marked more of the build's open results not reproduced than the deployment expects of one run, which tells the product's internal readers */
+            sharp_drop?: boolean;
         };
         ReceiptBody: {
             /** @description The build time the producer states, or the time the upload arrived where it states none */
@@ -20052,6 +20150,37 @@ export interface operations {
             };
         };
     };
+    "list-lead-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-seriesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-leads": {
         parameters: {
             query?: {
@@ -20059,6 +20188,8 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
                 /** @description List the leads in one state. Left out, the queue */
                 state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
                 /** @description The number returned */
@@ -20082,6 +20213,45 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LeadsOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "baseline" | "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

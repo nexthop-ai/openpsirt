@@ -99,7 +99,8 @@ func registerAnalyses(api huma.API, in core.Deps) {
 				_, _, err := admittedAnalysis(hc.Context(), in, hc.Param("product"), hc.Param("stream"), hc.Param("variant"))
 				return err
 			},
-			Limit: core.Fixed(analysisLimits(in).MaxBytes + core.Envelope),
+			Limit:   core.Fixed(analysisLimits(in).MaxBytes + core.Envelope),
+			Refused: analysisRefusedBeforeReading(in),
 		})},
 		DefaultStatus: http.StatusAccepted,
 	}, core.PerProduct, "A pipeline key covering this product, branch and variant sends without it, "+
@@ -125,6 +126,16 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	if err != nil {
 		return nil, err
 	}
+	// Every refusal past this point is recorded against the build and the
+	// series, as far as the upload got in naming it.
+	seriesName := strings.TrimSpace(parts.Series)
+	refused := func(answer error) error {
+		var said huma.StatusError
+		if errors.As(answer, &said) && said.GetStatus() < http.StatusInternalServerError {
+			analysisRefused(ctx, in, subject, named, seriesName, answer.Error())
+		}
+		return answer
+	}
 
 	var files []huma.FormFile
 	for _, part := range parts.SARIF {
@@ -133,9 +144,9 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		}
 	}
 	if most := analysisDocuments(in); len(files) > most {
-		return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
+		return nil, refused(huma.Error422UnprocessableEntity(fmt.Sprintf(
 			"that run carries %d documents, and this deployment reads %d; merge a tool's per-unit documents into one before sending",
-			len(files), most))
+			len(files), most)))
 	}
 
 	var retired string
@@ -148,8 +159,8 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
 	}
 	if retired != "" {
-		return nil, huma.NewError(http.StatusConflict, fmt.Sprintf(
-			"%s is retired and takes no analysis; declare it again to bring it back", retired))
+		return nil, refused(huma.NewError(http.StatusConflict, fmt.Sprintf(
+			"%s is retired and takes no analysis; declare it again to bring it back", retired)))
 	}
 
 	depth, err := in.Queue.Depth(ctx, queue.Analyze)
@@ -167,17 +178,18 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 
 	given, err := statedBeside(parts)
 	if err != nil {
-		return nil, huma.Error422UnprocessableEntity(err.Error())
+		return nil, refused(huma.Error422UnprocessableEntity(err.Error()))
 	}
 	logs, digests, err := readAnalysis(files, analysisLimits(in))
-	var refused refusal.Refusal
+	var turned refusal.Refusal
 	switch {
-	case errors.As(err, &refused):
-		return nil, huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error())
+	case errors.As(err, &turned):
+		return nil, refused(huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error()))
 	case err != nil:
 		return nil, core.WentWrong(in.Logger, "the upload could not be read", err)
 	}
 	stated := analysis.Describe(logs, given)
+	seriesName = strings.TrimSpace(stated.Series)
 	hash := analysis.RunHash(digests, stated.BuiltAt)
 	repositories, err := sourcelink.NewStore(in.DB.DB).Config(ctx, named.ProductID)
 	if err != nil {
@@ -186,8 +198,8 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	placed, err := analysis.Place(logs, strings.TrimSpace(parts.SourceRoot), analysisLimits(in).MaxBytes,
 		repositories.Snippets)
 	switch {
-	case errors.As(err, &refused):
-		return nil, huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error())
+	case errors.As(err, &turned):
+		return nil, refused(huma.Error422UnprocessableEntity("the upload could not be read: " + err.Error()))
 	case err != nil:
 		return nil, core.WentWrong(in.Logger, "the upload could not be placed", err)
 	}
@@ -225,8 +237,8 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):
 		return nil, huma.NewError(http.StatusServiceUnavailable, err.Error())
-	case errors.As(err, &refused):
-		return nil, huma.Error422UnprocessableEntity(err.Error())
+	case errors.As(err, &turned):
+		return nil, refused(huma.Error422UnprocessableEntity(err.Error()))
 	case err != nil:
 		return nil, core.WentWrong(in.Logger, "the upload could not be recorded", err)
 	}
@@ -314,6 +326,46 @@ func readAnalysis(files []huma.FormFile, limits sarif.Limits) ([]sarif.Log, []st
 		digests = append(digests, hex.EncodeToString(digest.Sum(nil)))
 	}
 	return logs, digests, nil
+}
+
+// analysisRefused records that an analyzer upload to a build was turned away,
+// against the series as far as the upload named it.
+//
+// Best-effort, as a scan refusal is: a note about something that already
+// failed, where failing the failure would turn a refusal the sender needs to
+// read into a fault they cannot.
+func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, named *catalog.Named,
+	name, reason string) {
+
+	target, err := catalog.NewStore(in.DB.DB).TargetFor(ctx, named.StreamID, named.VariantID)
+	if err == nil {
+		var credential *string
+		if sender := ingest.Sender(subject); sender != "" {
+			credential = &sender
+		}
+		err = series.NewStore(in.DB.DB).Refused(ctx, series.Refusal{
+			TargetID: target.ID, Series: name, Kind: kind.Analysis, Reason: reason, Credential: credential,
+		})
+	}
+	if err != nil {
+		in.Log().ErrorContext(ctx, "could not record that an analyzer upload was refused",
+			"error", err, "product", named.Product)
+	}
+}
+
+// analysisRefusedBeforeReading records an analyzer upload the form bound
+// turned away before the operation ran. The bound asks it only once the
+// sender has been admitted to the build.
+func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, string) {
+	return func(hctx huma.Context, reason string) {
+		ctx := hctx.Context()
+		subject, named, err := admittedAnalysis(ctx, in, hctx.Param("product"), hctx.Param("stream"),
+			hctx.Param("variant"))
+		if err != nil {
+			return
+		}
+		analysisRefused(ctx, in, subject, named, "", reason)
+	}
 }
 
 // admittedAnalysis is the sender and the build an analyzer upload names. A

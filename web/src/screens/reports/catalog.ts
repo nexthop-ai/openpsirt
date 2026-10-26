@@ -41,10 +41,11 @@ export type Report = {
   answers: string;
   // The address it is read at. A report the catalog owns is at its slug; one
   // that points elsewhere builds its address from the selection, so the scope
-  // picker is not asked for twice. The outcomes the server calls dismissals
-  // are passed in for an entry that asks about them; an entry that cannot
-  // be asked yet answers nothing.
-  to?: (at: Scoped, dismissing: readonly string[]) => string | null;
+  // picker is not asked for twice. The outcomes that always need a second
+  // person, about a vulnerability, a flaw or a lead, are passed in for an
+  // entry that asks about them; an entry that cannot be asked yet answers
+  // nothing.
+  to?: (at: Scoped, gated: readonly string[]) => string | null;
   // What it needs picked, for a report that cannot span.
   needs?: Needs;
 };
@@ -112,21 +113,25 @@ export const GROUPS: Group[] = [
         // come back empty, and the record's own empty state is written as that
         // answer.
         name: "The exception report",
-        answers: "Dismissals with no standing agreement from a second person. Should be empty.",
+        answers:
+          "Dismissals of vulnerabilities, flaws and leads with no standing agreement from a second person. Should be empty.",
         // The product the catalog is being read for, carried into the record.
         // The record reads its narrowing from the address alone, and without
         // the product it answers for every product the reader can see.
-        // Every outcome the server calls a dismissal, as it publishes them:
-        // asked of a list typed here, an outcome the server adds would go
-        // uncounted while the record said none stood alone. Before the
-        // server has said, there is nothing to ask.
-        to: (at, dismissing) =>
-          dismissing.length === 0
+        // Every outcome that always needs a second person, as the server
+        // publishes them: a lead's dismissal is one, beside the dismissals of
+        // a vulnerability. Asked of a list typed here, an outcome the server
+        // adds would go uncounted while the record said none stood alone.
+        // Before the server has said, there is nothing to ask. A claim about
+        // a lead is internal, and the record lists it only to somebody who
+        // reads internal material in its product.
+        to: (at, gated) =>
+          gated.length === 0
             ? null
             : withProduct(
                 new URLSearchParams([
                   ["alone", "true"],
-                  ...dismissing.map((outcome) => ["outcome", outcome]),
+                  ...gated.map((outcome) => ["outcome", outcome]),
                 ]).toString(),
                 at,
               ),
@@ -155,6 +160,13 @@ export const GROUPS: Group[] = [
         slug: "scan-coverage",
         name: "Scan coverage",
         answers: "What is being scanned, when each build was last seen, and what has gone quiet.",
+      },
+      {
+        slug: "leads-by-analyzer",
+        name: "Leads by analyzer",
+        answers: "How many static analysis leads each analyzer holds, and where they stand.",
+        // A series is one product's, and its leads are internal to it.
+        needs: "product",
       },
       {
         name: "Match coverage",
@@ -261,12 +273,12 @@ function lacks(needs: Needs | undefined, at: Scoped): Needs | null {
 export function leadsTo(
   report: Report,
   at: Scoped,
-  dismissing: readonly string[],
+  gated: readonly string[],
 ): { to: string | null; needs: Needs | null } {
   const needs = lacks(report.needs, at);
   if (needs) return { to: null, needs };
   if (report.slug) return { to: reportAt(report.slug), needs: null };
-  return { to: report.to?.(at, dismissing) ?? null, needs: null };
+  return { to: report.to?.(at, gated) ?? null, needs: null };
 }
 
 // What a sheet counted by product alone covers. Its reads take a product and no

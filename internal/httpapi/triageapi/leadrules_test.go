@@ -6,12 +6,15 @@ package triageapi_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -176,6 +179,27 @@ func leadRunWithSecondLeak() string {
 			`"region":{"startLine":4}}}]},`, 1)
 }
 
+// outgrownTold sweeps, and is how many outgrown rules a person holds.
+func outgrownTold(t *testing.T, r *httpapitest.Reach, who string) int {
+	t.Helper()
+	if _, _, err := notify.NewWatch(r.DB.DB, slog.New(slog.NewTextHandler(io.Discard, nil))).Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	var theirs struct {
+		Items []struct {
+			Kind string `json:"kind"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, "/v1/notifications", &theirs)
+	n := 0
+	for _, item := range theirs.Items {
+		if item.Kind == string(notify.RuleOutgrown) {
+			n++
+		}
+	}
+	return n
+}
+
 func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.LeadRuleGrowth, "1"); err != nil {
@@ -206,8 +230,21 @@ func TestAStandingRuleThatOutgrowsItsApprovalAsksForItAgain(t *testing.T) {
 		if got := leadsOf(t, r, "internal-reader", "?state=dismissed"); got.Ruled != 2 || len(got.Items) != 2 {
 			t.Errorf("an outgrown rule dismisses %+v; want both leads still", got)
 		}
+		// Whoever may approve it again is told, and its proposer is not.
+		if n := outgrownTold(t, r, "internal-reviewer"); n != 1 {
+			t.Errorf("an internal approver holds %d outgrown rules; want 1", n)
+		}
+		if n := outgrownTold(t, r, "internal-triager"); n != 0 {
+			t.Errorf("the rule's proposer holds %d outgrown rules; want none", n)
+		}
+		if n := outgrownTold(t, r, "internal-reader"); n != 0 {
+			t.Errorf("an internal reader who may not approve holds %d outgrown rules; want none", n)
+		}
 		if again := approveLeadRule(t, r, rule.ID); again.State != "in-force" || *again.Approved != 2 {
 			t.Errorf("approved again, the rule is %+v; want in force at two", again)
+		}
+		if n := outgrownTold(t, r, "internal-reviewer"); n != 0 {
+			t.Errorf("approved again, the rule is still told as outgrown %d times", n)
 		}
 
 		retire := fmt.Sprintf("%s/%d", leadRulesAt, rule.ID)

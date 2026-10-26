@@ -12,16 +12,20 @@ const (
 	onKey      = "key"
 	onFunction = "function"
 	onLine     = "line"
+	// onUnprinted is a re-baseline's pairing on the whole key without its
+	// fingerprint, where one result and one lead hold it.
+	onUnprinted = "unprinted"
 )
 
 // strong is whether a pairing on this layer is strong.
-func strong(on string) bool { return on == onKey }
+func strong(on string) bool { return on == onKey || on == onUnprinted }
 
 // candidate is a lead a result may be paired with, as its newest sighting
 // described it.
 type candidate struct {
 	findingID   int64
 	key         string
+	unprinted   string
 	functionKey string
 	lineKey     string
 	line        int
@@ -46,6 +50,19 @@ type pairing struct {
 // apart, one the last comparable run saw comes before one it missed, and then
 // the older lead.
 func pair(candidates []candidate, results []Keyed) []pairing {
+	return layered(candidates, results, false)
+}
+
+// pairAcross is pair for a re-baseline. After the whole key, a result and a
+// lead holding the whole key without its fingerprint are paired strongly
+// where they are the only result and the only lead holding it; the rest fall
+// to the probable layers. A rotated salt changes every fingerprint and nothing
+// else, so a key nothing else holds is the same result.
+func pairAcross(candidates []candidate, results []Keyed) []pairing {
+	return layered(candidates, results, true)
+}
+
+func layered(candidates []candidate, results []Keyed, rebaseline bool) []pairing {
 	takenC := make([]bool, len(candidates))
 	takenR := make([]bool, len(results))
 	var out []pairing
@@ -70,6 +87,11 @@ func pair(candidates []candidate, results []Keyed) []pairing {
 		{onKey, func(c candidate) string { return c.key }, func(k Keyed) string { return k.Key }},
 		{onFunction, func(c candidate) string { return c.functionKey }, func(k Keyed) string { return k.FunctionKey }},
 	} {
+		// A re-baseline's unique keys come after the whole key and before
+		// anything probable.
+		if layer.on == onFunction && rebaseline {
+			unique(candidates, results, takenC, takenR, &out)
+		}
 		waiting := map[string][]int{}
 		for _, c := range order {
 			if k := layer.ofC(candidates[c]); !takenC[c] && k != "" {
@@ -153,4 +175,29 @@ func pair(candidates []candidate, results []Keyed) []pairing {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].result < out[j].result })
 	return out
+}
+
+// unique pairs, strongly, each result and lead left untaken that are the only
+// result and the only lead holding their whole key without its fingerprint.
+func unique(candidates []candidate, results []Keyed, takenC, takenR []bool, out *[]pairing) {
+	leads := map[string][]int{}
+	for c, cand := range candidates {
+		if !takenC[c] && cand.unprinted != "" {
+			leads[cand.unprinted] = append(leads[cand.unprinted], c)
+		}
+	}
+	held := map[string][]int{}
+	for r, res := range results {
+		if !takenR[r] && res.UnprintedKey != "" {
+			held[res.UnprintedKey] = append(held[res.UnprintedKey], r)
+		}
+	}
+	for k, rs := range held {
+		if len(rs) != 1 || len(leads[k]) != 1 {
+			continue
+		}
+		r, c := rs[0], leads[k][0]
+		takenC[c], takenR[r] = true, true
+		*out = append(*out, pairing{result: r, candidate: c, on: onUnprinted})
+	}
 }

@@ -143,8 +143,8 @@ export function Catalog() {
 // beneath, where it would read as part of the description.
 function Entry({ report }: { report: Report }) {
   const at = useScope();
-  const { dismissing } = useOutcomes();
-  const { to, needs } = leadsTo(report, at, dismissing);
+  const { gated } = useOutcomes();
+  const { to, needs } = leadsTo(report, at, gated);
   return (
     <li>
       <div className="catalog-name">

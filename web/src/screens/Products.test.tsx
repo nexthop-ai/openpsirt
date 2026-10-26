@@ -116,6 +116,16 @@ describe("the products an administrator manages", () => {
     expect(init.body).toEqual({ share: 40, approvers: 0 });
   });
 
+  it("opens the product's repository settings from its row", async () => {
+    await drawn();
+    const links = Array.from(host().querySelectorAll("a")).filter(
+      (each) => each.textContent === "Repositories",
+    );
+    expect(links.map((each) => each.getAttribute("href"))).toEqual([
+      "/products/sonic/repositories",
+    ]);
+  });
+
   it("retires the product the row names", async () => {
     const writes = await drawn();
     await press(host(), "Retire");
@@ -131,6 +141,8 @@ describe("the products somebody else reads", () => {
     const words = Array.from(host().querySelectorAll("button")).map((each) => each.textContent);
     expect(words).not.toContain("Edit");
     expect(words).not.toContain("Retire");
+    const links = Array.from(host().querySelectorAll("a")).map((each) => each.textContent);
+    expect(links).not.toContain("Repositories");
     expect(host().textContent).toContain("deployment’s");
   });
 });

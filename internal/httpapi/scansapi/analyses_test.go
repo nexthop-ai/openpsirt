@@ -187,3 +187,55 @@ func TestTheTextAProducerStatesIsRecordedAtAnyLength(t *testing.T) {
 		}
 	})
 }
+
+func TestAnAnalyzerUploadTurnedAwayIsRecordedAgainstItsSeries(t *testing.T) {
+	httpapitest.IngestOn(t, dbtest.Two, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		for _, fields := range []map[string]string{
+			{"series": "nightly", "built": "yesterday"},
+			{"series": "nightly", "exit-status": "zero"},
+			nil,
+		} {
+			if code, _, body := sendRun(t, f, []string{clangRun}, fields); code != http.StatusUnprocessableEntity {
+				t.Fatalf("answered %d (%s); want 422", code, body)
+			}
+		}
+		req := httptest.NewRequest(http.MethodGet, analyses(f), nil)
+		rec := httptest.NewRecorder()
+		f.Handler.ServeHTTP(rec, f.Sending(req))
+		var listed struct {
+			Refused []scansapi.AnalysisRefusalBody `json:"refused"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &listed); err != nil {
+			t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+		}
+		got := map[string]string{}
+		for _, r := range listed.Refused {
+			got[r.Series] = r.Reason
+		}
+		if len(got) != 2 || !strings.Contains(got["nightly"], "whole number") ||
+			!strings.Contains(got[""], "names no series") {
+			t.Errorf("refused %+v; want the last refusal of nightly and the one naming no series", listed.Refused)
+		}
+	})
+}
+
+func TestAnAnalyzerUploadFromSomebodyNotAdmittedIsRecordedNowhere(t *testing.T) {
+	// Signed in and reading the product's internal work, but not triaging
+	// it, so the upload is refused by admission rather than before it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
+			httpapitest.Part{Field: "series", Content: "stranger"})
+		got := r.Post(t, "internal-reader", http.MethodPost,
+			"/v1/products/mine/streams/master/variants/broadcom/analyses", body, form)
+		if got.Code != http.StatusForbidden {
+			t.Fatalf("an upload from somebody who does not triage internal work answered %d: %s", got.Code, got.Body)
+		}
+		held, err := r.DB.DB.NewSelect().TableExpr(`"series_refusal"`).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d refusals were recorded for an upload its sender was not admitted to send", held)
+		}
+	})
+}

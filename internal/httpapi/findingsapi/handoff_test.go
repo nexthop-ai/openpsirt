@@ -477,3 +477,44 @@ func TestAMoveLandingWhileARunAppliesTakesTheSightingTheRunOpened(t *testing.T) 
 		}
 	})
 }
+
+// toldOf is the bodies of one kind a person holds.
+func toldOf(t *testing.T, r *httpapitest.Reach, who, kind string) []string {
+	t.Helper()
+	var theirs struct {
+		Items []struct {
+			Kind string `json:"kind"`
+			Body string `json:"body"`
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, "/v1/notifications", &theirs)
+	var out []string
+	for _, item := range theirs.Items {
+		if item.Kind == kind {
+			out = append(out, item.Body)
+		}
+	}
+	return out
+}
+
+func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place, flaw := httpapitest.HandedOffLead(t, r, false)
+		if got := toldOf(t, r, "internal-triager", "lead-handed-off"); len(got) != 1 ||
+			!strings.Contains(got[0], "handed off as a flaw") || strings.Contains(got[0], flaw) {
+			t.Errorf("the internal triager was told %q; want the hand-off without its flaw", got)
+		}
+		for _, who := range []string{"lead-handler", "internal-reader", "private-triage"} {
+			if got := toldOf(t, r, who, "lead-handed-off"); len(got) != 0 {
+				t.Errorf("%s was told %q; want nothing", who, got)
+			}
+		}
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			t.Fatalf("the move answered %d: %s", got.Code, got.Body)
+		}
+		if got := toldOf(t, r, "internal-triager", "lead-moved"); len(got) != 1 ||
+			!strings.Contains(got[0], "moved into its flaw's case") || strings.Contains(got[0], flaw) {
+			t.Errorf("the internal triager was told %q; want the move without its flaw", got)
+		}
+	})
+}

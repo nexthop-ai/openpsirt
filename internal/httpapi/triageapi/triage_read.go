@@ -38,7 +38,7 @@ type ClaimDetail struct {
 	When         string        `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
 	By           string        `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
 	ByName       string        `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, and nothing has replaced it"`
+	Reaffirmable bool          `json:"reaffirmable,omitempty" doc:"Whether you may re-affirm it now: it is yours, it lapsed, nothing has replaced it, and a place of it is not a lead past its end of life"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`

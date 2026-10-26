@@ -42,6 +42,10 @@ export function Lead() {
   if (lead.isError) return <Failed error={lead.error} what="The lead could not be read." />;
   const evidence = lead.data;
   const at = evidence.at;
+  // A lead seen only in releases past their end of life is kept as it stands.
+  // A move of one already handed off concerns its flaw, and stays offered.
+  const ended = !!evidence.past_end_of_life;
+  const acts = triages && !ended;
 
   return (
     <div>
@@ -53,6 +57,7 @@ export function Lead() {
             {product} · {stream} · {variant}
           </Link>{" "}
           <span className={`state ${LEAD_TONES[evidence.state]}`}>{stateSaid(evidence.state)}</span>
+          {ended && <span className="state closed"> Past end of life</span>}
         </p>
       </div>
 
@@ -105,7 +110,12 @@ export function Lead() {
 
       <Kin build={build} evidence={evidence} />
 
-      <Handoff build={build} place={place} evidence={evidence} handsOff={handsOff} />
+      <Handoff
+        build={build}
+        place={place}
+        evidence={evidence}
+        handsOff={handsOff && (!ended || evidence.state === "handed-off")}
+      />
 
       {!evidence.withheld && evidence.state !== "handed-off" && (
         <div className="card">
@@ -123,13 +133,13 @@ export function Lead() {
                 </Link>
               )}
             </p>
-          ) : triages && evidence.open ? (
+          ) : acts && evidence.open ? (
             <DecideForm build={build} place={place} />
           ) : (
             <p className="hint">None.</p>
           )}
-          {triages && evidence.state === "baseline" && <Escalate product={product} place={place} />}
-          {triages && evidence.state === "not-reproduced" && evidence.open && (
+          {acts && evidence.state === "baseline" && <Escalate product={product} place={place} />}
+          {acts && evidence.state === "not-reproduced" && evidence.open && (
             <FixForm build={build} place={place} />
           )}
         </div>

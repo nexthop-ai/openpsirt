@@ -71,6 +71,7 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		ProposedAt  time.Time `bun:"proposed_at"`
 		Rows        int       `bun:"rows_written"`
 		PrivateRows int       `bun:"private_rows"`
+		Internal    int       `bun:"internal_rows"`
 	}
 	err = claimRollup(w.db, "rows_written").
 		ColumnExpr(`MIN("de"."id") AS "decision_id"`).
@@ -92,15 +93,17 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 
 	now := time.Now().UTC()
 	for _, row := range rows {
-		private := row.PrivateRows > 0
+		split := rowsOf(row.Rows, row.PrivateRows, row.Internal)
+		private, internal := split.told()
 		days := int(now.Sub(row.ProposedAt).Hours() / 24)
 		holds := Holds{
 			About: identify(fmt.Sprintf("claim-waiting %d", row.ClaimID)),
 			Body: fmt.Sprintf("A claim in %s has been waiting %s for a second person. "+
 				"It covers %s and takes effect only once somebody agrees to it.",
 				row.Product, plainly(days), rowsWritten(row.Rows)),
-			Link:    weblink.ReviewQueue(),
-			Private: private,
+			Link:     weblink.ReviewQueue(),
+			Private:  private,
+			Internal: internal,
 			// A claim is one product and, in bulk, many issues, so it names
 			// the product and no single issue.
 			ProductID: &row.ProductID,
@@ -113,7 +116,7 @@ func (w *sweep) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 				continue
 			}
 			at := per[row.ProductID]
-			if !at.approvesAll(row.Rows-row.PrivateRows, row.PrivateRows) {
+			if !at.approvesAll(split) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -222,6 +225,7 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		SentBackAt  time.Time `bun:"sent_back_at"`
 		Rows        int       `bun:"rows_written"`
 		PrivateRows int       `bun:"private_rows"`
+		Internal    int       `bun:"internal_rows"`
 	}
 	err = claimRollup(w.db, "rows_written").
 		ColumnExpr(`MIN("de"."sent_back_at") AS "sent_back_at"`).
@@ -241,12 +245,13 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 
 	now := time.Now().UTC()
 	for _, row := range rows {
-		private := row.PrivateRows > 0
+		split := rowsOf(row.Rows, row.PrivateRows, row.Internal)
+		private, internal := split.told()
 		at := reach[row.ProposedBy][row.ProductID]
 		// A proposer who has since lost the reading that made the claim
 		// possible hears nothing. The condition is about a finding, and an
 		// alert is not a way back in.
-		if !at.readsAll(row.Rows-row.PrivateRows, row.PrivateRows) {
+		if !at.readsAll(split) {
 			continue
 		}
 		days := int(now.Sub(row.SentBackAt).Hours() / 24)
@@ -257,6 +262,7 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 				row.Product, plainly(days)),
 			Link:      weblink.ReviewQueueMine(),
 			Private:   private,
+			Internal:  internal,
 			ProductID: &row.ProductID,
 		})
 	}
@@ -269,9 +275,9 @@ func (w *sweep) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 // public, so a message about them carries no detail. Each sweep adds the
 // conditions and the columns of its own.
 //
-// A row is about an issue of the kinds the findings told about are filed
-// under, so a claim about a lead is told nobody: its rule is an issue of no
-// such kind.
+// A row is about an issue of the kinds claims are made about, leads'
+// rules included. A claim on a lead is internal work, counted apart so that
+// its audience is the product's internal readers.
 //
 // The withheld rows are counted rather than taken from an aggregate over
 // the word itself. A visibility is a name, and MIN over names would answer "is
@@ -281,13 +287,14 @@ func claimRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "de"."product_id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "de"."vulnerability_id"`).
-		Where(`"vu"."kind" IN (?)`, bun.List(kind.IssuesOf(kind.Notifications.Kinds()...))).
+		Where(`"vu"."kind" IN (?)`, bun.List(kind.IssuesOf(kind.Decisions.Kinds()...))).
 		ColumnExpr(`"de"."claim_id" AS "claim_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
 		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
+		ColumnExpr(access.InternalCountAs(`"de"."visibility"`, "internal_rows")).
 		GroupExpr(`"de"."claim_id", "de"."product_id", "de"."proposed_by"`)
 }
 
@@ -315,6 +322,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		Until       time.Time `bun:"until"`
 		Places      int       `bun:"places"`
 		PrivateRows int       `bun:"private_rows"`
+		Internal    int       `bun:"internal_rows"`
 	}
 	err = claimRollup(w.db, "places").
 		// The argument, which is where the date lives.
@@ -344,9 +352,10 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	}
 
 	for _, row := range rows {
-		private := row.PrivateRows > 0
+		split := rowsOf(row.Places, row.PrivateRows, row.Internal)
+		private, internal := split.told()
 		at := reach[row.ProposedBy][row.ProductID]
-		if !at.readsAll(row.Places-row.PrivateRows, row.PrivateRows) {
+		if !at.readsAll(split) {
 			continue
 		}
 		out[row.ProposedBy] = append(out[row.ProposedBy], Holds{
@@ -356,6 +365,7 @@ func (w *sweep) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 				row.Product, day(row.Until), rowsWritten(row.Places)),
 			Link:      weblink.ReviewQueueMine(),
 			Private:   private,
+			Internal:  internal,
 			ProductID: &row.ProductID,
 		})
 	}

@@ -80,6 +80,17 @@ func WithheldCountAs(column, name string) (string, any) {
 	return count + as("WithheldCountAs", name), arg
 }
 
+// InternalCountAs is an aggregate counting the rows of a group that are
+// internal work, selected under a name, with the argument it binds. A reader
+// of undisclosed work reads none of them, so an audience is asked about them
+// apart.
+func InternalCountAs(column, name string) (string, any) {
+	if !visibilityColumns[column] {
+		panic("access.InternalCountAs: " + column + " is not a visibility column")
+	}
+	return "COUNT(CASE WHEN " + column + " = ? THEN 1 END)" + as("InternalCountAs", name), string(Internal)
+}
+
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.
 func AnyPrivateAs(column, name string) (string, any) {
 	cond, arg := AnyPrivate(column)

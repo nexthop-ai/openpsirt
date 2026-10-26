@@ -8,6 +8,7 @@ import { Backlog } from "./Backlog";
 import { Compliance } from "./Compliance";
 import { Coverage } from "./Coverage";
 import { Effort } from "./Effort";
+import { LeadSeries } from "./LeadSeries";
 import { Overview } from "./Overview";
 import { Published } from "./Published";
 import { Register } from "./Register";
@@ -26,6 +27,7 @@ import { own } from "../../ui/own";
 export const PAGES: Record<string, ReactElement> = {
   "program-overview": <Overview />,
   "scan-coverage": <Coverage />,
+  "leads-by-analyzer": <LeadSeries />,
   "releases-out-of-support": <Support />,
   "approval-quality": <Scrutiny />,
   "deadline-compliance": <Compliance />,

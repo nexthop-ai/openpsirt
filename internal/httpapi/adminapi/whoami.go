@@ -37,7 +37,7 @@ type CanBody struct {
 	ReadsPublic       bool   `json:"reads_public" doc:"Read findings that have been disclosed"`
 	ReadsPrivate      bool   `json:"reads_private" doc:"Read findings nobody has disclosed yet"`
 	ReadsInternal     bool   `json:"reads_internal" doc:"Read internal findings, which are never disclosed"`
-	MayTriage         bool   `json:"may_triage" doc:"Argue about a finding here at any visibility"`
+	MayTriage         bool   `json:"may_triage" doc:"Argue about a disclosed or undisclosed finding here"`
 	TriagesPublic     bool   `json:"triages_public" doc:"Argue about a finding that has been disclosed"`
 	TriagesInternal   bool   `json:"triages_internal" doc:"Argue about an internal finding"`
 	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`

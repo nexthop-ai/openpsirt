@@ -5,7 +5,9 @@ package findingsapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -52,6 +54,7 @@ type LeadEvidenceBody struct {
 	Kin       []LeadKin          `json:"kin" doc:"Other analyzers' leads on the build that are the same flaw, and those that possibly are"`
 	Decision  *core.DecisionBody `json:"decision,omitempty" doc:"The live claim at the lead, agreed to or waiting for a second person. Absent where there is none"`
 	Withheld  bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
+	Ended     bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off"`
 	Handoff   *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
 }
 
@@ -135,6 +138,12 @@ func registerLeads(api huma.API, in core.Deps) {
 			Open: lead.ClosedAt == nil, LastSeen: core.Stamp(evidence.LastSeen), NotSeen: core.StampAt(evidence.NotSeen),
 			Compare: evidence.Compare, Unchanged: evidence.Unchanged, State: LeadState(evidence.State),
 			Kin: make([]LeadKin, 0, len(evidence.Kin)), Withheld: evidence.Stub,
+		}
+		switch err := finding.LeadEnded(ctx, in.DB.DB, named.ProductID, lead.PlaceIdentity, time.Now().UTC()); {
+		case errors.Is(err, finding.ErrLeadPastEndOfLife):
+			body.Ended = true
+		case err != nil:
+			return nil, core.WentWrong(in.Logger, "whether that lead's releases are in support could not be read", err)
 		}
 		if !evidence.Stub {
 			if body.Handoff, err = leadHandoff(ctx, in, subject, named.ProductID, lead.PlaceIdentity); err != nil {

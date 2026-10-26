@@ -54,6 +54,9 @@ type importantPath struct {
 type Escalated struct {
 	By int64
 	At time.Time
+	// Fresh says this request pulled it in, rather than finding it already
+	// pulled in.
+	Fresh bool
 }
 
 // Escalate pulls a product's lead into the queue on every build it is on.
@@ -86,6 +89,9 @@ func Escalate(ctx context.Context, db bun.IDB, subject access.Subject, productID
 				return access.Denied(fmt.Sprintf("pull a lead in product %d into the queue", productID))
 			}
 		}
+		if err := finding.LeadEnded(ctx, tx, productID, placeIdentity, now); err != nil {
+			return err
+		}
 		row := escalation{ProductID: productID, PlaceIdentity: placeIdentity,
 			EscalatedBy: subject.ID, EscalatedAt: now.UTC().Truncate(time.Microsecond)}
 		if err := database.InBatchesKeeping(ctx, tx, []escalation{row}); err != nil {
@@ -99,6 +105,7 @@ func Escalate(ctx context.Context, db bun.IDB, subject access.Subject, productID
 			return fmt.Errorf("read the lead pulled in: %w", err)
 		}
 		out.By, out.At = kept.EscalatedBy, kept.EscalatedAt
+		out.Fresh = kept.EscalatedBy == row.EscalatedBy && kept.EscalatedAt.Equal(row.EscalatedAt)
 		return nil
 	})
 	if err != nil {

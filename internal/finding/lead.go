@@ -8,12 +8,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -129,6 +131,9 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 		if lead.Absent == nil {
 			return ErrStillSeen
 		}
+		if err := LeadEnded(ctx, tx, productID, placeIdentity, now); err != nil {
+			return err
+		}
 		result, err := tx.NewUpdate().Model((*Finding)(nil)).
 			Set(`"closed_at" = ?`, now).
 			Set(`"closed_by" = ?`, subject.ID).
@@ -151,4 +156,56 @@ func (s *Store) FixLead(ctx context.Context, subject access.Subject, targetID in
 		return nil, err
 	}
 	return out, nil
+}
+
+// ErrLeadPastEndOfLife refuses a change to a lead every release it was seen
+// in is past its end of life. It is kept as it stands.
+var ErrLeadPastEndOfLife = refusal.New("every release this lead was seen in is past its end of life, so it is kept as it stands")
+
+// LeadInSupport is the condition, as SQL, under which LeadEnded accepts a
+// change to the lead at a place in a product at a moment: the place holds no
+// lead, or a lead of it is in a release not past its end of life. The product
+// and the place are columns of the caller's query, quoted as it names them.
+func LeadInSupport(product, place string, at time.Time) (string, []any) {
+	kinds, kindArgs := kind.Leads.Where(`"lsf"."kind"`)
+	past, pastArgs := catalog.PastEndOfLife("lss", "lsp", at)
+	seen := `SELECT 1 FROM "finding" AS "lsf"
+		JOIN "target" AS "lst" ON "lst"."id" = "lsf"."target_id"
+		JOIN "stream" AS "lss" ON "lss"."id" = "lst"."stream_id"
+		JOIN "product" AS "lsp" ON "lsp"."id" = "lss"."product_id"
+		WHERE "lss"."product_id" = ` + product + ` AND "lsf"."place_identity" = ` + place + ` AND ` + kinds
+	args := append(slices.Clone(kindArgs), kindArgs...)
+	args = append(args, pastArgs...)
+	return `(NOT EXISTS (` + seen + `) OR EXISTS (` + seen + ` AND NOT ` + past + `))`, args
+}
+
+// LeadEnded refuses, with ErrLeadPastEndOfLife, a change to the lead at a
+// place in a product where every release it was seen in is past its end of
+// life at now. A lead seen nowhere is left to the caller's own answer.
+func LeadEnded(ctx context.Context, db bun.IDB, productID int64, placeIdentity string, now time.Time) error {
+	kinds, kindArgs := kind.Leads.Where(`"f"."kind"`)
+	var streams []int64
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "t" ON "t"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "s" ON "s"."id" = "t"."stream_id"`).
+		ColumnExpr(`DISTINCT "t"."stream_id"`).
+		Where(`"s"."product_id" = ?`, productID).
+		Where(`"f"."place_identity" = ?`, placeIdentity).
+		Where(kinds, kindArgs...).
+		Scan(ctx, &streams); err != nil {
+		return fmt.Errorf("read the releases a lead was seen in: %w", err)
+	}
+	if len(streams) == 0 {
+		return nil
+	}
+	ended, err := catalog.NewStore(db).StreamsPastEndOfLife(ctx, now)
+	if err != nil {
+		return err
+	}
+	for _, id := range streams {
+		if !slices.Contains(ended, id) {
+			return nil
+		}
+	}
+	return ErrLeadPastEndOfLife
 }

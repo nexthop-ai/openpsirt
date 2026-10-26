@@ -90,11 +90,12 @@ func StatementsV0110(engine database.Engine) map[string][]string {
 		"vulnerability": vulnerabilityV0110(t),
 		"finding":       findingV0110(t),
 		"graph_node":    graphNodeV0110(t),
+		"notification":  notificationV0110(t),
 	}
 	for table, declared := range map[string][]string{
 		"series": seriesV0110(t), "series_run": seriesV0110(t), "series_document": seriesV0110(t),
 		"series_document_chunk": seriesV0110(t), "series_module": seriesV0110(t),
-		"sighting": seriesV0110(t), "analysis_result": analysisV0110(t),
+		"sighting": seriesV0110(t), "series_refusal": seriesV0110(t), "analysis_result": analysisV0110(t),
 		"analysis_location": analysisV0110(t),
 		"lead_escalation":   leadV0110(t), "lead_important_path": leadV0110(t), "lead_rule": leadV0110(t),
 		"rule_rating": leadV0110(t), "rule_family": leadV0110(t),

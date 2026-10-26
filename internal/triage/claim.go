@@ -406,6 +406,8 @@ type ClaimApproved struct {
 	// decision holds the product — so it is read off the rows that moved,
 	// for whoever has to say what the telling about them is about.
 	ReturnedIn int64
+	// ReturnedInternal says at least one row set aside is internal work.
+	ReturnedInternal bool
 }
 
 // ApproveClaim records a second person agreeing to a claim: every decision in
@@ -506,6 +508,7 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 
 	var approving, returning []int64
 	var returnedIn int64
+	var returnedInternal bool
 	for _, row := range rows {
 		if row.State != Proposed {
 			continue
@@ -520,6 +523,9 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 			}
 			returning = append(returning, row.ID)
 			returnedIn = row.ProductID
+			if row.Visibility == access.Internal {
+				returnedInternal = true
+			}
 			continue
 		}
 		// A row already with the author is not waiting on an approver, and
@@ -555,6 +561,7 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 		}
 		result.Returned = returned
 		result.ReturnedIn = returnedIn
+		result.ReturnedInternal = returnedInternal
 	}
 	return result, nil
 }
@@ -820,6 +827,8 @@ type SentBack struct {
 	// row being public says nothing about the rest, and what may leave
 	// this deployment is decided by the most careful row in the set.
 	Undisclosed bool
+	// Internal says at least one row is internal work, on the same terms.
+	Internal bool
 }
 
 // SendBackClaim asks the author for more before agreeing to any of a claim.
@@ -871,6 +880,9 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			// claim's identity and not for this.
 			if row.Visibility != access.Public {
 				result.Undisclosed = true
+			}
+			if row.Visibility == access.Internal {
+				result.Internal = true
 			}
 			ids = append(ids, row.ID)
 		}

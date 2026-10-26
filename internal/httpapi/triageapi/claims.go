@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -88,6 +89,10 @@ func registerClaims(api huma.API, in core.Deps) {
 				// words about an embargo landing in a mail
 				// server.
 				Private: true,
+				// Withheld as internal where any row set aside is
+				// internal work, which a reader of undisclosed work
+				// alone does not read.
+				Internal: done.ReturnedInternal,
 				// The product the returned rows are in, which
 				// is what a later read narrows by.
 				ProductID: &done.ReturnedIn,
@@ -132,6 +137,11 @@ func registerClaims(api huma.API, in core.Deps) {
 			if d, ok := described[back.Decision.ID]; ok {
 				link = weblink.Finding(d.Product, d.Stream, d.Variant,
 					d.Issue.Identifier, d.Component, d.Version)
+				// A rule names no finding page; its lead is addressed by
+				// its place.
+				if d.Issue.Kind == kind.Rule {
+					link = weblink.Lead(d.Product, d.Stream, d.Variant, back.Decision.PlaceIdentity)
+				}
 			}
 		} else if err != nil {
 			in.Log().Error("could not say which finding a sent-back claim is about",
@@ -149,7 +159,8 @@ func registerClaims(api huma.API, in core.Deps) {
 				// than off its representative row: that row is
 				// chosen by identifier and a claim's rows need
 				// not agree.
-				Private: back.Undisclosed,
+				Private:  back.Undisclosed,
+				Internal: back.Internal,
 				// Off the representative row, which is a row of
 				// this claim and so names its product and its
 				// issue.
@@ -237,6 +248,8 @@ func registerReaffirmClaim(api huma.API, in core.Deps) {
 			"`triage.agreed-issues` where nothing goes back to an approver, and against " +
 			"`triage.review-issues` where anything does; the findings it writes count against " +
 			"`triage.write-ceiling`.\n\n" +
+			"A lead past its end of life is not re-made, and a claim at no other place is " +
+			"refused with 409.\n\n" +
 			"A place that is open nowhere any more is not re-made, which is a finding that " +
 			"closed rather than a fault. `reasoning` is required.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,

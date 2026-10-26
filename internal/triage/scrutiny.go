@@ -528,7 +528,7 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 		ColumnExpr(`COUNT(DISTINCT "de"."claim_id") AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr(`"cl"."outcome" IN (?)`, bun.List(OutcomesDismissing())).
+			return q.WhereOr(`"cl"."outcome" IN (?)`, bun.List(closingUnconditionally())).
 				WhereOr(`"de"."needs_approval" = ?`, true)
 		}).
 		Where(standing, held...).
@@ -538,4 +538,18 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 		return 0, 0, fmt.Errorf("count what hides risk with nobody agreeing: %w", err)
 	}
 	return counted.Claims, counted.Rows, nil
+}
+
+// closingUnconditionally is what the condition counts whatever the gate's
+// verdict: the vulnerability outcomes that dismiss, and a lead dismissed or
+// called no security issue. Each closes the question and always needs a
+// second person.
+func closingUnconditionally() []Outcome {
+	out := OutcomesDismissing()
+	for _, each := range LeadOutcomes() {
+		if each.HidesRisk() {
+			out = append(out, each)
+		}
+	}
+	return out
 }

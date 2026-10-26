@@ -275,6 +275,11 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		{Unanswered, s.unanswered, "whose report nobody has answered"},
 		// A critical against something already shipped.
 		{CriticalOnRelease, s.criticalOnReleases, "what is critical on a release"},
+		// An analyzer whose absences are not evidence, or that stopped.
+		{AnalysisNotComparable, s.analysesNotComparable, "which analyzer runs could not be compared"},
+		{AnalysisQuiet, s.analysesQuiet, "which analyzers have gone quiet"},
+		// A standing rule on leads covering more than was agreed to.
+		{RuleOutgrown, s.rulesOutgrown, "which standing rules on leads have outgrown their approval"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {

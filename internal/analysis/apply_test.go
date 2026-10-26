@@ -241,19 +241,7 @@ func spread(n int) []sent {
 	return out
 }
 
-// sightings is every sighting the build's leads have.
-func (w *world) sightings(t *testing.T, targetID int64) []series.Sighting {
-	t.Helper()
-	var rows []series.Sighting
-	if err := w.DB.DB.NewSelect().Model(&rows).
-		Join(`JOIN "finding" AS "f" ON "f"."id" = "si"."finding_id"`).
-		Where(`"f"."target_id" = ?`, targetID).Scan(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	return rows
-}
-
-// drops sets the share and floor a run is held past.
+// drops sets the share and floor past which a run is a sharp drop.
 func (w *world) drops(t *testing.T, share, floor string) {
 	t.Helper()
 	settings := setting.NewStore(w.DB.DB)
@@ -396,23 +384,23 @@ func TestARunBuiltBeforeTheLastAppliedIsSuperseded(t *testing.T) {
 	})
 }
 
-func TestARunThatWouldMarkMostOfABuildIsHeld(t *testing.T) {
+func TestARunThatMarksMostOfABuildIsAppliedAndToldOnce(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
+		var told []Drop
+		w.applier.TellingDrops(func(_ context.Context, d Drop) { told = append(told, d) })
 		w.inventory(t, w.Target.ID)
 		w.drops(t, "50", "1")
 		start := time.Now().UTC().Add(-3 * time.Hour)
 		w.send(t, w.Target.ID, start, document([]sent{inFRR, inSWSS}, 10))
 		run, status := w.send(t, w.Target.ID, start.Add(time.Hour), document(nil, 10))
-		if status != series.Held {
-			t.Fatalf("status %s; want held", status)
+		if status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
 		}
-		if r := receiptOf(t, run); r.WouldMark != 2 || r.NotReproduced != 0 {
-			t.Errorf("receipt %+v; want two it would mark and none marked", r)
+		if r := receiptOf(t, run); !r.SharpDrop || r.NotReproduced != 2 {
+			t.Errorf("receipt %+v; want a sharp drop that marked both", r)
 		}
-		for _, s := range w.sightings(t, w.Target.ID) {
-			if s.AbsentRunID != nil {
-				t.Errorf("finding %d marked not reproduced by a held run", s.FindingID)
-			}
+		if len(told) != 1 || told[0].RunID != run.ID || told[0].Missed != 2 || told[0].Live != 2 {
+			t.Errorf("told %+v; want this run once, two of two", told)
 		}
 	})
 }
@@ -438,8 +426,8 @@ func TestARunPastOnlyOneOfTheTwoDropBoundsIsApplied(t *testing.T) {
 				if status != series.Applied {
 					t.Fatalf("status %s; want applied", status)
 				}
-				if r := receiptOf(t, run); r.NotReproduced != c.missed {
-					t.Errorf("receipt %+v; want %d not reproduced", r, c.missed)
+				if r := receiptOf(t, run); r.NotReproduced != c.missed || r.SharpDrop {
+					t.Errorf("receipt %+v; want %d not reproduced and no sharp drop", r, c.missed)
 				}
 			})
 		})
@@ -786,9 +774,90 @@ func TestTheFirstRunOnABranchTakesThePlacesOfTheLineItWasCutFrom(t *testing.T) {
 	})
 }
 
+// dismissed records an approved dismissal at a lead's place.
+func (w *world) dismissed(t *testing.T, lead finding.Finding, at time.Time) *triage.Decision {
+	t.Helper()
+	ctx := t.Context()
+	by, err := access.NewStore(w.DB.DB).Ensure(ctx, "analyst@example.com", "analyst", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reason := string(triage.FalsePositive)
+	at = at.Truncate(time.Microsecond)
+	claim := &triage.Claim{Kind: triage.FindingClaim, ProposedBy: by.ID, ProposedAt: at,
+		Outcome: triage.Dismissed, Justification: &reason}
+	if _, err := w.DB.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Any key holding is live; the place identity fits the column.
+	live := lead.PlaceIdentity
+	decided := &triage.Decision{ClaimID: claim.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
+		PlaceIdentity: lead.PlaceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
+		NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
+	if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return decided
+}
+
+// stateOf is a decision's state now.
+func (w *world) stateOf(t *testing.T, id int64) triage.State {
+	t.Helper()
+	var after triage.Decision
+	if err := w.DB.DB.NewSelect().Model(&after).Where(`"de"."id" = ?`, id).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return after.State
+}
+
+func TestARotatedSaltLapsesTheDismissalsOfTiesAlone(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Target.ID)
+		start := time.Now().UTC().Add(-3 * time.Hour)
+		// One result alone under its key without the fingerprint, and two
+		// that share one: the same rule, file, message and function.
+		lone := inside{inFRR, "bgp_attr_parse", "a1"}
+		tied, twin := inside{inSWSS, "Orch::doTask", "b1"}, inside{inSWSS, "Orch::doTask", "b2"}
+		twin.line = 40
+		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{lone, tied, twin}, 10, "0123456789abcdef"))
+		leads := w.leads(t, w.Target.ID)
+		if len(leads) != 3 {
+			t.Fatalf("leads %+v; want three", leads)
+		}
+		decided := map[int64]*triage.Decision{}
+		for _, lead := range leads {
+			decided[lead.ID] = w.dismissed(t, lead, start.Add(time.Minute))
+		}
+
+		var heard []triage.ForPerson
+		w.applier.TellingLapses(func(_ context.Context, told []triage.ForPerson) { heard = append(heard, told...) })
+
+		// The salt rotates, so every fingerprint changes and nothing else.
+		lone.print, tied.print, twin.print = "c1", "c2", "c3"
+		run, _ := w.send(t, w.Target.ID, start.Add(time.Hour),
+			documentOf([]interface{ json() string }{lone, tied, twin}, 10, "fedcba9876543210"))
+		if r := receiptOf(t, run); !r.Rebaseline || r.Opened != 0 || r.Seen != 3 || r.Probable != 2 {
+			t.Errorf("receipt %+v; want a re-baseline seeing all three, the two ties probably", r)
+		}
+		on := w.matchedOn(t, w.Target.ID)
+		for _, lead := range leads {
+			want := triage.LapsedState
+			if lead.ID == leads[0].ID {
+				want = triage.Approved
+			}
+			if got := w.stateOf(t, decided[lead.ID].ID); got != want {
+				t.Errorf("lead %d paired on %q: dismissal %q; want %q", lead.ID, on[lead.ID], got, want)
+			}
+		}
+		// Its proposer is told once, of both, as internal work.
+		if len(heard) != 1 || heard[0].Rows != 2 || !heard[0].Probable || !heard[0].Internal {
+			t.Errorf("told %+v; want the proposer told once of two lapsed claims on leads", heard)
+		}
+	})
+}
+
 func TestADismissalLapsesOnABranchItsLeadIsCarriedToProbably(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
-		ctx := t.Context()
 		tag := w.TargetFor(w.Tag, w.Customer)
 		w.inventory(t, w.Target.ID)
 		w.inventory(t, tag.ID)
@@ -796,37 +865,15 @@ func TestADismissalLapsesOnABranchItsLeadIsCarriedToProbably(t *testing.T) {
 		w.send(t, w.Target.ID, start, document([]sent{inFRR}, 10))
 		lead := w.leads(t, w.Target.ID)[0]
 
-		// An approved dismissal at the lead's place.
-		by, err := access.NewStore(w.DB.DB).Ensure(ctx, "analyst@example.com", "analyst", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		reason := string(triage.FalsePositive)
-		at := start.Add(time.Minute).Truncate(time.Microsecond)
-		claim := &triage.Claim{Kind: triage.FindingClaim, ProposedBy: by.ID, ProposedAt: at,
-			Outcome: triage.Dismissed, Justification: &reason}
-		if _, err := w.DB.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		live := "live-dismissal"
-		decided := &triage.Decision{ClaimID: claim.ID, ProductID: w.Product.ID, VulnerabilityID: lead.VulnerabilityID,
-			PlaceIdentity: lead.PlaceIdentity, Visibility: access.Internal, State: triage.Approved, LiveKey: &live,
-			NeedsApproval: true, ProposedBy: by.ID, ProposedAt: at}
-		if _, err := w.DB.DB.NewInsert().Model(decided).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
+		decided := w.dismissed(t, lead, start.Add(time.Minute))
 
 		// The tag's first run carries the lead from the branch on its
 		// nearest line, which is probable.
 		moved := inFRR
 		moved.line += 3
 		w.send(t, tag.ID, start.Add(time.Hour), document([]sent{moved}, 10))
-		var after triage.Decision
-		if err := w.DB.DB.NewSelect().Model(&after).Where(`"de"."id" = ?`, decided.ID).Scan(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if after.State != triage.LapsedState {
-			t.Errorf("the dismissal of a lead carried probably is %q; want it lapsed", after.State)
+		if state := w.stateOf(t, decided.ID); state != triage.LapsedState {
+			t.Errorf("the dismissal of a lead carried probably is %q; want it lapsed", state)
 		}
 	})
 }
@@ -952,7 +999,7 @@ func TestARunReportingNothingLeavesTheFingerprintsAsTheyWere(t *testing.T) {
 		printed := inside{inFRR, "", "a1"}
 		w.send(t, w.Target.ID, start, documentOf([]interface{ json() string }{printed}, 10, salt))
 		// Short of its units, so it marks nothing not reproduced and is never
-		// held. Its salt mark alone says nothing of how results are
+		// a sharp drop. Its salt mark alone says nothing of how results are
 		// fingerprinted.
 		empty, _ := w.send(t, w.Target.ID, start.Add(time.Hour), documentOf(nil, 4, salt))
 		if empty.Fingerprints != "" {

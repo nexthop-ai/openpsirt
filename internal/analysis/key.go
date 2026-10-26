@@ -94,6 +94,9 @@ type Keyed struct {
 	Print  string
 	Chain  string
 	Key    string
+	// UnprintedKey is the whole key without the fingerprint or the line,
+	// which a re-baseline compares where one result and one lead hold it.
+	UnprintedKey string
 	// FunctionKey and LineKey are the probable keys: the rule, the path and
 	// the message without its digits, with the function, and with neither.
 	// FunctionKey is empty where the output names no function.
@@ -120,6 +123,7 @@ func key(rule string, p sarif.Placed) Keyed {
 	}
 	message := withoutDigits(p.Message)
 	k.Key = digest(rule, p.Path, where, message, p.Function, k.Chain)
+	k.UnprintedKey = digest(rule, p.Path, message, p.Function, k.Chain)
 	k.LineKey = digest(rule, p.Path, message)
 	if p.Function != "" {
 		k.FunctionKey = digest(rule, p.Path, message, "function "+p.Function)

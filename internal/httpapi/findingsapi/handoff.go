@@ -124,7 +124,8 @@ func refusedHandoff(in core.Deps, err error) error {
 		return huma.Error403Forbidden("not authorized")
 	case errors.Is(err, analysis.ErrHandedOff), errors.Is(err, analysis.ErrNotConfirmed),
 		errors.Is(err, analysis.ErrAlreadyMoved), errors.Is(err, analysis.ErrNotMoved),
-		errors.Is(err, analysis.ErrFlawDisclosed), errors.Is(err, analysis.ErrNotHandedOff):
+		errors.Is(err, analysis.ErrFlawDisclosed), errors.Is(err, analysis.ErrNotHandedOff),
+		errors.Is(err, finding.ErrLeadPastEndOfLife):
 		return huma.Error409Conflict(err.Error())
 	}
 	return refusedFlaw(in, err)
@@ -240,6 +241,10 @@ func registerHandoff(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, refusedHandoff(in, err)
 		}
+		if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadHandedOff,
+			ProductID: at.named.ProductID, Place: input.Place, By: subject.ID}); err != nil {
+			in.Log().Error("could not say that a lead was handed off", "error", err)
+		}
 		return &struct {
 			Status int
 			Body   HandedOffBody
@@ -272,6 +277,10 @@ func registerHandoff(api huma.API, in core.Deps) {
 			}
 			if err != nil {
 				return nil, refusedHandoff(in, err)
+			}
+			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadMoved,
+				ProductID: at.named.ProductID, Place: input.Place, By: at.subject.ID, Into: move}); err != nil {
+				in.Log().Error("could not say that a lead moved", "error", err)
 			}
 			return &struct{}{}, nil
 		}

@@ -1250,6 +1250,7 @@ is what the screen is about.
 | A product row says what it triages from | An administrator changes it there. Everybody sees it because it explains a number, and "deployment's" is shown rather than the deployment's current word, because following it and stating it are different things |
 | A product row says whether its documents are published | A box an administrator ticks, and a word for everybody else. What publishing serves is `DESIGN-publishing.md`'s |
 | A product row opens the upstream it trusts | An administrator's row action opens a drawer: the upstream as trusted, how reading it is going, a key it offers in place of the trusted one, a control to stop trusting it, and a field to name one. Naming one is two steps, check and then trust, so the key documents will be checked against is shown before anything is read. What an upstream is, is `DESIGN-upstream.md`'s |
+| A product row opens its repository settings | An administrator's row action, offered to nobody else. § The repositories screen holds the screen |
 | A product, a release and a variant are each corrected and retired from the list that declares them | An administrator edits a name, or takes the thing out of use, from the row. The release list of variants is what a release was built as rather than what the product declares, so it carries no control: correcting one thing in two places is how the two come to disagree |
 | A product's edit offers both of its names and says which one is fixed by publication | The name scans and documents use, and the name screens show. They move independently and only the first can be refused, so offering them together with one sentence beside them is what makes the difference visible at the moment somebody types |
 | A retired product says so on its own page | Nothing lists it, so the page is reached by a link somebody kept. Unmarked it reads as a product in use whose scans have quietly stopped. It is not the out-of-support date shown beside it: that is a date support ended on, and this is not tracked here at all |
@@ -1286,6 +1287,22 @@ carries the two builds picked there, and picks its own pair the same way.
 | The chosen kind is in the address | A link somebody shares opens the same narrowing |
 | The file is the narrowing on the screen | CSV and JSON take the same two builds and the same kind |
 | A build with no inventory is said in words | The server refuses rather than listing every name of the other build as added |
+
+### The repositories screen
+
+One product's repository settings, reached from its row in the products
+table. What the settings are and how they are checked is `DESIGN-analysis.md`
+§ Repository settings.
+
+| Rule | |
+|---|---|
+| An administrator's screen | The endpoint refuses anybody else, so for anybody else the screen reads nothing and says it is for administrators |
+| Hosts and paths are two tables edited in place, saved together | The endpoint replaces both at once. A row is added and removed in place, and nothing is sent until Save |
+| A host offers its two templates only where it is custom | A template left on a host changed from custom is not sent, because the server reads none there |
+| A path states each source setting as kept, not kept, or inherited | Inherited is sent as the setting left out, which takes the nearest prefix stating it |
+| An empty field is left out, and every field is trimmed | A repository and a branch are optional, and the server refuses one without the other |
+| A refusal is shown and the draft stays as typed | The server names the entry it refused |
+| A save moves the lead screens | A lead's links are built from these settings as it is read |
 
 ## Product and scan-run pages
 
@@ -1422,7 +1439,7 @@ the screens draw them.
 | The link appears only for somebody who reads internal material in the product | A lead is internal, and every read of one asks that |
 | The rail carries it under the scope, beside the inbox, for somebody who reads internal material anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read internal material in the one picked. It opens on the branch and variant picked where both are, and on every build where they are not |
 | The leads screen opens on the queue, with one tab per state | The queue is open leads with nothing waiting and the baseline left out. The baseline is searched through its tab. Each state's tab carries its count; the queue's carries none, and the line above it counts what it leaves out |
-| What the queue leaves out is counted above it | How many wait for approval, and how many a standing rule dismisses, the second opening the dismissed tab |
+| What the queue leaves out is counted above it | How many wait for approval, how many a standing rule dismisses, the second opening the dismissed tab, and how many are past end of life |
 | A row opens the lead on the build it is on | Evidence is per build, so the row names one build and how many others hold the lead in the state listed. The build and the date it opened do not wrap |
 | The branch and variant are in the address | A link from a build's screens narrows the queue to it. A product picked in the scope bar keeps the screen and drops them, because a branch is one product's |
 | A lead's page holds the result, the path, the related places, the leads that are the same flaw, and the decision | In that order. Each place is the file and line, linked to the repository where the address passes the link check, with what the analyzer said there and the code it captured |
@@ -1432,6 +1449,7 @@ the screens draw them.
 | The form offers the three lead outcomes as cards, a reason for a dismissal, and the reasoning | "Propose" where somebody else has to agree, "Submit" for a confirmation, which takes effect at once |
 | A lead in the baseline offers to add it to the queue, and one not reproduced offers to close it as fixed | Each where the reader triages internal material. Closing takes what fixed it |
 | A reader who does not triage internal material sees no control that writes | The same rule as the inbox |
+| A lead past its end of life says so beside its state and offers no decision, hand-off, queue or fixed control | The server refuses each (`DESIGN-analysis.md` § End of life). A move of a lead already handed off stays |
 | The dismissal rules screen lists every standing rule with what it names, what it covers and its state | Coverage beside the coverage at approval, so an outgrown rule shows why. A state needing explanation explains on hover |
 | Approve is offered for a rule waiting or outgrown, to somebody holding `approver` and `internal-read`, and never on a rule they proposed | The server refuses the proposer, and the rule says whose it is |
 | A new rule names an analyzer rule, a path, or both | The server refuses a rule naming neither, and a rule naming no path for a rule that finds memory or injection flaws |
@@ -1442,6 +1460,9 @@ the screens draw them.
 | Keeping or moving the lead is a choice of two cards, and moving lists what goes public with the flaw before it is sent | The people whose writing is disclosed are named, as are the paths, and the snippets removed at disclosure are counted |
 | A handed-off lead shows its flaw, linked, in place of the decision | Moving in or out is one button while the flaw is undisclosed, and its collaborators are listed beside it. A kept lead lists what moving it in discloses above the button |
 | A lead in a case the reader is not on says so, and shows where it is alone | The queue's row reads Withheld in place of the message |
+| The leads screen offers its list as CSV and JSON, asked with the narrowing on screen | The file is the list, every row of it (`DESIGN-analysis.md` § Queue file) |
+| A series in the address narrows the leads screen, and is named in its heading | Each figure of Leads by analyzer opens the list of its series and state |
+| Leads by analyzer asks for no count from somebody who does not read internal material in the product | It says leads are internal. A table of zeros reads as an analyzer finding nothing |
 
 ## Disclosure and advisories
 

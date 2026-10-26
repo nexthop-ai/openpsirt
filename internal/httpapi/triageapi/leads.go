@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -114,8 +115,8 @@ func registerLeadDecisions(api huma.API, in core.Deps) {
 			return places, nil
 		})
 		switch {
-		case errors.Is(err, analysis.ErrHandedOff):
-			return nil, huma.Error409Conflict(analysis.ErrHandedOff.Error())
+		case errors.Is(err, analysis.ErrHandedOff), errors.Is(err, finding.ErrLeadPastEndOfLife):
+			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoOpenFinding):
 			return nil, core.NoSuchFinding()
 		}
@@ -166,7 +167,7 @@ func registerLeadFixed(api huma.API, in core.Deps) {
 		}
 		done, err := finding.NewStore(in.DB.DB).FixLead(ctx, subject, target.ID, input.Place, input.Body.Because)
 		switch {
-		case errors.Is(err, finding.ErrStillSeen):
+		case errors.Is(err, finding.ErrStillSeen), errors.Is(err, finding.ErrLeadPastEndOfLife):
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoReason):
 			return nil, core.Asked(in.Logger, err)
@@ -209,8 +210,16 @@ func registerLeadEscalation(api huma.API, in core.Deps) {
 		switch {
 		case errors.Is(err, finding.ErrNothingOpenThere), errors.Is(err, access.ErrDenied):
 			return nil, core.NoSuchFinding()
+		case errors.Is(err, finding.ErrLeadPastEndOfLife):
+			return nil, huma.Error409Conflict(err.Error())
 		case err != nil:
 			return nil, core.WentWrong(in.Logger, "that lead could not be pulled in", err)
+		}
+		if done.Fresh {
+			if err := notify.TellLeadTriagers(ctx, in.DB.DB, notify.LeadAct{Kind: notify.LeadEscalated,
+				ProductID: product.ID, Place: input.Place, By: subject.ID}); err != nil {
+				in.Log().Error("could not say that a lead was pulled in", "error", err)
+			}
 		}
 		return &struct{ Body LeadEscalatedBody }{Body: LeadEscalatedBody{At: core.Stamp(done.At)}}, nil
 	})

@@ -28,6 +28,7 @@ shares is in `DESIGN-ingest.md`.
 - [Weakness families](#weakness-families)
 - [Grouped leads](#grouped-leads)
 - [Hand-off](#hand-off)
+- [End of life](#end-of-life)
 - [Receipts](#receipts)
 - [Upload client](#upload-client)
 - [Not built](#not-built)
@@ -151,7 +152,6 @@ placed results are read before it, since they do not change once stored.
 |---|---|
 | `waiting` | The build has no inventory that has been read. The job is handed back and asked again a minute later, for a day from the run's arrival. The placed results are not read while a run waits |
 | `superseded` | The series has applied a run to this build built at or after this one. Nothing changes |
-| `held` | A comparable run would mark more of the build's open leads not reproduced than the deployment allows at once. Nothing changes |
 | `failed` | The placed results are held in a shape the release applying them does not read, or the build had no inventory read within a day of the run arriving |
 | `applied` | Results matched, opened and recorded |
 
@@ -161,9 +161,17 @@ twice or record two baselines. Each takes the series' row first, by writing a va
 no run wrote before, because a cluster certifies only rows that were written
 (`DESIGN-database.md` § Retryable transactions).
 
-The hold is two settings, the analyzer drop share and floor, and both have to
-be passed. The share is of the leads the last comparable run saw; the floor
-keeps a small series from being held each time two leads are fixed.
+A comparable run marking more of the build's open leads not reproduced than
+the deployment expects of one run is a sharp drop. It is applied, its receipt
+says so, and the product's internal readers are told once, after the run
+commits (`DESIGN-notifications.md` § Analyzer alerts). A run that analyzed
+part of the tree without saying so reads like a fix sweep, so a person is
+asked to look; setting the run aside would leave every later run superseded
+behind it.
+
+A sharp drop is two settings, the analyzer drop share and floor, and both
+have to be passed. The share is of the leads the last comparable run saw; the
+floor keeps a small series from raising one each time two leads are fixed.
 
 An applied run, in order:
 
@@ -192,6 +200,7 @@ input to a key and never a key by itself.
 | Key | Digest of | Strength |
 |---|---|---|
 | Whole | The rule, the path, the fingerprint or the line where there is none, the message with its digits taken out, the enclosing function and the call chain | Strong |
+| Unprinted | The whole key without the fingerprint or the line. Compared by a re-baseline alone, and only where one result and one lead hold it (§ Re-baseline) | Strong |
 | Function | The rule, the path, the message with its digits taken out, and the enclosing function. Absent where the output names no function | Probable |
 | Line | The rule, the path and the message with its digits taken out, compared with the nearest line | Probable |
 
@@ -207,13 +216,14 @@ input to a key and never a key by itself.
 
 A run is paired with the leads its series holds open on the build, one to
 one, a layer at a time, each layer on what the layers before it left: the
-whole key, then the function, then the nearest line.
+whole key, then the function, then the nearest line. A re-baseline compares
+the unprinted key after the whole key and before the function.
 
 | Rule | |
 |---|---|
 | A lead the last comparable run did not see is a candidate in every layer | Of 28 absences hand-checked, 5 came back one or two builds later. A lead it saw comes first where a layer cannot tell two apart |
 | The line layer offers a result the eight leads sharing its line key nearest its line | A generated file repeating one message holds thousands of results under one key, and offering each all of them is quadratic |
-| Each lead records how its newest sighting was paired: on the whole key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
+| Each lead records how its newest sighting was paired: on the whole key, the unprinted key, the function or the line | A dismissal carries on a strong pairing and lapses on a probable one (§ Lead triage) |
 
 ### Carrying
 
@@ -243,7 +253,11 @@ re-baseline.
 | A run reporting nothing records nothing | It says nothing about how results are fingerprinted, and reading it as a change would make the next run a re-baseline |
 | `none` is recorded only where no result carried a fingerprint | One unhashable result appearing or going away beside others says nothing about how the run fingerprints |
 | The salt is recorded as the client states its mark, a short digest | A rotated salt changes every fingerprint and no scheme name |
-| A re-baseline is matched like any other run, and says so on its receipt | Its whole keys no longer meet the leads', so its pairings are the probable layers' |
+| A re-baseline says so on its receipt | Its whole keys no longer meet the leads' |
+| A re-baseline pairs a result and a lead on the unprinted key where they are the only result and the only lead holding it, and the pairing is strong | A rotated salt or a new scheme changes every fingerprint and nothing else, so a key nothing else holds is the same result, and its dismissal carries |
+| A result or a lead sharing its unprinted key with another falls to the probable layers | The fingerprint was what told them apart, and pairing them by line is a guess, so their dismissals lapse |
+| The unprinted key is compared for the re-baseline alone | On any other run a fingerprint that changed is the analyzer saying the result changed |
+| Carrying from a closed lead or another build is on the whole key, on a re-baseline too | A result carried across a rotation opens as a new lead there |
 
 ## Placement
 
@@ -267,8 +281,9 @@ reader's browser does, and signs in where the repository is private.
 
 ### Repository settings
 
-An administrator states them per product, and the change is in the
-administrative trail.
+An administrator states them per product, through the API or the product's
+Repositories screen (`DESIGN-interface.md` § The repositories screen), and the
+change is in the administrative trail.
 
 | Setting | |
 |---|---|
@@ -482,6 +497,7 @@ one way to say a path does not matter is kept rather than two.
 | A lead open on two builds in two states counts in both | The count is of leads in a state, and a lead not reproduced on one build is open on another |
 | Only what the subject may read is listed or counted | Visibility is enforced where the leads are read (REQ-42, REQ-43) |
 | A branch or tag and a variant narrow the list independently | One build, one line, or the whole product |
+| A series narrows the list by its name, matched without regard to capitals | A name no series of the product holds lists nothing, the same answer as a series holding no lead |
 | A rule's rating is the one the newest run naming it gave, held until a run rates it again | A run of the tool that omits the properties says nothing about the rule |
 | A rule's tier is the highest of every weakness recorded for it, ranked again each time a run names the rule | A rule's weaknesses accumulate as its tags do, and a tier table changed by an upgrade reaches a rule at its next run |
 | A severity outside 0 to 10, or one that is not a number, and a precision outside the four words, are read as none | The order is the tool's, and a value it does not define orders nothing |
@@ -504,6 +520,35 @@ A baseline lead enters the queue when it is escalated.
 | A product marks at most 500 important paths | Each is asked of every baseline lead a list reads |
 | Somebody who reads a lead and does not triage it is answered as though it were not there | As closing a lead as fixed answers them |
 | Escalation is worked out when a lead is read | Marking or unmarking a path moves every lead under it at once |
+
+### Queue file
+
+`GET /v1/products/{product}/leads.{format}` writes the list out as CSV or
+JSON, as `DESIGN-reporting.md` § Exports writes every file.
+
+| Rule | |
+|---|---|
+| The file is the list: the same filters, the same order, every row rather than one page | A list and its file are one read, so a filter the screen applies is never missing from the file |
+| It is read under the list's visibility | A reader is written the leads the list shows them, and nothing else (REQ-42, REQ-43) |
+| A lead in a case the reader is not on is a row with an empty message, marked withheld | What the analyzer said is the case's once the lead is moved, as the list withholds it |
+| No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
+| With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves the baseline out |
+| A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
+
+### Leads by series
+
+`GET /v1/products/{product}/lead-series` counts a product's leads per analyzer
+series, by state. The reports catalog draws it as Leads by analyzer
+(`DESIGN-reporting.md` § Pages of the catalog's own).
+
+| Rule | |
+|---|---|
+| Every state is counted, zero included, beside how many open leads a waiting claim leaves out of the queue and how many dismissed leads a standing rule covers | The states are worked out for the queue already, so each costs nothing more |
+| Each count is the total the list answers for that series and state | A figure and the list it opens count one population, under the same visibility |
+| Counted over every build of the product | A series is the product's. A stream or variant would list a series that never ran there with every count zero, which reads as an analyzer that found nothing |
+| A series holding no lead is listed with every count zero | An analyzer that runs and finds nothing is a fact about the product |
+| Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its case reads the lead and not the product's figures |
+| Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
 ## Weakness families
 
@@ -573,7 +618,7 @@ at least one.
 | The leads near a lead are found through an index on a digest of the last path, and the last line | A path is text no MySQL index takes whole. For 16,000 baseline leads of two analyzers on one build, the queue answered in 0.6 s on PostgreSQL 16 and 1.2 s on MySQL 8.4, and in 90 s and 37 minutes without the index |
 | A rule with no weakness groups with nothing | clang tags none, so a clang lead groups only once its weaknesses are known |
 | A judgment about a lead is one claim over it and every lead of its group that nothing answers yet, agreed to once | The same flaw takes the same answer whichever tool reported it |
-| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
+| A lead of the group already answered, waiting on a claim, under a standing rule, fixed, handed off, past its end of life (§ End of life), or unreadable by the person judging is left out | A lead already answered keeps its own answer, and a judgment reaches no lead its author cannot read (REQ-42) |
 | A lead possibly the same flaw is left out | It is judged on its own |
 
 ## Hand-off
@@ -656,6 +701,25 @@ one handed-off lead, as case collaborators are brought into one flaw
 | A grant and its withdrawal are recorded in the administrative trail, and the person is told they were brought in, in a line their grant reaches | As a case collaborator is |
 | A reader on the flaw's case reads a moved lead in full | The lead is part of the case |
 
+## End of life
+
+A lead seen only in releases past their end of life is kept as it stands, and
+nothing about it is deleted (REQ-15). When a release reaches its end of life
+is in `DESIGN-data-model.md` § End of support.
+
+| Rule | |
+|---|---|
+| A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
+| The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
+| A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
+| A decision, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| A re-affirmation of a lapsed claim leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes a decision. The list of what is yours to re-affirm counts the same places and leaves off a claim with none |
+| A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
+| A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
+| A lead already handed off is still moved into or out of its flaw's case | The move is about the flaw, which is judged on its own builds |
+| Its evidence says it is past its end of life | The page offers none of the refused controls |
+| A retired branch, tag or variant takes no run (§ The upload), so it stops producing sightings, and its leads stay listed with the product | `DESIGN-data-model.md` § Catalog retirement. Retiring closes off what arrives, and keeps what was found |
+
 ## Receipts
 
 `GET …/analyses` lists a build's runs newest first.
@@ -666,8 +730,16 @@ one handed-off lead, as case collaborators are brought into one flaw
 | Comparable, and the reason where not | § Run parameters |
 | Baseline | The series' first comparable run |
 | Tool and version | As recorded |
-| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, what a held run would have marked, and what was dropped, left out and discarded, each by reason |
+| Counts | Opened, seen again, returned, not reproduced, paired probably, carried from the branch a build was cut from, reopened at a closed lead's place, and what was dropped, left out and discarded, each by reason |
 | Re-baseline | Whether the run's fingerprints changed from the build's last (§ Matching) |
+| Sharp drop | Whether the run marked more not reproduced than the deployment expects of one run (§ Run application) |
+
+Beside the runs, the list carries the last upload of each series to the
+build that was turned away after its sender was admitted: the series as the
+upload named it, when, and the words the sender was told. One is kept per
+series and build, replaced by the next. An upload refused before its sender
+was admitted to the build is recorded nowhere, because recording it would
+tell whoever reads the build that somebody without access tried.
 
 A receipt counts leads and never names one. A pipeline key reads the receipts
 of a build it may send to; a person reads them where they read internal
@@ -789,20 +861,9 @@ it is about.
 
 | Part | State |
 |---|---|
-| A file of the lead queue | Not built. The Evidence, Leads and Decisions consumers alone include the analysis kind (`DESIGN-kinds.md` § Consumers), so a lead is read through the lead queue, its evidence and the claims about it. The findings lists' files include no lead; the record's file carries claims about leads, as the record does. `DESIGN-interface.md` § Static analysis leads holds the screens |
-| A screen for a product's repository settings | Not built. They are read and written through the API |
-| Telling anybody a standing rule outgrew its approval | Not built. The rule's state says so where its rules are listed |
-| Telling anybody a lead was escalated | Not built |
-| Telling the author of a claim on a lead that it lapsed | Not built. The claim lapses and waits to be re-affirmed; nobody is told |
-| Telling anybody a claim on a lead waits for a second person or was sent back | Not built. Notifications include no lead (`DESIGN-kinds.md` § Consumers), so the claim notices count the claims about vulnerabilities and flaws alone; the review queue lists a claim on a lead |
-| Telling anybody a lead was handed off or moved | Not built. Recording the flaw tells what recording any flaw tells; a lead collaborator is told they were brought in |
-| Leads in the statistics and reports | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report counts how many leads there are, or how long one took to be judged or fixed. Approval quality reads lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
-| Matching a renamed file | Not built. Every key holds the path, so a renamed file's results open as new leads, and the old ones are not reproduced |
-| A re-baseline's probable pairings listed together | Not built. Each lapses its claims, and a person re-affirms them through the list of what lapsed |
+| Leads over time | Not built. Statistics include no lead (`DESIGN-kinds.md` § Consumers), so no report says how long a lead took to be judged or fixed, or how a series' counts moved. What a product's leads stand at now is counted by series (§ Leads by series). Approval quality and the exception report read lead claims: a lead's dismissal standing on one person is a control that did not hold (`DESIGN-reporting.md` § Approval quality) |
 | Third-party paths | Recorded on the run and read by nothing |
 | A repository an SPDX inventory states | Not read. A package's download location is read by nothing, so a component of an SPDX inventory is built from a repository only where its identifier names one |
-| Conditions for a not-comparable run, a held run, and a series gone quiet | Not built. A held run says so on its receipt alone |
-| Releasing a held run | Not built. A held run changes nothing and keeps nothing; the next run is compared against the last applied one |
 | Fuzzing findings | Intended scope, not built (REQ-14) |
 
 ## Limits
@@ -825,4 +886,5 @@ it is about.
 | The client's macOS and Windows behavior is tested and not used | No pipeline here runs on either system |
 | An internal reader tells a moved lead from a kept one | A moved lead is a stub to them and a kept one is not. That a lead is in a case is what the stub says, and the case is what it withholds |
 | The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
-| The upload records no refusal for the coverage report | A refused analyzer upload is answered to the sender and logged by nobody; a series gone quiet is not built |
+| A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
+| An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |

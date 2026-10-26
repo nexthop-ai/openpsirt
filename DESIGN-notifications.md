@@ -13,6 +13,8 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77, REQ-80, REQ-81.
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [An inventory that moved sharply](#an-inventory-that-moved-sharply)
+- [Analyzer alerts](#analyzer-alerts)
+- [Lead notices](#lead-notices)
 - [Staleness conditions](#staleness-conditions)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
@@ -85,6 +87,11 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody granted one handed-off lead | event | The same reason, for a grant of one lead (`DESIGN-analysis.md` § Lead collaborators) |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
+| An analyzer run that marked much of a build not reproduced | event | Below, under analyzer alerts |
+| An analyzer series whose newest run on a build could not be compared | condition | Below, under analyzer alerts |
+| An analyzer series gone quiet on a build | condition | Below, under analyzer alerts |
+| A lead pulled into the queue, handed off, or moved into or out of its flaw's case | event | Below, under lead notices |
+| A standing rule on leads outgrowing its approval | condition | Below, under lead notices |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
 | The same window near its end, where it names a warning | condition | Described under obligation notices below |
 | The same window passed | condition | Described under obligation notices below |
@@ -178,6 +185,53 @@ An inventory that held nothing has no share to be part of, so the share stops
 nothing that arrives. The floor still applies: both thresholds are asked of
 every upload, and a build given three names back after being emptied is three
 names.
+
+## Analyzer alerts
+
+What an analyzer series is doing on a build, told to everybody who reads the
+product's internal findings. Each names a series and a build and nothing it
+found, and each is about internal work, so it is withheld on the terms of
+§ The notification list.
+
+| Alert | Kind | Says | Clears |
+|---|---|---|---|
+| Sharp drop | event | A comparable run marked more of the build's open leads not reproduced than the deployment expects of one run, with both counts. Told once, after the run commits, and linked to the build's leads of the series not reproduced | Acknowledged |
+| Not comparable | condition | The series' newest applied run on the build could not be compared, and why. Nothing it stops reporting there is marked not reproduced | The next comparable run |
+| Gone quiet | condition | No run of the series has been applied to the build for three of its usual gaps, and never under a day. Names the last upload of the series to the build turned away since, with what its sender was told | The next applied run |
+
+| Rule | Reason |
+|---|---|
+| A sharp drop is applied rather than held | A run set aside leaves every later run superseded behind it, and a fix sweep looks the same as a partial run |
+| The usual gap is the median of the newest ten | One long weekend or a burst of reruns does not move it, and a pipeline that moved from weekly to nightly is judged by what it does now |
+| A series with fewer than three applied runs on a build is never quiet | Two runs are one gap, which is a guess |
+| Builds retired at any level, and releases past their end of life, are left out | Nobody analyzes them on purpose |
+| The thresholds of a sharp drop are the analyzer drop share and floor, both passed | `DESIGN-analysis.md` § Run application |
+
+## Lead notices
+
+A claim on a lead is told on the terms of every other claim: waiting for a
+second person, sent back and left, rows of it set aside, lapsed, an agreement an
+edit took back, an agreement taken back with its batch, and a mention in its
+notes. Its rows are internal work, so each
+line is withheld as internal (§ The notification list).
+
+| Notice | Kind | To | Clears |
+|---|---|---|---|
+| A claim on a lead waiting for a second person | condition | Whoever may approve at internal visibility: the approver capability and `internal-read`, never its proposer | Approved, sent back or withdrawn |
+| A claim on a lead sent back and left | condition | Its author, while they read internal work | Revised or withdrawn |
+| A dismissal of a lead lapsed by a probable pairing | event | Its proposer, once per run, after the run commits | Acknowledged |
+| An agreement to a claim on a lead taken back by an edit | event | Every approver whose agreement it was | Acknowledged |
+| A lead pulled into the queue by a person | event | The product's internal triagers, never whoever pulled it in. Pulled in again, nobody is told | Acknowledged |
+| A lead handed off as a flaw | event | The product's internal triagers, never whoever handed it off. The flaw recorded tells what recording any flaw tells | Acknowledged |
+| A handed-off lead moved into its flaw's case, or taken back out | event | The product's internal triagers, never whoever moved it | Acknowledged |
+| A standing rule on leads outgrowing its approval | condition | Whoever may approve at internal visibility, never its proposer | Approved again at its size, retired, or covering less |
+
+| Rule | Reason |
+|---|---|
+| A claim's rows are counted at three visibilities, and its audience reads or approves at each one its rows hold | A reader of undisclosed work reads no internal row |
+| A lead's escalation by an important path, or by a second analyzer, tells nobody | It happens as a run applies, and the lead arrives in the queue with the rest of the run |
+| A lead sent back links to the lead | A rule names no finding page |
+| A hand-off or a move names no flaw, and its link answers the flaw to whoever may read it | An internal triager reads nothing of a kept lead's case (`DESIGN-analysis.md` § Keep or move) |
 
 ## Staleness conditions
 
@@ -289,6 +343,7 @@ than about anybody's work.
 | Rule | Reason |
 |---|---|
 | The three that claim no further work is needed are counted whatever else is recorded about them | It does not apply, it will not be fixed, the fix is already here. Each closes the question and nothing re-opens it, so each needs a second person — and counting them unconditionally means a write path that got around the gate by clearing its own flag is still caught |
+| A lead dismissed or called no security issue is counted whatever else is recorded about it, as the three above are | Each closes the question and always needs a second person. The condition is a count across every product, so nothing about the lead reaches an administrator who reads no internal work |
 | A deferral or a promise to act counts where the gate asked for a second person | Both hide risk and both are approved conditionally, on where the date sits against the deadline already set. A short deferral standing alone is the rule working; one past the threshold needed agreement as surely as a dismissal did, and asking which outcome it was saw none of them |
 | The gate's verdict is read, never a caller's | A proposal's own answer is re-worked against the policy in force when the write lands, so nothing a caller asserts reaches the record |
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
@@ -483,6 +538,7 @@ name are what a later read has to ask about.
 |---|---|
 | It is about nothing undisclosed | Most of the table, and no rule narrows it |
 | It names a product where this person reads undisclosed work now | The role is the reason it arrived, so withdrawing the role is what takes it away |
+| It is about internal work, in a product where this person reads internal work now | A reader of undisclosed work reads no internal finding, so a line about one is withheld from them on the same terms |
 | It names an issue they were brought onto, one case at a time | A case grant is a pair. Widening it to the product would hand a collaborator the rest of that product's embargo list, which is the whole of what the grant is not |
 | It is about a handed-off lead they were granted, one lead at a time | A lead grant is a pair of a product and a place, and the line granting it is about that lead, so it is the one line the grant reaches |
 | They administer the deployment | Administering is not reading, and every other read here says so — but the embargo notice names administrators as an audience of its own, and a message sent under that rule and withheld under this one is written for somebody who cannot open it. An administrator grants roles, so it hands them nothing they could not hand themselves |
@@ -493,7 +549,7 @@ back returns the line, because they were told and that is a fact about a moment.
 It also avoids a clear-on-revoke path somebody has to remember, and there is
 more than one way to lose a role.
 
-A row marked private carries the product it is about, or the write is refused. A
+A row marked private carries the product it is about, or the write is refused, and a row about internal work is marked private. A
 private row attributable to nothing could only be shown to everybody or to
 nobody. Refusing where it is written makes that a failure at the producer rather
 than a leak, or a silent disappearance, at the reader.

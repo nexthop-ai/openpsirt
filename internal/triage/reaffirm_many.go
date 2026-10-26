@@ -5,6 +5,7 @@ package triage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -346,8 +347,10 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	}
 	// And only a claim the list of what is yours to re-affirm holds, the rule
 	// the single form asks. A claim with a withdrawn row is one somebody took
-	// back, and re-making it carries an agreement onto what was withdrawn.
-	reaffirmable, err := s.yoursToReaffirm(subject).Where(`"de"."claim_id" = ?`, previousClaimID).Exists(ctx)
+	// back, and re-making it carries an agreement onto what was withdrawn. A
+	// claim at leads past their end of life alone is refused below, in the
+	// words a decision there is refused in.
+	reaffirmable, err := s.lapsedOfYours(subject).Where(`"de"."claim_id" = ?`, previousClaimID).Exists(ctx)
 	if err != nil {
 		return reaffirmPlan{}, fmt.Errorf("read whether that claim is yours to re-affirm: %w", err)
 	}
@@ -387,6 +390,11 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 
 	proposals := make([]Proposal, 0, len(lapsed))
 	places := map[string]bool{}
+	// A lead past its end of life is kept as it stands, so the claim is
+	// re-made at the rest of its places and refused where none is left.
+	ended := map[string]bool{}
+	asked := map[string]bool{}
+	pastEnd := false
 	// One proposal per place and versions, however many rows lead to it. A
 	// place identity is names alone while a decision is keyed on the versions
 	// too, so one component at two versions under one consumer is two lapsed
@@ -401,6 +409,22 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 				continue
 			}
 			done[written] = true
+			if at.Kind == kind.Analysis {
+				lead := fmt.Sprintf("%d\x00%s", at.ProductID, at.PlaceIdentity)
+				if !asked[lead] {
+					asked[lead] = true
+					switch err := finding.LeadEnded(ctx, s.db, at.ProductID, at.PlaceIdentity, s.now()); {
+					case errors.Is(err, finding.ErrLeadPastEndOfLife):
+						ended[lead] = true
+					case err != nil:
+						return reaffirmPlan{}, err
+					}
+				}
+				if ended[lead] {
+					pastEnd = true
+					continue
+				}
+			}
 			// The visibility it had. A re-affirmation says the same claim
 			// still holds; it is not an occasion to change who may see it.
 			at.Visibility = row.Visibility
@@ -408,6 +432,9 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 			proposals = append(proposals, remade(*previous, at, reasoning, by,
 				severity[[2]int64{row.ProductID, row.VulnerabilityID}], full))
 		}
+	}
+	if len(proposals) == 0 && pastEnd {
+		return reaffirmPlan{}, finding.ErrLeadPastEndOfLife
 	}
 	if len(proposals) == 0 {
 		return reaffirmPlan{}, fmt.Errorf(

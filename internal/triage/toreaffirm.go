@@ -80,11 +80,15 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 		return nil, page.Total, nil
 	}
 
+	// The rows a re-affirmation re-makes, so a lead past its end of life is
+	// not counted.
+	inSupport, supportArgs := finding.LeadInSupport(`"de"."product_id"`, `"de"."place_identity"`, s.now())
 	var latest []int64
 	if err := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
 		ColumnExpr(`"de"."id"`).
 		Where(`"de"."claim_id" IN (?)`, bun.List(page.Order)).
 		Where(`"de"."state" = ?`, LapsedState)).
+		Where(inSupport, supportArgs...).
 		Scan(ctx, &latest); err != nil {
 		return nil, 0, fmt.Errorf("read what is yours to re-affirm: %w", err)
 	}
@@ -174,11 +178,21 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 // yoursToReaffirm selects the lapsed rows, nothing having replaced them, of
 // the claims this subject made and may re-affirm, over decision AS "de".
 //
+// A row at a lead past its end of life is left off, and so is a claim holding
+// no other: re-affirming re-makes a claim at its other places, and refuses one
+// with none.
+func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
+	inSupport, args := finding.LeadInSupport(`"de"."product_id"`, `"de"."place_identity"`, s.now())
+	return s.lapsedOfYours(subject).Where(inSupport, args...)
+}
+
+// lapsedOfYours is yoursToReaffirm wherever the places are.
+//
 // A claim with any lapsed row out of the subject's reach is left off:
 // re-affirming acts on the whole claim, and would refuse it. So is a claim
 // with a withdrawn row: its author took it back, and a withdrawal leaves a
 // row that had already lapsed as it was.
-func (s *Store) yoursToReaffirm(subject access.Subject) *bun.SelectQuery {
+func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 	outOfReach, reachArgs := notDecidableWhere(subject, "dn")
 	q := stillLatest(s.db.NewSelect().Model((*Decision)(nil)).
 		Join(`JOIN "claim" AS "cl" ON "cl"."id" = "de"."claim_id"`).

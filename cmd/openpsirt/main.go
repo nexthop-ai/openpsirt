@@ -602,8 +602,11 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 	// transaction open across the estate.
 	routing := finding.NewSweeper(db, work, logger, name)
 	// Applies what an analyzer reported against a build, once the build has
-	// an inventory to place the results on.
-	analyze := analysis.NewWorker(analysis.NewApplier(db), work, logger, name)
+	// an inventory to place the results on, and tells the product's internal
+	// readers of a run that dropped sharply.
+	analyze := analysis.NewWorker(analysis.NewApplier(db).TellingDrops(notify.AnalysisDrops(db.DB, logger)).
+		TellingLapses(notify.Lapses(db.DB, logger)),
+		work, logger, name)
 	// The tool's own health. It needs nothing configured, which is the point:
 	// an operator who never set up mail is exactly the one who would otherwise
 	// never hear that a build stopped being scanned.

@@ -31,6 +31,7 @@ const SAMPLES: Record<string, () => string[]> = {
   ],
   leadAt: () => [routes.leadAt(build, odd)],
   leadRulesAt: () => [routes.leadRulesAt(odd)],
+  repositoriesAt: () => [routes.repositoriesAt(odd)],
   componentAt: () => [routes.componentAt(odd, odd), routes.componentAt(odd, odd, odd, build)],
   allFindingsAt: () => [routes.allFindingsAt(), routes.allFindingsAt({ q: odd })],
   productFindingsAt: () => [routes.productFindingsAt(odd, { q: odd })],
