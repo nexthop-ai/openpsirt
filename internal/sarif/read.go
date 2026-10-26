@@ -61,11 +61,12 @@ type Limits struct {
 // document it took, so MaxHeld at its default bounds that to about 200 MB on
 // top of MaxBytes.
 //
-// The compressed bounds default to the decompressed ones, so a document sent
-// without compression is bounded as it is held. Analyzer output measured
-// here compresses 7 to 17 times over, so a compressed upload meets the
-// decompressed bound first. One document may take the whole upload's
-// bounds, which is what a tool's per-unit documents merged into one take.
+// Left unset, one document's bound is the upload's, and each bound as sent is
+// its decompressed counterpart, so a document sent without compression is
+// bounded as it is held. Analyzer output measured here compresses 7 to 17
+// times over, so a compressed upload meets the decompressed bound first. One
+// document may take the whole upload's bounds, which is what a tool's
+// per-unit documents merged into one take.
 func DefaultLimits() Limits {
 	return Limits{
 		MaxBytes:          256 << 20,
@@ -108,9 +109,11 @@ func (l Limits) OrDefault() Limits {
 			*f.v = *f.d
 		}
 	}
+	// One document takes the whole upload's bound, and the sizes as sent take
+	// the decompressed ones, so raising the upload's bound raises the rest.
 	for _, f := range []struct{ v, d *int64 }{
-		{&l.MaxBytes, &d.MaxBytes}, {&l.MaxPart, &d.MaxPart},
-		{&l.MaxCompressed, &d.MaxCompressed}, {&l.MaxPartCompressed, &d.MaxPartCompressed},
+		{&l.MaxBytes, &d.MaxBytes}, {&l.MaxPart, &l.MaxBytes},
+		{&l.MaxCompressed, &l.MaxBytes}, {&l.MaxPartCompressed, &l.MaxPart},
 	} {
 		if *f.v <= 0 {
 			*f.v = *f.d

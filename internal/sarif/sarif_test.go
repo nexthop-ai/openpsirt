@@ -817,3 +817,16 @@ func TestOneDocumentIsBoundedOnItsOwnAndAsSent(t *testing.T) {
 		t.Errorf("a document sent past its bound: %v", err)
 	}
 }
+
+func TestTheBoundsLeftUnsetFollowTheUploadsBound(t *testing.T) {
+	got := Limits{MaxBytes: 1 << 30}.OrDefault()
+	if got.MaxPart != 1<<30 || got.MaxCompressed != 1<<30 || got.MaxPartCompressed != 1<<30 {
+		t.Errorf("an upload bound of 1 GiB left one document at %d, the upload as sent at %d and one document as sent at %d; want all three 1 GiB",
+			got.MaxPart, got.MaxCompressed, got.MaxPartCompressed)
+	}
+	part := Limits{MaxBytes: 1 << 30, MaxPart: 1 << 20}.OrDefault()
+	if part.MaxCompressed != 1<<30 || part.MaxPartCompressed != 1<<20 {
+		t.Errorf("a document bound of 1 MiB left the upload as sent at %d and one document as sent at %d; want 1 GiB and 1 MiB",
+			part.MaxCompressed, part.MaxPartCompressed)
+	}
+}

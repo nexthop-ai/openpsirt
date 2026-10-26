@@ -19,7 +19,8 @@ import (
 
 // The bounds an upload is refused by are the ones the configuration states. A
 // scan past twice the configured size is refused before it is read, and an
-// analyzer's document past it is refused as it is read.
+// analyzer's document past it is refused by the bound as sent, which follows
+// the configured one where nothing sets it.
 func TestTheUploadBoundsTheServerRefusesByAreTheConfiguredOnes(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -43,7 +44,7 @@ func TestTheUploadBoundsTheServerRefusesByAreTheConfiguredOnes(t *testing.T) {
 			says  string
 		}{
 			build + "/scans":    {"inventory", http.StatusRequestEntityTooLarge, "8192 bytes"},
-			build + "/analyses": {"sarif", http.StatusUnprocessableEntity, "larger than the configured limit"},
+			build + "/analyses": {"sarif", http.StatusUnprocessableEntity, "the configured limit of 4096"},
 		} {
 			body, form := httpapitest.Form(t, httpapitest.Part{Field: c.field, Filename: "doc.json", Content: padded})
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, path, body)
