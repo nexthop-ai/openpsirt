@@ -116,11 +116,8 @@ func registerUploads(api huma.API, in core.Deps) {
 				// A document is recorded as it is taken or turned away, so
 				// nothing of one is still being read.
 				newest := held[0]
-				body.Latest = latestOf(newest.ReceivedAt, ingest.UploadCompleted, "")
-				if newest.Status == finding.UploadTurnedAway {
-					body.Latest = latestOf(newest.ReceivedAt, ingest.UploadRefused,
-						core.OrBlank(newest.Reason))
-				}
+				body.Latest = latestOf(newest.ReceivedAt, ingest.UploadStatus(newest.Status),
+					core.OrBlank(newest.Reason))
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

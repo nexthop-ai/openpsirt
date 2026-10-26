@@ -4,6 +4,7 @@
 package finding
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strings"
@@ -33,6 +34,10 @@ const mostUploadReason = 2000
 type Arrival struct {
 	// FeedID is the supplier whose feed fetched it, and zero for an upload.
 	FeedID int64
+	// Digest is SHA-256 of what arrived, where the statements carry a
+	// digest of something else. A fetched advisory's statements carry one
+	// over its bytes and the claims kept from it.
+	Digest string
 }
 
 // Upload is one VEX document or supplier advisory that arrived for a product,
@@ -135,8 +140,7 @@ func uploadOf(by access.Subject, productID int64, from Supplied, now time.Time) 
 		Document:   from.Document,
 		ReceivedAt: now.UTC().Truncate(time.Microsecond),
 	}
-	if from.Digest != "" {
-		digest := from.Digest
+	if digest := cmp.Or(from.Arrived.Digest, from.Digest); digest != "" {
 		row.Digest = &digest
 	}
 	if from.Arrived.FeedID != 0 {

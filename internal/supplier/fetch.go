@@ -275,7 +275,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Filled = true
 			return took, nil
 		}
-		recorded, checked, err := f.document(ctx, client, by, source, one, ships, sums)
+		recorded, checked, read, err := f.document(ctx, client, by, source, one, ships, sums)
 		var refused unreadable
 		switch {
 		case errors.Is(err, errWithdrawn):
@@ -292,7 +292,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			took.Skipped++
 		case errors.Is(err, errMismatched):
 			took.Mismatched++
-			if noted := f.turnedAway(ctx, by, source, one, err); noted != nil {
+			if noted := f.turnedAway(ctx, by, source, one, read, err); noted != nil {
 				return took, noted
 			}
 		case errors.As(err, &refused), steppedOver(err):
@@ -306,7 +306,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			if refused.barred {
 				took.bar(one.address, err)
 			}
-			if noted := f.turnedAway(ctx, by, source, one, err); noted != nil {
+			if noted := f.turnedAway(ctx, by, source, one, read, err); noted != nil {
 				return took, noted
 			}
 		case ctx.Err() != nil:
@@ -681,45 +681,59 @@ func documentIn(one feedEntry) string {
 // errWithdrawn says the supplier stopped being configured while a pass ran.
 var errWithdrawn = refusal.New("that supplier is no longer read from")
 
+// read is what was learned of one fetched document before it was recorded or
+// refused.
+type read struct {
+	// whole says the document arrived: its bytes were fetched in full.
+	whole bool
+	// digest is SHA-256 of those bytes, and publisher and identifier what
+	// the advisory names, once it was parsed.
+	digest, publisher, identifier string
+}
+
 // document reads one advisory and records what it says about a component this
-// product ships, answering how many claims it left and whether a digest the
-// publisher serves was compared against it.
+// product ships, answering how many claims it left, whether a digest the
+// publisher serves was compared against it, and what was read of it.
 //
 // Read before its digest is asked for. A statement set listed beside the
 // advisories is set aside whatever its digest says, and a distribution lists
 // tens of thousands of them.
 func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.Subject,
-	source Source, one entry, ships map[string]bool, sums *digests) (int, bool, error) {
+	source Source, one entry, ships map[string]bool, sums *digests) (int, bool, read, error) {
 
+	var got read
 	body, err := f.fetch(ctx, client, one.address, f.limits.OrDefault().MaxBytes)
 	if err != nil {
-		return 0, false, err
+		return 0, false, got, err
 	}
+	sum := sha256.Sum256(body)
+	got.whole, got.digest = true, hex.EncodeToString(sum[:])
 	advisory, err := sbom.ReadAdvisory(strings.NewReader(string(body)), f.limits)
 	if err != nil {
 		// A document that cannot be parsed is refused the same way every time,
 		// including the one this reader refuses on purpose — a statement set,
 		// which is told apart above so it can be counted as what it is.
 		if errors.Is(err, sbom.ErrWrongProfile) {
-			return 0, false, err
+			return 0, false, got, err
 		}
-		return 0, false, unreadable{err: err}
+		return 0, false, got, unreadable{err: err}
 	}
+	got.publisher, got.identifier = advisory.Publisher, advisory.Identifier
 	if err := shaped(advisory); err != nil {
-		return 0, false, unreadable{err: err}
+		return 0, false, got, unreadable{err: err}
 	}
 	checked, err := f.matches(ctx, client, one, body, sums)
 	if err != nil {
-		return 0, false, err
+		return 0, false, got, err
 	}
-	recorded, err := f.record(ctx, by, source, one, body, advisory, ships)
-	return recorded, checked, err
+	recorded, err := f.record(ctx, by, source, one, body, got, advisory, ships)
+	return recorded, checked, got, err
 }
 
 // record writes what one fetched advisory says about a component this product
 // ships.
 func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, one entry,
-	body []byte, advisory sbom.Advisory, ships map[string]bool) (int, error) {
+	body []byte, got read, advisory sbom.Advisory, ships map[string]bool) (int, error) {
 
 	sum := sha256.Sum256(body)
 	statements := ours(advisory, ships)
@@ -751,7 +765,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 				// can be checked.
 				Document: one.address,
 				Digest:   recording(sum[:], statements),
-				Arrived:  &finding.Arrival{FeedID: source.ID},
+				Arrived:  &finding.Arrival{FeedID: source.ID, Digest: got.digest},
 			}, statements)
 		return err
 	})
@@ -761,13 +775,22 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, 
 	return recorded, nil
 }
 
-// turnedAway records that a document a feed listed was refused, by the address
-// it was listed at. A failure to record it is a failure of the pass, so the
-// mark stays before the document and the next pass reads it again.
-func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, source Source, one entry, refused error) error {
+// turnedAway records that a document a feed fetched was refused, with what was
+// read of it. A document that never arrived whole — one the publisher would
+// not serve, one past the size bound, one at an address the client turns away
+// — is not recorded: nothing arrived, and the supplier's own record says what
+// stopped it. A failure to record it is a failure of the pass, so the mark
+// stays before the document and the next pass reads it again.
+func (f *Fetcher) turnedAway(ctx context.Context, by access.Subject, source Source, one entry,
+	got read, refused error) error {
+
+	if !got.whole {
+		return nil
+	}
 	return finding.NewStore(f.db).TurnedAway(ctx, by, source.ProductID, finding.Supplied{
-		Source: finding.FromAdvisory, Document: one.address,
-		Arrived: &finding.Arrival{FeedID: source.ID},
+		Source: finding.FromAdvisory, Publisher: got.publisher, Identifier: got.identifier,
+		Document: one.address,
+		Arrived:  &finding.Arrival{FeedID: source.ID, Digest: got.digest},
 	}, refused.Error())
 }
 

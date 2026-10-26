@@ -116,7 +116,8 @@ export function Uploads() {
       ) : tab === "sarif" ? (
         <AnalysisRuns build={build} />
       ) : tab === "vex" || tab === "supplier-advisory" ? (
-        <Documents product={product} type={tab} />
+        // Keyed so a page reached on one kind is not carried to the other.
+        <Documents key={`${product} ${tab}`} product={product} type={tab} />
       ) : (
         <SBOMs build={build} />
       )}

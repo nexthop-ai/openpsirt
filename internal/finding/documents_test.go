@@ -116,9 +116,34 @@ func TestEveryUploadOfADocumentIsListedAndTheNewestTakenStands(t *testing.T) {
 		if err != nil || total != 4 || len(page) != 1 || page[0].ID != debian.ID {
 			t.Errorf("the third page of one reads %+v of %d: %v", page, total, err)
 		}
-		// Another kind holds none of them.
-		if _, total, err := store.Uploads(ctx, by, c.product, finding.FromAdvisory, 50, 0); err != nil || total != 0 {
-			t.Errorf("the advisories hold %d: %v", total, err)
+		// Two advisories from one publisher are two documents, and a refusal
+		// under one's key replaces nothing.
+		for _, name := range []string{"DSA-1", "DSA-2"} {
+			if _, _, err := store.RecordStatements(ctx, by, c.product, finding.Supplied{
+				Source: finding.FromAdvisory, Publisher: "Debian", Identifier: name,
+				Document: name + ".json", Digest: "sha256:" + name, Arrived: uploaded,
+			}, []finding.Statement{{Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := store.TurnedAway(ctx, by, c.product, finding.Supplied{
+			Source: finding.FromAdvisory, Publisher: "Debian", Identifier: "DSA-1",
+			Document: "dsa-1-again.json", Arrived: uploaded,
+		}, "it does not match its digest"); err != nil {
+			t.Fatal(err)
+		}
+		advisories, total, err := store.Uploads(ctx, by, c.product, finding.FromAdvisory, 50, 0)
+		if err != nil || total != 3 {
+			t.Fatalf("the advisories hold %+v of %d: %v", advisories, total, err)
+		}
+		if again := advisories[0]; again.Status != finding.UploadTurnedAway || again.Identifier != "DSA-1" ||
+			again.Current() {
+			t.Errorf("the refusal reads %+v", again)
+		}
+		for _, u := range advisories[1:] {
+			if !u.Current() {
+				t.Errorf("%s reads as replaced; want it standing beside the other and the refusal", u.Identifier)
+			}
 		}
 	})
 }

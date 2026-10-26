@@ -359,8 +359,8 @@ func analysisRefused(ctx context.Context, in core.Deps, subject access.Subject, 
 // analysisRefusedBeforeReading records an analyzer upload the form bound
 // turned away before the operation ran. The bound asks it only once the
 // sender has been admitted to the build.
-func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, string) {
-	return func(hctx huma.Context, reason string) {
+func analysisRefusedBeforeReading(in core.Deps) func(huma.Context, int, string) {
+	return func(hctx huma.Context, _ int, reason string) {
 		ctx := hctx.Context()
 		subject, named, err := admittedAnalysis(ctx, in, hctx.Param("product"), hctx.Param("stream"),
 			hctx.Param("variant"))

@@ -13,7 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // DocumentUploadBody is one VEX document or supplier advisory that arrived for
@@ -59,7 +58,8 @@ func registerDocuments(api huma.API, in core.Deps) {
 			"taken or turned away: who uploaded it, what became of it, and how many " +
 			"statements it recorded and set aside. The newest copy taken from each " +
 			"publisher is marked `current`.\n\n" +
-			"Statements a trusted upstream publishes are listed with the upstream, not here.",
+			"Uploads made before v0.11.0 are not listed. Their statements still apply.\n\n" +
+			"Statements a trusted upstream publishes are listed with that upstream.",
 		Tags: []string{"Ingest"},
 	}, core.AnyPerson, "Answers for a product you may see."), documentsOf(in, finding.FromVex))
 
@@ -71,8 +71,10 @@ func registerDocuments(api huma.API, in core.Deps) {
 			"newest first, taken or turned away: who uploaded it or which supplier feed " +
 			"fetched it, what became of it, and how many statements it recorded and set " +
 			"aside. The newest copy taken of each advisory is marked `current`.\n\n" +
+			"Uploads made before v0.11.0 are not listed. Their statements still apply.\n\n" +
 			"An advisory a feed fetched is listed where it said something about a component " +
-			"this product ships, set aside something an earlier copy said, or was turned away.",
+			"this product ships, set aside something an earlier copy said, or arrived whole and was " +
+			"turned away.",
 		Tags: []string{"Ingest"},
 	}, core.AnyPerson, "Answers for a product you may see."), documentsOf(in, finding.FromAdvisory))
 }
@@ -102,12 +104,9 @@ func documentsOf(in core.Deps, source string) func(context.Context, *documentsIn
 		out.Body.Items, out.Body.Total = make([]DocumentUploadBody, 0, len(held)), total
 		for _, u := range held {
 			body := DocumentUploadBody{
-				ReceivedAt: core.Stamp(u.ReceivedAt), Status: core.UploadStatus(ingest.UploadCompleted),
+				ReceivedAt: core.Stamp(u.ReceivedAt), Status: core.UploadStatus(u.Status),
 				Publisher: u.Publisher, Identifier: u.Identifier, Document: u.Document,
 				FetchedBy: u.Feed, Recorded: u.Recorded, SetAside: u.Superseded, Current: u.Current(),
-			}
-			if u.Status == finding.UploadTurnedAway {
-				body.Status = core.UploadStatus(ingest.UploadRefused)
 			}
 			body.Reason, body.Digest = core.OrBlank(u.Reason), core.OrBlank(u.Digest)
 			if u.Credential != nil {

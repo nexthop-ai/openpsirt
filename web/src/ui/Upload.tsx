@@ -83,6 +83,9 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
         }),
       );
     },
+    // A refusal is recorded too, so the every-kind counts and marks are asked
+    // again whatever the answer.
+    onSettled: () => void queries.invalidateQueries({ queryKey: ["uploads"] }),
     onSuccess: (result, to) => {
       if (result.outcome === "already_held") {
         setHeld({ scan: result.scan_id, ...to });

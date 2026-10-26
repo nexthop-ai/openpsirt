@@ -204,7 +204,10 @@ export function Documents({ product, type }: { product: string; type: keyof type
         All builds of this product
       </p>
       {items.length === 0 ? (
-        <Empty title={kind.none} detail="An administrator uploads them under Settings.">
+        <Empty
+          title={kind.none}
+          detail="Administrators upload them under Settings. Uploads from before v0.11.0 aren't listed, and their statements still apply."
+        >
           <Link to={settingsAt("suppliers")} className="linkish">
             Supplier settings
           </Link>

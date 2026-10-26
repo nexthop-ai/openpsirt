@@ -50,7 +50,7 @@ export function Run() {
       <div className="screen-head">
         <span className="crumbs">
           <Link to={uploadsAt(build)} className="linkish" style={{ fontWeight: 500 }}>
-            Inventories
+            Uploads
           </Link>{" "}
           › <b>run {it.run_id}</b>
         </span>

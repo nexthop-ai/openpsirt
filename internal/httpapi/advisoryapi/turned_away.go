@@ -40,9 +40,14 @@ func turnedAway(ctx context.Context, in core.Deps, by access.Subject, productID 
 
 // turnedAwayBeforeReading records a document the form bound refused before
 // the operation ran, against the product it names. Nothing of the document
-// was read, so the record names the kind and the sender alone.
-func turnedAwayBeforeReading(in core.Deps, source string) func(huma.Context, string) {
-	return func(hctx huma.Context, reason string) {
+// was read, so the record names the kind and the sender alone. A request shed
+// because the deployment is receiving as many uploads as it takes is answered
+// 503, which is the deployment and not the document, and is not recorded.
+func turnedAwayBeforeReading(in core.Deps, source string) func(huma.Context, int, string) {
+	return func(hctx huma.Context, status int, reason string) {
+		if status >= http.StatusInternalServerError {
+			return
+		}
 		ctx := hctx.Context()
 		if core.Administrating(ctx) != nil {
 			return

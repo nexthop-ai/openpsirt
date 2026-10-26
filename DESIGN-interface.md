@@ -1316,6 +1316,9 @@ What each list holds is `DESIGN-ingest.md` § Upload listing.
 | The newest taken copy of a document is marked Current | What it says is what stands. An earlier copy is kept and replaced |
 | An address a feed fetched an advisory from is not a link | It is a third party's URL, shown on hover |
 | Upload stays where it is | The bar and this screen upload an inventory. VEX documents and supplier advisories are uploaded from the suppliers settings, which the empty tab links |
+| An empty document tab says earlier uploads are not listed | Uploads before v0.11.0 have no record, and their statements still apply. Read as "nothing applies here" otherwise |
+| An upload from anywhere asks the every-kind list again | A refusal is recorded too, so the counts and the marks move whatever the answer |
+| Each document tab opens on its first page | The page reached on one kind is not carried to the other |
 
 ### The repositories screen
 

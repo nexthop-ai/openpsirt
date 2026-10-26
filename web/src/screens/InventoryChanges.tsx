@@ -55,7 +55,7 @@ export function InventoryChanges() {
             className="linkish"
             style={{ fontWeight: 500 }}
           >
-            Inventories
+            Uploads
           </Link>{" "}
           › <b>upload {scan}</b>
         </span>

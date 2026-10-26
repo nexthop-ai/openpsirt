@@ -4,6 +4,7 @@
 package advisoryapi_test
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // documents is a page of the uploads of one kind of document.
@@ -168,6 +170,33 @@ func TestAnUploadTurnedAwayAnywhereItCanBeIsListedAsRefused(t *testing.T) {
 			t.Errorf("the request past the bound reads %+v", bounded)
 		}
 
+		// The same, for a supplier advisory: past the bound, and naming
+		// itself with more than a name records.
+		if got := r.Advised(t, "admin", "dsa-big.json", said+strings.Repeat(" ", 2<<20)); got.Code != http.StatusRequestEntityTooLarge {
+			t.Fatalf("an advisory past the bound answered %d: %s", got.Code, got.Body.String())
+		}
+		named := strings.Repeat("D", 200)
+		httpapitest.RefusedWith(t, r.Advised(t, "admin", "dsa-long.json",
+			httpapitest.SupplierAdvisory(named, "known_not_affected", "3.7.0")), http.StatusUnprocessableEntity)
+		httpapitest.RefusedWith(t, r.Advised(t, "admin", "dsa-broken.json", "{"), http.StatusUnprocessableEntity)
+		var advisories documents
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/supplier-advisories", &advisories)
+		if advisories.Total != 3 || len(advisories.Items) != 3 {
+			t.Fatalf("the advisory list holds %+v; want the three refusals", advisories.Items)
+		}
+		if broken := advisories.Items[0]; broken.Status != "refused" || broken.Document != "dsa-broken.json" ||
+			broken.Reason == "" || broken.Identifier != "" {
+			t.Errorf("the advisory nothing can read reads %+v", broken)
+		}
+		if named := advisories.Items[1]; named.Status != "refused" || !strings.Contains(named.Reason, "longer than") ||
+			named.Identifier == "" || named.Document != "dsa-long.json" || named.UploadedBy != "admin" {
+			t.Errorf("the advisory naming itself at length reads %+v", named)
+		}
+		if big := advisories.Items[2]; big.Status != "refused" || !strings.Contains(big.Reason, "larger than") ||
+			big.UploadedBy != "admin" {
+			t.Errorf("the advisory past the bound reads %+v", big)
+		}
+
 		var kinds struct {
 			Items []struct {
 				Type   string `json:"type"`
@@ -183,6 +212,45 @@ func TestAnUploadTurnedAwayAnywhereItCanBeIsListedAsRefused(t *testing.T) {
 				each.Latest.Reason != long.Reason) {
 				t.Errorf("the VEX documents' newest reads %+v; want the refusal", each.Latest)
 			}
+		}
+	})
+}
+
+func TestAnUploadShedAtTheSimultaneousLimitIsNotRecordedAsRefused(t *testing.T) {
+	// Answered 503: the deployment was busy, and nothing is wrong with the
+	// document.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if _, _, err := setting.NewStore(r.DB.DB).Change(t.Context(), setting.UploadsAtOnce, "1"); err != nil {
+			t.Fatal(err)
+		}
+		said := httpapitest.Said("fixed", "", "")
+		whole, kind := httpapitest.Form(t, httpapitest.Part{Field: "statements", Filename: "debian.json", Content: said})
+		content := whole.Bytes()
+
+		// The first upload is held part way through its body, so it holds
+		// its place while the second arrives.
+		pr, pw := io.Pipe()
+		done := make(chan int)
+		go func() {
+			done <- r.Post(t, "admin", http.MethodPost, "/v1/products/mine/vex-statements?publisher=debian",
+				pr, kind).Code
+		}()
+		if _, err := pw.Write(content[:64]); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.RefusedWith(t, r.Vexed(t, "admin", "ubuntu", said), http.StatusServiceUnavailable)
+		if _, err := pw.Write(content[64:]); err != nil {
+			t.Fatal(err)
+		}
+		_ = pw.Close()
+		if code := <-done; code != http.StatusCreated {
+			t.Fatalf("the upload holding the place answered %d", code)
+		}
+
+		var vex documents
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-statements", &vex)
+		if vex.Total != 1 || len(vex.Items) != 1 || vex.Items[0].Status != "completed" {
+			t.Errorf("the VEX list holds %+v; want the upload taken alone", vex.Items)
 		}
 	})
 }

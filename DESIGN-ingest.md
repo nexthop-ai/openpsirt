@@ -1048,7 +1048,7 @@ record holds the rest.
 |---|---|
 | The kind, the publisher and the name the publisher gave it | As far as the document was read. Empty where it was turned away first |
 | The file name a client gave, or the address a feed fetched it from | |
-| The digest of what arrived | Absent where it was turned away before it was read whole |
+| The digest of what arrived | SHA-256 of the bytes, for a fetched advisory as for an upload. Absent where it was turned away before it was read whole |
 | Who uploaded it, or which supplier's feed fetched it | One of the two. The sender is spelled as a scan's is, so a key and a person are never the same sender |
 | When it arrived | |
 | Completed or refused, and what the sender was told where it was refused | |
@@ -1058,9 +1058,10 @@ record holds the rest.
 |---|---|
 | One row per arrival, never replaced | An administrator uploads by hand, and a feed steps past a document once it has read or refused it. Nothing retries on a timer the way a pipeline sending an inventory does |
 | A taken document is recorded in the transaction that records its statements | The record and the statements cannot disagree about whether it was taken |
-| A refusal is recorded wherever the upload is turned away once its sender is admitted | By the form bound before the operation runs, by the reader, and by the checks on the publisher and the name. An answer of 500 or above is this deployment failing, and is not recorded as a refusal |
-| A document a feed fetched is recorded where it said something about a component this product ships, set aside something an earlier copy said, or was refused | A distribution lists tens of thousands of advisories about nothing a product here ships |
-| A feed's refusal is a document it stepped over | Withdrawn, too large, malformed, mismatching its digest, or at an address the client turns away. A statement set listed beside the advisories is left alone and not recorded. A publisher that cannot be reached is a failure of the pass, not of a document |
+| A refusal is recorded wherever the upload is turned away once its sender is admitted | By the form bound before the operation runs, by the reader, and by the checks on the publisher and the name. An answer of 500 or above is this deployment failing, and is not recorded as a refusal. That includes a request shed because the deployment is receiving as many uploads as it takes |
+| A document a feed fetched is recorded where it said something about a component this product ships, set aside something an earlier copy said, or arrived whole and was refused | A distribution lists tens of thousands of advisories about nothing a product here ships |
+| A feed's refusal is a document that arrived whole and was stepped over | Malformed, misshapen, or mismatching the digest its publisher serves, with the publisher and the name where it was parsed that far |
+| A document a feed could not fetch whole is not recorded | Withdrawn, refused by the publisher, past the size bound, or at an address the client turns away. Nothing arrived, and the supplier's own record says what stopped the pass. A statement set listed beside the advisories is left alone and not recorded either |
 | A trusted upstream's documents are not recorded here | They are read on a schedule, from the upstream (`DESIGN-upstream.md`) |
 
 ### Document lists
@@ -1343,7 +1344,7 @@ from a fuzzer are intended scope and **are not built** (REQ-14).
 | Limit | Detail |
 |---|---|
 | An upload refused by the request's own validation is not recorded | A missing document part, or a query parameter past its bound, is refused before the operation runs and before anything reads which product it names |
-| Document uploads begin at v0.11.0 | A database upgraded from v0.10.0 has statements and no record of the uploads that made them. Who uploaded those is in the history of administrative changes |
+| Document uploads begin at v0.11.0 | A database upgraded from v0.10.0 has statements and no record of the uploads that made them. Who uploaded those is in the history of administrative changes. The lists, and an empty tab on the Uploads screen, say that earlier uploads are not listed and their statements still apply |
 | The list of uploads is per build, with the product's documents on every build of it | The SBOM and SARIF paths name a build, and the other two name a product. A product-wide list of every build's uploads is not built |
 | A day's whole archive is downloaded to keep half a megabyte of it | 622 MB on 2026-10-07. The List's hourly files of what changed are not read: a day's delay is what the scanner's own data has, and a second path to keep right has not been measured as worth it |
 | A deployment reaching the internet only through a proxy fetches no CVE records | The guarded client dials directly, so the check on the address it connects to is a check on the host it reaches. Such a deployment imports an archive instead |

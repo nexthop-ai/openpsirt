@@ -29629,7 +29629,9 @@ paths:
       description: |-
         Returns every supplier security advisory that arrived for this product, newest first, taken or turned away: who uploaded it or which supplier feed fetched it, what became of it, and how many statements it recorded and set aside. The newest copy taken of each advisory is marked `current`.
 
-        An advisory a feed fetched is listed where it said something about a component this product ships, set aside something an earlier copy said, or was turned away.
+        Uploads made before v0.11.0 are not listed. Their statements still apply.
+
+        An advisory a feed fetched is listed where it said something about a component this product ships, set aside something an earlier copy said, or arrived whole and was turned away.
 
         Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
       operationId: list-supplier-advisories
@@ -30113,7 +30115,9 @@ paths:
       description: |-
         Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken from each publisher is marked `current`.
 
-        Statements a trusted upstream publishes are listed with the upstream, not here.
+        Uploads made before v0.11.0 are not listed. Their statements still apply.
+
+        Statements a trusted upstream publishes are listed with that upstream.
 
         Requires: any signed-in person, and not a pipeline key. Answers for a product you may see.
       operationId: list-vex-documents

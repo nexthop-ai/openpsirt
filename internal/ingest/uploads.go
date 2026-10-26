@@ -32,7 +32,9 @@ type UploadStatus string
 const (
 	// UploadInProgress is taken and still being read or applied.
 	UploadInProgress UploadStatus = "in-progress"
-	// UploadCompleted is read and applied, or kept beside a newer one.
+	// UploadCompleted is read and applied, or kept beside a newer one. A VEX
+	// document or a supplier advisory is recorded in this word and the next,
+	// so its record is its status.
 	UploadCompleted UploadStatus = "completed"
 	// UploadFailed is taken and then found unusable.
 	UploadFailed UploadStatus = "failed"

@@ -119,6 +119,52 @@ describe("the tabs", () => {
     expect(asked).not.toContain(SCANS);
   });
 
+  it("each open on the first page of their own list", async () => {
+    const doc = {
+      received_at: "2026-10-01T00:00:00Z",
+      status: "completed",
+      publisher: "debian",
+      document: "debian.json",
+      recorded: 1,
+      set_aside: 0,
+      current: true,
+    };
+    const get = serve((path) => {
+      if (path === UPLOADS) {
+        return {
+          data: {
+            items: [
+              { type: "sbom", total: 0 },
+              { type: "vex", total: 60 },
+              { type: "supplier-advisory", total: 3 },
+            ],
+          },
+        };
+      }
+      return { data: { items: [doc], total: 60 } };
+    });
+    mount.render(
+      screen(<Uploads />, "/products/sonic/streams/master/variants/x/uploads/vex", PATTERN),
+    );
+    await settle();
+    const next = Array.from(mount.host().querySelectorAll("button")).find(
+      (each) => each.textContent === "Next",
+    );
+    act(() => next?.click());
+    await settle();
+    const advisories = Array.from(mount.host().querySelectorAll<HTMLAnchorElement>("nav .tab2"))[2];
+    act(() => advisories?.click());
+    await settle();
+    const calls = get.mock.calls as unknown as [
+      path: string,
+      init: { params?: { query?: { offset?: number } } },
+    ][];
+    const offsets = (path: string) =>
+      calls.filter(([at]) => at === path).map(([, init]) => init?.params?.query?.offset);
+    expect(offsets("/v1/products/{product}/vex-statements")).toEqual([0, 50]);
+    expect(offsets("/v1/products/{product}/supplier-advisories")).toEqual([0]);
+  });
+
   it("open on SBOMs where the address names a kind the reader may not read", async () => {
     const { asked } = await opened("/sarif", [{ type: "sbom", total: 0 }]);
     expect(asked).toContain(SCANS);
