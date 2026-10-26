@@ -535,6 +535,7 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 | No row carries source text | The queue holds none. A snippet is evidence, kept under the path's setting (§ Snippets) |
 | With no state named the file says it lists the queue | An empty query reads as everything, and the queue leaves the baseline out |
 | A refusal is answered before the first byte | A refusal written into the file would follow a 200 |
+| A findings list's file writes the queue of its selection below its findings, through this read (`DESIGN-reporting.md` § Exports) | The finding exports include the leads the reader reads (REQ-50) |
 
 ### Leads by series
 

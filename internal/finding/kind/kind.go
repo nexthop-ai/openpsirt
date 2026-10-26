@@ -116,8 +116,14 @@ const (
 	// Statistics is every figure about findings: trends, comparisons of two
 	// builds, coverage, the reports and the home page's numbers.
 	Statistics Consumer = "statistics"
-	// Exports is the findings lists written out as files.
+	// Exports is the findings lists written out as files: the rows the
+	// list reads, then the leads of the same selection as the lead queue
+	// reads them.
 	Exports Consumer = "exports"
+	// Register is the disposition register: what was decided at every place
+	// of one build, its screen and its file. It states what a build ships,
+	// beside its VEX document, and a lead nobody has judged is not that.
+	Register Consumer = "register"
 	// VEX is the documents stating what affects a build.
 	VEX Consumer = "vex"
 	// Advisories is the documents about flaws recorded here.
@@ -129,9 +135,9 @@ const (
 	Evidence Consumer = "evidence"
 	// Leads is the lead queue: the leads a product holds, by where they
 	// stand, with how many each list leaves out, what pulls one out of the
-	// baseline, the queue's file, and the counts by analyzer series. The file
-	// and the counts are here rather than under Exports and Statistics,
-	// which feed the vulnerability figures and documents.
+	// baseline, the queue's file, the leads a findings list's file carries,
+	// and the counts by analyzer series. The counts are here rather than
+	// under Statistics, which feeds the vulnerability figures.
 	Leads Consumer = "leads"
 )
 
@@ -139,7 +145,7 @@ const (
 func consumers() []Consumer {
 	return []Consumer{
 		Closure, VersionCarry, Ranking, Triage, Assignment, Decisions, Inventory, Statistics,
-		Exports, VEX, Advisories, Notifications, Evidence, Leads,
+		Exports, Register, VEX, Advisories, Notifications, Evidence, Leads,
 	}
 }
 
@@ -148,17 +154,18 @@ func consumers() []Consumer {
 // A run's sweep covers what a scan of the inventory produces, and nothing a
 // person recorded: a flaw written by hand and swept by the first run after it
 // would be closed silently, with a reason reading as though it went away.
-// Analysis results are read by the consumers built for them and by no other;
-// the vulnerability figures, documents and lists are about what a build ships,
-// and a lead nobody has judged is not that.
+// Analysis results are read by the consumers built for them, by the claims
+// about them, and by the findings lists' files, which write out everything the
+// reader may read. The vulnerability figures, documents and lists are about
+// what a build ships, and a lead nobody has judged is not that.
 func (c Consumer) Kinds() []Kind {
 	switch c {
 	case Closure:
 		return []Kind{Vulnerability}
-	case VersionCarry, Ranking, Triage, Inventory, Statistics, Exports, VEX,
+	case VersionCarry, Ranking, Triage, Inventory, Statistics, Register, VEX,
 		Advisories, Notifications:
 		return []Kind{Vulnerability, Entered}
-	case Assignment, Decisions:
+	case Assignment, Decisions, Exports:
 		return []Kind{Vulnerability, Entered, Analysis}
 	case Evidence, Leads:
 		return []Kind{Analysis}
@@ -166,8 +173,8 @@ func (c Consumer) Kinds() []Kind {
 	return nil
 }
 
-// includes reports whether this consumer reads findings of kind k.
-func (c Consumer) includes(k Kind) bool {
+// Includes reports whether this consumer reads findings of kind k.
+func (c Consumer) Includes(k Kind) bool {
 	for _, have := range c.Kinds() {
 		if have == k {
 			return true

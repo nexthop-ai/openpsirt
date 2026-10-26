@@ -12,9 +12,12 @@ import (
 )
 
 // An analysis result reaches none of the consumers of vulnerability findings,
-// at any visibility: the lists and their counts, the exports and the VEX
-// document. Each read below would carry it on its visibility alone, since a
-// lead moved into a private case is private and only its kind keeps it out.
+// at any visibility: the lists and their counts, the disposition register, the
+// findings file's vulnerability rows and the VEX document. Each read below
+// would carry it on its visibility alone, since a lead moved into a private
+// case is private and only its kind keeps it out. A findings file writes a
+// lead only through the lead queue's read, which needs the analyzer's result
+// these rows have none of.
 func TestAnAnalysisResultReachesNoConsumerOfVulnerabilityFindings(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)

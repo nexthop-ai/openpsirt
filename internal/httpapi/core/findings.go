@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -229,6 +230,14 @@ type Narrowing struct {
 	Exclude      []string               `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
 	Sort         sortOrder              `query:"sort" doc:"The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
 	Ascending    bool                   `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
+}
+
+// OnlyOrders reports whether the narrowing asks nothing but the order the
+// list is paged in. A filter added to the list is a narrowing here without
+// anything naming it.
+func (n Narrowing) OnlyOrders() bool {
+	n.Sort, n.Ascending = "", false
+	return reflect.ValueOf(n).IsZero()
 }
 
 // BandCounts reads counts keyed by severity band into the four a body states,

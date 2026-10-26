@@ -882,8 +882,14 @@ stops is one somebody reads as whole.
 | A field the list leaves out is an empty cell in the file, never a zero | The fix-bundle list omits the build count for one build, because it is the same on every row; written as a zero it states that the bundle is in no build. Every signal the list carries is a column, exploitation here included |
 | The queue's file is one of its lists, the one the screen shows | The approvals leave out your own claims; the expired deferrals and the missed fix dates hold everybody's you may decide on. It carries what each promised: the date a deferral runs to, the date a fix was promised by, and the version an upgrade moves to |
 | An agreement taken back is not somebody who agrees | The record's file lists only agreements that still stand, and states separately whether a second person has one |
-| The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50). The findings lists' files include no lead (`DESIGN-kinds.md` § Consumers) |
-| The lead queue's file is the queue, under the queue's visibility | It belongs to the Leads consumer, so the findings lists' files still hold no lead. A lead in a case the reader is not on is a row with no message, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
+| The record's file includes claims about leads | It writes what the record shows, under the same visibility (REQ-50) |
+| The lead queue's file is the queue, under the queue's visibility | A lead in a case the reader is not on is a row with no message, and no row carries source text (`DESIGN-analysis.md` § Queue file) |
+| A findings list's file holds, below its findings, the lead queue of the same selection, read as the queue reads it (REQ-50) | The finding exports include every kind the reader reads (`DESIGN-kinds.md` § Consumers). Readers of disclosed or undisclosed work alone read no lead, and their files hold none |
+| The cross-product file holds each product's queue in turn, by product name | Each product's queue is its own read, under its own visibility |
+| A findings file narrowed by any filter but the order holds no lead, and states that it holds none | A lead carries no rating, component, upstream, decision or deadline, so every filter asks what a lead does not carry. A filter added to the list narrows the leads out without anything naming it |
+| A file states which leads it holds | Without it, an empty lead list in a file reads as a product with no leads |
+| A lead row is a row of the findings file's columns. The rule is the issue, and the opened date, branch or tag and variant are the newest build's, as the queue lists it. The columns after the variant are a lead's: whether the row is a lead, the path, line, function and message, and whether the message is withheld. Every other column is empty on a lead, and the lead columns are empty on every other row | One header keeps a file one table, and a reader filters the leads by one column. A lead has no rating, component or decision to fill the rest with |
+| The disposition register holds no lead | It is the Register consumer's, which states what a build ships beside its VEX document (`DESIGN-kinds.md` § Consumers) |
 
 ## Settings
 
