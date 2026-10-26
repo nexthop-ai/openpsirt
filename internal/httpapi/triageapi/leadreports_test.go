@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // leadSeries is a product's lead counts by analyzer series as somebody reads
@@ -251,4 +252,32 @@ func TestTheExceptionReportListsALeadDismissalNobodyAgreedToOnlyToInternalReader
 			t.Errorf("a lead's dismissal two people made is still in the exception report: %+v", got)
 		}
 	})
+}
+
+func TestALeadDismissalStandingWithNobodyAgreeingIsCountedWhateverItsFlagSays(t *testing.T) {
+	for name, outcome := range map[string]string{
+		"dismissed":    `{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`,
+		"not security": `{"outcome":"not-security","reasoning":"a crash in a tool that exits"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+				decided := decideLead(t, r, httpapitest.SeededLead(t, r), outcome)
+				// Standing, and cleared of the gate's flag, which is the write
+				// path got around.
+				if _, err := r.DB.DB.NewUpdate().Table("decision").
+					Set(`"state" = ?`, triage.Approved).Set(`"needs_approval" = ?`, false).
+					Where(`"claim_id" = ?`, decided.ClaimID).Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				claims, rows, err := triage.NewStore(r.DB.DB).HiddenWithNobodyAgreeing(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if claims != 1 || rows != 1 {
+					t.Errorf("%s standing alone with no flag counts %d claims over %d rows; want one of each",
+						name, claims, rows)
+				}
+			})
+		})
+	}
 }
