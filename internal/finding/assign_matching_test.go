@@ -33,7 +33,7 @@ func TestAssigningEverythingMatchingNamesAnUnheldPieceItCouldNotMove(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		admits := func(context.Context, bun.IDB, access.Visibility) error { return nil }
+		admits := func(context.Context, bun.IDB, []access.Visibility) error { return nil }
 
 		handed, err := f.store.AssignMatching(ctx, who, f.scope, finding.Filter{}, nil, &colleague.ID, admits)
 		if err != nil {

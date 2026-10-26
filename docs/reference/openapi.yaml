@@ -909,6 +909,23 @@ components:
           description: "A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"
           type: string
       type: object
+    Assign-leadRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Assign-leadRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        person:
+          description: Their sign-in identity, or empty for nobody
+          type: string
+        team:
+          description: "A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"
+          type: string
+      type: object
     Assign-matching-findingsRequest:
       additionalProperties: false
       properties:
@@ -5838,6 +5855,15 @@ components:
           format: uri
           readOnly: true
           type: string
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
+          type: string
         at:
           $ref: "#/components/schemas/LeadPlace"
           description: Where the lead is
@@ -6046,6 +6072,15 @@ components:
     LeadRowBody:
       additionalProperties: false
       properties:
+        assigned_team:
+          description: "Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it"
+          type: boolean
+        assigned_to:
+          description: "Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is"
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from the name above
+          type: string
         builds:
           description: The number of builds in the list's scope the lead is listed on, in the state the list asks for
           format: int64
@@ -27788,6 +27823,69 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment:
+    put:
+      description: |-
+        Records who is dealing with this lead.
+
+        It covers the product, not the build named in the path: what is assigned is the lead on every build of the product it is open on.
+
+        Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
+
+        A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409.
+
+        A lead seen on a build it was not open on when it was assigned starts unassigned there.
+
+        Requires: public-triage or private-triage or internal-triage on the product. At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
+      operationId: assign-lead
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: The lead's place identity
+          in: path
+          name: place
+          required: true
+          schema:
+            description: The lead's place identity
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assign-leadRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Assign a lead to somebody
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+          - internal-triage
+        note: At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
   /v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators:
     get:
       description: |-

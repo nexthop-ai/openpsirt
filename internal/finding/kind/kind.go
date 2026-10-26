@@ -97,9 +97,15 @@ const (
 	// are worked out from, and the passes that rewrite them.
 	Ranking Consumer = "ranking"
 	// Triage is the shared finding model as people work it: the findings
-	// lists and their counts, one finding's page, assignment and routing,
-	// notes on an issue, and disclosure.
+	// lists and their counts, one finding's page, the lists of who holds
+	// what, notes on an issue, and disclosure.
 	Triage Consumer = "triage"
+	// Assignment is who deals with a finding: the write that gives work to a
+	// person or a team or hands it back, handing over everything one person
+	// holds, and the routing rules' sweep and preview. It names leads, which
+	// Triage does not, so a lead is held and routed by the one implementation
+	// a finding is without reaching the findings lists or disclosure.
+	Assignment Consumer = "assignment"
 	// Decisions is the claims people make about findings: their rows, the
 	// reasoning and its revisions, approvals, comments on a claim, the review
 	// queue, every read of one claim, and the record of judgments and its file.
@@ -132,7 +138,7 @@ const (
 // consumers is every consumer of findings.
 func consumers() []Consumer {
 	return []Consumer{
-		Closure, VersionCarry, Ranking, Triage, Decisions, Inventory, Statistics,
+		Closure, VersionCarry, Ranking, Triage, Assignment, Decisions, Inventory, Statistics,
 		Exports, VEX, Advisories, Notifications, Evidence, Leads,
 	}
 }
@@ -152,7 +158,7 @@ func (c Consumer) Kinds() []Kind {
 	case VersionCarry, Ranking, Triage, Inventory, Statistics, Exports, VEX,
 		Advisories, Notifications:
 		return []Kind{Vulnerability, Entered}
-	case Decisions:
+	case Assignment, Decisions:
 		return []Kind{Vulnerability, Entered, Analysis}
 	case Evidence, Leads:
 		return []Kind{Analysis}

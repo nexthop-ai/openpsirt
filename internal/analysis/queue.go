@@ -64,7 +64,11 @@ type QueueRow struct {
 	State    State     `bun:"stands"`
 	Builds   int       `bun:"builds"`
 	Opened   time.Time `bun:"opened"`
-	// Stub is a lead moved into a case, read without what the analyzer said.
+	// Holder is the party dealing with the lead on that build, where anybody
+	// is: a person, or a team it is queued with.
+	Holder *int64 `bun:"assigned_to"`
+	// Stub is a lead moved into a case, read without what the analyzer said
+	// or who holds it.
 	Stub bool `bun:"-"`
 }
 
@@ -198,7 +202,7 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		ColumnExpr(`"f"."place_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
-		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant"`).
+		ColumnExpr(`"s"."name" AS "stream", "va"."name" AS "variant", "f"."assigned_to"`).
 		ColumnExpr(state+` AS "stands"`, stateArgs...).
 		Where(`"f"."id" IN (?)`, bun.List(newest)).
 		Scan(ctx, &rows); err != nil {
@@ -212,9 +216,10 @@ func LeadsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scop
 	for _, p := range page {
 		r := byPlace[p.Place]
 		r.Builds, r.Opened = p.Builds, p.Opened
-		// What the analyzer said is the case's once the lead is moved.
+		// What the analyzer said, and who is working it, are the case's
+		// once the lead is moved.
 		if p.Stub == 1 {
-			r.Message, r.Stub = "", true
+			r.Message, r.Holder, r.Stub = "", nil, true
 		}
 		out.Rows = append(out.Rows, r)
 	}

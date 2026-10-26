@@ -156,7 +156,7 @@ func TestTheLeadFileHoldsWhatTheListHoldsAndWithholdsWhatItWithholds(t *testing.
 
 		_, rows, body := leadFile(t, r, "internal-reader", "?state=handed-off")
 		if len(rows) != 1 || rows[0][0] != "clang-tidy/leak" || rows[0][4] != "" || rows[0][5] != "true" ||
-			rows[0][11] != place {
+			rows[0][12] != place {
 			t.Fatalf("an internal reader's file holds %q; want the moved lead, withheld", rows)
 		}
 		if strings.Contains(body, message) || strings.Contains(body, snippet) {
@@ -203,9 +203,18 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 			"/v1/products/mine/leads/"+place+"/escalation", `{}`); got.Code >= 300 {
 			t.Fatalf("pulling the lead in answered %d: %s", got.Code, got.Body)
 		}
-		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][11] != place ||
+		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][12] != place ||
 			rows[0][6] != "open" || rows[0][2] != "12" {
 			t.Errorf("the queue's file holds %q; want the lead pulled in, open at line 12", rows)
+		}
+		// Whoever holds a lead is a column of the file, as the list names them.
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut,
+			"/v1/products/mine/streams/master/variants/broadcom/leads/"+place+"/assignment",
+			`{"person":"internal-triager"}`); got.Code >= 300 {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		if _, rows, _ := leadFile(t, r, "internal-reader", ""); len(rows) != 1 || rows[0][11] != "internal-triager" {
+			t.Errorf("the queue's file holds %q; want the lead held by the internal triager", rows)
 		}
 	})
 }

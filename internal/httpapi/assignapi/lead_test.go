@@ -1,0 +1,249 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package assignapi_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
+)
+
+// leadAt is where the seeded lead is addressed on the seeded build.
+func leadAt(place string) string {
+	return "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+}
+
+// granted gives one of the cast another role on the seeded product.
+func granted(t *testing.T, r *httpapitest.Reach, who string, role access.Role) {
+	t.Helper()
+	ctx := t.Context()
+	person, err := r.Rights.Ensure(ctx, who, httpapitest.ShownAs(who), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Rights.GrantRole(ctx, person.ID, mine.ID, role); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// heldLead is who the lead page and the queue name as dealing with the lead.
+type heldLead struct {
+	AssignedTo   string `json:"assigned_to"`
+	AssignedTeam bool   `json:"assigned_team"`
+}
+
+// holderOf is who the lead page says is dealing with the lead, and who the
+// queue's row for it says, as one reader reads both.
+func holderOf(t *testing.T, r *httpapitest.Reach, who, place string) (page, queue heldLead) {
+	t.Helper()
+	httpapitest.Read(t, r, who, leadAt(place), &page)
+	var listed struct {
+		Items []struct {
+			Place string `json:"place"`
+			heldLead
+		} `json:"items"`
+	}
+	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=baseline", &listed)
+	for _, row := range listed.Items {
+		if row.Place == place {
+			queue = row.heldLead
+		}
+	}
+	return page, queue
+}
+
+// Assigning a lead is triage at the lead's visibility. Somebody who does not
+// read it, and somebody who reads it and triages only another visibility, are
+// answered as though it were not there, and giving it to somebody else asks
+// for the assigner right as a finding's assignment does.
+func TestALeadIsAssignedByWhoeverTriagesItsVisibility(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := leadAt(place) + "/assignment"
+		// Reading the lead, and triaging disclosed work alone.
+		granted(t, r, "internal-reviewer", access.PublicTriage)
+		for _, c := range []struct {
+			who, body string
+			want      int
+		}{
+			{"reader", `{"person":"reader"}`, http.StatusNotFound},
+			{"triager", `{"person":"triager"}`, http.StatusNotFound},
+			{"private-triage", `{"person":"private-triage"}`, http.StatusNotFound},
+			{"internal-reader", `{"person":"internal-reader"}`, http.StatusNotFound},
+			{"internal-reviewer", `{"person":"internal-reviewer"}`, http.StatusNotFound},
+			{"assigner-only", `{"person":"assigner-only"}`, http.StatusNotFound},
+			{"internal-triager", `{"person":"internal-reader"}`, http.StatusUnprocessableEntity},
+			{"internal-triager", `{"team":"anybody"}`, http.StatusUnprocessableEntity},
+			{"internal-triager", `{"person":"internal-triager"}`, http.StatusNoContent},
+		} {
+			if got := httpapitest.AsPerson(t, r, c.who, http.MethodPut, at, c.body); got.Code != c.want {
+				t.Errorf("%s sending %s answered %d, want %d: %s", c.who, c.body, got.Code, c.want, got.Body)
+			}
+		}
+		page, queue := holderOf(t, r, "internal-reader", place)
+		if page.AssignedTo != "internal-triager" || queue.AssignedTo != "internal-triager" {
+			t.Errorf("the lead page names %+v and the queue %+v; want the triager who took it", page, queue)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at, `{}`); got.Code != http.StatusNoContent {
+			t.Fatalf("handing it back answered %d: %s", got.Code, got.Body)
+		}
+		if page, queue := holderOf(t, r, "internal-reader", place); page.AssignedTo != "" || queue.AssignedTo != "" {
+			t.Errorf("a lead handed back is named as held by %+v and %+v", page, queue)
+		}
+	})
+}
+
+// A lead given to somebody is given only where they read it, and the line
+// telling them is withheld as internal work: a reader of undisclosed work is
+// refused the lead and told nothing, and the holder losing internal reading
+// loses the line with it, though they still read the product's undisclosed
+// work.
+func TestALeadAssignedIsToldToItsHolderAsInternalWork(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := leadAt(place) + "/assignment"
+		granted(t, r, "internal-triager", access.Assigner)
+		granted(t, r, "internal-reader", access.PrivateRead)
+
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+			`{"person":"private"}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("handing a lead to a reader of undisclosed work answered %d: %s", got.Code, got.Body)
+		}
+		// Asked of what was stored rather than of what they read: the area
+		// narrows a line about internal work away from them, and a line
+		// written for them at all is the defect.
+		written, err := r.DB.DB.NewSelect().TableExpr(`"notification" AS "n"`).
+			Join(`JOIN "person" AS "p" ON "p"."id" = "n"."person_id"`).
+			Where(`"p"."identity" = ?`, "private").
+			Where(`"n"."kind" = ?`, notify.Assigned).Count(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if written != 0 {
+			t.Error("a reader of undisclosed work was told about a lead")
+		}
+
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+			`{"person":"internal-reader"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("handing the lead to a reader of internal work answered %d: %s", got.Code, got.Body)
+		}
+		if !toldAbout(t, r, "internal-reader", "clang-tidy/leak at src/a.c:12") {
+			t.Fatal("the reader handed the lead was not told")
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/internal-reader/roles/mine/internal-read", ""); got.Code != http.StatusOK {
+			t.Fatalf("withdrawing internal reading answered %d: %s", got.Code, got.Body)
+		}
+		if toldAbout(t, r, "internal-reader", "clang-tidy/leak") {
+			t.Error("somebody who no longer reads internal work still reads the line about a lead")
+		}
+	})
+}
+
+// Losing the last role on a product hands back the leads it carried, as it
+// hands back every finding.
+func TestLosingTheLastRoleHandsBackTheLeadsItCarried(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		var withdrawn struct {
+			Released int64 `json:"released"`
+		}
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodDelete,
+			"/v1/people/internal-triager/roles/mine/internal-triage", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("withdrawing the role answered %d: %s", got.Code, got.Body)
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &withdrawn); err != nil {
+			t.Fatal(err)
+		}
+		if withdrawn.Released == 0 {
+			t.Error("the last role went and the lead it carried was not handed back")
+		}
+		if page, _ := holderOf(t, r, "internal-reader", place); page.AssignedTo != "" {
+			t.Errorf("the lead is still held by %q", page.AssignedTo)
+		}
+	})
+}
+
+// A team is handed a lead when one of its members reads it, and its queue is
+// named on the lead.
+func TestATeamHoldsALeadOneOfItsMembersReads(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		at := leadAt(place) + "/assignment"
+		granted(t, r, "internal-triager", access.Assigner)
+		for _, team := range []string{
+			`{"name":"private-desk","members":["private"]}`,
+			`{"name":"analysis-desk","members":["internal-reader"]}`,
+		} {
+			if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams", team); made.Code != http.StatusCreated {
+				t.Fatalf("declaring a team answered %d: %s", made.Code, made.Body.String())
+			}
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+			`{"team":"private-desk"}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("a team nobody on which reads internal work was handed a lead: %d %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at,
+			`{"team":"analysis-desk"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("a team with a reader of internal work answered %d: %s", got.Code, got.Body)
+		}
+		page, queue := holderOf(t, r, "internal-reader", place)
+		if page.AssignedTo != "analysis-desk" || !page.AssignedTeam || !queue.AssignedTeam {
+			t.Errorf("the lead page names %+v and the queue %+v; want the team's queue", page, queue)
+		}
+	})
+}
+
+// A lead every release of which is past its end of life is kept as it stands.
+func TestALeadPastItsEndOfLifeIsNotAssigned(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+			Where(`"name" = ?`, "master").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"person":"internal-triager"}`); got.Code != http.StatusConflict {
+			t.Errorf("taking a lead past its end of life answered %d: %s", got.Code, got.Body)
+		}
+	})
+}
+
+// Handing everything one person holds to somebody else moves their leads too,
+// and is refused where the recipient may not read internal work.
+func TestHandingOverSomebodysWorkMovesTheirLeadsToAReaderOfThem(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		place := httpapitest.SeededLead(t, r)
+		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, leadAt(place)+"/assignment",
+			`{"person":"internal-triager"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
+		}
+		at := "/v1/people/internal-triager/assignments/hand-back"
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"private"}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("handing a lead to a reader of undisclosed work answered %d: %s", got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, at, `{"to":"internal-reader"}`); got.Code != http.StatusOK {
+			t.Fatalf("handing a lead to a reader of internal work answered %d: %s", got.Code, got.Body)
+		}
+		if page, _ := holderOf(t, r, "internal-reader", place); page.AssignedTo != "internal-reader" {
+			t.Errorf("the lead is held by %q; want the reader it was handed to", page.AssignedTo)
+		}
+	})
+}

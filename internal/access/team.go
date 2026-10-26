@@ -500,7 +500,8 @@ func rolesReading(productID int64, visibility Visibility) []Role {
 }
 
 // AnyMemberReads reports whether at least one person on a team may read a
-// finding of this visibility in this product.
+// finding of each of these visibilities in this product: one member who reads
+// every one of them. Naming none is a question nobody answers yes to.
 //
 // Not every member: requiring that would turn routing pressure into access
 // pressure — an administrator granting somebody private reading so that a
@@ -512,22 +513,29 @@ func rolesReading(productID int64, visibility Visibility) []Role {
 // Asked of the same rule every query uses rather than spelled again here, so
 // that "may read" cannot come to mean two things.
 func (s *Store) AnyMemberReads(ctx context.Context, teamID, productID int64,
-	visibility Visibility) (bool, error) {
+	visibilities ...Visibility) (bool, error) {
 
-	enough := rolesReading(productID, visibility)
-	if len(enough) == 0 {
+	if len(visibilities) == 0 {
 		return false, nil
 	}
 	// An administrator is not counted. Administration is not a read grant,
 	// and a team whose only qualifying member is an administrator is a queue
 	// nobody working the product can see. A member who has left is not
 	// counted either, for the same reason.
-	reads, err := holdingAny(s.db.NewSelect().
+	members := s.db.NewSelect().
 		TableExpr(`"team_member" AS "tmm"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "tmm"."person_id"`).
 		ColumnExpr(`"tmm"."person_id"`).
 		Where(`"tmm"."team_id" = ?`, teamID).
-		Where(`"pe"."deactivated_at" IS NULL`), `"tmm"."person_id"`, enough, productID).Exists(ctx)
+		Where(`"pe"."deactivated_at" IS NULL`)
+	for _, visibility := range visibilities {
+		enough := rolesReading(productID, visibility)
+		if len(enough) == 0 {
+			return false, nil
+		}
+		members = holdingAny(members, `"tmm"."person_id"`, enough, productID)
+	}
+	reads, err := members.Exists(ctx)
 	if err != nil {
 		return false, fmt.Errorf("read whether anybody on that team may see this: %w", err)
 	}

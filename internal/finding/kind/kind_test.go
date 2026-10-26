@@ -30,7 +30,7 @@ func TestEveryConsumerIncludesOnlyDeclaredKinds(t *testing.T) {
 }
 
 // builtForAnalysis is the consumers that read analysis results.
-var builtForAnalysis = map[Consumer]bool{Decisions: true, Evidence: true, Leads: true}
+var builtForAnalysis = map[Consumer]bool{Assignment: true, Decisions: true, Evidence: true, Leads: true}
 
 func TestAnalysisReachesOnlyTheConsumersBuiltForIt(t *testing.T) {
 	for _, c := range consumers() {

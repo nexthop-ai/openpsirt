@@ -56,6 +56,8 @@ type LeadEvidenceBody struct {
 	Withheld  bool               `json:"withheld,omitempty" doc:"Whether the lead is part of a case you are not on, so only its state, rule, location and sightings are answered"`
 	Ended     bool               `json:"past_end_of_life,omitempty" doc:"Whether every release the lead was seen in is past its end of life, so it is kept as it stands and takes no decision, fixed closure, pull into the queue or hand-off"`
 	Handoff   *LeadHandoffBody   `json:"handoff,omitempty" doc:"The flaw the lead was handed off as. Answered where you read the product's undisclosed work, are on the flaw's case, or were granted the lead"`
+	// Who is dealing with the lead on this build, while it is open there.
+	core.HolderBody
 }
 
 // LeadHandoffBody is the flaw a lead was handed off as.
@@ -158,8 +160,16 @@ func registerLeads(api huma.API, in core.Deps) {
 			body.Kin = append(body.Kin, one)
 		}
 		if evidence.Stub {
-			// The claims about a moved lead are private with it.
+			// The claims about a moved lead, and who works it, are private
+			// with it.
 			return &struct{ Body LeadEvidenceBody }{Body: body}, nil
+		}
+		if lead.ClosedAt == nil && lead.AssignedTo != nil {
+			who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, []int64{*lead.AssignedTo})
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "who is dealing with that lead could not be read", err)
+			}
+			body.HolderBody = core.HolderOf(who[*lead.AssignedTo])
 		}
 		held, err := triage.NewStore(in.DB.DB).PreviouslyAt(ctx, subject, triage.Place{
 			ProductID: named.ProductID, VulnerabilityID: lead.VulnerabilityID, PlaceIdentity: lead.PlaceIdentity,

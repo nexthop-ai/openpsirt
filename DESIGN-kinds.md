@@ -76,7 +76,8 @@ and a kind it does not name never reaches it.
 | Closure | A run's sweep: what it opens, updates and closes | Vulnerability |
 | Version carry | A decision lapsing when a version it was about moved, and a decision carried to a build whose versions match (REQ-25) | Vulnerability, entered |
 | Ranking | Urgency and deadlines, and the passes that rewrite them | Vulnerability, entered |
-| Triage | The findings lists and their counts, one finding's page, assignment and routing, notes on an issue, and disclosure | Vulnerability, entered |
+| Triage | The findings lists and their counts, one finding's page, the lists of who holds what, notes on an issue, and disclosure | Vulnerability, entered |
+| Assignment | Giving work to a person or a team, handing over everything somebody holds, handing back what a lost role carried, and routing by a team's rules and its preview (`DESIGN-access.md` § Teams, `DESIGN-analysis.md` § Lead assignment) | Vulnerability, entered, analysis |
 | Decisions | Claims and their rows, the reasoning and its revisions, approvals, comments on a claim, the review queue, every read of one claim, the record of judgments and its file, and the notices about claims: waiting, sent back, lapsed and an agreement withdrawn | Vulnerability, entered, analysis |
 | Inventory | A build's tree, a component and the places it sits at | Vulnerability, entered |
 | Statistics | Trends, comparisons of two builds, coverage, the reports and the home page's figures | Vulnerability, entered |
@@ -87,9 +88,9 @@ and a kind it does not name never reaches it.
 | Evidence | One lead's evidence: where it is, the path the analyzer took to it, links into the source, and the source kept beside it (`DESIGN-analysis.md` § Source) | Analysis |
 | Leads | The lead queue: a product's leads by where they stand, with how many each list leaves out, what pulls one out of the baseline, the leads a standing rule covers, the queue's file, and the counts of a product's leads by analyzer series, and the notices about leads and their series (`DESIGN-analysis.md` § Lead queue, § Dismissal rules; `DESIGN-notifications.md` § Analyzer alerts, § Lead notices) | Analysis |
 
-Analysis findings are included by Evidence, Leads and Decisions alone: a
-lead is read through the lead queue, its evidence and the claims about it
-(`DESIGN-analysis.md` § Lead triage). The record's file follows Decisions and
+Analysis findings are included by Evidence, Leads, Decisions and Assignment
+alone: a lead is read through the lead queue, its evidence and the claims about
+it (`DESIGN-analysis.md` § Lead triage), and held the way a finding is. The record's file follows Decisions and
 includes claims about leads, because it writes what the record shows, under the
 same visibility (REQ-50). `DESIGN-interface.md` § Static analysis leads holds
 the screens.
@@ -98,6 +99,8 @@ the screens.
 |---|---|
 | The queue's file and the counts by series are part of Leads, not of Exports and Statistics | Exports and Statistics feed the findings lists' files, the vulnerability figures and what a VEX document states, and a lead nobody has judged is none of those. Naming analysis there would reach every statement they hold |
 | Each is the queue's own read over the queue's own visibility | A figure, the list it opens and the file of that list count one population |
+| Assignment is a consumer of its own, not part of Triage | Triage feeds the findings lists and disclosure, and naming analysis there puts a lead nobody has judged into both. Holding work is one act whatever the work is, so a handover and a lost role move a lead with everything else |
+| The lists of who holds what stay with Triage | Unassigned work, one person's work, a team's queue and the work of somebody who has left list findings. A lead's holder is read on the lead and in the lead queue |
 
 ## Inclusion
 

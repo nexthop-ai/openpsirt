@@ -209,7 +209,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 			admits = teamAdmits(team, product)
 		}
 
-		_, undisclosed, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
+		_, withheld, err := finding.NewStore(in.DB.DB).Assign(ctx, subject, target, issue,
 			component, to, admits)
 		if err != nil {
 			return nil, recipient(err, func(err error) error { return core.RefusedFinding(in, err) })
@@ -244,7 +244,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 		// assigns it again, and the notification is the lesser half of
 		// the two.
 		if to != nil && *to != subject.Party() &&
-			seenBy(ctx, in, input.Body.Person, product, undisclosed) {
+			seenBy(ctx, in, input.Body.Person, product, withheld) {
+			private, internal := notify.Withholding(withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: input.Vulnerability + " in " + input.Component +
@@ -261,7 +262,8 @@ func registerAssigning(api huma.API, in core.Deps) {
 				// announcement an embargo exists to prevent,
 				// so a channel that leaves here carries the
 				// link alone.
-				Private: undisclosed,
+				Private:  private,
+				Internal: internal,
 				// The same two as columns. Concerns above is a
 				// string a digest matches on; these are what a
 				// read narrows by.
@@ -620,13 +622,14 @@ func locateFinding(ctx context.Context, in core.Deps, subject access.Subject,
 // nothing about what the recipient can, and it is the recipient who receives
 // the text.
 //
-// At the visibility of the finding, not merely of the product. The body names
-// the issue, the component and the build, and is stored as written — so
+// At every visibility the work holds, not merely of the product. The body
+// names the issue, the component and the build, and is stored as written — so
 // somebody who may read what has been disclosed and no more is handed the name
 // of a finding nobody has announced, in a product they hold nothing
 // undisclosed on. Seeing that a product exists is not reading its embargoed
-// work.
-func seenBy(ctx context.Context, in core.Deps, identity string, productID int64, undisclosed bool) bool {
+// work, and reading undisclosed work is not reading internal work.
+func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
+	withheld []access.Visibility) bool {
 	them, err := access.NewStore(in.DB.DB).Resolve(ctx, identity)
 	switch {
 	case errors.Is(err, access.ErrDenied):
@@ -639,34 +642,35 @@ func seenBy(ctx context.Context, in core.Deps, identity string, productID int64,
 			"person", identity, "error", err)
 		return false
 	}
-	if undisclosed {
-		return them.Reads(access.Private, productID)
+	if len(withheld) > 0 {
+		for _, v := range withheld {
+			if !them.Reads(v, productID) {
+				return false
+			}
+		}
+		return true
 	}
 	// A disclosed finding travels with the assignment to whoever holds it,
 	// so reading the product at any visibility is enough to be told.
 	return them.ReadsIn(productID)
 }
 
-// teamMayHold reports whether a team may be handed work whose strictest
-// visibility is this: at least one member reads it.
+// teamMayHold reports whether a team may be handed work holding these
+// visibilities other than public: at least one member reads all of it.
 //
 // Undisclosed work needs a member who reads undisclosed work, and internal work
-// a member who reads internal work. Disclosed work travels with the assignment
-// to whoever holds it, so a member who reads the product at any visibility is
-// enough — a team of people working private reports may be handed a disclosed
-// finding and see it.
+// a member who reads internal work; work holding both needs one member who
+// reads both. Disclosed work travels with the assignment to whoever holds it,
+// so a member who reads the product at any visibility is enough — a team of
+// people working private reports may be handed a disclosed finding and see it.
 func teamMayHold(ctx context.Context, rights *access.Store, teamID, productID int64,
-	strictest access.Visibility) (bool, error) {
+	withheld []access.Visibility) (bool, error) {
 
-	reads, err := rights.AnyMemberReads(ctx, teamID, productID, strictest)
-	if err != nil || reads || strictest != access.Public {
-		return reads, err
+	if len(withheld) > 0 {
+		return rights.AnyMemberReads(ctx, teamID, productID, withheld...)
 	}
 	for _, v := range access.Visibilities() {
-		if v == access.Public {
-			continue
-		}
-		reads, err = rights.AnyMemberReads(ctx, teamID, productID, v)
+		reads, err := rights.AnyMemberReads(ctx, teamID, productID, v)
 		if err != nil || reads {
 			return reads, err
 		}

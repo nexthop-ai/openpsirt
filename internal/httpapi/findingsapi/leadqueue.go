@@ -31,6 +31,7 @@ type LeadRowBody struct {
 	State    LeadState `json:"state" doc:"Where the lead stands on that build"`
 	Builds   int       `json:"builds" doc:"The number of builds in the list's scope the lead is listed on, in the state the list asks for"`
 	Opened   string    `json:"opened" format:"date" doc:"When the lead was first opened on any of them"`
+	core.HolderBody
 }
 
 // LeadsOutput is a page of a product's leads.
@@ -80,17 +81,35 @@ func (a LeadsAsked) scoped(ctx context.Context, in core.Deps) (access.Subject, a
 	}, nil
 }
 
-// leadRow is one lead as the list and its file both state it.
-func leadRow(r analysis.QueueRow) LeadRowBody {
-	row := LeadRowBody{
-		Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
-		Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
-		Opened: r.Opened.UTC().Format(time.DateOnly),
+// leadRows is a page of leads as the list and its file both state them, with
+// who holds each one named.
+func leadRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]LeadRowBody, error) {
+	parties := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		if r.Holder != nil {
+			parties = append(parties, *r.Holder)
+		}
 	}
-	if r.Line != nil {
-		row.Line = *r.Line
+	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, parties)
+	if err != nil {
+		return nil, err
 	}
-	return row
+	out := make([]LeadRowBody, 0, len(rows))
+	for _, r := range rows {
+		row := LeadRowBody{
+			Place: r.Place, Rule: r.Rule, Path: r.Path, Function: r.Function, Message: r.Message, Withheld: r.Stub,
+			Stream: r.Stream, Variant: r.Variant, State: LeadState(r.State), Builds: r.Builds,
+			Opened: r.Opened.UTC().Format(time.DateOnly),
+		}
+		if r.Line != nil {
+			row.Line = *r.Line
+		}
+		if r.Holder != nil {
+			row.HolderBody = core.HolderOf(who[*r.Holder])
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 // leadColumns names the columns of the lead queue's file, in the order
@@ -98,7 +117,7 @@ func leadRow(r analysis.QueueRow) LeadRowBody {
 func leadColumns() []string {
 	return []string{
 		"rule", "path", "line", "function", "message", "withheld", "state", "stream", "variant",
-		"builds", "opened", "place",
+		"builds", "opened", "assigned_to", "place",
 	}
 }
 
@@ -111,7 +130,8 @@ func leadCells(row LeadRowBody) []string {
 	}
 	return []string{
 		row.Rule, row.Path, line, row.Function, row.Message, strconv.FormatBool(row.Withheld),
-		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened, row.Place,
+		string(row.State), row.Stream, row.Variant, strconv.Itoa(row.Builds), row.Opened,
+		row.AssignedTo, row.Place,
 	}
 }
 
@@ -157,9 +177,8 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 		for state, n := range queue.ByState {
 			out.Body.States[string(state)] = n
 		}
-		out.Body.Items = make([]LeadRowBody, 0, len(queue.Rows))
-		for _, r := range queue.Rows {
-			out.Body.Items = append(out.Body.Items, leadRow(r))
+		if out.Body.Items, err = leadRows(ctx, in, queue.Rows); err != nil {
+			return nil, core.WentWrong(in.Logger, "who holds the leads could not be read", err)
 		}
 		return out, nil
 	})
@@ -199,9 +218,13 @@ func registerLeadQueue(api huma.API, in core.Deps) {
 				if err != nil {
 					return nil, err
 				}
-				rows := make([][]string, 0, len(queue.Rows))
-				for _, r := range queue.Rows {
-					rows = append(rows, leadCells(leadRow(r)))
+				listed, err := leadRows(ctx, in, queue.Rows)
+				if err != nil {
+					return nil, err
+				}
+				rows := make([][]string, 0, len(listed))
+				for _, row := range listed {
+					rows = append(rows, leadCells(row))
 				}
 				return rows, nil
 			},

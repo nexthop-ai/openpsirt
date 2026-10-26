@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -26,10 +27,10 @@ import (
 var ErrSamePerson = refusal.New("that would hand their work to themselves")
 
 // ErrRecipientMayNotRead says work was handed to somebody not cleared to read
-// all of it: some of it is undisclosed in a product where they may read only
-// what has been disclosed. The hand-over would be the disclosure.
-var ErrRecipientMayNotRead = refusal.New("some of this has not been disclosed and they may " +
-	"not read undisclosed work there, so handing it to them would be the disclosure")
+// all of it: some of it is undisclosed or internal in a product where they may
+// not read work of that visibility. The hand-over would show it to them.
+var ErrRecipientMayNotRead = refusal.New("some of this is undisclosed or internal and they may " +
+	"not read work of that visibility there, so handing it to them would show it to them")
 
 // moveWork is the write itself, apart from the answering: which rows move, and
 // what they move to.
@@ -44,13 +45,21 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 
 	return s.moveWhere(ctx, db, subject, productID, to, dispatches,
 		func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where(`"vulnerability_id" = ?`, vulnerabilityID).
+			return asPieces(q).Where(`"vulnerability_id" = ?`, vulnerabilityID).
 				Where(`"component_id" = ?`, componentID)
 		})
 }
 
+// asPieces keeps a write to the kinds whose work is an issue at a component:
+// the findings list's kinds. A lead is one place, named by moveLead, and an
+// analyzer rule at a component is many leads rather than one piece of work.
+func asPieces(q *bun.UpdateQuery) *bun.UpdateQuery {
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
+	return q.Where(kinds, kindArgs...)
+}
+
 // moveWhere is moveWork over whichever work the caller names: one issue at one
-// component, or several issues at every binary of one fold.
+// component, several issues at every binary of one fold, or one lead.
 //
 // The naming is the only part a caller supplies. The product, the open rows and
 // who may move which of them are this function's, so an act that hands over
@@ -67,7 +76,7 @@ func (s *Store) moveWhere(ctx context.Context, db bun.IDB, subject access.Subjec
 	selfward := to == nil || *to == subject.Party()
 
 	now := s.now().UTC().Truncate(time.Microsecond)
-	kinds, kindArgs := kind.Triage.Where(`"kind"`)
+	kinds, kindArgs := kind.Assignment.Where(`"kind"`)
 	update := naming(db.NewUpdate().Model((*Finding)(nil)).
 		Where(kinds, kindArgs...).
 		// Across the product's builds, not one of them. The same code
@@ -222,20 +231,23 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 // holds one. Nothing here asks which it is: the whole point of one
 // column is that every filter, count and handover asks "who holds this" once.
 //
-// Admits is asked whether the party may hold work of the strictest visibility
-// open there, in the transaction that moves it. Nil admits any party.
+// Admits is asked whether the party may hold work of every visibility open
+// there, in the transaction that moves it. Nil admits any party.
+//
+// The visibilities other than public among what moved come back, each once,
+// which decides what may be said about the act outside the application.
 func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
-	componentID int64, to *int64, admits Admits) (moved int64, undisclosed bool, err error) {
+	componentID int64, to *int64, admits Admits) (moved int64, withheld []access.Visibility, err error) {
 
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		moved, undisclosed = 0, false
+		moved, withheld = 0, nil
 		inner := &Store{db: tx, now: s.now, reach: s.reach}
 		var err error
-		moved, undisclosed, err = inner.assign(ctx, subject, targetID, vulnerabilityID,
+		moved, withheld, err = inner.assign(ctx, subject, targetID, vulnerabilityID,
 			componentID, to, admits)
 		return err
 	})
-	return moved, undisclosed, err
+	return moved, withheld, err
 }
 
 // assign is Assign inside the transaction it opened.
@@ -244,11 +256,11 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 // what is open there, and a scan recording an undisclosed place between a read
 // of that and the write would hand the new row over unasked.
 func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
-	componentID int64, to *int64, admits Admits) (int64, bool, error) {
+	componentID int64, to *int64, admits Admits) (int64, []access.Visibility, error) {
 
 	productID, err := productOf(ctx, s.db, targetID)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, err
 	}
 	// Deciding who deals with something is a write, so it asks for a
 	// right. Being able to *see* a finding is not being able to hand it
@@ -269,34 +281,35 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// between them is all it takes to reassign what the rule just refused.
 	dispatches, err := mayHandOver(subject, productID)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, err
 	}
 	if err := mayMove(subject, productID, to, dispatches); err != nil {
-		return 0, false, err
+		return 0, nil, err
 	}
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, err
 	}
 
 	// An assignment carries visibility of what was assigned, so the
-	// recipient is asked about the strictest visibility open here rather
-	// than about their present sight of the row — which, before the
+	// recipient is asked about every visibility open here rather than
+	// about their present sight of the row — which, before the
 	// assignment, they do not have.
 	if to != nil && admits != nil {
-		strictest, err := s.strictestOf(ctx, productID, visible, vulnerabilityID, componentID)
+		withheld, err := withheldAmong(ctx, s.db, visible,
+			oneFinding(productID, vulnerabilityID, componentID))
 		if err != nil {
-			return 0, false, err
+			return 0, nil, fmt.Errorf("read how far this is disclosed: %w", err)
 		}
-		if err := admits(ctx, s.db, strictest); err != nil {
-			return 0, false, err
+		if err := admits(ctx, s.db, withheld); err != nil {
+			return 0, nil, err
 		}
 	}
 
 	moved, err := s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
 		to, dispatches)
 	if err != nil {
-		return 0, false, err
+		return 0, nil, err
 	}
 	if moved == 0 {
 		// Nothing moved. For a caller who may not dispatch, that is either
@@ -318,15 +331,13 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 				Where(`"assigned_to" NOT IN (?)`, bun.List(subject.Mine())).
 				Exists(ctx)
 			if err != nil {
-				return 0, false, fmt.Errorf("read who is dealing with this: %w", err)
+				return 0, nil, fmt.Errorf("read who is dealing with this: %w", err)
 			}
 			if held {
-				return 0, false, access.Denied(fmt.Sprintf(
-					"take work somebody else is dealing with in product %d — you may take "+
-						"what nobody owns, and hand back your own", productID))
+				return 0, nil, heldElsewhere(productID)
 			}
 		}
-		return 0, false, nil
+		return 0, nil, nil
 	}
 
 	// The disclosure of what was just handed over.
@@ -341,101 +352,108 @@ func (s *Store) assign(ctx context.Context, subject access.Subject, targetID, vu
 	// Asked of every visibility rather than of what the caller may read: what
 	// moved carries its visibility to whoever now holds it, whether or not the
 	// caller can see every row of it.
-	private, err := anyUndisclosed(ctx, s.db, access.Visibilities(),
+	withheld, err := withheldAmong(ctx, s.db, access.Visibilities(),
 		oneFinding(productID, vulnerabilityID, componentID))
 	if err != nil {
-		return moved, false, fmt.Errorf("read whether that finding is disclosed: %w", err)
+		return moved, nil, fmt.Errorf("read whether that finding is disclosed: %w", err)
 	}
-	return moved, private, nil
+	return moved, withheld, nil
 }
 
-// anyUndisclosed reports whether any open finding naming selects is
-// undisclosed, among the visibilities given.
-func anyUndisclosed(ctx context.Context, db bun.IDB, visible []access.Visibility,
-	naming func(*bun.SelectQuery) *bun.SelectQuery) (bool, error) {
+// heldElsewhere refuses taking work somebody else holds to a caller who may
+// not dispatch.
+func heldElsewhere(productID int64) error {
+	return access.Denied(fmt.Sprintf(
+		"take work somebody else is dealing with in product %d — you may take "+
+			"what nobody owns, and hand back your own", productID))
+}
 
-	kinds, kindArgs := kind.Triage.Where(`"kind"`)
-	return naming(db.NewSelect().Model((*Finding)(nil)).Column("id")).
+// withheldAmong is every visibility other than public that an open finding
+// naming selects holds, among the visibilities given, each once and in the
+// order access.Visibilities names them.
+//
+// A set rather than the strictest of them: undisclosed and internal work are
+// read under separate grants, so neither is stricter than the other, and a
+// recipient is asked about each one present. Work where this is empty is
+// disclosed throughout, and travels with an assignment to whoever holds it.
+func withheldAmong(ctx context.Context, db bun.IDB, visible []access.Visibility,
+	naming func(*bun.SelectQuery) *bun.SelectQuery) ([]access.Visibility, error) {
+
+	kinds, kindArgs := kind.Assignment.Where(`"kind"`)
+	var held []access.Visibility
+	if err := naming(db.NewSelect().Model((*Finding)(nil)).ColumnExpr(`DISTINCT "visibility"`)).
 		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).
 		Where(`"visibility" IN (?)`, bun.List(visible)).
-		Where(`"visibility" = ?`, access.Private).
-		Exists(ctx)
+		Where(`"visibility" <> ?`, access.Public).
+		Scan(ctx, &held); err != nil {
+		return nil, err
+	}
+	return inOrder(held), nil
+}
+
+// inOrder is a set of visibilities in the order access.Visibilities names
+// them, each once, so two reads of one set compare equal.
+func inOrder(held []access.Visibility) []access.Visibility {
+	var out []access.Visibility
+	for _, v := range access.Visibilities() {
+		if slices.Contains(held, v) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // oneFinding names one issue at one component across a product's builds.
 func oneFinding(productID, vulnerabilityID, componentID int64) func(*bun.SelectQuery) *bun.SelectQuery {
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(inThisProduct, productID).
+			Where(kinds, kindArgs...).
 			Where(`"vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"component_id" = ?`, componentID)
 	}
 }
 
-// strictestOf is the tightest visibility any open place of this finding
-// carries, across the product's builds.
+// WithheldOnComponent is every visibility other than public open against a
+// component in these builds.
 //
-// The question routing asks: work goes to a party that can read all of what is
-// routed there, and one undisclosed place among fifty public ones makes the
-// whole of it undisclosed for that purpose. A disclosed row travels with the
-// assignment to whoever holds it, so the strictest is the only one worth
-// asking about.
-//
-// Narrowed by what the caller may see, like every other read here. A place
-// they cannot see is not one they can route.
-func (s *Store) strictestOf(ctx context.Context, productID int64, visible []access.Visibility,
-	vulnerabilityID, componentID int64) (access.Visibility, error) {
-
-	private, err := anyUndisclosed(ctx, s.db, visible, oneFinding(productID, vulnerabilityID, componentID))
-	if err != nil {
-		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)
-	}
-	if private {
-		return access.Private, nil
-	}
-	return access.Public, nil
-}
-
-// StrictestOnComponent is how far the least disclosed thing open against a
-// component in these builds has been announced.
-//
-// The same question StrictestOf asks about one finding, asked about everything
+// The question an assignment asks about one finding, asked about everything
 // an upgrade covers. Handing a promise to somebody is handing them what it
 // covers, and one embargoed finding among fifty is enough to make the handover
-// the disclosure — so the level that matters is the strictest in the set
-// rather than that of whichever row somebody happened to be looking at.
-func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject,
-	productID int64, targets []int64, component, version string) (access.Visibility, error) {
+// the disclosure — so what matters is every visibility in the set rather than
+// that of whichever row somebody happened to be looking at.
+func (s *Store) WithheldOnComponent(ctx context.Context, subject access.Subject,
+	productID int64, targets []int64, component, version string) ([]access.Visibility, error) {
 
 	visible, err := access.Readable(subject, productID)
 	if err != nil {
-		return access.Public, err
+		return nil, err
 	}
 	if len(targets) == 0 {
-		return access.Public, nil
+		return nil, nil
 	}
 	folds, err := OneFoldNamed(ctx, s.db, targets, component, version)
 	if err != nil {
-		return access.Public, err
+		return nil, err
 	}
 	if len(folds) == 0 {
-		return access.Public, nil
+		return nil, nil
 	}
 	// Matched on the fold, the way the upgrade itself resolves what it covers:
 	// naming any binary of a source package reaches all of them, so asking
 	// about the binary alone would miss the embargo sitting on its sibling.
-	private, err := anyUndisclosed(ctx, s.db, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
+	kinds, kindArgs := kind.Triage.Where(`"kind"`)
+	withheld, err := withheldAmong(ctx, s.db, visible, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where(`"target_id" IN (?)`, bun.List(targets)).
+			Where(kinds, kindArgs...).
 			Where(`"component_id" IN (SELECT "c"."id" FROM "component" AS "c"
 			WHERE `+FoldedOn+` IN (?))`, bun.List(folds))
 	})
 	if err != nil {
-		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)
+		return nil, fmt.Errorf("read how far this is disclosed: %w", err)
 	}
-	if private {
-		return access.Private, nil
-	}
-	return access.Public, nil
+	return withheld, nil
 }
 
 // Release hands everything one person holds back to nobody.
@@ -478,7 +496,7 @@ func (s *Store) ReleaseIn(ctx context.Context, subject access.Subject, party, pr
 	}
 	var moved int64
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		kinds, kindArgs := kind.Triage.Where(`"kind"`)
+		kinds, kindArgs := kind.Assignment.Where(`"kind"`)
 		result, err := tx.NewUpdate().Model((*Finding)(nil)).
 			Set(`"assigned_to" = ?`, nil).Set(`"assigned_at" = ?`, nil).
 			Where(kinds, kindArgs...).
@@ -513,7 +531,7 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 				return err
 			}
 		}
-		kinds, kindArgs := kind.Triage.Where(`"kind"`)
+		kinds, kindArgs := kind.Assignment.Where(`"kind"`)
 		update := tx.NewUpdate().Model((*Finding)(nil)).
 			Where(kinds, kindArgs...).
 			Where(`"assigned_to" = ?`, from).
@@ -537,26 +555,30 @@ func (s *Store) handOver(ctx context.Context, subject access.Subject, from int64
 }
 
 // mayReadAllOf refuses a hand-over whose recipient may not read the
-// undisclosed part of what it moves.
+// undisclosed or internal part of what it moves.
 //
-// Asked per product, of the products where the work being moved holds
-// something undisclosed, and inside the transaction that moves it. A party no
-// person holds reads nothing undisclosed.
+// Asked per product and per visibility, of the products where the work being
+// moved holds something other than disclosed work, and inside the transaction
+// that moves it. A party no person holds reads nothing withheld.
 func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
-	var products []int64
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	if err := tx.NewSelect().
-		TableExpr(`"target" AS "tg"`).
-		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
-		ColumnExpr(`DISTINCT "st"."product_id"`).
-		Where(`"tg"."id" IN (SELECT "f"."target_id" FROM "finding" AS "f"
-			WHERE "f"."assigned_to" = ? AND "f"."closed_at" IS NULL AND "f"."visibility" = ?
-			AND `+kinds+`)`,
-			append([]any{from, access.Private}, kindArgs...)...).
-		Scan(ctx, &products); err != nil {
-		return fmt.Errorf("read where their undisclosed work is: %w", err)
+	var held []struct {
+		ProductID  int64             `bun:"product_id"`
+		Visibility access.Visibility `bun:"visibility"`
 	}
-	if len(products) == 0 {
+	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
+	if err := tx.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON "tg"."id" = "f"."target_id"`).
+		Join(`JOIN "stream" AS "st" ON "st"."id" = "tg"."stream_id"`).
+		ColumnExpr(`DISTINCT "st"."product_id" AS "product_id", "f"."visibility" AS "visibility"`).
+		Where(`"f"."assigned_to" = ?`, from).
+		Where(`"f"."closed_at" IS NULL`).
+		Where(`"f"."visibility" <> ?`, access.Public).
+		Where(kinds, kindArgs...).
+		Scan(ctx, &held); err != nil {
+		return fmt.Errorf("read where their undisclosed and internal work is: %w", err)
+	}
+	if len(held) == 0 {
 		return nil
 	}
 	var people []int64
@@ -571,8 +593,8 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 		return ErrRecipientMayNotRead
 	}
 	rights := access.NewStore(tx)
-	for _, product := range products {
-		reads, err := rights.PersonReads(ctx, people[0], product, access.Private)
+	for _, one := range held {
+		reads, err := rights.PersonReads(ctx, people[0], one.ProductID, one.Visibility)
 		if err != nil {
 			return err
 		}

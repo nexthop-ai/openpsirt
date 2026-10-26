@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -493,50 +494,124 @@ func TestARoutingRuleIsWrittenAndRetiredOnlyByAnAssigner(t *testing.T) {
 	})
 }
 
-func TestARoutingRulePlacesNoAnalysisResult(t *testing.T) {
+// leadsAt turns two issues' rows into leads, one at each visibility a lead
+// holds, and leaves the third as the vulnerability it was.
+func leadsAt(t *testing.T, f *fixture) {
+	t.Helper()
+	ctx := t.Context()
+	f.shipped(t, twoConsumers())
+	if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+		found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for visibility, identifier := range map[access.Visibility]string{
+		access.Internal: "CVE-2026-2", access.Private: "CVE-2026-1",
+	} {
+		if _, err := f.db.DB.NewUpdate().Table("finding").
+			Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`, identifier).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// placedByRule applies the rules of the fixture's product and counts what they
+// placed on its build, leads and the rest apart.
+func placedByRule(t *testing.T, f *fixture) (leads map[access.Visibility]int, others int) {
+	t.Helper()
+	ctx := t.Context()
+	who := f.planner(t, access.PublicTriage, access.Assigner)
+	if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "platform"), "the library",
+		"", "libnl-3-*"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+		t.Fatal(err)
+	}
+	var rows []finding.Finding
+	if err := f.db.DB.NewSelect().Model(&rows).Where(`"f"."target_id" = ?`, f.target).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("the build holds no finding, so this checked nothing")
+	}
+	leads = map[access.Visibility]int{}
+	for _, row := range rows {
+		switch {
+		case row.AssignedTo == nil:
+		case row.Kind == "analysis":
+			leads[row.Visibility]++
+		default:
+			others++
+		}
+	}
+	return leads, others
+}
+
+// A lead is held and routed by the one implementation a finding is: a rule
+// naming its component places it with the team, at whatever visibility it
+// holds.
+func TestARoutingRulePlacesTheLeadsNobodyHolds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
-			found("CVE-2026-1", libnl), found("CVE-2026-2", libnl), found("CVE-2026-3", libnl),
-		}); err != nil {
-			t.Fatal(err)
+		leadsAt(t, f)
+		leads, others := placedByRule(t, f)
+		if others == 0 {
+			t.Error("the rule placed no vulnerability")
 		}
-		// Two issues' rows as leads, one at each visibility a lead holds, and
-		// the third left as the vulnerability the rule does place.
-		for visibility, identifier := range map[access.Visibility]string{
-			access.Internal: "CVE-2026-2", access.Private: "CVE-2026-1",
-		} {
-			if _, err := f.db.DB.NewUpdate().Table("finding").
-				Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, visibility).
-				Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`, identifier).
-				Exec(ctx); err != nil {
-				t.Fatal(err)
+		for _, v := range []access.Visibility{access.Internal, access.Private} {
+			if leads[v] == 0 {
+				t.Errorf("the rule placed no lead at %s", v)
 			}
 		}
-		who := f.planner(t, access.PublicTriage, access.Assigner)
-		if _, err := f.store.AddRule(ctx, who, f.productID, f.team(t, "platform"), "the library",
-			"", "libnl-3-*"); err != nil {
+	})
+}
+
+// A lead every release of which is past its end of life is kept as it stands,
+// so a rule places it nowhere, and places what is still in support.
+func TestARoutingRulePlacesNoLeadPastItsEndOfLife(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		leadsAt(t, f)
+		ended := time.Now().UTC().Add(-48 * time.Hour).Truncate(24 * time.Hour)
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"stream"`).Set(`"eol_on" = ?`, ended).
+			Where(`"id" IN (SELECT "stream_id" FROM "target" WHERE "id" = ?)`, f.target).
+			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, _, err := f.store.ApplyRules(ctx, f.productID, 100); err != nil {
+		leads, others := placedByRule(t, f)
+		if len(leads) != 0 {
+			t.Errorf("the rule placed leads past their end of life: %v", leads)
+		}
+		if others == 0 {
+			t.Error("the rule placed no vulnerability, so the release's end of life stopped all of it")
+		}
+	})
+}
+
+// What a rule would catch counts a lead as one piece of work, as it counts an
+// issue at a component: two results of one rule in one component are two
+// leads.
+func TestARulePreviewCountsEachLeadItWouldPlace(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		leadsAt(t, f)
+		leads, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+			ColumnExpr(`DISTINCT "vulnerability_id", "place_identity"`).
+			Where(`"kind" = ?`, "analysis").Count(t.Context())
+		if err != nil {
 			t.Fatal(err)
 		}
-		var rows []finding.Finding
-		if err := f.db.DB.NewSelect().Model(&rows).Where(`"f"."target_id" = ?`, f.target).Scan(ctx); err != nil {
+		if leads < 2 {
+			t.Fatalf("the fixture holds %d leads, so this checked nothing", leads)
+		}
+		who := f.planner(t, access.PublicTriage, access.PrivateRead, access.InternalRead)
+		caught, err := f.store.WouldMatch(t.Context(), who, f.productID, "", "libnl-3-*", 20)
+		if err != nil {
 			t.Fatal(err)
 		}
-		placed := 0
-		for _, row := range rows {
-			switch {
-			case row.Kind == "analysis" && row.AssignedTo != nil:
-				t.Errorf("the rule placed an analysis result at %s", row.Visibility)
-			case row.AssignedTo != nil:
-				placed++
-			}
-		}
-		if placed == 0 {
-			t.Error("the rule placed nothing, so it checked nothing")
+		if want := int(leads) + 1; caught.Work != want || caught.Unheld != want {
+			t.Errorf("the preview counts %d pieces, %d unheld; want the vulnerability and each of %d leads",
+				caught.Work, caught.Unheld, leads)
 		}
 	})
 }

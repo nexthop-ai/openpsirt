@@ -25,6 +25,7 @@ shares is in `DESIGN-ingest.md`.
 - [Source](#source)
 - [Lead triage](#lead-triage)
 - [Lead queue](#lead-queue)
+- [Lead assignment](#lead-assignment)
 - [Weakness families](#weakness-families)
 - [Grouped leads](#grouped-leads)
 - [Hand-off](#hand-off)
@@ -550,6 +551,26 @@ series, by state. The reports catalog draws it as Leads by analyzer
 | Read only by somebody holding `internal-read` on the product, and refused to anybody else with no count and no series named | A count of leads is internal however it is narrowed. A reader of a moved lead through its case reads the lead and not the product's figures |
 | Ordered by the series' name | The series are few, and a reader looks one up by its name |
 
+## Lead assignment
+
+`PUT …/streams/{stream}/variants/{variant}/leads/{place}/assignment` gives a
+lead to a person or a team, or hands it back to nobody, as a finding is
+assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
+
+| Rule | |
+|---|---|
+| It covers the lead on every build of the product it is open on | A lead is one place across the product's builds, as a claim about it is |
+| The assigner triages the lead at every visibility it is open at | Internal where it is kept, private where it was moved into a case. Somebody who triages neither is answered as though the lead were not there |
+| Giving it to somebody else, or taking it from them, needs `assigner` as well | The assigner right a finding's assignment asks for |
+| A person is given it only where they read it at every visibility it is open at, and a team only where one member reads all of them | Holding a lead is not a way to read one. A lead collaborator reads the lead through their grant and is not given it |
+| Asked inside the transaction that writes | As every assignment asks it |
+| A lead past its end of life is refused with 409 | § End of life |
+| A lead seen on a build where it was not open when it was assigned starts unassigned there | As a finding arriving under an assigned component does |
+| Losing the last role on a product, deactivation and a handover move leads with everything else | One act whatever the work is (`DESIGN-kinds.md` § Consumers) |
+| A team's routing rules place leads nobody holds | `DESIGN-access.md` § Routing rules |
+| The lead's page and every row of the queue and its file name who holds it | The page names the holder on its build while it is open there; a row names the holder of the finding it shows. A stub names nobody |
+| The person given it is told "a lead assigned", at internal visibility | `DESIGN-notifications.md` § Lead notices |
+
 ## Weakness families
 
 A rule names the weaknesses its tags name, as `external/cwe/cwe-N`, or as
@@ -712,7 +733,7 @@ is in `DESIGN-data-model.md` § End of support.
 | A lead is past its end of life when every release of the product holding a finding of it is | A lead also seen in a supported release is work there |
 | The queue leaves out every sighting in a release past its end of life, and counts the open leads it leaves out | A list that leaves leads out says how many (REQ-30). The lists by state still hold them |
 | A lead open only in releases past their end of life leaves the queue, and is past its end of life only where its other sightings are too | A lead closed or not reproduced on a supported release is still that release's to decide, and the queue holds open work |
-| A decision, a fixed closure, pulling it into the queue and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
+| A decision, a fixed closure, pulling it into the queue, an assignment and a hand-off are refused with 409 | Nobody fixes a release nobody supports |
 | A re-affirmation of a lapsed claim leaves such a lead out, re-makes the rest, and is refused with 409 where none is left | A re-affirmation writes a decision. The list of what is yours to re-affirm counts the same places and leaves off a claim with none |
 | A judgment about a lead still in support reaches none of its kin past their end of life | The kin is refused a decision of its own |
 | A claim already standing at it is still agreed to or withdrawn | The claim is a judgment somebody made, and an approval is of what was read (REQ-28) |
@@ -888,3 +909,5 @@ it is about.
 | The claims about a moved lead are read by readers of the product's undisclosed work, and by nobody on the flaw's case or granted the lead alone | A claim is filed under the analyzer's rule, and a case or a lead grant reaches decisions filed under its flaw. A case collaborator reads the lead's evidence and the flaw's decisions |
 | A renamed file's results open as new leads | Every key holds the path, so the leads under the old name go not reproduced and nothing carries their claims to the new name |
 | An upload refused before it names its series is recorded against no series | The build's receipts list it, and no series gone quiet names it. One refused before its sender is admitted is recorded nowhere (§ Receipts) |
+| The lists of held work list no lead | Unassigned work, one person's work, a team's queue and the work of somebody who has left are lists of findings (`DESIGN-kinds.md` § Consumers). A lead's holder is read on the lead and in the lead queue, which takes no narrowing by holder |
+| A routing rule places a baseline lead | A rule matches a lead by its component, and nothing in that asks whether the lead is in the queue. It is held, and still in the baseline |

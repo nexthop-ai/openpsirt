@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -109,13 +110,13 @@ func TestAnUndisclosedFindingOnASiblingBinaryCountsForTheSourcePackage(t *testin
 		hide(t, f, gnutls)
 
 		both := f.holding(t, access.PublicTriage, access.PrivateTriage)
-		strictest, err := f.store.StrictestOnComponent(t.Context(), both, f.productID,
+		withheld, err := f.store.WithheldOnComponent(t.Context(), both, f.productID,
 			[]int64{f.target}, "libcurl4t64", "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strictest != access.Private {
-			t.Errorf("asked by the disclosed binary, the source reads as %q", strictest)
+		if !slices.Equal(withheld, []access.Visibility{access.Private}) {
+			t.Errorf("asked by the disclosed binary, the source reads as %q", withheld)
 		}
 
 		builds, err := f.store.AcrossBuilds(t.Context(), f.holding(t, access.PublicTriage),
@@ -153,13 +154,13 @@ func TestANameResolvesToWhatTheBuildsAskedAboutShip(t *testing.T) {
 		if len(reached) != 1 {
 			t.Errorf("a promise for the second build reached %d places, want its one", len(reached))
 		}
-		strictest, err := f.store.StrictestOnComponent(t.Context(), both, f.productID,
+		withheld, err := f.store.WithheldOnComponent(t.Context(), both, f.productID,
 			[]int64{other}, libnl.Name, "")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strictest != access.Private {
-			t.Errorf("the second build's embargoed finding reads as %q", strictest)
+		if !slices.Equal(withheld, []access.Visibility{access.Private}) {
+			t.Errorf("the second build's embargoed finding reads as %q", withheld)
 		}
 	})
 }
@@ -220,7 +221,7 @@ func TestTheFindingsOfANamedComponentAreReadWithItsFoldsAsValues(t *testing.T) {
 		if len(reached) != 2 {
 			t.Errorf("naming one binary reached %d issues, want both binaries' two", len(reached))
 		}
-		if _, err := f.store.StrictestOnComponent(t.Context(), who, f.productID,
+		if _, err := f.store.WithheldOnComponent(t.Context(), who, f.productID,
 			[]int64{f.target}, "curl", ""); err != nil {
 			t.Fatal(err)
 		}

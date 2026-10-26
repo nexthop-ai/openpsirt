@@ -209,3 +209,124 @@ func LeadEnded(ctx context.Context, db bun.IDB, productID int64, placeIdentity s
 	}
 	return ErrLeadPastEndOfLife
 }
+
+// AssignLead records who is dealing with a lead, across every build of the
+// product it is seen on, or hands it back to nobody where to is nil. Admits
+// is asked whether the party may hold work of every visibility open at the
+// lead, in the transaction that moves it. Nil admits any party.
+//
+// The grain is the lead, which is its place in the product: a judgment about
+// it covers every stream and variant it is seen on, and so does whoever
+// works it. The write is the one every finding is handed over through, under
+// the same rule about who may move what: taking a lead nobody holds and
+// handing back your own is triage at the lead's visibility, and giving it to
+// somebody else or taking it from them asks for assigner beside it.
+//
+// The visibilities other than public among what moved come back, each once,
+// which decides what may be said about the act outside the application.
+func (s *Store) AssignLead(ctx context.Context, subject access.Subject, targetID int64,
+	placeIdentity string, to *int64, admits Admits) (moved int64, withheld []access.Visibility, err error) {
+
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		moved, withheld = 0, nil
+		inner := &Store{db: tx, now: s.now, reach: s.reach}
+		var err error
+		moved, withheld, err = inner.assignLead(ctx, subject, targetID, placeIdentity, to, admits)
+		return err
+	})
+	return moved, withheld, err
+}
+
+// assignLead is AssignLead inside the transaction it opened.
+func (s *Store) assignLead(ctx context.Context, subject access.Subject, targetID int64,
+	placeIdentity string, to *int64, admits Admits) (int64, []access.Visibility, error) {
+
+	productID, err := productOf(ctx, s.db, targetID)
+	if err != nil {
+		return 0, nil, err
+	}
+	visible := access.Visible(subject, productID)
+	if !subject.Sees(productID) || len(visible) == 0 {
+		return 0, nil, ErrNothingOpenThere
+	}
+	naming := oneLead(productID, placeIdentity)
+	var open []access.Visibility
+	if err := naming(s.db.NewSelect().Model((*Finding)(nil)).ColumnExpr(`DISTINCT "visibility"`)).
+		Where(`"closed_at" IS NULL`).
+		Where(`"visibility" IN (?)`, bun.List(visible)).
+		Scan(ctx, &open); err != nil {
+		return 0, nil, fmt.Errorf("read the lead at that place: %w", err)
+	}
+	// A lead somebody may not read is one they are not told of.
+	if len(open) == 0 {
+		return 0, nil, ErrNothingOpenThere
+	}
+	for _, v := range open {
+		if !subject.Triages(v, productID) {
+			return 0, nil, access.Denied(fmt.Sprintf(
+				"decide who deals with a lead in product %d", productID))
+		}
+	}
+	if err := LeadEnded(ctx, s.db, productID, placeIdentity, s.now().UTC()); err != nil {
+		return 0, nil, err
+	}
+	dispatches := subject.Holds(access.Assigner, productID)
+	if err := mayMove(subject, productID, to, dispatches); err != nil {
+		return 0, nil, err
+	}
+	if to != nil && admits != nil {
+		held, err := withheldAmong(ctx, s.db, visible, naming)
+		if err != nil {
+			return 0, nil, fmt.Errorf("read how far this lead is disclosed: %w", err)
+		}
+		if err := admits(ctx, s.db, held); err != nil {
+			return 0, nil, err
+		}
+	}
+
+	moved, err := s.moveWhere(ctx, s.db, subject, productID, to, dispatches,
+		func(q *bun.UpdateQuery) *bun.UpdateQuery {
+			kinds, kindArgs := kind.Leads.Where(`"kind"`)
+			return q.Where(kinds, kindArgs...).Where(`"place_identity" = ?`, placeIdentity)
+		})
+	if err != nil {
+		return 0, nil, err
+	}
+	if moved == 0 {
+		// Nothing moved: nothing open, or somebody else holds it and this
+		// caller may not take it. Asked on the failing path only, over what
+		// the caller may read.
+		if !dispatches {
+			held, err := naming(s.db.NewSelect().Model((*Finding)(nil)).Column("id")).
+				Where(`"closed_at" IS NULL`).
+				Where(`"visibility" IN (?)`, bun.List(visible)).
+				Where(`"assigned_to" IS NOT NULL`).
+				Where(`"assigned_to" NOT IN (?)`, bun.List(subject.Mine())).
+				Exists(ctx)
+			if err != nil {
+				return 0, nil, fmt.Errorf("read who is dealing with this lead: %w", err)
+			}
+			if held {
+				return 0, nil, heldElsewhere(productID)
+			}
+		}
+		return 0, nil, nil
+	}
+	// Asked of every visibility rather than of what the caller may read: what
+	// moved carries its visibility to whoever now holds it.
+	withheld, err := withheldAmong(ctx, s.db, access.Visibilities(), naming)
+	if err != nil {
+		return moved, nil, fmt.Errorf("read whether that lead is disclosed: %w", err)
+	}
+	return moved, withheld, nil
+}
+
+// oneLead names one lead across a product's builds.
+func oneLead(productID int64, placeIdentity string) func(*bun.SelectQuery) *bun.SelectQuery {
+	kinds, kindArgs := kind.Leads.Where(`"kind"`)
+	return func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where(inThisProduct, productID).
+			Where(kinds, kindArgs...).
+			Where(`"place_identity" = ?`, placeIdentity)
+	}
+}

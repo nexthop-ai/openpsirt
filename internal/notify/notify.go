@@ -1100,3 +1100,20 @@ func Concerning(productID, vulnerabilityID, componentID int64) string {
 func ConcerningLead(productID int64, placeIdentity string) string {
 	return fmt.Sprintf("lead/%d/%s", productID, placeIdentity)
 }
+
+// Withholding is the marks a telling about work holding these visibilities
+// carries: withheld where any is other than public, and internal where any is
+// internal. A reader of undisclosed work reads no internal work, so work
+// holding both is read by those who read internal work, as a claim spanning
+// both is.
+func Withholding(visibilities []access.Visibility) (private, internal bool) {
+	for _, v := range visibilities {
+		if v != access.Public {
+			private = true
+		}
+		if v == access.Internal {
+			internal = true
+		}
+	}
+	return private, internal
+}

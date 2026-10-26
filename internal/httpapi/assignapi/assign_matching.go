@@ -52,26 +52,26 @@ func recipient(err error, otherwise func(error) error) error {
 
 // personAdmits refuses handing a person work some of which is undisclosed, or
 // internal, in a product where they may not read work of that visibility: the
-// hand-over would be the disclosure. Asked through the transaction that hands
-// the work over.
+// hand-over would be the disclosure. Each visibility the work holds is asked
+// about, because each is its own grant. Asked through the transaction that
+// hands the work over.
 func personAdmits(person *access.Account, productID int64) finding.Admits {
-	return func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
-		if strictest == access.Public {
-			return nil
-		}
-		reads, err := access.NewStore(db).PersonReads(ctx, person.ID, productID, strictest)
-		if err != nil {
-			return err
-		}
-		if !reads && strictest == access.Internal {
-			return errRecipient{huma.Error422UnprocessableEntity(
-				"some of this is internal and they may not read internal work here, " +
-					"so handing it to them would show it to them")}
-		}
-		if !reads {
-			return errRecipient{huma.Error422UnprocessableEntity(
-				"some of this has not been disclosed and they may not read " +
-					"undisclosed work here, so handing it to them would be the disclosure")}
+	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
+		for _, v := range withheld {
+			reads, err := access.NewStore(db).PersonReads(ctx, person.ID, productID, v)
+			if err != nil {
+				return err
+			}
+			if !reads && v == access.Internal {
+				return errRecipient{huma.Error422UnprocessableEntity(
+					"some of this is internal and they may not read internal work here, " +
+						"so handing it to them would show it to them")}
+			}
+			if !reads {
+				return errRecipient{huma.Error422UnprocessableEntity(
+					"some of this has not been disclosed and they may not read " +
+						"undisclosed work here, so handing it to them would be the disclosure")}
+			}
 		}
 		return nil
 	}
@@ -80,8 +80,8 @@ func personAdmits(person *access.Account, productID int64) finding.Admits {
 // teamAdmits refuses routing work to a team none of whose members may read it,
 // where it would sit in a queue nobody on it can see.
 func teamAdmits(team *access.Team, productID int64) finding.Admits {
-	return func(ctx context.Context, db bun.IDB, strictest access.Visibility) error {
-		reads, err := teamMayHold(ctx, access.NewStore(db), team.ID, productID, strictest)
+	return func(ctx context.Context, db bun.IDB, withheld []access.Visibility) error {
+		reads, err := teamMayHold(ctx, access.NewStore(db), team.ID, productID, withheld)
 		if err != nil {
 			return err
 		}
@@ -185,11 +185,13 @@ func registerAssignMatching(api huma.API, in core.Deps) {
 		// single assignment gives, and never for handing back.
 		arrived := handed.Pieces - len(handed.Left)
 		if to != nil && *to != subject.Party() && whoToTell != 0 && arrived > 0 &&
-			seenBy(ctx, in, input.Body.Person, product, handed.Undisclosed) {
+			seenBy(ctx, in, input.Body.Person, product, handed.Withheld) {
+			private, internal := notify.Withholding(handed.Withheld)
 			core.Tell(ctx, in, "could not say that work was assigned", notify.Telling{
 				PersonID: whoToTell, Kind: notify.Assigned,
 				Body: piecesOfWork(arrived) + " in " + input.Product,
-				Link: weblink.Assignments(), Private: handed.Undisclosed, ProductID: &product,
+				Link: weblink.Assignments(), Private: private, Internal: internal,
+				ProductID: &product,
 			}, "person", whoToTell)
 		}
 		left, err := pieceBodies(ctx, in, handed.Left)

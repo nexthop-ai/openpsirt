@@ -1,8 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package assignapi holds the operations that hand work out: assignment,
-// routing rules, teams, tags, bulk acts, fix bundles and planned upgrades.
+// Package assignapi holds the operations that hand work out: assignment of
+// findings and leads, routing rules, teams, tags, bulk acts, fix bundles and planned upgrades.
 package assignapi
 
 import (
@@ -18,6 +18,7 @@ func Register(api huma.API, in core.Deps) {
 	registerPlanUpgrade(api, in)
 	registerAssignment(api, in)
 	registerAssignMatching(api, in)
+	registerLeadAssigning(api, in)
 	registerBundles(api, in)
 	registerPendingUpgrades(api, in)
 	registerRouting(api, in)

@@ -4800,6 +4800,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign a lead to somebody
+         * @description Records who is dealing with this lead.
+         *
+         *     It covers the product, not the build named in the path: what is assigned is the lead on every build of the product it is open on.
+         *
+         *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
+         *
+         *     A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409.
+         *
+         *     A lead seen on a build it was not open on when it was assigned starts unassigned there.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
+         */
+        put: operations["assign-lead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators": {
         parameters: {
             query?: never;
@@ -7293,6 +7323,18 @@ export interface components {
              * Format: uri
              * @description A URL to the JSON Schema for this object.
              * @example https://example.com/schemas/Assign-findingRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Their sign-in identity, or empty for nobody */
+            person?: string;
+            /** @description A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it */
+            team?: string;
+        };
+        "Assign-leadRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Assign-leadRequest.json
              */
             readonly $schema?: string;
             /** @description Their sign-in identity, or empty for nobody */
@@ -10086,6 +10128,12 @@ export interface components {
              * @example https://example.com/schemas/LeadEvidenceBody.json
              */
             readonly $schema?: string;
+            /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
+            assigned_team?: boolean;
+            /** @description Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is */
+            assigned_to?: string;
+            /** @description Their display name, where it differs from the name above */
+            assigned_to_name?: string;
             /** @description Where the lead is */
             at: components["schemas"]["LeadPlace"];
             /** @description The address comparing the lead's repository between those two builds */
@@ -10211,6 +10259,12 @@ export interface components {
             within?: string;
         };
         LeadRowBody: {
+            /** @description Whether it is a team's queue rather than one person's work: unheld until somebody on the team takes it */
+            assigned_team?: boolean;
+            /** @description Who is dealing with it: a person by sign-in identity, or a team by name. Absent where nobody is */
+            assigned_to?: string;
+            /** @description Their display name, where it differs from the name above */
+            assigned_to_name?: string;
             /**
              * Format: int64
              * @description The number of builds in the list's scope the lead is listed on, in the state the list asks for
@@ -22235,6 +22289,43 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["LeadEvidenceBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assign-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                place: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Assign-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

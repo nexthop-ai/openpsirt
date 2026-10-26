@@ -31,7 +31,7 @@ func (c *counted) WithGroup(string) slog.Handler      { return c }
 func TestANoticeDroppedOnAFailedReadIsLogged(t *testing.T) {
 	logged := &counted{}
 	in := core.Deps{DB: dbtest.Without(t, "person"), Logger: slog.New(logged)}
-	if seenBy(t.Context(), in, "triager", 1, false) {
+	if seenBy(t.Context(), in, "triager", 1, nil) {
 		t.Fatal("somebody whose record could not be read was told")
 	}
 	if logged.errors == 0 {
@@ -44,7 +44,7 @@ func TestANoticeForNobodyIsDroppedQuietly(t *testing.T) {
 	logged := &counted{}
 	handle, _ := dbtest.Racing(t, nil)
 	in := core.Deps{DB: handle, Logger: slog.New(logged)}
-	if seenBy(t.Context(), in, "nobody-here", 1, false) {
+	if seenBy(t.Context(), in, "nobody-here", 1, nil) {
 		t.Fatal("somebody nobody knows was told")
 	}
 	if logged.errors != 0 {

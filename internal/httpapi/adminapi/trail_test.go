@@ -642,6 +642,7 @@ var outsideTheTrail = map[string]string{
 	"approve-claim":                "the decision record",
 	"assess-issue":                 "the decision record",
 	"assign-finding":               "the decision record",
+	"assign-lead":                  "the decision record",
 	"assign-matching-findings":     "the decision record",
 	"carry-decisions":              "the decision record",
 	"comment-on-claim":             "the decision record",
