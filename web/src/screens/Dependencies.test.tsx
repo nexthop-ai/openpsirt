@@ -13,7 +13,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const AT = "/products/sonic/streams/master/variants/arm/dependencies";
 const PATTERN = "/products/:product/streams/:stream/variants/:variant/dependencies";
-const BUILD = "/v1/products/{product}/streams/{stream}/variants/{variant}";
+const BUILD = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}";
 
 const node = (component: string, of: Record<string, unknown> = {}) => ({
   component,

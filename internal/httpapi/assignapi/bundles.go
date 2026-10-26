@@ -85,8 +85,8 @@ func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 func registerBundles(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-fix-bundles", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/fix-bundles",
-		Summary: "List findings by upgrade",
+		Path:    "/v1/products/{product}/planned-upgrades",
+		Summary: "List planned upgrades",
 		Description: "One row per upstream upgrade, with the issues it closes.\n\n" +
 
 			"Keyed on the source package where one is recorded and on the component's " +
@@ -142,8 +142,8 @@ func registerBundles(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-fix-bundles", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/fix-bundles.{format}",
-		Summary: "Export findings by upgrade",
+		Path:    "/v1/products/{product}/planned-upgrades.{format}",
+		Summary: "Export planned upgrades",
 		Description: "The same list as a file: one row per upstream upgrade, with what it closes " +
 			"and the builds that hold it.\n\n" +
 			"Takes the same selection and the same filters as the screen, from the same " +
@@ -270,8 +270,8 @@ type PlannedBody struct {
 func registerPendingUpgrades(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-pending-upgrades", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades",
-		Summary: "List the upgrades one build is waiting on",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades",
+		Summary: "List one build's planned upgrades",
 		Description: "Everything committed for this build, one row per upgrade — a source package " +
 			"at the version it was built at, moving to another version — with what it would " +
 			"still close here.\n\n" +
@@ -317,9 +317,9 @@ func registerPendingUpgrades(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-pending-upgrades", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/pending-upgrades.{format}",
-		Summary: "Export the upgrades one build is waiting on",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/planned-upgrades.{format}",
+		Summary: "Export one build's planned upgrades",
 		Description: "The same list as a file: one row per upgrade this build is waiting on, " +
 			"where it stands, and what it would still close here.\n\n" +
 			"The packages one upgrade moves are a single cell, separated by spaces, because a " +

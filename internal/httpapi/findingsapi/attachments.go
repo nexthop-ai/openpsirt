@@ -127,7 +127,7 @@ type arrivedParts struct {
 func registerAttachments(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "upload-attachment", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/attachments",
+		Path:    "/v1/products/{product}/issues/{issue}/attachments",
 		Summary: "Attach a file to an issue",
 		Description: "Stores one file against an issue and returns the reference to put in text. " +
 			"Refer to it as `attachment:<token>` — as a link for anything downloaded, or as a " +
@@ -154,7 +154,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		// outside.
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
 			Admit: func(hc huma.Context) error {
-				_, _, err := issueAttaching(hc.Context(), in, hc.Param("product"), hc.Param("vulnerability"))
+				_, _, err := issueAttaching(hc.Context(), in, hc.Param("product"), hc.Param("issue"))
 				return err
 			},
 			Limit: attachmentRequest(in),
@@ -162,7 +162,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 	}, core.PerProduct, "A collaborator brought onto this issue may attach to it too.",
 		core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, under any identifier it goes by"`
+		Vulnerability string `path:"issue" doc:"The issue, under any identifier it goes by"`
 		RawBody       huma.MultipartFormFiles[attachmentParts]
 	}) (*attachmentUploaded, error) {
 		subject, at, err := issueAttaching(ctx, in, input.Product, input.Vulnerability)
@@ -188,7 +188,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-attachments", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/attachments",
+		Path:    "/v1/products/{product}/issues/{issue}/attachments",
 		Summary: "List files attached to an issue",
 		Description: "What text about this issue refers to. An upload nothing refers to yet is " +
 			"not listed, because it is not attached to anything — it becomes visible here when " +
@@ -198,7 +198,7 @@ func registerAttachments(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 	}) (*attachmentsOutput, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {

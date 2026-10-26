@@ -81,7 +81,7 @@ function useSources(product: string) {
     enabled: product !== "",
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/advisory-sources", {
+        await api.GET("/v1/products/{product}/supplier-advisory-feeds", {
           params: { path: { product } },
         }),
       ),
@@ -119,7 +119,7 @@ export function AdvisorySources() {
   const add = useMutation({
     mutationFn: async (body: { name: string; url: string }) =>
       unwrap(
-        await api.POST("/v1/products/{product}/advisory-sources", {
+        await api.POST("/v1/products/{product}/supplier-advisory-feeds", {
           params: { path: { product } },
           body,
         }),
@@ -134,7 +134,7 @@ export function AdvisorySources() {
   const withdraw = useMutation({
     mutationFn: async (which: string) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/advisory-sources/{name}", {
+        await api.DELETE("/v1/products/{product}/supplier-advisory-feeds/{name}", {
           params: { path: { product, name: which } },
         }),
       ),
@@ -323,7 +323,7 @@ function Upload({ product }: { product: string }) {
         return `${taken.identifier} from ${taken.publisher}: ${taken.recorded} claims taken, ${taken.superseded} set aside.`;
       }
       const taken = unwrap(
-        await api.POST("/v1/products/{product}/vex-statements", {
+        await api.POST("/v1/products/{product}/vex-documents", {
           params: { path: { product } },
           ...sent,
         }),

@@ -68,10 +68,10 @@ describe("the filters as the server takes them", () => {
   it("sends a claim's states only with the claim", () => {
     expect(
       listQuery(new URLSearchParams("claim=12&claim_state=lapsed&claim_state=bogus")),
-    ).toMatchObject({ claim: 12, claim_state: ["lapsed"] });
+    ).toMatchObject({ decision: 12, decision_state: ["lapsed"] });
     const alone = listQuery(new URLSearchParams("claim_state=lapsed&claim=soon"));
-    expect(alone).not.toHaveProperty("claim");
-    expect(alone).not.toHaveProperty("claim_state");
+    expect(alone).not.toHaveProperty("decision");
+    expect(alone).not.toHaveProperty("decision_state");
   });
 
   it("carries what the address says", () => {
@@ -123,7 +123,7 @@ describe("the filters as the server takes them", () => {
     );
     expect(asked).toMatchObject({
       component: ["openssl", "libssl3"],
-      tag: ["waiting", "escalated"],
+      label: ["waiting", "escalated"],
       weakness: ["CWE-787", "CWE-125"],
       vex_publisher: ["debian"],
       assigned: ["me", "nobody"],

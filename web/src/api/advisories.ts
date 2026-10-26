@@ -181,8 +181,8 @@ export function useTakeAFlawOff() {
       vulnerability: string;
     }) =>
       unwrap(
-        await api.DELETE("/v1/advisories/{advisory}/issues/{product}/{vulnerability}", {
-          params: { path: { advisory, product, vulnerability } },
+        await api.DELETE("/v1/advisories/{advisory}/issues/{product}/{issue}", {
+          params: { path: { advisory, product, issue: vulnerability } },
         }),
       ),
     onSuccess: done,

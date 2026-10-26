@@ -40,7 +40,7 @@ export function Branches() {
     queryKey: ["streams", product, "counts"],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams", {
+        await api.GET("/v1/products/{product}/branches-and-tags", {
           params: { path: { product }, query: { counts: true } },
         }),
       ),
@@ -49,7 +49,7 @@ export function Branches() {
   const declare = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/products/{product}/streams", {
+        await api.POST("/v1/products/{product}/branches-and-tags", {
           params: { path: { product } },
           body: {
             name: name.trim(),
@@ -69,7 +69,7 @@ export function Branches() {
   const amend = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.PATCH("/v1/products/{product}/streams/{stream}", {
+        await api.PATCH("/v1/products/{product}/branches-and-tags/{stream}", {
           params: { path: { product, stream: editing } },
           body: { name: renameTo.trim() },
         }),
@@ -83,7 +83,7 @@ export function Branches() {
   const retire = useMutation({
     mutationFn: async (stream: string) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/streams/{stream}", {
+        await api.DELETE("/v1/products/{product}/branches-and-tags/{stream}", {
           params: { path: { product, stream } },
         }),
       ),
@@ -99,7 +99,7 @@ export function Branches() {
   const setEndOfLife = useMutation({
     mutationFn: async ({ stream, on }: { stream: string; on: string }) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/streams/{stream}/end-of-life", {
+        await api.PUT("/v1/products/{product}/branches-and-tags/{stream}/end-of-life", {
           params: { path: { product, stream } },
           body: { on },
         }),
@@ -114,7 +114,7 @@ export function Branches() {
   const setRelease = useMutation({
     mutationFn: async ({ stream, on, from }: { stream: string; on: string; from: string }) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/streams/{stream}/release", {
+        await api.PUT("/v1/products/{product}/branches-and-tags/{stream}/release", {
           params: { path: { product, stream } },
           body: { released_on: on, ...(from ? { cut_from: from } : {}) },
         }),

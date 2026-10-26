@@ -42,7 +42,7 @@ import (
 // request. A refusal that arrives because the body was wrong proves nothing
 // about who may do what.
 func DeclaredBody(method, path, name string) io.Reader {
-	if method == http.MethodPut && strings.HasSuffix(path, "/triage-floor") {
+	if method == http.MethodPut && strings.HasSuffix(path, "/minimum-severity") {
 		return strings.NewReader(`{"floor": "high"}`)
 	}
 	if method == http.MethodPut && strings.HasSuffix(path, "/pair-thresholds") {
@@ -60,25 +60,25 @@ func DeclaredBody(method, path, name string) io.Reader {
 	if method != http.MethodPost {
 		return nil
 	}
-	if strings.HasSuffix(path, "/lead-rules") {
+	if strings.HasSuffix(path, "/suppression-rules") {
 		return strings.NewReader(`{"prefix": "tests", "reason": "used_in_tests", "reasoning": "` + name + `"}`)
 	}
-	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/decision") {
+	if strings.Contains(path, "/code-findings/") && strings.HasSuffix(path, "/decision") {
 		return strings.NewReader(`{"outcome": "confirmed", "reasoning": "` + name + `"}`)
 	}
-	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/hand-off/withdrawal") {
+	if strings.Contains(path, "/code-findings/") && strings.HasSuffix(path, "/flaw/withdrawal") {
 		return strings.NewReader(`{"because": "` + name + `"}`)
 	}
-	if strings.Contains(path, "/leads/") && strings.HasSuffix(path, "/fixed") {
+	if strings.Contains(path, "/code-findings/") && strings.HasSuffix(path, "/fixed") {
 		return strings.NewReader(`{"because": "` + name + `", "fixed_in": 1}`)
 	}
 	if strings.HasSuffix(path, "/reports") {
 		return strings.NewReader(`{"summary": "` + name + `"}`)
 	}
-	if strings.HasSuffix(path, "/streams") {
+	if strings.HasSuffix(path, "/branches-and-tags") {
 		return strings.NewReader(`{"name": "` + name + `", "kind": "branch"}`)
 	}
-	if strings.HasSuffix(path, "/exploited-here") {
+	if strings.HasSuffix(path, "/incidents") {
 		return strings.NewReader(
 			`{"known_at": "2026-09-20T14:00:00Z", "grounds": "A customer sent captures."}`)
 	}

@@ -68,7 +68,7 @@ type AroundBody struct {
 func registerGraph(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-top-level-components", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/components",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
 		Summary: "List what a build pulls in directly",
 		Description: "Returns the build's own component and what it depends on, most findings " +
 			"first. The root is named separately from the list because it is what the list " +
@@ -151,7 +151,7 @@ func registerGraph(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-component-neighbors", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
 			"/components/{component}/around",
 		Summary: "Show what is directly above and below a component",
 		Description: "Returns what pulls this component in, and what it pulls in.\n\n" +

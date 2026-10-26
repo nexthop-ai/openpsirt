@@ -108,7 +108,7 @@ func analysesURL(to Target) (string, error) {
 		}
 	}
 	return base.String() + "/v1/products/" + url.PathEscape(to.Product) +
-		"/streams/" + url.PathEscape(to.Stream) +
+		"/branches-and-tags/" + url.PathEscape(to.Stream) +
 		"/variants/" + url.PathEscape(to.Variant) + "/analyses", nil
 }
 

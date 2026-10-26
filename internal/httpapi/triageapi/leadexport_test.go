@@ -131,7 +131,7 @@ func TestAFindingsFileNarrowedByAFilterHoldsNoLeadAndSaysSo(t *testing.T) {
 			// The address the Findings screen exports, with the defaults it
 			// writes in: every lead answers these the same way.
 			"on=branch&support=in-support&planned=unplanned&sort=age",
-			"below_floor=true",
+			"below_minimum_severity=true",
 		} {
 			_, said, header, rows := findingsFile(t, r, "internal-reader", "/v1/products/mine/findings.csv?"+asked)
 			if leads := leadRowsIn(t, header, rows); len(leads) != 1 {

@@ -21,7 +21,7 @@ const releases = [
 function serving(held: { stream: string; variant: string }[], total: number) {
   serve((path) => {
     if (path === "/v1/products/{product}/releases") return { data: { items: releases } };
-    if (path === "/v1/issues/{vulnerability}") {
+    if (path === "/v1/issues/{issue}") {
       return {
         data: { items: held.map((each) => ({ ...each, product: "sonic" })), total },
       };

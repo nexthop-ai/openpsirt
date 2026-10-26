@@ -463,7 +463,7 @@ type CarriedBody struct {
 func registerCarry(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "preview-carried-decisions", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
 		Summary: "Show what triage a new line would inherit",
 		Description: "Returns what an existing line's decisions would mean for this one, " +
 			"without changing anything. Ask before creating a line: the answer is what " +
@@ -519,7 +519,7 @@ func registerCarry(api huma.API, in core.Deps) {
 func registerCarrying(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "carry-decisions", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
 		Summary: "Carry chosen triage onto a new line",
 		Description: "Takes the judgments named onto this build as claims waiting for " +
 			"agreement, each carrying the words from the line it came from.\n\n" +

@@ -56,7 +56,7 @@ func TestMeasureTheLeadQueueOfOneBuild(t *testing.T) {
 				httpapitest.ApplyRunIn(t, r, "clang/measured", built, measuredRun("clang", leads/2, 0))
 				httpapitest.ApplyRunIn(t, r, "cppcheck/measured", built, measuredRun("cppcheck", leads/2, 3))
 				for _, query := range []string{"", "?state=open"} {
-					path := "/v1/products/mine/leads" + query
+					path := "/v1/products/mine/code-findings" + query
 					began := time.Now()
 					got := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet, path, "")
 					took := time.Since(began)

@@ -43,7 +43,7 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		r.ScannedSiblings(t)
 
 		var page bundled
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/fix-bundles", &page)
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/planned-upgrades", &page)
 		if page.Total != 1 || len(page.Items) != 1 {
 			t.Fatalf("two packages of one source bumping once are %d bundles: %+v",
 				page.Total, page.Items)
@@ -118,7 +118,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		// for a release it is not.
 		gone := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
 		if set := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/products/mine/streams/master/end-of-life",
+			"/v1/products/mine/branches-and-tags/master/end-of-life",
 			`{"on":"`+gone+`"}`); set.Code >= 300 {
 			t.Fatalf("retiring the release answered %d: %s", set.Code, set.Body.String())
 		}
@@ -147,7 +147,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 				left.Total)
 		}
 		if set := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/products/mine/streams/master/end-of-life", `{"on":""}`); set.Code >= 300 {
+			"/v1/products/mine/branches-and-tags/master/end-of-life", `{"on":""}`); set.Code >= 300 {
 			t.Fatalf("putting the release back answered %d: %s", set.Code, set.Body.String())
 		}
 		// Putting a release back puts what is open in it back on the clock,
@@ -250,7 +250,7 @@ func TestABuildSaysWhichUpgradesItIsWaitingOnAndWhatHasLanded(t *testing.T) {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 
-		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
+		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		var waiting struct {
 			Items []struct {
 				Upstream   string   `json:"upstream"`
@@ -392,7 +392,7 @@ func TestABuildHasOneCommitmentPerFold(t *testing.T) {
 			} `json:"items"`
 		}
 		httpapitest.Read(t, r, "triager",
-			"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades", &plan)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades", &plan)
 
 		curl := 0
 		for _, row := range plan.Items {
@@ -426,7 +426,7 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 	// is a planned one with a later date.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
+		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		standing := func(t *testing.T) struct {
 			By     string `json:"by"`
 			HeldBy string `json:"held_by"`
@@ -471,7 +471,7 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 		// and naming one of them would hand somebody work that is half
 		// theirs.
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-CURL1/components/libcurl4t64/assignment",
 			`{"person":"triager"}`); got.Code >= 300 {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
@@ -549,7 +549,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 		}
 		r.Agreed(t, made.ClaimID)
 
-		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
+		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		var waiting struct {
 			Items []struct {
 				To string `json:"to"`
@@ -563,7 +563,7 @@ func TestChangingWhatAReleaseIsMovingToTakesBackTheAgreement(t *testing.T) {
 
 		// Moved, with a reason, which is what a second person reads.
 		if moved := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/promise", made.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/promise", made.ClaimID),
 			`{"to":"8.6.0-1","by":"2030-02-01","reasoning":"8.5.0 was pulled; taking 8.6.0."}`,
 		); moved.Code != http.StatusNoContent {
 			t.Fatalf("re-promising answered %d: %s", moved.Code, moved.Body.String())
@@ -611,7 +611,7 @@ func TestAPromiseCarriesNoBoundAndAJudgmentKeepsItsOwn(t *testing.T) {
 		// The judgment, refused, which is what keeps this test honest: the cap
 		// is in force and reaching this path.
 		judged := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-CURL1/components/libcurl4t64/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 				`"reasoning":"The transfer path is never reached."}`)
@@ -663,7 +663,7 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 			} `json:"items"`
 			Findings int `json:"findings"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/components/libcurl4t64/issues", &candidates)
 		// Both siblings carry the two fixable issues, and the third sits on
 		// one of them: three issues, five findings across the fold.
@@ -679,8 +679,8 @@ func TestABulkJudgmentCoversTheFoldTheListShowed(t *testing.T) {
 
 		// And the judgment written from it covers the fold, in one claim.
 		decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/components/libcurl4t64/decisions",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/components/libcurl4t64/bulk-decision",
 			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
 				`"selected_by":"the whole fold",`+
@@ -714,8 +714,8 @@ func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 	// has to be able to act on.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/libcurl4t64/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/libcurl4t64/bulk-decision"
 
 		// Everything the component holds, described as though it were a subset.
 		everything := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
@@ -745,7 +745,7 @@ func TestABulkClaimRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 				} `json:"selection"`
 			} `json:"claim"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
 		claim := detail.Claim
 		if claim.Selection == nil {
 			t.Fatal("a bulk claim records no narrowing an approver could re-run")
@@ -785,8 +785,8 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/libcurl4t64/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/libcurl4t64/bulk-decision"
 		decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
@@ -810,7 +810,7 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 				} `json:"selection"`
 			} `json:"claim"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
 		if detail.Claim.Selection == nil {
 			t.Fatal("a narrowed claim records no narrowing")
 		}
@@ -835,7 +835,7 @@ func TestANarrowedClaimRecordsWhatThatNarrowingReaches(t *testing.T) {
 		if err := json.Unmarshal(escaped.Body.Bytes(), &made); err != nil {
 			t.Fatal(err)
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/claims/%d", made.ClaimID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.ClaimID), &detail)
 		if detail.Claim.Selection == nil {
 			t.Fatal("a narrowed claim records no narrowing")
 		}
@@ -853,7 +853,7 @@ func TestTheFixBundleFileSaysWhatTheListSays(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/fix-bundles.csv?stream=master&variant=broadcom", "")
+			"/v1/products/mine/planned-upgrades.csv?stream=master&variant=broadcom", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("exporting answered %d: %s", got.Code, got.Body.String())
 		}
@@ -888,7 +888,7 @@ func TestThePendingUpgradesFileSaysWhatTheListSays(t *testing.T) {
 			t.Fatalf("declaring answered %d: %s", got.Code, got.Body.String())
 		}
 
-		const plan = "/v1/products/mine/streams/master/variants/broadcom/pending-upgrades"
+		const plan = "/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades"
 		var list struct {
 			Items []map[string]any `json:"items"`
 		}
@@ -958,7 +958,7 @@ func TestALimitOfZeroAnswersTheTotalAlone(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		for _, path := range []string{
-			"/v1/products/mine/fix-bundles",
+			"/v1/products/mine/planned-upgrades",
 			"/v1/products/mine/findings/components",
 		} {
 			var page, alone struct {

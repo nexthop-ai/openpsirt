@@ -89,7 +89,7 @@ func TestNothingAThirdPartyNamedBecomesMarkupInTheIssueDocument(t *testing.T) {
 		}
 		claim, _ := r.Claimed(t, proposer, url.PathEscape(identifier), "plainlib", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, approver, http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -215,7 +215,7 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			t.Errorf("a claim nobody has agreed to reads as %q", out.Items[0].State)
 		}
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
 		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
@@ -358,7 +358,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		r.ScannedWithEvidence(t)
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			"/v1/claims/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
+			"/v1/decisions/"+httpapitest.Itoa(claim)+"/approval", `{}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 

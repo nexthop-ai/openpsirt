@@ -35,17 +35,23 @@ export function VEX() {
     queryKey: ["vex-issuances", product, stream, variant, kind],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance", {
-          params: { path, query: asked },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+          {
+            params: { path, query: asked },
+          },
+        ),
       ),
   });
   const record = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance", {
-          params: { path, query: asked },
-        }),
+        await api.POST(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance",
+          {
+            params: { path, query: asked },
+          },
+        ),
       ),
     onSuccess: () => {
       void queries.invalidateQueries({
@@ -67,10 +73,13 @@ export function VEX() {
             ? "Approved dismissals, and suppliers' statements in their name. Public findings only."
             : "Approved dismissals and public findings only."}{" "}
           <a
-            href={linkTo("/v1/products/{product}/streams/{stream}/variants/{variant}/vex", {
-              path,
-              query: asked,
-            })}
+            href={linkTo(
+              "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex",
+              {
+                path,
+                query: asked,
+              },
+            )}
           >
             Current document (JSON)
           </a>
@@ -143,7 +152,7 @@ export function VEX() {
                       <td>
                         <a
                           href={linkTo(
-                            "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+                            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
                             {
                               path: { ...path, version: row.version ?? 0 },
                               query: asked,
@@ -177,7 +186,7 @@ export function VEX() {
             Recorded as version {record.data.version}.{" "}
             <a
               href={linkTo(
-                "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+                "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}",
                 {
                   path: { ...path, version: record.data.version },
                   query: asked,

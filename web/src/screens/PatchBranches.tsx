@@ -34,12 +34,12 @@ export function PatchBranches() {
     queryKey: ["patch-branches", pages],
     queryFn: async () => {
       const first = unwrap(
-        await api.GET("/v1/patch-branches", { params: { query: { limit: PAGE } } }),
+        await api.GET("/v1/patch-branch-lookups", { params: { query: { limit: PAGE } } }),
       );
       const rows = [...(first.repositories ?? [])];
       for (let page = 1; page < pages && rows.length < first.total; page++) {
         const more = unwrap(
-          await api.GET("/v1/patch-branches", {
+          await api.GET("/v1/patch-branch-lookups", {
             params: { query: { limit: PAGE, offset: page * PAGE } },
           }),
         );

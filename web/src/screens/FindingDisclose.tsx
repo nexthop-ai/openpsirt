@@ -25,8 +25,8 @@ export function Disclose({ product, vulnerability }: { product: string; vulnerab
   const disclose = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure", {
-          params: { path: { product, vulnerability } },
+        await api.POST("/v1/products/{product}/issues/{issue}/disclosure", {
+          params: { path: { product, issue: vulnerability } },
           body: { reason: because },
         }),
       ),

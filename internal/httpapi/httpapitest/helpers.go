@@ -213,8 +213,8 @@ func (r *Reach) Decided(t *testing.T, place string) int64 {
 // agreed to, commented on or withdrawn — is the claim's.
 func (r *Reach) DecidedAt(t *testing.T, place string) (decision, claim int64) {
 	t.Helper()
-	path := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-		"/findings/CVE-2026-9999/places/%s/decision", place)
+	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+		"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 	got := AsPerson(t, r, "triager", http.MethodPost, path,
 		`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 			`"reasoning":"The parser is never reached: we only call the encoder."}`)

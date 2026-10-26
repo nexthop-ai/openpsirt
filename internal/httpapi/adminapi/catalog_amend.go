@@ -298,7 +298,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "amend-stream", Method: http.MethodPatch,
-		Path:    "/v1/products/{product}/streams/{stream}",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}",
 		Summary: "Amend a branch or tag",
 		Description: "Corrects what a release is called.\n\n" +
 			"Refused once a VEX document has gone out for any build of this release, a " +
@@ -353,7 +353,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retire-stream", Method: http.MethodDelete,
-		Path:    "/v1/products/{product}/streams/{stream}",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}",
 		Summary: "Retire a branch or tag",
 		Description: "Takes a release out of use. It is offered nowhere and no scan may be " +
 			"filed against it, while everything already filed against it stays. Declaring it " +

@@ -48,7 +48,7 @@ func TestWhatABuildCarriesIsReachableAndNarrowedLikeEverythingElse(t *testing.T)
 			t.Fatal(err)
 		}
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/carried-patches"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/carried-patches"
 		var body struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`

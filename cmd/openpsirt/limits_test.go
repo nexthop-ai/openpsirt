@@ -35,7 +35,7 @@ func TestTheUploadBoundsTheServerRefusesByAreTheConfiguredOnes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		build := "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
+		build := "/v1/products/" + fixture.ProductName + "/branches-and-tags/" + fixture.BranchName +
 			"/variants/" + fixture.CustomerVariant
 		padded := `{"version":"2.1.0",` + strings.Repeat(" ", 3*4096) + `"runs":[]}`
 		for path, c := range map[string]struct {
@@ -43,7 +43,7 @@ func TestTheUploadBoundsTheServerRefusesByAreTheConfiguredOnes(t *testing.T) {
 			code  int
 			says  string
 		}{
-			build + "/scans":    {"inventory", http.StatusRequestEntityTooLarge, "8192 bytes"},
+			build + "/sboms":    {"inventory", http.StatusRequestEntityTooLarge, "8192 bytes"},
 			build + "/analyses": {"sarif", http.StatusUnprocessableEntity, "the configured limit of 4096"},
 		} {
 			body, form := httpapitest.Form(t, httpapitest.Part{Field: c.field, Filename: "doc.json", Content: padded})
@@ -71,7 +71,7 @@ func TestAnAnalyzerUploadIsBoundedAsItIsSent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		path := "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
+		path := "/v1/products/" + fixture.ProductName + "/branches-and-tags/" + fixture.BranchName +
 			"/variants/" + fixture.CustomerVariant + "/analyses"
 		// The request's bound leaves room for the form around the documents,
 		// so the request past it is padded past that room as well.

@@ -43,7 +43,7 @@ func TestTheAnonymousSubjectReadsNoLead(t *testing.T) {
 			fmt.Sprintf("/v1/disclosure-movements/%d/approval", movement.ID), ""); got.Code != http.StatusNoContent {
 			t.Fatalf("agreeing to the disclosure answered %d: %s", got.Code, got.Body)
 		}
-		at := "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		if got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Fatalf("a reader of disclosed work read the disclosed lead with %d, so this checks nothing: %s",
 				got.Code, got.Body)
@@ -51,12 +51,12 @@ func TestTheAnonymousSubjectReadsNoLead(t *testing.T) {
 
 		reached := 0
 		for path, item := range r.API.OpenAPI().Paths {
-			if item.Get == nil || !strings.Contains(path, "lead") {
+			if item.Get == nil || !strings.Contains(path, "code-finding") {
 				continue
 			}
 			reached++
 			filled := strings.NewReplacer("{product}", "mine", "{stream}", "master",
-				"{variant}", "broadcom", "{place}", place, "{format}", "csv").Replace(path)
+				"{variant}", "broadcom", "{occurrence}", place, "{format}", "csv").Replace(path)
 			if got := r.Body(t, "", http.MethodGet, filled); got.Code != http.StatusUnauthorized {
 				t.Errorf("%s answered %d with no credential, want 401", filled, got.Code)
 			}

@@ -42,7 +42,7 @@ func TestRowsOfALeadClaimSetAsideAreToldToAProposerWhoReadsOnlyInternalWork(t *t
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID),
 			fmt.Sprintf(`{"except":[%d],"because":"the overflow is not the leak"}`, aside)); got.Code != http.StatusOK {
 			t.Fatalf("approving with a row set aside answered %d: %s", got.Code, got.Body)
 		}
@@ -57,7 +57,7 @@ func TestAMentionOnALeadClaimReachesSomebodyWhoReadsOnlyInternalWork(t *testing.
 		decided := decideLead(t, r, httpapitest.SeededLead(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", decided.ClaimID),
+			fmt.Sprintf("/v1/decisions/%d/comments", decided.ClaimID),
 			`{"body":"@internal-reader, could you look at the check above?"}`); got.Code >= 400 {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
 		}
@@ -72,7 +72,7 @@ func TestAnApprovalBatchUndoneIsToldToALeadProposerWhoReadsOnlyInternalWork(t *t
 		decided := decideLead(t, r, httpapitest.SeededLead(t, r),
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the pointer is checked a line above"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving under a batch answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodDelete,

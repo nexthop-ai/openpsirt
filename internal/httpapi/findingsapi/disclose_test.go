@@ -32,7 +32,7 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
-		finding := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+		finding := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 			recorded.Identifier + "/components/" + recorded.Component
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, finding+"/assignment",
 			`{"person":"private"}`); got.Code != http.StatusNoContent {
@@ -129,7 +129,7 @@ func TestWhoeverDisclosesAnIssueIsNotToldOfIt(t *testing.T) {
 		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
-		finding := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+		finding := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 			recorded.Identifier + "/components/" + recorded.Component
 		// The person who will agree to the disclosure holds the finding.
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, finding+"/assignment",

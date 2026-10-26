@@ -32,11 +32,11 @@ type asked struct {
 // that operation without breaking it.
 var standIn = map[string]string{
 	"product": "mine", "stream": "master", "variant": "broadcom",
-	"vulnerability": "CVE-2026-9999", "component": "libnl-3-200",
+	"issue": "CVE-2026-9999", "component": "libnl-3-200",
 	"identity": "reader", "name": "master", "format": "json",
 	"role": "public-read", "kind": "branch", "alias": "CVE-2026-1000",
-	"id": "1", "place": "1", "batch": "1", "team": "1", "scan": "1",
-	"run": "1", "document": "1", "token": "1", "tag": "one",
+	"id": "1", "occurrence": "1", "batch": "1", "team": "1", "sbom": "1",
+	"run": "1", "document": "1", "token": "1", "label": "one",
 	"reference": "MINE-R-2026-100000", "ruling": "1", "version": "1", "fix": "1",
 	"note": "1",
 }

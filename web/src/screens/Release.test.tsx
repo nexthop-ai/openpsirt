@@ -13,7 +13,7 @@ afterEach(() => vi.restoreAllMocks());
 describe("a release", () => {
   it("says its variants could not be read rather than that nothing was filed", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/streams"
+      path === "/v1/products/{product}/branches-and-tags"
         ? { data: { items: [{ name: "v1.2" }], total: 1 } }
         : { status: 503 },
     );
@@ -29,7 +29,7 @@ describe("a release", () => {
     // The list of lines answers a retired one only when asked to include
     // them, as the server does.
     serve((path, init) => {
-      if (path === "/v1/products/{product}/streams") {
+      if (path === "/v1/products/{product}/branches-and-tags") {
         const retired = (init as Init).params?.query?.retired === true;
         const items = [
           { name: "202411.1", kind: "tag" },

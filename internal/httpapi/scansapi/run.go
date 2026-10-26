@@ -50,8 +50,8 @@ type RunBody struct {
 func registerRun(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-scan-run", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/runs/{run}",
-		Summary: "Show what one run of the scanner did",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}",
+		Summary: "Show a known vulnerability scan",
 		Description: "One run, with what it was measured with and what it changed — broken " +
 			"down by the rating in force, and with how much of what it opened is known to be " +
 			"exploited.\n\n" +

@@ -128,8 +128,8 @@ func IngestOn(t *testing.T, on Engines, opts queue.Options, fn func(t *testing.T
 		})
 		fn(t, &IngestFixture{
 			Handler: handler, DB: db, Queue: q, Key: secret,
-			Path: "/v1/products/" + fixture.ProductName + "/streams/" + fixture.BranchName +
-				"/variants/" + fixture.CustomerVariant + "/scans",
+			Path: "/v1/products/" + fixture.ProductName + "/branches-and-tags/" + fixture.BranchName +
+				"/variants/" + fixture.CustomerVariant + "/sboms",
 		})
 	})
 }

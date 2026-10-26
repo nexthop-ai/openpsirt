@@ -39,8 +39,8 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 				Version string `json:"version"`
 			} `json:"differing"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/reach", place), &reached)
 		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
 			t.Errorf("the build at the same version should be reached by lookup: %+v", reached)
 		}
@@ -49,7 +49,7 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 			t.Fatalf("the build at another version should be offered with that version: %+v", reached)
 		}
 		// The name it gave is what the route resolves by.
-		path := "/v1/products/mine/streams/master/variants/mellanox/findings/CVE-2026-9999" +
+		path := "/v1/products/mine/branches-and-tags/master/variants/mellanox/findings/CVE-2026-9999" +
 			"/components/libnl-3-200/decision?version=" + reached.Differing[0].Version
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
@@ -70,7 +70,7 @@ func TestAnOutcomeIsOfferedOnlyWhereItsEvidenceCanBeSent(t *testing.T) {
 	// being wrong.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		const path = "/v1/products/mine/streams/master/variants/broadcom" +
+		const path = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/decision"
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
@@ -100,7 +100,7 @@ func TestReachingAnotherBuildCoversOnlyWhatIsLeftThere(t *testing.T) {
 		r.Decided(t, place)
 		body := `{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",` +
 			`"reasoning":"The parser is never reached there either."`
-		path := "/v1/products/mine/streams/master/variants/arista/findings/CVE-2026-9999" +
+		path := "/v1/products/mine/branches-and-tags/master/variants/arista/findings/CVE-2026-9999" +
 			"/components/libnl-3-200/decision?version=3.7.0"
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path, body+`}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("a second claim about a place already reached answered %d, want 422: %s",
@@ -141,8 +141,8 @@ func TestHowFarADecisionWouldReachComesBackInThreeParts(t *testing.T) {
 				Version string `json:"version"`
 			} `json:"differing"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/reach", place), &reached)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/reach", place), &reached)
 
 		if reached.Here != 1 {
 			t.Errorf("the judgment covers %d places here, want 1", reached.Here)
@@ -187,7 +187,7 @@ func TestTheMergedReachAnswersEveryPlaceRatherThanASample(t *testing.T) {
 				Places  int    `json:"places"`
 			} `json:"differing"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200/reach", &reached)
 
 		if len(reached.Automatic) != 1 || reached.Automatic[0].Variant != "arista" {
@@ -218,7 +218,7 @@ func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing
 		r.Scanned(t)
 		r.ScannedAlso(t, "arista", "3.7.0")
 		got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/reach", "")
 		if got.Code != http.StatusNotFound {
 			t.Errorf("somebody who may not see the product was answered %d: %s",
@@ -237,9 +237,9 @@ func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
 	// are about.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		build := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999"
+		build := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999"
 		paths := []string{
-			build + "/places/" + place + "/reach",
+			build + "/occurrences/" + place + "/reach",
 			build + "/components/libnl-3-200/reach",
 		}
 

@@ -62,7 +62,7 @@ type AssessmentBody struct {
 func registerAssessment(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assess-issue", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/assessment",
+		Path:    "/v1/products/{product}/issues/{issue}/assessment",
 		Summary: "Record what a product thinks of an issue, as against what was published",
 		Description: "Recorded against the issue, not against a place, and against one " +
 			"product. A published rating being wrong, or a report being disputed, is one " +
@@ -89,7 +89,7 @@ func registerAssessment(api huma.API, in core.Deps) {
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Body          AssessmentBody
 	}) (*struct{ Body AssessmentBody }, error) {
 		subject, _, err := core.Triaging(ctx, in)

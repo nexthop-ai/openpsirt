@@ -18,7 +18,7 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 	// that it stands alone, and it is then gated.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		const finding = "/v1/products/mine/streams/master/variants/broadcom" +
+		const finding = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999"
 
 		type places struct {
@@ -45,7 +45,7 @@ func TestAFindingSaysHowLongEachPlaceWasPutOff(t *testing.T) {
 		}
 		until := time.Now().UTC().AddDate(0, 0, 10).Format(time.DateOnly)
 		if made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			finding+"/places/"+place+"/decision",
+			finding+"/occurrences/"+place+"/decision",
 			`{"outcome":"deferred","deferred_until":"`+until+
 				`","reasoning":"Not this sprint."}`); made.Code != http.StatusCreated {
 			t.Fatalf("deferring answered %d: %s", made.Code, made.Body.String())

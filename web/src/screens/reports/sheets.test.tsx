@@ -46,7 +46,7 @@ function links(name: string): string[] {
     .map((each) => each.getAttribute("href") ?? "");
 }
 
-const REGISTER = "/v1/products/{product}/streams/{stream}/variants/{variant}/register";
+const REGISTER = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register";
 
 describe("the disposition register", () => {
   const row = {

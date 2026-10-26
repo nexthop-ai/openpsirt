@@ -112,8 +112,8 @@ func registerElsewhere(api huma.API, in core.Deps) {
 func registerReachAcross(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding-reach", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/findings/{vulnerability}/components/{component}/reach",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/findings/{issue}/components/{component}/reach",
 		Summary: "Show how far a decision about this finding would reach",
 		Description: "The same three parts the per-place answer gives, for every place " +
 			"the finding sits at, merged.\n\n" +
@@ -129,7 +129,7 @@ func registerReachAcross(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
 		core.ComponentQuery
 	}) (*struct{ Body ReachBody }, error) {

@@ -310,7 +310,7 @@ export function Activity({
   const comments = useQuery({
     queryKey: ["comments", claimId],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/comments", { params: { path: { id: claimId } } })),
+      unwrap(await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: claimId } } })),
   });
 
   const now: Event[] = [];
@@ -507,7 +507,7 @@ export function Comments({
   const comments = useQuery({
     queryKey: ["comments", claimId],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/comments", { params: { path: { id: claimId } } })),
+      unwrap(await api.GET("/v1/decisions/{id}/comments", { params: { path: { id: claimId } } })),
   });
 
   return (
@@ -613,9 +613,17 @@ function Prior({
     mutationFn: async () =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision/reaffirmation",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation",
           {
-            params: { path: { ...at, place: item.place } },
+            params: {
+              path: {
+                product: at.product,
+                stream: at.stream,
+                variant: at.variant,
+                issue: at.vulnerability,
+                occurrence: item.place,
+              },
+            },
             body: { previous: item.id, reasoning: `${item.reasoning}\n\n${note}`.trim() },
           },
         ),

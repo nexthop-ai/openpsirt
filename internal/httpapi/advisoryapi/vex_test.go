@@ -23,7 +23,7 @@ func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
 	// formatting over decisions already made and approved.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		// Nothing approved yet, so the document says nothing. Silence reads as
 		// affected in this format, which is the honest answer.
@@ -108,7 +108,7 @@ func TestAVEXDocumentCarriesNothingNobodyHasAnnounced(t *testing.T) {
 		claim, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
 		r.AgreedBy(t, "private-dispatcher", claim)
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 		var doc struct {
 			Statements []struct {
 				Vulnerability struct {
@@ -152,7 +152,7 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 	// they say about the name I have — found nothing.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		// A later scan reporting the issue under a second name, which is how
 		// a scanner's issue gains one.
@@ -239,14 +239,14 @@ func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing
 				Place string `json:"place"`
 			} `json:"places"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9998/components/docker-swss", &places)
 		if len(places.Places) != 1 {
 			t.Fatalf("the image's own issue sits at %d places, want one", len(places.Places))
 		}
 		one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9998/places/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9998/occurrences/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
 		if one.Code != http.StatusCreated {
 			t.Fatalf("deciding the image's issue answered %d: %s", one.Code, one.Body.String())
 		}
@@ -270,7 +270,7 @@ func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing
 				} `json:"products"`
 			} `json:"statements"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex", &doc)
 		stated := 0
 		for _, each := range doc.Statements {
 			if each.Vulnerability.Name != "CVE-2026-9998" {
@@ -293,7 +293,7 @@ func TestADismissalOfAnImagesOwnIssueNamesTheImageAsTheBuildStampedIt(t *testing
 // one of the consumers given.
 func dismissedAtOnePlace(t *testing.T, r *httpapitest.Reach, consumers map[string]bool) {
 	t.Helper()
-	const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+	const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 	// The issue sits at more than one place in this component.
 	var places struct {
 		Places []struct {
@@ -308,8 +308,8 @@ func dismissedAtOnePlace(t *testing.T, r *httpapitest.Reach, consumers map[strin
 
 	// Agreed at one place only.
 	one := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
+		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/"+places.Places[0].Place+"/decision", httpapitest.Dismissal)
 	if one.Code != http.StatusCreated {
 		t.Fatalf("deciding one place answered %d: %s", one.Code, one.Body.String())
 	}
@@ -363,7 +363,7 @@ func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T)
 	httpapitest.ReachAs(t, httpapitest.CastSeed.Two, publisher.Named{}, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/vex", "")
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/vex", "")
 		if got.Code != http.StatusConflict {
 			t.Fatalf("answered %d, want a conflict naming what is unconfigured: %s",
 				got.Code, got.Body.String())
@@ -376,7 +376,7 @@ func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T)
 		// nothing and names no author, so the sentence about an unconfigured
 		// publisher answers a question it was never asked.
 		if gone := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/vex/issuance",
 			""); gone.Code != http.StatusOK {
 			t.Errorf("reading what has gone out answered %d: %s",
 				gone.Code, gone.Body.String())
@@ -400,7 +400,7 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		embargoed := r.Embargoed(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		// Something for the document to carry, so that what is measured is a
 		// refusal rather than an empty answer either way.
@@ -417,7 +417,7 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 		// A judgment on the embargoed issue, which is what the collaborator is
 		// brought in to argue about and the thing their grant does reach.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/"+
 				embargoed+"/components/libnl-3-200/decision", httpapitest.Dismissal)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
@@ -445,7 +445,7 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 		// The grant is live and reaches the case: they read what was decided
 		// about the issue they are on.
 		if got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			fmt.Sprintf("/v1/decisions/%d", decided.IDs[0]), ""); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decision-occurrences/%d", decided.IDs[0]), ""); got.Code != http.StatusOK {
 			t.Fatalf("the collaborator does not reach their own case, so this proves "+
 				"nothing: %d %s", got.Code, got.Body.String())
 		}
@@ -514,7 +514,7 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 	// is told, and two engines of four is not where a portability trap shows.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		const stops = "The service is bound to the management VLAN only."
 		const argued = "Checked the build flags and the exposed sockets."
@@ -555,7 +555,7 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 	// against an empty string is most likely to answer differently on.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		const instead = "Use SSH, or reach it from the management VLAN only."
 		// One that says what to do, and one that says nothing.
@@ -613,7 +613,7 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 	// because surviving the bump is the whole of what a correction is.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
 
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image",
 			`{"outcome":"mismatched","justification":"component_not_present",`+
@@ -859,7 +859,7 @@ func TestAVEXStatementNamesTheComponentAsThisBuildStatedIt(t *testing.T) {
 				} `json:"products"`
 			} `json:"statements"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom/vex", &doc)
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex", &doc)
 		named := map[string][]string{}
 		for _, one := range doc.Statements {
 			for _, product := range one.Products {

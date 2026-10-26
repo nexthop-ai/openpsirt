@@ -27,9 +27,9 @@ func TestABuildNeverScannedIsTheProductsBusinessOnly(t *testing.T) {
 			"never-scanned", true); err != nil {
 			t.Fatal(err)
 		}
-		at := "/v1/products/mine/streams/master/variants/never-scanned/components/mine"
+		at := "/v1/products/mine/branches-and-tags/master/variants/never-scanned/components/mine"
 		nobody := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			"/v1/products/nobody-declared/streams/master/variants/never-scanned/components/mine", "")
+			"/v1/products/nobody-declared/branches-and-tags/master/variants/never-scanned/components/mine", "")
 
 		stranger := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, at, "")
 		httpapitest.RefusedWith(t, stranger, http.StatusNotFound)

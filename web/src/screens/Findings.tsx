@@ -317,7 +317,7 @@ export function Findings() {
     enabled: more && !spanning,
     queryKey: ["tags", product],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/tags", { params: { path: { product } } })),
+      unwrap(await api.GET("/v1/products/{product}/labels", { params: { path: { product } } })),
     retry: false,
   });
   // The package kinds present in the scope on screen, with how much is open at

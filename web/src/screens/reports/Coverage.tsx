@@ -40,7 +40,7 @@ export function Coverage() {
   const coverage = useQuery({
     queryKey: ["scanning", "report", scope],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/scanning", { params: { query: { limit: SHOWN, ...scope } } })),
+      unwrap(await api.GET("/v1/last-uploads", { params: { query: { limit: SHOWN, ...scope } } })),
   });
 
   const builds = coverage.data?.items ?? [];
@@ -187,7 +187,7 @@ export function Coverage() {
 // request this page makes, so the browser fetches it with the session it
 // already has.
 function fileAt(format: "csv" | "json", asked: string): string {
-  return linkedFile("/v1/scanning.{format}", format, { query: asked });
+  return linkedFile("/v1/last-uploads.{format}", format, { query: asked });
 }
 
 function scansAt(product: string, stream: string, variant: string): string {

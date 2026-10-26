@@ -97,8 +97,8 @@ func countCoverage(rows []ingest.Coverage) coverageCounts {
 
 func registerCoverage(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-scanning", Method: http.MethodGet, Path: "/v1/scanning",
-		Summary: "List when each build was last scanned",
+		OperationID: "list-scanning", Method: http.MethodGet, Path: "/v1/last-uploads",
+		Summary: "List the last upload per build",
 		Description: "Returns every build you can see, longest-silent first, with when a scan " +
 			"last arrived for it and whether that is longer ago than this deployment allows.\n\n" +
 			"A build that stops being scanned reports no new findings and fails nothing, so it " +
@@ -192,8 +192,8 @@ func scanningRows(ctx context.Context, in core.Deps, q core.ScopeQuery) ([]inges
 func registerCoverageExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-scanning", Method: http.MethodGet,
-		Path:    "/v1/scanning.{format}",
-		Summary: "Export when each build was last scanned",
+		Path:    "/v1/last-uploads.{format}",
+		Summary: "Export the last upload per build",
 		Description: "Every build you can see, longest-silent first, as a file: when a scan " +
 			"last arrived, how long it has been, and whether that is longer than this " +
 			"deployment allows.\n\n" +

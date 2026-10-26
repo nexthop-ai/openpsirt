@@ -53,7 +53,7 @@ function serving(decisions: Record<number, unknown>) {
       };
     }
     if (path.endsWith("/components/{component}")) return { data: finding };
-    if (path === "/v1/decisions/{id}") {
+    if (path === "/v1/decision-occurrences/{id}") {
       const id = (init as { params: { path: { id: number } } }).params.path.id;
       const answer = decisions[id];
       return answer ? { data: answer } : { status: 500 };

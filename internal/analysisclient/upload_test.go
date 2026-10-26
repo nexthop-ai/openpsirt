@@ -51,7 +51,7 @@ func TestARunIsSentCompressedWithItsFields(t *testing.T) {
 	if answer.Status != http.StatusAccepted || string(answer.Body) != `{"outcome":"queued"}` {
 		t.Errorf("answer %d %s", answer.Status, answer.Body)
 	}
-	if path != "/v1/products/sonic/streams/202605.1/variants/broad%20com/analyses" {
+	if path != "/v1/products/sonic/branches-and-tags/202605.1/variants/broad%20com/analyses" {
 		t.Errorf("sent to %s", path)
 	}
 	if auth != "Bearer opk_test" {

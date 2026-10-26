@@ -33,7 +33,7 @@ change. [Build pipelines](pipeline.md) § Prerequisites has the three requests,
 and § The pipeline key the key an upload takes.
 
 ```bash
-curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
+curl -X POST "$OPENPSIRT/v1/products/sonic/branches-and-tags" \
   -H "Origin: $OPENPSIRT" \
   -H 'Content-Type: application/json' \
   -d '{"name": "202605.1", "kind": "tag"}'
@@ -45,7 +45,7 @@ The SBOM and the VEX document go in one request.
 
 ```bash
 curl --retry 5 -X POST \
-  "$OPENPSIRT/v1/products/sonic/streams/202605.1/variants/broadcom/scans" \
+  "$OPENPSIRT/v1/products/sonic/branches-and-tags/202605.1/variants/broadcom/sboms" \
   -H "Authorization: Bearer $OPENPSIRT_KEY" \
   -F "inventory=@sonic-202605.1.cdx.json" \
   -F "suppressions=@sonic-202605.1.openvex.json"
@@ -70,7 +70,7 @@ those with their SBOMs.
 
 ```bash
 curl --retry 5 -X POST \
-  "$OPENPSIRT/v1/products/sonic/vex-statements?publisher=vendor-202605.1-broadcom" \
+  "$OPENPSIRT/v1/products/sonic/vex-documents?publisher=vendor-202605.1-broadcom" \
   -H "Origin: $OPENPSIRT" \
   -F "statements=@sonic-202605.1.openvex.json"
 ```

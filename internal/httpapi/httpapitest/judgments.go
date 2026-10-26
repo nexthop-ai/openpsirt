@@ -66,7 +66,7 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 // the claim it made.
 func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string) (claim int64, ids []int64) {
 	t.Helper()
-	path := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
+	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 		"/findings/%s/components/%s/decision", vulnerability, component)
 	got := AsPerson(t, r, who, http.MethodPost, path, body)
 	if got.Code != http.StatusCreated {
@@ -96,8 +96,8 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 	ctx := t.Context()
 	// One judgment over the fold: two packages, two places, one claim.
 	decided := AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/streams/master/variants/broadcom"+
-			"/components/libcurl4t64/decisions",
+		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/components/libcurl4t64/bulk-decision",
 		`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
 			`"justification":"vulnerable_code_cannot_be_controlled_by_adversary",`+
 			`"selected_by":"the transfer path",`+
@@ -133,7 +133,7 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 func (r *Reach) AgreedAcrossTheFold(t *testing.T, issue, justification string) int64 {
 	t.Helper()
 	decided := AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/streams/master/variants/broadcom/components/libcurl4t64/decisions",
+		"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/libcurl4t64/bulk-decision",
 		fmt.Sprintf(`{"vulnerabilities":[%q],"outcome":"not-applicable",`+
 			`"justification":%q,"selected_by":"the transfer path",`+
 			`"reasoning":"Judged at 8.4.0."}`, issue, justification))
@@ -161,7 +161,7 @@ func (r *Reach) Agreed(t *testing.T, claim int64) {
 func (r *Reach) AgreedBy(t *testing.T, who string, claim int64) {
 	t.Helper()
 	if ok := AsPerson(t, r, who, http.MethodPost,
-		fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
+		fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
 		t.Fatalf("%s approving answered %d: %s", who, ok.Code, ok.Body.String())
 	}
 }
@@ -264,8 +264,8 @@ func (r *Reach) TwoPlacesOf(t *testing.T, vulnerability string) []string {
 func (r *Reach) AgreedAt(t *testing.T, place, body string) {
 	t.Helper()
 	made := AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/"+place+"/decision", body)
+		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/"+place+"/decision", body)
 	if made.Code != http.StatusCreated {
 		t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())
 	}
@@ -344,7 +344,7 @@ func (r *Reach) Became(t *testing.T, who string) []becameRow {
 	var out struct {
 		Items []becameRow `json:"items"`
 	}
-	Read(t, r, who, "/v1/my-claims", &out)
+	Read(t, r, who, "/v1/my-decisions", &out)
 	return out.Items
 }
 
@@ -408,7 +408,7 @@ type caught struct {
 func (r *Reach) Preview(t *testing.T, query string) caught {
 	t.Helper()
 	var out caught
-	Read(t, r, "triager", "/v1/products/mine/routing-rules/preview?"+query, &out)
+	Read(t, r, "triager", "/v1/products/mine/assignment-rules/preview?"+query, &out)
 	return out
 }
 
@@ -417,7 +417,7 @@ func (r *Reach) Preview(t *testing.T, query string) caught {
 func (r *Reach) PreviewAs(t *testing.T, who, query string) caught {
 	t.Helper()
 	var out caught
-	Read(t, r, who, "/v1/products/mine/routing-rules/preview?"+query, &out)
+	Read(t, r, who, "/v1/products/mine/assignment-rules/preview?"+query, &out)
 	return out
 }
 
@@ -439,7 +439,7 @@ var (
 func (r *Reach) AttackedAt(t *testing.T, known time.Time) int64 {
 	t.Helper()
 	got := AsPerson(t, r, "private-triage", http.MethodPost,
-		"/v1/products/mine/issues/CVE-2026-9999/exploited-here",
+		"/v1/products/mine/issues/CVE-2026-9999/incidents",
 		`{"known_at":"`+known.UTC().Format(time.RFC3339)+`",`+
 			`"grounds":"A customer sent packet captures."}`)
 	if got.Code != http.StatusCreated {
@@ -457,7 +457,7 @@ func (r *Reach) AttackedAt(t *testing.T, known time.Time) int64 {
 // Declared adds a window as the administrator and returns its identifier.
 func (r *Reach) Declared(t *testing.T, name string, hours int) int64 {
 	t.Helper()
-	got := AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+	got := AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows",
 		fmt.Sprintf(`{"name":%q,"hours":%d}`, name, hours))
 	if got.Code != http.StatusCreated {
 		t.Fatalf("declaring a window answered %d: %s", got.Code, got.Body.String())
@@ -498,7 +498,7 @@ func (r *Reach) Internal(t *testing.T, identifier string) {
 // returns the answer.
 func (r *Reach) DeclaredAs(t *testing.T, body string) int {
 	t.Helper()
-	return AsPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows", body).Code
+	return AsPerson(t, r, "admin", http.MethodPost, "/v1/response-windows", body).Code
 }
 
 // Embargoed records a flaw nobody has announced and returns its identifier.
@@ -522,7 +522,7 @@ func (r *Reach) Embargoed(t *testing.T) string {
 
 // FindingAt is where one issue in the scanned build is read.
 func FindingAt(vulnerability string) string {
-	return "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 		vulnerability + "/components/libnl-3-200"
 }
 
@@ -549,14 +549,14 @@ type ReportRead struct {
 // and two variants of one are one row.
 func (r *Reach) EndingIn(t *testing.T, stream string, days int) {
 	t.Helper()
-	made := AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/streams",
+	made := AsPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/branches-and-tags",
 		fmt.Sprintf(`{"name":%q,"kind":"tag","parent":"master"}`, stream))
 	if made.Code != http.StatusCreated {
 		t.Fatalf("declaring a release answered %d: %s", made.Code, made.Body.String())
 	}
 	on := time.Now().UTC().AddDate(0, 0, days).UTC().Format(time.DateOnly)
 	ended := AsPerson(t, r, "admin", http.MethodPut,
-		"/v1/products/mine/streams/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
+		"/v1/products/mine/branches-and-tags/"+stream+"/end-of-life", fmt.Sprintf(`{"on":%q}`, on))
 	if ended.Code != http.StatusNoContent {
 		t.Fatalf("giving it an end date answered %d: %s", ended.Code, ended.Body.String())
 	}

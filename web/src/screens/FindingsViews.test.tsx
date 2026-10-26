@@ -136,7 +136,7 @@ describe("the open findings by component", () => {
 describe("the open findings by upgrade", () => {
   it("links a file narrowed the same way, and says which filters it cannot apply", async () => {
     serve((path) =>
-      path === "/v1/products/{product}/fix-bundles"
+      path === "/v1/products/{product}/planned-upgrades"
         ? {
             data: {
               total: 1,
@@ -169,7 +169,7 @@ describe("the open findings by upgrade", () => {
     );
     await settle();
     const csv = href("CSV");
-    expect(csv).toContain("fix-bundles.csv");
+    expect(csv).toContain("planned-upgrades.csv");
     expect(csv).toContain("component=libssl3");
     expect(csv).not.toContain("limit=");
     expect(text()).toContain("Not applied here: age.");

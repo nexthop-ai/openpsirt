@@ -22,7 +22,7 @@ func TestCarryingWritesClaimsWaitingForASecondPerson(t *testing.T) {
 		r.Agreed(t, claim)
 		r.ScannedTag(t, "v2.0", "3.7.1")
 
-		const at = "/v1/products/mine/streams/v2.0/variants/broadcom/carried" +
+		const at = "/v1/products/mine/branches-and-tags/v2.0/variants/broadcom/carried" +
 			"?from=master&from_variant=broadcom"
 		var offered struct {
 			Moved []struct {

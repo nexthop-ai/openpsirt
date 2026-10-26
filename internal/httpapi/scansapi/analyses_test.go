@@ -29,7 +29,7 @@ const clangRun = `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"clang-ti
 
 // analyses is the path a build sends its analyzer runs to.
 func analyses(f *httpapitest.IngestFixture) string {
-	return strings.TrimSuffix(f.Path, "/scans") + "/analyses"
+	return strings.TrimSuffix(f.Path, "/sboms") + "/analyses"
 }
 
 // sendRun posts an analyzer run with the fields beside it, as a pipeline.
@@ -226,7 +226,7 @@ func TestAnAnalyzerUploadFromSomebodyNotAdmittedIsRecordedNowhere(t *testing.T) 
 		body, form := httpapitest.Form(t, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: `{"runs":`},
 			httpapitest.Part{Field: "series", Content: "stranger"})
 		got := r.Post(t, "internal-reader", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/analyses", body, form)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses", body, form)
 		if got.Code != http.StatusForbidden {
 			t.Fatalf("an upload from somebody who does not triage internal work answered %d: %s", got.Code, got.Body)
 		}

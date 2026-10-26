@@ -24,7 +24,7 @@ async function drawn(
     const query = (init as Init).params?.query ?? {};
     if (path === "/v1/products") return { data: { items: [{ name: "sonic" }] } };
     if (path === "/v1/teams") return { data: { items: [{ name: "platform" }] } };
-    if (path === "/v1/products/{product}/routing-rules") return { data: { items: RULES } };
+    if (path === "/v1/products/{product}/assignment-rules") return { data: { items: RULES } };
     if (path === "/v1/products/{product}/findings/components")
       return {
         data: {
@@ -34,7 +34,7 @@ async function drawn(
           ],
         },
       };
-    if (path === "/v1/products/{product}/routing-rules/preview") {
+    if (path === "/v1/products/{product}/assignment-rules/preview") {
       const total = caught(query);
       return { data: { total, components: total ? ["linux-image-6.12"] : [], unheld: 4, work: 9 } };
     }

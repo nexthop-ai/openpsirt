@@ -36,8 +36,8 @@ type ClaimApprovedBody struct {
 
 func registerClaims(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "approve-claim", Method: http.MethodPost, Path: "/v1/claims/{id}/approval",
-		Summary: "Approve a claim",
+		OperationID: "approve-claim", Method: http.MethodPost, Path: "/v1/decisions/{id}/approval",
+		Summary: "Approve a decision",
 		Description: "Approves every waiting decision in a claim as one action, under the same " +
 			"rules each decision is approved under: not by the person who proposed it, and " +
 			"against the revision of the reasoning that stands now.\n\n" +
@@ -102,8 +102,8 @@ func registerClaims(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "send-claim-back", Method: http.MethodPost, Path: "/v1/claims/{id}/send-back",
-		Summary: "Send a claim back for more",
+		OperationID: "send-claim-back", Method: http.MethodPost, Path: "/v1/decisions/{id}/send-back",
+		Summary: "Send a decision back for more",
 		Description: "Asks the author for more before agreeing to any of a claim. Every waiting " +
 			"decision in it leaves the review queue together and comes back when the author " +
 			"revises.\n\n" +
@@ -176,8 +176,8 @@ func registerClaims(api huma.API, in core.Deps) {
 func registerClaimLink(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "point-claim-elsewhere", Method: http.MethodPut,
-		Path:    "/v1/claims/{id}/elsewhere",
-		Summary: "Record where this claim's work is happening",
+		Path:    "/v1/decisions/{id}/elsewhere",
+		Summary: "Record where this decision's work is happening",
 		Description: "Stores a link to a ticket, a thread or a change — and sends nothing to " +
 			"it. A stored link has no egress at all, which is what makes it available to a " +
 			"deployment that has not decided to let anything out; the half that *sends* is a " +
@@ -226,8 +226,8 @@ type ReaffirmedBody struct {
 func registerReaffirmClaim(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "reaffirm-claim", Method: http.MethodPost,
-		Path:    "/v1/claims/{id}/reaffirmation",
-		Summary: "Re-affirm everything one action claimed",
+		Path:    "/v1/decisions/{id}/reaffirmation",
+		Summary: "Re-affirm everything one decision covers",
 		Description: "Re-makes every row of this claim that stopped applying because an " +
 			"upstream version moved, at the versions each place has now, as one act with one " +
 			"reasoning.\n\n" +

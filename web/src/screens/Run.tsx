@@ -34,9 +34,12 @@ export function Run() {
     queryKey: ["run", at],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/runs/{run}", {
-          params: { path: at },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}",
+          {
+            params: { path: at },
+          },
+        ),
       ),
   });
 

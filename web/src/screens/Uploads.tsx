@@ -56,9 +56,12 @@ export function Uploads() {
     queryKey: ["uploads", product, stream, variant],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/uploads", {
-          params: { path: { product, stream, variant } },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads",
+          {
+            params: { path: { product, stream, variant } },
+          },
+        ),
       ),
     refetchInterval: (query) =>
       query.state.data?.items?.some((each) => each.latest?.status === "in-progress")
@@ -140,9 +143,12 @@ function SBOMs({ build }: { build: Build }) {
     queryKey: ["scans", product, stream, variant],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/scans", {
-          params: { path: { product, stream, variant } },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms",
+          {
+            params: { path: { product, stream, variant } },
+          },
+        ),
       ),
     // Asked again only while an upload on the page is still being read or
     // scanned: a settled page has nothing to move, and a page of receipts is
@@ -156,7 +162,8 @@ function SBOMs({ build }: { build: Build }) {
   });
   const scanning = useQuery({
     queryKey: ["scanning", product],
-    queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: { product } } })),
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/last-uploads", { params: { query: { product } } })),
   });
   const quiet = (scanning.data?.items ?? []).filter((b) => b.quiet);
   // The total, against the number named. These rows are named
@@ -417,9 +424,9 @@ function Sent({
   if (sent.length === 0) return <span className="hint">—</span>;
   const where = (document: number) =>
     linkTo(
-      "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/documents/{document}",
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/documents/{document}",
       {
-        path: { product: at.product, stream: at.stream, variant: at.variant, scan, document },
+        path: { product: at.product, stream: at.stream, variant: at.variant, sbom: scan, document },
       },
     );
   return (

@@ -110,7 +110,7 @@ describe("proposing a deferral past the threshold", () => {
     expect(sent()).toHaveLength(1);
     const [path, init] = sent()[0] ?? ["", {}];
     expect(path).toBe(
-      "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/decision",
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision",
     );
     expect((init as { body: unknown }).body).toEqual({
       outcome: "deferred",

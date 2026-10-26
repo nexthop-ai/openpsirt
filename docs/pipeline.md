@@ -36,7 +36,7 @@ curl -X POST "$OPENPSIRT/v1/products" \
   -H 'Content-Type: application/json' \
   -d '{"name": "sonic", "display_name": "SONiC"}'
 
-curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
+curl -X POST "$OPENPSIRT/v1/products/sonic/branches-and-tags" \
   -H 'Content-Type: application/json' \
   -d '{"name": "main", "kind": "branch"}'
 
@@ -48,7 +48,7 @@ curl -X POST "$OPENPSIRT/v1/products/sonic/variants" \
 A tag names the branch it was cut from, which is what release comparison reads:
 
 ```bash
-curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
+curl -X POST "$OPENPSIRT/v1/products/sonic/branches-and-tags" \
   -H 'Content-Type: application/json' \
   -d '{"name": "v2.4.1", "kind": "tag", "parent": "main"}'
 ```
@@ -88,7 +88,7 @@ Your build already produces an SBOM. Send it.
 
 ```bash
 curl --retry 5 -X POST \
-  "$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans" \
+  "$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/broadcom/sboms" \
   -H "Authorization: Bearer $OPENPSIRT_KEY" \
   -F "inventory=@sbom.cdx.json"
 ```
@@ -117,7 +117,7 @@ together each gets its turn rather than failing its step.
     OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
   run: |
     curl --fail-with-body --retry 5 -X POST \
-      "$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans" \
+      "$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/${{ matrix.variant }}/sboms" \
       -H "Authorization: Bearer $OPENPSIRT_KEY" \
       -F "inventory=@sbom.cdx.json"
 ```
@@ -134,7 +134,7 @@ send-inventory:
   script:
     - |
       curl --fail-with-body --retry 5 -X POST \
-        "$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans" \
+        "$OPENPSIRT/v1/products/sonic/branches-and-tags/$CI_COMMIT_BRANCH/variants/broadcom/sboms" \
         -H "Authorization: Bearer $OPENPSIRT_KEY" \
         -F "inventory=@sbom.cdx.json"
 ```
@@ -150,11 +150,11 @@ says which part is missing rather than making you guess:
 
 ## The result
 
-Poll the scans for that build.
+Poll the SBOM uploads for that build.
 
 ```bash
 curl -H "Authorization: Bearer $OPENPSIRT_KEY" \
-  "$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans"
+  "$OPENPSIRT/v1/products/sonic/branches-and-tags/main/variants/broadcom/sboms"
 ```
 
 Each entry carries `state`, and where something went wrong, `failure` — in the
@@ -190,7 +190,7 @@ Which names those were is one request further, against the upload the receipt
 names:
 
 ```
-GET /v1/products/sonic/streams/master/variants/broadcom/scans/2/changes
+GET /v1/products/sonic/branches-and-tags/master/variants/broadcom/sboms/2/changes
 ```
 
 ```json

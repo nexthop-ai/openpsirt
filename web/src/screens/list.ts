@@ -268,7 +268,7 @@ const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
   planned: { planned: true, unplanned: true, either: true },
   across_variants: { only: true, every: true },
   sort: { urgency: true, age: true, deadline: true, places: true, epss: true, severity: true },
-  claim_state: { proposed: true, approved: true, withdrawn: true, lapsed: true },
+  decision_state: { proposed: true, approved: true, withdrawn: true, lapsed: true },
 };
 
 type ClosedParameter =
@@ -286,7 +286,7 @@ type ClosedParameter =
   | "planned"
   | "across_variants"
   | "sort"
-  | "claim_state";
+  | "decision_state";
 
 // The words the address carries for one closed parameter that the server
 // takes, in the order they came, and none of the others.
@@ -394,7 +394,7 @@ export function listQuery(params: URLSearchParams) {
   // The claim whose places the list is narrowed to, as the claim page links to.
   // The states narrow its rows and are sent only with it.
   const claim = num(params.get("claim"), 1, Number.MAX_SAFE_INTEGER);
-  const claimStates = pick("claim_state", params.getAll("claim_state"));
+  const claimStates = pick("decision_state", params.getAll("claim_state"));
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   const openedAfter = day(params.get("opened_after"));
   const openedBefore = day(params.get("opened_before"));
@@ -412,10 +412,10 @@ export function listQuery(params: URLSearchParams) {
     ...(openedAfter ? { opened_after: openedAfter } : {}),
     ...(openedBefore ? { opened_before: openedBefore } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
-    ...(claim !== undefined ? { claim } : {}),
+    ...(claim !== undefined ? { decision: claim } : {}),
     ...(claim !== undefined && claimStates.length > 0
       ? {
-          claim_state: [...new Set(claimStates)],
+          decision_state: [...new Set(claimStates)],
         }
       : {}),
     ...(proposedAfter ? { proposed_after: proposedAfter } : {}),
@@ -456,10 +456,10 @@ export function listQuery(params: URLSearchParams) {
     ...(buildSays.length > 0 ? { build_says: buildSays } : {}),
     ...(hiding.length > 0 ? { exclude: hiding } : {}),
     ...(components.length > 0 ? { component: components } : {}),
-    ...(tags.length > 0 ? { tag: tags } : {}),
+    ...(tags.length > 0 ? { label: tags } : {}),
     ...(origin ? { origin } : {}),
     ...(planned && planned !== "either" ? { planned } : {}),
-    ...(params.get("below") === "yes" ? { below_floor: true } : {}),
+    ...(params.get("below") === "yes" ? { below_minimum_severity: true } : {}),
   };
 }
 

@@ -72,7 +72,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 				t.Errorf("the lead at %s says third-party: %v; want %v", path, got.ThirdParty, want.third)
 			}
 			var offer findingsapi.HandoffOfferBody
-			httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/hand-off", &offer)
+			httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/flaw", &offer)
 			if offer.Prefix != want.prefix || offer.ThirdParty != want.third {
 				t.Errorf("the offer for %s is the prefix %q, third-party %v; want %q, %v",
 					path, offer.Prefix, offer.ThirdParty, want.prefix, want.third)
@@ -86,9 +86,9 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &listed)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &listed)
 		file := httpapitest.AsPerson(t, r, "internal-reader", http.MethodGet,
-			"/v1/products/mine/leads.csv", "")
+			"/v1/products/mine/code-findings.csv", "")
 		records, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
 		if err != nil {
 			t.Fatalf("the file is not CSV a strict reader reads: %v\n%s", err, file.Body)
@@ -126,7 +126,7 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 			`{"outcome":"confirmed","reasoning":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(placeOf[deep])+"/hand-off",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(placeOf[deep])+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"the window overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -134,11 +134,11 @@ func TestVendoredCodeDeclaredThirdPartyIsOnePrefixAndIsSaidToBeThirdParty(t *tes
 		// Learned for the declared path rather than the deeper lead's
 		// directory, so a lead nearer the top of the vendored code is
 		// offered it.
-		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[shallow])+"/hand-off", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[shallow])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From != "confirmed" || first.Component != "zlib" {
 			t.Errorf("the shallower vendored lead was offered %+v first; want zlib, as its prefix was confirmed", first)
 		}
-		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[own])+"/hand-off", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(placeOf[own])+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From == "confirmed" {
 			t.Errorf("a lead outside the vendored code was offered %+v first", first)
 		}
@@ -163,7 +163,7 @@ func TestTheLeadQueueReadsThirdPartyFromTheNewestRunThatSawTheLead(t *testing.T)
 				ThirdParty bool   `json:"third_party"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/leads", &listed)
+		httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/code-findings", &listed)
 		seen := false
 		for _, item := range listed.Items {
 			if item.Path != vendored {

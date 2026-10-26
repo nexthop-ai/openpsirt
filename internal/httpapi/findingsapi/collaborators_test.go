@@ -79,7 +79,7 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 		}
 
 		// They may argue about it: a collaborator proposes and comments.
-		decide := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+		decide := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 			embargoed + "/components/libnl-3-200/decision"
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost, decide, httpapitest.Dismissal)
 		if made.Code != http.StatusCreated {
@@ -103,7 +103,7 @@ func TestSomebodyIsBroughtIntoOneCaseAndReachesNothingElse(t *testing.T) {
 			t.Fatalf("bringing a second person in answered %d", got.Code)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim.ClaimID), `{}`), http.StatusNotFound)
+			fmt.Sprintf("/v1/decisions/%d/approval", claim.ClaimID), `{}`), http.StatusNotFound)
 
 		// Being brought in is said at once, and says which issue: this is the
 		// one message that names an undisclosed finding on purpose, and it
@@ -167,7 +167,7 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 		// The person who reads the case makes the claim, so what is being
 		// measured is reading somebody else's decision rather than their own.
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/"+
 				embargoed+"/components/libnl-3-200/decision", httpapitest.Dismissal)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
@@ -186,7 +186,7 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 				} `json:"decision"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/decisions", &listed)
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences", &listed)
 		var found bool
 		for _, one := range listed.Items {
 			if one.Decision.ID == claim.IDs[0] {
@@ -197,7 +197,7 @@ func TestACollaboratorReadsTheDecisionsTheirCaseIsListedWith(t *testing.T) {
 			t.Fatalf("the collaborator's own case is not in the list, so this proves nothing")
 		}
 
-		at := fmt.Sprintf("/v1/decisions/%d", claim.IDs[0])
+		at := fmt.Sprintf("/v1/decision-occurrences/%d", claim.IDs[0])
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Errorf("a decision listed to this collaborator answered %d when opened: %s",
 				got.Code, got.Body.String())
@@ -340,7 +340,7 @@ func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testin
 		// it stays out of reach.
 		for _, path := range []string{
 			"/v1/products/mine/findings",
-			"/v1/products/mine/streams/master/variants/broadcom/vex",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/vex",
 		} {
 			httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, ""), http.StatusNotFound)
 		}
@@ -432,9 +432,9 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 			t.Fatalf("bringing them in answered %d: %s", got.Code, got.Body.String())
 		}
 
-		build := "/v1/products/mine/streams/master/variants/broadcom"
+		build := "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		for _, path := range []string{
-			build + "/scans",
+			build + "/sboms",
 			build + "/components",
 			build + "/match-coverage",
 			build + "/match-coverage.csv",
@@ -443,7 +443,7 @@ func TestWhatACollaboratorMayNotReachAnswersTheWayAStrangerIsAnswered(t *testing
 		} {
 			collaborator := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
 			stranger := httpapitest.AsPerson(t, r, "reader", http.MethodGet,
-				"/v1/products/theirs/streams/master/variants/broadcom"+
+				"/v1/products/theirs/branches-and-tags/master/variants/broadcom"+
 					path[len(build):], "")
 			if collaborator.Code != stranger.Code {
 				t.Errorf("%s answers a collaborator %d and a stranger %d, so the pair "+
@@ -528,23 +528,23 @@ func TestACollaboratorIsToldNothingOfWhatWasFiledAgainstABuild(t *testing.T) {
 		}
 
 		stranger := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			"/v1/products/nobody-declared/streams/master/variants/broadcom/scans", "")
+			"/v1/products/nobody-declared/branches-and-tags/master/variants/broadcom/sboms", "")
 		httpapitest.RefusedWith(t, stranger, http.StatusNotFound)
 		for _, path := range []string{
-			"/v1/products/mine/streams/master/variants/broadcom/scans",
-			"/v1/products/mine/streams/master/variants/never-scanned/scans",
-			"/v1/products/mine/streams/master/variants/nobody-declared/scans",
-			"/v1/products/mine/streams/master/variants/broadcom/scans/1/documents/1",
-			"/v1/products/mine/streams/master/variants/broadcom/scans/1/changes",
-			"/v1/products/mine/streams/master/variants/never-scanned/scans/1/changes",
-			"/v1/products/mine/streams/master/variants/broadcom/runs/1",
-			"/v1/products/mine/streams/master/variants/never-scanned/runs/1",
-			"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades",
-			"/v1/products/mine/streams/master/variants/never-scanned/pending-upgrades",
-			"/v1/products/mine/streams/master/variants/broadcom/pending-upgrades.csv",
-			"/v1/products/mine/streams/master/variants/never-scanned/pending-upgrades.csv",
-			"/v1/products/mine/streams/master/variants/broadcom/carried-patches",
-			"/v1/products/mine/streams/master/variants/never-scanned/carried-patches",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/sboms",
+			"/v1/products/mine/branches-and-tags/master/variants/nobody-declared/sboms",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/1/documents/1",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/1/changes",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/sboms/1/changes",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/runs/1",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/runs/1",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/planned-upgrades",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/planned-upgrades.csv",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/planned-upgrades.csv",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/carried-patches",
+			"/v1/products/mine/branches-and-tags/master/variants/never-scanned/carried-patches",
 		} {
 			got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet, path, "")
 			if got.Code != stranger.Code || got.Body.String() != stranger.Body.String() {
@@ -622,17 +622,17 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 		}
 		mine, _ := r.Claimed(t, "triager", theirs, "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", mine),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", mine),
 			`{"reasoning":"The socket is not built into this image."}`); got.Code != http.StatusOK {
 			t.Errorf("revising their own claim on their case answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/comments", mine),
+			fmt.Sprintf("/v1/decisions/%d/comments", mine),
 			`{"body":"Checked the build configuration."}`); got.Code != http.StatusCreated {
 			t.Errorf("commenting on a claim about their case answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			fmt.Sprintf("/v1/claims/%d", mine), ""); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d", mine), ""); got.Code != http.StatusOK {
 			t.Errorf("reading a claim about their case answered %d: %s", got.Code, got.Body.String())
 		}
 
@@ -642,10 +642,10 @@ func TestACollaboratorReachesExactlyTheirCase(t *testing.T) {
 		httpapitest.RefusedWith(t, attach(notTheirs), http.StatusNotFound)
 		for _, c := range []struct{ method, path, body string }{
 			{http.MethodGet, "/v1/products/mine/issues/" + notTheirs + "/attachments", ""},
-			{http.MethodGet, fmt.Sprintf("/v1/claims/%d", elsewhere), ""},
-			{http.MethodPost, fmt.Sprintf("/v1/claims/%d/comments", elsewhere),
+			{http.MethodGet, fmt.Sprintf("/v1/decisions/%d", elsewhere), ""},
+			{http.MethodPost, fmt.Sprintf("/v1/decisions/%d/comments", elsewhere),
 				`{"body":"Checked the build configuration."}`},
-			{http.MethodPut, fmt.Sprintf("/v1/claims/%d/reasoning", elsewhere),
+			{http.MethodPut, fmt.Sprintf("/v1/decisions/%d/reasoning", elsewhere),
 				`{"reasoning":"The socket is not built into this image."}`},
 		} {
 			for _, who := range []string{"outsider", "triager"} {

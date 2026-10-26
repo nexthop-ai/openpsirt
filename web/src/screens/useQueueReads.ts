@@ -98,7 +98,7 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
     queryKey: ["my-claims", mine ? offset : 0, mine],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/my-claims", {
+        await api.GET("/v1/my-decisions", {
           params: { query: { limit: mine ? PAGE : 1, offset: mine ? offset : 0 } },
         }),
       ),

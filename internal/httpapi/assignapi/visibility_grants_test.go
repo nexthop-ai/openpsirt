@@ -106,16 +106,16 @@ func TestProductWideTriageIsHeldByTheUndisclosedHalfAlone(t *testing.T) {
 			want, refused            int
 		}
 		asks := []ask{
-			{"listing routing rules", http.MethodGet, "/v1/products/mine/routing-rules", "",
+			{"listing routing rules", http.MethodGet, "/v1/products/mine/assignment-rules", "",
 				http.StatusOK, http.StatusForbidden},
 			{"previewing a routing rule", http.MethodGet,
-				"/v1/products/mine/routing-rules/preview?upstream=libnl", "", http.StatusOK,
+				"/v1/products/mine/assignment-rules/preview?upstream=libnl", "", http.StatusOK,
 				http.StatusForbidden},
 			{"rating an issue", http.MethodPost, "/v1/products/mine/issues/" + hidden + "/assessment",
 				`{"severity":"critical","reasoning":"Reachable from the management port."}`,
 				http.StatusCreated, http.StatusForbidden},
 			{"recording exploitation here", http.MethodPost,
-				"/v1/products/mine/issues/" + hidden + "/exploited-here",
+				"/v1/products/mine/issues/" + hidden + "/incidents",
 				`{"known_at":"2026-09-20T14:00:00Z","grounds":"A customer sent captures."}`,
 				http.StatusCreated, http.StatusForbidden},
 			{"taking work nobody holds", http.MethodPut, httpapitest.FindingAt(hidden) + "/assignment",
@@ -190,12 +190,12 @@ func TestAgreeingIsAnsweredAtTheClaimsOwnVisibility(t *testing.T) {
 		undisclosed, _ := r.Claimed(t, "private-triage", hidden, "libnl-3-200", httpapitest.Dismissal)
 
 		if got := httpapitest.AsPerson(t, r, "split-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", disclosed), `{}`); got.Code != http.StatusNotFound {
+			fmt.Sprintf("/v1/decisions/%d/approval", disclosed), `{}`); got.Code != http.StatusNotFound {
 			t.Errorf("triage of undisclosed work agreeing to a disclosed claim answered %d: %s",
 				got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "split-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", undisclosed), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", undisclosed), `{}`); got.Code != http.StatusOK {
 			t.Errorf("triage of undisclosed work agreeing to an undisclosed claim answered %d: %s",
 				got.Code, got.Body.String())
 		}

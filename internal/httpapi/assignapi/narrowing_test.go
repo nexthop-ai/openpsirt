@@ -45,7 +45,7 @@ func TestTheWordsInUseAreOnlyThoseOnFindingsTheAskerMayRead(t *testing.T) {
 		hidden := r.Embargoed(t)
 
 		if put := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			httpapitest.FindingAt(hidden)+"/tags/waiting-on-reporter", ""); put.Code != http.StatusNoContent {
+			httpapitest.FindingAt(hidden)+"/labels/waiting-on-reporter", ""); put.Code != http.StatusNoContent {
 			t.Fatalf("marking the embargo answered %d: %s", put.Code, put.Body.String())
 		}
 
@@ -54,7 +54,7 @@ func TestTheWordsInUseAreOnlyThoseOnFindingsTheAskerMayRead(t *testing.T) {
 			var out struct {
 				Items []string `json:"items"`
 			}
-			httpapitest.Read(t, r, who, "/v1/products/mine/tags", &out)
+			httpapitest.Read(t, r, who, "/v1/products/mine/labels", &out)
 			return out.Items
 		}
 		for _, word := range words(t, "triager") {
@@ -83,8 +83,8 @@ func TestAProductSomebodyHoldsNothingOnIsNotDeclaredAsFarAsTheyKnow(t *testing.T
 	// one guess at a time.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		hidden := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/decisions?product=theirs", "")
-		missing := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/decisions?product=nosuch", "")
+		hidden := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/decision-occurrences?product=theirs", "")
+		missing := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/decision-occurrences?product=nosuch", "")
 		if hidden.Code != missing.Code {
 			t.Errorf("a product held by somebody else answers %d and a name nobody "+
 				"declared answers %d", hidden.Code, missing.Code)

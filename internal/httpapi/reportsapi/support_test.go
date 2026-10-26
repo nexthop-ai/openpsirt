@@ -57,7 +57,7 @@ func TestWhatIsOutOfSupportIsListedBecauseNothingElseCountsIt(t *testing.T) {
 		}
 
 		ended := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/products/mine/streams/master/end-of-life", `{"on":"2020-01-01"}`)
+			"/v1/products/mine/branches-and-tags/master/end-of-life", `{"on":"2020-01-01"}`)
 		if ended.Code != http.StatusNoContent {
 			t.Fatalf("putting a release out of support answered %d: %s",
 				ended.Code, ended.Body.String())
@@ -94,7 +94,7 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		ended := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/products/mine/streams/master/end-of-life", `{"on":"2020-01-01"}`)
+			"/v1/products/mine/branches-and-tags/master/end-of-life", `{"on":"2020-01-01"}`)
 		if ended.Code != http.StatusNoContent {
 			t.Fatalf("putting a release out of support answered %d", ended.Code)
 		}
@@ -139,7 +139,7 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		soon := time.Now().UTC().AddDate(0, 0, 20).Format(time.DateOnly)
 		ending := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/products/mine/streams/master/end-of-life",
+			"/v1/products/mine/branches-and-tags/master/end-of-life",
 			fmt.Sprintf(`{"on":%q}`, soon))
 		if ending.Code != http.StatusNoContent {
 			t.Fatalf("giving a release an end date answered %d: %s",

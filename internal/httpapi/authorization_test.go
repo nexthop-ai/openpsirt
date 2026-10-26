@@ -28,43 +28,43 @@ func TestWhoMayReachWhat(t *testing.T) {
 		// are a list to reach.
 		place, flaw := httpapitest.HandedOffLead(t, r, false)
 		var (
-			lead      = "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
-			flawLead  = "/v1/products/mine/issues/" + flaw + "/lead"
-			theirLead = "/v1/products/theirs/streams/master/variants/broadcom/leads/" + place
+			lead      = "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
+			flawLead  = "/v1/products/mine/issues/" + flaw + "/code-finding"
+			theirLead = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/code-findings/" + place
 		)
 		const (
-			leads      = "/v1/products/mine/leads"
-			leadFile   = "/v1/products/mine/leads.csv"
-			leadSeries = "/v1/products/mine/lead-series"
-			leadRules  = "/v1/products/mine/lead-rules"
-			theirLeads = "/v1/products/theirs/leads"
+			leads      = "/v1/products/mine/code-findings"
+			leadFile   = "/v1/products/mine/code-findings.csv"
+			leadSeries = "/v1/products/mine/code-finding-series"
+			leadRules  = "/v1/products/mine/suppression-rules"
+			theirLeads = "/v1/products/theirs/code-findings"
 			repos      = "/v1/products/mine/repositories"
-			runs       = "/v1/products/mine/streams/master/variants/broadcom/analyses"
-			theirRuns  = "/v1/products/theirs/streams/master/variants/broadcom/analyses"
+			runs       = "/v1/products/mine/branches-and-tags/master/variants/broadcom/analyses"
+			theirRuns  = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/analyses"
 		)
 		const (
 			products   = "/v1/products"
-			mine       = "/v1/products/mine/streams"
+			mine       = "/v1/products/mine/branches-and-tags"
 			mineVars   = "/v1/products/mine/variants"
-			mineBuilt  = "/v1/products/mine/streams/master/variants"
-			theirs     = "/v1/products/theirs/streams"
+			mineBuilt  = "/v1/products/mine/branches-and-tags/master/variants"
+			theirs     = "/v1/products/theirs/branches-and-tags"
 			theirsVars = "/v1/products/theirs/variants"
-			absent     = "/v1/products/nosuch/streams"
+			absent     = "/v1/products/nosuch/branches-and-tags"
 			version    = "/v1/version"
 
 			mineFound = "/v1/products/mine/findings?stream=master&variant=broadcom"
-			mineFloor = "/v1/products/mine/triage-floor"
+			mineFloor = "/v1/products/mine/minimum-severity"
 			mineEOL   = "/v1/products/mine/end-of-life"
-			streamEOL = "/v1/products/mine/streams/master/end-of-life"
-			mineScans = "/v1/products/mine/streams/master/variants/broadcom/scans"
+			streamEOL = "/v1/products/mine/branches-and-tags/master/end-of-life"
+			mineScans = "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
 			// What one upload changed about the build's inventory. Reached
 			// on the same terms the receipt carrying its counts is: they are
 			// one answer read twice.
 			mineMoved  = mineScans + "/1/changes"
-			theirMoved = "/v1/products/theirs/streams/master/variants/broadcom/scans/1/changes"
+			theirMoved = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/sboms/1/changes"
 			// What the scanner cannot match in one build, and its file.
-			mineUnmatched   = "/v1/products/mine/streams/master/variants/broadcom/match-coverage"
-			theirsUnmatched = "/v1/products/theirs/streams/master/variants/broadcom/match-coverage"
+			mineUnmatched   = "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"
+			theirsUnmatched = "/v1/products/theirs/branches-and-tags/master/variants/broadcom/unmatched-components"
 			theirFound      = "/v1/products/theirs/findings?stream=master&variant=broadcom"
 			// The same list with the branch and the variant left
 			// at "all". Widening the selection is exactly the
@@ -74,8 +74,8 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// Recording that a product was exploited through an issue, which
 			// refuses a dismissal somebody would otherwise be free to make
 			// and moves where this product's findings sit.
-			mineAttacked   = "/v1/products/mine/issues/CVE-2026-0001/exploited-here"
-			theirsAttacked = "/v1/products/theirs/issues/CVE-2026-0001/exploited-here"
+			mineAttacked   = "/v1/products/mine/issues/CVE-2026-0001/incidents"
+			theirsAttacked = "/v1/products/theirs/issues/CVE-2026-0001/incidents"
 			people         = "/v1/people"
 			keys           = "/v1/keys"
 			tokens         = "/v1/tokens"
@@ -292,14 +292,14 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodPost, lead + "/fixed", http.StatusNotFound},
 			// A hand-off takes triage of the internal lead and of the private
 			// flaw, asked before anything the request names is resolved.
-			{"lead-handler", http.MethodGet, lead + "/hand-off", http.StatusOK},
-			{"internal-triager", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
-			{"private-triage", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
-			{"internal-reader", http.MethodGet, lead + "/hand-off", http.StatusForbidden},
-			{"internal-triager", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
-			{"private-triage", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
-			{"internal-reader", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusForbidden},
-			{"", http.MethodPost, lead + "/hand-off/withdrawal", http.StatusUnauthorized},
+			{"lead-handler", http.MethodGet, lead + "/flaw", http.StatusOK},
+			{"internal-triager", http.MethodGet, lead + "/flaw", http.StatusForbidden},
+			{"private-triage", http.MethodGet, lead + "/flaw", http.StatusForbidden},
+			{"internal-reader", http.MethodGet, lead + "/flaw", http.StatusForbidden},
+			{"internal-triager", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
+			{"private-triage", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
+			{"internal-reader", http.MethodPost, lead + "/flaw/withdrawal", http.StatusForbidden},
+			{"", http.MethodPost, lead + "/flaw/withdrawal", http.StatusUnauthorized},
 			// The lead a flaw was recorded from is read by whoever reads both
 			// the flaw and the lead in full, and answers as no lead elsewhere.
 			{"lead-handler", http.MethodGet, flawLead, http.StatusOK},
@@ -307,8 +307,8 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"internal-reader", http.MethodGet, flawLead, http.StatusNotFound},
 			{"outsider", http.MethodGet, flawLead, http.StatusNotFound},
 			{"", http.MethodGet, flawLead, http.StatusUnauthorized},
-			{"internal-triager", http.MethodPut, lead + "/move", http.StatusForbidden},
-			{"internal-triager", http.MethodDelete, lead + "/move", http.StatusForbidden},
+			{"internal-triager", http.MethodPut, lead + "/flaw/disclosure", http.StatusForbidden},
+			{"internal-triager", http.MethodDelete, lead + "/flaw/disclosure", http.StatusForbidden},
 			// Who is granted a kept lead is managed by whoever reads it at
 			// internal visibility, and by nobody else.
 			{"internal-reader", http.MethodGet, lead + "/collaborators", http.StatusOK},
@@ -409,9 +409,9 @@ func TestWhatSomebodyCannotSeeLooksExactlyLikeWhatIsNotThere(t *testing.T) {
 	// and watching which guesses answer differently.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		for _, pair := range [][2]string{
-			{"/v1/products/theirs/streams", "/v1/products/nosuch/streams"},
+			{"/v1/products/theirs/branches-and-tags", "/v1/products/nosuch/branches-and-tags"},
 			{"/v1/products/theirs/variants", "/v1/products/nosuch/variants"},
-			{"/v1/products/theirs/streams/master/variants", "/v1/products/nosuch/streams/master/variants"},
+			{"/v1/products/theirs/branches-and-tags/master/variants", "/v1/products/nosuch/branches-and-tags/master/variants"},
 		} {
 			hidden := r.Body(t, "reader", http.MethodGet, pair[0])
 			missing := r.Body(t, "reader", http.MethodGet, pair[1])
@@ -454,9 +454,9 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		for _, path := range []string{
 			"/v1/products",
-			"/v1/products/mine/streams",
+			"/v1/products/mine/branches-and-tags",
 			"/v1/products/mine/variants",
-			"/v1/products/mine/streams/master/variants",
+			"/v1/products/mine/branches-and-tags/master/variants",
 			"/v1/products/mine/findings?stream=master&variant=broadcom",
 			"/v1/people",
 			"/v1/keys",
@@ -467,7 +467,7 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 			// Nor when anything was last scanned. A key reads back what it
 			// sent; when a build was last scanned by anybody is a fact about
 			// the deployment, and the answer names every build there is.
-			"/v1/scanning",
+			"/v1/last-uploads",
 			// Nor a notification area. A key is not a person and has nobody to
 			// tell; its identifier comes from another table and would collide
 			// with a person's.
@@ -484,11 +484,11 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 		// back what became of what it sent. Without it an acceptance is
 		// unverifiable by the only party that can act on a rejected file.
 		if got := r.AsKey(t, http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/scans"); got != http.StatusOK {
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"); got != http.StatusOK {
 			t.Errorf("a pipeline could not read its own receipts: %d", got)
 		}
 		if got := r.AsKey(t, http.MethodGet,
-			"/v1/products/theirs/streams/master/variants/broadcom/scans"); got != http.StatusNotFound {
+			"/v1/products/theirs/branches-and-tags/master/variants/broadcom/sboms"); got != http.StatusNotFound {
 			t.Errorf("a pipeline reached receipts outside its scope: %d", got)
 		}
 		// And what one of its uploads changed, which is the detail behind the
@@ -497,12 +497,12 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 		// scope it is the same refusal a receipt gets.
 		sent := r.SentByTheKey(t)
 		if got := r.AsKey(t, http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/scans/"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/"+
 				strconv.FormatInt(sent, 10)+"/changes"); got != http.StatusOK {
 			t.Errorf("a pipeline could not read what its own upload changed: %d", got)
 		}
 		if got := r.AsKey(t, http.MethodGet,
-			"/v1/products/theirs/streams/master/variants/broadcom/scans/1/changes"); got != http.StatusNotFound {
+			"/v1/products/theirs/branches-and-tags/master/variants/broadcom/sboms/1/changes"); got != http.StatusNotFound {
 			t.Errorf("a pipeline reached an inventory outside its scope: %d", got)
 		}
 		if got := r.AsKey(t, http.MethodGet, "/v1/version"); got != http.StatusForbidden {
@@ -540,7 +540,7 @@ func TestScanningShowsOnlyTheBuildsTheAskerHolds(t *testing.T) {
 	// product exists, which is the thing every other refusal here is careful
 	// not to say.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		req := httptest.NewRequest(http.MethodGet, "/v1/scanning", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1/last-uploads", nil)
 		req.Header.Set(httpapitest.TestHeader, "reader")
 		rec := httptest.NewRecorder()
 		r.Handler.ServeHTTP(rec, req)
@@ -571,7 +571,7 @@ func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 		for _, path := range []string{
 			"/openapi.json", "/openapi.yaml", "/openapi-3.0.json", "/openapi-3.0.yaml",
 			"/schemas/VariantBody.json", "/docs",
-			"/v1/version", "/v1/products", "/v1/scanning", "/v1/notifications",
+			"/v1/version", "/v1/products", "/v1/last-uploads", "/v1/notifications",
 		} {
 			got := r.Body(t, "", http.MethodGet, path)
 			if got.Code != http.StatusUnauthorized {
@@ -657,13 +657,13 @@ func TestAKeyReachesOnlyTheTargetItIsScopedTo(t *testing.T) {
 			return httpapitest.Response{Code: rec.Code, Text: rec.Body.String()}
 		}
 
-		mine := sent("/v1/products/mine/streams/master/variants/broadcom/scans")
+		mine := sent("/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms")
 		if mine.Code != http.StatusAccepted {
 			t.Errorf("a key sending to its own product answered %d: %s", mine.Code, mine.Text)
 		}
 
-		elsewhere := sent("/v1/products/theirs/streams/master/variants/broadcom/scans")
-		absent := sent("/v1/products/nosuch/streams/master/variants/broadcom/scans")
+		elsewhere := sent("/v1/products/theirs/branches-and-tags/master/variants/broadcom/sboms")
+		absent := sent("/v1/products/nosuch/branches-and-tags/master/variants/broadcom/sboms")
 		if elsewhere.Code != http.StatusNotFound {
 			t.Errorf("a key reaching another product answered %d, want 404", elsewhere.Code)
 		}
@@ -671,7 +671,7 @@ func TestAKeyReachesOnlyTheTargetItIsScopedTo(t *testing.T) {
 			t.Errorf("another product answered %d and an absent one %d", elsewhere.Code, absent.Code)
 		}
 
-		req := httpapitest.Upload(t, "/v1/products/mine/streams/master/variants/broadcom/scans",
+		req := httpapitest.Upload(t, "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms",
 			httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 		req.Header.Set("Authorization", "Bearer "+r.Revoked)
 		rec := httptest.NewRecorder()

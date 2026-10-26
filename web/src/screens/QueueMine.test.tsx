@@ -56,7 +56,7 @@ describe("the claims somebody proposed", () => {
     await act(async () => button(mount.host(), "Hold 1 back").click());
     await settle();
     const [path, init] = only(sent);
-    expect(path).toBe("/v1/claims/{id}/split");
+    expect(path).toBe("/v1/decisions/{id}/split");
     expect(init.params?.path).toEqual({ id: 41 });
     expect(init.body).toEqual({ rows: [5, 6], because: "these two are exploited" });
     expect(mount.host().querySelector("textarea")).toBeNull();

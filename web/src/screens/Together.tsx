@@ -40,7 +40,7 @@ const PAGE = 500;
 // from the generated client rather than restated, so a field the server
 // requires cannot be left out of the call and noticed by nobody.
 type Claimed = NonNullable<
-  paths["/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions"]["post"]["requestBody"]
+  paths["/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 // The outcomes one bulk claim may record, in the order the form offers them.
@@ -102,7 +102,7 @@ export function Together() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues",
           {
             params: {
               path: at,
@@ -121,7 +121,7 @@ export function Together() {
     mutationFn: async (body: Claimed) =>
       unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision",
           { params: { path: at, query: which }, body },
         ),
       ),
@@ -185,7 +185,7 @@ export function Together() {
       for (let from = 0; from < everything; from += 500) {
         const page = unwrap(
           await api.GET(
-            "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues",
+            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues",
             {
               params: {
                 path: at,

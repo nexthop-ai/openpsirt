@@ -53,7 +53,7 @@ describe("revising and withdrawing a claim's reasoning", () => {
     await press(mount.host(), "Save revision");
     await settle();
     const [path, init] = only(put);
-    expect(path).toBe("/v1/claims/{id}/reasoning");
+    expect(path).toBe("/v1/decisions/{id}/reasoning");
     expect(init.params?.path).toEqual({ id: 12 });
     expect(init.body).toEqual({ reasoning: "Unreachable, and the module is not loaded." });
     expect(onDone).toHaveBeenCalled();

@@ -22,9 +22,9 @@ import (
 func registerMyClaimsExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-my-claims", Method: http.MethodGet,
-		Path:    "/v1/my-claims.{format}",
-		Summary: "Export the outcomes of your own claims",
-		Description: "What `GET /v1/my-claims` lists, as a file: every claim you proposed, " +
+		Path:    "/v1/my-decisions.{format}",
+		Summary: "Export the outcomes of your own decisions",
+		Description: "What `GET /v1/my-decisions` lists, as a file: every claim you proposed, " +
 			"newest first, with what became of each and who did it, rather than one page.\n\n" +
 			"Narrowed to what you may still read.",
 		Tags: []string{"Triage"},

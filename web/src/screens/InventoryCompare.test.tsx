@@ -17,7 +17,7 @@ const PAIR = "from=4.2&from_variant=x86&to=4.3&to_variant=x86";
 function served() {
   const asked: string[] = [];
   serve((path, init) => {
-    if (path === "/v1/products/{product}/streams") {
+    if (path === "/v1/products/{product}/branches-and-tags") {
       return { data: { items: [{ name: "4.2" }, { name: "4.3" }] } };
     }
     if (path === "/v1/products/{product}/variants") return { data: { items: [{ name: "x86" }] } };

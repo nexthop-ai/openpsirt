@@ -54,7 +54,7 @@ type PatchBranchesOutput struct {
 func registerPatchBranches(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-patch-branch-progress", Method: http.MethodGet,
-		Path:    "/v1/patch-branches",
+		Path:    "/v1/patch-branch-lookups",
 		Summary: "Show how far patch branch lookups have got",
 		Description: "The repositories patch links point into, and how many of the commits " +
 			"each link names have been looked up in a copy of the repository.\n\n" +

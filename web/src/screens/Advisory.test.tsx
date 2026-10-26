@@ -89,7 +89,7 @@ describe("one advisory", () => {
     await press(mount.host(), "Take off");
     await settle();
     expect(removed()[0]?.[1]).toEqual({
-      params: { path: { advisory: "SONIC-2026-1", product: "sonic", vulnerability: "CVE-2026-1" } },
+      params: { path: { advisory: "SONIC-2026-1", product: "sonic", issue: "CVE-2026-1" } },
     });
   });
 

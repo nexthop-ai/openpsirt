@@ -398,13 +398,13 @@ seed-declare = for spec in $(4); do \
 # with the one inventory the binary has.
 demo-self-specs = \
 	'/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
-	'/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
-	'/v1/products/openpsirt/streams|{"name":"v1.0","kind":"tag","parent":"main"}' \
+	'/v1/products/openpsirt/branches-and-tags|{"name":"main","kind":"branch"}' \
+	'/v1/products/openpsirt/branches-and-tags|{"name":"v1.0","kind":"tag","parent":"main"}' \
 	'/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}' \
 	'/v1/products/openpsirt/variants|{"name":"container","customer_facing":true}'
 dev-self-specs = \
 	'/v1/products|{"name":"openpsirt","display_name":"OpenPSIRT"}' \
-	'/v1/products/openpsirt/streams|{"name":"main","kind":"branch"}' \
+	'/v1/products/openpsirt/branches-and-tags|{"name":"main","kind":"branch"}' \
 	'/v1/products/openpsirt/variants|{"name":"binary","customer_facing":true}'
 
 # The inventory $(4) uploaded to product $(5), stream $(6) and variant $(7),
@@ -412,7 +412,7 @@ dev-self-specs = \
 seed-upload = curl -sS --noproxy '*' -o /dev/null -w "  upload $(5)/$(6)/$(7) %{http_code}\n" \
 	  -X POST $(2) -H "Origin: $(3)" \
 	  -F "inventory=@$(4)" \
-	  "$(1)/v1/products/$(5)/streams/$(6)/variants/$(7)/scans"
+	  "$(1)/v1/products/$(5)/branches-and-tags/$(6)/variants/$(7)/sboms"
 
 # Every build DEMO_BUILDS names: its product, branch and variant declared, the
 # grant on its product, and its inventory uploaded. The same arguments as
@@ -429,7 +429,7 @@ seed-builds = for entry in $(DEMO_BUILDS); do \
 # loop sets.
 build-specs = \
 	"/v1/products|{\"name\":\"$$product\",\"display_name\":\"$$display\"}" \
-	"/v1/products/$$product/streams|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
+	"/v1/products/$$product/branches-and-tags|{\"name\":\"$$stream\",\"kind\":\"branch\"}" \
 	"/v1/products/$$product/variants|{\"name\":\"$$variant\",\"customer_facing\":true}"
 
 # Where each build's scan stands and how much is open in it: every build
@@ -441,9 +441,9 @@ seed-status = builds=""; for entry in $(DEMO_BUILDS); do \
 	done; \
 	for triple in $$builds $(3); do \
 	  IFS=':' read -r product stream variant <<< "$$triple"; \
-	  build="$$product/streams/$$stream/variants/$$variant"; \
+	  build="$$product/branches-and-tags/$$stream/variants/$$variant"; \
 	  printf "  %-46s scan " "$$build"; curl -sS --noproxy '*' $(2) \
-	    "$(1)/v1/products/$$build/scans?limit=1" \
+	    "$(1)/v1/products/$$build/sboms?limit=1" \
 	    | sed -e 's/.*"state":"\([a-z]*\)".*/\1/' -e 's/^{.*/no scans yet/' | tr -d '\n'; \
 	  printf " · open "; curl -sS --noproxy '*' $(2) \
 	    "$(1)/v1/products/$$product/findings?stream=$$stream&variant=$$variant&limit=1" \
@@ -574,7 +574,7 @@ demo-vex:
 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" \
 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" \
-	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
+	  "$(DEMO_URL)/v1/products/$$product/vex-documents?publisher=debian"
 
 # A few judgments, so the screens that report on triage have something to
 # report.
@@ -640,14 +640,14 @@ demo-triage:
 	  decided="$$decided|$$component|"; \
 	  curl -sS --noproxy '*' -o /dev/null -w "  $$cve decided %{http_code}\n" \
 	    -X POST -H "Origin: $$at" -H 'Content-Type: application/json' -d "$$body" \
-	    "$$at/v1/products/$$product/streams/$$stream/variants/$$variant/findings/$$cve/components/$$component/decision"; \
+	    "$$at/v1/products/$$product/branches-and-tags/$$stream/variants/$$variant/findings/$$cve/components/$$component/decision"; \
 	done <<< "$$rows"; \
 	claim=$$(curl -sS --noproxy '*' "$$agrees/v1/review-queue?limit=1" \
 	  | grep -o '"claim":{"id":[0-9]*' | head -1 | tr -dc '0-9' || true); \
 	if [ -n "$$claim" ]; then \
 	  curl -sS --noproxy '*' -o /dev/null -w "  claim $$claim agreed %{http_code}\n" \
 	    -X POST -H "Origin: $$agrees" -H 'Content-Type: application/json' -d '{}' \
-	    "$$agrees/v1/claims/$$claim/approval"; \
+	    "$$agrees/v1/decisions/$$claim/approval"; \
 	else \
 	  echo "  nothing was waiting for a second person"; \
 	fi; \
@@ -692,7 +692,7 @@ demo-triage:
 	  curl -sS --noproxy '*' -o /dev/null -w "  $$cve handed to holly %{http_code}\n" \
 	    -X PUT -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
 	    -d '{"person":"holly"}' \
-	    "$(DEMO_URL)/v1/products/$$product/streams/$$stream/variants/$$variant/findings/$$cve/components/$$component/assignment"; \
+	    "$(DEMO_URL)/v1/products/$$product/branches-and-tags/$$stream/variants/$$variant/findings/$$cve/components/$$component/assignment"; \
 	fi
 
 # One flaw in what this deployment ships, recorded by hand (MDL-27 to MDL-31).

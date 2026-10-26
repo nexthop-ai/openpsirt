@@ -79,7 +79,7 @@ func registerAnalyses(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "upload-analysis",
 		Method:      http.MethodPost,
-		Path:        "/v1/products/{product}/streams/{stream}/variants/{variant}/analyses",
+		Path:        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
 		Summary:     "Upload static analysis results",
 		Description: "Accepts one analyzer run as SARIF 2.1.0 documents in repeated multipart fields " +
 			"named `sarif`, each optionally compressed with gzip. The other fields fill what the " +

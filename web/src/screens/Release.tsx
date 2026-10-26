@@ -50,9 +50,12 @@ export function Release({ product, stream }: { product: string; stream: string }
       queryKey: ["release-counts", product, stream, variant.name],
       queryFn: async () =>
         unwrap(
-          await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/readiness", {
-            params: { path: { product, stream, variant: variant.name ?? "" } },
-          }),
+          await api.GET(
+            "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
+            {
+              params: { path: { product, stream, variant: variant.name ?? "" } },
+            },
+          ),
         ),
     })),
   });

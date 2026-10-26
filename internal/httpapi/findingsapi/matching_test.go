@@ -59,7 +59,7 @@ func TestABuildSaysWhatItHoldsThatNothingCanMatch(t *testing.T) {
 		}
 		r.Scan(t, "match-coverage", snap, nil)
 
-		const build = "/v1/products/mine/streams/master/variants/broadcom/match-coverage"
+		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom/unmatched-components"
 		var all findingsapi.MatchCoverageBody
 		httpapitest.Read(t, r, "reader", build, &all)
 		if all.Components != 4 || all.Unmatched != 3 || all.Total != 3 {

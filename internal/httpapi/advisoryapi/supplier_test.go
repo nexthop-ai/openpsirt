@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
-const build = "/v1/products/mine/streams/master/variants/broadcom"
+const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 
 // statementsAbout reads one kind of the build's document, as its identifier
 // and what it says about CVE-2022-37434.

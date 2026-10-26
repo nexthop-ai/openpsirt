@@ -48,7 +48,7 @@ export function Claim({ who }: { who: Who }) {
 
   const claim = useQuery({
     queryKey: ["claim", id],
-    queryFn: async () => unwrap(await api.GET("/v1/claims/{id}", { params: { path: { id } } })),
+    queryFn: async () => unwrap(await api.GET("/v1/decisions/{id}", { params: { path: { id } } })),
   });
 
   if (claim.isPending) return <Loading />;
@@ -331,7 +331,7 @@ function Reaffirm({ claim, id, mine }: { claim: Claimed; id: number; mine: boole
   const again = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/claims/{id}/reaffirmation", {
+        await api.POST("/v1/decisions/{id}/reaffirmation", {
           params: { path: { id } },
           body: { reasoning: reasoning.trim() },
         }),

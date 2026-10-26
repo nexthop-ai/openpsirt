@@ -248,12 +248,12 @@ func asDay(at time.Time) string {
 func registerAuditExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-audit", Method: http.MethodGet, Path: "/v1/audit.{format}",
-		Summary: "Export the record of judgments",
+		Summary: "Export the audit log of decisions",
 		Description: "The audit list as a file: every judgment the same filters would show, " +
 			"not one page of them.\n\n" +
 			"One row per decision, with the claim it belongs to, who proposed it, who has a " +
 			"standing agreement on it, and whether a second person does. Every decision one " +
-			"act wrote shares a claim, and `GET /v1/audit/claims` lists them grouped by it. " +
+			"act wrote shares a claim, and `GET /v1/audit/decisions` lists them grouped by it. " +
 			"Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
 			"`agreements` is the whole of the record, with dates: who agreed, when, " +

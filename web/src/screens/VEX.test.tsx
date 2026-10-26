@@ -10,7 +10,8 @@ const mount = mounted();
 
 afterEach(() => vi.restoreAllMocks());
 
-const ISSUANCE = "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance";
+const ISSUANCE =
+  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance";
 
 async function drawn(at = "/products/sonic/streams/master/variants/arm/vex") {
   const read = serve((path) =>

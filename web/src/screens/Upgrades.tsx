@@ -41,7 +41,7 @@ export function Upgrades() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades",
           {
             params: { path: { product, stream, variant } },
           },
@@ -168,7 +168,7 @@ export function Upgrades() {
 // The address the file comes from.
 function fileAt(product: string, stream: string, variant: string, format: "csv" | "json"): string {
   return linkedFile(
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}",
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades.{format}",
     format,
     {
       path: { product, stream, variant },

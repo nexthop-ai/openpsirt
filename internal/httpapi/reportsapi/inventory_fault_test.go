@@ -50,7 +50,7 @@ func TestAnInventoryChangeWhoseBuildCouldNotBeReadIsAFault(t *testing.T) {
 		Access: httpapitest.Trusting(t, rights),
 	})
 	got := httpapitest.AsPerson(t, &httpapitest.Reach{Handler: handler}, "reader", http.MethodGet,
-		"/v1/products/mine/streams/master/variants/broadcom/scans/1/changes", "")
+		"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms/1/changes", "")
 	if got.Code != http.StatusInternalServerError {
 		t.Errorf("an inventory change over a build that could not be read answered %d: %s",
 			got.Code, got.Body.String())

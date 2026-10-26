@@ -195,7 +195,7 @@ describe("offering somebody to mention", () => {
 describe("carrying decisions from another line", () => {
   it("forgets what was ticked when the line carried from changes", async () => {
     serve((path) => {
-      if (path === "/v1/products/{product}/streams") {
+      if (path === "/v1/products/{product}/branches-and-tags") {
         return { data: { items: [{ name: "master" }, { name: "202411" }, { name: "202505" }] } };
       }
       return {

@@ -139,7 +139,7 @@ export function TheRecord() {
     queryKey: ["audit", products, outcomes, states, sent.from, sent.to, alone, inForce, offset],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/audit/claims", {
+        await api.GET("/v1/audit/decisions", {
           params: {
             query: {
               limit: PAGE,

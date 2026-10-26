@@ -300,7 +300,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/advisories/{advisory}/issues/{product}/{vulnerability}": {
+    "/v1/advisories/{advisory}/issues/{product}/{issue}": {
         parameters: {
             query?: never;
             header?: never;
@@ -576,7 +576,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List judgments with who made them and who agreed
+         * List decisions with who made them and who agreed
          * @description Every judgment recorded in a period, newest first, with what it was about, the reasoning it rests on, who proposed it and when, and who agreed and when — including agreements later taken back.
          *
          *     The period is the date a judgment was proposed, not approved: a judgment belongs to when it was argued, and dating it by its agreement would move it out of that period whenever an approval came late, which is the ordinary case.
@@ -606,10 +606,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Export the record of judgments
+         * Export the audit log of decisions
          * @description The audit list as a file: every judgment the same filters would show, not one page of them.
          *
-         *     One row per decision, with the claim it belongs to, who proposed it, who has a standing agreement on it, and whether a second person does. Every decision one act wrote shares a claim, and `GET /v1/audit/claims` lists them grouped by it. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+         *     One row per decision, with the claim it belongs to, who proposed it, who has a standing agreement on it, and whether a second person does. Every decision one act wrote shares a claim, and `GET /v1/audit/decisions` lists them grouped by it. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
          *
          *     `agreements` is the whole of the record, with dates: who agreed, when, whether the agreement was carried from an earlier claim, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
          *
@@ -628,7 +628,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/audit/claims": {
+    "/v1/audit/decisions": {
         parameters: {
             query?: never;
             header?: never;
@@ -636,7 +636,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List judgments by claim
+         * List the audit log by decision
          * @description The record one claim at a time, newest first: every claim with a decision the filters match, once, however many places it covers.
          *
          *     Takes every filter the per-decision record takes, with the same meaning. A claim is listed where any of its decisions match, and every count on it is of the decisions that match and that you may read. Asked for `state=lapsed`, a claim with one lapsed decision of forty reads as one decision, lapsed. `total` counts claims.
@@ -650,314 +650,6 @@ export interface paths {
         get: operations["list-audit-claims"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a claim
-         * @description Returns one claim whole: what it says, where it lands, what it covers now, and what became of it.
-         *
-         *     A claim is one proposer's action however many decisions it wrote, so the outcome, the reason, the dates and the version are the claim's rather than any row's. `happened` reads the claim as a whole — `mixed` where its rows did not all end the same way — and `argument` names no decision, because nothing here acts on one.
-         *
-         *     `rows`, `issues` and `places` are what it wrote. `folds`, `packages`, `consumers` and `findings` are what it covers now, which grows as builds appear with nobody acting; what somebody consented to is on the approval, at `GET /v1/claims/{id}/approvals`.
-         *
-         *     For the earlier justifications see `GET /v1/claims/{id}/revisions` and for the discussion `GET /v1/claims/{id}/comments`.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only claims you may read every row of.
-         */
-        get: operations["get-claim"];
-        put?: never;
-        post?: never;
-        /**
-         * Withdraw a triage claim
-         * @description Withdraws the claim so none of it applies to any finding. A claim is one argument however many places it covers, so this takes back all of it; holding part of one back is setting rows aside, at `POST /v1/claims/{id}/approval`. The record is kept — a withdrawn claim reads as proposed, approved, then withdrawn. Requires no approval.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        delete: operations["withdraw-claim"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/approval": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve a claim
-         * @description Approves every waiting decision in a claim as one action, under the same rules each decision is approved under: not by the person who proposed it, and against the revision of the reasoning that stands now.
-         *
-         *     Name decisions in `except` to set them aside. The rest is approved; those are moved into a claim of their own, marked sent back, and `because` is recorded on each as a comment — the same way sending back records a reason. The response names that claim.
-         *
-         *     Pass `batch` to approve several claims under one name, undone together with `DELETE /v1/approval-batches/{batch}`.
-         *
-         *     Returns 404 for a claim you may not act on every row of, and 409 if you proposed it.
-         *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
-         */
-        post: operations["approve-claim"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/approvals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List who approved a claim
-         * @description Returns every approval recorded against this claim, including ones later withdrawn, each naming the revision of the justification it was given for.
-         *
-         *     An approval carrying `carried_from` was not given for this claim. A re-affirmation states its own reasoning and stands on the agreement its predecessor had, so the person named agreed to the earlier claim's words; `carried_from` is the approval where those are.
-         *
-         *     A withdrawn approval is kept rather than deleted: who agreed to what, and when it stopped counting, is part of the record.
-         *
-         *     `covered` is how many findings the claim covered when it was agreed to. A claim applies to every build running the same versions, so it covers more as builds appear — with nobody acting, and nobody having agreed to the larger number. Comparing this against what it covers now is the point of keeping it.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-claim-approvals"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/comments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List comments on a claim
-         * @description Returns the comments on a claim, oldest first, with who wrote each and when. A comment that has been edited also carries when it was last changed.
-         *
-         *     Comments are separate from the justification and never affect an approval.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-claim-comments"];
-        put?: never;
-        /**
-         * Add a comment to a claim
-         * @description Adds a markdown comment to a claim. Comments are separate from the justification and never affect an approval, so an approved claim can be annotated at any time.
-         *
-         *     A comment may later be edited by its author only, and editing overwrites it rather than keeping revisions.
-         *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["comment-on-claim"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/elsewhere": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Record where this claim's work is happening
-         * @description Stores a link to a ticket, a thread or a change — and sends nothing to it. A stored link has no egress at all, which is what makes it available to a deployment that has not decided to let anything out; the half that *sends* is a separate thing a deployment configures.
-         *
-         *     Anybody who may argue about the claim may set it: a link is a note about where the conversation is rather than a judgment, and needing a second person for it would leave it unset.
-         *
-         *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        put: operations["point-claim-elsewhere"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/promise": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Change a promised upgrade or patch
-         * @description Changes the version a promised upgrade moves to, or the date a promised upgrade or patch is promised by, on the claim and on every commitment it wrote. A promised patch has no version: send `to` empty or leave it out.
-         *
-         *     This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
-         *
-         *     `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        put: operations["repromise-upgrade"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/reaffirmation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Re-affirm everything one action claimed
-         * @description Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
-         *
-         *     Deciding is bulk-capable and re-deciding was not. A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
-         *
-         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
-         *
-         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
-         *
-         *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
-         *
-         *     A lead past its end of life is not re-made, and a claim at no other place is refused with 409.
-         *
-         *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
-         *
-         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
-         */
-        post: operations["reaffirm-claim"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/reasoning": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update a claim's justification
-         * @description Replaces the justification text with a new revision. Earlier revisions are kept and remain readable.
-         *
-         *     A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Everybody whose approval it withdrew is notified. Requires no approval of its own.
-         *
-         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        put: operations["revise-claim"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/revisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List a claim's justification history
-         * @description Returns every revision of the justification, oldest first, with who wrote each and when.
-         *
-         *     A claim is one argument however many places it covers, so its reasoning is one text with one history. An approval names the specific revision that was agreed to, so this is how to read what an approver actually saw rather than what the text says now.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-claim-revisions"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/send-back": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a claim back for more
-         * @description Asks the author for more before agreeing to any of a claim. Every waiting decision in it leaves the review queue together and comes back when the author revises.
-         *
-         *     `because` is required and is recorded as a comment on each decision. Needs no approval of its own. You cannot send back a claim whose words are your own.
-         *
-         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
-         */
-        post: operations["send-claim-back"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/claims/{id}/split": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Hold part of a claim back
-         * @description Moves the rows named into a claim of their own, belonging to you, carrying the argument they were made under and sitting with you rather than in the review queue. Revise it to give them an argument of their own.
-         *
-         *     This is the proposer's side of setting rows aside, and each act is refused to the other: an approver holding rows back is agreeing to the rest in the same action, and a proposer doing that would be approving their own claim.
-         *
-         *     `because` is required and is recorded as a comment on the new claim. Naming a row that is not part of the claim is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["split-claim"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1048,7 +740,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/decisions": {
+    "/v1/decision-occurrences": {
         parameters: {
             query?: never;
             header?: never;
@@ -1056,7 +748,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List triage decisions
+         * List triage decisions by occurrence
          * @description Returns triage decisions on products you may triage, newest first, with the justification text for each.
          *
          *     Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, `wont-fix`, `already-fixed`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
@@ -1076,6 +768,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/decision-occurrences/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a triage decision at one occurrence
+         * @description Returns one decision with the justification as it currently stands, where it applies, who proposed it and how long it has stood.
+         *
+         *     What it says — the outcome, the justification, the dates — belongs to the claim it is one row of, at `claim_id`. For the earlier justifications see `GET /v1/decisions/{id}/revisions`, and for who agreed to which of them see `GET /v1/decisions/{id}/approvals`.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-decision"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/decisions/{id}": {
         parameters: {
             query?: never;
@@ -1084,16 +800,300 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get a triage decision
-         * @description Returns one decision with the justification as it currently stands, where it applies, who proposed it and how long it has stood.
+         * Get a decision
+         * @description Returns one claim whole: what it says, where it lands, what it covers now, and what became of it.
          *
-         *     What it says — the outcome, the justification, the dates — belongs to the claim it is one row of, at `claim_id`. For the earlier justifications see `GET /v1/claims/{id}/revisions`, and for who agreed to which of them see `GET /v1/claims/{id}/approvals`.
+         *     A claim is one proposer's action however many decisions it wrote, so the outcome, the reason, the dates and the version are the claim's rather than any row's. `happened` reads the claim as a whole — `mixed` where its rows did not all end the same way — and `argument` names no decision, because nothing here acts on one.
+         *
+         *     `rows`, `issues` and `places` are what it wrote. `folds`, `packages`, `consumers` and `findings` are what it covers now, which grows as builds appear with nobody acting; what somebody consented to is on the approval, at `GET /v1/decisions/{id}/approvals`.
+         *
+         *     For the earlier justifications see `GET /v1/decisions/{id}/revisions` and for the discussion `GET /v1/decisions/{id}/comments`.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only claims you may read every row of.
+         */
+        get: operations["get-claim"];
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a triage decision
+         * @description Withdraws the claim so none of it applies to any finding. A claim is one argument however many places it covers, so this takes back all of it; holding part of one back is setting rows aside, at `POST /v1/decisions/{id}/approval`. The record is kept — a withdrawn claim reads as proposed, approved, then withdrawn. Requires no approval.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        delete: operations["withdraw-claim"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a decision
+         * @description Approves every waiting decision in a claim as one action, under the same rules each decision is approved under: not by the person who proposed it, and against the revision of the reasoning that stands now.
+         *
+         *     Name decisions in `except` to set them aside. The rest is approved; those are moved into a claim of their own, marked sent back, and `because` is recorded on each as a comment — the same way sending back records a reason. The response names that claim.
+         *
+         *     Pass `batch` to approve several claims under one name, undone together with `DELETE /v1/approval-batches/{batch}`.
+         *
+         *     Returns 404 for a claim you may not act on every row of, and 409 if you proposed it.
+         *
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
+         */
+        post: operations["approve-claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List who approved a decision
+         * @description Returns every approval recorded against this claim, including ones later withdrawn, each naming the revision of the justification it was given for.
+         *
+         *     An approval carrying `carried_from` was not given for this claim. A re-affirmation states its own reasoning and stands on the agreement its predecessor had, so the person named agreed to the earlier claim's words; `carried_from` is the approval where those are.
+         *
+         *     A withdrawn approval is kept rather than deleted: who agreed to what, and when it stopped counting, is part of the record.
+         *
+         *     `covered` is how many findings the claim covered when it was agreed to. A claim applies to every build running the same versions, so it covers more as builds appear — with nobody acting, and nobody having agreed to the larger number. Comparing this against what it covers now is the point of keeping it.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
-        get: operations["get-decision"];
+        get: operations["list-claim-approvals"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List comments on a decision
+         * @description Returns the comments on a claim, oldest first, with who wrote each and when. A comment that has been edited also carries when it was last changed.
+         *
+         *     Comments are separate from the justification and never affect an approval.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-claim-comments"];
+        put?: never;
+        /**
+         * Add a comment to a decision
+         * @description Adds a markdown comment to a claim. Comments are separate from the justification and never affect an approval, so an approved claim can be annotated at any time.
+         *
+         *     A comment may later be edited by its author only, and editing overwrites it rather than keeping revisions.
+         *
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["comment-on-claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/elsewhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record where this decision's work is happening
+         * @description Stores a link to a ticket, a thread or a change — and sends nothing to it. A stored link has no egress at all, which is what makes it available to a deployment that has not decided to let anything out; the half that *sends* is a separate thing a deployment configures.
+         *
+         *     Anybody who may argue about the claim may set it: a link is a note about where the conversation is rather than a judgment, and needing a second person for it would leave it unset.
+         *
+         *     Sent empty it is cleared. A stale link is worse than none — it sends somebody to a ticket that closed for a different reason.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        put: operations["point-claim-elsewhere"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/promise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a promised upgrade or patch
+         * @description Changes the version a promised upgrade moves to, or the date a promised upgrade or patch is promised by, on the claim and on every commitment it wrote. A promised patch has no version: send `to` empty or leave it out.
+         *
+         *     This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
+         *
+         *     `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        put: operations["repromise-upgrade"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/reaffirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm everything one decision covers
+         * @description Re-makes every row of this claim that stopped applying because an upstream version moved, at the versions each place has now, as one act with one reasoning.
+         *
+         *     Deciding is bulk-capable and re-deciding was not. A team answering one kernel issue writes a decision at each of its places in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
+         *
+         *     Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
+         *
+         *     One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
+         *
+         *     Bounded unless it is a promise to upgrade. The issues it covers count against `triage.agreed-issues` where nothing goes back to an approver, and against `triage.review-issues` where anything does; the findings it writes count against `triage.write-ceiling`.
+         *
+         *     A lead past its end of life is not re-made, and a claim at no other place is refused with 409.
+         *
+         *     A place that is open nowhere any more is not re-made, which is a finding that closed rather than a fault. `reasoning` is required.
+         *
+         *     Requires: public-triage or private-triage or internal-triage, held by a signed-in person and not a pipeline key
+         */
+        post: operations["reaffirm-claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/reasoning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update a decision's justification
+         * @description Replaces the justification text with a new revision. Earlier revisions are kept and remain readable.
+         *
+         *     A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Everybody whose approval it withdrew is notified. Requires no approval of its own.
+         *
+         *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        put: operations["revise-claim"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a decision's justification history
+         * @description Returns every revision of the justification, oldest first, with who wrote each and when.
+         *
+         *     A claim is one argument however many places it covers, so its reasoning is one text with one history. An approval names the specific revision that was agreed to, so this is how to read what an approver actually saw rather than what the text says now.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-claim-revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/send-back": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a decision back for more
+         * @description Asks the author for more before agreeing to any of a claim. Every waiting decision in it leaves the review queue together and comes back when the author revises.
+         *
+         *     `because` is required and is recorded as a comment on each decision. Needs no approval of its own. You cannot send back a claim whose words are your own.
+         *
+         *     Requires: approver or public-triage or private-triage or internal-triage on the product. The proposer may not approve their own.
+         */
+        post: operations["send-claim-back"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/decisions/{id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hold part of a decision back
+         * @description Moves the rows named into a claim of their own, belonging to you, carrying the argument they were made under and sitting with you rather than in the review queue. Revise it to give them an argument of their own.
+         *
+         *     This is the proposer's side of setting rows aside, and each act is refused to the other: an approver holding rows back is agreeing to the rest in the same action, and a proposer doing that would be approving their own claim.
+         *
+         *     `because` is required and is recorded as a comment on the new claim. Naming a row that is not part of the claim is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["split-claim"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1150,7 +1150,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/disclosing": {
+    "/v1/disclosure-deadlines": {
         parameters: {
             query?: never;
             header?: never;
@@ -1158,7 +1158,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what is approaching disclosure
+         * List disclosure deadlines
          * @description Returns issues nobody has announced whose embargo is running out, soonest first, and the ones whose date has already arrived. One item is one issue in one product, the unit an embargo is moved and disclosed in, with the builds and components carrying it and the findings counted across them.
          *
          *     Nothing here discloses anything. Reaching the date escalates: the row appears and the people who can act on it are told.
@@ -1260,83 +1260,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/exploited-here/{id}": {
+    "/v1/failed-jobs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List failed jobs
+         * @description Returns background jobs that failed, newest first, with why each stopped where anything reported a reason. A job fails once it has been tried as many times as it is allowed to be, whether it reported a failure or its worker stopped answering.
+         *
+         *     At most 200 are returned. `total` is how many have failed in all, so a clipped page can be told from a complete one.
+         *
+         *     `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
+         *
+         *     Requires: administrator
+         */
+        get: operations["list-set-aside-work"];
         put?: never;
         post?: never;
-        /**
-         * Clear a record of being exploited
-         * @description A deliberate act with a reason on it. Nothing else clears one: no scan, no rescan, and no closing of the findings it was about. A record that turned out to be wrong is still something somebody has to say, and the cleared record stays readable with who cleared it and why.
-         *
-         *     What it does not do is put back what recording it undid. An agreement taken back stays taken back, and whether the claim it stood on was right is for whoever answers the finding again.
-         *
-         *     Asked of triage on the product the record belongs to: clearing one is recording one.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
-         */
-        delete: operations["clear-exploited-here"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/exploited-here/{id}/fixes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Name a release carrying the fix
-         * @description Records that a tag of the record's product carries the fix for the attack. Name each tag as it is cut; a tag declared before any scan of it is the ordinary case. Recorded in the administrative trail.
-         *
-         *     A window starting from the fix starts at the earliest release date stated for a tag the record names. A tag with no stated release date starts nothing.
-         *
-         *     A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
-         */
-        post: operations["name-fix-release"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/exploited-here/{id}/fixes/{fix}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Withdraw a release named as carrying the fix
-         * @description Takes back a tag named in error. The naming stays readable with who withdrew it and when, and the tag may be named again. A window starting from the fix moves to the earliest release date the record still names, or stops where none is stated. Recorded in the administrative trail.
-         *
-         *     A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
-         */
-        delete: operations["withdraw-fix-release"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/exploited-here/{id}/told": {
+    "/v1/failed-jobs/{id}/retry": {
         parameters: {
             query?: never;
             header?: never;
@@ -1346,16 +1296,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record that somebody outside was told
-         * @description Records who was told about an attack, when, and what they were told, with the recipient's reference, the places named and what was said about malice where the notice carried them. Append-only: a notice recorded in error is corrected by recording another beside it.
+         * Retry a failed job
+         * @description Puts one failed job back in the queue for whichever worker takes it next, with its attempts reset to zero and its last error kept.
          *
-         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident, and a window starting from it starts at the first such notice.
+         *     A job that has not failed is refused rather than moved.
          *
-         *     Allowed on a cleared record, because a notice given before the clearing still happened.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         *     Requires: administrator
          */
-        post: operations["record-told-outside"];
+        post: operations["retry-set-aside-work"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1446,7 +1394,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/issues/{vulnerability}": {
+    "/v1/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incidents and their response windows
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
+         *
+         *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
+         *
+         *     Unpaged. A record you may not be told of is left out and counted nowhere.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+         */
+        get: operations["list-obligations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incidents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear an incident
+         * @description A deliberate act with a reason on it. Nothing else clears one: no scan, no rescan, and no closing of the findings it was about. A record that turned out to be wrong is still something somebody has to say, and the cleared record stays readable with who cleared it and why.
+         *
+         *     What it does not do is put back what recording it undid. An agreement taken back stays taken back, and whether the claim it stood on was right is for whoever answers the finding again.
+         *
+         *     Asked of triage on the product the record belongs to: clearing one is recording one.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         */
+        delete: operations["clear-exploited-here"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incidents/{id}/fixes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Name a release carrying the fix
+         * @description Records that a tag of the record's product carries the fix for the attack. Name each tag as it is cut; a tag declared before any scan of it is the ordinary case. Recorded in the administrative trail.
+         *
+         *     A window starting from the fix starts at the earliest release date stated for a tag the record names. A tag with no stated release date starts nothing.
+         *
+         *     A branch, a retired tag and a cleared record are refused with 422, a tag the product does not have with 422, and a tag the record already names with 409.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         */
+        post: operations["name-fix-release"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incidents/{id}/fixes/{fix}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a release named as carrying the fix
+         * @description Takes back a tag named in error. The naming stays readable with who withdrew it and when, and the tag may be named again. A window starting from the fix moves to the earliest release date the record still names, or stops where none is stated. Recorded in the administrative trail.
+         *
+         *     A naming already withdrawn, or never made, answers 404. A cleared record is refused with 422.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         */
+        delete: operations["withdraw-fix-release"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/incidents/{id}/told": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that somebody outside was told
+         * @description Records who was told about an attack, when, and what they were told, with the recipient's reference, the places named and what was said about malice where the notice carried them. Append-only: a notice recorded in error is corrected by recording another beside it.
+         *
+         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident, and a window starting from it starts at the first such notice.
+         *
+         *     Allowed on a cleared record, because a notice given before the clearing still happened.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. The product is the record's own, not one in the path.
+         */
+        post: operations["record-told-outside"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/issues/{issue}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1476,7 +1552,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/issues/{vulnerability}/document": {
+    "/v1/issues/{issue}/document": {
         parameters: {
             query?: never;
             header?: never;
@@ -1556,6 +1632,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/last-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the last upload per build
+         * @description Returns every build you can see, longest-silent first, with when a scan last arrived for it and whether that is longer ago than this deployment allows.
+         *
+         *     A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one that is still being scanned. A build nothing has ever been filed against is measured from when it was declared.
+         *
+         *     How long counts as quiet is the `scanning.quiet-after` setting.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-scanning"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/last-uploads.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the last upload per build
+         * @description Every build you can see, longest-silent first, as a file: when a scan last arrived, how long it has been, and whether that is longer than this deployment allows.
+         *
+         *     `quiet_days` is measured from the last arrival, or from when the build was declared where nothing has ever been filed against it — `last_received_at` is empty in that case, which is a different situation from a scan that failed.
+         *
+         *     A build whose release is out of support is in the file, marked `out_of_support`, and is never reported as quiet. A build taken out of use is marked `retired` and is never reported as quiet either.
+         *
+         *     The threshold `quiet` was computed against is stated in the file.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-scanning"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/measures": {
         parameters: {
             query?: never;
@@ -1592,7 +1722,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/my-claims": {
+    "/v1/my-decisions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1600,7 +1730,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the outcomes of your own claims
+         * List the outcomes of your own decisions
          * @description Returns the claims you proposed, newest first, with what happened to each: still waiting, sent back, approved, withdrawn, lapsed, an agreement undone, or several of those where a claim's rows ended differently.
          *
          *     This is the other half of the review queue's `mine=true`, which lists only what is still pending — so approved, withdrawn, lapsed and undone all present there as the row disappearing. Approval itself sends no message; this is where it is seen.
@@ -1618,7 +1748,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/my-claims.{format}": {
+    "/v1/my-decisions.{format}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1626,8 +1756,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Export the outcomes of your own claims
-         * @description What `GET /v1/my-claims` lists, as a file: every claim you proposed, newest first, with what became of each and who did it, rather than one page.
+         * Export the outcomes of your own decisions
+         * @description What `GET /v1/my-decisions` lists, as a file: every claim you proposed, newest first, with what became of each and who did it, rather than one page.
          *
          *     Narrowed to what you may still read.
          *
@@ -1752,96 +1882,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/obligation-windows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List obligation windows
-         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known, from the first notice for another window, or from the release of the fix. None ships: a deployment declares the windows it answers to.
-         *
-         *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
-         *
-         *     Requires: any signed-in person, and not a pipeline key
-         */
-        get: operations["list-obligation-windows"];
-        put?: never;
-        /**
-         * Declare an obligation window
-         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from, or from the release of the fix with from_fix. Recorded in the administrative trail.
-         *
-         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does, and from sent with from_fix.
-         *
-         *     Requires: administrator
-         */
-        post: operations["declare-obligation-window"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/obligation-windows/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Change an obligation window
-         * @description Restates a window in force: its name, how long it runs, its warning, the products it applies to and what it starts from. Each field is replaced by what is sent, so a warning, a product list, a from window or from_fix left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
-         *
-         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that is not in force, does not apply to every product this one does or would start a loop, from sent with from_fix, and a product list leaving out a product a window starting from this one applies to.
-         *
-         *     Requires: administrator
-         */
-        put: operations["change-obligation-window"];
-        post?: never;
-        /**
-         * Retire an obligation window
-         * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
-         *
-         *     A window already retired, or never declared, answers 404. A window another window in force starts from answers 409 naming that window: change or retire it first.
-         *
-         *     Requires: administrator
-         */
-        delete: operations["retire-obligation-window"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/obligations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List standing attacks and their windows
-         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs for that incident, every notice recorded about it, and every tag named as carrying the fix. A window starts when the attack became known, at the first notice for the window it starts from, or at the earliest release date stated for a tag named as carrying the fix, and has no end until then.
-         *
-         *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
-         *
-         *     Unpaged. A record you may not be told of is left out and counted nowhere.
-         *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
-         */
-        get: operations["list-obligations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/outbound": {
         parameters: {
             query?: never;
@@ -1908,7 +1948,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/patch-branches": {
+    "/v1/patch-branch-lookups": {
         parameters: {
             query?: never;
             header?: never;
@@ -2326,7 +2366,7 @@ export interface paths {
         patch: operations["amend-product"];
         trace?: never;
     };
-    "/v1/products/{product}/advisory-sources": {
+    "/v1/products/{product}/assignment-rules": {
         parameters: {
             query?: never;
             header?: never;
@@ -2334,45 +2374,67 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the suppliers advisories are read from
-         * @description The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
+         * List assignment rules
+         * @description The standing rules for this product, in the order they are tried.
          *
-         *     Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
+         *     First match wins, and which rule placed a finding is recorded on the finding.
          *
-         *     Requires: administrator
+         *     Requires: public-triage or private-triage or internal-triage on the product
          */
-        get: operations["list-advisory-sources"];
+        get: operations["list-routing-rules"];
         put?: never;
         /**
-         * Read advisories from a supplier
-         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision. A statement that their own product, at the version a build ships, is not affected closes the finding inside that product at the next scan.
+         * Add an assignment rule
+         * @description Records a standing rule and queues it against what is already open.
          *
-         *     The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
+         *     It matches on component identity as well as on a place in the tree. A rule naming a source package catches every binary package built from it, wherever they sit.
          *
-         *     Only claims naming a component this product ships are recorded.
+         *     It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
          *
-         *     A new supplier is read from the number of days before it was added that scanning.supplier-history names. To take an advisory published before that, upload it.
+         *     It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
          *
-         *     Each document is checked against the digest file its publisher serves beside it, ending .sha256 or .sha512, and one that does not match is not read. A publisher serving neither is read unchecked.
+         *     Send `reports` and neither key for a rule placing the product's vulnerability reports nobody holds. A report is placed only where one member of the team reads undisclosed work here, and a report recorded later is placed as it is recorded.
          *
-         *     A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
+         *     Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
          *
-         *     A supplier withdrawn and added again under the same name resumes where it stopped, no further back than that same window.
-         *
-         *     The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
-         *
-         *     The address must be https and carry no user information. A product that is out of use takes no supplier.
-         *
-         *     Requires: administrator
+         *     Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
          */
-        post: operations["add-advisory-source"];
+        post: operations["add-routing-rule"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/advisory-sources/{name}": {
+    "/v1/products/{product}/assignment-rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview what an assignment rule would catch
+         * @description Answers what a rule with these keys matches, without recording anything: the components it names, how many pieces of work sit at them, and how many of those nobody holds.
+         *
+         *     `*` matches any run of characters in either key.
+         *
+         *     It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
+         *
+         *     Send `reports` instead of either key for a rule placing vulnerability reports: `work` is then the product's open reports and `unheld` those nobody holds, counted where you read the product's reports and zero elsewhere.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        get: operations["preview-routing-rule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/assignment-rules/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2383,14 +2445,1444 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Stop reading a supplier
-         * @description Stops reading a supplier. What they have already said stays standing, because an approval may have been granted on the strength of it.
+         * Retire an assignment rule
+         * @description Takes a rule out of use. What it already placed stays placed: changing a rule never takes something out of somebody's hands, and that holds for a team's queue as much as for a person.
          *
-         *     The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
+         *     Requires: assigner on the product
+         */
+        delete: operations["retire-routing-rule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a product's branches and tags
+         * @description Every stream declared under this product, with how many variants each has and how much is open in it.
+         *
+         *     A stream is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
+         *
+         *     A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
+         *
+         *     A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-streams"];
+        put?: never;
+        /**
+         * Create a branch or tag
+         * @description Records a line of a product. A branch moves and is rebuilt; a tag never changes and is what somebody received.
          *
          *     Requires: administrator
          */
-        delete: operations["withdraw-advisory-source"];
+        post: operations["declare-stream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a branch or tag
+         * @description Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
+         *
+         *     An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the release listed and scannable.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-stream"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a branch or tag
+         * @description Corrects what a release is called.
+         *
+         *     Refused once a VEX document has gone out for any build of this release, a published advisory named it, its OpenVEX document has been served, or it has a scanned build and a CSAF VEX document of its product has been served, withdrawn or not. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
+         *
+         *     Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-stream"];
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/end-of-life": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when a branch or tag goes out of support
+         * @description Sets the date support ends for one release, overriding what its product says. Past it, nothing on the release carries a remediation deadline and a build that stops being scanned is expected rather than a fault.
+         *
+         *     An empty date clears the override, so the release follows its product again. Clearing is not the same as stating the product's current date: a release that stated it would stop following when the product changed.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-stream-end-of-life"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when a release went out and what it was cut from
+         * @description Records the day a tag actually shipped, and the branch it was cut from.
+         *
+         *     Both are settable after the fact, because that is when they are usually known. A tag is declared here so scans can be filed against it, which happens whenever somebody gets to it — before the release, months after, or while backfilling a year. Fixed at declaration, a release recorded late ordered after ones that came out before it, and a year entered in an afternoon plotted as a single day.
+         *
+         *     The date orders and labels the release-over-release chart. Left unset, the day the release was declared here stands in.
+         *
+         *     The parent fills in, and never changes. It is what a branch is compared against for release notes, and a pipeline that does not know declares the tag without it — so saying it late is the same act arriving late, because nothing had been said for it to contradict. Naming a different branch is refused, and so is clearing one: a tag is one frozen point and it came from wherever it came from. It is a branch and nothing is cut from itself; both are refused rather than stored, because a cycle here is a comparison that never returns.
+         *
+         *     An empty date clears the date. An empty parent leaves whatever stands alone.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-release-details"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the variants a release was built as
+         * @description Lists the variants one release was actually built as — a subset of what the product declares.
+         *
+         *     A release predating a variant has never been filed against it and does not list it, which is what keeps something introduced later from appearing to have shipped years ago.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-release-variants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List uploaded analyzer runs and their status
+         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
+         *
+         *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-analyses"];
+        put?: never;
+        /**
+         * Upload static analysis results
+         * @description Accepts one analyzer run as SARIF 2.1.0 documents in repeated multipart fields named `sarif`, each optionally compressed with gzip. The other fields fill what the documents leave unstated; where both state a value, the documents win.
+         *
+         *     The series names the analysis and is required, in the `series` field or as the part of each run's `automationDetails.id` before its last slash.
+         *
+         *     Returns 202 once the documents are read and their results placed and stored, before any result is applied. The documents themselves are not stored. Poll `GET .../analyses` for what the run did. The same documents for the same series and build answer 200 with the run they match.
+         *
+         *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else.
+         *
+         *     Requires: internal-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
+         */
+        post: operations["upload-analysis"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show what triage a new line would inherit
+         * @description Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
+         *
+         *     Six groups, because they need different things:
+         *
+         *     `applying` reach this line by matching, and there is nothing to choose.
+         *
+         *     `moved` held a claim at a version this line does not have. Each would come across as a proposal carrying the old reasoning, never as a decision.
+         *
+         *     `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
+         *
+         *     `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
+         *
+         *     `upgrades` are promised upgrades that moved. Plan the upgrade from the component, naming this line, rather than carrying it.
+         *
+         *     `absent` cover nothing here and are left behind.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        get: operations["preview-carried-decisions"];
+        put?: never;
+        /**
+         * Carry chosen triage onto a new line
+         * @description Takes the judgments named onto this build as claims waiting for agreement, each carrying the words from the line it came from.
+         *
+         *     Reasoning travels and conclusions do not. Every one arrives needing approval, however confident whoever carried it was: a version moved, which is exactly what made the old judgment stop applying, so somebody has to look at the new code. What is inherited is the thinking rather than the answer.
+         *
+         *     Only what the preview offered. A judgment that already applies here has nothing to agree to, and one covering nothing here has nothing to apply to; naming either is refused rather than skipped, because a caller that got the set wrong should hear so.
+         *
+         *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["carry-decisions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried-patches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what a build says it deals with itself
+         * @description Everything this build has argued about in its own inventories: carried patches saying what they fix, and statements it sent alongside.
+         *
+         *     A history rather than a list of what is true tonight. Each row says when the build first said it and when it stopped, because a claim that stopped is the interesting one — somebody dropped a patch, and the finding it answered is back. A list of what is current would not have that row at all.
+         *
+         *     A carried patch is the only way a backport can be seen here. No version comparison finds one: the fix is in the package and the version has not moved, so unless the build declares it, the finding sits open with nothing true to say about it.
+         *
+         *     `suppresses` says whether a claim takes a finding off the list. Saying it is affected, or that it has not decided, is information rather than an answer.
+         *
+         *     Narrow to one package with `component`, matched on what the claim says it is about rather than on a component this build carries — a claim naming something that is no longer here is exactly the row somebody asking why a patch stopped working is looking for.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-carried-patches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a code finding's evidence
+         * @description Returns what the newest run that saw a code finding on a build said about it: where it is, the path the analyzer took to it, and the other places it names. Each place links into the repository's web view at the analyzed commit, where the product names the repository's host, and carries the source kept beside it, where the product keeps source under its path.
+         *
+         *     A code finding the build no longer holds open answers the newest it held, with when it was last seen, when it was first not seen, and whether its repository changed between the two.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-lead-evidence"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign a code finding to somebody
+         * @description Records who is dealing with this code finding.
+         *
+         *     It covers the product, not the build named in the path: what is assigned is the code finding on every build of the product it is open on.
+         *
+         *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
+         *
+         *     A person is given a code finding only where they may read it at its visibility, and a team only where one member may. A code finding every release of which is past its end of life is refused with 409, and so is a code finding recorded as a flaw: assign the flaw instead.
+         *
+         *     A code finding seen on a build it was not open on when it was assigned starts unassigned there.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
+         */
+        put: operations["assign-lead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a code finding's collaborators
+         * @description Everybody granted this one code finding recorded as a flaw in this product, oldest first.
+         *
+         *     A grant reads the code finding's evidence and nothing else of the product, until its flaw is disclosed.
+         *
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
+         */
+        get: operations["list-lead-collaborators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/collaborators/{identity}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add a code finding collaborator
+         * @description Grants one person this one code finding recorded as a flaw in this product, to read its evidence, without granting them anything else of the product.
+         *
+         *     It is an access change: it lands in the administration trail, and they are told in the notification area inside the application.
+         *
+         *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
+         *
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
+         */
+        put: operations["add-lead-collaborator"];
+        post?: never;
+        /**
+         * Remove a code finding collaborator
+         * @description Withdraws the grant. The record of it is kept.
+         *
+         *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
+         *
+         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
+         */
+        delete: operations["remove-lead-collaborator"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a triage decision for a code finding
+         * @description Records what a code finding is: `dismissed`, `not-security` or `confirmed`.
+         *
+         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
+         *
+         *     The decision covers the code finding on every stream and variant it is seen on, and every code finding another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A code finding that is fixed is refused: it opens again where it is seen again. A code finding recorded as a flaw is refused with 409, because its flaw is judged instead.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["decide-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a code finding as fixed
+         * @description Closes a code finding on one build because it is fixed there. The code finding has to be one the newest comparable run did not see: a code finding a run still sees is refused with 409. `because` says what fixed it, and is required.
+         *
+         *     `fixed_in` names the build that fixed it, as the run of the code finding's series on this build that analyzed it: an applied, comparable run built at or after the first run that did not see the code finding, which the code finding's evidence names as `not_seen_run`. Any other run is refused with 422.
+         *
+         *     A code finding seen again opens anew at the same place.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["fix-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the offer to record a code finding as a flaw
+         * @description Returns what recording a confirmed code finding as a flaw here is offered: the components it may be recorded against, most likely first, the builds it was seen in, and what including it in the flaw's disclosure would publish with the flaw.
+         *
+         *     A suggestion lists the builds the code finding was seen in that lack it, since recording the flaw against those is refused, and the builds holding it that the code finding's series never analyzed.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        get: operations["get-lead-handoff"];
+        put?: never;
+        /**
+         * Record a confirmed code finding as a flaw
+         * @description Records a confirmed code finding as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the code finding to it, with every other code finding the claim confirming it covers.
+         *
+         *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the code finding's prefix so the next code finding under it is offered the same; leave it out for the build itself.
+         *
+         *     `move` makes the linked code findings part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the code findings are kept internal and linked.
+         *
+         *     A code finding nobody confirmed, or one already recorded as a flaw, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        post: operations["hand-off-lead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Include a code finding in its flaw's disclosure
+         * @description Includes a code finding kept internal in its flaw's disclosure, with every code finding linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../flaw` lists what that discloses.
+         *
+         *     Recorded in the administration trail. A code finding not recorded as a flaw, one already included, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        put: operations["move-lead"];
+        post?: never;
+        /**
+         * Take a code finding out of its flaw's disclosure
+         * @description Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with every code finding linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
+         *
+         *     Recorded in the administration trail. A code finding not recorded as a flaw, one kept internal, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        delete: operations["unmove-lead"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo recording a code finding as a flaw
+         * @description Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the code finding it was recorded from, marked undone.
+         *
+         *     `because` is required. Recorded in the administration trail. A code finding not recorded as a flaw, or one whose flaw is disclosed, is refused with 409.
+         *
+         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
+         */
+        post: operations["undo-lead-handoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what a build pulls in directly
+         * @description Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
+         *
+         *     The list also holds every component nothing else in the build depends on, and the root's counts cover them. An inventory naming no root of its own is filed with the build standing in for it.
+         *
+         *     The starting point for walking the graph. A full render is not offered and would not be useful: a real image holds thousands of components and tens of thousands of edges, which neither draws nor reads. Ask for one step at a time.
+         *
+         *     Every entry carries how many findings are open against it and how many components it pulls in, so descending follows something rather than being exploration.
+         *
+         *     With `q` it searches instead: components anywhere in the build whose name contains that text, most findings first and no root. Nobody finds anything in a graph this size by opening nodes — a real image holds eight thousand components under a root with five thousand children — so searching is the way in, and browsing is for answering "what else is under this" once you are already somewhere.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-top-level-components"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the chains your own findings sit on
+         * @description The build's dependency graph, seen upward from your own work: from each component you hold a finding on, up to the build's root.
+         *
+         *     This is what the tree is for somebody who holds no reading on the product. Descended from the root, that tree is the inventory of what the product contains — the breadth they were not granted — so it cannot be offered with rows hidden: a container's count would still say how much sits under it. The chain upward is the part that makes a finding judgeable, because it says what pulled the thing in, and every node on it sits above something already granted.
+         *
+         *     The counts are yours. A node says how much of your own work hangs beneath it along these chains, never how much the build holds there.
+         *
+         *     Rows come back in the order they are drawn, parents before children, the fullest branch first. A component the inventory placed nowhere has no chain and sits at the end.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers what you hold, whether or not you read the product.
+         */
+        get: operations["list-my-components"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/around": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show what is directly above and below a component
+         * @description Returns what pulls this component in, and what it pulls in.
+         *
+         *     `above` is the direction people actually use. Somebody arrives from a finding and asks why the component is here, which is walking up — and up is short. Walking down is where the size lives.
+         *
+         *     A component reached several ways appears once with several parents. It is a graph rather than a tree, so anything drawing it has to expect the same component under many places.
+         *
+         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-component-neighbors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/bulk-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a bulk decision
+         * @description Records the same claim against every issue you name: one outcome, one justification, one reasoning, and a separate decision for every place each issue sits at, each keyed and expiring on its own.
+         *
+         *     You name the issues; the places are resolved here. `selected_by` says how you narrowed the list and is recorded with every claim, so "how were these chosen" has an answer later — but it is never the claim. The reasoning has to hold for every issue in the list, since "these matched a word" is not a defense anybody would accept.
+         *
+         *     `contains` is the same question an approver can re-run. Send the text you narrowed the candidate list by; the claim records how many issues that narrowing reaches, read here, against how many you named. Equal, the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set.
+         *
+         *     Always needs a second person to agree, whatever the outcome.
+         *
+         *     A place a live decision already covers refuses the whole claim, naming that decision. Send `skip_decided` to leave those places out instead; `skipped` lists each one with the decision standing there. Where every place is covered, nothing is recorded and the request is refused.
+         *
+         *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["decide-together"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the issues open against one component
+         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at, the version that fixes it where the report names one, and what one judgment about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its places here.
+         *
+         *     `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-issues-at-component"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get everything known about one finding
+         * @description Returns the full record for one issue in one component of a build: the description, the advisory, every reference the data carries with patches listed first, the score and what it assumes, whether it is known to be exploited and how likely exploitation is, the weakness classification, what upstream has done about it, and every place the component sits at here.
+         *
+         *     This is what a triage decision is made from, so it is gathered into one request. Each entry in `places` carries the `place` identity to name when recording a decision about it.
+         *
+         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices; where the issue is open at only one of them, that one is answered.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-finding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/assignment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign a finding to somebody
+         * @description Records who is dealing with this issue in this component.
+         *
+         *     It covers the product, not the build named in the path. The path says which finding is being looked at; what is assigned is every build of the product holding the same component, and every place that component sits at.
+         *
+         *     Send `person` as an empty string to hand it back to nobody, which is this same operation rather than one of its own.
+         *
+         *     Send `team` instead to route it to a team. That is a queue rather than a holding: it stays unheld until somebody takes it, and anybody on the team may take it with the triage right alone. Routing to a team asks that at least one member may read what is being routed there — not that every member may.
+         *
+         *     Findings arriving later under the same component start unassigned.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
+         */
+        put: operations["assign-finding"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record one decision about a finding, covering its occurrences
+         * @description Records the same claim against every place this issue occupies in this component. Naming `places` narrows it; leaving it out covers all of them.
+         *
+         *     A place left out stays open. Nothing is recorded against it and nothing is asked about it.
+         *
+         *     One record is written per place, each keyed and expiring on its own, so this reads later as the several decisions it is rather than as one.
+         *
+         *     The ordinary approval rules apply however many places this reaches: covering many places does not on its own require a second person.
+         *
+         *     Pass `also` to apply the same judgment to other builds of this product, naming each as the reach gives it. All of it is written in one transaction: the response is what every build recorded, or a refusal and nothing written anywhere. In those builds only the places nothing already stands at are written, because the ones at matching versions are reached by lookup already. The claim records the build in the path and each build named in `also` as the builds it was made on, and no build it reaches by lookup.
+         *
+         *     Pass `extends` to carry an approved claim to this issue: the source must be approved, sit at the same component under the same consumer, and the outcome and justification must match it. The new claim is recorded as an extension of it and still waits for a second person. `similar` on `GET .../findings/{issue}/components/{component}` lists the claims that qualify.
+         *
+         *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["decide-finding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/labels/{label}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Label a finding
+         * @description Puts a free-text label on one issue in one component of this product.
+         *
+         *     No fixed vocabulary, because none has been earned yet. A label that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
+         *
+         *     One issue in one component of one product, not one place and not one build: a kernel flaw at sixty places is one thing somebody is labeling, and a label is about the work rather than about a release.
+         *
+         *     Matched without regard to capitals and shown back as it was typed. Labeling what already carries the label succeeds and keeps the first spelling.
+         *
+         *     Labeling is triage, so it asks for the triage right: a label changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        put: operations["tag-finding"];
+        post?: never;
+        /**
+         * Take a label off a finding
+         * @description Removes a label. Taking off one that is not there succeeds and changes nothing.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        delete: operations["untag-finding"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show how far a decision about this finding would reach
+         * @description The same three parts the per-place answer gives, for every place the finding sits at, merged.
+         *
+         *     A judgment is made about an issue in a component, which is a group of places rather than one — a kernel flaw sits at sixty. Asking per place is a request each, so a screen doing that samples, and a sample decides which other builds it can offer to include: one reachable only from a place the sample missed is never offered and the judgment does not travel there.
+         *
+         *     A build reached from two places of the finding is one thing to agree to, and carries the places of both.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-finding-reach"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get what has been decided about a finding
+         * @description Returns the decision currently suppressing this finding, if any, together with everything decided here before — withdrawn claims, and claims that stopped applying when an upstream version changed.
+         *
+         *     `standing` is absent when nothing has been decided, or when a claim is still waiting for approval: a claim nobody has agreed to suppresses nothing.
+         *
+         *     Read `previously` before deciding again. A claim that lapsed on a version upgrade is usually still the right answer, and re-affirming it is a different request from making a new one.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-finding-decision"];
+        put?: never;
+        /**
+         * Record a triage decision for a finding
+         * @description Records how a finding was triaged: `affected`, `not-applicable`, `mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
+         *
+         *     `not-applicable` and `mismatched` require a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
+         *
+         *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
+         *
+         *     `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
+         *
+         *     The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
+         *
+         *     `mismatched` is the exception, and the only one: it says the scanner matched this against something it is not, which is a claim about identity rather than about risk. It covers the place at whatever versions the place holds, and no version change expires it — a bump does not make a wrong match right. Its `justification` is limited to the two reasons that say something is not there, `component_not_present` and `vulnerable_code_not_present`; the three that describe how code is reached or what stops it are refused, because a version bump changes those and this outcome would carry them past it.
+         *
+         *     The response says whether a second person must approve it. Most outcomes require approval; a deferral shorter than the configured threshold does not.
+         *
+         *     It also says how many findings this one judgment covers, and how many distinct versions of the component sit at this place — more than one means a single decision cannot honestly cover all of them.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["decide"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-affirm a decision after an upstream version changed
+         * @description Re-makes a decision that stopped applying because an upstream version moved, at the versions this finding has now. `previous` is the decision being re-made, from `previously` in `GET .../decision`.
+         *
+         *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
+         *
+         *     It does need approval again if nothing was ever agreed to, or if the issue is rated a band worse since the original was agreed to and the claim is one a severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
+         *
+         *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
+         *
+         *     `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product
+         */
+        post: operations["reaffirm-decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/occurrences/{occurrence}/reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show how far a decision here would reach
+         * @description Returns the three parts of what a judgment made here covers.
+         *
+         *     `here` is how many places in this build. `automatic` are other builds it reaches without anybody doing anything, because their upstream versions and chains already match — a decision is a claim about a combination of code, not about a release. `differing` hold the same issue at the same place at another version, so each is a separate judgment.
+         *
+         *     Only `differing` is a choice. The first two follow from the matching rules and are there to be told, not agreed to — and showing them as one number is how a decision comes to reach builds the person making it never knew about.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-decision-reach"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a recorded flaw as fixed in this build
+         * @description Closes a flaw somebody recorded here, in one build, because it has been fixed there. Every location of the issue in that build is closed together.
+         *
+         *     Only a flaw somebody recorded. Everywhere else, resolution is computed from scans rather than declared, which is what stops a fix being reported that shipped in nobody's release. A flaw recorded by hand is the one case with no such evidence and no prospect of any — no scan reports it — so a person closes it or nothing does. An issue a scanner found is refused.
+         *
+         *     A reason is required. A closure with no reason is a record saying somebody closed it and nothing else.
+         *
+         *     Nothing reopens one. Closing is a considered act, and this is the way it is undone: it is not.
+         *
+         *     Requires: public-triage or private-triage on the product
+         */
+        post: operations["resolve-finding"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List one build's planned upgrades
+         * @description Everything committed for this build, one row per upgrade — a source package at the version it was built at, moving to another version — with what it would still close here.
+         *
+         *     What it covers is a match, not a list. A finding is covered when its component folds to the same key in this build, so changing the version a release is moving to is one row, and an issue published tonight against the same package is covered by this morning's commitment with nobody acting.
+         *
+         *     The fix-bundle query read from the other end. A triager reads an upgrade and the issues it closes; a coordinator reads a build and the upgrades it is waiting on. One query rather than two reports that will eventually disagree.
+         *
+         *     Nothing here is declared done. A piece of work has landed when the build stops holding it, which the scans already say — a declared fix that is still open after a scan has run is a missed target, and the scan is independent evidence against the claim.
+         *
+         *     Each row says where it stands — planned, landed, or lapsed — derived on every read from the scans and the date the promise named, and set by nobody. A lapsed upgrade returns as one item to whoever holds it: the findings it covers stay covered, because deciding them again one at a time is the thing the promise was made instead of. They return on their own only when the component moved and they did not close, which needs nothing extra — a decision is keyed on the version it was made against and stops applying the moment that version changes.
+         *
+         *     There is no separate 'replanned': re-promising writes a new date and the standing promise is the one read, so a replanned upgrade is a planned one with a later date.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-pending-upgrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/planned-upgrades.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export one build's planned upgrades
+         * @description The same list as a file: one row per upgrade this build is waiting on, where it stands, and what it would still close here.
+         *
+         *     The packages one upgrade moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-pending-upgrades"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare a branch against the last release cut from it
+         * @description Answers the question asked before shipping: is what we are about to ship better or worse than what we last shipped. "8 criticals now, v2.4.1 shipped with 4."
+         *
+         *     The release is the newest one cut from this branch, built the same way, that has been scanned here — a branch built for one chip beside a release built for another compares two different pieces of software and reads as a regression somebody then goes looking for.
+         *
+         *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer. A build nothing has scanned, declared and never built or with every upload refused, answers with zeroes, no `last_scanned_at`, and `why` saying nothing has been scanned there yet.
+         *
+         *     Counted as issues at components at or above the deployment's line, which `floor` names.
+         *
+         *     `blocking` is the worst few of what the count is made of: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-readiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List every known vulnerability in a build and its disposition
+         * @description One row per issue and place in this build, with its state, what was claimed, who claimed it, who agreed, when each of those happened, its deadline and whether that was met.
+         *
+         *     Every issue known in the build, decided or not: `undecided` rows are in here, and closed ones too. The audit list is what was decided.
+         *
+         *     Current state only; there is no `as_of`. Each row carries the dates of what happened to it.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-disposition-register"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the disposition register
+         * @description The register as a file. Read with your own visibility as it streams, like every other export here.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-disposition-register"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/runs/{run}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show a known vulnerability scan
+         * @description One run, with what it was measured with and what it changed — broken down by the rating in force, and with how much of what it opened is known to be exploited.
+         *
+         *     A receipt says a run happened; this says what it did. A row reading "7,604 opened" is a number with no shape, and somebody looking at a build that jumped overnight is asking which of them matter.
+         *
+         *     Counted as issues at components, the unit every other count here uses: a component reached twenty ways carries the same issue twenty times, so counting rows would report how much the dependency graph shares rather than how much changed.
+         *
+         *     Derived when it is asked for rather than stored, so it moves as findings close and reopen — and narrowed by what you may see, like every other count here.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-scan-run"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List uploaded SBOMs and their status
+         * @description Returns uploads newest first, each with its state: `reading` (accepted, not yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), or `failed` with the reason.
+         *
+         *     Because uploads return 202 before parsing, this is how a build pipeline finds out whether its SBOM was usable. An API key sees every upload on a build it may upload to, whichever key sent it.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-scans"];
+        put?: never;
+        /**
+         * Upload an SBOM and its VEX documents
+         * @description Accepts a CycloneDX 1.x, SPDX 2.x or SPDX 3.x SBOM and any number of OpenVEX documents as multipart form fields named `inventory` and `suppressions`. The format is taken from the document itself; a major version this does not read is rejected by name.
+         *
+         *     The product, branch and variant must already exist; an upload naming something undeclared is rejected and the error says which part is missing.
+         *
+         *     Returns 202 before the documents are parsed. A success here means they were accepted for processing, not that they were valid. Poll `GET .../sboms` to find out whether they parsed and what the scan found.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
+         *
+         *     Requires: public-triage or private-triage or internal-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
+         */
+        post: operations["upload-scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what an upload changed about a build's inventory
+         * @description Returns the component names this upload added, removed and moved to different versions, against the upload read before it. Removals first, then arrivals, then the names that moved version.
+         *
+         *     Counted by name rather than by component, so a dependency upgraded is one name that moved rather than one arrival and one departure. A name the build ships at several versions at once carries all of them on each side.
+         *
+         *     Empty for the first upload read for a build, which is the first picture of it rather than a change to one, and for an upload nothing has read yet.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-inventory-changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/documents/{document}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fetch a document an SBOM upload carried
+         * @description Returns the bytes as they arrived, byte for byte: the hash on the receipt is over what comes back from here, so a copy can be checked against what was actually read.
+         *
+         *     A tagged release keeps its documents and a branch build does not. A nightly build's contents are let go once they have been read, because keeping them costs storage that grows with the calendar; a tag's are kept because re-scanning it years from now needs both what it contained and what the build had already argued about its own patches. One that was let go answers 410, which says the bytes went on purpose — the record of what arrived is still on the receipt.
+         *
+         *     Named through the scan it belongs to rather than on its own, so whoever may read the receipt may read what it describes and there is one rule rather than two.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["fetch-scan-document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List unmatched components
+         * @description Returns the components the build holds now that the vulnerability scanner has no way to match, with the reason for each and a count per reason. Such a component reports no findings whatever it contains.
+         *
+         *     Read from the component as the scanner is given it, when this is asked. A component meeting several reasons is listed under the first in the order `reasons` gives.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-match-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export unmatched components
+         * @description Every component the unmatched components list names, as a file, in the same order, with the reason for each.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-match-coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List upload types and their status
+         * @description Returns each kind of upload a build takes, with how many are held and what became of the newest: SBOMs and static analysis runs sent to this build, and VEX documents and supplier advisories uploaded to its product. Each kind's own list carries the uploads themselves.
+         *
+         *     A kind the caller may not read is left out. An API key reads the SBOMs and the static analysis runs of a build it may upload to. A person reads static analysis runs where they read internal findings in the product.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-uploads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate a VEX document for a build
+         * @description Returns an OpenVEX document saying what stands about the third-party components this build ships: every approved `not applicable` and `already fixed` claim, as `not_affected` and `fixed` statements with the justification and the reasoning somebody wrote.
+         *
+         *     Approved claims only, and a deferral is absent rather than exported as anything — silence already reads as affected in this format.
+         *
+         *     Public findings only. `undisclosed=true` includes the rest for somebody who may read them, which is a preview rather than a thing to publish.
+         *
+         *     `kind=with-suppliers` is a second document with an identifier of its own. It adds, as `not_affected`, what a supplier states about its own product where the statement closed every place of a component in the build, in the supplier's name.
+         *
+         *     Requires a publisher configured for this deployment: a document naming none has nobody as its author.
+         *
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+         */
+        get: operations["get-vex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the times a VEX document went out
+         * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
+         *
+         *     The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
+         *
+         *     The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same. `changed` says whether the public document generated now differs from the last one that went out.
+         *
+         *     `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
+         *
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
+         */
+        get: operations["list-vex-issuances"];
+        put?: never;
+        /**
+         * Record that a VEX document went out
+         * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
+         *
+         *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
+         *
+         *     It is what the document's version counts. A document is assembled from what stands now and holds no history of its own, so without this every generation is the first revision of something, and a reader keeping documents by their identifier cannot tell which supersedes which.
+         *
+         *     The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
+         *
+         *     Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+         */
+        post: operations["record-vex-issued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/vex/issuance/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a VEX document that went out
+         * @description The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
+         *
+         *     A revision nobody recorded answers 404.
+         *
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+         */
+        get: operations["get-vex-issued"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-finding-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count code findings by analyzer series
+         * @description Returns one entry per analyzer series the product holds, ordered by name, with how many of its code findings stand in each state across every build of the product. A series with no code findings is listed with every count zero.
+         *
+         *     Each count is the total the code finding list answers for the same `series` and `state`.
+         *
+         *     Refused, with no count, to anybody who does not read internal material in the product.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Requires internal-read on the product.
+         */
+        get: operations["list-lead-series"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-findings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List code findings
+         * @description Returns one row per code finding the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
+         *
+         *     With no `state` it is the queue: open code findings with no claim waiting for a second person. `state` lists the code findings in one state instead. `fixed` lists the code findings closed on a build and not opened anew there.
+         *
+         *     `states` counts every code finding in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a suppression rule covers, so what the list leaves out is counted. The queue also leaves out a code finding open only in releases past their end of life, and `past_end_of_life` counts those. A code finding seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the code findings nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/code-findings.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export code findings
+         * @description The code finding list as a file: every row the same filters would list, not one page of them, in the same order.
+         *
+         *     Read with your own visibility, as it is written. No row carries source text.
+         *
+         *     With no `state` it is the queue, and the file says so. Takes every filter the code finding list takes.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-leads"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2842,64 +4334,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/fix-bundles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List findings by upgrade
-         * @description One row per upstream upgrade, with the issues it closes.
-         *
-         *     Keyed on the source package where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 are upgraded once.
-         *
-         *     Only what has a fix: a bundle is a version to move to, so a finding upstream has released nothing for is not in one.
-         *
-         *     Grouping is presentation: one act still writes one decision per component and per place.
-         *
-         *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
-         *
-         *     Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
-         *
-         *     `limit=0` returns `total` alone, with no rows.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-fix-bundles"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/fix-bundles.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export findings by upgrade
-         * @description The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
-         *
-         *     Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-fix-bundles"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/holders": {
         parameters: {
             query?: never;
@@ -2928,7 +4362,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}": {
+    "/v1/products/{product}/issues/{issue}/aliases/{alias}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2970,7 +4404,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/assessment": {
+    "/v1/products/{product}/issues/{issue}/assessment": {
         parameters: {
             query?: never;
             header?: never;
@@ -2998,7 +4432,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/attachments": {
+    "/v1/products/{product}/issues/{issue}/attachments": {
         parameters: {
             query?: never;
             header?: never;
@@ -3034,7 +4468,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/builds": {
+    "/v1/products/{product}/issues/{issue}/builds": {
         parameters: {
             query?: never;
             header?: never;
@@ -3064,7 +4498,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/collaborators": {
+    "/v1/products/{product}/issues/{issue}/code-finding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the code finding a flaw was recorded from
+         * @description Returns the code finding a flaw recorded here was recorded from, with the component its offer ranked first, the builds it proposed, and whether recording it was undone.
+         *
+         *     `fixed_in` lists each build the flaw is still open on where the code finding is not reproduced, with the first run that did not see it. Closing the flaw as fixed there is `POST .../findings/{issue}/resolve`, which a person does.
+         *
+         *     A flaw recorded from no code finding, and a code finding you do not read in full, answer 404.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
+         */
+        get: operations["get-flaw-lead"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{issue}/collaborators": {
         parameters: {
             query?: never;
             header?: never;
@@ -3088,7 +4548,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/collaborators/{identity}": {
+    "/v1/products/{product}/issues/{issue}/collaborators/{identity}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3124,7 +4584,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/disclosure": {
+    "/v1/products/{product}/issues/{issue}/disclosure": {
         parameters: {
             query?: never;
             header?: never;
@@ -3162,7 +4622,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/disclosure/extension": {
+    "/v1/products/{product}/issues/{issue}/disclosure/extension": {
         parameters: {
             query?: never;
             header?: never;
@@ -3192,7 +4652,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/disclosure/shortening": {
+    "/v1/products/{product}/issues/{issue}/disclosure/shortening": {
         parameters: {
             query?: never;
             header?: never;
@@ -3220,7 +4680,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/duplicate-disclosure": {
+    "/v1/products/{product}/issues/{issue}/duplicate-disclosure": {
         parameters: {
             query?: never;
             header?: never;
@@ -3246,7 +4706,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/duplicates": {
+    "/v1/products/{product}/issues/{issue}/duplicates": {
         parameters: {
             query?: never;
             header?: never;
@@ -3270,7 +4730,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/exploited-here": {
+    "/v1/products/{product}/issues/{issue}/incidents": {
         parameters: {
             query?: never;
             header?: never;
@@ -3280,7 +4740,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Record that this product was exploited through an issue
+         * Record an incident
          * @description A different fact from the exploitation a feed reports. A feed says a vulnerability is being used somewhere in the world; this says that this product was the thing attacked, which no feed reports and nothing here can work out. It comes from a customer, a researcher or an investigation.
          *
          *     Recorded against the issue and one product, and it applies to every finding of that issue there whatever produced them. A flaw inherited from a dependency and used against this product is the ordinary case, and it needs no flaw of this deployment's own.
@@ -3300,33 +4760,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get the lead a flaw was recorded from
-         * @description Returns the static analysis lead a flaw recorded here was handed off from, with the component its hand-off was offered first, the builds it proposed, and whether the hand-off was undone.
-         *
-         *     `fixed_in` lists each build the flaw is still open on where the lead is not reproduced, with the first run that did not see it. Closing the flaw as fixed there is `POST .../findings/{vulnerability}/resolve`, which a person does.
-         *
-         *     A flaw recorded from no lead, and a lead you do not read in full, answer 404.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers where you may read a finding of this issue in this product and read its lead in full. Anywhere else it answers as a flaw recorded from no lead.
-         */
-        get: operations["get-flaw-lead"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/issues/{vulnerability}/notes": {
+    "/v1/products/{product}/issues/{issue}/notes": {
         parameters: {
             query?: never;
             header?: never;
@@ -3366,7 +4800,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/issues/{vulnerability}/report": {
+    "/v1/products/{product}/issues/{issue}/report": {
         parameters: {
             query?: never;
             header?: never;
@@ -3394,7 +4828,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/lead-rules": {
+    "/v1/products/{product}/labels": {
         parameters: {
             query?: never;
             header?: never;
@@ -3402,144 +4836,16 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List standing rules for leads
-         * @description Returns the product's standing rules for static analysis leads, retired ones included, oldest first, each with how many open leads it names now.
+         * List a product's labels
+         * @description Every label anybody has used here, most-used first.
          *
-         *     Requires: internal-read or internal-triage on the product
+         *     What a filter offers rather than a vocabulary: the list is what people have actually written, which is also the evidence for promoting one of them to a real concept.
+         *
+         *     Only the words on findings you may read. A label row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
          */
-        get: operations["list-lead-rules"];
-        put?: never;
-        /**
-         * Propose a standing rule for leads
-         * @description Records a rule dismissing every open lead of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule finds memory safety or injection flaws, or where no analyzer has reported it.
-         *
-         *     It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
-         *
-         *     Requires: internal-triage on the product
-         */
-        post: operations["propose-lead-rule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/lead-rules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Retire a standing rule for leads
-         * @description Takes a rule out of use. The leads it covered are open again where nothing else answers them. Recorded in the administrative trail.
-         *
-         *     Requires: internal-triage on the product
-         */
-        delete: operations["retire-lead-rule"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/lead-rules/{id}/approval": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Approve a standing rule for leads
-         * @description Puts a proposed rule in force, recording how many open leads it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
-         *
-         *     Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. A rule with no path is refused with 422 where its analyzer rule has since been found to find memory safety or injection flaws. Recorded in the administrative trail.
-         *
-         *     Requires: approver on the product
-         */
-        post: operations["approve-lead-rule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/lead-series": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count leads by analyzer series
-         * @description Returns one entry per analyzer series the product holds, ordered by name, with how many of its leads stand in each state across every build of the product. A series with no leads is listed with every count zero.
-         *
-         *     Each count is the total the lead list answers for the same `series` and `state`.
-         *
-         *     Refused, with no count, to anybody who does not read internal material in the product.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Requires internal-read on the product.
-         */
-        get: operations["list-lead-series"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/leads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List static analysis leads
-         * @description Returns one row per lead the product holds, however many builds it is on. Ordered by the tier of the weaknesses the rule names, then whether another analyzer reports the same flaw on the build, then the tool's own security severity for the rule, then its precision, then newest first.
-         *
-         *     With no `state` it is the queue: open leads with no claim waiting for a second person. `state` lists the leads in one state instead. `fixed` lists the leads closed on a build and not opened anew there.
-         *
-         *     `states` counts every lead in the scope by state and `waiting` the open ones left out for a waiting claim, and `ruled` the dismissed ones a standing rule covers, so what the list leaves out is counted. The queue also leaves out a lead open only in releases past their end of life, and `past_end_of_life` counts those. A lead seen only in such releases is kept as it stands: a decision, a fixed closure, an assignment and handing it off are refused with 409. `stream`, `variant` and `series` are optional and independent. `assigned=nobody` keeps the leads nobody holds on the build each row names, and combines with every other filter. Supports limit and offset.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-leads"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/leads.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export static analysis leads
-         * @description The lead list as a file: every row the same filters would list, not one page of them, in the same order.
-         *
-         *     Read with your own visibility, as it is written. No row carries source text.
-         *
-         *     With no `state` it is the queue, and the file says so. Takes every filter the lead list takes.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-leads"];
+        get: operations["list-tags"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3567,6 +4873,32 @@ export interface paths {
          */
         get: operations["list-mentionable"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/minimum-severity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a product's minimum severity
+         * @description Sets the least severity worth triaging for one product, overriding what the deployment says. Below the line a finding is still recorded, still counted and still reportable, and it carries no deadline — it is out of the working list, not out of the system.
+         *
+         *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current line: a product that stated it would stop following when the deployment changed.
+         *
+         *     Deadlines are rewritten afterwards, away from the request, because moving the line moves what is on a clock at all. The response returns before that has finished.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-product-triage-floor"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3650,6 +4982,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/planned-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List planned upgrades
+         * @description One row per upstream upgrade, with the issues it closes.
+         *
+         *     Keyed on the source package where one is recorded and on the component's own name otherwise, so packages built from one source are one row — curl, libcurl4t64 and libcurl3t64 are upgraded once.
+         *
+         *     Only what has a fix: a bundle is a version to move to, so a finding upstream has released nothing for is not in one.
+         *
+         *     Grouping is presentation: one act still writes one decision per component and per place.
+         *
+         *     Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about a place or a deadline has no row here to narrow.
+         *
+         *     Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `places`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
+         *
+         *     `limit=0` returns `total` alone, with no rows.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-fix-bundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/planned-upgrades.{format}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export planned upgrades
+         * @description The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
+         *
+         *     Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
+         */
+        get: operations["export-fix-bundles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/publication": {
         parameters: {
             query?: never;
@@ -3723,7 +5113,7 @@ export interface paths {
          *
          *     `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
          *
-         *     A duplicate of a flaw recorded here, covering a report from outside, gives the flaw's undisclosed places in this product a disclosure date, or brings theirs earlier: when the earliest such report arrived, plus `disclosure.after`. Bringing a date earlier past the movement threshold waits for a second person, as a shortening does. Withdrawing the ruling puts the date back where it set it. `GET /v1/products/{product}/issues/{vulnerability}/duplicate-disclosure` says the date first.
+         *     A duplicate of a flaw recorded here, covering a report from outside, gives the flaw's undisclosed places in this product a disclosure date, or brings theirs earlier: when the earliest such report arrived, plus `disclosure.after`. Bringing a date earlier past the movement threshold waits for a second person, as a shortening does. Withdrawing the ruling puts the date back where it set it. `GET /v1/products/{product}/issues/{issue}/duplicate-disclosure` says the date first.
          *
          *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`.
          *
@@ -4164,1450 +5554,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/routing-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the rules that route work to teams
-         * @description The standing rules for this product, in the order they are tried.
-         *
-         *     First match wins, and which rule placed a finding is recorded on the finding.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        get: operations["list-routing-rules"];
-        put?: never;
-        /**
-         * Add a rule that routes work to a team
-         * @description Records a standing rule and queues it against what is already open.
-         *
-         *     It matches on component identity as well as on a place in the tree. A rule naming a source package catches every binary package built from it, wherever they sit.
-         *
-         *     It places only work nobody holds. A human assignment always wins, and adding a rule never takes something out of somebody's hands.
-         *
-         *     It places work only at a visibility one member of the team reads. Undisclosed or internal work nobody on the team reads stays unassigned.
-         *
-         *     Send `reports` and neither key for a rule placing the product's vulnerability reports nobody holds. A report is placed only where one member of the team reads undisclosed work here, and a report recorded later is placed as it is recorded.
-         *
-         *     Applying it to what is open is queued rather than done here. The reply says the rule was recorded, not that the sweep has finished. Where the queue is full the rule is not recorded and the answer is 503: send it again later.
-         *
-         *     Requires: assigner on the product. A rule hands work to somebody, continuously, on behalf of whoever wrote it.
-         */
-        post: operations["add-routing-rule"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/routing-rules/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Preview what a routing rule would catch
-         * @description Answers what a rule with these keys matches, without recording anything: the components it names, how many pieces of work sit at them, and how many of those nobody holds.
-         *
-         *     `*` matches any run of characters in either key.
-         *
-         *     It does not account for the rules already there. First match wins, so what this catches is what it would place only where no earlier rule claimed it first.
-         *
-         *     Send `reports` instead of either key for a rule placing vulnerability reports: `work` is then the product's open reports and `unheld` those nobody holds, counted where you read the product's reports and zero elsewhere.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        get: operations["preview-routing-rule"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/routing-rules/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Retire a routing rule
-         * @description Takes a rule out of use. What it already placed stays placed: changing a rule never takes something out of somebody's hands, and that holds for a team's queue as much as for a person.
-         *
-         *     Requires: assigner on the product
-         */
-        delete: operations["retire-routing-rule"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List a product's branches and tags
-         * @description Every stream declared under this product, with how many variants each has and how much is open in it.
-         *
-         *     A stream is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
-         *
-         *     A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
-         *
-         *     A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-streams"];
-        put?: never;
-        /**
-         * Create a branch or tag
-         * @description Records a line of a product. A branch moves and is rebuilt; a tag never changes and is what somebody received.
-         *
-         *     Requires: administrator
-         */
-        post: operations["declare-stream"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Retire a branch or tag
-         * @description Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
-         *
-         *     An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the release listed and scannable.
-         *
-         *     Requires: administrator
-         */
-        delete: operations["retire-stream"];
-        options?: never;
-        head?: never;
-        /**
-         * Amend a branch or tag
-         * @description Corrects what a release is called.
-         *
-         *     Refused once a VEX document has gone out for any build of this release, a published advisory named it, its OpenVEX document has been served, or it has a scanned build and a CSAF VEX document of its product has been served, withdrawn or not. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
-         *
-         *     Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
-         *
-         *     Requires: administrator
-         */
-        patch: operations["amend-stream"];
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/end-of-life": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set when a branch or tag goes out of support
-         * @description Sets the date support ends for one release, overriding what its product says. Past it, nothing on the release carries a remediation deadline and a build that stops being scanned is expected rather than a fault.
-         *
-         *     An empty date clears the override, so the release follows its product again. Clearing is not the same as stating the product's current date: a release that stated it would stop following when the product changed.
-         *
-         *     Requires: administrator
-         */
-        put: operations["set-stream-end-of-life"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set when a release went out and what it was cut from
-         * @description Records the day a tag actually shipped, and the branch it was cut from.
-         *
-         *     Both are settable after the fact, because that is when they are usually known. A tag is declared here so scans can be filed against it, which happens whenever somebody gets to it — before the release, months after, or while backfilling a year. Fixed at declaration, a release recorded late ordered after ones that came out before it, and a year entered in an afternoon plotted as a single day.
-         *
-         *     The date orders and labels the release-over-release chart. Left unset, the day the release was declared here stands in.
-         *
-         *     The parent fills in, and never changes. It is what a branch is compared against for release notes, and a pipeline that does not know declares the tag without it — so saying it late is the same act arriving late, because nothing had been said for it to contradict. Naming a different branch is refused, and so is clearing one: a tag is one frozen point and it came from wherever it came from. It is a branch and nothing is cut from itself; both are refused rather than stored, because a cycle here is a comparison that never returns.
-         *
-         *     An empty date clears the date. An empty parent leaves whatever stands alone.
-         *
-         *     Requires: administrator
-         */
-        put: operations["set-release-details"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the variants a release was built as
-         * @description Lists the variants one release was actually built as — a subset of what the product declares.
-         *
-         *     A release predating a variant has never been filed against it and does not list it, which is what keeps something introduced later from appearing to have shipped years ago.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-release-variants"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/analyses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List uploaded analyzer runs and their status
-         * @description Returns analyzer runs newest first, each with its status and, once applied, whether it was comparable and how many results it opened, saw again and did not see. `refused` is, for each series, the last upload to the build turned away once its sender was admitted, with what the sender was told.
-         *
-         *     An API key sees every run on a build it may upload to. A person sees them where they read internal findings in the product.
-         *
-         *     Requires: any recognized credential. Answers only what you may see.
-         */
-        get: operations["list-analyses"];
-        put?: never;
-        /**
-         * Upload static analysis results
-         * @description Accepts one analyzer run as SARIF 2.1.0 documents in repeated multipart fields named `sarif`, each optionally compressed with gzip. The other fields fill what the documents leave unstated; where both state a value, the documents win.
-         *
-         *     The series names the analysis and is required, in the `series` field or as the part of each run's `automationDetails.id` before its last slash.
-         *
-         *     Returns 202 once the documents are read and their results placed and stored, before any result is applied. The documents themselves are not stored. Poll `GET .../analyses` for what the run did. The same documents for the same series and build answer 200 with the run they match.
-         *
-         *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else.
-         *
-         *     Requires: internal-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
-         */
-        post: operations["upload-analysis"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show what triage a new line would inherit
-         * @description Returns what an existing line's decisions would mean for this one, without changing anything. Ask before creating a line: the answer is what somebody is agreeing to.
-         *
-         *     Six groups, because they need different things:
-         *
-         *     `applying` reach this line by matching, and there is nothing to choose.
-         *
-         *     `moved` held a claim at a version this line does not have. Each would come across as a proposal carrying the old reasoning, never as a decision.
-         *
-         *     `postponed` were deferrals. Each says how long it has already been put off across every line it has come through, which is the total that carrying it again agrees to.
-         *
-         *     `expired` are deferrals and promises at a place this line still holds whose date has passed. A carried judgment keeps its date, so these cannot be carried.
-         *
-         *     `upgrades` are promised upgrades that moved. Plan the upgrade from the component, naming this line, rather than carrying it.
-         *
-         *     `absent` cover nothing here and are left behind.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        get: operations["preview-carried-decisions"];
-        put?: never;
-        /**
-         * Carry chosen triage onto a new line
-         * @description Takes the judgments named onto this build as claims waiting for agreement, each carrying the words from the line it came from.
-         *
-         *     Reasoning travels and conclusions do not. Every one arrives needing approval, however confident whoever carried it was: a version moved, which is exactly what made the old judgment stop applying, so somebody has to look at the new code. What is inherited is the thinking rather than the answer.
-         *
-         *     Only what the preview offered. A judgment that already applies here has nothing to agree to, and one covering nothing here has nothing to apply to; naming either is refused rather than skipped, because a caller that got the set wrong should hear so.
-         *
-         *     A deferral is carried with the date it had, not with a fresh one. Bounded by how many issues it covers, set under `triage.review-issues`, and by how many findings it writes, set under `triage.write-ceiling`.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["carry-decisions"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/carried-patches": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List what a build says it deals with itself
-         * @description Everything this build has argued about in its own inventories: carried patches saying what they fix, and statements it sent alongside.
-         *
-         *     A history rather than a list of what is true tonight. Each row says when the build first said it and when it stopped, because a claim that stopped is the interesting one — somebody dropped a patch, and the finding it answered is back. A list of what is current would not have that row at all.
-         *
-         *     A carried patch is the only way a backport can be seen here. No version comparison finds one: the fix is in the package and the version has not moved, so unless the build declares it, the finding sits open with nothing true to say about it.
-         *
-         *     `suppresses` says whether a claim takes a finding off the list. Saying it is affected, or that it has not decided, is information rather than an answer.
-         *
-         *     Narrow to one package with `component`, matched on what the claim says it is about rather than on a component this build carries — a claim naming something that is no longer here is exactly the row somebody asking why a patch stopped working is looking for.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-carried-patches"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/components": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List what a build pulls in directly
-         * @description Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
-         *
-         *     The list also holds every component nothing else in the build depends on, and the root's counts cover them. An inventory naming no root of its own is filed with the build standing in for it.
-         *
-         *     The starting point for walking the graph. A full render is not offered and would not be useful: a real image holds thousands of components and tens of thousands of edges, which neither draws nor reads. Ask for one step at a time.
-         *
-         *     Every entry carries how many findings are open against it and how many components it pulls in, so descending follows something rather than being exploration.
-         *
-         *     With `q` it searches instead: components anywhere in the build whose name contains that text, most findings first and no root. Nobody finds anything in a graph this size by opening nodes — a real image holds eight thousand components under a root with five thousand children — so searching is the way in, and browsing is for answering "what else is under this" once you are already somewhere.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-top-level-components"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/components/mine": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show the chains your own findings sit on
-         * @description The build's dependency graph, seen upward from your own work: from each component you hold a finding on, up to the build's root.
-         *
-         *     This is what the tree is for somebody who holds no reading on the product. Descended from the root, that tree is the inventory of what the product contains — the breadth they were not granted — so it cannot be offered with rows hidden: a container's count would still say how much sits under it. The chain upward is the part that makes a finding judgeable, because it says what pulled the thing in, and every node on it sits above something already granted.
-         *
-         *     The counts are yours. A node says how much of your own work hangs beneath it along these chains, never how much the build holds there.
-         *
-         *     Rows come back in the order they are drawn, parents before children, the fullest branch first. A component the inventory placed nowhere has no chain and sits at the end.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers what you hold, whether or not you read the product.
-         */
-        get: operations["list-my-components"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show what is directly above and below a component
-         * @description Returns what pulls this component in, and what it pulls in.
-         *
-         *     `above` is the direction people actually use. Somebody arrives from a finding and asks why the component is here, which is walking up — and up is short. Walking down is where the size lives.
-         *
-         *     A component reached several ways appears once with several parents. It is a graph rather than a tree, so anything drawing it has to expect the same component under many places.
-         *
-         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-component-neighbors"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record one judgment about several issues at once
-         * @description Records the same claim against every issue you name: one outcome, one justification, one reasoning, and a separate decision for every place each issue sits at, each keyed and expiring on its own.
-         *
-         *     You name the issues; the places are resolved here. `selected_by` says how you narrowed the list and is recorded with every claim, so "how were these chosen" has an answer later — but it is never the claim. The reasoning has to hold for every issue in the list, since "these matched a word" is not a defense anybody would accept.
-         *
-         *     `contains` is the same question an approver can re-run. Send the text you narrowed the candidate list by; the claim records how many issues that narrowing reaches, read here, against how many you named. Equal, the claim is exactly what that narrowing returns; far apart, the sentence does not describe the set.
-         *
-         *     Always needs a second person to agree, whatever the outcome.
-         *
-         *     A place a live decision already covers refuses the whole claim, naming that decision. Send `skip_decided` to leave those places out instead; `skipped` lists each one with the decision standing there. Where every place is covered, nothing is recorded and the request is refused.
-         *
-         *     Bounded twice, over what the names resolve to: by how many issues one answer may cover, set under `triage.review-issues`, and by how many findings it may write, set under `triage.write-ceiling`. At most 2000 names per request.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["decide-together"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the issues open against one component
-         * @description Returns the distinct issues open against this component in this build, most urgent first, with how many places each sits at, the version that fixes it where the report names one, and what one judgment about it would be made on: what the issue says about itself, whether anybody is known to be exploiting it, the published estimate, and the earliest deadline among its places here.
-         *
-         *     `contains` matches the text of a report. It narrows a list; it is not part of any claim made afterwards.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-issues-at-component"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get everything known about one finding
-         * @description Returns the full record for one issue in one component of a build: the description, the advisory, every reference the data carries with patches listed first, the score and what it assumes, whether it is known to be exploited and how likely exploitation is, the weakness classification, what upstream has done about it, and every place the component sits at here.
-         *
-         *     This is what a triage decision is made from, so it is gathered into one request. Each entry in `places` carries the `place` identity to name when recording a decision about it.
-         *
-         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices; where the issue is open at only one of them, that one is answered.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-finding"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Assign a finding to somebody
-         * @description Records who is dealing with this issue in this component.
-         *
-         *     It covers the product, not the build named in the path. The path says which finding is being looked at; what is assigned is every build of the product holding the same component, and every place that component sits at.
-         *
-         *     Send `person` as an empty string to hand it back to nobody, which is this same operation rather than one of its own.
-         *
-         *     Send `team` instead to route it to a team. That is a queue rather than a holding: it stays unheld until somebody takes it, and anybody on the team may take it with the triage right alone. Routing to a team asks that at least one member may read what is being routed there — not that every member may.
-         *
-         *     Findings arriving later under the same component start unassigned.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. Giving work to somebody else also needs assigner. Taking unowned work, or handing back your own, does not.
-         */
-        put: operations["assign-finding"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record one judgment about a finding, covering its places
-         * @description Records the same claim against every place this issue occupies in this component. Naming `places` narrows it; leaving it out covers all of them.
-         *
-         *     A place left out stays open. Nothing is recorded against it and nothing is asked about it.
-         *
-         *     One record is written per place, each keyed and expiring on its own, so this reads later as the several decisions it is rather than as one.
-         *
-         *     The ordinary approval rules apply however many places this reaches: covering many places does not on its own require a second person.
-         *
-         *     Pass `also` to apply the same judgment to other builds of this product, naming each as the reach gives it. All of it is written in one transaction: the response is what every build recorded, or a refusal and nothing written anywhere. In those builds only the places nothing already stands at are written, because the ones at matching versions are reached by lookup already. The claim records the build in the path and each build named in `also` as the builds it was made on, and no build it reaches by lookup.
-         *
-         *     Pass `extends` to carry an approved claim to this issue: the source must be approved, sit at the same component under the same consumer, and the outcome and justification must match it. The new claim is recorded as an extension of it and still waits for a second person. `similar` on `GET .../findings/{vulnerability}/components/{component}` lists the claims that qualify.
-         *
-         *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move, so it requires `committed_to`, the date the work lands. `upgrade-needed` is not recorded here — an upgrade answers a component and everything open on it, so it is recorded from the component.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["decide-finding"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/reach": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show how far a decision about this finding would reach
-         * @description The same three parts the per-place answer gives, for every place the finding sits at, merged.
-         *
-         *     A judgment is made about an issue in a component, which is a group of places rather than one — a kernel flaw sits at sixty. Asking per place is a request each, so a screen doing that samples, and a sample decides which other builds it can offer to include: one reachable only from a place the sample missed is never offered and the judgment does not travel there.
-         *
-         *     A build reached from two places of the finding is one thing to agree to, and carries the places of both.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-finding-reach"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Tag a finding with a word
-         * @description Puts a free-text tag on one issue in one component of this product.
-         *
-         *     No fixed vocabulary, because none has been earned yet. A tag that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
-         *
-         *     One issue in one component of one product, not one place and not one build: a kernel flaw at sixty places is one thing somebody is tagging, and a tag is about the work rather than about a release.
-         *
-         *     Matched without regard to capitals and shown back as it was typed. Tagging what already carries the tag succeeds and keeps the first spelling.
-         *
-         *     Tagging is triage, so it asks for the triage right: a tag changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        put: operations["tag-finding"];
-        post?: never;
-        /**
-         * Take a tag off a finding
-         * @description Removes a tag. Taking off one that is not there succeeds and changes nothing.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        delete: operations["untag-finding"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get what has been decided about a finding
-         * @description Returns the decision currently suppressing this finding, if any, together with everything decided here before — withdrawn claims, and claims that stopped applying when an upstream version changed.
-         *
-         *     `standing` is absent when nothing has been decided, or when a claim is still waiting for approval: a claim nobody has agreed to suppresses nothing.
-         *
-         *     Read `previously` before deciding again. A claim that lapsed on a version upgrade is usually still the right answer, and re-affirming it is a different request from making a new one.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-finding-decision"];
-        put?: never;
-        /**
-         * Record a triage decision for a finding
-         * @description Records how a finding was triaged: `affected`, `not-applicable`, `mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
-         *
-         *     `not-applicable` and `mismatched` require a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
-         *
-         *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
-         *
-         *     `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
-         *
-         *     The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
-         *
-         *     `mismatched` is the exception, and the only one: it says the scanner matched this against something it is not, which is a claim about identity rather than about risk. It covers the place at whatever versions the place holds, and no version change expires it — a bump does not make a wrong match right. Its `justification` is limited to the two reasons that say something is not there, `component_not_present` and `vulnerable_code_not_present`; the three that describe how code is reached or what stops it are refused, because a version bump changes those and this outcome would carry them past it.
-         *
-         *     The response says whether a second person must approve it. Most outcomes require approval; a deferral shorter than the configured threshold does not.
-         *
-         *     It also says how many findings this one judgment covers, and how many distinct versions of the component sit at this place — more than one means a single decision cannot honestly cover all of them.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["decide"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision/reaffirmation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Re-affirm a decision after an upstream version changed
-         * @description Re-makes a decision that stopped applying because an upstream version moved, at the versions this finding has now. `previous` is the decision being re-made, from `previously` in `GET .../decision`.
-         *
-         *     Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
-         *
-         *     It does need approval again if nothing was ever agreed to, or if the issue is rated a band worse since the original was agreed to and the claim is one a severity bears on. A rescoring within one band — 7.5 to 7.6 — is not. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
-         *
-         *     Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
-         *
-         *     `reasoning` is required. "Still true" with nothing behind it is what a re-affirmation becomes when it is made too easy.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product
-         */
-        post: operations["reaffirm-decision"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/reach": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show how far a decision here would reach
-         * @description Returns the three parts of what a judgment made here covers.
-         *
-         *     `here` is how many places in this build. `automatic` are other builds it reaches without anybody doing anything, because their upstream versions and chains already match — a decision is a claim about a combination of code, not about a release. `differing` hold the same issue at the same place at another version, so each is a separate judgment.
-         *
-         *     Only `differing` is a choice. The first two follow from the matching rules and are there to be told, not agreed to — and showing them as one number is how a decision comes to reach builds the person making it never knew about.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-decision-reach"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Close a recorded flaw as fixed in this build
-         * @description Closes a flaw somebody recorded here, in one build, because it has been fixed there. Every location of the issue in that build is closed together.
-         *
-         *     Only a flaw somebody recorded. Everywhere else, resolution is computed from scans rather than declared, which is what stops a fix being reported that shipped in nobody's release. A flaw recorded by hand is the one case with no such evidence and no prospect of any — no scan reports it — so a person closes it or nothing does. An issue a scanner found is refused.
-         *
-         *     A reason is required. A closure with no reason is a record saying somebody closed it and nothing else.
-         *
-         *     Nothing reopens one. Closing is a considered act, and this is the way it is undone: it is not.
-         *
-         *     Requires: public-triage or private-triage on the product
-         */
-        post: operations["resolve-finding"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a lead's evidence
-         * @description Returns what the newest run that saw a lead on a build said about it: where it is, the path the analyzer took to it, and the other places it names. Each place links into the repository's web view at the analyzed commit, where the product names the repository's host, and carries the source kept beside it, where the product keeps source under its path.
-         *
-         *     A lead the build no longer holds open answers the newest it held, with when it was last seen, when it was first not seen, and whether its repository changed between the two.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-lead-evidence"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Assign a lead to somebody
-         * @description Records who is dealing with this lead.
-         *
-         *     It covers the product, not the build named in the path: what is assigned is the lead on every build of the product it is open on.
-         *
-         *     Send `person` as an empty string to hand it back to nobody. Send `team` instead to route it to a team, which is a queue rather than a holding: it stays unheld until somebody takes it.
-         *
-         *     A person is given a lead only where they may read it at its visibility, and a team only where one member may. A lead every release of which is past its end of life is refused with 409, and so is a lead handed off as a flaw: assign the flaw instead.
-         *
-         *     A lead seen on a build it was not open on when it was assigned starts unassigned there.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. At the lead's visibility. Giving it to somebody else also needs assigner. Taking a lead nobody holds, or handing back your own, does not.
-         */
-        put: operations["assign-lead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List who has been granted a handed-off lead
-         * @description Everybody granted this one handed-off lead in this product, oldest first.
-         *
-         *     A grant reads the lead's evidence and nothing else of the product, until its flaw is disclosed.
-         *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
-         */
-        get: operations["list-lead-collaborators"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/collaborators/{identity}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Grant somebody a handed-off lead
-         * @description Grants one person this one handed-off lead in this product, to read its evidence, without granting them anything else of the product.
-         *
-         *     It is an access change: it lands in the administration trail, and they are told in the notification area inside the application.
-         *
-         *     Adding somebody who already holds it succeeds and changes nothing. Once the flaw is disclosed, a grant is refused with 409.
-         *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
-         */
-        put: operations["add-lead-collaborator"];
-        post?: never;
-        /**
-         * Withdraw somebody's grant of a handed-off lead
-         * @description Withdraws the grant. The record of it is kept.
-         *
-         *     Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the flaw is disclosed, a withdrawal is refused with 409.
-         *
-         *     Requires: internal-read or internal-triage on the product. Where you read internal work in the product, kept lead or moved.
-         */
-        delete: operations["remove-lead-collaborator"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record a triage decision for a lead
-         * @description Records what a lead is: `dismissed`, `not-security` or `confirmed`.
-         *
-         *     `dismissed` requires a `reason`: `false_positive`, `wont_fix`, `used_in_tests` or `mitigated`. A dismissal and `not-security` take effect once somebody else holding `approver` and `internal-read` on the product agrees; `confirmed` takes effect at once.
-         *
-         *     The decision covers the lead on every stream and variant it is seen on, and every lead another analyzer reports as the same flaw on the build that nothing answers yet, as one claim agreed to once. A lead that is fixed is refused: it opens again where it is seen again. A lead handed off as a flaw is refused with 409, because its flaw is judged instead.
-         *
-         *     Requires: internal-triage on the product
-         */
-        post: operations["decide-lead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/fixed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Close a lead as fixed
-         * @description Closes a lead on one build because it is fixed there. The lead has to be one the newest comparable run did not see: a lead a run still sees is refused with 409. `because` says what fixed it, and is required.
-         *
-         *     `fixed_in` names the build that fixed it, as the run of the lead's series on this build that analyzed it: an applied, comparable run built at or after the first run that did not see the lead, which the lead's evidence names as `not_seen_run`. Any other run is refused with 422.
-         *
-         *     A lead seen again opens anew at the same place.
-         *
-         *     Requires: internal-triage on the product
-         */
-        post: operations["fix-lead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get what a lead's hand-off is offered
-         * @description Returns what recording a confirmed lead as a flaw here is offered: the components it may be recorded against, most likely first, the builds it was seen in, and what moving it into the flaw's case would disclose with the flaw.
-         *
-         *     A suggestion lists the builds the lead was seen in that lack it, since recording the flaw against those is refused, and the builds holding it that the lead's series never analyzed.
-         *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
-         */
-        get: operations["get-lead-handoff"];
-        put?: never;
-        /**
-         * Hand off a confirmed lead as a flaw
-         * @description Records a confirmed lead as a flaw in this product, found here and undisclosed, through the same path as `POST /v1/products/{product}/findings`, and links the lead to it, with every other lead the claim confirming it covers.
-         *
-         *     `builds` is the whole set the flaw is recorded against. `component` names what carries it, as the builds name it, and is remembered for the lead's prefix so the next lead under it is offered the same; leave it out for the build itself.
-         *
-         *     `move` makes the linked leads part of the flaw's case: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. Left out, the leads are kept internal and linked.
-         *
-         *     A lead nobody confirmed, or one already handed off, is refused with 409.
-         *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
-         */
-        post: operations["hand-off-lead"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/hand-off/withdrawal": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Undo a lead's hand-off
-         * @description Undoes the hand-off of a lead while its flaw is undisclosed, with every lead linked to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and the flaw is taken back out of every build it was recorded against, closed as `invalid` for the reason given. The flaw keeps the record of the lead it was recorded from, marked undone.
-         *
-         *     `because` is required. Recorded in the administration trail. A lead not handed off, or one whose flaw is disclosed, is refused with 409.
-         *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
-         */
-        post: operations["undo-lead-handoff"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/move": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Move a handed-off lead into its flaw's case
-         * @description Makes a kept lead part of its flaw's case, with every lead linked to the same flaw: everybody who reads them keeps reading them, the flaw's readers read them too, and they are disclosed with the flaw. `GET .../hand-off` lists what that discloses.
-         *
-         *     Recorded in the administration trail. A lead not handed off, one already moved, or one whose flaw is disclosed, is refused with 409.
-         *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
-         */
-        put: operations["move-lead"];
-        post?: never;
-        /**
-         * Take a lead back out of its flaw's case
-         * @description Takes a moved lead out of its flaw's case while the flaw is undisclosed, with every lead linked to the same flaw. The flaw's readers no longer read them, everybody else who read them still does, and they stay linked to the flaw.
-         *
-         *     Recorded in the administration trail. A lead not handed off, a kept lead, or one whose flaw is disclosed, is refused with 409.
-         *
-         *     Requires: internal-triage or private-triage on the product. Both internal-triage and private-triage on the product.
-         */
-        delete: operations["unmove-lead"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the components a scanner cannot match
-         * @description Returns the components the build holds now that the vulnerability scanner has no way to match, with the reason for each and a count per reason. Such a component reports no findings whatever it contains.
-         *
-         *     Read from the component as the scanner is given it, when this is asked. A component meeting several reasons is listed under the first in the order `reasons` gives.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-match-coverage"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export the components a scanner cannot match
-         * @description Every component the match coverage list names, as a file, in the same order, with the reason for each.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-match-coverage"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the upgrades one build is waiting on
-         * @description Everything committed for this build, one row per upgrade — a source package at the version it was built at, moving to another version — with what it would still close here.
-         *
-         *     What it covers is a match, not a list. A finding is covered when its component folds to the same key in this build, so changing the version a release is moving to is one row, and an issue published tonight against the same package is covered by this morning's commitment with nobody acting.
-         *
-         *     The fix-bundle query read from the other end. A triager reads an upgrade and the issues it closes; a coordinator reads a build and the upgrades it is waiting on. One query rather than two reports that will eventually disagree.
-         *
-         *     Nothing here is declared done. A piece of work has landed when the build stops holding it, which the scans already say — a declared fix that is still open after a scan has run is a missed target, and the scan is independent evidence against the claim.
-         *
-         *     Each row says where it stands — planned, landed, or lapsed — derived on every read from the scans and the date the promise named, and set by nobody. A lapsed upgrade returns as one item to whoever holds it: the findings it covers stay covered, because deciding them again one at a time is the thing the promise was made instead of. They return on their own only when the component moved and they did not close, which needs nothing extra — a decision is keyed on the version it was made against and stops applying the moment that version changes.
-         *
-         *     There is no separate 'replanned': re-promising writes a new date and the standing promise is the one read, so a replanned upgrade is a planned one with a later date.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-pending-upgrades"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/pending-upgrades.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export the upgrades one build is waiting on
-         * @description The same list as a file: one row per upgrade this build is waiting on, where it stands, and what it would still close here.
-         *
-         *     The packages one upgrade moves are a single cell, separated by spaces, because a spreadsheet has no second dimension.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-pending-upgrades"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/readiness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Compare a branch against the last release cut from it
-         * @description Answers the question asked before shipping: is what we are about to ship better or worse than what we last shipped. "8 criticals now, v2.4.1 shipped with 4."
-         *
-         *     The release is the newest one cut from this branch, built the same way, that has been scanned here — a branch built for one chip beside a release built for another compares two different pieces of software and reads as a regression somebody then goes looking for.
-         *
-         *     Both sides come from scans already collected, so this asks nothing new of a build pipeline. Where there is nothing to compare against, `shipped` is absent and `why` says what is missing rather than reporting zeroes, because a release that shipped clean and a release nobody scanned are not the same answer. A build nothing has scanned, declared and never built or with every upload refused, answers with zeroes, no `last_scanned_at`, and `why` saying nothing has been scanned there yet.
-         *
-         *     Counted as issues at components at or above the deployment's line, which `floor` names.
-         *
-         *     `blocking` is the worst few of what the count is made of: the work nobody has agreed to ship with, worst first, read through the findings list's own reader with the same line — so the list it opens is the list it counts. Anything agreed is absent, because agreeing is the decision to ship with it. `blockers` says how many there are altogether.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-readiness"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List every known vulnerability in a build and its disposition
-         * @description One row per issue and place in this build, with its state, what was claimed, who claimed it, who agreed, when each of those happened, its deadline and whether that was met.
-         *
-         *     Every issue known in the build, decided or not: `undecided` rows are in here, and closed ones too. The audit list is what was decided.
-         *
-         *     Current state only; there is no `as_of`. Each row carries the dates of what happened to it.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-disposition-register"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/register.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export the disposition register
-         * @description The register as a file. Read with your own visibility as it streams, like every other export here.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-disposition-register"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/runs/{run}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Show what one run of the scanner did
-         * @description One run, with what it was measured with and what it changed — broken down by the rating in force, and with how much of what it opened is known to be exploited.
-         *
-         *     A receipt says a run happened; this says what it did. A row reading "7,604 opened" is a number with no shape, and somebody looking at a build that jumped overnight is asking which of them matter.
-         *
-         *     Counted as issues at components, the unit every other count here uses: a component reached twenty ways carries the same issue twenty times, so counting rows would report how much the dependency graph shares rather than how much changed.
-         *
-         *     Derived when it is asked for rather than stored, so it moves as findings close and reopen — and narrowed by what you may see, like every other count here.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-scan-run"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List uploaded scans and their status
-         * @description Returns uploads newest first, each with its state: `reading` (accepted, not yet parsed), `scanning` (parsed, vulnerability scan pending), `scanned` (complete), or `failed` with the reason.
-         *
-         *     Because uploads return 202 before parsing, this is how a build pipeline finds out whether its SBOM was usable. An API key sees every upload on a build it may upload to, whichever key sent it.
-         *
-         *     Requires: any recognized credential. Answers only what you may see.
-         */
-        get: operations["list-scans"];
-        put?: never;
-        /**
-         * Upload an SBOM and its VEX documents
-         * @description Accepts a CycloneDX 1.x, SPDX 2.x or SPDX 3.x SBOM and any number of OpenVEX documents as multipart form fields named `inventory` and `suppressions`. The format is taken from the document itself; a major version this does not read is rejected by name.
-         *
-         *     The product, branch and variant must already exist; an upload naming something undeclared is rejected and the error says which part is missing.
-         *
-         *     Returns 202 before the documents are parsed. A success here means they were accepted for processing, not that they were valid. Poll `GET .../scans` to find out whether they parsed and what the scan found.
-         *
-         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
-         *
-         *     Requires: public-triage or private-triage or internal-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
-         */
-        post: operations["upload-scan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List what an upload changed about a build's inventory
-         * @description Returns the component names this upload added, removed and moved to different versions, against the upload read before it. Removals first, then arrivals, then the names that moved version.
-         *
-         *     Counted by name rather than by component, so a dependency upgraded is one name that moved rather than one arrival and one departure. A name the build ships at several versions at once carries all of them on each side.
-         *
-         *     Empty for the first upload read for a build, which is the first picture of it rather than a change to one, and for an upload nothing has read yet.
-         *
-         *     Requires: any recognized credential. Answers only what you may see.
-         */
-        get: operations["list-inventory-changes"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/documents/{document}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Fetch a scan document
-         * @description Returns the bytes as they arrived, byte for byte: the hash on the receipt is over what comes back from here, so a copy can be checked against what was actually read.
-         *
-         *     A tagged release keeps its documents and a branch build does not. A nightly build's contents are let go once they have been read, because keeping them costs storage that grows with the calendar; a tag's are kept because re-scanning it years from now needs both what it contained and what the build had already argued about its own patches. One that was let go answers 410, which says the bytes went on purpose — the record of what arrived is still on the receipt.
-         *
-         *     Named through the scan it belongs to rather than on its own, so whoever may read the receipt may read what it describes and there is one rule rather than two.
-         *
-         *     Requires: any recognized credential. Answers only what you may see.
-         */
-        get: operations["fetch-scan-document"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/uploads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List upload types and their status
-         * @description Returns each kind of upload a build takes, with how many are held and what became of the newest: SBOMs and static analysis runs sent to this build, and VEX documents and supplier advisories uploaded to its product. Each kind's own list carries the uploads themselves.
-         *
-         *     A kind the caller may not read is left out. An API key reads the SBOMs and the static analysis runs of a build it may upload to. A person reads static analysis runs where they read internal findings in the product.
-         *
-         *     Requires: any recognized credential. Answers only what you may see.
-         */
-        get: operations["list-uploads"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate a VEX document for a build
-         * @description Returns an OpenVEX document saying what stands about the third-party components this build ships: every approved `not applicable` and `already fixed` claim, as `not_affected` and `fixed` statements with the justification and the reasoning somebody wrote.
-         *
-         *     Approved claims only, and a deferral is absent rather than exported as anything — silence already reads as affected in this format.
-         *
-         *     Public findings only. `undisclosed=true` includes the rest for somebody who may read them, which is a preview rather than a thing to publish.
-         *
-         *     `kind=with-suppliers` is a second document with an identifier of its own. It adds, as `not_affected`, what a supplier states about its own product where the statement closed every place of a component in the build, in the supplier's name.
-         *
-         *     Requires a publisher configured for this deployment: a document naming none has nobody as its author.
-         *
-         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
-         */
-        get: operations["get-vex"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the times a VEX document went out
-         * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
-         *
-         *     The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
-         *
-         *     The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same. `changed` says whether the public document generated now differs from the last one that went out.
-         *
-         *     `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
-         *
-         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
-         */
-        get: operations["list-vex-issuances"];
-        put?: never;
-        /**
-         * Record that a VEX document went out
-         * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
-         *
-         *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
-         *
-         *     It is what the document's version counts. A document is assembled from what stands now and holds no history of its own, so without this every generation is the first revision of something, and a reader keeping documents by their identifier cannot tell which supersedes which.
-         *
-         *     The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
-         *
-         *     Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
-         */
-        post: operations["record-vex-issued"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read a VEX document that went out
-         * @description The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
-         *
-         *     A revision nobody recorded answers 404.
-         *
-         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
-         */
-        get: operations["get-vex-issued"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/products/{product}/supplier-advisories": {
         parameters: {
             query?: never;
@@ -5650,7 +5596,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/tags": {
+    "/v1/products/{product}/supplier-advisory-feeds": {
         parameters: {
             query?: never;
             header?: never;
@@ -5658,25 +5604,45 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List a product's tags
-         * @description Every tag anybody has used here, most-used first.
+         * List supplier advisory feeds
+         * @description The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
          *
-         *     What a filter offers rather than a vocabulary: the list is what people have actually written, which is also the evidence for promoting one of them to a real concept.
+         *     Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
          *
-         *     Only the words on findings you may read. A tag row carries no visibility of its own, so the list is narrowed by the findings it was written on — reading it is a read act, and writing one is the act that asks for triage.
-         *
-         *     Requires: public-read or public-triage or private-read or private-triage or internal-read or internal-triage on the product. Answers only the words on findings you may see.
+         *     Requires: administrator
          */
-        get: operations["list-tags"];
+        get: operations["list-advisory-sources"];
         put?: never;
-        post?: never;
+        /**
+         * Add a supplier advisory feed
+         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision. A statement that their own product, at the version a build ships, is not affected closes the finding inside that product at the next scan.
+         *
+         *     The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
+         *
+         *     Only claims naming a component this product ships are recorded.
+         *
+         *     A new supplier is read from the number of days before it was added that scanning.supplier-history names. To take an advisory published before that, upload it.
+         *
+         *     Each document is checked against the digest file its publisher serves beside it, ending .sha256 or .sha512, and one that does not match is not read. A publisher serving neither is read unchecked.
+         *
+         *     A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
+         *
+         *     A supplier withdrawn and added again under the same name resumes where it stopped, no further back than that same window.
+         *
+         *     The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
+         *
+         *     The address must be https and carry no user information. A product that is out of use takes no supplier.
+         *
+         *     Requires: administrator
+         */
+        post: operations["add-advisory-source"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/products/{product}/triage-floor": {
+    "/v1/products/{product}/supplier-advisory-feeds/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -5684,18 +5650,92 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        put?: never;
+        post?: never;
         /**
-         * Set what a product considers worth triaging
-         * @description Sets the least severity worth triaging for one product, overriding what the deployment says. Below the line a finding is still recorded, still counted and still reportable, and it carries no deadline — it is out of the working list, not out of the system.
+         * Remove a supplier advisory feed
+         * @description Stops reading a supplier. What they have already said stays standing, because an approval may have been granted on the strength of it.
          *
-         *     An empty value clears the override, so the product follows the deployment again. Clearing is not the same as stating the deployment's current line: a product that stated it would stop following when the deployment changed.
-         *
-         *     Deadlines are rewritten afterwards, away from the request, because moving the line moves what is on a clock at all. The response returns before that has finished.
+         *     The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
          *
          *     Requires: administrator
          */
-        put: operations["set-product-triage-floor"];
+        delete: operations["withdraw-advisory-source"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/suppression-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List suppression rules
+         * @description Returns the product's suppression rules, retired ones included, oldest first, each with how many open code findings it names now.
+         *
+         *     Requires: internal-read or internal-triage on the product
+         */
+        get: operations["list-lead-rules"];
+        put?: never;
+        /**
+         * Propose a suppression rule
+         * @description Records a suppression rule dismissing every open code finding of an analyzer rule, every one at or under a path, or every one of a rule under a path. At least one of `rule` and `prefix` is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule finds memory safety or injection flaws, or where no analyzer has reported it.
+         *
+         *     It dismisses nothing until somebody other than its author holding `approver` and `internal-read` on the product approves it. Its words do not change: retire it and propose another. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        post: operations["propose-lead-rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/suppression-rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         post?: never;
+        /**
+         * Retire a suppression rule
+         * @description Takes a rule out of use. The code findings it covered are open again where nothing else answers them. Recorded in the administrative trail.
+         *
+         *     Requires: internal-triage on the product
+         */
+        delete: operations["retire-lead-rule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/suppression-rules/{id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a suppression rule
+         * @description Puts a proposed rule in force, recording how many open code findings it covers as what was approved. An outgrown rule is approved again at its new size; a rule in force is refused with 409.
+         *
+         *     Requires `approver` and `internal-read` on the product, and somebody other than the rule's author, which is refused with 409. A rule with no path is refused with 422 where its analyzer rule has since been found to find memory safety or injection flaws. Recorded in the administrative trail.
+         *
+         *     Requires: approver on the product
+         */
+        post: operations["approve-lead-rule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5834,7 +5874,7 @@ export interface paths {
         patch: operations["amend-variant"];
         trace?: never;
     };
-    "/v1/products/{product}/vex-statements": {
+    "/v1/products/{product}/vex-documents": {
         parameters: {
             query?: never;
             header?: never;
@@ -5888,7 +5928,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Re-affirm several lapsed claims
+         * Re-affirm several lapsed decisions
          * @description Re-makes each claim named, as one act with one reasoning. Name claims from `GET /v1/to-reaffirm`.
          *
          *     Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed place at the versions it has now, keeping the claim's own outcome, justification and dates, and carrying its earlier agreement.
@@ -6020,6 +6060,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/response-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List response windows
+         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known, from the first notice for another window, or from the release of the fix. None ships: a deployment declares the windows it answers to.
+         *
+         *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
+         *
+         *     Requires: any signed-in person, and not a pipeline key
+         */
+        get: operations["list-obligation-windows"];
+        put?: never;
+        /**
+         * Declare a response window
+         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known, or from the first notice for the window named in from, or from the release of the fix with from_fix. Recorded in the administrative trail.
+         *
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, and a from window that is not in force or does not apply to every product this one does, and from sent with from_fix.
+         *
+         *     Requires: administrator
+         */
+        post: operations["declare-obligation-window"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/response-windows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change a response window
+         * @description Restates a window in force: its name, how long it runs, its warning, the products it applies to and what it starts from. Each field is replaced by what is sent, so a warning, a product list, a from window or from_fix left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         *
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length, a from window that is not in force, does not apply to every product this one does or would start a loop, from sent with from_fix, and a product list leaving out a product a window starting from this one applies to.
+         *
+         *     Requires: administrator
+         */
+        put: operations["change-obligation-window"];
+        post?: never;
+        /**
+         * Retire a response window
+         * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
+         *
+         *     A window already retired, or never declared, answers 404. A window another window in force starts from answers 409 naming that window: change or retire it first.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-obligation-window"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/review-queue": {
         parameters: {
             query?: never;
@@ -6033,9 +6137,9 @@ export interface paths {
          *
          *     `reason` picks the list:
          *
-         *     - `approval`, the default: claims waiting for a second person, limited to what you may approve every row of. Your own are not here, because approving your own is refused. Approve, send back or set rows aside with `POST /v1/claims/{id}/approval` and `POST /v1/claims/{id}/send-back`.
+         *     - `approval`, the default: claims waiting for a second person, limited to what you may approve every row of. Your own are not here, because approving your own is refused. Approve, send back or set rows aside with `POST /v1/decisions/{id}/approval` and `POST /v1/decisions/{id}/send-back`.
          *     - `expired-deferral`: deferrals whose date has passed.
-         *     - `missed-fix-date`: promised upgrades and patches whose date has passed with the finding still open. Change the promise with `PUT /v1/claims/{id}/promise`.
+         *     - `missed-fix-date`: promised upgrades and patches whose date has passed with the finding still open. Change the promise with `PUT /v1/decisions/{id}/promise`.
          *
          *     The last two list claims you may decide on every row of, your own included, and are answered by a new decision. A decision the code moved out from under is in none of them; its author finds it in `GET /v1/to-reaffirm`.
          *
@@ -6178,60 +6282,6 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-running-out"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/scanning": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List when each build was last scanned
-         * @description Returns every build you can see, longest-silent first, with when a scan last arrived for it and whether that is longer ago than this deployment allows.
-         *
-         *     A build that stops being scanned reports no new findings and fails nothing, so it looks healthier than one that is still being scanned. A build nothing has ever been filed against is measured from when it was declared.
-         *
-         *     How long counts as quiet is the `scanning.quiet-after` setting.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-scanning"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/scanning.{format}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export when each build was last scanned
-         * @description Every build you can see, longest-silent first, as a file: when a scan last arrived, how long it has been, and whether that is longer than this deployment allows.
-         *
-         *     `quiet_days` is measured from the last arrival, or from when the build was declared where nothing has ever been filed against it — `last_received_at` is empty in that case, which is a different situation from a scan that failed.
-         *
-         *     A build whose release is out of support is in the file, marked `out_of_support`, and is never reported as quiet. A build taken out of use is marked `retired` and is never reported as quiet either.
-         *
-         *     The threshold `quiet` was computed against is stated in the file.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
-         */
-        get: operations["export-scanning"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6684,7 +6734,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List your lapsed claims
+         * List your lapsed decisions
          * @description Returns the claims you proposed that lapsed and that nothing has replaced, the most recently written first: the claims that are yours to re-affirm. `product` narrows them to one product.
          *
          *     A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
@@ -7014,56 +7064,6 @@ export interface paths {
         get: operations["list-weaknesses"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/work/set-aside": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List work that stopped being retried
-         * @description Returns background work the queue has set aside, newest first, with why each stopped where anything reported a reason. A job is set aside once it has been tried as many times as it is allowed to be, whether it reported a failure or its worker stopped answering.
-         *
-         *     At most 200 are returned. `total` is how many are set aside in all, so a clipped page can be told from a complete one.
-         *
-         *     `waiting` is what has not stopped: how much of each kind is queued, against the bound that refuses more of it. A queue filling up and a queue that has given up are different faults and only one of them leaves rows here.
-         *
-         *     Requires: administrator
-         */
-        get: operations["list-set-aside-work"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/work/set-aside/{id}/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Retry work that was set aside
-         * @description Puts one set-aside job back in the queue for whichever worker takes it next, with its attempts reset to zero and its last error kept.
-         *
-         *     A job that is not set aside is refused rather than moved.
-         *
-         *     Requires: administrator
-         */
-        post: operations["retry-set-aside-work"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15391,7 +15391,7 @@ export interface operations {
                 /** @description Only advisories covering something in this product */
                 product?: string;
                 /** @description Only advisories covering this issue */
-                vulnerability?: string;
+                issue?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -15758,7 +15758,7 @@ export interface operations {
             path: {
                 advisory: string;
                 product: string;
-                vulnerability: string;
+                issue: string;
             };
             cookie?: never;
         };
@@ -16283,6 +16283,187 @@ export interface operations {
             };
         };
     };
+    "edit-comment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Edit-commentRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-comment-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWasSaidBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-compliance-rate": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
+                from?: string;
+                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
+                to?: string;
+                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverPeriodRateBodyBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-decisions": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name */
+                product?: string;
+                /** @description Limit to one outcome */
+                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
+                /** @description Limit to one state */
+                state?: "proposed" | "approved" | "withdrawn" | "lapsed";
+                /** @description Only deferrals whose date has passed */
+                expired?: boolean;
+                /** @description Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up */
+                stopped?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionDetail"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-claim": {
         parameters: {
             query?: never;
@@ -16710,187 +16891,6 @@ export interface operations {
             };
         };
     };
-    "edit-comment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Edit-commentRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MentionsBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-comment-history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyWasSaidBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-compliance-rate": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name. Empty means every product you can see */
-                product?: string;
-                /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
-                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
-                variant?: string;
-                /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
-                from?: string;
-                /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
-                to?: string;
-                /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
-                days?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OverPeriodRateBodyBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-decisions": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name */
-                product?: string;
-                /** @description Limit to one outcome */
-                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed" | "dismissed" | "not-security" | "confirmed";
-                /** @description Limit to one state */
-                state?: "proposed" | "approved" | "withdrawn" | "lapsed";
-                /** @description Only deferrals whose date has passed */
-                expired?: boolean;
-                /** @description Lapsed decisions and expired deferrals as one list. A decision can be both, so the two asked separately do not add up */
-                stopped?: boolean;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecisionsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecisionDetail"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-repeated-deferrals": {
         parameters: {
             query?: {
@@ -17109,6 +17109,351 @@ export interface operations {
             };
         };
     };
+    "list-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-set-aside-workResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retry-set-aside-work": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job to put back */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-findings-anywhere": {
+        parameters: {
+            query?: {
+                /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only issues somebody is known to be exploiting */
+                exploited?: boolean;
+                /** @description Keep only issues where an upstream fixed version is known */
+                fixable?: boolean;
+                /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
+                below_minimum_severity?: boolean;
+                /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
+                component?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
+                /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
+                q?: string;
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
+                ecosystem?: string[] | null;
+                /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
+                on?: ("branch" | "tag")[] | null;
+                /** @description Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything */
+                support?: ("in-support" | "past-eol")[] | null;
+                /** @description Keep only what sits inside the container of this name */
+                under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
+                /** @description Keep only what the build holds directly, which is what has no container above it */
+                under_build?: boolean;
+                /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
+                assigned?: ("me" | "somebody" | "nobody")[] | null;
+                /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
+                epss_at_least?: number;
+                /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
+                open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
+                /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
+                due_within?: number;
+                /** @description Keep only what is already past its deadline */
+                overdue?: boolean;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
+                weakness?: string[] | null;
+                /** @description Keep only groups where a claim is with its author, sent back for more */
+                sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                /** @description Keep only what one of these VEX publishers has a standing statement about */
+                vex_publisher?: string[] | null;
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
+                opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
+                /** @description Accepted and matches nothing: this list holds open rows only */
+                closed_after?: string;
+                /** @description Keep only what somebody claimed something about after this date */
+                proposed_after?: string;
+                /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
+                vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
+                /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
+                reassessed?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
+                /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
+                planned?: "planned" | "unplanned" | "either";
+                /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
+                unconfirmed?: boolean;
+                /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
+                exclude?: string[] | null;
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
+                /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
+                asc?: boolean;
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnywhereOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-findings-anywhere": {
+        parameters: {
+            query?: {
+                /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
+                severity?: "low" | "medium" | "high" | "critical";
+                /** @description Keep only issues somebody is known to be exploiting */
+                exploited?: boolean;
+                /** @description Keep only issues where an upstream fixed version is known */
+                fixable?: boolean;
+                /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
+                below_minimum_severity?: boolean;
+                /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
+                component?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
+                /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
+                q?: string;
+                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
+                ecosystem?: string[] | null;
+                /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
+                on?: ("branch" | "tag")[] | null;
+                /** @description Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything */
+                support?: ("in-support" | "past-eol")[] | null;
+                /** @description Keep only what sits inside the container of this name */
+                under?: string;
+                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
+                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
+                /** @description Keep only what the build holds directly, which is what has no container above it */
+                under_build?: boolean;
+                /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
+                assigned?: ("me" | "somebody" | "nobody")[] | null;
+                /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
+                epss_at_least?: number;
+                /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
+                open_for?: number;
+                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
+                open_under?: number;
+                /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
+                due_within?: number;
+                /** @description Keep only what is already past its deadline */
+                overdue?: boolean;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
+                weakness?: string[] | null;
+                /** @description Keep only groups where a claim is with its author, sent back for more */
+                sent_back?: boolean;
+                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                /** @description Keep only what one of these VEX publishers has a standing statement about */
+                vex_publisher?: string[] | null;
+                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
+                opened_after?: string;
+                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
+                opened_before?: string;
+                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
+                opened_by_run?: number;
+                /** @description Accepted and matches nothing: this list holds open rows only */
+                closed_after?: string;
+                /** @description Keep only what somebody claimed something about after this date */
+                proposed_after?: string;
+                /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
+                vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
+                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
+                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
+                /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
+                reassessed?: boolean;
+                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
+                origin?: "scanner" | "manual";
+                /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
+                planned?: "planned" | "unplanned" | "either";
+                /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
+                unconfirmed?: boolean;
+                /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
+                exclude?: string[] | null;
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
+                /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
+                asc?: boolean;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-package-kinds-anywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PackageKindsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-obligations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObligationsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "clear-exploited-here": {
         parameters: {
             query?: never;
@@ -17242,263 +17587,6 @@ export interface operations {
             };
         };
     };
-    "list-findings-anywhere": {
-        parameters: {
-            query?: {
-                /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
-                severity?: "low" | "medium" | "high" | "critical";
-                /** @description Keep only issues somebody is known to be exploiting */
-                exploited?: boolean;
-                /** @description Keep only issues where an upstream fixed version is known */
-                fixable?: boolean;
-                /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
-                /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
-                component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
-                /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
-                q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
-                ecosystem?: string[] | null;
-                /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
-                on?: ("branch" | "tag")[] | null;
-                /** @description Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything */
-                support?: ("in-support" | "past-eol")[] | null;
-                /** @description Keep only what sits inside the container of this name */
-                under?: string;
-                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
-                /** @description Keep only what the build holds directly, which is what has no container above it */
-                under_build?: boolean;
-                /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
-                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
-                /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
-                /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
-                assigned?: ("me" | "somebody" | "nobody")[] | null;
-                /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
-                epss_at_least?: number;
-                /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
-                open_for?: number;
-                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
-                open_under?: number;
-                /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
-                due_within?: number;
-                /** @description Keep only what is already past its deadline */
-                overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
-                /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
-                weakness?: string[] | null;
-                /** @description Keep only groups where a claim is with its author, sent back for more */
-                sent_back?: boolean;
-                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
-                /** @description Keep only what one of these VEX publishers has a standing statement about */
-                vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
-                opened_after?: string;
-                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
-                opened_before?: string;
-                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
-                opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
-                closed_after?: string;
-                /** @description Keep only what somebody claimed something about after this date */
-                proposed_after?: string;
-                /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
-                vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
-                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
-                /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
-                reassessed?: boolean;
-                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
-                origin?: "scanner" | "manual";
-                /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
-                planned?: "planned" | "unplanned" | "either";
-                /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
-                unconfirmed?: boolean;
-                /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
-                exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
-                sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
-                /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
-                asc?: boolean;
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnywhereOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-findings-anywhere": {
-        parameters: {
-            query?: {
-                /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
-                severity?: "low" | "medium" | "high" | "critical";
-                /** @description Keep only issues somebody is known to be exploiting */
-                exploited?: boolean;
-                /** @description Keep only issues where an upstream fixed version is known */
-                fixable?: boolean;
-                /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
-                /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
-                component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
-                /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
-                q?: string;
-                /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
-                ecosystem?: string[] | null;
-                /** @description Keep only what sits in releases of these kinds. Defaults to branches: no work lands in a tag, whatever anybody decides about it. Ask for both to see everything */
-                on?: ("branch" | "tag")[] | null;
-                /** @description Keep only what sits in releases in this state of support, its own end-of-life date or the product's. Defaults to what is still in support. Ask for both to see everything */
-                support?: ("in-support" | "past-eol")[] | null;
-                /** @description Keep only what sits inside the container of this name */
-                under?: string;
-                /** @description Keep only components a producer scoped one of these ways in this build, in the producer's own word: a CycloneDX component scope, or an SPDX lifecycle scope. Any of them, not all. Asked of the component's incoming edges, so one reached from two consumers scoped differently answers to both words. Nothing here ranks by it or decides anything from it — reading 'build' as 'does not ship' is wrong for every compiled language */
-                declared_as?: ("required" | "optional" | "excluded" | "build" | "design" | "development" | "other" | "runtime")[] | null;
-                /** @description Keep only what the build holds directly, which is what has no container above it */
-                under_build?: boolean;
-                /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
-                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
-                /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
-                /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
-                assigned?: ("me" | "somebody" | "nobody")[] | null;
-                /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
-                epss_at_least?: number;
-                /** @description Keep only what has been open here for at least this many days. The finding's own age, not the year in its identifier */
-                open_for?: number;
-                /** @description Keep only what has been open here for fewer than this many days. With open_for, the stretch between the two */
-                open_under?: number;
-                /** @description Keep only what runs out within this many days. What is already past its deadline is asked for with overdue instead */
-                due_within?: number;
-                /** @description Keep only what is already past its deadline */
-                overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a judgment rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose places disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
-                /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
-                weakness?: string[] | null;
-                /** @description Keep only groups where a claim is with its author, sent back for more */
-                sent_back?: boolean;
-                /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
-                /** @description Keep only what one of these VEX publishers has a standing statement about */
-                vex_publisher?: string[] | null;
-                /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
-                opened_after?: string;
-                /** @description Keep only what was first seen here before this date, as 2026-03-31. The date itself is not included */
-                opened_before?: string;
-                /** @description Keep only what one scan run opened, by its identifier. What a run reports having opened, as the list of it */
-                opened_by_run?: number;
-                /** @description Accepted and matches nothing: this list holds open rows only */
-                closed_after?: string;
-                /** @description Keep only what somebody claimed something about after this date */
-                proposed_after?: string;
-                /** @description Keep only what a VEX statement says one of these about, in the format's own vocabulary. With a publisher, both must hold */
-                vex_status?: ("not_affected" | "affected" | "fixed" | "under_investigation")[] | null;
-                /** @description Keep only what the build's own claims say one of these about, in the VEX vocabulary. 'affected' finds the places the build says the flaw applies at, with its workaround */
-                build_says?: ("not_affected" | "affected" | "under_investigation")[] | null;
-                /** @description Keep only groups whose issue we rated differently from the world — what has been re-prioritized here */
-                reassessed?: boolean;
-                /** @description Keep only what a person recorded here, or only what a scanner reported. Left out, both. The ones a person recorded are the only ones a person may close by hand */
-                origin?: "scanner" | "manual";
-                /** @description Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means */
-                planned?: "planned" | "unplanned" | "either";
-                /** @description Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does */
-                unconfirmed?: boolean;
-                /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
-                exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
-                sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
-                /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
-                asc?: boolean;
-            };
-            header?: never;
-            path: {
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-package-kinds-anywhere": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PackageKindsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "get-issue": {
         parameters: {
             query?: {
@@ -17507,7 +17595,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description The issue, by any name it is known under */
-                vulnerability: string;
+                issue: string;
             };
             cookie?: never;
         };
@@ -17539,7 +17627,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description The issue, by any name it is known under */
-                vulnerability: string;
+                issue: string;
             };
             cookie?: never;
         };
@@ -17638,6 +17726,82 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-scanning": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverageOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-scanning": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                stream?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+            };
+            header?: never;
+            path: {
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17901,161 +18065,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-obligation-windows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WindowsBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "declare-obligation-window": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WindowSaid"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WindowBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "change-obligation-window": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WindowSaid"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WindowBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "retire-obligation-window": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-obligations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ObligationsBody"];
-                };
             };
             /** @description Error */
             default: {
@@ -18777,7 +18786,7 @@ export interface operations {
             };
         };
     };
-    "list-advisory-sources": {
+    "list-routing-rules": {
         parameters: {
             query?: never;
             header?: never;
@@ -18794,7 +18803,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
+                    "application/json": components["schemas"]["ListBodyRuleBody"];
                 };
             };
             /** @description Error */
@@ -18808,7 +18817,7 @@ export interface operations {
             };
         };
     };
-    "add-advisory-source": {
+    "add-routing-rule": {
         parameters: {
             query?: never;
             header?: never;
@@ -18819,7 +18828,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
+                "application/json": components["schemas"]["Add-routing-ruleRequest"];
             };
         };
         responses: {
@@ -18829,7 +18838,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                    "application/json": components["schemas"]["RuleBody"];
                 };
             };
             /** @description Error */
@@ -18843,13 +18852,51 @@ export interface operations {
             };
         };
     };
-    "withdraw-advisory-source": {
+    "preview-routing-rule": {
+        parameters: {
+            query?: {
+                /** @description A source package name, with * for any run of characters */
+                upstream?: string;
+                /** @description A component name, with * for any run of characters */
+                beneath?: string;
+                /** @description Preview a rule placing vulnerability reports */
+                reports?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatchesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-routing-rule": {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 product: string;
-                name: string;
+                id: number;
             };
             cookie?: never;
         };
@@ -18857,6 +18904,2312 @@ export interface operations {
         responses: {
             /** @description No Content */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-streams": {
+        parameters: {
+            query?: {
+                /** @description Include streams that have been retired. They say so, and no scan may be filed against one */
+                retired?: boolean;
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyStreamBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "declare-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StreamBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeclaredStreamBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-streamRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-stream-end-of-life": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndOfLifeBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-release-details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Set-release-detailsRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-release-variants": {
+        parameters: {
+            query?: {
+                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
+                counts?: boolean;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyVariantBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-analyses": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisReceiptsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The declared product this build is of */
+                product: string;
+                /** @description The declared branch or tag */
+                stream: string;
+                /** @description The declared way that stream is built */
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** @description When the build was made, in RFC 3339. Runs are ordered by it */
+                    built?: string;
+                    /** @description The commit analyzed, at the top of the checkout */
+                    commit?: string;
+                    /** @description The analyzer's exit status, as a whole number */
+                    "exit-status"?: string;
+                    /** @description The rules enabled, one identifier per field */
+                    rules?: string[] | null;
+                    sarif: string[];
+                    /** @description Which analysis this is, the same for every build: the tool and its configuration */
+                    series?: string;
+                    /** @description The checkout's absolute path on the build host, which every path is placed against */
+                    "source-root"?: string;
+                    /** @description A path, relative to the checkout, holding code the product did not write */
+                    "third-party"?: string[] | null;
+                    /** @description The analyzer's version */
+                    "tool-version"?: string;
+                    /** @description How many it analyzed, as a whole number */
+                    "units-analyzed"?: string;
+                    /** @description How many translation units the run was meant to analyze, as a whole number */
+                    "units-expected"?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "preview-carried-decisions": {
+        parameters: {
+            query: {
+                /** @description The stream to inherit from */
+                from: string;
+                /** @description That stream's variant */
+                from_variant: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CarriedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "carry-decisions": {
+        parameters: {
+            query: {
+                /** @description The line to carry from — a branch or a tag */
+                from: string;
+                /** @description That line's variant */
+                from_variant: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Carry-decisionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Carry-decisionsResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-carried-patches": {
+        parameters: {
+            query?: {
+                /** @description Narrow to what one package was claimed about */
+                component?: string;
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CountedListBodyCarriedClaimBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-lead-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadEvidenceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assign-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Assign-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-lead-collaborators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyCollaboratorBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-lead-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-lead-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "decide-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeadDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "fix-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Fix-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadFixedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-lead-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandoffOfferBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "hand-off-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Hand-off-leadRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandedOffBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "move-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "unmove-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "undo-lead-handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The lead's place identity */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Undo-lead-handoffRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-top-level-components": {
+        parameters: {
+            query?: {
+                /** @description Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly */
+                q?: string;
+                /** @description The number of matches returned. Only read when searching */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RootsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-my-components": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OursOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-component-neighbors": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The component's name, as the findings list gives it */
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AroundBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "decide-together": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Decide-togetherRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Decide-togetherResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-issues-at-component": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+                /** @description Match the text of the report */
+                contains?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-issues-at-componentResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-finding": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The component's name, as the findings list gives it */
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assign-finding": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                issue: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Assign-findingRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "decide-finding": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The component, as the findings list gives it */
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindingDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecidedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "tag-finding": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                issue: string;
+                component: string;
+                /** @description The word, matched without regard to capitals */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "untag-finding": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                issue: string;
+                component: string;
+                /** @description The word, matched without regard to capitals */
+                label: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-finding-reach": {
+        parameters: {
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                issue: string;
+                component: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReachBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-finding-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The place, as the findings list gives it */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    decide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The place, as the findings list gives it */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "reaffirm-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The place, as the findings list gives it */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reaffirm-decisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-decision-reach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+                /** @description The place, as the findings list gives it */
+                occurrence: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReachBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "resolve-finding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolve-findingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-pending-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyPlannedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-pending-upgrades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-disposition-register": {
+        parameters: {
+            query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Get-disposition-registerResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-disposition-register": {
+        parameters: {
+            query?: {
+                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
+                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
+                /** @description Keep rows whose standing judgment is one of these. Repeatable */
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                /** @description Keep one component, by name */
+                component?: string;
+                /** @description Keep one vulnerability, under the name it is filed here */
+                issue?: string;
+                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
+                standing?: "open" | "closed";
+                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
+                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-scan-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The run, as a receipt or a finding names it */
+                run: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-scans": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The declared product this build is of */
+                product: string;
+                /** @description The declared branch or tag */
+                stream: string;
+                /** @description The declared way that stream is built */
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    inventory: string;
+                    suppressions?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-inventory-changes": {
+        parameters: {
+            query?: {
+                /** @description One kind of change alone */
+                change?: "added" | "removed" | "changed";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The upload, as a receipt names it */
+                sbom: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyInventoryChangeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "fetch-scan-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The upload, as the receipt names it */
+                sbom: number;
+                /** @description The document, as the receipt names it */
+                document: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-match-coverage": {
+        parameters: {
+            query?: {
+                /** @description One reason alone */
+                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchCoverageBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-match-coverage": {
+        parameters: {
+            query?: {
+                /** @description One reason alone */
+                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vex": {
+        parameters: {
+            query?: {
+                /** @description Include findings nobody has announced. A preview, not a document to publish */
+                undisclosed?: boolean;
+                /** @description Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Statements"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-vex-issuances": {
+        parameters: {
+            query?: {
+                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VexIssuancesBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-vex-issued": {
+        parameters: {
+            query?: {
+                /** @description Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VEXRecordedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vex-issued": {
+        parameters: {
+            query?: {
+                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
+                kind?: "ours" | "with-suppliers";
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description Which revision, counting from one */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-lead-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-seriesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
+                assigned?: "nobody";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "export-leads": {
+        parameters: {
+            query?: {
+                /** @description Limit to one branch or tag. Left out, every one under the product */
+                stream?: string;
+                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
+                variant?: string;
+                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
+                series?: string;
+                /** @description List the leads in one state. Left out, the queue */
+                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
+                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
+                assigned?: "nobody";
+            };
+            header?: never;
+            path: {
+                product: string;
+                format: "csv" | "json";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -19249,11 +21602,11 @@ export interface operations {
                 /** @description Keep only issues where an upstream fixed version is known */
                 fixable?: boolean;
                 /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
+                below_minimum_severity?: boolean;
                 /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
                 component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
@@ -19291,9 +21644,9 @@ export interface operations {
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
                 /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
@@ -19416,11 +21769,11 @@ export interface operations {
                 /** @description Keep only issues where an upstream fixed version is known */
                 fixable?: boolean;
                 /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
+                below_minimum_severity?: boolean;
                 /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
                 component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
@@ -19458,9 +21811,9 @@ export interface operations {
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
                 /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
@@ -19545,11 +21898,11 @@ export interface operations {
                 /** @description Keep only issues where an upstream fixed version is known */
                 fixable?: boolean;
                 /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
+                below_minimum_severity?: boolean;
                 /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
                 component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
@@ -19587,9 +21940,9 @@ export interface operations {
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
                 /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
@@ -19679,11 +22032,11 @@ export interface operations {
                 /** @description Keep only issues where an upstream fixed version is known */
                 fixable?: boolean;
                 /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
+                below_minimum_severity?: boolean;
                 /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
                 component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
@@ -19721,9 +22074,9 @@ export interface operations {
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
                 /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
@@ -19811,11 +22164,11 @@ export interface operations {
                 /** @description Keep only issues where an upstream fixed version is known */
                 fixable?: boolean;
                 /** @description Include what this product does not consider worth triaging. Those are always recorded and counted; this asks to see them in the list */
-                below_floor?: boolean;
+                below_minimum_severity?: boolean;
                 /** @description Keep only what is open against components of these names, whatever version. Any of them, not all: a component is one name and asking for two means either */
                 component?: string[] | null;
-                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/tags */
-                tag?: string[] | null;
+                /** @description Keep only what somebody marked with one of these words, matched without regard to capitals. Any of them, not all. Free text: what is in use here is listed at /v1/products/{product}/labels */
+                label?: string[] | null;
                 /** @description Keep only rows whose component name or issue name contains this, ignoring capitals. Issue names include every alias, so searching the name a reporter used reaches the row filed under the name a scanner used. A way to find a package, or an advisory, in a list of thousands — where component is the exact package name */
                 q?: string;
                 /** @description Keep only components of these package kinds, as the package identifier spells them — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven, or anything else a producer emits. The kind is read out of the identifier rather than chosen from a list, so any string is accepted and one nothing carries matches nothing. Not the language's name — Rust is cargo and Python is pypi */
@@ -19853,9 +22206,9 @@ export interface operations {
                 /** @description Keep only groups where a claim is with its author, sent back for more */
                 sent_back?: boolean;
                 /** @description Keep only what sits at a place this claim wrote a decision for, by the claim's identifier */
-                claim?: number;
-                /** @description With claim, keep only the places where its decision is in one of these states. Any of them. Ignored without claim */
-                claim_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
+                decision?: number;
+                /** @description With decision, keep only the places where its row is in one of these states. Any of them. Ignored without decision */
+                decision_state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Keep only what one of these VEX publishers has a standing statement about */
                 vex_publisher?: string[] | null;
                 /** @description Keep only what was first seen here on or after this date, as 2026-03-31 */
@@ -19938,6 +22291,925 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PackageKindsOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-holders": {
+        parameters: {
+            query?: {
+                /** @description The visibility of the work being handed over */
+                visibility?: "public" | "private" | "internal";
+                /** @description Narrow to names containing this, ignoring capitals */
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyHolderBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+                /** @description The other identifier, as it is written */
+                alias: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+                /** @description The name to remove, as it is written */
+                alias: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AliasRemovedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "assess-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssessmentBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssessmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, under any identifier it goes by */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    evidence: boolean;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-affected-builds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The identifier it was filed under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Set-affected-buildsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-flaw-lead": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The flaw, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlawLeadBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-collaborators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyCollaboratorBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "remove-collaborator": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+                identity: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-disclosure-movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyMovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "disclose-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Disclose-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "extend-disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Extend-disclosureRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "shorten-disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Shorten-disclosureRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "preview-duplicate-disclosure": {
+        parameters: {
+            query?: {
+                /** @description The references of the reports the ruling would cover. Repeatable */
+                report?: string[] | null;
+            };
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicateDisclosureBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-duplicate-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-exploited-here": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExploitedHereKept"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExploitedHereBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-issue-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyWrittenBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "note-on-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Note-on-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteWritten"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyString"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-mentionable": {
+        parameters: {
+            query?: {
+                /** @description The kind of finding the text is about */
+                visibility?: "public" | "private" | "internal";
+                /** @description Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name */
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyMentionableBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-product-triage-floor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriageFloorBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-nameable-flaws": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyNameableBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-product-overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-product-pair-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairThresholdsBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -20041,1107 +23313,6 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-holders": {
-        parameters: {
-            query?: {
-                /** @description The visibility of the work being handed over */
-                visibility?: "public" | "private" | "internal";
-                /** @description Narrow to names containing this, ignoring capitals */
-                q?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyHolderBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "add-alias": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-                /** @description The other identifier, as it is written */
-                alias: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "remove-alias": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-                /** @description The name to remove, as it is written */
-                alias: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AliasRemovedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "assess-issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssessmentBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssessmentBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-attachments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AttachmentsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "upload-attachment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The issue, under any identifier it goes by */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "multipart/form-data": {
-                    evidence: boolean;
-                    /** Format: binary */
-                    file: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AttachmentBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-affected-builds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The identifier it was filed under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Set-affected-buildsRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AffectsBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-collaborators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyCollaboratorBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "add-collaborator": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-                identity: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "remove-collaborator": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-                identity: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-disclosure-movements": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyMovementBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "disclose-issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Disclose-issueRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MovementBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "extend-disclosure": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Extend-disclosureRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MovementBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "shorten-disclosure": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Shorten-disclosureRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MovementBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "preview-duplicate-disclosure": {
-        parameters: {
-            query?: {
-                /** @description The references of the reports the ruling would cover. Repeatable */
-                report?: string[] | null;
-            };
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DuplicateDisclosureBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-duplicate-reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyReportBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "record-exploited-here": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ExploitedHereKept"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExploitedHereBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-flaw-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The flaw, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FlawLeadBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-issue-notes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyWrittenBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "note-on-issue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Note-on-issueRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NoteWritten"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReportBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-lead-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["List-lead-rulesResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "propose-lead-rule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Propose-lead-ruleRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadRuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "retire-lead-rule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "approve-lead-rule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadRuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-lead-series": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["List-lead-seriesResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-leads": {
-        parameters: {
-            query?: {
-                /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
-                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
-                variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
-                series?: string;
-                /** @description List the leads in one state. Left out, the queue */
-                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
-                assigned?: "nobody";
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-leads": {
-        parameters: {
-            query?: {
-                /** @description Limit to one branch or tag. Left out, every one under the product */
-                stream?: string;
-                /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
-                variant?: string;
-                /** @description Limit to one analyzer series, by name, without regard to capitals. A name the product holds no series under lists nothing */
-                series?: string;
-                /** @description List the leads in one state. Left out, the queue */
-                state?: "open" | "not-reproduced" | "fixed" | "dismissed" | "not-security" | "confirmed" | "handed-off";
-                /** @description Limit to the leads with no holder on the build each row names. Every count is then of those leads */
-                assigned?: "nobody";
-            };
-            header?: never;
-            path: {
-                product: string;
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-mentionable": {
-        parameters: {
-            query?: {
-                /** @description The kind of finding the text is about */
-                visibility?: "public" | "private" | "internal";
-                /** @description Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name */
-                q?: string;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyMentionableBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-nameable-flaws": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyNameableBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-product-overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OverviewOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-product-pair-thresholds": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PairThresholdsBody"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -22002,2328 +24173,6 @@ export interface operations {
             };
         };
     };
-    "list-routing-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyRuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "add-routing-rule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Add-routing-ruleRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "preview-routing-rule": {
-        parameters: {
-            query?: {
-                /** @description A source package name, with * for any run of characters */
-                upstream?: string;
-                /** @description A component name, with * for any run of characters */
-                beneath?: string;
-                /** @description Preview a rule placing vulnerability reports */
-                reports?: boolean;
-            };
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatchesOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "retire-routing-rule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-streams": {
-        parameters: {
-            query?: {
-                /** @description Include streams that have been retired. They say so, and no scan may be filed against one */
-                retired?: boolean;
-                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
-                counts?: boolean;
-            };
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyStreamBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "declare-stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StreamBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DeclaredStreamBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "retire-stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "amend-stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Amend-streamRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-stream-end-of-life": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EndOfLifeBody"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "set-release-details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Set-release-detailsRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-release-variants": {
-        parameters: {
-            query?: {
-                /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
-                counts?: boolean;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyVariantBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-analyses": {
-        parameters: {
-            query?: {
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalysisReceiptsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "upload-analysis": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The declared product this build is of */
-                product: string;
-                /** @description The declared branch or tag */
-                stream: string;
-                /** @description The declared way that stream is built */
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "multipart/form-data": {
-                    /** @description When the build was made, in RFC 3339. Runs are ordered by it */
-                    built?: string;
-                    /** @description The commit analyzed, at the top of the checkout */
-                    commit?: string;
-                    /** @description The analyzer's exit status, as a whole number */
-                    "exit-status"?: string;
-                    /** @description The rules enabled, one identifier per field */
-                    rules?: string[] | null;
-                    sarif: string[];
-                    /** @description Which analysis this is, the same for every build: the tool and its configuration */
-                    series?: string;
-                    /** @description The checkout's absolute path on the build host, which every path is placed against */
-                    "source-root"?: string;
-                    /** @description A path, relative to the checkout, holding code the product did not write */
-                    "third-party"?: string[] | null;
-                    /** @description The analyzer's version */
-                    "tool-version"?: string;
-                    /** @description How many it analyzed, as a whole number */
-                    "units-analyzed"?: string;
-                    /** @description How many translation units the run was meant to analyze, as a whole number */
-                    "units-expected"?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Accepted */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AnalysisResult"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "preview-carried-decisions": {
-        parameters: {
-            query: {
-                /** @description The stream to inherit from */
-                from: string;
-                /** @description That stream's variant */
-                from_variant: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CarriedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "carry-decisions": {
-        parameters: {
-            query: {
-                /** @description The line to carry from — a branch or a tag */
-                from: string;
-                /** @description That line's variant */
-                from_variant: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Carry-decisionsRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Carry-decisionsResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-carried-patches": {
-        parameters: {
-            query?: {
-                /** @description Narrow to what one package was claimed about */
-                component?: string;
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CountedListBodyCarriedClaimBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-top-level-components": {
-        parameters: {
-            query?: {
-                /** @description Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly */
-                q?: string;
-                /** @description The number of matches returned. Only read when searching */
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RootsBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-my-components": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OursOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-component-neighbors": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The component's name, as the findings list gives it */
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AroundBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "decide-together": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Decide-togetherRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Decide-togetherResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-issues-at-component": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-                /** @description Match the text of the report */
-                contains?: string;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["List-issues-at-componentResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-finding": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The component's name, as the findings list gives it */
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvidenceBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "assign-finding": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Assign-findingRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "decide-finding": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The component, as the findings list gives it */
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FindingDecisionBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecidedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-finding-reach": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReachBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "tag-finding": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-                /** @description The word, matched without regard to capitals */
-                tag: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "untag-finding": {
-        parameters: {
-            query?: {
-                /** @description The version, where the build ships that name at more than one */
-                version?: string;
-                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
-                ecosystem?: string;
-                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
-                namespace?: string;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-                component: string;
-                /** @description The word, matched without regard to capitals */
-                tag: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-finding-decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The place, as the findings list gives it */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StandingBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    decide: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The place, as the findings list gives it */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DecisionBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecisionBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "reaffirm-decision": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The place, as the findings list gives it */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Reaffirm-decisionRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecisionBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-decision-reach": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The issue, by any name it is known under */
-                vulnerability: string;
-                /** @description The place, as the findings list gives it */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReachBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "resolve-finding": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Resolve-findingRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResolvedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-lead-evidence": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadEvidenceBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "assign-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Assign-leadRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-lead-collaborators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyCollaboratorBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "add-lead-collaborator": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-                identity: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "remove-lead-collaborator": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-                identity: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "decide-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LeadDecisionBody"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DecisionBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "fix-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Fix-leadRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LeadFixedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-lead-handoff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HandoffOfferBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "hand-off-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Hand-off-leadRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HandedOffBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "undo-lead-handoff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Undo-lead-handoffRequest"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "move-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "unmove-lead": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The lead's place identity */
-                place: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-match-coverage": {
-        parameters: {
-            query?: {
-                /** @description One reason alone */
-                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MatchCoverageBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-match-coverage": {
-        parameters: {
-            query?: {
-                /** @description One reason alone */
-                reason?: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-pending-upgrades": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyPlannedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-pending-upgrades": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-readiness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReadinessBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-disposition-register": {
-        parameters: {
-            query?: {
-                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
-                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
-                /** @description Keep rows whose standing judgment is one of these. Repeatable */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
-                /** @description Keep one component, by name */
-                component?: string;
-                /** @description Keep one vulnerability, under the name it is filed here */
-                issue?: string;
-                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
-                standing?: "open" | "closed";
-                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
-                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Get-disposition-registerResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-disposition-register": {
-        parameters: {
-            query?: {
-                /** @description Keep rows standing in any of these. Repeatable; any of them matches */
-                state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
-                /** @description Keep rows whose standing judgment is one of these. Repeatable */
-                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
-                /** @description Keep one component, by name */
-                component?: string;
-                /** @description Keep one vulnerability, under the name it is filed here */
-                issue?: string;
-                /** @description Keep one side of the build's history. Neither is the whole register, which is what it is for */
-                standing?: "open" | "closed";
-                /** @description Keep rows closed for any of these reasons. Repeatable. A row still open closed for none, so naming any keeps only closed rows */
-                closed_because?: ("removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "unaffected" | "disclaimed" | "fixed")[] | null;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-scan-run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The run, as a receipt or a finding names it */
-                run: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RunBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-scans": {
-        parameters: {
-            query?: {
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ReceiptsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "upload-scan": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The declared product this build is of */
-                product: string;
-                /** @description The declared branch or tag */
-                stream: string;
-                /** @description The declared way that stream is built */
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    inventory: string;
-                    suppressions?: string[];
-                };
-            };
-        };
-        responses: {
-            /** @description Accepted */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UploadResult"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-inventory-changes": {
-        parameters: {
-            query?: {
-                /** @description One kind of change alone */
-                change?: "added" | "removed" | "changed";
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The upload, as a receipt names it */
-                scan: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyInventoryChangeBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "fetch-scan-document": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description The upload, as the receipt names it */
-                scan: number;
-                /** @description The document, as the receipt names it */
-                document: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-uploads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UploadsOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-vex": {
-        parameters: {
-            query?: {
-                /** @description Include findings nobody has announced. A preview, not a document to publish */
-                undisclosed?: boolean;
-                /** @description Which document about the build: ours, what this deployment agreed to, or with-suppliers, that with what suppliers state about their own products beside it. Each has its own identifier and revisions. Absent means ours */
-                kind?: "ours" | "with-suppliers";
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Statements"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-vex-issuances": {
-        parameters: {
-            query?: {
-                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
-                kind?: "ours" | "with-suppliers";
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VexIssuancesBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "record-vex-issued": {
-        parameters: {
-            query?: {
-                /** @description Which document about the build went out: ours or with-suppliers. Each counts its own revisions. Absent means ours */
-                kind?: "ours" | "with-suppliers";
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["VEXRecordedBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-vex-issued": {
-        parameters: {
-            query?: {
-                /** @description Which document about the build: ours or with-suppliers. Absent means ours */
-                kind?: "ours" | "with-suppliers";
-            };
-            header?: never;
-            path: {
-                product: string;
-                stream: string;
-                variant: string;
-                /** @description Which revision, counting from one */
-                version: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
     "list-supplier-advisories": {
         parameters: {
             query?: {
@@ -24398,7 +24247,7 @@ export interface operations {
             };
         };
     };
-    "list-tags": {
+    "list-advisory-sources": {
         parameters: {
             query?: never;
             header?: never;
@@ -24415,7 +24264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyString"];
+                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
                 };
             };
             /** @description Error */
@@ -24429,7 +24278,7 @@ export interface operations {
             };
         };
     };
-    "set-product-triage-floor": {
+    "add-advisory-source": {
         parameters: {
             query?: never;
             header?: never;
@@ -24440,9 +24289,41 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TriageFloorBody"];
+                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
             };
         };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {
@@ -24450,6 +24331,134 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-lead-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-lead-rulesResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "propose-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Propose-lead-ruleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "approve-lead-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRuleBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -24995,6 +25004,132 @@ export interface operations {
             };
         };
     };
+    "list-obligation-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "declare-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "change-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-review-queue": {
         parameters: {
             query?: {
@@ -25201,82 +25336,6 @@ export interface operations {
                 variant?: string;
                 /** @description The distance ahead to look */
                 days?: number;
-            };
-            header?: never;
-            path: {
-                format: "csv" | "json";
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-scanning": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name. Empty means every product you can see */
-                product?: string;
-                /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
-                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
-                variant?: string;
-                /** @description The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CoverageOutputBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "export-scanning": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name. Empty means every product you can see */
-                product?: string;
-                /** @description Limit to one branch or tag. Only meaningful with a product */
-                stream?: string;
-                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
-                variant?: string;
             };
             header?: never;
             path: {
@@ -26401,65 +26460,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WeaknessesOutputBody"];
                 };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-set-aside-work": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["List-set-aside-workResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "retry-set-aside-work": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The job to put back */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Error */
             default: {

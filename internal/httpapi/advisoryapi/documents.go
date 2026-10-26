@@ -52,7 +52,7 @@ type documentsInput struct {
 func registerDocuments(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-vex-documents", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/vex-statements",
+		Path:    "/v1/products/{product}/vex-documents",
 		Summary: "List uploaded VEX documents",
 		Description: "Returns every VEX document uploaded to this product, newest first, " +
 			"taken or turned away: who uploaded it, what became of it, and how many " +

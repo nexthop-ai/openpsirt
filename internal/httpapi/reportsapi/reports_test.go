@@ -192,8 +192,8 @@ func TestARowAgreedPartlyByAClaimNeedingNobodyStatesNeitherOutcome(t *testing.T)
 		places := r.TwoPlacesOf(t, "CVE-2026-9999")
 		r.AgreedAt(t, places[0], httpapitest.Dismissal)
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+places[1]+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+places[1]+"/decision",
 			`{"outcome":"affected","reasoning":"We ship the vulnerable parser."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding a place answered %d: %s", made.Code, made.Body.String())

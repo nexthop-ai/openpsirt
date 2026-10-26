@@ -400,7 +400,7 @@ export function ByBump({
     queryKey: ["fix-bundles", at, narrowed],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/fix-bundles", {
+        await api.GET("/v1/products/{product}/planned-upgrades", {
           params: {
             path: { product: at.product },
             query: narrowed as Record<string, never>,
@@ -549,10 +549,10 @@ export function Peek({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}",
           {
             params: {
-              path: { ...at, vulnerability, component },
+              path: { ...at, issue: vulnerability, component },
               query: whichOf({ version, ecosystem, namespace }),
             },
           },
@@ -660,7 +660,7 @@ function bundlesFile(
     if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
     asked.set(key, String(value));
   }
-  return fileAt("/v1/products/{product}/fix-bundles.{format}", format, {
+  return fileAt("/v1/products/{product}/planned-upgrades.{format}", format, {
     path: { product: at.product },
     query: asked,
   });

@@ -31,19 +31,25 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
     enabled: from !== "",
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/carried", {
-          params: { path: at, query: { from, from_variant: at.variant } },
-        }),
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+          {
+            params: { path: at, query: { from, from_variant: at.variant } },
+          },
+        ),
       ),
   });
 
   const carry = useMutation({
     mutationFn: async (decisions: number[]) =>
       unwrap(
-        await api.POST("/v1/products/{product}/streams/{stream}/variants/{variant}/carried", {
-          params: { path: at, query: { from, from_variant: at.variant } },
-          body: { decisions },
-        }),
+        await api.POST(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/carried",
+          {
+            params: { path: at, query: { from, from_variant: at.variant } },
+            body: { decisions },
+          },
+        ),
       ),
     onSuccess: async () => {
       setPicked(new Set());

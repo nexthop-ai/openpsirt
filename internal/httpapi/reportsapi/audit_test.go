@@ -31,7 +31,7 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{"batch":"a-batch"}`); got.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{"batch":"a-batch"}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 		// Taken back, which is the half the file dropped.
@@ -140,7 +140,7 @@ func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T)
 			} `json:"items"`
 			Total int `json:"total"`
 		}
-		httpapitest.Read(t, r, "reviewer", "/v1/audit/claims", &claims)
+		httpapitest.Read(t, r, "reviewer", "/v1/audit/decisions", &claims)
 		if claims.Total != 1 || len(claims.Items) != 1 || claims.Items[0].Claim != claim {
 			t.Fatalf("the record by claim lists %+v, want claim %d once", claims, claim)
 		}
@@ -160,7 +160,7 @@ func TestTheRecordListsOneEntryPerClaimAndTheFileOneRowPerDecision(t *testing.T)
 			Items []struct{} `json:"items"`
 			Total int        `json:"total"`
 		}
-		httpapitest.Read(t, r, "reviewer", "/v1/audit/claims?state=lapsed", &lapsed)
+		httpapitest.Read(t, r, "reviewer", "/v1/audit/decisions?state=lapsed", &lapsed)
 		if lapsed.Total != 0 || len(lapsed.Items) != 0 {
 			t.Errorf("asked for what lapsed, the record lists %d claims", lapsed.Total)
 		}

@@ -107,7 +107,7 @@ export function AutoAssignment() {
     queryKey: ["rule-preview", product, reports, upstream.trim(), beneath.trim()],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/routing-rules/preview", {
+        await api.GET("/v1/products/{product}/assignment-rules/preview", {
           params: {
             path: { product },
             query: reports
@@ -142,7 +142,7 @@ export function AutoAssignment() {
     queryKey: ["routing-rules", product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/routing-rules", {
+        await api.GET("/v1/products/{product}/assignment-rules", {
           params: { path: { product } },
         }),
       ),
@@ -151,7 +151,7 @@ export function AutoAssignment() {
   const add = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/products/{product}/routing-rules", {
+        await api.POST("/v1/products/{product}/assignment-rules", {
           params: { path: { product } },
           body: reports
             ? { name, team, reports: true }
@@ -178,7 +178,7 @@ export function AutoAssignment() {
   const retire = useMutation({
     mutationFn: async (id: number) =>
       unwrap(
-        await api.DELETE("/v1/products/{product}/routing-rules/{id}", {
+        await api.DELETE("/v1/products/{product}/assignment-rules/{id}", {
           params: { path: { product, id } },
         }),
       ),

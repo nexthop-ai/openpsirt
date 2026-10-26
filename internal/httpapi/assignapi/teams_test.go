@@ -157,7 +157,7 @@ func TestAnAssignmentNamesAPartyRatherThanAPerson(t *testing.T) {
 			t.Fatalf("recording a person answered %d: %s", made.Code, made.Body.String())
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at,
 			`{"person":"later"}`); got.Code != http.StatusNoContent {
@@ -177,7 +177,7 @@ func TestAnAssignmentNamesAPartyRatherThanAPerson(t *testing.T) {
 		var detail struct {
 			AssignedTo string `json:"assigned_to"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
 		if detail.AssignedTo != "later" {
 			t.Errorf("the finding says %q is dealing with it", detail.AssignedTo)
@@ -196,7 +196,7 @@ func TestATeamQueueIsTakenFromWithTriageAndFilledWithDispatch(t *testing.T) {
 			t.Fatalf("recording a team answered %d: %s", made.Code, made.Body.String())
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 
 		// Filling the queue is dispatching. Refused as an act rather than as
@@ -279,7 +279,7 @@ func TestWorkIsNotRoutedWhereNobodyOnTheTeamCanSeeIt(t *testing.T) {
 			`{"name":"outsiders","members":["approver"]}`); made.Code != http.StatusCreated {
 			t.Fatalf("recording a team answered %d: %s", made.Code, made.Body.String())
 		}
-		at := "/v1/products/mine/streams/master/variants/broadcom" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
 		refused := httpapitest.AsPerson(t, r, "assigner", http.MethodPut, at, `{"team":"outsiders"}`)
 		if refused.Code != http.StatusUnprocessableEntity {
@@ -308,7 +308,7 @@ func TestWorkIsHeldByOnePartyAtATime(t *testing.T) {
 			t.Fatal(made.Body.String())
 		}
 		got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/assignment",
 			`{"person":"triager","team":"kernel"}`)
 		if got.Code != http.StatusUnprocessableEntity {
@@ -342,7 +342,7 @@ func TestATeamQueueAndItsCountsAreNarrowedPerMember(t *testing.T) {
 		}
 
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
-			at := "/v1/products/mine/streams/master/variants/broadcom/findings/" +
+			at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/" +
 				issue + "/components/linux-image/assignment"
 			if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at,
 				`{"team":"kernel"}`); got.Code != http.StatusNoContent {

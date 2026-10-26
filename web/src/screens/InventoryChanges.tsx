@@ -28,10 +28,10 @@ export function InventoryChanges() {
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/sboms/{sbom}/changes",
           {
             params: {
-              path: at,
+              path: { product, stream, variant, sbom: at.scan },
               query: { limit: PAGE, offset, ...(only ? { change: only } : {}) },
             },
           },

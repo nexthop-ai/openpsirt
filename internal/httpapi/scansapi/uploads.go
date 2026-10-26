@@ -46,7 +46,7 @@ type UploadsOutput struct {
 func registerUploads(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-uploads", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/uploads",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/uploads",
 		Summary: "List upload types and their status",
 		Description: "Returns each kind of upload a build takes, with how many are held and what " +
 			"became of the newest: SBOMs and static analysis runs sent to this build, and VEX " +

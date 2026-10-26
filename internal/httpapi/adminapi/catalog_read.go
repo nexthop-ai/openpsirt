@@ -105,7 +105,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "list-streams", Method: http.MethodGet, Path: "/v1/products/{product}/streams",
+		OperationID: "list-streams", Method: http.MethodGet, Path: "/v1/products/{product}/branches-and-tags",
 		Summary: "List a product's branches and tags",
 		Description: "Every stream declared under this product, with how many variants each " +
 			"has and how much is open in it.\n\n" +
@@ -252,7 +252,7 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-release-variants", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants",
 		Summary: "List the variants a release was built as",
 		Description: "Lists the variants one release was actually built as — a subset of what " +
 			"the product declares.\n\n" +

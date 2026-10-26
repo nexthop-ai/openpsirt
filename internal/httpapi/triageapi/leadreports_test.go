@@ -27,7 +27,7 @@ type leadSeries struct {
 	} `json:"items"`
 }
 
-const leadSeriesAt = "/v1/products/mine/lead-series"
+const leadSeriesAt = "/v1/products/mine/code-finding-series"
 
 // The counts by series are internal however they are narrowed. An internal
 // reader reads them; anybody else is refused, and the refusal names neither a
@@ -74,7 +74,7 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"used_in_tests","reasoning":"only the test harness calls it"}`)
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
 		if other := leadsOf(t, r, "internal-reader", "?series=SEMGREP/default"); len(other.Items) != 2 {
@@ -114,7 +114,7 @@ func TestEachSeriesCountIsTheTotalOfTheListItNames(t *testing.T) {
 // with the strict field count a conformant reader applies.
 func leadFile(t *testing.T, r *httpapitest.Reach, who, query string) (int, [][]string, string) {
 	t.Helper()
-	got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/products/mine/leads.csv"+query, "")
+	got := httpapitest.AsPerson(t, r, who, http.MethodGet, "/v1/products/mine/code-findings.csv"+query, "")
 	if got.Code != http.StatusOK {
 		return got.Code, nil, got.Body.String()
 	}
@@ -197,7 +197,7 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 		}
 		// Whoever holds a lead is a column of the file, as the list names them.
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom/leads/"+place+"/assignment",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place+"/assignment",
 			`{"person":"internal-triager"}`); got.Code >= 300 {
 			t.Fatalf("taking the lead answered %d: %s", got.Code, got.Body)
 		}
@@ -209,7 +209,7 @@ func TestTheLeadFileWithNoStateIsTheQueueAndSaysSo(t *testing.T) {
 
 // exceptionReport is the record asked what the exception report asks it:
 // every outcome that always needs a second person, standing on one.
-const exceptionReport = "/v1/audit/claims?alone=true&outcome=not-applicable&outcome=mismatched" +
+const exceptionReport = "/v1/audit/decisions?alone=true&outcome=not-applicable&outcome=mismatched" +
 	"&outcome=wont-fix&outcome=already-fixed&outcome=dismissed&outcome=not-security"
 
 // The exception report covers every kind. A lead dismissed with no second
@@ -241,7 +241,7 @@ func TestTheExceptionReportListsALeadDismissalNobodyAgreedToOnlyToInternalReader
 		}
 		// Agreed to by a second person, it leaves.
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`); got.Code != http.StatusOK {
 			t.Fatalf("the approval answered %d: %s", got.Code, got.Body)
 		}
 		httpapitest.Read(t, r, "internal-reader", exceptionReport, &got)

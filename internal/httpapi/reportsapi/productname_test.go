@@ -26,7 +26,7 @@ func TestAListNamesAProductByTheNameThatAddressesIt(t *testing.T) {
 			ProductName string `json:"product_name"`
 		}
 		for _, path := range []string{
-			"/v1/audit", "/v1/audit/claims", "/v1/effort", "/v1/running-out?days=365",
+			"/v1/audit", "/v1/audit/decisions", "/v1/effort", "/v1/running-out?days=365",
 		} {
 			var list struct {
 				Items []row `json:"items"`
@@ -112,7 +112,7 @@ func TestABuildsCountsNameItByTheNamesThatAddressIt(t *testing.T) {
 			} `json:"now"`
 		}
 		httpapitest.Read(t, r, "triager",
-			"/v1/products/mine/streams/master/variants/broadcom/readiness", &readiness)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness", &readiness)
 		now := readiness.Now
 		if now.Stream != "master" || now.StreamName != "Master" ||
 			now.Variant != "broadcom" || now.VariantName != "Broadcom" {
@@ -193,7 +193,7 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 			{"/v1/running-out?days=365", true},
 			{"/v1/unassigned", true},
 			{"/v1/audit", false},
-			{"/v1/audit/claims", false},
+			{"/v1/audit/decisions", false},
 			{"/v1/effort", false},
 		} {
 			var got struct {
@@ -216,7 +216,7 @@ func TestABuildWithNoDisplayNamesIsNamedByItsNames(t *testing.T) {
 			Now row `json:"now"`
 		}
 		httpapitest.Read(t, r, "triager",
-			"/v1/products/mine/streams/master/variants/broadcom/readiness", &readiness)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness", &readiness)
 		named("readiness", readiness.Now, true)
 	})
 }

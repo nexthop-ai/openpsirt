@@ -53,11 +53,11 @@ type CatchesOutput struct {
 }
 
 func registerRouting(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/routing-rules"
+	const path = "/v1/products/{product}/assignment-rules"
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-routing-rules", Method: http.MethodGet, Path: path,
-		Summary: "List the rules that route work to teams",
+		Summary: "List assignment rules",
 		Description: "The standing rules for this product, in the order they are tried.\n\n" +
 			"First match wins, and which rule placed a finding is recorded on the finding.",
 		Tags: []string{"Administration"},
@@ -107,7 +107,7 @@ func registerRouting(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "preview-routing-rule", Method: http.MethodGet, Path: path + "/preview",
-		Summary: "Preview what a routing rule would catch",
+		Summary: "Preview what an assignment rule would catch",
 		Description: "Answers what a rule with these keys matches, without recording " +
 			"anything: the components it names, how many pieces of work sit at them, and how " +
 			"many of those nobody holds.\n\n" +
@@ -180,7 +180,7 @@ func registerRouting(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "add-routing-rule", Method: http.MethodPost, Path: path,
-		Summary: "Add a rule that routes work to a team",
+		Summary: "Add an assignment rule",
 		Description: "Records a standing rule and queues it against what is already open.\n\n" +
 			"It matches on component identity as well as on a place in the tree. A rule " +
 			"naming a source package catches every binary package built from it, wherever " +
@@ -254,7 +254,7 @@ func registerRouting(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retire-routing-rule", Method: http.MethodDelete,
 		Path:    path + "/{id}",
-		Summary: "Retire a routing rule",
+		Summary: "Retire an assignment rule",
 		Description: "Takes a rule out of use. What it already placed stays placed: " +
 			"changing a rule never takes something out of somebody's hands, and that holds " +
 			"for a team's queue as much as for a person.",

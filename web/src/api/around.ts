@@ -25,7 +25,7 @@ export const fetchAround =
   async () =>
     unwrap(
       await api.GET(
-        "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/around",
+        "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/around",
         {
           params: {
             path: { ...at, component },

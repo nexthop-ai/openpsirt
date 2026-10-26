@@ -82,8 +82,8 @@ type WindowsBody struct {
 
 func registerObligations(api huma.API, in core.Deps) {
 	huma.Register(api, core.Answering(huma.Operation{
-		OperationID: "list-obligations", Method: http.MethodGet, Path: "/v1/obligations",
-		Summary: "List standing attacks and their windows",
+		OperationID: "list-obligations", Method: http.MethodGet, Path: "/v1/incidents",
+		Summary: "List incidents and their response windows",
 		Description: "Every standing record that a product was exploited through an issue, " +
 			"earliest known first. Each carries every window this deployment counts, as it " +
 			"runs for that incident, every notice recorded about it, and every tag named as " +
@@ -153,8 +153,8 @@ func registerObligations(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-obligation-windows", Method: http.MethodGet,
-		Path:    "/v1/obligation-windows",
-		Summary: "List obligation windows",
+		Path:    "/v1/response-windows",
+		Summary: "List response windows",
 		Description: "Every window in force, shortest first. Each runs from the moment an " +
 			"attack on a product became known, from the first notice for another window, or " +
 			"from the release of the fix. " +
@@ -181,8 +181,8 @@ func registerObligations(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "declare-obligation-window", Method: http.MethodPost,
-		Path:    "/v1/obligation-windows",
-		Summary: "Declare an obligation window",
+		Path:    "/v1/response-windows",
+		Summary: "Declare a response window",
 		Description: "Adds a window every standing attack on the products it names is " +
 			"watched against, counted from the moment each became known, or from the first " +
 			"notice for the window named in from, or from the release of the fix with from_fix. " +
@@ -211,8 +211,8 @@ func registerObligations(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "change-obligation-window", Method: http.MethodPut,
-		Path:    "/v1/obligation-windows/{id}",
-		Summary: "Change an obligation window",
+		Path:    "/v1/response-windows/{id}",
+		Summary: "Change a response window",
 		Description: "Restates a window in force: its name, how long it runs, its warning, " +
 			"the products it applies to and what it starts from. Each field is replaced by " +
 			"what is sent, so a warning, a product list, a from window or from_fix left off " +
@@ -244,8 +244,8 @@ func registerObligations(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retire-obligation-window", Method: http.MethodDelete,
-		Path:    "/v1/obligation-windows/{id}",
-		Summary: "Retire an obligation window",
+		Path:    "/v1/response-windows/{id}",
+		Summary: "Retire a response window",
 		Description: "Stops counting a window. Notices recorded against it keep naming it, " +
 			"and its name may be declared again. Recorded in the administrative trail.\n\n" +
 			"A window already retired, or never declared, answers 404. A window another " +
@@ -267,7 +267,7 @@ func registerObligations(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "record-told-outside", Method: http.MethodPost,
-		Path:    "/v1/exploited-here/{id}/told",
+		Path:    "/v1/incidents/{id}/told",
 		Summary: "Record that somebody outside was told",
 		Description: "Records who was told about an attack, when, and what they were told, " +
 			"with the recipient's reference, the places named and what was said about " +

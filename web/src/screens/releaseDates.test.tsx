@@ -28,7 +28,7 @@ describe("a tag's release date", () => {
       if (path === "/v1/session/me") {
         return { data: { identity: "ana", name: "Ana", admin: true, kind: "person", reach: [] } };
       }
-      if (path === "/v1/products/{product}/streams") {
+      if (path === "/v1/products/{product}/branches-and-tags") {
         return { data: { items: [{ name: "v1.0", kind: "tag", parent: "master" }] } };
       }
       return { data: { items: [] } };

@@ -48,7 +48,8 @@ export function Products({ who }: { who: Who }) {
   // One row is enough to carry it. Nothing is flagged until it has arrived.
   const scanning = useQuery({
     queryKey: ["scanning", "quiet-after"],
-    queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: { limit: 1 } } })),
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/last-uploads", { params: { query: { limit: 1 } } })),
   });
   const quietAfter = scanning.data?.quiet_after_days;
   const declare = useMutation({
@@ -110,7 +111,7 @@ export function Products({ who }: { who: Who }) {
   const setFloor = useMutation({
     mutationFn: async ({ product, floor }: { product: string; floor: Line }) =>
       unwrap(
-        await api.PUT("/v1/products/{product}/triage-floor", {
+        await api.PUT("/v1/products/{product}/minimum-severity", {
           params: { path: { product } },
           body: { floor },
         }),

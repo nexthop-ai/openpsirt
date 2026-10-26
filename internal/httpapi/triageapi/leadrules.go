@@ -75,13 +75,13 @@ func leadRuleSaid(r analysis.StandingRule) string {
 }
 
 func registerLeadRules(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/lead-rules"
+	const path = "/v1/products/{product}/suppression-rules"
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-lead-rules", Method: http.MethodGet, Path: path,
-		Summary: "List standing rules for leads",
-		Description: "Returns the product's standing rules for static analysis leads, retired ones " +
-			"included, oldest first, each with how many open leads it names now.",
+		Summary: "List suppression rules",
+		Description: "Returns the product's suppression rules, retired ones " +
+			"included, oldest first, each with how many open code findings it names now.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.InternalRead, access.InternalTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -116,8 +116,8 @@ func registerLeadRules(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "propose-lead-rule", Method: http.MethodPost, Path: path,
-		Summary: "Propose a standing rule for leads",
-		Description: "Records a rule dismissing every open lead of an analyzer rule, every one at or " +
+		Summary: "Propose a suppression rule",
+		Description: "Records a suppression rule dismissing every open code finding of an analyzer rule, every one at or " +
 			"under a path, or every one of a rule under a path. At least one of `rule` and `prefix` " +
 			"is required, and so are `reason` and `reasoning`. A `rule` with no `prefix` is refused where the rule " +
 			"finds memory safety or injection flaws, or where no analyzer has reported it.\n\n" +
@@ -159,8 +159,8 @@ func registerLeadRules(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "approve-lead-rule", Method: http.MethodPost, Path: path + "/{id}/approval",
-		Summary: "Approve a standing rule for leads",
-		Description: "Puts a proposed rule in force, recording how many open leads it covers as what " +
+		Summary: "Approve a suppression rule",
+		Description: "Puts a proposed rule in force, recording how many open code findings it covers as what " +
 			"was approved. An outgrown rule is approved again at its new size; a rule in force is " +
 			"refused with 409.\n\n" +
 			"Requires `approver` and `internal-read` on the product, and somebody other than the " +
@@ -201,8 +201,8 @@ func registerLeadRules(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "retire-lead-rule", Method: http.MethodDelete, Path: path + "/{id}",
-		Summary: "Retire a standing rule for leads",
-		Description: "Takes a rule out of use. The leads it covered are open again where nothing " +
+		Summary: "Retire a suppression rule",
+		Description: "Takes a rule out of use. The code findings it covered are open again where nothing " +
 			"else answers them. Recorded in the administrative trail.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "", access.InternalTriage), func(ctx context.Context, input *struct {

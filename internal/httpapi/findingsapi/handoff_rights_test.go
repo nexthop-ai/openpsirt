@@ -38,15 +38,15 @@ func TestAHandOffAMoveAndAnUndoTakeBothTriageRoles(t *testing.T) {
 		// Internal triage alone, private triage alone, and internal reading.
 		for _, who := range []string{"internal-triager", "embargo-triager", "internal-reader"} {
 			cases = append(cases,
-				asked{who, http.MethodGet, "/hand-off", "", http.StatusForbidden},
-				asked{who, http.MethodPost, "/hand-off", handOffNamingNoBuild, http.StatusForbidden},
-				asked{who, http.MethodPut, "/move", "", http.StatusForbidden},
-				asked{who, http.MethodDelete, "/move", "", http.StatusForbidden},
+				asked{who, http.MethodGet, "/flaw", "", http.StatusForbidden},
+				asked{who, http.MethodPost, "/flaw", handOffNamingNoBuild, http.StatusForbidden},
+				asked{who, http.MethodPut, "/flaw/disclosure", "", http.StatusForbidden},
+				asked{who, http.MethodDelete, "/flaw/disclosure", "", http.StatusForbidden},
 			)
 		}
 		cases = append(cases,
-			asked{"lead-handler", http.MethodGet, "/hand-off", "", http.StatusOK},
-			asked{"lead-handler", http.MethodDelete, "/move", "", http.StatusConflict},
+			asked{"lead-handler", http.MethodGet, "/flaw", "", http.StatusOK},
+			asked{"lead-handler", http.MethodDelete, "/flaw/disclosure", "", http.StatusConflict},
 		)
 		answered(t, r, place, cases)
 	})

@@ -35,11 +35,11 @@ type AdvisorySourceBody struct {
 // registerAdvisorySources configures which suppliers this deployment reads
 // published advisories from.
 func registerAdvisorySources(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/advisory-sources"
+	const path = "/v1/products/{product}/supplier-advisory-feeds"
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-advisory-sources", Method: http.MethodGet, Path: path,
-		Summary: "List the suppliers advisories are read from",
+		Summary: "List supplier advisory feeds",
 		Description: "The suppliers configured for this product, when each was last " +
 			"tried, when one last succeeded, and how far through what they publish this " +
 			"deployment has read.\n\n" +
@@ -74,7 +74,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "add-advisory-source", Method: http.MethodPost, Path: path,
-		Summary: "Read advisories from a supplier",
+		Summary: "Add a supplier advisory feed",
 		Description: "Records a supplier whose published security advisories are read on " +
 			"the scan schedule. What they say arrives as evidence beside a finding and a " +
 			"prefill for a decision. A statement that their own product, at the version a " +
@@ -159,7 +159,7 @@ func registerAdvisorySources(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "withdraw-advisory-source", Method: http.MethodDelete,
 		Path:    path + "/{name}",
-		Summary: "Stop reading a supplier",
+		Summary: "Remove a supplier advisory feed",
 		Description: "Stops reading a supplier. What they have already said stays " +
 			"standing, because an approval may have been granted on the strength of it.\n\n" +
 			"The name is matched without regard to capitals. A name no supplier is " +

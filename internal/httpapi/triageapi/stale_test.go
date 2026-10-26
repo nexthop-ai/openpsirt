@@ -68,7 +68,7 @@ func TestAClaimSentBackAndLeftIsSaidToItsAuthor(t *testing.T) {
 		r.Scanned(t)
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/send-back", claim),
+			fmt.Sprintf("/v1/decisions/%d/send-back", claim),
 			`{"because":"Name the kconfig option."}`); got.Code != http.StatusNoContent {
 			t.Fatalf("sending it back answered %d: %s", got.Code, got.Body.String())
 		}
@@ -93,7 +93,7 @@ func TestAClaimSentBackAndLeftIsSaidToItsAuthor(t *testing.T) {
 
 		// Revising it is the thing happening, and it clears.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim),
 			`{"reasoning":"CONFIG_NL is not set in this image."}`); got.Code != http.StatusOK {
 			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
 		}
@@ -169,7 +169,7 @@ func TestWorkSittingInATeamQueueIsSaidToTheTeam(t *testing.T) {
 			t.Fatalf("recording a team answered %d: %s", made.Code, made.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-			"/v1/products/mine/streams/master/variants/broadcom"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/assignment",
 			`{"team":"kernel"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("routing to the team answered %d: %s", got.Code, got.Body.String())
@@ -232,7 +232,7 @@ func TestTheProposerSeesWhatBecameOfEachClaim(t *testing.T) {
 
 		r.Agreed(t, agreed)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/send-back", sent),
+			fmt.Sprintf("/v1/decisions/%d/send-back", sent),
 			`{"because":"Name the kconfig option."}`); got.Code != http.StatusNoContent {
 			t.Fatalf("sending back answered %d: %s", got.Code, got.Body.String())
 		}
@@ -267,7 +267,7 @@ func TestAnAgreementTakenBackIsSaidToWhoeverProposedIt(t *testing.T) {
 		r.Scanned(t)
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			fmt.Sprintf("/v1/decisions/%d/approval", claim),
 			`{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
@@ -310,7 +310,7 @@ func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
 		}
 
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim),
 			`{"reasoning":"The parser is unreachable: the only caller is the encoder."}`); got.Code != http.StatusOK {
 			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
 		}
@@ -328,7 +328,7 @@ func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
 
 		// A second revision withdraws nothing, because nothing stands.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim),
 			`{"reasoning":"The parser is unreachable, and the encoder never calls it."}`); got.Code != http.StatusOK {
 			t.Fatalf("revising again answered %d: %s", got.Code, got.Body.String())
 		}
@@ -360,7 +360,7 @@ func TestAnApproverWhoEditsWhatTheyAgreedToIsNotToldTheirOwnEdit(t *testing.T) {
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		r.Agreed(t, claim)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim),
 			`{"reasoning":"The parser is unreachable: the only caller is the encoder."}`); got.Code != http.StatusOK {
 			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
 		}
@@ -380,7 +380,7 @@ func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T
 		r.Scanned(t)
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			fmt.Sprintf("/v1/decisions/%d/approval", claim),
 			`{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
 		}
@@ -389,7 +389,7 @@ func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T
 		}
 
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/issues/CVE-2026-9999/exploited-here",
+			"/v1/products/mine/issues/CVE-2026-9999/incidents",
 			`{"known_at":"2026-09-20T14:00:00Z",`+
 				`"grounds":"A customer sent packet captures."}`,
 		); got.Code != http.StatusCreated {
@@ -424,7 +424,7 @@ func TestAStandingConditionSaysWhatIsTrueNow(t *testing.T) {
 		hand := func(t *testing.T, issue string) {
 			t.Helper()
 			if got := httpapitest.AsPerson(t, r, "assigner", http.MethodPut,
-				"/v1/products/mine/streams/master/variants/broadcom"+
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
 					"/findings/"+issue+"/components/linux-image/assignment",
 				`{"team":"platform"}`); got.Code != http.StatusNoContent {
 				t.Fatalf("handing work to the team answered %d: %s", got.Code, got.Body.String())

@@ -22,7 +22,7 @@ describe("an upload that is already held", () => {
   it("names the build it was sent to, whatever the target became while it was on its way", async () => {
     serve((path) => {
       if (path === "/v1/products") return { data: { items: [{ name: "sonic" }] } };
-      if (path === "/v1/products/{product}/streams") {
+      if (path === "/v1/products/{product}/branches-and-tags") {
         return { data: { items: [{ name: "master" }, { name: "release" }] } };
       }
       if (path === "/v1/products/{product}/variants") {

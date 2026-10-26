@@ -15,7 +15,7 @@ func TestAPersonUploadsOnlyWhereTheyTriage(t *testing.T) {
 	// A person may send a build by hand where they triage the product. Somebody
 	// who reads it passes every check before that one.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		const at = "/v1/products/mine/streams/master/variants/broadcom/scans"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
 		send := func(who string) int {
 			req := httpapitest.Upload(t, at, httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 			req.Header.Set(httpapitest.TestHeader, who)

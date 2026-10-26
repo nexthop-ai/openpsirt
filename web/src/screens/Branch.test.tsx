@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 // the server does.
 async function drawn(stream: string, streams: Answer) {
   const spy = serve((path, init) => {
-    if (path === "/v1/products/{product}/streams") {
+    if (path === "/v1/products/{product}/branches-and-tags") {
       const retired = (init as Init).params?.query?.retired === true;
       const items = (streams.data as { items?: { retired?: boolean }[] } | undefined)?.items;
       return items

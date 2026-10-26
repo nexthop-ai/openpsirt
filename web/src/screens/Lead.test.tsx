@@ -48,7 +48,10 @@ async function drawn(triages: boolean, evidence: object = EVIDENCE, hides = fals
           outcomes: [],
         },
       };
-    if (path === "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}")
+    if (
+      path ===
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}"
+    )
       return { data: evidence };
     if (path === "/v1/products/{product}/holders")
       return { data: { items: [{ kind: "team", identity: "kernel", name: "Kernel" }] } };
@@ -167,7 +170,7 @@ describe("a lead", () => {
     await settle();
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(
-      "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/decision",
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision",
     );
     expect((init as { body: unknown }).body).toEqual({
       outcome: "dismissed",
@@ -201,7 +204,7 @@ describe("a lead", () => {
     expect(searched()[0]).toBe("internal");
     const [path, init] = sent()[0] ?? [];
     expect(path).toBe(
-      "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}/assignment",
+      "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment",
     );
     expect((init as { body: unknown }).body).toEqual({ team: "kernel" });
   });

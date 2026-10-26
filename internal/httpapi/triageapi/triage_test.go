@@ -53,7 +53,7 @@ func TestDecidingAboutSomethingNobodyScannedIsNotThere(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-1/places/nowhere/decision", body)
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-1/occurrences/nowhere/decision", body)
 		if got.Code != http.StatusNotFound {
 			t.Errorf("deciding about an unscanned build answered %d, want 404: %s", got.Code, got.Body.String())
 		}
@@ -67,7 +67,7 @@ func TestDecidingIsRefusedToSomebodyWhoOnlyReads(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
 		const body = `{"outcome":"wont-fix","reasoning":"Not worth it."}`
-		at := "/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/" +
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" +
 			place + "/decision"
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "reader", http.MethodPost, at, body), http.StatusNotFound)
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at, body); got.Code != http.StatusCreated {
@@ -78,7 +78,7 @@ func TestDecidingIsRefusedToSomebodyWhoOnlyReads(t *testing.T) {
 
 func TestApprovingSomethingThatIsNotThereSaysSo(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/claims/999999/approval", `{}`)
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/decisions/999999/approval", `{}`)
 		if got.Code != http.StatusNotFound {
 			t.Errorf("approving a decision that does not exist answered %d", got.Code)
 		}
@@ -101,7 +101,7 @@ func TestARefusalOfTypedTextSaysWhereToLook(t *testing.T) {
 
 		body := `{"reasoning":"This is fine.\n\nBut see ![proof](https://evil.example/x.png)"}`
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			fmt.Sprintf("/v1/claims/%d/reasoning", claim), body)
+			fmt.Sprintf("/v1/decisions/%d/reasoning", claim), body)
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("a remote image answered %d: %s", got.Code, got.Body.String())
 		}
@@ -135,7 +135,7 @@ func TestARefusalOfTypedTextSaysWhereToLook(t *testing.T) {
 		var detail struct {
 			Reasoning string `json:"reasoning"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", id), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decision-occurrences/%d", id), &detail)
 		if strings.Contains(detail.Reasoning, "evil.example") {
 			t.Error("refused text was stored anyway")
 		}
@@ -202,8 +202,8 @@ func TestABackportIsRecordableAndAnUpgradeIsNotRecordedFromOneFinding(t *testing
 	// is about.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
-		at := fmt.Sprintf("/v1/products/mine/streams/master/variants/broadcom"+
-			"/findings/CVE-2026-9999/places/%s/decision", place)
+		at := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/occurrences/%s/decision", place)
 
 		// No date: refused, because there is nothing to gate against and
 		// nothing to lapse.

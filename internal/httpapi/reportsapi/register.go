@@ -129,7 +129,7 @@ func measuredWith(ctx context.Context, in core.Deps, subject access.Subject,
 		measured.DocumentHeld = &held
 		if held {
 			measured.DocumentAt = fmt.Sprintf(
-				"/v1/products/%s/streams/%s/variants/%s/scans/%d/documents/%d",
+				"/v1/products/%s/branches-and-tags/%s/variants/%s/sboms/%d/documents/%d",
 				url.PathEscape(product), url.PathEscape(stream), url.PathEscape(variant),
 				scan.ID, document.ID)
 		}
@@ -180,7 +180,7 @@ func (r Registering) narrow() finding.Registering {
 }
 
 func registerRegister(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/streams/{stream}/variants/{variant}/register"
+	const path = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/register"
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-disposition-register", Method: http.MethodGet, Path: path,
 		Summary: "List every known vulnerability in a build and its disposition",

@@ -110,7 +110,7 @@ export function whereOf(at: At) {
       product: at.product,
       stream: at.stream,
       variant: at.variant,
-      vulnerability: at.vulnerability,
+      issue: at.vulnerability,
       component: at.component,
     },
     query: whichOf(at),
@@ -433,7 +433,7 @@ export function Decide({
     queryFn: async () =>
       unwrap(
         await api.GET(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/reach",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/reach",
           {
             params: whereOf(at),
           },
@@ -532,7 +532,7 @@ export function Decide({
       // some releases and not others — an act nobody performed.
       const here = unwrap(
         await api.POST(
-          "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/decision",
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/findings/{issue}/components/{component}/decision",
           {
             params: whereOf(at),
             body: {

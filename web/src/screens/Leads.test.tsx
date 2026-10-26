@@ -41,7 +41,7 @@ async function drawn(at = "/products/sonic/leads", rows: object[] = ROWS) {
           outcomes: [],
         },
       };
-    if (path === "/v1/products/{product}/leads") {
+    if (path === "/v1/products/{product}/code-findings") {
       asked.push((init as { params: { query: unknown } }).params.query);
       return {
         data: {
@@ -73,7 +73,7 @@ describe("the leads", () => {
       (each) => each.textContent === "CSV",
     );
     const at = new URL(file?.getAttribute("href") ?? "", "http://x");
-    expect(at.pathname).toBe("/v1/products/sonic/leads.csv");
+    expect(at.pathname).toBe("/v1/products/sonic/code-findings.csv");
     expect(Object.fromEntries(at.searchParams)).toEqual({
       state: "not-reproduced",
       series: "semgrep/default",

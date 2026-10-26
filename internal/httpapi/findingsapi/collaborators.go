@@ -43,7 +43,7 @@ type CollaboratorBody struct {
 // and routing that through somebody who does not read it would make the
 // administrator the bottleneck on every embargo.
 func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
-	const path = "/v1/products/{product}/issues/{vulnerability}/collaborators"
+	const path = "/v1/products/{product}/issues/{issue}/collaborators"
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-collaborators", Method: http.MethodGet, Path: path,
@@ -56,7 +56,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	}, core.PerProduct, "Only where you may read undisclosed work.", core.PrivateRights()...),
 		func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
-			Vulnerability string `path:"vulnerability"`
+			Vulnerability string `path:"issue"`
 		}) (*core.ListOutput[CollaboratorBody], error) {
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
@@ -94,7 +94,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	}, core.PerProduct, "Only where you may read undisclosed work.", core.PrivateRights()...),
 		func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
-			Vulnerability string `path:"vulnerability"`
+			Vulnerability string `path:"issue"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
@@ -170,7 +170,7 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 	}, core.PerProduct, "Only where you may read undisclosed work.", core.PrivateRights()...),
 		func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
-			Vulnerability string `path:"vulnerability"`
+			Vulnerability string `path:"issue"`
 			Identity      string `path:"identity"`
 		}) (*struct{}, error) {
 			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)

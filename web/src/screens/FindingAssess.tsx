@@ -64,8 +64,8 @@ export function Assess({
   const assess = useMutation({
     mutationFn: async () =>
       unwrap(
-        await api.POST("/v1/products/{product}/issues/{vulnerability}/assessment", {
-          params: { path: { product, vulnerability } },
+        await api.POST("/v1/products/{product}/issues/{issue}/assessment", {
+          params: { path: { product, issue: vulnerability } },
           body: { severity: severity as (typeof RATINGS)[number], reasoning },
         }),
       ),

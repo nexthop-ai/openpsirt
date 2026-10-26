@@ -29,7 +29,7 @@ import (
 func registerIssueNotes(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-issue-notes", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/notes",
+		Path:    "/v1/products/{product}/issues/{issue}/notes",
 		Summary: "List notes on an issue in a product",
 		Description: "Returns the notes written about this issue in this product, oldest " +
 			"first, with who wrote each and when. A note that has been edited also carries " +
@@ -46,7 +46,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		"visibility — an issue with one undisclosed place here is undisclosed for this. "+
 		"Anywhere else it answers as an issue that is not there."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 	}) (*core.ListOutput[core.WrittenBody], error) {
 		subject, store, err := core.Triaging(ctx, in)
 		if err != nil {
@@ -65,7 +65,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "note-on-issue", Method: http.MethodPost,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/notes",
+		Path:    "/v1/products/{product}/issues/{issue}/notes",
 		Summary: "Add a note to an issue in a product",
 		Description: "Adds a markdown note about this issue in this product. It records no " +
 			"judgment: nothing about what ranks, what a deadline is, or what the product " +
@@ -83,7 +83,7 @@ func registerIssueNotes(api huma.API, in core.Deps) {
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", core.TriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Body          struct {
 			Body string `json:"body" minLength:"1" doc:"The text, in markdown"`
 		}

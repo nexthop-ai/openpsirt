@@ -64,8 +64,8 @@ func TestAnAdvisoryIsListedByWhatItCoversAndAgreedToBySomebodyElse(t *testing.T)
 			Total int `json:"total"`
 		}
 		var covering, notCovering listing
-		httpapitest.Read(t, r, "private-triage", "/v1/advisories?product=mine&vulnerability="+flaw, &covering)
-		httpapitest.Read(t, r, "private-triage", "/v1/advisories?product=mine&vulnerability="+other, &notCovering)
+		httpapitest.Read(t, r, "private-triage", "/v1/advisories?product=mine&issue="+flaw, &covering)
+		httpapitest.Read(t, r, "private-triage", "/v1/advisories?product=mine&issue="+other, &notCovering)
 		if covering.Total != 1 || notCovering.Total != 0 {
 			t.Errorf("narrowed to what it covers the list holds %d, and to another flaw %d",
 				covering.Total, notCovering.Total)

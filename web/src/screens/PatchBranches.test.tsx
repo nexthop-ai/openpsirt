@@ -21,7 +21,7 @@ const repo = (url: string, of: Record<string, unknown>) => ({
 
 async function drawn(repositories: unknown[], total = repositories.length) {
   const spy = serve((path, init) => {
-    if (path !== "/v1/patch-branches") return undefined;
+    if (path !== "/v1/patch-branch-lookups") return undefined;
     const offset = (init as Init).params?.query?.offset ?? 0;
     return {
       data: {

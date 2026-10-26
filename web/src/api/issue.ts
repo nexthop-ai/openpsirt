@@ -19,8 +19,8 @@ export function useIssue(vulnerability: string, enabled = true) {
     enabled,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/issues/{vulnerability}", {
-          params: { path: { vulnerability }, query: { limit: ISSUE_PAGE } },
+        await api.GET("/v1/issues/{issue}", {
+          params: { path: { issue: vulnerability }, query: { limit: ISSUE_PAGE } },
         }),
       ),
     retry: false,

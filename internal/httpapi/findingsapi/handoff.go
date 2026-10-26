@@ -102,7 +102,7 @@ type HandedOffBody struct {
 }
 
 // leadPath is one lead, addressed by its place on one build.
-const leadPath = "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}"
+const leadPath = "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}"
 
 // leadAt is the reader, the build and the product a route about one lead
 // names.
@@ -148,13 +148,13 @@ func refusedHandoff(in core.Deps, err error) error {
 
 func registerHandoff(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "get-lead-handoff", Method: http.MethodGet, Path: leadPath + "/hand-off",
-		Summary: "Get what a lead's hand-off is offered",
-		Description: "Returns what recording a confirmed lead as a flaw here is offered: the " +
+		OperationID: "get-lead-handoff", Method: http.MethodGet, Path: leadPath + "/flaw",
+		Summary: "Get the offer to record a code finding as a flaw",
+		Description: "Returns what recording a confirmed code finding as a flaw here is offered: the " +
 			"components it may be recorded against, most likely first, the builds it was seen in, " +
-			"and what moving it into the flaw's case would disclose with the flaw.\n\n" +
-			"A suggestion lists the builds the lead was seen in that lack it, since recording the " +
-			"flaw against those is refused, and the builds holding it that the lead's series never " +
+			"and what including it in the flaw's disclosure would publish with the flaw.\n\n" +
+			"A suggestion lists the builds the code finding was seen in that lack it, since recording the " +
+			"flaw against those is refused, and the builds holding it that the code finding's series never " +
 			"analyzed.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
@@ -162,7 +162,7 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 	}) (*struct{ Body HandoffOfferBody }, error) {
 		at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -191,25 +191,25 @@ func registerHandoff(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "hand-off-lead", Method: http.MethodPost, Path: leadPath + "/hand-off",
-		Summary: "Hand off a confirmed lead as a flaw",
-		Description: "Records a confirmed lead as a flaw in this product, found here and " +
+		OperationID: "hand-off-lead", Method: http.MethodPost, Path: leadPath + "/flaw",
+		Summary: "Record a confirmed code finding as a flaw",
+		Description: "Records a confirmed code finding as a flaw in this product, found here and " +
 			"undisclosed, through the same path as `POST /v1/products/{product}/findings`, and " +
-			"links the lead to it, with every other lead the claim confirming it covers.\n\n" +
+			"links the code finding to it, with every other code finding the claim confirming it covers.\n\n" +
 			"`builds` is the whole set the flaw is recorded against. `component` names what " +
-			"carries it, as the builds name it, and is remembered for the lead's prefix so the next " +
-			"lead under it is offered the same; leave it out for the build itself.\n\n" +
-			"`move` makes the linked leads part of the flaw's case: everybody who reads them keeps " +
+			"carries it, as the builds name it, and is remembered for the code finding's prefix so the next " +
+			"code finding under it is offered the same; leave it out for the build itself.\n\n" +
+			"`move` makes the linked code findings part of the flaw's case: everybody who reads them keeps " +
 			"reading them, the flaw's readers read them too, and they are disclosed with the flaw. " +
-			"Left out, the leads are kept internal and linked.\n\n" +
-			"A lead nobody confirmed, or one already handed off, is refused with 409.",
+			"Left out, the code findings are kept internal and linked.\n\n" +
+			"A code finding nobody confirmed, or one already recorded as a flaw, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 		Body    struct {
 			Builds    []LeadBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
 			Component string      `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
@@ -274,13 +274,13 @@ func registerHandoff(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`
 			Variant string `path:"variant"`
-			Place   string `path:"place" doc:"The lead's place identity"`
+			Place   string `path:"occurrence" doc:"The lead's place identity"`
 		}) (*struct{}, error) {
 			at, err := locateLead(ctx, in, input.Product, input.Stream, input.Variant)
 			if err != nil {
@@ -302,24 +302,24 @@ func registerHandoff(api huma.API, in core.Deps) {
 		}
 	}
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "move-lead", Method: http.MethodPut, Path: leadPath + "/move",
-		Summary: "Move a handed-off lead into its flaw's case",
-		Description: "Makes a kept lead part of its flaw's case, with every lead linked to the " +
+		OperationID: "move-lead", Method: http.MethodPut, Path: leadPath + "/flaw/disclosure",
+		Summary: "Include a code finding in its flaw's disclosure",
+		Description: "Includes a code finding kept internal in its flaw's disclosure, with every code finding linked to the " +
 			"same flaw: everybody who reads them keeps reading them, the flaw's readers read them " +
-			"too, and they are disclosed with the flaw. `GET .../hand-off` lists what that " +
+			"too, and they are disclosed with the flaw. `GET .../flaw` lists what that " +
 			"discloses.\n\n" +
-			"Recorded in the administration trail. A lead not handed off, one already moved, or " +
+			"Recorded in the administration trail. A code finding not recorded as a flaw, one already included, or " +
 			"one whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
 		access.InternalTriage, access.PrivateTriage), moving(true))
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "unmove-lead", Method: http.MethodDelete, Path: leadPath + "/move",
-		Summary: "Take a lead back out of its flaw's case",
-		Description: "Takes a moved lead out of its flaw's case while the flaw is undisclosed, with " +
-			"every lead linked to the same flaw. The flaw's readers no longer read them, everybody " +
+		OperationID: "unmove-lead", Method: http.MethodDelete, Path: leadPath + "/flaw/disclosure",
+		Summary: "Take a code finding out of its flaw's disclosure",
+		Description: "Takes a code finding out of its flaw's disclosure while the flaw is undisclosed, with " +
+			"every code finding linked to the same flaw. The flaw's readers no longer read them, everybody " +
 			"else who read them still does, and they stay linked to the flaw.\n\n" +
-			"Recorded in the administration trail. A lead not handed off, a kept lead, or one whose " +
+			"Recorded in the administration trail. A code finding not recorded as a flaw, one kept internal, or one whose " +
 			"flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
@@ -375,13 +375,13 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 	}
 	type personInput = struct {
 		Product  string `path:"product"`
 		Stream   string `path:"stream"`
 		Variant  string `path:"variant"`
-		Place    string `path:"place" doc:"The lead's place identity"`
+		Place    string `path:"occurrence" doc:"The lead's place identity"`
 		Identity string `path:"identity"`
 	}
 	// handed is the hand-off of the lead a route names, where the reader
@@ -422,9 +422,9 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-lead-collaborators", Method: http.MethodGet, Path: path,
-		Summary: "List who has been granted a handed-off lead",
-		Description: "Everybody granted this one handed-off lead in this product, oldest first.\n\n" +
-			"A grant reads the lead's evidence and nothing else of the product, until its flaw " +
+		Summary: "List a code finding's collaborators",
+		Description: "Everybody granted this one code finding recorded as a flaw in this product, oldest first.\n\n" +
+			"A grant reads the code finding's evidence and nothing else of the product, until its flaw " +
 			"is disclosed.",
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "Where you read internal work in the product, kept lead or moved.", leadReaders()...),
@@ -452,8 +452,8 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "add-lead-collaborator", Method: http.MethodPut, Path: path + "/{identity}",
-		Summary: "Grant somebody a handed-off lead",
-		Description: "Grants one person this one handed-off lead in this product, to read its " +
+		Summary: "Add a code finding collaborator",
+		Description: "Grants one person this one code finding recorded as a flaw in this product, to read its " +
 			"evidence, without granting them anything else of the product.\n\n" +
 			"It is an access change: it lands in the administration trail, and they are told in " +
 			"the notification area inside the application.\n\n" +
@@ -519,7 +519,7 @@ func registerLeadCollaborators(api huma.API, in core.Deps, a core.Administering)
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "remove-lead-collaborator", Method: http.MethodDelete, Path: path + "/{identity}",
-		Summary: "Withdraw somebody's grant of a handed-off lead",
+		Summary: "Remove a code finding collaborator",
 		Description: "Withdraws the grant. The record of it is kept.\n\n" +
 			"Withdrawing a grant somebody does not hold answers 404 and records nothing. Once the " +
 			"flaw is disclosed, a withdrawal is refused with 409.",

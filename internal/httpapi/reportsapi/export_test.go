@@ -302,7 +302,7 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		}
 
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			fmt.Sprintf("/v1/decisions/%d/approval", claim),
 			`{"batch":"a-batch"}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
@@ -398,14 +398,14 @@ func TestAnExportAnswersTheSameQuestionAsTheListItCameFrom(t *testing.T) {
 		// and which the export could never have produced a row of.
 		for _, each := range []struct{ list, file, query string }{
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", ""},
-			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "tag=nothing-is-marked-this"},
+			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "label=nothing-is-marked-this"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "weakness=CWE-125"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "epss_at_least=0.9"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "under_build=true"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "opened_after=2099-01-01"},
 			{"/v1/products/mine/findings", "/v1/products/mine/findings.csv", "origin=manual"},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", ""},
-			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "tag=nothing-is-marked-this"},
+			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "label=nothing-is-marked-this"},
 			{"/v1/products/mine/findings/components", "/v1/products/mine/findings/components.csv", "assigned=nobody"},
 		} {
 			want := counted(t, each.list, each.query)
@@ -657,7 +657,7 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 
-		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/scanning.csv", "")
+		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/last-uploads.csv", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("exporting coverage answered %d: %s", got.Code, got.Body.String())
 		}

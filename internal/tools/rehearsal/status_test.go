@@ -72,8 +72,8 @@ func TestTheSweepAsksTheBuildThatSortsFirst(t *testing.T) {
 
 func TestAPathIsFilledOnlyWhenEveryParameterHasAName(t *testing.T) {
 	names := map[string]string{"product": "open psirt", "stream": "main"}
-	if got, ok := fillPath("/v1/products/{product}/streams/{stream}", names); !ok ||
-		got != "/v1/products/open%20psirt/streams/main" {
+	if got, ok := fillPath("/v1/products/{product}/branches-and-tags/{stream}", names); !ok ||
+		got != "/v1/products/open%20psirt/branches-and-tags/main" {
 		t.Errorf("filled %q, %v", got, ok)
 	}
 	if _, ok := fillPath("/v1/products/{product}/cases/{case}", names); ok {

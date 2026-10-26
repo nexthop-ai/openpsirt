@@ -143,9 +143,9 @@ type CoveredBuild struct {
 func registerFindingDecision(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-finding", Method: http.MethodPost,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/findings/{vulnerability}/components/{component}/decision",
-		Summary: "Record one judgment about a finding, covering its places",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/findings/{issue}/components/{component}/decision",
+		Summary: "Record one decision about a finding, covering its occurrences",
 		Description: "Records the same claim against every place this issue occupies in this " +
 			"component. Naming `places` narrows it; leaving it out covers all of them.\n\n" +
 			"A place left out stays open. Nothing is recorded against it and nothing is " +
@@ -164,7 +164,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 			"Pass `extends` to carry an approved claim to this issue: the source must be " +
 			"approved, sit at the same component under the same consumer, and the outcome and " +
 			"justification must match it. The new claim is recorded as an extension of it and " +
-			"still waits for a second person. `similar` on `GET .../findings/{vulnerability}/" +
+			"still waits for a second person. `similar` on `GET .../findings/{issue}/" +
 			"components/{component}` lists the claims that qualify.\n\n" +
 			"`patch-needed` is the backport case: a fix is being carried into this build " +
 			"and the version does not move, so it requires `committed_to`, the date the work " +
@@ -175,7 +175,7 @@ func registerFindingDecision(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component, as the findings list gives it"`
 		core.ComponentQuery
 		Body FindingDecisionBody

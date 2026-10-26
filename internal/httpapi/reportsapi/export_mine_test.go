@@ -34,11 +34,11 @@ func TestTheFileOfYourClaimsHoldsWhatTheMineTabLists(t *testing.T) {
 
 		claim, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 		if got := httpapitest.AsPerson(t, r, "reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code >= 300 {
+			fmt.Sprintf("/v1/decisions/%d/approval", claim), `{}`); got.Code >= 300 {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 
-		mine := file("triager", "/v1/my-claims.csv")
+		mine := file("triager", "/v1/my-decisions.csv")
 		if len(mine) != 2 {
 			t.Fatalf("the proposer's file of their claims has %d rows, want the one: %v",
 				len(mine)-1, mine)
@@ -55,7 +55,7 @@ func TestTheFileOfYourClaimsHoldsWhatTheMineTabLists(t *testing.T) {
 				t.Errorf("the claim's row names no %s, which the tab shows: %v", column, mine)
 			}
 		}
-		if theirs := file("reviewer", "/v1/my-claims.csv"); len(theirs) != 1 {
+		if theirs := file("reviewer", "/v1/my-decisions.csv"); len(theirs) != 1 {
 			t.Errorf("somebody who proposed nothing exported %v", theirs)
 		}
 
@@ -71,7 +71,7 @@ func TestTheFileOfYourClaimsHoldsWhatTheMineTabLists(t *testing.T) {
 			"/v1/people/triager/roles/mine/public-triage", ""); got.Code >= 300 {
 			t.Fatalf("withdrawing the triager's role answered %d: %s", got.Code, got.Body.String())
 		}
-		if lost := file("triager", "/v1/my-claims.csv"); len(lost) != 1 {
+		if lost := file("triager", "/v1/my-decisions.csv"); len(lost) != 1 {
 			t.Errorf("a proposer who lost the product still exports its claim: %v", lost)
 		}
 	})

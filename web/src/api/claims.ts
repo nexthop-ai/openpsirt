@@ -166,7 +166,7 @@ export function useApproveClaim() {
       because?: string;
     }) =>
       unwrap(
-        await api.POST("/v1/claims/{id}/approval", {
+        await api.POST("/v1/decisions/{id}/approval", {
           params: { path: { id } },
           body: {
             ...(batch ? { batch } : {}),
@@ -185,7 +185,7 @@ export function useRejectClaim() {
   return useMutation({
     mutationFn: async ({ id, because }: { id: number; because: string }) =>
       unwrap(
-        await api.POST("/v1/claims/{id}/send-back", {
+        await api.POST("/v1/decisions/{id}/send-back", {
           params: { path: { id } },
           body: { because },
         }),
@@ -203,7 +203,7 @@ export function useSplitClaim() {
   return useMutation({
     mutationFn: async ({ id, rows, because }: { id: number; rows: number[]; because: string }) =>
       unwrap(
-        await api.POST("/v1/claims/{id}/split", {
+        await api.POST("/v1/decisions/{id}/split", {
           params: { path: { id } },
           body: { rows, because },
         }),
@@ -218,7 +218,7 @@ export function useClaimApprovals(id: number) {
   return useQuery({
     queryKey: ["claim", id, "approvals"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/approvals", { params: { path: { id } } })),
+      unwrap(await api.GET("/v1/decisions/{id}/approvals", { params: { path: { id } } })),
   });
 }
 
@@ -226,6 +226,6 @@ export function useClaimRevisions(id: number) {
   return useQuery({
     queryKey: ["claim", id, "revisions"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/claims/{id}/revisions", { params: { path: { id } } })),
+      unwrap(await api.GET("/v1/decisions/{id}/revisions", { params: { path: { id } } })),
   });
 }

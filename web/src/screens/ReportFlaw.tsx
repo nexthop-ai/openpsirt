@@ -168,12 +168,15 @@ export function ReportFlaw() {
     // refused.
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/streams/{stream}/variants/{variant}/components", {
-          params: {
-            path: { product, stream: streams[0] ?? "", variant: variants[0] ?? "" },
-            query: { q: component.trim(), limit: 20 },
+        await api.GET(
+          "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components",
+          {
+            params: {
+              path: { product, stream: streams[0] ?? "", variant: variants[0] ?? "" },
+              query: { q: component.trim(), limit: 20 },
+            },
           },
-        }),
+        ),
       ),
   });
 
@@ -213,8 +216,8 @@ export function ReportFlaw() {
         form.append("evidence", "true");
         try {
           unwrap(
-            await api.POST("/v1/products/{product}/issues/{vulnerability}/attachments", {
-              params: { path: { product, vulnerability: made.identifier } },
+            await api.POST("/v1/products/{product}/issues/{issue}/attachments", {
+              params: { path: { product, issue: made.identifier } },
               body: form as never,
               bodySerializer: (body: unknown) => body as FormData,
             }),

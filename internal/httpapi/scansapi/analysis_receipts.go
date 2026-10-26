@@ -60,7 +60,7 @@ type AnalysisReceiptsOutput struct {
 func registerAnalysisReceipts(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-analyses", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/analyses",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses",
 		Summary: "List uploaded analyzer runs and their status",
 		Description: "Returns analyzer runs newest first, each with its status and, once applied, " +
 			"whether it was comparable and how many results it opened, saw again and did not see. " +

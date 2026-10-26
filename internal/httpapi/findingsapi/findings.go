@@ -637,8 +637,8 @@ type EvidenceBody struct {
 func registerFindingDetail(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-finding", Method: http.MethodGet,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/findings/{vulnerability}/components/{component}",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/findings/{issue}/components/{component}",
 		Summary: "Get everything known about one finding",
 		Description: "Returns the full record for one issue in one component of a build: the " +
 			"description, the advisory, every reference the data carries with patches listed " +
@@ -657,7 +657,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
 		core.ComponentQuery
 	}) (*struct{ Body EvidenceBody }, error) {

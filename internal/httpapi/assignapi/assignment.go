@@ -112,8 +112,8 @@ func registerAssignment(api huma.API, in core.Deps) {
 func registerAssigning(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "assign-finding", Method: http.MethodPut,
-		Path: "/v1/products/{product}/streams/{stream}/variants/{variant}" +
-			"/findings/{vulnerability}/components/{component}/assignment",
+		Path: "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}" +
+			"/findings/{issue}/components/{component}/assignment",
 		Summary: "Assign a finding to somebody",
 		Description: "Records who is dealing with this issue in this component.\n\n" +
 			"It covers the product, not the build named in the path. The path says which " +
@@ -132,7 +132,7 @@ func registerAssigning(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Component     string `path:"component"`
 		core.ComponentQuery
 		Body struct {

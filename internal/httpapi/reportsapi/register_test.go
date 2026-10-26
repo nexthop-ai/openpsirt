@@ -21,7 +21,7 @@ func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		place := r.Scanned(t)
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		var register struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
@@ -53,8 +53,8 @@ func TestTheRegisterHoldsWhatNobodyHasDecided(t *testing.T) {
 		// And once somebody decides, the row carries who and when — both
 		// names, because two different people is the whole of the control.
 		made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/places/"+place+"/decision",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/occurrences/"+place+"/decision",
 			`{"outcome":"wont-fix","reasoning":"Not worth it here."}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
@@ -77,7 +77,7 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/register.csv", "")
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/register.csv", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("exporting the register answered %d: %s", got.Code, got.Body.String())
 		}
@@ -94,7 +94,7 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 		}
 		// Somebody who holds nothing on the product gets nothing at all.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "approver", http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/register.csv",
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/register.csv",
 			""), http.StatusNotFound)
 	})
 }
@@ -106,7 +106,7 @@ func TestTheRegisterLeavesAsAFileWithTheSameVisibility(t *testing.T) {
 func TestARegisterExportPastTheSlotsIsRefusedWithATimeToAskAgain(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom/register.csv"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register.csv"
 		ask := func() *http.Request {
 			req := httptest.NewRequest(http.MethodGet, at, nil)
 			req.Header.Set(httpapitest.TestHeader, "triager")
@@ -220,7 +220,7 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/streams/master/variants/broadcom/register"
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		var whole struct {
 			Items []struct {
 				Vulnerability string `json:"vulnerability"`
@@ -256,7 +256,7 @@ func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
 		r.Scanned(t)
 		document := r.InventoryOf(t, "the inventory this build shipped")
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		var register struct {
 			Measured struct {
 				Scan            int64  `json:"scan"`
@@ -329,7 +329,7 @@ func TestTheRegisterNarrows(t *testing.T) {
 		r.ScannedTwoIssues(t)
 		r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		rows := func(t *testing.T, query string) []struct {
 			Vulnerability string `json:"vulnerability"`
 			State         string `json:"state"`
@@ -423,7 +423,7 @@ func TestTheRegisterFileSaysWhichSupplierAnsweredAPlace(t *testing.T) {
 		}
 		r.ScannedInsideAcme(t, "inside", false)
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/register"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/register"
 		var listed struct {
 			Items []struct {
 				Stated *struct {

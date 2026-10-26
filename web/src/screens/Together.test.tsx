@@ -11,7 +11,7 @@ const mount = mounted();
 afterEach(() => vi.restoreAllMocks());
 
 const ISSUES =
-  "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues";
+  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/components/{component}/issues";
 
 describe("narrowing a bulk decision", () => {
   it("keeps the component it was opened for", async () => {

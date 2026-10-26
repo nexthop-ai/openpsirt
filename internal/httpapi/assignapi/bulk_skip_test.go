@@ -18,8 +18,8 @@ func TestABulkClaimSkippingDecidedPlacesSaysWhichItLeftOut(t *testing.T) {
 	// the decision standing there.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/linux-image/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/linux-image/bulk-decision"
 		claim := func(issues, extra string) *struct {
 			code int
 			body string
@@ -75,8 +75,8 @@ func TestABulkAnswerIsBoundedByTheIssuesItAsksAReviewerToRead(t *testing.T) {
 	// place ceiling, and passes once the limit is two.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/linux-image/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/linux-image/bulk-decision"
 		const body = `{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],` +
 			`"outcome":"wont-fix","selected_by":"the drivers",` +
 			`"reasoning":"Not built for this image."}`
@@ -106,8 +106,8 @@ func TestABulkDeferralRecordsTheDateItRunsTo(t *testing.T) {
 	// outcome or where it is not a date.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		const at = "/v1/products/mine/streams/master/variants/broadcom" +
-			"/components/linux-image/decisions"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/components/linux-image/bulk-decision"
 		decide := func(outcome, until string) (int, string) {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
 				`{"vulnerabilities":["CVE-2026-9999","CVE-2026-1000"],"outcome":"`+outcome+`",`+
@@ -145,7 +145,7 @@ func TestABulkDeferralRecordsTheDateItRunsTo(t *testing.T) {
 				DeferredUntil string `json:"deferred_until"`
 			} `json:"argument"`
 		}
-		httpapitest.Read(t, r, "triager", "/v1/claims/"+httpapitest.Itoa(made.ClaimID), &claim)
+		httpapitest.Read(t, r, "triager", "/v1/decisions/"+httpapitest.Itoa(made.ClaimID), &claim)
 		if claim.Argument.Outcome != "deferred" || claim.Argument.DeferredUntil != httpapitest.AheadOfUs {
 			t.Errorf("the claim reads %+v, want deferred until %s", claim.Argument, httpapitest.AheadOfUs)
 		}

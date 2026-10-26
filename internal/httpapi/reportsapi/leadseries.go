@@ -24,12 +24,12 @@ type LeadSeriesBody struct {
 func registerLeadSeries(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "list-lead-series", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/lead-series",
-		Summary: "Count leads by analyzer series",
+		Path:    "/v1/products/{product}/code-finding-series",
+		Summary: "Count code findings by analyzer series",
 		Description: "Returns one entry per analyzer series the product holds, ordered by name, " +
-			"with how many of its leads stand in each state across every build of the product. " +
-			"A series with no leads is listed with every count zero.\n\n" +
-			"Each count is the total the lead list answers for the same `series` and `state`.\n\n" +
+			"with how many of its code findings stand in each state across every build of the product. " +
+			"A series with no code findings is listed with every count zero.\n\n" +
+			"Each count is the total the code finding list answers for the same `series` and `state`.\n\n" +
 			"Refused, with no count, to anybody who does not read internal material in the product.",
 		Tags: []string{"Reports"},
 	}, core.AnyPerson, "Requires internal-read on the product."), func(ctx context.Context, input *struct {

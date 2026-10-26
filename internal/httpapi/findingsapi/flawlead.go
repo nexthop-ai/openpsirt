@@ -64,20 +64,20 @@ type FlawLeadBody struct {
 func registerFlawLead(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-flaw-lead", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/lead",
-		Summary: "Get the lead a flaw was recorded from",
-		Description: "Returns the static analysis lead a flaw recorded here was handed off from, with " +
-			"the component its hand-off was offered first, the builds it proposed, and whether the " +
-			"hand-off was undone.\n\n" +
-			"`fixed_in` lists each build the flaw is still open on where the lead is not reproduced, " +
+		Path:    "/v1/products/{product}/issues/{issue}/code-finding",
+		Summary: "Get the code finding a flaw was recorded from",
+		Description: "Returns the code finding a flaw recorded here was recorded from, with " +
+			"the component its offer ranked first, the builds it proposed, and whether recording it " +
+			"was undone.\n\n" +
+			"`fixed_in` lists each build the flaw is still open on where the code finding is not reproduced, " +
 			"with the first run that did not see it. Closing the flaw as fixed there is `POST " +
-			".../findings/{vulnerability}/resolve`, which a person does.\n\n" +
-			"A flaw recorded from no lead, and a lead you do not read in full, answer 404.",
+			".../findings/{issue}/resolve`, which a person does.\n\n" +
+			"A flaw recorded from no code finding, and a code finding you do not read in full, answer 404.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers where you may read a finding of this issue in this product and read "+
 		"its lead in full. Anywhere else it answers as a flaw recorded from no lead."), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability" doc:"The flaw, by any name it is known under"`
+		Vulnerability string `path:"issue" doc:"The flaw, by any name it is known under"`
 	}) (*struct{ Body FlawLeadBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {
@@ -131,14 +131,14 @@ func registerFlawLead(api huma.API, in core.Deps) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "undo-lead-handoff", Method: http.MethodPost, Path: leadPath + "/hand-off/withdrawal",
-		Summary: "Undo a lead's hand-off",
-		Description: "Undoes the hand-off of a lead while its flaw is undisclosed, with every lead linked " +
+		OperationID: "undo-lead-handoff", Method: http.MethodPost, Path: leadPath + "/flaw/withdrawal",
+		Summary: "Undo recording a code finding as a flaw",
+		Description: "Undoes recording a code finding as a flaw while its flaw is undisclosed, with every code finding linked " +
 			"to the same flaw. Each is confirmed again and internal, its collaborators' grants end, and " +
 			"the flaw is taken back out of every build it was recorded against, closed as `invalid` for " +
-			"the reason given. The flaw keeps the record of the lead it was recorded from, marked " +
+			"the reason given. The flaw keeps the record of the code finding it was recorded from, marked " +
 			"undone.\n\n" +
-			"`because` is required. Recorded in the administration trail. A lead not handed off, or one " +
+			"`because` is required. Recorded in the administration trail. A code finding not recorded as a flaw, or one " +
 			"whose flaw is disclosed, is refused with 409.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "Both internal-triage and private-triage on the product.",
@@ -146,7 +146,7 @@ func registerFlawLead(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 		Body    struct {
 			Because string `json:"because" minLength:"1" doc:"Why the hand-off is undone, in markdown"`
 		}

@@ -31,16 +31,16 @@ func TestAProductRenamedBeforeARetryIsWhatTheRetryReads(t *testing.T) {
 		send  func(t *testing.T, r *httpapitest.Reach) *httptest.ResponseRecorder
 	}{
 		{"adding a supplier", nil, func(t *testing.T, r *httpapitest.Reach) *httptest.ResponseRecorder {
-			return r.Named(t, "admin", http.MethodPost, "/v1/products/mine/advisory-sources", publishedAt)
+			return r.Named(t, "admin", http.MethodPost, "/v1/products/mine/supplier-advisory-feeds", publishedAt)
 		}},
 		{"withdrawing a supplier", func(t *testing.T, r *httpapitest.Reach) {
-			if got := r.Named(t, "admin", http.MethodPost, "/v1/products/mine/advisory-sources",
+			if got := r.Named(t, "admin", http.MethodPost, "/v1/products/mine/supplier-advisory-feeds",
 				publishedAt); got.Code != http.StatusCreated {
 				t.Fatalf("naming a supplier answered %d: %s", got.Code, got.Body.String())
 			}
 		}, func(t *testing.T, r *httpapitest.Reach) *httptest.ResponseRecorder {
 			return r.Named(t, "admin", http.MethodDelete,
-				"/v1/products/mine/advisory-sources/ExampleDistribution", "")
+				"/v1/products/mine/supplier-advisory-feeds/ExampleDistribution", "")
 		}},
 		{"uploading VEX statements", nil, func(t *testing.T, r *httpapitest.Reach) *httptest.ResponseRecorder {
 			return r.Vexed(t, "admin", "debian", httpapitest.Said("not_affected",

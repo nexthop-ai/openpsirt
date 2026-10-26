@@ -90,7 +90,7 @@ const blocking = 5
 func registerReadiness(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-readiness", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/readiness",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/readiness",
 		Summary: "Compare a branch against the last release cut from it",
 		Description: "Answers the question asked before shipping: is what we are about to " +
 			"ship better or worse than what we last shipped. \"8 criticals now, v2.4.1 " +

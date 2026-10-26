@@ -41,7 +41,7 @@ shares is in `DESIGN-ingest.md`.
 One request carries one run of one analysis against one build:
 
 ```
-POST /v1/products/{product}/streams/{stream}/variants/{variant}/analyses
+POST /v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/analyses
   sarif=@…        one or more SARIF 2.1.0 documents, gzip accepted
   series, commit, built, tool-version, rules, units-expected, units-analyzed,
   exit-status, source-root, third-party
@@ -397,7 +397,7 @@ is sent.
 
 ### Evidence
 
-`GET …/streams/{stream}/variants/{variant}/leads/{place}` answers one lead's
+`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}` answers one lead's
 evidence on one build: its rule, where it is, the path the analyzer took to
 it, the related places, each with its link and source, when it was last seen,
 and, for a lead no longer open, when it was first not seen, by which run, with
@@ -424,7 +424,7 @@ product, the rule the lead is filed under, and the lead's place, with no
 versions, so one judgment covers the lead on every stream and variant it is
 seen on (REQ-25).
 
-`POST …/streams/{stream}/variants/{variant}/leads/{place}/decision` records one.
+`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/decision` records one.
 
 | Outcome | Means | Second person |
 |---|---|---|
@@ -452,7 +452,7 @@ seen on (REQ-25).
 
 ### Fixed leads
 
-`POST …/streams/{stream}/variants/{variant}/leads/{place}/fixed` closes a lead
+`POST …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/fixed` closes a lead
 on one build, with what fixed it and the build that fixed it.
 
 | Rule | |
@@ -468,7 +468,7 @@ on one build, with what fixed it and the build that fixed it.
 
 A standing rule dismisses every lead of a product it names, with one reason
 and one reasoning: `tests/`, vendored code, a checker noisy on this codebase.
-`…/products/{product}/lead-rules` lists, proposes, approves and retires them.
+`…/products/{product}/suppression-rules` lists, proposes, approves and retires them.
 
 | A rule names | Covers |
 |---|---|
@@ -564,7 +564,7 @@ one way to say a path does not matter is kept rather than two.
 
 ### Queue file
 
-`GET /v1/products/{product}/leads.{format}` writes the list out as CSV or
+`GET /v1/products/{product}/code-findings.{format}` writes the list out as CSV or
 JSON, as `DESIGN-reporting.md` § Exports writes every file.
 
 | Rule | |
@@ -581,7 +581,7 @@ JSON, as `DESIGN-reporting.md` § Exports writes every file.
 
 ### Leads by series
 
-`GET /v1/products/{product}/lead-series` counts a product's leads per analyzer
+`GET /v1/products/{product}/code-finding-series` counts a product's leads per analyzer
 series, by state. The reports catalog draws it as Leads by analyzer
 (`DESIGN-reporting.md` § Pages of the catalog's own).
 
@@ -596,7 +596,7 @@ series, by state. The reports catalog draws it as Leads by analyzer
 
 ## Lead assignment
 
-`PUT …/streams/{stream}/variants/{variant}/leads/{place}/assignment` gives a
+`PUT …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/assignment` gives a
 lead to a person or a team, or hands it back to nobody, as a finding is
 assigned (`DESIGN-access.md` § Assignment, § Teams; REQ-34).
 
@@ -697,7 +697,7 @@ every recorded flaw takes (`DESIGN-findings.md` § Recorded flaws), and linked
 to it. The lead is then handed off: its flaw is what is judged, fixed and
 disclosed.
 
-`GET …/streams/{stream}/variants/{variant}/leads/{place}/hand-off` is what a
+`GET …/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}/flaw` is what a
 hand-off is offered, and `POST` on the same address records it.
 
 | Rule | |
@@ -736,7 +736,7 @@ hand-off is offered, and `POST` on the same address records it.
 ### Keep or move
 
 A hand-off keeps the lead internal or moves it into its flaw's case.
-`PUT …/leads/{place}/move` moves a kept lead, and `DELETE` on the same address
+`PUT …/code-findings/{occurrence}/flaw/disclosure` moves a kept lead, and `DELETE` on the same address
 takes a moved one back out.
 
 | | Kept | Moved |
@@ -777,7 +777,7 @@ takes a moved one back out.
 
 ### Undone hand-off
 
-`POST …/leads/{place}/hand-off/withdrawal` undoes a hand-off, with why.
+`POST …/code-findings/{occurrence}/flaw/withdrawal` undoes a hand-off, with why.
 
 | Rule | |
 |---|---|
@@ -808,7 +808,7 @@ advisory names the build fixed from that closure (`DESIGN-remediation.md`
 
 ### Lead collaborators
 
-`…/leads/{place}/collaborators` lists, adds and removes people brought into
+`…/code-findings/{occurrence}/collaborators` lists, adds and removes people brought into
 one handed-off lead, as case collaborators are brought into one flaw
 (REQ-43, `DESIGN-access.md` § Case collaborators).
 

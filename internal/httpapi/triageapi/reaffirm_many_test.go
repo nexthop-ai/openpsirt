@@ -353,7 +353,7 @@ func TestALapsedClaimInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testi
 			t.Fatal(err)
 		}
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/theirs/streams/master/variants/mellanox"+
+			"/v1/products/theirs/branches-and-tags/master/variants/mellanox"+
 				"/findings/CVE-2026-9999/components/libnl-3-200/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"Not compiled into that build."}`)
@@ -539,7 +539,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		}
 
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/products/mine/streams/master/variants/broadcom/findings/CVE-2026-9999/places/"+
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/"+
 				place+"/decision/reaffirmation",
 			fmt.Sprintf(`{"previous":%d,"reasoning":"Still true."}`, previous))
 		if got.Code != http.StatusUnprocessableEntity {

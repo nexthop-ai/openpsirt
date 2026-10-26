@@ -56,9 +56,9 @@ func TestACatalogListCountsWhatWasAskedForAndNothingOtherwise(t *testing.T) {
 
 		for _, path := range []string{
 			"/v1/products",
-			"/v1/products/mine/streams",
+			"/v1/products/mine/branches-and-tags",
 			"/v1/products/mine/variants",
-			"/v1/products/mine/streams/master/variants",
+			"/v1/products/mine/branches-and-tags/master/variants",
 		} {
 			var list struct {
 				Items []struct {

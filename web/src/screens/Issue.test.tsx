@@ -11,7 +11,7 @@ afterEach(() => vi.restoreAllMocks());
 
 async function drawn(issue: Answer) {
   serve((path) => {
-    if (path === "/v1/issues/{vulnerability}") return issue;
+    if (path === "/v1/issues/{issue}") return issue;
     return { data: { items: [], total: 0 } };
   });
   mount.render(screen(<Issue />, "/issues/CVE-2026-1", "/issues/:vulnerability"));

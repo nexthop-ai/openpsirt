@@ -99,7 +99,7 @@ export function useFindingsViews({
     enabled: !spanning,
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/fix-bundles", {
+        await api.GET("/v1/products/{product}/planned-upgrades", {
           params: {
             path: { product },
             query: bumpQuery({ product, ...selection }, query, 0, 0) as Record<string, never>,

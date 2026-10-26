@@ -425,7 +425,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 		scan(t, file(t, built.Add(2*time.Hour)), built.Add(3*time.Hour))
 
 		var out scansapi.ReceiptsOutput
-		path := "/v1/products/mine/streams/master/variants/broadcom/scans"
+		path := "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"
 		httpapitest.Read(t, r, "private-triage", path, &out.Body)
 		if len(out.Body.Items) != 2 {
 			t.Fatalf("got %d receipts, want the two that were sent", len(out.Body.Items))

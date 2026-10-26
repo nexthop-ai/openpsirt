@@ -63,7 +63,7 @@ type ReportBody struct {
 // registerWhoTold is the record of who told us, and the other names an issue
 // goes by.
 func registerWhoTold(api huma.API, in core.Deps) {
-	const path = "/v1/products/{product}/issues/{vulnerability}/report"
+	const path = "/v1/products/{product}/issues/{issue}/report"
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-report", Method: http.MethodGet, Path: path,
@@ -82,7 +82,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.PerProduct, "", core.PrivateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 	}) (*struct{ Body ReportBody }, error) {
 		// Read with the right every read of a report asks, which the store
 		// checks against the product it was reported in.
@@ -106,7 +106,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "add-alias", Method: http.MethodPut,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}",
+		Path:    "/v1/products/{product}/issues/{issue}/aliases/{alias}",
 		Summary: "Record another name for an issue",
 		Description: "Records that this issue is also known by another identifier — a CVE or " +
 			"a GHSA assigned after we minted our own.\n\n" +
@@ -129,7 +129,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Also asks for triage in every other product the issue is open in.",
 		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The other identifier, as it is written"`
 	}) (*struct{}, error) {
 		subject, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
@@ -176,7 +176,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "remove-alias", Method: http.MethodDelete,
-		Path:    "/v1/products/{product}/issues/{vulnerability}/aliases/{alias}",
+		Path:    "/v1/products/{product}/issues/{issue}/aliases/{alias}",
 		Summary: "Remove another name for an issue",
 		Description: "Removes a name somebody recorded by hand for this issue.\n\n" +
 			"From here on a scan reporting that name no longer resolves here. Findings " +
@@ -194,7 +194,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 	}, core.PerProduct, "Also asks for triage in every other product the issue is open in.",
 		core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
-		Vulnerability string `path:"vulnerability"`
+		Vulnerability string `path:"issue"`
 		Alias         string `path:"alias" maxLength:"191" doc:"The name to remove, as it is written"`
 	}) (*struct{ Body AliasRemovedBody }, error) {
 		subject, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)

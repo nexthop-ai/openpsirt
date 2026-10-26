@@ -126,14 +126,14 @@ func (LeadAssignee) Schema(huma.Registry) *huma.Schema {
 func registerLeads(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-lead-evidence", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}",
-		Summary: "Get a lead's evidence",
-		Description: "Returns what the newest run that saw a lead on a build said about it: where it " +
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}",
+		Summary: "Get a code finding's evidence",
+		Description: "Returns what the newest run that saw a code finding on a build said about it: where it " +
 			"is, the path the analyzer took to it, and the other places it names. Each place links " +
 			"into the repository's web view at the analyzed commit, where the product names the " +
 			"repository's host, and carries the source kept beside it, where the product keeps " +
 			"source under its path.\n\n" +
-			"A lead the build no longer holds open answers the newest it held, with when it was " +
+			"A code finding the build no longer holds open answers the newest it held, with when it was " +
 			"last seen, when it was first not seen, and whether its repository changed between " +
 			"the two.",
 		Tags: []string{"Findings"},
@@ -141,7 +141,7 @@ func registerLeads(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Place   string `path:"place" doc:"The lead's place identity"`
+		Place   string `path:"occurrence" doc:"The lead's place identity"`
 	}) (*struct{ Body LeadEvidenceBody }, error) {
 		subject, err := core.Reading(ctx)
 		if err != nil {

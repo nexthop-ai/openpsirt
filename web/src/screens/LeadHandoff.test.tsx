@@ -12,7 +12,8 @@ afterEach(() => vi.restoreAllMocks());
 
 const AT = "/products/sonic/streams/master/variants/broadcom/leads/abc";
 const PATTERN = "/products/:product/streams/:stream/variants/:variant/leads/:place";
-const LEAD = "/v1/products/{product}/streams/{stream}/variants/{variant}/leads/{place}";
+const LEAD =
+  "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/code-findings/{occurrence}";
 
 const CONFIRMED = {
   rule: "clang/unix.Malloc",
@@ -81,7 +82,7 @@ async function drawn(evidence: object, hides = true, offer: object = OFFER) {
         },
       };
     if (path === LEAD) return { data: evidence };
-    if (path === `${LEAD}/hand-off`) return { data: offer };
+    if (path === `${LEAD}/flaw`) return { data: offer };
     if (path === `${LEAD}/collaborators`) return { data: { items: [] } };
     if (path === "/v1/products/{product}/mentionable") return { data: { items: [] } };
     return undefined;
@@ -105,7 +106,7 @@ describe("handing off a lead", () => {
     await press(mount.host(), "Hand off");
     await settle();
     const [path, init] = sent()[0] ?? [];
-    expect(path).toBe(`${LEAD}/hand-off`);
+    expect(path).toBe(`${LEAD}/flaw`);
     expect((init as { body: unknown }).body).toEqual({
       builds: [{ stream: "master", variant: "broadcom" }],
       summary: "p leaks",
@@ -220,7 +221,7 @@ describe("a handed-off lead", () => {
     expect(text()).toContain("p leaks on the early return");
     await press(mount.host(), "Move into the case");
     await settle();
-    expect(sent()[0]?.[0]).toBe(`${LEAD}/move`);
+    expect(sent()[0]?.[0]).toBe(`${LEAD}/flaw/disclosure`);
   });
 
   it("says a move takes the leads linked to its flaw", async () => {
@@ -235,7 +236,7 @@ describe("a handed-off lead", () => {
     change(mount.host().querySelector("textarea"), "handed off against the wrong component");
     await press(mount.host(), "Undo hand-off");
     await settle();
-    expect(sent()[0]?.[0]).toBe(`${LEAD}/hand-off/withdrawal`);
+    expect(sent()[0]?.[0]).toBe(`${LEAD}/flaw/withdrawal`);
     expect(sent()[0]?.[1]).toMatchObject({
       body: { because: "handed off against the wrong component" },
     });

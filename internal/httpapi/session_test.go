@@ -116,13 +116,13 @@ func TestAKeyIsNotAskedToEchoAnythingOrToSayWhereItCameFrom(t *testing.T) {
 	// echo a value — which is what the first version of this test did.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.AsKey(t, http.MethodGet,
-			"/v1/products/mine/streams/master/variants/broadcom/scans"); got != http.StatusOK {
+			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"); got != http.StatusOK {
 			t.Errorf("a key reading its receipts answered %d, want 200", got)
 		}
 
 		// No Origin, no echoed value, and a method that changes something.
 		// A build sends exactly this.
-		req := httpapitest.Upload(t, "/v1/products/mine/streams/master/variants/broadcom/scans",
+		req := httpapitest.Upload(t, "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms",
 			httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 		req.Header.Set("Authorization", "Bearer "+r.Key)
 		rec := httptest.NewRecorder()
@@ -295,7 +295,7 @@ func TestATokenIsACredentialLikeAnyOther(t *testing.T) {
 			t.Errorf("a personal token could not read what its owner reads: %d", got)
 		}
 		// And reaches no further than its owner does.
-		if got := r.WithKey(t, secret, http.MethodGet, "/v1/products/theirs/streams").Code; got != http.StatusNotFound {
+		if got := r.WithKey(t, secret, http.MethodGet, "/v1/products/theirs/branches-and-tags").Code; got != http.StatusNotFound {
 			t.Errorf("a personal token reached past its owner: %d", got)
 		}
 		// Nor into administration.

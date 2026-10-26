@@ -62,7 +62,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
-		OperationID: "declare-stream", Method: http.MethodPost, Path: "/v1/products/{product}/streams",
+		OperationID: "declare-stream", Method: http.MethodPost, Path: "/v1/products/{product}/branches-and-tags",
 		Summary: "Create a branch or tag",
 		Description: "Records a line of a product. A branch moves and is rebuilt; a tag never " +
 			"changes and is what somebody received.",

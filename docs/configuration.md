@@ -1068,7 +1068,7 @@ one applies to the branch you ship.
 Off unless the deployment turns it on. It fetches a copy of each repository a
 patch link names, from the host the link names, and asks the copy which
 branches hold each commit. Progress, failures and the size of each copy are on
-the System screen and at `/v1/patch-branches`.
+the System screen and at `/v1/patch-branch-lookups`.
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.
@@ -1420,3 +1420,86 @@ changes the upgrade from v0.8.0 alone, as [From v0.8.0](#from-v080) says.
 | The unanswered notice and a reporter writing back go to whoever holds the report, the members of the team whose queue it is in, or everybody who works reports in the product where nobody holds it | Nothing. Every report the upgrade carries is held by nobody, so its notices reach whom they reached in v0.10.2 |
 | Withdrawing a role that is not somebody's last, a group-bound sign-in that derives fewer roles, the first sign-in after the switch into group-bound mode, a switch out of it, taking somebody off a team and retiring a team hand back the work they leave with a holder who may no longer read it. v0.10.2 handed work back only when somebody's last role on a product went, or they were deactivated | Nothing. Work v0.10.2 already left with somebody who cannot read it stays with them until a write names its holder |
 | A role held across every product counts in every notice's audience as a role on each product. v0.10.2 read per-product roles alone, so somebody reading a product only through such a role was told nothing about it | Nothing |
+| The API paths use the words the interface uses. A request to a former path answers 404, apart from the SBOM upload paths | Move every client but a build pipeline to the paths in [Renamed API paths](#renamed-api-paths) |
+| The SBOM upload, the list of uploads and the read of what an upload changed keep answering at their former addresses under `/v1/products/{product}/streams/{stream}/variants/{variant}/scans`, with no removal planned | Nothing. A build pipeline needs no edit |
+| `/v1/decisions/{id}` is one decision, which v0.10.2 answered at `/v1/claims/{id}`. The row of a decision at one occurrence, which v0.10.2 answered at `/v1/decisions/{id}`, is at `/v1/decision-occurrences/{id}` | A client reading such a row by its identifier asks `/v1/decision-occurrences/{id}`, because the former address answers a different record |
+| The findings lists take `label`, `below_minimum_severity`, `decision` and `decision_state` in place of `tag`, `below_floor`, `claim` and `claim_state`. `GET /v1/advisories` takes `issue` in place of `vulnerability` | Rename them in the request. A former name is refused with 400, naming it |
+
+#### Renamed API paths
+
+Every path below `/v1/products/{product}/streams` moves below
+`/v1/products/{product}/branches-and-tags`, and `…` below is a build's address,
+`/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}`. A path
+under it absent from the table keeps the rest of its address.
+
+| Former path | Path |
+|---|---|
+| `…/components/{component}/decisions` | `…/components/{component}/bulk-decision` |
+| `…/findings/{vulnerability}/components/{component}/tags/{tag}` | `…/findings/{issue}/components/{component}/labels/{label}` |
+| `…/findings/{vulnerability}/places/{place}/decision` | `…/findings/{issue}/occurrences/{occurrence}/decision` |
+| `…/findings/{vulnerability}/places/{place}/decision/reaffirmation` | `…/findings/{issue}/occurrences/{occurrence}/decision/reaffirmation` |
+| `…/findings/{vulnerability}/places/{place}/reach` | `…/findings/{issue}/occurrences/{occurrence}/reach` |
+| `…/leads/{place}` | `…/code-findings/{occurrence}` |
+| `…/leads/{place}/assignment` | `…/code-findings/{occurrence}/assignment` |
+| `…/leads/{place}/collaborators` | `…/code-findings/{occurrence}/collaborators` |
+| `…/leads/{place}/collaborators/{identity}` | `…/code-findings/{occurrence}/collaborators/{identity}` |
+| `…/leads/{place}/decision` | `…/code-findings/{occurrence}/decision` |
+| `…/leads/{place}/fixed` | `…/code-findings/{occurrence}/fixed` |
+| `…/leads/{place}/hand-off` | `…/code-findings/{occurrence}/flaw` |
+| `…/leads/{place}/hand-off/withdrawal` | `…/code-findings/{occurrence}/flaw/withdrawal` |
+| `…/leads/{place}/move` | `…/code-findings/{occurrence}/flaw/disclosure` |
+| `…/match-coverage` | `…/unmatched-components` |
+| `…/match-coverage.{format}` | `…/unmatched-components.{format}` |
+| `…/pending-upgrades` | `…/planned-upgrades` |
+| `…/pending-upgrades.{format}` | `…/planned-upgrades.{format}` |
+| `…/scans` | `…/sboms` |
+| `…/scans/{scan}/changes` | `…/sboms/{sbom}/changes` |
+| `…/scans/{scan}/documents/{document}` | `…/sboms/{sbom}/documents/{document}` |
+| `/v1/audit/claims` | `/v1/audit/decisions` |
+| `/v1/claims/{id}` | `/v1/decisions/{id}` |
+| `/v1/claims/{id}/approval` | `/v1/decisions/{id}/approval` |
+| `/v1/claims/{id}/approvals` | `/v1/decisions/{id}/approvals` |
+| `/v1/claims/{id}/comments` | `/v1/decisions/{id}/comments` |
+| `/v1/claims/{id}/elsewhere` | `/v1/decisions/{id}/elsewhere` |
+| `/v1/claims/{id}/promise` | `/v1/decisions/{id}/promise` |
+| `/v1/claims/{id}/reaffirmation` | `/v1/decisions/{id}/reaffirmation` |
+| `/v1/claims/{id}/reasoning` | `/v1/decisions/{id}/reasoning` |
+| `/v1/claims/{id}/revisions` | `/v1/decisions/{id}/revisions` |
+| `/v1/claims/{id}/send-back` | `/v1/decisions/{id}/send-back` |
+| `/v1/claims/{id}/split` | `/v1/decisions/{id}/split` |
+| `/v1/decisions` | `/v1/decision-occurrences` |
+| `/v1/decisions/{id}` | `/v1/decision-occurrences/{id}` |
+| `/v1/disclosing` | `/v1/disclosure-deadlines` |
+| `/v1/exploited-here/{id}` | `/v1/incidents/{id}` |
+| `/v1/exploited-here/{id}/fixes` | `/v1/incidents/{id}/fixes` |
+| `/v1/exploited-here/{id}/fixes/{fix}` | `/v1/incidents/{id}/fixes/{fix}` |
+| `/v1/exploited-here/{id}/told` | `/v1/incidents/{id}/told` |
+| `/v1/my-claims` | `/v1/my-decisions` |
+| `/v1/my-claims.{format}` | `/v1/my-decisions.{format}` |
+| `/v1/obligation-windows` | `/v1/response-windows` |
+| `/v1/obligation-windows/{id}` | `/v1/response-windows/{id}` |
+| `/v1/obligations` | `/v1/incidents` |
+| `/v1/patch-branches` | `/v1/patch-branch-lookups` |
+| `/v1/products/{product}/advisory-sources` | `/v1/products/{product}/supplier-advisory-feeds` |
+| `/v1/products/{product}/advisory-sources/{name}` | `/v1/products/{product}/supplier-advisory-feeds/{name}` |
+| `/v1/products/{product}/fix-bundles` | `/v1/products/{product}/planned-upgrades` |
+| `/v1/products/{product}/fix-bundles.{format}` | `/v1/products/{product}/planned-upgrades.{format}` |
+| `/v1/products/{product}/issues/{vulnerability}/exploited-here` | `/v1/products/{product}/issues/{issue}/incidents` |
+| `/v1/products/{product}/issues/{vulnerability}/lead` | `/v1/products/{product}/issues/{issue}/code-finding` |
+| `/v1/products/{product}/lead-rules` | `/v1/products/{product}/suppression-rules` |
+| `/v1/products/{product}/lead-rules/{id}` | `/v1/products/{product}/suppression-rules/{id}` |
+| `/v1/products/{product}/lead-rules/{id}/approval` | `/v1/products/{product}/suppression-rules/{id}/approval` |
+| `/v1/products/{product}/lead-series` | `/v1/products/{product}/code-finding-series` |
+| `/v1/products/{product}/leads` | `/v1/products/{product}/code-findings` |
+| `/v1/products/{product}/leads.{format}` | `/v1/products/{product}/code-findings.{format}` |
+| `/v1/products/{product}/routing-rules` | `/v1/products/{product}/assignment-rules` |
+| `/v1/products/{product}/routing-rules/preview` | `/v1/products/{product}/assignment-rules/preview` |
+| `/v1/products/{product}/routing-rules/{id}` | `/v1/products/{product}/assignment-rules/{id}` |
+| `/v1/products/{product}/streams` | `/v1/products/{product}/branches-and-tags` |
+| `/v1/products/{product}/tags` | `/v1/products/{product}/labels` |
+| `/v1/products/{product}/triage-floor` | `/v1/products/{product}/minimum-severity` |
+| `/v1/products/{product}/vex-statements` | `/v1/products/{product}/vex-documents` |
+| `/v1/scanning` | `/v1/last-uploads` |
+| `/v1/scanning.{format}` | `/v1/last-uploads.{format}` |
+| `/v1/work/set-aside` | `/v1/failed-jobs` |
+| `/v1/work/set-aside/{id}/retry` | `/v1/failed-jobs/{id}/retry` |

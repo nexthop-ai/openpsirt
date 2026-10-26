@@ -22,7 +22,7 @@ import (
 
 // leadAt is the seeded lead's address on the seeded build.
 func leadAt(place string) string {
-	return "/v1/products/mine/streams/master/variants/broadcom/leads/" + place
+	return "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + place
 }
 
 // evidenceAs is the seeded lead's evidence as one person reads it.
@@ -77,7 +77,7 @@ func TestAConfirmedLeadIsHandedOffAsAFlawOnce(t *testing.T) {
 		if got.State != "handed-off" || got.Handoff == nil || got.Handoff.Flaw != flaw || got.Handoff.Moved {
 			t.Fatalf("the lead reads %s with %+v; want handed off, kept, as %s", got.State, got.Handoff, flaw)
 		}
-		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+		again := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"again"}`)
 		httpapitest.RefusedWith(t, again, http.StatusConflict)
 		// The flaw is judged now, not the lead.
@@ -92,14 +92,14 @@ func TestOnlyAConfirmedLeadIsHandedOffBySomebodyWorkingBothHalves(t *testing.T) 
 		place := httpapitest.SeededLead(t, r)
 		body := `{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost,
-			leadAt(place)+"/hand-off", body), http.StatusConflict)
+			leadAt(place)+"/flaw", body), http.StatusConflict)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, leadAt(place)+"/decision",
 			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		// Internal triage alone does not record a private flaw.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost,
-			leadAt(place)+"/hand-off", body), http.StatusForbidden)
+			leadAt(place)+"/flaw", body), http.StatusForbidden)
 	})
 }
 
@@ -112,7 +112,7 @@ func handedOffItems(t *testing.T, r *httpapitest.Reach, who string) []string {
 			Message string `json:"message"`
 		} `json:"items"`
 	}
-	httpapitest.Read(t, r, who, "/v1/products/mine/leads?state=handed-off", &listed)
+	httpapitest.Read(t, r, who, "/v1/products/mine/code-findings?state=handed-off", &listed)
 	said := make([]string, 0, len(listed.Items))
 	for _, item := range listed.Items {
 		said = append(said, item.Message)
@@ -128,7 +128,7 @@ func claimAt(t *testing.T, r *httpapitest.Reach, place string) string {
 		Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("/v1/claims/%d", claim)
+	return fmt.Sprintf("/v1/decisions/%d", claim)
 }
 
 func TestAnIncludedLeadStaysWholeToEverybodyWhoReadIt(t *testing.T) {
@@ -155,7 +155,7 @@ func TestTheFlawsReadersReadALeadOnlyOnceItIsIncluded(t *testing.T) {
 		if said := handedOffItems(t, r, "private"); len(said) != 0 {
 			t.Errorf("a reader of undisclosed work listed %q before the lead was included; want nothing", said)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
 		}
 		full := evidenceAs(t, r, "private", place)
@@ -167,7 +167,7 @@ func TestTheFlawsReadersReadALeadOnlyOnceItIsIncluded(t *testing.T) {
 		}
 		// Reading undisclosed work is not reading internal work: the lead
 		// reaches them, and no other internal lead does.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/products/mine/lead-series", ""),
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodGet, "/v1/products/mine/code-finding-series", ""),
 			http.StatusForbidden)
 	})
 }
@@ -195,7 +195,7 @@ func TestAKeptLeadNamesItsFlawOnlyToThePeopleOnTheCase(t *testing.T) {
 		var listed struct {
 			Items []json.RawMessage `json:"items"`
 		}
-		httpapitest.Read(t, r, "embargo-reader", "/v1/products/mine/leads?state=handed-off", &listed)
+		httpapitest.Read(t, r, "embargo-reader", "/v1/products/mine/code-findings?state=handed-off", &listed)
 		if len(listed.Items) != 0 {
 			t.Errorf("somebody granted one lead listed %d; want none, as the grant is not a list", len(listed.Items))
 		}
@@ -221,7 +221,7 @@ func TestAMovedLeadIsDisclosedWithItsFlawWithoutItsSnippets(t *testing.T) {
 		}
 		// Disclosure is one way.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/move", ""), http.StatusConflict)
+			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
 	})
 }
 
@@ -252,7 +252,7 @@ func TestAnUndoneMoveTakesBackOnlyTheFlawsReaders(t *testing.T) {
 		if got := evidenceAs(t, r, "embargo-reader", place); got.At.Message != "p is leaked" {
 			t.Fatalf("a reader of undisclosed work read %+v while the lead was included; want the whole lead", got)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
 		}
 		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
@@ -261,8 +261,8 @@ func TestAnUndoneMoveTakesBackOnlyTheFlawsReaders(t *testing.T) {
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "embargo-reader", http.MethodGet, leadAt(place), ""),
 			http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete,
-			leadAt(place)+"/move", ""), http.StatusConflict)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("moving it again answered %d: %s", got.Code, got.Body)
 		}
 	})
@@ -303,7 +303,7 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
 		}
 		var offer findingsapi.HandoffOfferBody
-		httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/hand-off", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(place)+"/flaw", &offer)
 		last := offer.Suggestions[len(offer.Suggestions)-1]
 		if offer.Prefix != "src" || len(offer.Seen) != 1 || last.From != "build" || last.Component != "" {
 			t.Fatalf("offered %+v; want the build last, for the prefix src", offer)
@@ -316,7 +316,7 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if said := offer.Discloses.Said; !slices.Contains(said, findingsapi.AnalyzerSaidBody{Path: "src/a.c", Message: "p is leaked"}) {
 			t.Errorf("a move discloses the messages %+v; want the analyzer's message at src/a.c", said)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -333,12 +333,12 @@ func TestAHandOffOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 			`{"outcome":"confirmed","reasoning":"n overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("confirming the second lead answered %d: %s", got.Code, got.Body)
 		}
-		httpapitest.Read(t, r, "lead-handler", leadAt(other)+"/hand-off", &offer)
+		httpapitest.Read(t, r, "lead-handler", leadAt(other)+"/flaw", &offer)
 		if first := offer.Suggestions[0]; first.From != "confirmed" || first.Component != "zlib" || len(first.Lacking) != 0 {
 			t.Errorf("the second lead under src was offered %+v first; want zlib, as src was confirmed", first)
 		}
 		// The build itself replaces what src was confirmed as.
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(other)+"/hand-off",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(other)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the second hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -396,7 +396,7 @@ func TestAKeptLeadStaysWhereItIsOnceItsFlawIsDisclosed(t *testing.T) {
 		}
 		disclosed(t, r, flaw)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut,
-			leadAt(place)+"/move", ""), http.StatusConflict)
+			leadAt(place)+"/flaw/disclosure", ""), http.StatusConflict)
 		if got := evidenceAs(t, r, "internal-reader", place); got.At.Message != "p is leaked" {
 			t.Errorf("an internal reader read %+v; want the kept lead, internal still", got)
 		}
@@ -417,7 +417,7 @@ func TestAHandedOffLeadsClaimIsNeitherRevisedNorWithdrawn(t *testing.T) {
 			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &claim); err != nil {
 			t.Fatal(err)
 		}
-		at := fmt.Sprintf("/v1/claims/%d", claim)
+		at := fmt.Sprintf("/v1/decisions/%d", claim)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodPut, at+"/reasoning",
 			`{"reasoning":"p leaks, and more besides"}`), http.StatusConflict)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "internal-triager", http.MethodDelete, at, ""),
@@ -466,10 +466,10 @@ func TestAnUndoneBatchLeavesTheConfirmationAHandOffRestsOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got := httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{"batch":"tuesday"}`); got.Code != http.StatusOK {
 			t.Fatalf("agreeing to the confirmation answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/hand-off",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, leadAt(place)+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
@@ -507,7 +507,7 @@ func TestAMoveLandingWhileARunAppliesReachesTheSightingTheRunOpened(t *testing.T
 		// The lead is moved after the run has read its hand-off, and before
 		// the run opens the sighting at it.
 		hooked, rival := dbtest.RivalAfterRead(t, r.DB, "lead_handoff", "finding", 3*time.Second, func() error {
-			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+			if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 				return fmt.Errorf("the move answered %d: %s", got.Code, got.Body)
 			}
 			return nil
@@ -564,7 +564,7 @@ func TestAHandOffAndAMoveAreToldToTheProductsInternalTriagersWithoutTheFlawAndNo
 				t.Errorf("%s was told %q; want nothing", who, got)
 			}
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("the move answered %d: %s", got.Code, got.Body)
 		}
 		if got := toldOf(t, r, "internal-triager", "lead-moved"); len(got) != 1 ||
@@ -589,10 +589,10 @@ func claimReads(t *testing.T, r *httpapitest.Reach, who, claim, decision string)
 			} `json:"decision"`
 		} `json:"items"`
 	}
-	httpapitest.Read(t, r, who, "/v1/decisions?limit=200", &listed)
+	httpapitest.Read(t, r, who, "/v1/decision-occurrences?limit=200", &listed)
 	listedIt := false
 	for _, item := range listed.Items {
-		if fmt.Sprintf("/v1/claims/%d", item.Decision.ClaimID) == claim {
+		if fmt.Sprintf("/v1/decisions/%d", item.Decision.ClaimID) == claim {
 			listedIt = true
 		}
 	}
@@ -619,7 +619,7 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 			Where(`"de"."place_identity" = ?`, place).Limit(1).Scan(t.Context(), &decision); err != nil {
 			t.Fatal(err)
 		}
-		decisionAt := fmt.Sprintf("/v1/decisions/%d", decision)
+		decisionAt := fmt.Sprintf("/v1/decision-occurrences/%d", decision)
 		if got := httpapitest.AsPerson(t, r, "internal-triager", http.MethodPost, claim+"/comments",
 			`{"body":"the early return is the only path"}`); got.Code != http.StatusCreated {
 			t.Fatalf("commenting answered %d: %s", got.Code, got.Body)
@@ -637,7 +637,7 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 			}
 		}
 		expect("while the lead was kept", none)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("including the lead answered %d: %s", got.Code, got.Body)
 		}
 		expect("while the lead was included", whole)
@@ -649,7 +649,7 @@ func TestTheClaimsAtALeadAreReadByTheFlawsReadersOnlyWhileItIsIncluded(t *testin
 		// Reading the claims is not arguing them.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodPost, claim+"/comments",
 			`{"body":"me too"}`), http.StatusNotFound)
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, leadAt(place)+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the move answered %d: %s", got.Code, got.Body)
 		}
 		expect("once the move was undone", none)

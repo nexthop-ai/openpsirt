@@ -38,7 +38,7 @@ func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
 		}
 
 		again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("re-affirming answered %d: %s", again.Code, again.Body.String())
@@ -95,7 +95,7 @@ func TestReAffirmingAWholeClaimSomebodyElseMadeIsRefusedInWords(t *testing.T) {
 		claimed := r.AgreedThenLapsed(t)
 
 		refused := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
 		if refused.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("somebody else re-affirming the claim answered %d: %s",
@@ -123,7 +123,7 @@ func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
 			t.Fatalf("setting the cap answered %d: %s", got.Code, got.Body.String())
 		}
 		refused := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
 		if refused.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("re-affirming a dismissal past the cap answered %d: %s",
@@ -140,7 +140,7 @@ func TestReAffirmingADismissalIsBoundedAndAPromiseIsNot(t *testing.T) {
 			t.Fatalf("raising the cap answered %d: %s", got.Code, got.Body.String())
 		}
 		if again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; still not reached."}`,
 		); again.Code != http.StatusCreated {
 			t.Fatalf("re-affirming inside the cap answered %d: %s",
@@ -183,7 +183,7 @@ func TestTwoLapsedRowsAtOnePlaceAreOneReAffirmation(t *testing.T) {
 		}
 
 		again := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/reaffirmation", claimed),
+			fmt.Sprintf("/v1/decisions/%d/reaffirmation", claimed),
 			`{"reasoning":"Checked again at 8.6.0; still not reached."}`)
 		if again.Code != http.StatusCreated {
 			t.Fatalf("re-affirming a claim with two rows at one place answered %d: %s",

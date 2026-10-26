@@ -143,7 +143,7 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 				Passed        bool   `json:"passed"`
 			} `json:"items"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/disclosing?within=365", &listed)
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosure-deadlines?within=365", &listed)
 		if len(listed.Items) != 1 {
 			t.Fatalf("%d findings are approaching disclosure for somebody who may see them",
 				len(listed.Items))
@@ -161,7 +161,7 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 					Vulnerability string `json:"vulnerability"`
 				} `json:"items"`
 			}
-			httpapitest.Read(t, r, who, "/v1/disclosing?within=365", &theirs)
+			httpapitest.Read(t, r, who, "/v1/disclosure-deadlines?within=365", &theirs)
 			if len(theirs.Items) != 0 {
 				t.Errorf("%s was shown %d undisclosed findings", who, len(theirs.Items))
 			}
@@ -199,7 +199,7 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 			} `json:"items"`
 		}
 		var whole listing
-		httpapitest.Read(t, r, "private-triage", "/v1/disclosing?within=365", &whole)
+		httpapitest.Read(t, r, "private-triage", "/v1/disclosure-deadlines?within=365", &whole)
 		if whole.Total != 1 || len(whole.Items) != 1 {
 			t.Fatalf("a flaw in two builds is %d rows of a total %d, want one of one",
 				len(whole.Items), whole.Total)
@@ -217,7 +217,7 @@ func TestOneEmbargoIsOneRowNamingEveryBuildInTheScopeAskedFor(t *testing.T) {
 
 		var narrowed listing
 		httpapitest.Read(t, r, "private-triage",
-			"/v1/disclosing?within=365&product=mine&stream=v1.0", &narrowed)
+			"/v1/disclosure-deadlines?within=365&product=mine&stream=v1.0", &narrowed)
 		if len(narrowed.Items) != 1 {
 			t.Fatalf("narrowed to a build carrying it, %d rows, want 1", len(narrowed.Items))
 		}
@@ -674,7 +674,7 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 			t.Fatalf("the drawn identifier collided with the one used as absent")
 		}
 
-		const build = "/v1/products/mine/streams/master/variants/broadcom"
+		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		routes := []struct {
 			what   string
 			method string

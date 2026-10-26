@@ -82,8 +82,8 @@ func onlyReason(listed []graph.Unmatched, reason string) []graph.Unmatched {
 func registerMatchCoverage(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-match-coverage", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage",
-		Summary: "List the components a scanner cannot match",
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components",
+		Summary: "List unmatched components",
 		Description: "Returns the components the build holds now that the vulnerability scanner " +
 			"has no way to match, with the reason for each and a count per reason. Such a " +
 			"component reports no findings whatever it contains.\n\n" +
@@ -131,9 +131,9 @@ func registerMatchCoverage(api huma.API, in core.Deps) {
 func registerMatchCoverageExport(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "export-match-coverage", Method: http.MethodGet,
-		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/match-coverage.{format}",
-		Summary: "Export the components a scanner cannot match",
-		Description: "Every component the match coverage list names, as a file, in the same order, " +
+		Path:    "/v1/products/{product}/branches-and-tags/{stream}/variants/{variant}/unmatched-components.{format}",
+		Summary: "Export unmatched components",
+		Description: "Every component the unmatched components list names, as a file, in the same order, " +
 			"with the reason for each.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {

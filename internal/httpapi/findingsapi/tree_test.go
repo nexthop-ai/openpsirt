@@ -23,7 +23,7 @@ func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
 	// expects two — and the list the number opens has to show the same.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedShared(t)
-		const build = "/v1/products/mine/streams/master/variants/broadcom"
+		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 
 		type node struct {
 			Component string `json:"component"`
@@ -147,7 +147,7 @@ func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const at = "/v1/products/mine/streams/master/variants/broadcom/components/stdlib/around"
+		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/components/stdlib/around"
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, "")
 		if got.Code != http.StatusConflict {
 			t.Errorf("a name the build holds at two versions answered %d, want 409: %s", got.Code, got.Body.String())

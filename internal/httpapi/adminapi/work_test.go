@@ -35,7 +35,7 @@ func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
 				Limit   int    `json:"limit"`
 			} `json:"waiting"`
 		}
-		httpapitest.Read(t, r, "admin", "/v1/work/set-aside", &listed)
+		httpapitest.Read(t, r, "admin", "/v1/failed-jobs", &listed)
 		if listed.Total != 1 || len(listed.Items) != 1 || listed.Items[0].ID != id ||
 			listed.Items[0].Kind != queue.Scan || listed.Items[0].Reference != "target:1" {
 			t.Errorf("the set-aside list reads as %+v", listed)
@@ -53,19 +53,19 @@ func TestSetAsideWorkIsListedAndPutBackOnce(t *testing.T) {
 			}
 		}
 
-		retry := fmt.Sprintf("/v1/work/set-aside/%d/retry", id)
+		retry := fmt.Sprintf("/v1/failed-jobs/%d/retry", id)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "triager", http.MethodPost, retry, ""), http.StatusForbidden)
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, retry, ""); got.Code != http.StatusNoContent {
 			t.Fatalf("putting the job back answered %d: %s", got.Code, got.Body.String())
 		}
-		httpapitest.Read(t, r, "admin", "/v1/work/set-aside", &listed)
+		httpapitest.Read(t, r, "admin", "/v1/failed-jobs", &listed)
 		if listed.Total != 0 {
 			t.Errorf("a job put back is still listed as set aside: %+v", listed.Items)
 		}
 		// Put back already, and never there: neither is set aside.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost, retry, ""), http.StatusNotFound)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "admin", http.MethodPost,
-			"/v1/work/set-aside/999999/retry", ""), http.StatusNotFound)
+			"/v1/failed-jobs/999999/retry", ""), http.StatusNotFound)
 	})
 }
 

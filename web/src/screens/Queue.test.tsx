@@ -14,7 +14,7 @@ afterEach(() => vi.restoreAllMocks());
 
 const exports = () =>
   Array.from(mount.host().querySelectorAll<HTMLAnchorElement>("a")).filter((each) =>
-    /^\/v1\/(review-queue|my-claims)\./.test(each.getAttribute("href") ?? ""),
+    /^\/v1\/(review-queue|my-decisions)\./.test(each.getAttribute("href") ?? ""),
   );
 
 describe("the review queue", () => {
@@ -44,8 +44,8 @@ describe("the review queue", () => {
     mount.render(screen(<Queue />, "/review-queue?mine=1&severity=high"));
     await settle();
     expect(exports().map((each) => each.getAttribute("href"))).toEqual([
-      "/v1/my-claims.csv",
-      "/v1/my-claims.json",
+      "/v1/my-decisions.csv",
+      "/v1/my-decisions.json",
     ]);
   });
 
@@ -122,8 +122,8 @@ describe("approving a selection", () => {
         (init as { body: unknown }).body,
       ]),
     ).toEqual([
-      ["/v1/claims/{id}/approval", 1, { batch: "tuesday" }],
-      ["/v1/claims/{id}/approval", 2, { batch: "tuesday" }],
+      ["/v1/decisions/{id}/approval", 1, { batch: "tuesday" }],
+      ["/v1/decisions/{id}/approval", 2, { batch: "tuesday" }],
     ]);
     expect(host.textContent).toContain("One claim could not be agreed to and is still selected.");
     expect(host.textContent).toContain("1 selected");

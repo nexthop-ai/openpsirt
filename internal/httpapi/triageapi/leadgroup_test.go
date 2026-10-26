@@ -71,7 +71,7 @@ func kinOf(t *testing.T, r *httpapitest.Reach, place string) []struct {
 			Same  bool   `json:"same"`
 		} `json:"kin"`
 	}
-	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &got)
+	httpapitest.Read(t, r, "internal-reader", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &got)
 	return got.Kin
 }
 
@@ -202,7 +202,7 @@ func TestOneDecisionAnswersEveryLeadThatIsTheSameFlaw(t *testing.T) {
 		decided := decideLead(t, r, place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"the length is checked by the caller"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		if got := leadState(t, r, place); got != "dismissed" {
 			t.Errorf("the lead decided is %q; want dismissed", got)
 		}
@@ -229,7 +229,7 @@ func TestALeadOfAGroupAlreadyAnsweredKeepsItsAnswer(t *testing.T) {
 		decided := decideLead(t, r, kin[0].Place,
 			`{"outcome":"dismissed","reason":"false_positive","reasoning":"never reached"}`)
 		httpapitest.AsPerson(t, r, "internal-reviewer", http.MethodPost,
-			fmt.Sprintf("/v1/claims/%d/approval", decided.ClaimID), `{}`)
+			fmt.Sprintf("/v1/decisions/%d/approval", decided.ClaimID), `{}`)
 		if got := leadState(t, r, place); got != "confirmed" {
 			t.Errorf("the leak confirmed first is %q; want it confirmed still", got)
 		}
@@ -323,7 +323,7 @@ func handedOffAs(t *testing.T, r *httpapitest.Reach, place string) (string, stri
 			Moved bool   `json:"moved"`
 		} `json:"handoff"`
 	}
-	httpapitest.Read(t, r, "lead-handler", "/v1/products/mine/streams/master/variants/broadcom/leads/"+place, &got)
+	httpapitest.Read(t, r, "lead-handler", "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"+place, &got)
 	if got.Handoff == nil {
 		return got.State, "", false
 	}
@@ -337,18 +337,18 @@ func TestAHandOffLinksEveryLeadItsConfirmationCovers(t *testing.T) {
 			t.Fatalf("the leak's kin are %v; want the overflow on line 4", kin)
 		}
 		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"p leaks and n overflows, one flaw"}`)
-		at := "/v1/products/mine/streams/master/variants/broadcom/leads/"
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"
 		var offer struct {
 			Together  int `json:"together"`
 			Discloses struct {
 				Paths []string `json:"paths"`
 			} `json:"discloses"`
 		}
-		httpapitest.Read(t, r, "lead-handler", at+place+"/hand-off", &offer)
+		httpapitest.Read(t, r, "lead-handler", at+place+"/flaw", &offer)
 		if offer.Together != 1 || len(offer.Discloses.Paths) != 2 {
 			t.Errorf("the hand-off offers %+v; want the overflow with it, and both files disclosed", offer)
 		}
-		got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off",
+		got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks","move":true}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
@@ -359,10 +359,10 @@ func TestAHandOffLinksEveryLeadItsConfirmationCovers(t *testing.T) {
 				state, as, moved, flaw)
 		}
 		// One flaw is recorded once.
-		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+kin[0]+"/hand-off",
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+kin[0]+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"n overflows"}`), http.StatusConflict)
 		// The leads of one flaw move together.
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, at+kin[0]+"/move", ""); got.Code != http.StatusNoContent {
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodDelete, at+kin[0]+"/flaw/disclosure", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("taking the overflow out of the case answered %d: %s", got.Code, got.Body)
 		}
 		if _, _, moved := handedOffAs(t, r, place); moved {
@@ -378,15 +378,15 @@ func TestAnUndoneHandOffIsTrailedUnderEachLeadsOwnName(t *testing.T) {
 			t.Fatalf("the leak's kin are %v; want the overflow on line 4", kin)
 		}
 		decideLead(t, r, place, `{"outcome":"confirmed","reasoning":"p leaks and n overflows, one flaw"}`)
-		at := "/v1/products/mine/streams/master/variants/broadcom/leads/"
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off",
+		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/"
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/flaw",
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"p leaks"}`); got.Code != http.StatusCreated {
 			t.Fatalf("the hand-off answered %d: %s", got.Code, got.Body)
 		}
 		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPut, at+kin[0]+"/collaborators/embargo-reader", ""); got.Code != http.StatusNoContent {
 			t.Fatalf("granting the overflow answered %d: %s", got.Code, got.Body)
 		}
-		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/hand-off/withdrawal",
+		if got := httpapitest.AsPerson(t, r, "lead-handler", http.MethodPost, at+place+"/flaw/withdrawal",
 			`{"because":"two flaws after all"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("undoing the hand-off answered %d: %s", got.Code, got.Body)
 		}
