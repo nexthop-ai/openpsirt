@@ -661,6 +661,7 @@ hand-off is offered, and `POST` on the same address records it.
 | A hand-off is made by somebody holding `internal-triage` and `private-triage` on the product | It reads the internal lead and writes the private flaw |
 | The flaw is undisclosed, found here, and recorded at no version | A flaw in our own code is the disclosure process's case. A lead is carried by its place rather than by versions |
 | The flaw and the link are written in one transaction, which reads again that the lead is confirmed and not handed off | A retry is asked the question again (REQ-71) |
+| A hand-off changes the stamp of the claim standing at the lead, matched on the stamp it read, as every write to a claim does (`DESIGN-database.md` § Reads a write depends on) | A withdrawal of the confirmation committing beside the hand-off would otherwise leave a flaw nobody confirmed. The one that matches nothing is taken again, and finds the other |
 | A handed-off lead takes no claim, and no claim about it is revised, withdrawn, split, approved or sent back; each is refused with 409. An undone batch of approvals leaves such a claim out | The flaw's decisions replace the lead's, and a confirmation withdrawn under a handed-off lead leaves a flaw nobody confirmed |
 | A hand-off, a move and an undo are refused to anybody without both triage roles before any build the request names is resolved | A refusal that differed for a build that exists and one that does not would list a product's builds (REQ-42) |
 

@@ -219,6 +219,31 @@ func confirmedAt(ctx context.Context, db bun.IDB, productID, findingID int64) (b
 	return outcome != nil && *outcome == string(Confirmed), nil
 }
 
+// stampedClaim is a claim and the stamp it was read with.
+type stampedClaim struct {
+	ID    int64 `bun:"id"`
+	Stamp int   `bun:"stamp"`
+}
+
+// claimsAt is every claim with a live row at the place of a lead finding, in
+// a product, with the stamp each holds: zero for a claim nobody has stamped.
+func claimsAt(ctx context.Context, db bun.IDB, productID, findingID int64) ([]stampedClaim, error) {
+	var out []stampedClaim
+	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "decision" AS "dc" ON `+finding.DecisionFiledAt("dc", "f")).
+		Join(`JOIN "claim" AS "sc" ON "sc"."id" = "dc"."claim_id"`).
+		Join(`LEFT JOIN "claim_stamp" AS "cst" ON "cst"."claim_id" = "sc"."id"`).
+		ColumnExpr(`DISTINCT "sc"."id", COALESCE("cst"."stamp", 0) AS "stamp"`).
+		Where(`"f"."id" = ?`, findingID).
+		Where(`"dc"."product_id" = ?`, productID).
+		Where(`"dc"."live_key" IS NOT NULL`).
+		OrderExpr(`"sc"."id" ASC`).
+		Scan(ctx, &out); err != nil {
+		return nil, fmt.Errorf("read the claims standing at the lead: %w", err)
+	}
+	return out, nil
+}
+
 // Propose is what handing off the lead at a place in a product is offered:
 // the components, ranked, the builds it was seen in, and what moving it into
 // its case would disclose.
@@ -659,6 +684,14 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 		if err != nil {
 			return err
 		}
+		// The claims standing at the lead, with the stamps they hold, read
+		// before whether one confirms it. Restamped once it does, so a
+		// revision or withdrawal of the confirmation committing beside this
+		// matches nothing, or makes this match nothing, and is asked again.
+		standing, err := claimsAt(ctx, tx, in.ProductID, l.ID)
+		if err != nil {
+			return err
+		}
 		if err := finding.LeadEnded(ctx, tx, in.ProductID, in.PlaceIdentity, now); err != nil {
 			return err
 		}
@@ -671,6 +704,11 @@ func HandOff(ctx context.Context, db bun.IDB, subject access.Subject, in Handing
 			return err
 		} else if !ok {
 			return ErrNotConfirmed
+		}
+		for _, c := range standing {
+			if err := triage.Restamp(ctx, tx, c.ID, c.Stamp); err != nil {
+				return err
+			}
 		}
 		// Every lead the confirming claim covers is the one flaw, and is
 		// linked to it: a lead of the group left behind holds a claim

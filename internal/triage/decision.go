@@ -185,6 +185,9 @@ var ErrNothingToApprove = refusal.New("that decision has no reasoning to approve
 type Store struct {
 	db  bun.IDB
 	now func() time.Time
+	// restamps is the stamp each claim written in this transaction was read
+	// at, restamped as the transaction ends. Nil outside one.
+	restamps map[int64]int
 }
 
 // NewStore returns a store over db.
@@ -226,7 +229,11 @@ func (s *Store) writing(ctx context.Context,
 		return err
 	}
 	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
-		return do(ctx, &Store{db: tx, now: s.now}, tx)
+		within := &Store{db: tx, now: s.now, restamps: map[int64]int{}}
+		if err := do(ctx, within, tx); err != nil {
+			return err
+		}
+		return within.restampAll(ctx)
 	})
 }
 

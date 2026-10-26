@@ -904,6 +904,8 @@ var tables = []string{
 	"claim_revision",
 	// Before claim and target, both of which it points at.
 	"claim_build",
+	// Before claim, which it points at.
+	"claim_stamp",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"claim",

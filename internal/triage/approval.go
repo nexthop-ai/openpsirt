@@ -342,12 +342,23 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		return Undone{}, err
 	}
 	// A confirmation a hand-off rests on stands: its flaw is judged
-	// instead, and nothing about the claim changes again.
+	// instead, and nothing about the claim changes again. The stamps are
+	// read before the hand-offs are asked about, and every claim undone is
+	// restamped from them, as every writer of a claim is (writableRows).
+	stamps, err := s.stampsOf(ctx, claims)
+	if err != nil {
+		return Undone{}, err
+	}
 	if claims, decisions, err = s.leavingHandedOff(ctx, claims, decisions); err != nil {
 		return Undone{}, err
 	}
 	if len(claims) == 0 {
 		return Undone{}, nil
+	}
+	for _, id := range claims {
+		if err := s.restamp(ctx, id, stamps[id]); err != nil {
+			return Undone{}, err
+		}
 	}
 
 	// The proposers, read inside the same transaction as the writes
