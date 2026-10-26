@@ -281,3 +281,57 @@ func TestADigestLeavesOutEverythingItsReaderWasToldAbout(t *testing.T) {
 		}
 	})
 }
+
+// Reports in the reader's teams' queues are counted in the digest and never
+// named, and a report in a team they are not on is not theirs to count.
+func TestADigestCountsTheReportsInTheReadersTeamsQueues(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		rights := access.NewStore(db.DB)
+		holder, err := rights.Ensure(ctx, "holder@example.com", "Hana Holder", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, holder.ID, w.Product.ID, access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := rights.DeclareTeam(ctx, "intake", "Intake")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := rights.AddToTeam(ctx, theirs.ID, holder.ID, holder.ID); err != nil {
+			t.Fatal(err)
+		}
+		other, err := rights.DeclareTeam(ctx, "kernel", "Kernel")
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		for reference, team := range map[string]*access.Team{
+			"SONIC-R-2026-777777": theirs, "SONIC-R-2026-888888": other,
+		} {
+			row := &finding.FlawReport{
+				Reference: reference, ProductID: w.Product.ID, Summary: "A claim.",
+				RecordedBy: holder.ID, RecordedAt: now, AssignedTo: &team.PartyID, AssignedAt: &now,
+			}
+			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		digest, err := notify.Assemble(ctx, db.DB, holder, 50)
+		if err != nil {
+			t.Fatalf("assemble: %v", err)
+		}
+		if digest.QueuedReports != 1 {
+			t.Errorf("the digest counts %d reports in their teams' queues, want 1", digest.QueuedReports)
+		}
+		text := digest.Message("https://psirt.example").Text
+		if !strings.Contains(text, "1 vulnerability report waits in your teams' queues") {
+			t.Errorf("the message does not count the queued report:\n%s", text)
+		}
+		if strings.Contains(text, "SONIC-R-2026-777777") {
+			t.Errorf("the message names a report:\n%s", text)
+		}
+	})
+}

@@ -416,3 +416,50 @@ func TestAnIssueAtPlacesOfBothVisibilitiesIsOnePieceOfQueuedWork(t *testing.T) {
 		}
 	})
 }
+
+// Reports a team's queue holds are a condition of their own, told to the
+// members who read the product's reports, and a judged report is not
+// waiting.
+func TestReportsSittingInATeamQueueAreToldToTheMembersWhoReadReports(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		s := aSplit(t, w)
+		privateReader := s.person(t, "private-reader", access.PrivateRead)
+		publicReader := s.person(t, "public-reader", access.PublicRead)
+		admin := s.person(t, "admin")
+		queue, err := s.rights.DeclareTeam(ctx, "Intake", "Intake")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, who := range []int64{privateReader, publicReader} {
+			if _, err := s.rights.AddToTeam(ctx, queue.ID, who, admin); err != nil {
+				t.Fatal(err)
+			}
+		}
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		routed := now.Add(-5 * 24 * time.Hour)
+		for i, judged := range []bool{false, false, true} {
+			row := &finding.FlawReport{
+				Reference: fmt.Sprintf("SONIC-R-2026-00000%d", i), ProductID: s.product,
+				Summary: "A claim.", RecordedBy: admin, RecordedAt: now,
+				AssignedTo: &queue.PartyID, AssignedAt: &routed,
+			}
+			if judged {
+				row.EvaluatedAt, row.EvaluatedBy = &now, &admin
+			}
+			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		sweep(t, db)
+
+		told := openFor(t, db, privateReader, notify.QueueUntaken)
+		if len(told) != 1 || len(saying(told, "Intake has 2 vulnerability reports waiting")) != 1 {
+			t.Errorf("a member who reads reports was told %q, want the two open reports", told)
+		}
+		if told := openFor(t, db, publicReader, notify.QueueUntaken); len(told) != 0 {
+			t.Errorf("a member who reads no reports was told of reports waiting: %q", told)
+		}
+	})
+}

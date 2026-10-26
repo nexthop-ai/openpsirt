@@ -467,7 +467,60 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// The open reports a team's queue holds, in a condition of their own. A
+	// report is undisclosed, so one folded into the findings' count would
+	// withhold the whole queue from a member who reads only disclosed work.
+	var reports []struct {
+		TeamID    int64  `bun:"team_id"`
+		Team      string `bun:"team"`
+		TeamName  string `bun:"team_name"`
+		ProductID int64  `bun:"product_id"`
+		Product   string `bun:"product"`
+		Waiting   int    `bun:"waiting"`
+	}
+	if err := w.db.NewSelect().
+		TableExpr(`"flaw_report" AS "fr"`).
+		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "fr"."assigned_to"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "fr"."product_id"`).
+		ColumnExpr(`"tm"."id" AS "team_id"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF("tm"."display_name", ''), "tm"."name")) AS "team"`).
+		ColumnExpr(`MIN("tm"."name") AS "team_name"`).
+		ColumnExpr(`"fr"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`COUNT(*) AS "waiting"`).
+		// Untouched only, as a finding is: one judged, or under a ruling,
+		// has been acted on.
+		Where(`"fr"."evaluated_at" IS NULL`).
+		Where(`"fr"."vulnerability_id" IS NULL`).
+		Where(`"fr"."ruling_id" IS NULL`).
+		Where(`"fr"."assigned_at" <= ?`, since).
+		Where(`"tm"."retired_at" IS NULL`).
+		GroupExpr(`"tm"."id", "fr"."product_id"`).
+		Scan(ctx, &reports); err != nil {
+		return nil, fmt.Errorf("read the reports sitting in a queue: %w", err)
+	}
 	rights := access.NewStore(w.db)
+	for _, row := range reports {
+		members, err := rights.MembersOf(ctx, row.TeamID)
+		if err != nil {
+			return nil, fmt.Errorf("read who is on that team: %w", err)
+		}
+		holds := Holds{
+			About: identify(fmt.Sprintf("queue-untaken-reports %d %d", row.TeamID, row.ProductID)),
+			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken.",
+				row.Team, count(row.Waiting, "vulnerability report", "vulnerability reports"), row.Product),
+			Link:      weblink.AssignmentsTeam(row.TeamName),
+			Private:   true,
+			ProductID: &row.ProductID,
+			TeamID:    &row.TeamID,
+		}
+		for _, personID := range members {
+			if reach[personID][row.ProductID].reads(true) {
+				out[personID] = append(out[personID], holds)
+			}
+		}
+	}
 	for _, row := range rows {
 		members, err := rights.MembersOf(ctx, row.TeamID)
 		if err != nil {

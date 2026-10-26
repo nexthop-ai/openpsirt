@@ -79,7 +79,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A claim waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
 | A claim sent back and not revised | condition | The event told them at the moment it was sent back; an event cannot report that it has since been ignored |
 | A deferral running out | condition | Before the date. What follows the date is the finding arriving back as late work |
-| Work sitting in a team queue | condition | Per team and product, with a count |
+| Work sitting in a team queue | condition | Per team and product, with a count. Open reports in the queue are a condition of their own, to the members who read the product's reports, because a report is undisclosed and folded into the findings' count it would withhold the whole queue from a member who reads only disclosed work |
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges. To the report's audience (§ Report audience). Clears when the first message sent to the reporter is recorded, which is the acknowledgement |
@@ -484,13 +484,13 @@ Everything else leaves immediately, so a daily message carrying what was left
 would carry nothing — and a channel that arrives empty is one people stop
 opening.
 
-The digest carries what nothing else told the reader, and there are exactly two
-of those:
+The digest carries what nothing else told the reader:
 
 | Content | Detail |
 |---|---|
 | Work that became yours without a message | The immediate one is not sent when somebody assigns something to themselves, when nothing could send at that moment, or when the person had no address yet |
 | Findings nobody owns | For whoever asks. Somebody triaging a product wants to know what arrived; somebody who only holds their own assigned work does not |
+| Vulnerability reports in your teams' queues | A count, never a name, because a report is undisclosed. A rule placing a report in a queue tells nobody |
 
 Both switches are off by default, and neither is derived from a role. A role says
 what somebody may do, not what they want to read.
